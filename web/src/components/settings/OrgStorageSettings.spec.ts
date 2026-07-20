@@ -21,20 +21,9 @@ import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
 
-const { mockGetStorage, mockNotify } = vi.hoisted(() => ({
+const { mockGetStorage } = vi.hoisted(() => ({
   mockGetStorage: vi.fn(),
-  mockNotify: vi.fn(() => vi.fn()),
 }));
-
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
 
 vi.mock("@/services/org_storage", () => ({
   default: {
@@ -120,7 +109,7 @@ describe("OrgStorageSettings", () => {
 
     expect(wrapper.text()).toContain("No bucket configured");
     expect(
-      wrapper.find('[data-test="storage-settings-configure-btn"]').exists()
+      wrapper.find('[data-test="org-storage-settings-empty-state"]').exists()
     ).toBe(true);
   });
 
@@ -130,7 +119,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
 
     await wrapper
-      .find('[data-test="storage-settings-configure-btn"]')
+      .find('[data-test="org-storage-settings-empty-state"] button')
       .trigger("click");
     await nextTick();
 

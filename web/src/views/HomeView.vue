@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:rounded-md tw:overflow-hidden tw:min-h-0 tw:h-full tw:flex tw:flex-col"
+    class="rounded-md overflow-hidden min-h-0 h-full flex flex-col"
     data-test="home-page"
   >
     <!-- No card-container here: the page already renders inside MainLayout's
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
     <div
-      class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
+      class="h-full overflow-hidden flex flex-col min-h-0"
     >
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
@@ -40,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="t('home.subtitle')"
         icon="home"
         :tabs-below="tabOrder.length > 1"
-        class="tw:shrink-0 tw:px-4"
+        class="shrink-0 px-4"
         :class="
-          tabOrder.length > 1 ? '' : 'tw:border-b tw:border-border-default'
+          tabOrder.length > 1 ? '' : 'border-b border-border-default'
         "
       >
         <template v-if="tabOrder.length > 1" #tabs>
@@ -57,18 +57,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="tab in tabOrder"
               :key="tab.id"
               :name="tab.id"
-              :label="tab.label"
               :data-test="`home-tab-${tab.id}`"
-            />
+            >
+              <span class="o-tab__label truncate">{{ tab.label }}</span>
+              <button
+                v-if="tab.id.startsWith('dash:')"
+                type="button"
+                class="home-tab-close q-ml-xs"
+                :data-test="`home-tab-close-${tab.id}`"
+                :aria-label="t('home.removeHomeDashboard')"
+                @mousedown.stop.prevent
+                @pointerdown.stop.prevent
+                @click.stop.prevent="onCloseTab(tab.id)"
+              >
+                &times;
+              </button>
+              <OTooltip
+                v-if="tab.id.startsWith('dash:')"
+                side="bottom"
+                :content="t('home.removeHomeDashboard')"
+              />
+            </OTab>
           </OTabs>
         </template>
       </AppPageHeader>
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
-           here (not on the root) so the header above stays full-bleed. -->
-      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:pt-px tw:px-2.5 tw:pb-2.5">
+           here (not on the root) so the header above stays full-bleed. The
+           pinned dashboard tab opts out: its actions row draws a full-bleed
+           divider (like the header's) and the dashboard grid pads itself. -->
+      <div
+        class="flex-1 min-h-0 flex flex-col"
+        :class="activeHomeTab.startsWith('dash:') ? '' : 'pt-px px-2.5 pb-2.5'"
+      >
         <!-- O2 AI Assistant tab -->
-        <div v-if="activeHomeTab === 'ai'" class="home-ai-panel tw:flex-1 tw:min-h-0 tw:flex tw:flex-row tw:overflow-hidden">
+        <div v-if="activeHomeTab === 'ai'" class="home-ai-panel flex-1 min-h-0 flex flex-row overflow-hidden">
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
           <O2AIChat
             ref="homeChat"
@@ -82,14 +105,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              already provides the border; avoids a double-bordered card). -->
         <div
           v-if="activeHomeTab === 'overview'"
-          class="tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+          class="flex-1 min-h-0 overflow-hidden"
         >
           <OverviewTab />
         </div>
 
         <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:-mr-2.5">
+        <div v-if="activeHomeTab === 'usage'" class="flex-1 min-h-0 overflow-hidden -mr-2.5">
           <UsageTab />
+        </div>
+
+        <!-- Pinned dashboard tab -->
+        <div
+          v-else-if="activeHomeTab.startsWith('dash:')"
+          class="flex-1 min-h-0 overflow-hidden"
+        >
+          <PinnedDashboardTab
+            :key="activeHomeTab"
+            :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
+            :folder-id="parsePinnedTabId(activeHomeTab).folderId"
+            @update-label="(l) => onPinnedLabel(parsePinnedTabId(activeHomeTab).dashboardId, l)"
+            @unavailable="onPinnedUnavailable"
+          />
         </div>
       </div>
     </div>
@@ -114,7 +151,11 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageHome",
@@ -128,8 +169,11 @@ export default defineComponent({
     const isEnterpriseOrCloud =
       config.isEnterprise === "true" || config.isCloud === "true";
 
+    const { homeDashboard, clearHomeDashboard, updateLabel } =
+      useHomeDashboard();
+
     const DEFAULT_TABS = computed(() => {
-      const tabs: { id: string; label: string }[] = [];
+      const tabs: { id: string; label: string; closable?: boolean }[] = [];
       if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
@@ -137,8 +181,58 @@ export default defineComponent({
         tabs.push({ id: "overview", label: t("home.tabOverview") });
       }
       tabs.push({ id: "usage", label: t("home.tabUsage") });
+      // Append the org home dashboard as a single tab (if set).
+      if (homeDashboard.value) {
+        tabs.push({
+          id: `dash:${homeDashboard.value.folderId}:${homeDashboard.value.dashboardId}`,
+          label: homeDashboard.value.label,
+          closable: true,
+        });
+      }
       return tabs;
     });
+
+    // "dash:default:abc" -> { folderId: "default", dashboardId: "abc" }
+    function parsePinnedTabId(id: string) {
+      const rest = id.slice("dash:".length);
+      const sep = rest.indexOf(":");
+      return { folderId: rest.slice(0, sep), dashboardId: rest.slice(sep + 1) };
+    }
+
+    function onPinnedLabel(dashboardId: string, label: string) {
+      updateLabel(
+        store.state.selectedOrganization?.identifier,
+        dashboardId,
+        label,
+      );
+    }
+
+    // Remove the pin and recover the active tab. Shared by the "dashboard is
+    // gone" path (onPinnedUnavailable) and the deliberate close (onCloseTab).
+    function removeHomePin() {
+      const org = store.state.selectedOrganization?.identifier;
+      clearHomeDashboard(org);
+      // Active tab no longer exists in the recomputed set → fall back to first.
+      if (!DEFAULT_TABS.value.find((tb) => tb.id === activeHomeTab.value)) {
+        activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+      }
+    }
+
+    // The pinned dashboard could not be loaded (deleted / inaccessible). Clear
+    // the pin and tell the user why — distinct from a deliberate close.
+    function onPinnedUnavailable(_dashboardId: string) {
+      removeHomePin();
+      toast({
+        variant: "error",
+        message: t("dashboard.homePinUnavailable"),
+      });
+    }
+
+    function onCloseTab(id: string) {
+      if (!id.startsWith("dash:")) return;
+      // Deliberate unpin — no error toast.
+      removeHomePin();
+    }
 
     function loadTabOrder() {
       try {
@@ -190,6 +284,17 @@ export default defineComponent({
     );
 
     watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
+
+    // When the user opens the pinned dashboard tab, re-read the authoritative
+    // home_dashboard org setting so a snapshot that went stale on another system
+    // (e.g. the dashboard was moved to a different folder elsewhere) self-corrects
+    // before we render / navigate with its folderId.
+    watch(activeHomeTab, (val) => {
+      if (val.startsWith("dash:")) {
+        const org = store.state.selectedOrganization?.identifier;
+        if (org) useHomeDashboard().load(org);
+      }
+    });
 
     // Drag-to-reorder — OTabs reports the move (dragged id → target id + which
     // side of the target) and we apply it to our own ordered list, then persist.
@@ -251,6 +356,10 @@ export default defineComponent({
       homeChat,
       onLoadChat,
       onNewChat,
+      parsePinnedTabId,
+      onPinnedLabel,
+      onPinnedUnavailable,
+      onCloseTab,
     };
   },
   components: {
@@ -260,7 +369,9 @@ export default defineComponent({
     HomeChatHistory,
     OTabs,
     OTab,
+    OTooltip,
     AppPageHeader,
+    PinnedDashboardTab,
   },
 });
 </script>
@@ -272,6 +383,29 @@ export default defineComponent({
  */
 
 /* Home tab bar now uses the shared OTabs component (see template). */
+
+.home-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  transition: all 0.2s ease;
+}
+
+.home-tab-close:hover {
+  opacity: 1;
+  background: var(--color-surface-subtle-hover);
+  color: var(--color-text-primary);
+}
 
 /* Chat fills remaining width and height */
 .home-ai-panel .chat-container {

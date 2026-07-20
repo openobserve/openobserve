@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
+import https from 'https';
 
 // Cache cloud config to avoid re-reading on every call
 let _cachedCloudConfig = null;
@@ -9,7 +10,12 @@ let _cachedCloudConfig = null;
 // "Premature close" / ECONNRESET flakiness in CI. A fresh connection per
 // request (keepAlive: false) + skipping the Gunzip stream (compress: false)
 // eliminates both failure modes.
-const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) URLs work — an http.Agent rejects https:// URLs.
+const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const selectAgent = (parsedURL) =>
+  parsedURL.protocol === 'https:' ? noKeepAliveHttpsAgent : noKeepAliveHttpAgent;
 
 export const getHeaders = () => {
   // On cloud, use email:passcode from cloud-config.json (written by global-setup-alpha1.js)
@@ -56,7 +62,7 @@ export const sendRequest = async (page, url, payload, headers) => {
     headers: headers,
     body: JSON.stringify(payload),
     compress: false,
-    agent: noKeepAliveAgent,
+    agent: selectAgent,
   });
 
   return await response.json();

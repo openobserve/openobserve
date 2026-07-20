@@ -11,6 +11,11 @@ import OTable from "@/lib/core/Table/OTable.vue";
 vi.mock("@/services/organizations", () => ({
   default: {
     list: vi.fn(),
+    // getOrganizations() sources the list from the _meta admin endpoint (so it can
+    // surface status / deleted_at); resurrect_org + delete_org are used by row actions.
+    get_admin_org: vi.fn(),
+    resurrect_org: vi.fn(),
+    delete_org: vi.fn(),
   },
 }));
 
@@ -28,7 +33,7 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-// Mock toast (component uses toast() from @/lib/feedback/Toast/useToast instead of $q.notify)
+// Mock toast (component uses toast() from @/lib/feedback/Toast/useToast)
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
@@ -63,6 +68,12 @@ describe("ListOrganizations", () => {
         selectedOrganization: {
           identifier: "test-org",
         },
+        // useIsMetaOrg compares selectedOrganization.identifier to zoConfig.meta_org.
+        // "test-org" !== "_meta" → isMetaOrg is false → getOrganizations() uses the
+        // regular list() endpoint (the non-admin path these tests exercise).
+        zoConfig: {
+          meta_org: "_meta",
+        },
         userInfo: {
           email: "test@example.com",
         },
@@ -93,6 +104,14 @@ describe("ListOrganizations", () => {
 
     // Mock the organizations service list method
     organizationsService.list.mockResolvedValue(mockOrganizations);
+    // getOrganizations() now reads from the _meta admin endpoint. Delegate it to
+    // whatever `list` is currently mocked to return (incl. per-test mockResolvedValueOnce),
+    // so existing test data setups keep driving the component unchanged.
+    organizationsService.get_admin_org.mockImplementation((...args) =>
+      organizationsService.list(...args),
+    );
+    organizationsService.resurrect_org.mockResolvedValue({});
+    organizationsService.delete_org.mockResolvedValue({});
 
     wrapper = mount(ListOrganizations, {
       global: {
@@ -157,10 +176,11 @@ describe("ListOrganizations", () => {
 
     it("should setup columns correctly for non-cloud mode", () => {
       const columns = wrapper.vm.columns;
-      // #, name, identifier, type, actions = 5 columns when isCloud is false
-      expect(columns).toHaveLength(5);
+      // #, name, identifier, type, status, actions = 6 columns when isCloud is false
+      expect(columns).toHaveLength(6);
       expect(columns.map(c => c.id)).toContain("name");
       expect(columns.map(c => c.id)).toContain("identifier");
+      expect(columns.map(c => c.id)).toContain("status");
     });
 
     it("should add plan column when isCloud is true", async () => {
@@ -187,8 +207,8 @@ describe("ListOrganizations", () => {
       });
 
       await flushPromises();
-      // #, name, identifier, type, plan, actions = 6 columns when isCloud is true
-      expect(wrapperWithCloud.vm.columns).toHaveLength(6);
+      // #, name, identifier, type, status, plan, actions = 7 columns when isCloud is true
+      expect(wrapperWithCloud.vm.columns).toHaveLength(7);
       wrapperWithCloud.unmount();
 
       config.isCloud = "false";
@@ -196,9 +216,66 @@ describe("ListOrganizations", () => {
   });
 
   describe("Data Loading", () => {
-    it("should load organizations on mount", async () => {
+    it("should load organizations on mount via the regular list endpoint (non-_meta context)", async () => {
+      await flushPromises();
+      // selectedOrganization is "test-org" (not _meta) → isMetaOrg is false →
+      // getOrganizations() uses the regular list() endpoint, not the admin one.
+      expect(organizationsService.list).toHaveBeenCalled();
+      expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
+    });
+
+    it("should use the _meta admin endpoint when the selected org is _meta on cloud", async () => {
+      config.isCloud = "true";
+      organizationsService.list.mockClear();
+      organizationsService.get_admin_org.mockClear();
+      organizationsService.get_admin_org.mockResolvedValue(mockOrganizations);
+      const metaWrapper = mount(ListOrganizations, {
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: {
+              ...mockStore,
+              state: {
+                ...mockStore.state,
+                // Selecting the _meta org flips isMetaOrg true → admin endpoint on cloud.
+                selectedOrganization: { identifier: "_meta" },
+              },
+            },
+          },
+          stubs: { OTable: true },
+        },
+      });
+      await flushPromises();
+      expect(organizationsService.get_admin_org).toHaveBeenCalledWith("_meta");
+      expect(organizationsService.list).not.toHaveBeenCalled();
+      metaWrapper.unmount();
+      config.isCloud = "false";
+    });
+
+    it("should fall back to the regular list for _meta off-cloud", async () => {
+      config.isCloud = "false";
+      organizationsService.list.mockClear();
+      organizationsService.get_admin_org.mockClear();
+      organizationsService.list.mockResolvedValue(mockOrganizations);
+      const metaWrapper = mount(ListOrganizations, {
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: {
+              ...mockStore,
+              state: {
+                ...mockStore.state,
+                selectedOrganization: { identifier: "_meta" },
+              },
+            },
+          },
+          stubs: { OTable: true },
+        },
+      });
       await flushPromises();
       expect(organizationsService.list).toHaveBeenCalled();
+      expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
+      metaWrapper.unmount();
     });
 
     it("should transform organization data correctly", async () => {
@@ -207,9 +284,15 @@ describe("ListOrganizations", () => {
       expect(wrapper.vm.organizations[1].type).toBe("Team");
     });
 
-    it("should update store with organizations", async () => {
+    it("should load organizations into the local list", async () => {
       await flushPromises();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizations", mockOrganizations.data.data);
+      // getOrganizations() populates the component's own list and deliberately does
+      // NOT dispatch setOrganizations (the navbar switcher keeps its own filtered
+      // list of non-deleting orgs).
+      expect(wrapper.vm.organizations).toHaveLength(mockOrganizations.data.data.length);
+      expect(wrapper.vm.organizations[0].identifier).toBe(
+        mockOrganizations.data.data[0].identifier,
+      );
     });
 
     it("should handle loading state correctly", async () => {

@@ -1,4 +1,4 @@
-@import "tailwindcss" prefix(tw);
+@import "tailwindcss";
 @import "tw-animate-css";
 /* Design tokens — all SCSS files removed; these 4 CSS files are the sole source. */
 @import "../lib/styles/tokens/base.css";
@@ -8,7 +8,49 @@
 
 @plugin "@tailwindcss/typography";
 
+/* Bind `dark:` to the app's `.dark` class (set by utils/theme.ts), not the OS
+   `prefers-color-scheme` — Tailwind v4's default — so it follows the app theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source "../**/*.{vue,js,ts}";
+
+/*
+ * Font-size parity with the pre-prefix-removal build.
+ *
+ * On main (`@import "tailwindcss" prefix(tw)`) Tailwind namespaced its theme
+ * variables, so the `tw:text-sm` / `tw:text-base` utilities read Tailwind's
+ * built-in scale (`--tw-text-sm` = 0.875rem/14px, `--tw-text-base` = 1rem/16px)
+ * — independent of the O2 design tokens `--text-sm` (0.8125rem/13px) and
+ * `--text-base` (0.875rem/14px), which drive element-level rules (body, p,
+ * headings, label).
+ *
+ * Dropping the prefix collapsed both into the single `--text-*` variable, so the
+ * ~780 `text-sm` / `text-base` utility usages inherited the smaller O2 tokens and
+ * every label/header/button shrank ~1px. Re-pin ONLY the two utilities to
+ * Tailwind's defaults so utility-driven text matches main pixel-for-pixel, while
+ * the semantic element rules keep the O2 token sizes (unchanged from main).
+ * `var(--tw-leading, …)` is preserved so `leading-*` overrides still win.
+ */
+@layer utilities {
+  .text-sm {
+    font-size: 0.875rem;
+    line-height: var(--tw-leading, calc(1.25 / 0.875));
+  }
+  .text-base {
+    font-size: 1rem;
+    line-height: var(--tw-leading, calc(1.5 / 1));
+  }
+  /* `!important` variants (`text-sm!` / `text-base!`) are separate classes and
+     must be re-pinned too, or they fall back to the smaller O2 token. */
+  .text-sm\! {
+    font-size: 0.875rem !important;
+    line-height: var(--tw-leading, calc(1.25 / 0.875)) !important;
+  }
+  .text-base\! {
+    font-size: 1rem !important;
+    line-height: var(--tw-leading, calc(1.5 / 1)) !important;
+  }
+}
 
 /*
  * When reka-ui opens a modal dialog it sets `body { pointer-events: none }`

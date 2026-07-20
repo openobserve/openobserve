@@ -11,52 +11,52 @@ describe("OCardSection", () => {
   it("applies no role classes when role is omitted", () => {
     const wrapper = mount(OCardSection);
     const classes = wrapper.classes().join(" ");
-    expect(classes).not.toContain("tw:flex-1");
-    expect(classes).not.toContain("tw:flex-none");
-    expect(classes).not.toContain("tw:p-4");
+    expect(classes).not.toContain("flex-1");
+    expect(classes).not.toContain("flex-none");
+    expect(classes).not.toContain("p-4");
   });
 
   it("applies header role classes", () => {
     const wrapper = mount(OCardSection, { props: { role: "header" } });
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:flex");
-    expect(classes).toContain("tw:items-center");
-    expect(classes).toContain("tw:flex-none");
-    expect(classes).toContain("tw:px-4");
+    expect(classes).toContain("flex");
+    expect(classes).toContain("items-center");
+    expect(classes).toContain("flex-none");
+    expect(classes).toContain("px-4");
   });
 
   it("applies body role classes", () => {
     const wrapper = mount(OCardSection, { props: { role: "body" } });
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:flex-1");
-    expect(classes).toContain("tw:p-4");
-    expect(classes).not.toContain("tw:overflow-y-auto");
+    expect(classes).toContain("flex-1");
+    expect(classes).toContain("p-4");
+    expect(classes).not.toContain("overflow-y-auto");
   });
 
   it("applies scrollable class when role=body and scrollable=true", () => {
     const wrapper = mount(OCardSection, {
       props: { role: "body", scrollable: true },
     });
-    expect(wrapper.classes().join(" ")).toContain("tw:overflow-y-auto");
+    expect(wrapper.classes().join(" ")).toContain("overflow-y-auto");
   });
 
   it("does not add overflow when scrollable without role", () => {
     const wrapper = mount(OCardSection, { props: { scrollable: true } });
-    expect(wrapper.classes().join(" ")).not.toContain("tw:overflow-y-auto");
+    expect(wrapper.classes().join(" ")).not.toContain("overflow-y-auto");
   });
 
   it("applies footer role classes", () => {
     const wrapper = mount(OCardSection, { props: { role: "footer" } });
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:flex-none");
-    expect(classes).toContain("tw:px-4");
+    expect(classes).toContain("flex-none");
+    expect(classes).toContain("px-4");
   });
 
   it("forwards extra class via attrs", () => {
     const wrapper = mount(OCardSection, {
       props: { role: "body" },
-      attrs: { class: "tw:p-0" },
+      attrs: { class: "p-0" },
     });
-    expect(wrapper.classes()).toContain("tw:p-0");
+    expect(wrapper.classes()).toContain("p-0");
   });
 });

@@ -32,13 +32,13 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
   <IngestionContent>
     <CopyContent :content="content" />
     <div>
-      <div class="tw:font-medium">Check further documentation at:</div>
-      <ol class="tw:list-decimal tw:pl-5 tw:mt-1">
-        <li class="tw:py-0.5">
-          <a :href="docURL" target="_blank" rel="noopener noreferrer" class="tw:text-text-link tw:hover:text-text-link-hover tw:underline">Python</a>
+      <div class="font-medium">Check further documentation at:</div>
+      <ol class="list-decimal pl-5 mt-1">
+        <li class="py-0.5">
+          <a :href="docURL" target="_blank" rel="noopener noreferrer" class="text-text-link hover:text-text-link-hover underline">Python</a>
         </li>
-        <li class="tw:py-0.5">
-          <a :href="docURLFastAPI" target="_blank" rel="noopener noreferrer" class="tw:text-text-link tw:hover:text-text-link-hover tw:underline">FastAPI</a>
+        <li class="py-0.5">
+          <a :href="docURLFastAPI" target="_blank" rel="noopener noreferrer" class="text-text-link hover:text-text-link-hover underline">FastAPI</a>
         </li>
       </ol>
     </div>

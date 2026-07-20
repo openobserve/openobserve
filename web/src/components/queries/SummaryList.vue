@@ -30,7 +30,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="width: 100%"
     :show-global-filter="false"
     :default-columns="false"
+    :enable-column-resize="true"
+    :persist-columns="true"
+    table-id="settings-query-management-summary"
   >
+    <template #toolbar>
+      <div
+        class="flex-1 text-xs font-bold"
+        data-test="summary-list-last-refresh"
+      >
+        Last Data Refresh Time: {{ lastRefreshed }}
+      </div>
+    </template>
+    <template #toolbar-trailing>
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        class="shrink-0"
+        icon-left="refresh"
+        data-test="summary-list-refresh-btn"
+        @click="$emit('refresh')"
+      >
+        <OTooltip side="bottom" :content="t('common.refresh')" />
+      </OButton>
+    </template>
     <template #empty>
       <OEmptyState
         size="hero"
@@ -84,6 +107,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from '@/lib/core/Button/OButton.vue';
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -91,7 +115,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { OEmptyState, OTable, OUserCell, OButton, OSpinner, OCheckbox },
+  components: { OEmptyState, OTable, OUserCell, OButton, OTooltip, OSpinner, OCheckbox },
   props: {
     rows: {
       type: Array,
@@ -105,6 +129,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    lastRefreshed: {
+      type: String,
+      default: "",
+    },
   },
   emits: [
     "cancel:hideform",
@@ -112,6 +140,7 @@ export default defineComponent({
     "update:selectedRows",
     "delete:queries",
     "clear:filters",
+    "refresh",
   ],
   setup(props, { emit }) {
     const { isMetaOrg } = useIsMetaOrg();
@@ -134,11 +163,11 @@ export default defineComponent({
 
     const columns = ref<OTableColumnDef[]>([
       { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
-      { id: "user_id", header: t("user.email"), accessorKey: "user_id", size: COL.email, sortable: true, meta: { align: "left" , autoWidth: true } },
-      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: 130, sortable: true, meta: { align: "left"  } },
-      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: 170, sortable: true, meta: { align: "right" } },
-      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: 190, cell: " ", sortable: true, meta: { align: "left" } },
-      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", size: 170, cell: " ", sortable: true, meta: { align: "left" } },
+      { id: "user_id", header: t("user.email"), accessorKey: "user_id", size: COL.email, sortable: true, hideable: true, meta: { align: "left" , autoWidth: true } },
+      { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: 130, sortable: true, hideable: true, meta: { align: "left"  } },
+      { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: 170, sortable: true, hideable: true, meta: { align: "right" } },
+      { id: "duration", header: t("queries.totalDuration"), accessorKey: "duration", size: 190, cell: " ", sortable: true, hideable: true, meta: { align: "left" } },
+      { id: "queryRange", header: t("queries.totalTimeRange"), accessorKey: "queryRange", size: 170, cell: " ", sortable: true, hideable: true, meta: { align: "left" } },
       { id: "actions", header: t("common.actions"), isAction: true, size: 100, meta: { align: "center", actionCount: 1 } },
     ]);
 

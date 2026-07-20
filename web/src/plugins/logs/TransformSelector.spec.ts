@@ -18,11 +18,32 @@ import { ref, computed } from "vue";
 import TransformSelector from "./TransformSelector.vue";
 
 // ── Mock vue-i18n ──────────────────────────────────────────────────────────────
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: (key: string) => key,
-  }),
-}));
+// Existing tests assert on translation KEY paths (the mock echoes keys). The i18n
+// migration moved two previously-hardcoded literals into the `logs.transformSelector.*`
+// namespace, and those tests assert on the real rendered copy (incl. `{name}`
+// interpolation). Resolve that migrated namespace from the real en.json messages so
+// those assertions pass, while continuing to echo keys everywhere else.
+vi.mock("vue-i18n", async () => {
+  const enLocale = (await import("@/locales/languages/en-US.json")).default as Record<
+    string,
+    any
+  >;
+  const resolve = (key: string, params?: Record<string, unknown>): string => {
+    const msg = key
+      .split(".")
+      .reduce<any>((o, k) => (o == null ? o : o[k]), enLocale);
+    if (typeof msg !== "string") return key;
+    return msg.replace(/\{(\w+)\}/g, (_m: string, name: string) =>
+      params && name in params ? String(params[name]) : `{${name}}`,
+    );
+  };
+  return {
+    useI18n: () => ({
+      t: (key: string, params?: Record<string, unknown>) =>
+        key.startsWith("logs.transformSelector.") ? resolve(key, params) : key,
+    }),
+  };
+});
 
 // ── Shared searchObj state ─────────────────────────────────────────────────────
 const mockSearchObj = {

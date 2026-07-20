@@ -27,18 +27,6 @@ vi.mock('@/lib/feedback/Toast/useToast', () => ({
   toast: (...args: any[]) => mockToastFn(...args),
 }));
 
-// Mock useQuasar
-const mockNotify = vi.fn(() => vi.fn()); // notify returns dismiss function
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
-
 // Mock external services and components
 vi.mock("@/services/cipher_keys", () => ({
   default: {
@@ -133,8 +121,6 @@ beforeEach(async () => {
   vi.spyOn(router, 'push');
 });
 
-// Mock Quasar notify is defined above
-
 const createWrapper = (props = {}, options = {}) => {
   return mount(CipherKeys, {
     props: {
@@ -145,9 +131,6 @@ const createWrapper = (props = {}, options = {}) => {
       mocks: {
         $store: mockStore,
         $router: router,
-        $q: {
-          notify: mockNotify,
-        },
       },
       provide: {
         store: mockStore,

@@ -17,36 +17,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="error-viewer-container"
-    class="card-container tw:h-full tw:overflow-y-auto"
+    class="card-container h-full overflow-y-auto"
   >
     <template v-if="isLoading.length">
       <div
-        class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:h-[calc(100vh-12.5rem)]"
+        class="pb-4 flex items-center justify-center text-center h-[calc(100vh-12.5rem)]"
       >
         <div>
           <OSpinner
             size="md"
-            class="tw:mx-auto tw:block"
+            class="mx-auto block"
             data-test="error-viewer-loading-indicator"
           />
-          <div class="tw:text-center tw:w-full">
+          <div class="text-center w-full">
             {{ t("rum.loadingErrorDetails") }}
           </div>
         </div>
       </div>
     </template>
     <div v-else>
-      <div class="tw:p-[0.625rem]">
+      <div class="p-[0.625rem]">
         <ErrorHeader :error="errorDetails" />
       </div>
-      <OSeparator class="tw:w-full" />
-      <div class="tw:p-[0.625rem]">
+      <OSeparator class="w-full" />
+      <div class="p-[0.625rem]">
         <ErrorTags :error="errorDetails" />
         <ErrorStackTrace
           :error_stack="errorDetails.error_stack || []"
           :error="errorDetails"
         />
         <ErrorSessionReplay :error="errorDetails" />
+        <TraceCorrelationCard
+          v-if="errorTraceId"
+          :trace-id="errorTraceId"
+          :session-id="errorDetails.session_id || ''"
+          :timestamp="errorDetails._timestamp || 0"
+          data-test="error-viewer-trace-correlation"
+        />
         <ErrorEvents :error="errorDetails" />
       </div>
     </div>
@@ -65,6 +72,7 @@ import { useStore } from "vuex";
 import useErrorTracking from "@/composables/useErrorTracking";
 import searchService from "@/services/search";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
+import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -85,6 +93,18 @@ onActivated(async () => {
 
 const getTimestamp = computed(() => {
   return Number(router.currentRoute.value.query.timestamp) || 30000;
+});
+
+// Trace id linking this error to a backend trace: on the error itself, or
+// on the nearest xhr/fetch event captured around the failure.
+const errorTraceId = computed(() => {
+  if (errorDetails.value?._oo_trace_id) {
+    return errorDetails.value._oo_trace_id as string;
+  }
+  const xhrWithTrace = (errorDetails.value?.events || []).find(
+    (event: any) => event.type === "resource" && event._oo_trace_id,
+  );
+  return (xhrWithTrace?._oo_trace_id as string) || "";
 });
 
 const getErrorLogs = () => {

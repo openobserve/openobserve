@@ -1,0 +1,269 @@
+{
+  "description": "Error path validation — verifies the server returns proper 4xx client-error codes (not 5xx) for invalid inputs. Each case sends an intentionally bad query or payload and asserts the response stays in the 400-499 range.",
+  "cases": [
+    {
+      "id": "ERR_SYNTAX_01",
+      "category": "malformed_sql",
+      "description": "Typo in SELECT keyword",
+      "sql": "SELEC * FROM \"{stream}\"",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_SYNTAX_02",
+      "category": "malformed_sql",
+      "description": "Incomplete WHERE clause (no condition)",
+      "sql": "SELECT * FROM \"{stream}\" WHERE",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_SYNTAX_03",
+      "category": "malformed_sql",
+      "description": "Garbage / non-SQL input",
+      "sql": "FOOBAR BAZ QUX 12345 !@#$%",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_SYNTAX_04",
+      "category": "malformed_sql",
+      "description": "Unclosed single-quoted string literal",
+      "sql": "SELECT * FROM \"{stream}\" WHERE facility_zone = 'unclosed",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_SYNTAX_05",
+      "category": "malformed_sql",
+      "description": "Call to non-existent function",
+      "sql": "SELECT NONEXISTENT_FUNC_XYZ999(*) FROM \"{stream}\"",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_SYNTAX_06",
+      "category": "malformed_sql",
+      "description": "Unterminated GROUP BY clause",
+      "sql": "SELECT facility_zone, COUNT(*) FROM \"{stream}\" GROUP BY",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_TYPE_01",
+      "category": "type_mismatch",
+      "description": "Arithmetic on string literal",
+      "sql": "SELECT 'hello' + 5 FROM \"{stream}\"",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_TYPE_02",
+      "category": "type_mismatch",
+      "description": "Comparing numeric column to non-numeric string literal",
+      "sql": "SELECT * FROM \"{stream}\" WHERE throughput_rate > 'not_a_number'",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_TYPE_03",
+      "category": "type_mismatch",
+      "description": "String argument to numeric ROUND function",
+      "sql": "SELECT ROUND(facility_zone) FROM \"{stream}\"",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_STREAM_01",
+      "category": "missing_stream",
+      "description": "Query references a stream that does not exist",
+      "sql": "SELECT * FROM \"nonexistent_stream_zyxwv_99999\"",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_STREAM_02",
+      "category": "missing_stream",
+      "description": "Empty stream name (zero-length identifier)",
+      "sql": "SELECT * FROM \"\"",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_STREAM_03",
+      "category": "missing_stream",
+      "description": "Cross-stream JOIN where one side does not exist",
+      "sql": "SELECT * FROM \"{stream}\" JOIN \"nonexistent_stream_zyxwv_99999\" ON true",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_STREAM_04",
+      "category": "missing_stream",
+      "description": "Unclosed double-quoted stream identifier",
+      "sql": "SELECT * FROM \"unclosed_identifier",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_TIME_01",
+      "category": "invalid_time_range",
+      "description": "start_time > end_time (reversed time window)",
+      "sql": "SELECT COUNT(*) FROM \"{stream}\"",
+      "payload_overrides": {
+        "start_time": 2000000000,
+        "end_time": 1000000000
+      },
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_TIME_02",
+      "category": "invalid_time_range",
+      "description": "Missing start_time in query payload",
+      "sql": "SELECT COUNT(*) FROM \"{stream}\"",
+      "payload_overrides": {},
+      "payload_remove": [
+        "start_time"
+      ],
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_TIME_03",
+      "category": "invalid_time_range",
+      "description": "Missing end_time in query payload",
+      "sql": "SELECT COUNT(*) FROM \"{stream}\"",
+      "payload_overrides": {},
+      "payload_remove": [
+        "end_time"
+      ],
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_BODY_01",
+      "category": "invalid_request_body",
+      "description": "SQL field set to empty string",
+      "sql": "",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_BODY_02",
+      "category": "invalid_request_body",
+      "description": "Missing 'sql' key in query payload",
+      "sql": "SELECT COUNT(*) FROM \"{stream}\"",
+      "payload_overrides": {},
+      "payload_remove": [
+        "sql"
+      ],
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_DDL_01",
+      "category": "disallowed_sql",
+      "description": "DROP TABLE in search SQL",
+      "sql": "DROP TABLE \"{stream}\"",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_DDL_02",
+      "category": "disallowed_sql",
+      "description": "INSERT INTO in search SQL",
+      "sql": "INSERT INTO \"{stream}\" (facility_zone) VALUES ('test')",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_DDL_03",
+      "category": "disallowed_sql",
+      "description": "ALTER TABLE in search SQL",
+      "sql": "ALTER TABLE \"{stream}\" ADD COLUMN foo STRING",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_NESTING_01",
+      "category": "edge_case",
+      "description": "SELECT * without FROM clause",
+      "sql": "SELECT *",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_NESTING_02",
+      "category": "edge_case",
+      "description": "Reference to non-existent column on an existing stream",
+      "sql": "SELECT nonexistent_column_xyz999 FROM \"{stream}\"",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_EDGE_01",
+      "category": "edge_case",
+      "description": "Excessively large LIMIT value",
+      "sql": "SELECT * FROM \"{stream}\" LIMIT 99999999999",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_EDGE_03",
+      "category": "edge_case",
+      "description": "Invalid histogram interval (negative value)",
+      "sql": "SELECT histogram(_timestamp, -60) FROM \"{stream}\"",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_EDGE_04",
+      "category": "edge_case",
+      "description": "Deeply nested SELECT (30 levels)",
+      "sql": "SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM (SELECT * FROM \"{stream}\"))))))))))))))))))))))))))))))",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_SCHEMA_01",
+      "category": "cross_schema",
+      "description": "Cross-schema JOIN with dot-notation table references",
+      "sql": "SELECT b.id, b.name FROM default AS a INNER JOIN enrich.rich AS b ON a.id = b.id LIMIT 1",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    },
+    {
+      "id": "ERR_SCHEMA_02",
+      "category": "cross_schema",
+      "description": "Fully-qualified dot-notation reference on an existing stream",
+      "sql": "SELECT * FROM default.\"{stream}\" LIMIT 1",
+      "payload_overrides": {},
+      "expect_status_min": 400,
+      "expect_status_max": 499
+    }
+  ]
+}

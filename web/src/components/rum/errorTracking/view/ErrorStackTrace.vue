@@ -15,23 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:mt-4 tw:ml-1">
-    <div class="tw:w-full">
-      <div class="tw:text-base tw:font-bold tw:mb-1">{{ t("rum.errorStack") }}</div>
-      <div class="tw:mb-2">{{ error_stack[0] }}</div>
+  <div class="flex mt-4 ml-1">
+    <div class="w-full">
+      <div class="text-base font-bold mb-1">{{ t("rum.errorStack") }}</div>
+      <div class="mb-2">{{ error_stack[0] }}</div>
 
       <!-- Tabs for Pretty and Raw views -->
       <OTabs
         v-model="activeTab"
         dense
-        class="tw:text-gray-500 tw:mb-1"
+        class="text-gray-500 mb-1"
         align="left"
       >
-        <OTab name="raw" label="Raw" />
-        <OTab name="pretty" label="Pretty" />
+        <OTab name="raw" :label="t('rum.stackTraceRaw')" data-test="rum-error-stack-trace-raw-tab" />
+        <OTab name="pretty" :label="t('rum.stackTracePretty')" data-test="rum-error-stack-trace-pretty-tab" />
       </OTabs>
 
-      <OSeparator class="tw:mb-2" />
+      <OSeparator class="mb-2" />
 
       <!-- Tab panels -->
       <OTabPanels v-model="activeTab" animated>
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="index"
                 data-test="error-stack-trace-line"
-                class="tw:border-b tw:border-l tw:border-r tw:border-solid tw:border-(--o2-border) tw:text-[13px] tw:py-1.5 tw:px-2"
+                class="border-b border-l border-r border-solid border-(--o2-border) text-[13px] py-1.5 px-2"
                 :style="{
                   'border-top': Number(index) === 1 ? '1px solid #e0e0e0' : '',
                   'border-radius':

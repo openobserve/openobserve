@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-2" data-test="dashboard-promql-chart-config">
+  <div class="flex flex-col gap-2" data-test="dashboard-promql-chart-config">
     <!-- Aggregation Function Selector -->
     <OSelect
       v-if="showAggregationConfig"
@@ -27,42 +27,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #tooltip>
         <OTooltip max-width="300px">
           <template #content>
-            <b>Aggregation Function - </b>
-            Determines how time-series data is converted to a single value.
+            <b>{{ t('dashboard.promQLChartConfig.aggTooltipTitle') }}</b>
+            {{ t('dashboard.promQLChartConfig.aggTooltipDesc') }}
             <br /><br />
-            <b>Last:</b> Most recent value (default)
+            <b>{{ t('dashboard.promQLChartConfig.aggLastLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggLastDesc') }}
             <br />
-            <b>First:</b> Oldest value
+            <b>{{ t('dashboard.promQLChartConfig.aggFirstLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggFirstDesc') }}
             <br />
-            <b>Min/Max:</b> Minimum/Maximum value
+            <b>{{ t('dashboard.promQLChartConfig.aggMinMaxLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggMinMaxDesc') }}
             <br />
-            <b>Avg:</b> Average of all values
+            <b>{{ t('dashboard.promQLChartConfig.aggAvgLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggAvgDesc') }}
             <br />
-            <b>Sum:</b> Total of all values
+            <b>{{ t('dashboard.promQLChartConfig.aggSumLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggSumDesc') }}
             <br />
-            <b>Count:</b> Number of data points
+            <b>{{ t('dashboard.promQLChartConfig.aggCountLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggCountDesc') }}
             <br />
-            <b>Range:</b> Difference between max and min
+            <b>{{ t('dashboard.promQLChartConfig.aggRangeLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggRangeDesc') }}
             <br />
-            <b>Diff:</b> Difference between last and first
+            <b>{{ t('dashboard.promQLChartConfig.aggDiffLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggDiffDesc') }}
           </template>
         </OTooltip>
       </template>
     </OSelect>
 
     <!-- GeoMap Label Configuration -->
-    <div v-if="chartType === 'geomap'" class="tw:flex tw:flex-col tw:gap-2">
+    <div v-if="chartType === 'geomap'" class="flex flex-col gap-2">
       <OInput
         v-model="geoLatLabel"
         :label="t('dashboard.geoLatLabel')"
-        placeholder="latitude or lat"
+        :placeholder="t('dashboard.promQLChartConfig.geoLatPlaceholder')"
         data-test="dashboard-config-geo-lat-label"
       >
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              Name of the metric label containing latitude values. Default:
-              "latitude" or "lat"
+              {{ t('dashboard.promQLChartConfig.geoLatTooltip') }}
             </template>
           </OTooltip>
         </template>
@@ -71,14 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="geoLonLabel"
         :label="t('dashboard.geoLonLabel')"
-        placeholder="longitude or lon"
+        :placeholder="t('dashboard.promQLChartConfig.geoLonPlaceholder')"
         data-test="dashboard-config-geo-lon-label"
       >
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              Name of the metric label containing longitude values. Default:
-              "longitude" or "lon"
+              {{ t('dashboard.promQLChartConfig.geoLonTooltip') }}
             </template>
           </OTooltip>
         </template>
@@ -87,14 +85,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OInput
         v-model="geoWeightLabel"
         :label="t('dashboard.geoWeightLabel')"
-        placeholder="weight"
+        :placeholder="t('dashboard.promQLChartConfig.geoWeightPlaceholder')"
         data-test="dashboard-config-geo-weight-label"
       >
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              Name of the metric label containing weight values. Default:
-              "weight"
+              {{ t('dashboard.promQLChartConfig.geoWeightTooltip') }}
             </template>
           </OTooltip>
         </template>
@@ -102,18 +99,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Maps Label Configuration -->
-    <div v-if="chartType === 'maps'" class="tw:flex tw:flex-col tw:gap-2">
+    <div v-if="chartType === 'maps'" class="flex flex-col gap-2">
       <OInput
         v-model="mapsNameLabel"
         :label="t('dashboard.mapsNameLabel')"
-        placeholder="country or location"
+        :placeholder="t('dashboard.promQLChartConfig.mapsNamePlaceholder')"
         data-test="dashboard-config-maps-name-label"
       >
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              Name of the metric label containing location names (e.g., country,
-              region). Default: "name"
+              {{ t('dashboard.promQLChartConfig.mapsNameTooltip') }}
             </template>
           </OTooltip>
         </template>
@@ -121,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Table Configuration -->
-    <div v-if="chartType === 'table'" class="tw:flex tw:flex-col tw:gap-2">
+    <div v-if="chartType === 'table'" class="flex flex-col gap-2">
       <!-- PromQL Table Mode -->
       <OSelect
         v-show="isConfigOptionVisible('promqlTable', 'promql-table-mode')"
@@ -133,18 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              <b>PromQL Table Mode - </b>
-              Controls how time-series data is displayed in the table.
+              <b>{{ t('dashboard.promQLChartConfig.promqlTableModeTooltipTitle') }}</b>
+              {{ t('dashboard.promQLChartConfig.promqlTableModeTooltipDesc') }}
               <br /><br />
-              <b>Time Series:</b> Shows timestamp and value columns for selected
-              series with legend dropdown. <br /><br />
-              <b>Time Series with Metadata:</b> Shows timestamp, value, and all
-              metric labels (job, instance, etc.) for selected series with
-              legend dropdown. <br /><br />
-              <b>Aggregate:</b> Shows aggregated values across all series
-              without timestamps (no legend dropdown). <br /><br />
-              <b>Note:</b> The legend dropdown only appears in time series modes
-              when multiple series are present.
+              <b>{{ t('dashboard.promQLChartConfig.tableModeTimeSeriesLabel') }}</b> {{ t('dashboard.promQLChartConfig.tableModeTimeSeriesDesc') }} <br /><br />
+              <b>{{ t('dashboard.promQLChartConfig.tableModeTimeSeriesMetaLabel') }}</b> {{ t('dashboard.promQLChartConfig.tableModeTimeSeriesMetaDesc') }} <br /><br />
+              <b>{{ t('dashboard.promQLChartConfig.tableModeAggregateLabel') }}</b> {{ t('dashboard.promQLChartConfig.tableModeAggregateDesc') }} <br /><br />
+              <b>{{ t('dashboard.promQLChartConfig.noteLabel') }}</b> {{ t('dashboard.promQLChartConfig.promqlTableModeNoteDesc') }}
             </template>
           </OTooltip>
         </template>
@@ -162,15 +153,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="350px">
               <template #content>
-                <b>Table Aggregations - </b>
-                Select multiple aggregation functions to display as columns.
+                <b>{{ t('dashboard.promQLChartConfig.tableAggTooltipTitle') }}</b>
+                {{ t('dashboard.promQLChartConfig.tableAggTooltipDesc') }}
                 <br /><br />
-                Single aggregation: creates a "value" column
+                {{ t('dashboard.promQLChartConfig.tableAggSingle') }}
                 <br />
-                Multiple aggregations: creates "value_last", "value_sum", etc.
+                {{ t('dashboard.promQLChartConfig.tableAggMultiple') }}
                 <br /><br />
-                Example: Selecting "last", "sum", "avg" will create three value
-                columns.
+                {{ t('dashboard.promQLChartConfig.tableAggExample') }}
               </template>
             </OTooltip>
           </template>
@@ -188,9 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('promqlTable', 'visible-columns') ||
             isConfigOptionVisible('promqlTable', 'hidden-columns')
           "
-          class="tw:mb-2 tw:text-sm tw:font-medium tw:mt-3"
+          class="mb-2 text-sm font-medium mt-3"
         >
-          Column Filters
+          {{ t('dashboard.promQLChartConfig.columnFilters') }}
         </div>
 
         <OSelect
@@ -207,17 +197,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="400px">
               <template #content>
-                <b>Visible Columns</b>
+                <b>{{ t('dashboard.promQLChartConfig.visibleColumnsTitle') }}</b>
                 <br /><br />
-                Specify which metric label columns to show in the table.
+                {{ t('dashboard.promQLChartConfig.visibleColumnsDesc') }}
                 <br /><br />
-                <b>How to use:</b><br />
-                • Select from dropdown (loaded from stream fields)<br />
-                • Type custom column names and press Enter<br />
-                • Leave empty to show all columns
+                <b>{{ t('dashboard.promQLChartConfig.howToUse') }}</b><br />
+                {{ t('dashboard.promQLChartConfig.bulletSelectFromDropdown') }}<br />
+                {{ t('dashboard.promQLChartConfig.bulletTypeCustom') }}<br />
+                {{ t('dashboard.promQLChartConfig.bulletLeaveEmpty') }}
                 <br /><br />
-                <b>Note:</b> This takes precedence over "Hidden Columns" if
-                both are set.
+                <b>{{ t('dashboard.promQLChartConfig.noteLabel') }}</b> {{ t('dashboard.promQLChartConfig.visibleColumnsNote') }}
               </template>
             </OTooltip>
           </template>
@@ -237,17 +226,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="400px">
               <template #content>
-                <b>Hidden Columns</b>
+                <b>{{ t('dashboard.promQLChartConfig.hiddenColumnsTitle') }}</b>
                 <br /><br />
-                Specify which metric label columns to hide from the table.
+                {{ t('dashboard.promQLChartConfig.hiddenColumnsDesc') }}
                 <br /><br />
-                <b>How to use:</b><br />
-                • Select from dropdown (loaded from stream fields)<br />
-                • Type custom column names and press Enter<br />
-                • All other columns will be shown
+                <b>{{ t('dashboard.promQLChartConfig.howToUse') }}</b><br />
+                {{ t('dashboard.promQLChartConfig.bulletSelectFromDropdown') }}<br />
+                {{ t('dashboard.promQLChartConfig.bulletTypeCustom') }}<br />
+                {{ t('dashboard.promQLChartConfig.bulletAllOtherShown') }}
                 <br /><br />
-                <b>Tip:</b> Useful for hiding internal labels like __name__,
-                le (histogram buckets), quantile, etc.
+                <b>{{ t('dashboard.promQLChartConfig.tipLabel') }}</b> {{ t('dashboard.promQLChartConfig.hiddenColumnsTip') }}
               </template>
             </OTooltip>
           </template>
@@ -265,26 +253,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('promqlTable', 'sticky-first-column') ||
             isConfigOptionVisible('promqlTable', 'sticky-columns')
           "
-          class="tw:mb-2 tw:text-sm tw:font-medium tw:mt-3"
+          class="mb-2 text-sm font-medium mt-3"
         >
-          Sticky Columns
+          {{ t('dashboard.promQLChartConfig.stickyColumns') }}
         </div>
 
         <OSwitch
           v-show="isConfigOptionVisible('promqlTable', 'sticky-first-column')"
           v-model="stickyFirstColumn"
-          label="Sticky First Column"
+          :label="t('dashboard.promQLChartConfig.stickyFirstColumnLabel')"
           data-test="dashboard-config-sticky-first-column"
           size="lg"
         >
           <template #tooltip>
             <OTooltip max-width="300px">
               <template #content>
-                <b>Sticky First Column - </b>
-                Makes the first column stay fixed when scrolling horizontally.
+                <b>{{ t('dashboard.promQLChartConfig.stickyFirstColumnTooltipTitle') }}</b>
+                {{ t('dashboard.promQLChartConfig.stickyFirstColumnTooltipDesc') }}
                 <br /><br />
-                Useful for keeping the primary identifier visible (e.g., job,
-                instance).
+                {{ t('dashboard.promQLChartConfig.stickyFirstColumnTooltipNote') }}
               </template>
             </OTooltip>
           </template>
@@ -305,17 +292,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="400px">
               <template #content>
-                <b>Sticky Columns</b>
+                <b>{{ t('dashboard.promQLChartConfig.stickyColumns') }}</b>
                 <br /><br />
-                Specify which columns should remain fixed when scrolling
-                horizontally.
+                {{ t('dashboard.promQLChartConfig.stickyColumnsDesc') }}
                 <br /><br />
-                <b>How to use:</b><br />
-                • Select from dropdown (loaded from stream fields)<br />
-                • Type custom column names and press Enter<br />
-                • Columns will stay visible during horizontal scroll
+                <b>{{ t('dashboard.promQLChartConfig.howToUse') }}</b><br />
+                {{ t('dashboard.promQLChartConfig.bulletSelectFromDropdown') }}<br />
+                {{ t('dashboard.promQLChartConfig.bulletTypeCustom') }}<br />
+                {{ t('dashboard.promQLChartConfig.bulletStickyScroll') }}
                 <br /><br />
-                <b>Note:</b> Disabled when "Sticky First Column" is enabled.
+                <b>{{ t('dashboard.promQLChartConfig.noteLabel') }}</b> {{ t('dashboard.promQLChartConfig.stickyColumnsNote') }}
               </template>
             </OTooltip>
           </template>
@@ -332,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="
             isConfigOptionVisible('promqlTable', 'configure-column-order')
           "
-          class="tw:font-semibold"
+          class="font-semibold"
         ></div>
         <OButton
           v-show="
@@ -405,15 +391,15 @@ export default defineComponent({
 
     // Aggregation function options
     const aggregationOptions = [
-      { label: "Last (most recent value)", value: "last" },
-      { label: "First (oldest value)", value: "first" },
-      { label: "Min (minimum value)", value: "min" },
-      { label: "Max (maximum value)", value: "max" },
-      { label: "Avg (average)", value: "avg" },
-      { label: "Sum (total)", value: "sum" },
-      { label: "Count (number of data points)", value: "count" },
-      { label: "Range (max - min)", value: "range" },
-      { label: "Diff (last - first)", value: "diff" },
+      { label: t("dashboard.promQLChartConfig.aggOptionLast"), value: "last" },
+      { label: t("dashboard.promQLChartConfig.aggOptionFirst"), value: "first" },
+      { label: t("dashboard.promQLChartConfig.aggOptionMin"), value: "min" },
+      { label: t("dashboard.promQLChartConfig.aggOptionMax"), value: "max" },
+      { label: t("dashboard.promQLChartConfig.aggOptionAvg"), value: "avg" },
+      { label: t("dashboard.promQLChartConfig.aggOptionSum"), value: "sum" },
+      { label: t("dashboard.promQLChartConfig.aggOptionCount"), value: "count" },
+      { label: t("dashboard.promQLChartConfig.aggOptionRange"), value: "range" },
+      { label: t("dashboard.promQLChartConfig.aggOptionDiff"), value: "diff" },
     ];
 
     // Chart types that support aggregation
@@ -533,9 +519,9 @@ export default defineComponent({
 
     // Options for PromQL table mode
     const promqlTableModeOptions = [
-      { label: "Time series", value: "single" },
-      { label: "Expanded Time series", value: "expanded_timeseries" },
-      { label: "Aggregate", value: "all" },
+      { label: t("dashboard.promQLChartConfig.tableModeOptionSingle"), value: "single" },
+      { label: t("dashboard.promQLChartConfig.tableModeOptionExpanded"), value: "expanded_timeseries" },
+      { label: t("dashboard.promQLChartConfig.tableModeOptionAggregate"), value: "all" },
     ];
 
     // Get available column options from stream fields across ALL queries

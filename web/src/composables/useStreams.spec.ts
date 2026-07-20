@@ -540,18 +540,15 @@ describe("useStreams Composable", () => {
     });
 
     it("should handle resetStreamType with empty string", () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       
       streamsInstance.resetStreamType("");
       
       // Should not call dispatch
       expect(mockStore.dispatch).not.toHaveBeenCalled();
       
-      consoleSpy.mockRestore();
     });
 
     it("should handle resetStreamType error gracefully", () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // Mock store dispatch to throw error
       mockStore.dispatch = vi.fn().mockImplementation(() => {
@@ -560,10 +557,7 @@ describe("useStreams Composable", () => {
 
       streamsInstance.resetStreamType("logs");
 
-      expect(consoleSpy).toHaveBeenCalledWith("Error while clearing local cache for stream type.", expect.any(Error));
 
-      // Restore
-      consoleSpy.mockRestore();
       // Restore dispatch for subsequent tests
       mockStore.dispatch = vi.fn();
     });

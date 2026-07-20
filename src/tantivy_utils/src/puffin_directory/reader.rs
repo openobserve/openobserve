@@ -205,7 +205,7 @@ impl Directory for PuffinDirReader {
 
 /// preload the terms in the index
 pub async fn warm_up_terms(
-    searcher: &tantivy::Searcher,
+    segment_reader: &tantivy::SegmentReader,
     terms_grouped_by_field: &HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>>,
     need_all_term_fields: HashSet<tantivy::schema::Field>,
     need_fast_field: HashSet<String>,
@@ -215,40 +215,32 @@ pub async fn warm_up_terms(
     let mut warm_up_terms_futures = Vec::new();
     let mut warm_up_fast_fields_futures = Vec::new();
     for (field, terms) in terms_grouped_by_field {
-        for segment_reader in searcher.segment_readers() {
-            let inv_idx = segment_reader.inverted_index(*field)?;
-            if terms.is_empty() {
-                continue;
-            }
-            for (term, position_needed) in terms.iter() {
-                let inv_idx_clone = inv_idx.clone();
-                warm_up_terms_futures
-                    .push(async move { inv_idx_clone.warm_postings(term, *position_needed).await });
-            }
+        let inv_idx = segment_reader.inverted_index(*field)?;
+        if terms.is_empty() {
+            continue;
+        }
+        for (term, position_needed) in terms.iter() {
+            let inv_idx_clone = inv_idx.clone();
+            warm_up_terms_futures
+                .push(async move { inv_idx_clone.warm_postings(term, *position_needed).await });
         }
     }
 
     // warn up the all term fields
     for field in need_all_term_fields {
-        for segment_reader in searcher.segment_readers() {
-            let inv_idx = segment_reader.inverted_index(field)?;
-            let inv_idx_clone = inv_idx.clone();
-            warm_up_fields_futures
-                .push(async move { inv_idx_clone.warm_postings_full(false).await });
-            warm_up_fields_term_futures
-                .push(async move { inv_idx.terms().warm_up_dictionary().await });
-        }
+        let inv_idx = segment_reader.inverted_index(field)?;
+        let inv_idx_clone = inv_idx.clone();
+        warm_up_fields_futures.push(async move { inv_idx_clone.warm_postings_full(false).await });
+        warm_up_fields_term_futures.push(async move { inv_idx.terms().warm_up_dictionary().await });
     }
 
     // warm up fast fields if needed
     if !need_fast_field.is_empty() {
-        for segment_reader in searcher.segment_readers() {
-            for field_name in &need_fast_field {
-                let fast_field_reader = segment_reader.fast_fields();
-                warm_up_fast_fields_futures.push(async move {
-                    warm_up_fastfield(fast_field_reader, field_name.clone()).await
-                });
-            }
+        for field_name in &need_fast_field {
+            let fast_field_reader = segment_reader.fast_fields();
+            warm_up_fast_fields_futures.push(async move {
+                warm_up_fastfield(fast_field_reader, field_name.clone()).await
+            });
         }
     }
 
@@ -622,7 +614,7 @@ mod tests {
         // Test with empty terms
         let terms_grouped_by_field = HashbrownHashMap::new();
         let result = warm_up_terms(
-            &searcher,
+            searcher.segment_readers().first().unwrap(),
             &terms_grouped_by_field,
             HashSet::new(),
             HashSet::new(),
@@ -665,7 +657,7 @@ mod tests {
         terms_grouped_by_field.insert(text_field, field_terms);
 
         let result = warm_up_terms(
-            &searcher,
+            searcher.segment_readers().first().unwrap(),
             &terms_grouped_by_field,
             HashSet::new(),
             HashSet::new(),
@@ -703,7 +695,7 @@ mod tests {
         // Test with prefix field
         let terms_grouped_by_field = HashbrownHashMap::new();
         let result = warm_up_terms(
-            &searcher,
+            searcher.segment_readers().first().unwrap(),
             &terms_grouped_by_field,
             HashSet::from([text_field]),
             HashSet::new(),
@@ -741,7 +733,7 @@ mod tests {
         // Test with fast fields enabled
         let terms_grouped_by_field = HashbrownHashMap::new();
         let result = warm_up_terms(
-            &searcher,
+            searcher.segment_readers().first().unwrap(),
             &terms_grouped_by_field,
             HashSet::new(),
             HashSet::from([TIMESTAMP_COL_NAME.to_string()]),
@@ -791,7 +783,7 @@ mod tests {
 
         let start = Instant::now();
         let result = warm_up_terms(
-            &searcher,
+            searcher.segment_readers().first().unwrap(),
             &terms_grouped_by_field,
             HashSet::new(),
             HashSet::new(),

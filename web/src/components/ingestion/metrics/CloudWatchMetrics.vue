@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       with Data Firehose to OpenObserve. You may choose JSON or OpenTelemetry
       1.0 as the output format.</IngestionDocLink
     >
-    <div class="tw:italic">
+    <div class="italic">
       Note: Output is available under Logs with stream name
       'cloudwatch_metrics'.
     </div>

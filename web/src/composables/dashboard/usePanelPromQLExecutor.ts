@@ -16,6 +16,9 @@
 import { markRaw } from "vue";
 import { generateTraceContext } from "@/utils/zincutils";
 import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
+import { computeStepSeconds } from "@/utils/metrics/metricDefaults";
+import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
+import { parseSearchError } from "@/utils/query/searchError";
 
 export const usePanelPromQLExecutor = (ctx: {
   state: any;
@@ -126,14 +129,58 @@ export const usePanelPromQLExecutor = (ctx: {
 
           const { traceId } = generateTraceContext();
 
-          const queryStepValue = it.config?.step_value?.trim()?.length
-            ? it.config?.step_value?.trim()
-            : undefined;
+          // "0" is not a step — it is the panel schema's way of saying "no step
+          // set, let the server decide", and it is what a dashboard panel
+          // carries by default. Treating it as an explicit value made it beat
+          // the heatmap cap below (the metrics editor's blob has `null` here,
+          // which is why the same heatmap was bounded there and unbounded on a
+          // dashboard). Normalising it to `undefined` changes nothing else: the
+          // fallback at the end sends "0" anyway.
+          const explicitStep = (value?: string) => {
+            const trimmed = value?.trim();
+            return trimmed && trimmed !== "0" ? trimmed : undefined;
+          };
 
-          const panelStepValue = panelSchema.value.config.step_value?.trim()
-            ?.length
-            ? panelSchema.value.config?.step_value?.trim()
-            : undefined;
+          const queryStepValue = explicitStep(it.config?.step_value);
+          const panelStepValue = explicitStep(
+            panelSchema.value.config?.step_value,
+          );
+
+          // A heatmap's cost is COLUMNS x ROWS, and `step: "0"` hands the column
+          // count to the backend — which returns ~300 points regardless of
+          // range. Against a ~24-bucket histogram that is ~7,000 cells for a
+          // full-size panel, and ECharts falls over drawing them. Nothing is
+          // gained by it either: you cannot see more columns than the panel has
+          // pixels.
+          //
+          // So a heatmap without an explicit step gets one that bounds the
+          // columns. EVERY heatmap, not only the Prometheus-histogram mode that
+          // prompted this: the argument is about pixels, not about buckets, so
+          // it holds for a `sum by (pod)` heatmap just as well, and a rule that
+          // applied to one chart and not another would be a rule nobody could
+          // predict. A saved panel therefore redraws at up to 120 columns rather
+          // than ~300 — coarser, but only in a dimension the panel was never
+          // wide enough to show. An explicit `step_value` still wins.
+          //
+          // Same helper the Metrics Explorer cards use (a coarse step is why the
+          // same metric renders fine on a card and kills the editor), so the two
+          // cannot drift.
+          const isHeatmap = panelSchema.value?.type === "heatmap";
+          const heatmapStepValue =
+            isHeatmap && !queryStepValue && !panelStepValue
+              ? `${computeStepSeconds(
+                  // MILLISECONDS. `usePanelDataLoader` builds these with
+                  // `new Date(...).getTime()` (:408), and only the request payload
+                  // converts to the microseconds the backend wants — these raw
+                  // values never are. Dividing by 1e6 made the range look ~1000x
+                  // shorter, so the step collapsed to MIN_STEP_SECONDS and the cap
+                  // silently inverted: 15s columns at ANY range. A 24h heatmap asked
+                  // for 5,760 columns instead of 120 — worse than no cap at all,
+                  // because the backend's own default would have returned ~300.
+                  (endISOTimestamp - startISOTimestamp) / 1000,
+                  HEATMAP_MAX_COLUMNS,
+                )}s`
+              : undefined;
 
           const payload = {
             queryReq: {
@@ -144,7 +191,7 @@ export const usePanelPromQLExecutor = (ctx: {
                 ? queryStepValue
                 : panelStepValue
                   ? panelStepValue
-                  : "0",
+                  : (heatmapStepValue ?? "0"),
               query_type: it.config.query_type || "range", // Add query_type from config (default: range)
             },
             type: "promql" as const,
@@ -223,13 +270,18 @@ export const usePanelPromQLExecutor = (ctx: {
             // Mark this query as completed (even with error)
             completedQueries.add(queryIndex);
 
-            const errorMessage =
-              err?.content?.message || err?.content?.error || "Unknown error";
-            const errorCode = err?.content?.code || "";
+            // Through the shared reader. The backend hands back its internal
+            // envelope ("Error during planning: ErrorCode# {...}") rather than a
+            // sentence, and reading `content.message` raw is what put that in
+            // front of users. This is the path a dashboard actually takes —
+            // `usePanelDataLoader.processApiError` handles the axios path and is
+            // never called for a streaming query, so unwrapping there alone left
+            // the envelope on screen exactly where it is most often seen.
+            const parsed = parseSearchError(err, "Unknown error");
 
             state.errorDetail = {
-              message: errorMessage,
-              code: errorCode,
+              message: parsed.message,
+              code: parsed.code ?? "",
             };
 
             removeTraceId(traceId);

@@ -249,7 +249,7 @@ describe("ExportDashboard", () => {
     });
 
     const exportButton = wrapper.find('[data-test="export-dashboard"]');
-    // OButton renders with Tailwind classes instead of Quasar's dashboard-icons class
+    // OButton renders with Tailwind classes instead of a dashboard-icons class
     expect(exportButton.exists()).toBe(true);
   });
 });

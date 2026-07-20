@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- ── HERO layout ──────────────────────────────────────────────────── -->
   <div
     v-if="size === 'hero'"
-    class="tw:w-full tw:h-full tw:overflow-y-auto tw:flex tw:flex-col tw:items-center tw:pb-8"
+    class="w-full h-full overflow-y-auto flex flex-col items-center pb-8"
     data-test="query-error-state"
   >
     <!-- Illustration + title + description + action cards -->
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :illustration="illustration ?? 'broken-panel'"
       size="block"
       :hide-action="true"
-      class="tw:w-full tw:shrink-0"
+      class="w-full shrink-0"
     >
       <template #title>{{ resolvedTitle }}</template>
       <template #description>{{ resolvedDescription }}</template>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Detail panel + buttons (outside OEmptyState — avoids its overflow:hidden) -->
     <div
       v-if="hasAnyContent"
-      class="tw:w-full tw:max-w-2xl tw:mx-auto tw:px-6 tw:flex tw:flex-col tw:gap-3"
+      class="w-full max-w-2xl mx-auto px-6 flex flex-col gap-3"
     >
       <ErrorDetailPanel
         :summary-line="summaryLine"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @toggle-detail="showDetail = !showDetail"
       />
 
-      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
+      <div class="flex items-center justify-center gap-2 flex-wrap">
         <OButton
           variant="ghost"
           size="sm"
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" alt="" />
+            <img :src="aiIconSrc" class="w-4 h-4 shrink-0" alt="" />
           </template>
           {{ t("queryError.askAi") }}
         </OButton>
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- AI button when there's nothing to show in the detail panel -->
     <div
       v-else-if="aiEnabled && (isQueryError || errorCode === 0)"
-      class="tw:flex tw:justify-center tw:mt-2"
+      class="flex justify-center mt-2"
     >
       <OButton
         variant="ghost"
@@ -196,23 +196,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- ── BLOCK layout (dashboard panels, alerts) ───────────────────────── -->
   <div
     v-else
-    class="tw:w-full tw:flex tw:flex-col tw:gap-3 tw:p-4"
+    class="w-full flex flex-col gap-3 p-4"
     data-test="query-error-state"
   >
     <!-- Title row -->
-    <div class="tw:flex tw:items-start tw:gap-2">
+    <div class="flex items-start gap-2">
       <OIcon
         name="error-outline"
         size="sm"
-        class="tw:text-status-error tw:shrink-0 tw:mt-0.5"
+        class="text-status-error shrink-0 mt-0.5"
       />
-      <div class="tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
-        <p class="tw:text-sm tw:font-semibold tw:text-text-body tw:m-0">
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <p class="text-sm font-semibold text-text-body m-0">
           {{ resolvedTitle }}
         </p>
         <p
           v-if="summaryLine"
-          class="tw:text-xs tw:text-text-secondary tw:m-0 tw:break-words"
+          class="text-xs text-text-secondary m-0 break-words"
           data-test="query-error-summary"
         >
           {{ summaryLine }}
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="hasDetail">
       <button
         type="button"
-        class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-secondary tw:cursor-pointer tw:bg-transparent tw:border-0 tw:p-0 tw:self-start tw:hover:text-text-body tw:transition-colors"
+        class="flex items-center gap-1 text-xs text-text-secondary cursor-pointer bg-transparent border-0 p-0 self-start hover:text-text-body transition-colors"
         data-test="query-error-toggle-detail-btn"
         @click="showDetail = !showDetail"
       >
@@ -233,11 +233,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </button>
       <div
         v-if="showDetail"
-        class="tw:rounded tw:bg-surface-panel tw:border tw:border-border-default tw:px-3 tw:py-2 tw:max-h-40 tw:overflow-y-auto"
+        class="rounded bg-surface-panel border border-border-default px-3 py-2 max-h-40 overflow-y-auto"
         data-test="query-error-detail-expanded"
       >
         <p
-          class="tw:text-xs tw:font-mono tw:text-text-secondary tw:m-0 tw:whitespace-pre-wrap tw:break-all"
+          class="text-xs font-mono text-text-secondary m-0 whitespace-pre-wrap break-all"
         >
           {{ detailBody }}
         </p>
@@ -245,13 +245,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Trace ID (block) -->
-    <small v-if="traceId" class="tw:text-text-caption" data-test="query-error-trace-id">
-      <span class="tw:font-medium">{{ t("queryError.traceId") }}</span>
+    <small v-if="traceId" class="text-text-caption" data-test="query-error-trace-id">
+      <span class="font-medium">{{ t("queryError.traceId") }}</span>
       {{ traceId }}
     </small>
 
     <!-- Action row (block) -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+    <div class="flex items-center gap-2 flex-wrap">
       <!-- Default slot for module-specific actions -->
       <slot name="actions" v-bind="slotProps">
         <OButton

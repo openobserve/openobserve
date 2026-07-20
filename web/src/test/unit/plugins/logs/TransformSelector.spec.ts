@@ -61,7 +61,6 @@ vi.mock("@/utils/zincutils", () => ({
 
 describe("TransformSelector.vue", () => {
   let store: any;
-  let $q: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,15 +78,6 @@ describe("TransformSelector.vue", () => {
         theme: "light",
       },
     });
-
-    // Mock Quasar - provide it properly
-    $q = {
-      dark: ref({
-        isActive: false,
-        mode: false,
-      }),
-      notify: vi.fn(),
-    };
   });
 
   const defaultProps = {
@@ -103,9 +93,6 @@ describe("TransformSelector.vue", () => {
       props,
       global: {
         plugins: [store, i18n],
-        mocks: {
-          $q,
-        },
         stubs: {
           "q-toggle": { template: "<div class='q-toggle' />" },
           "q-btn-group": { template: "<div class='q-btn-group'><slot /></div>" },
@@ -165,9 +152,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -199,9 +183,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -227,9 +208,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -255,9 +233,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -281,9 +256,6 @@ describe("TransformSelector.vue", () => {
         },
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -327,9 +299,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -360,9 +329,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -404,9 +370,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": {
               template: '<div :disable="$attrs.disable" />',
@@ -430,9 +393,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -464,9 +424,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": {
               template: '<div class="toggle" :disable="$attrs.disable" />',
@@ -495,9 +452,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": {
               template: '<div class="toggle" :disable="$attrs.disable" />',
@@ -523,9 +477,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -552,9 +503,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -581,9 +529,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -607,9 +552,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -634,9 +576,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -663,9 +602,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -692,9 +628,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -720,9 +653,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -750,9 +680,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [darkStore, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": {
@@ -803,9 +730,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -834,9 +758,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -862,9 +783,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -890,9 +808,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },
@@ -917,9 +832,6 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
             "q-toggle": true,
             "q-btn-group": { template: "<div><slot /></div>" },

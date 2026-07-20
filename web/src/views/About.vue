@@ -15,55 +15,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] tw:pt-2.5">
-    <div class="tw:h-full tw:overflow-auto">
-      <div class="tw:flex tw:flex-col tw:gap-4">
+  <div class="rounded-md w-full h-full px-[0.625rem] pb-[0.625rem] pt-2.5">
+    <div class="h-full overflow-auto">
+      <div class="flex flex-col gap-4">
 
         <!-- ── Hero Banner ─────────────────────────────────────────── -->
-        <div class="tw:relative tw:bg-(--o2-card-bg) tw:rounded-xl tw:p-4 tw:overflow-hidden">
-          <div class="tw:relative tw:z-1">
+        <div class="relative bg-(--o2-card-bg) rounded-xl p-4 overflow-hidden">
+          <div class="relative z-1">
             <img
               :src="
                 store.state.theme == 'dark'
                   ? getImageURL('images/common/openobserve_latest_dark_2.svg')
                   : getImageURL('images/common/openobserve_latest_light_2.svg')
               "
-              class="tw:block tw:max-w-55"
+              class="block max-w-55"
               width="220"
             />
-            <OText variant="body" class="tw:mt-1 tw:mb-0">
+            <OText variant="body" class="mt-1 mb-0">
               {{ t("about.logoMsg") }}
             </OText>
 
             <!-- One-line meta bar -->
-            <div class="tw:inline-flex tw:items-center tw:flex-wrap tw:gap-2 tw:mt-5">
+            <div class="inline-flex items-center flex-wrap gap-2 mt-5">
               <!-- version -->
-              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:font-semibold tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:text-(--o2-positive) tw:border-[color-mix(in_srgb,var(--o2-positive)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))]">
-                <OIcon name="check-circle" size="sm" class="tw:text-(--o2-positive) tw:shrink-0" />
+              <span class="inline-flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap py-2 px-3.5 rounded border text-(--o2-positive) border-[color-mix(in_srgb,var(--o2-positive)_28%,transparent)] bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))]">
+                <OIcon name="check-circle" size="sm" class="text-(--o2-positive) shrink-0" />
                 {{ store.state.zoConfig.version }}
               </span>
               <!-- build type -->
-              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:font-semibold tw:capitalize tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:text-(--o2-primary-color) tw:border-[color-mix(in_srgb,var(--o2-primary-color)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))]">
-                <OIcon name="workspaces" size="sm" class="tw:text-(--o2-primary-color) tw:shrink-0" />
+              <span class="inline-flex items-center gap-1.5 text-sm font-semibold capitalize whitespace-nowrap py-2 px-3.5 rounded border text-(--o2-primary-color) border-[color-mix(in_srgb,var(--o2-primary-color)_28%,transparent)] bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))]">
+                <OIcon name="workspaces" size="sm" class="text-(--o2-primary-color) shrink-0" />
                 {{ store.state.zoConfig.build_type }}
               </span>
               <!-- commit -->
-              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:border-[color-mix(in_srgb,var(--o2-info)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-info)_8%,var(--o2-card-bg))]">
-                <OIcon name="code" size="sm" class="tw:text-(--o2-info) tw:shrink-0" />
-                <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-(--o2-info)">{{ t("about.commit_lbl") }}</span>
+              <span class="inline-flex items-center gap-1.5 text-sm text-(--o2-text-heading) whitespace-nowrap py-2 px-3.5 rounded border border-[color-mix(in_srgb,var(--o2-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--o2-info)_8%,var(--o2-card-bg))]">
+                <OIcon name="code" size="sm" class="text-(--o2-info) shrink-0" />
+                <span class="text-xs font-semibold uppercase tracking-wide text-(--o2-info)">{{ t("about.commit_lbl") }}</span>
                 <OText variant="mono">{{ store.state.zoConfig.commit_hash }}</OText>
                 <button
                   @click="copyToClipboard(store.state.zoConfig.commit_hash)"
-                  class="tw:inline-flex tw:items-center tw:justify-center tw:p-0.5 tw:rounded tw:border-none tw:bg-transparent tw:cursor-pointer tw:text-(--o2-text-muted) tw:hover:text-(--o2-info) tw:transition-colors tw:duration-150"
+                  class="inline-flex items-center justify-center p-0.5 rounded border-none bg-transparent cursor-pointer text-(--o2-text-muted) hover:text-(--o2-info) transition-colors duration-150"
                   title="Copy commit hash"
                 >
                   <OIcon name="content-copy" size="sm" />
                 </button>
               </span>
               <!-- built date -->
-              <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:text-sm tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:py-2 tw:px-3.5 tw:rounded tw:border tw:border-[color-mix(in_srgb,var(--o2-warning)_28%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-warning)_8%,var(--o2-card-bg))]">
-                <OIcon name="event" size="sm" class="tw:text-(--o2-warning) tw:shrink-0" />
-                <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-(--o2-warning)">{{ t("about.build_lbl") }}</span>
+              <span class="inline-flex items-center gap-1.5 text-sm text-(--o2-text-heading) whitespace-nowrap py-2 px-3.5 rounded border border-[color-mix(in_srgb,var(--o2-warning)_28%,transparent)] bg-[color-mix(in_srgb,var(--o2-warning)_8%,var(--o2-card-bg))]">
+                <OIcon name="event" size="sm" class="text-(--o2-warning) shrink-0" />
+                <span class="text-xs font-semibold uppercase tracking-wide text-(--o2-warning)">{{ t("about.build_lbl") }}</span>
                 {{ formatDate(store.state.zoConfig.build_date) }}
               </span>
             </div>
@@ -71,65 +71,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Info Cards Grid ─────────────────────────────────────── -->
-        <div class="tw:grid tw:grid-cols-1 tw:gap-4">
+        <div class="grid grid-cols-1 gap-4">
 
           <!-- Open Source Libraries -->
-          <div class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4 tw:flex tw:flex-col tw:gap-y-2">
-            <div class="tw:flex tw:items-center tw:gap-3">
-              <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
+          <div class="bg-(--o2-card-bg) rounded-[0.625rem] p-4 flex flex-col gap-y-2">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] text-(--o2-primary-color)">
                 <OIcon name="code" size="md" />
               </div>
-                <OText variant="page-title" as="h2" class="tw:text-xl tw:font-medium">{{ t("about.os_libraries") }}</OText>
+                <OText variant="page-title" as="h2" class="text-xl font-medium">{{ t("about.os_libraries") }}</OText>
             </div>
-            <div class="tw:text-sm" style="color: var(--o2-text-secondary)">{{ t("about.os_libraries_msg") }}</div>
-            <div class="tw:grid tw:grid-cols-4 tw:gap-2.5">
+            <div class="text-sm" style="color: var(--o2-text-secondary)">{{ t("about.os_libraries_msg") }}</div>
+            <div class="grid grid-cols-4 gap-2.5">
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
                 target="_blank"
-                class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-3.5 tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg) tw:no-underline tw:transition-all tw:duration-200 tw:hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
+                class="flex items-center gap-3 py-3 px-3.5 border border-(--o2-border-color) rounded-lg bg-(--o2-card-bg) no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
               >
-                <OIcon name="settings" size="md" class="tw:text-(--o2-primary-color) tw:shrink-0" />
-                <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
-                  <span class="tw:text-sm tw:font-semibold tw:font-mono tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">Cargo.toml</span>
-                  <span class="tw:text-xs tw:text-(--o2-text-muted)">Rust crates</span>
+                <OIcon name="settings" size="md" class="text-(--o2-primary-color) shrink-0" />
+                <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+                  <span class="text-sm font-semibold font-mono text-(--o2-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">Cargo.toml</span>
+                  <span class="text-xs text-(--o2-text-muted)">Rust crates</span>
                 </div>
-                <OIcon name="open-in-new" size="sm" class="tw:text-(--o2-text-muted) tw:shrink-0" />
+                <OIcon name="open-in-new" size="sm" class="text-(--o2-text-muted) shrink-0" />
               </a>
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
                 target="_blank"
-                class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-3.5 tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg) tw:no-underline tw:transition-all tw:duration-200 tw:hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
+                class="flex items-center gap-3 py-3 px-3.5 border border-(--o2-border-color) rounded-lg bg-(--o2-card-bg) no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
               >
-                <OIcon name="backpack" size="md" class="tw:text-(--o2-primary-color) tw:shrink-0" />
-                <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
-                  <span class="tw:text-sm tw:font-semibold tw:font-mono tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">package.json</span>
-                  <span class="tw:text-xs tw:text-(--o2-text-muted)">Node packages</span>
+                <OIcon name="backpack" size="md" class="text-(--o2-primary-color) shrink-0" />
+                <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+                  <span class="text-sm font-semibold font-mono text-(--o2-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">package.json</span>
+                  <span class="text-xs text-(--o2-text-muted)">Node packages</span>
                 </div>
-                <OIcon name="open-in-new" size="sm" class="tw:text-(--o2-text-muted) tw:shrink-0" />
+                <OIcon name="open-in-new" size="sm" class="text-(--o2-text-muted) shrink-0" />
               </a>
               <a
                 href="https://npmjs.com"
                 target="_blank"
-                class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-3.5 tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg) tw:no-underline tw:transition-all tw:duration-200 tw:hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
+                class="flex items-center gap-3 py-3 px-3.5 border border-(--o2-border-color) rounded-lg bg-(--o2-card-bg) no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
               >
-                <OIcon name="javascript" size="md" class="tw:text-(--o2-primary-color) tw:shrink-0" />
-                <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
-                  <span class="tw:text-sm tw:font-semibold tw:font-mono tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">npmjs.com</span>
-                  <span class="tw:text-xs tw:text-(--o2-text-muted)">JS registry</span>
+                <OIcon name="javascript" size="md" class="text-(--o2-primary-color) shrink-0" />
+                <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+                  <span class="text-sm font-semibold font-mono text-(--o2-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">npmjs.com</span>
+                  <span class="text-xs text-(--o2-text-muted)">JS registry</span>
                 </div>
-                <OIcon name="open-in-new" size="sm" class="tw:text-(--o2-text-muted) tw:shrink-0" />
+                <OIcon name="open-in-new" size="sm" class="text-(--o2-text-muted) shrink-0" />
               </a>
               <a
                 href="https://crates.io"
                 target="_blank"
-                class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-3.5 tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg) tw:no-underline tw:transition-all tw:duration-200 tw:hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
+                class="flex items-center gap-3 py-3 px-3.5 border border-(--o2-border-color) rounded-lg bg-(--o2-card-bg) no-underline transition-all duration-200 hover:border-[color-mix(in_srgb,var(--o2-primary-color)_35%,transparent)]"
               >
-                <OIcon name="inventory-2" size="md" class="tw:text-(--o2-primary-color) tw:shrink-0" />
-                <div class="tw:flex-1 tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
-                  <span class="tw:text-sm tw:font-semibold tw:font-mono tw:text-(--o2-text-heading) tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">crates.io</span>
-                  <span class="tw:text-xs tw:text-(--o2-text-muted)">Rust registry</span>
+                <OIcon name="inventory-2" size="md" class="text-(--o2-primary-color) shrink-0" />
+                <div class="flex-1 flex flex-col gap-0.5 min-w-0">
+                  <span class="text-sm font-semibold font-mono text-(--o2-text-heading) whitespace-nowrap overflow-hidden text-ellipsis">crates.io</span>
+                  <span class="text-xs text-(--o2-text-muted)">Rust registry</span>
                 </div>
-                <OIcon name="open-in-new" size="sm" class="tw:text-(--o2-text-muted) tw:shrink-0" />
+                <OIcon name="open-in-new" size="sm" class="text-(--o2-text-muted) shrink-0" />
               </a>
             </div>
           </div>
@@ -137,44 +137,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- License Info (opensource or enterprise on-prem) -->
           <div
             v-if="store.state.zoConfig.build_type == 'opensource' || (store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false')"
-            class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4"
+            class="bg-(--o2-card-bg) rounded-[0.625rem] p-4"
           >
-            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-              <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-info)_12%,var(--o2-card-bg))] tw:text-(--o2-info)">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--o2-info)_12%,var(--o2-card-bg))] text-(--o2-info)">
                 <OIcon name="shield" size="md" />
               </div>
-              <OText variant="page-title" as="h2" class="tw:m-0 tw:text-xl tw:font-medium">{{ t("about.license_info") }}</OText>
+              <OText variant="page-title" as="h2" class="m-0 text-xl font-medium">{{ t("about.license_info") }}</OText>
             </div>
-            <OText v-if="store.state.zoConfig.build_type == 'opensource'" variant="body" as="div" class="tw:leading-relaxed tw:m-0 tw:mb-4">
+            <OText v-if="store.state.zoConfig.build_type == 'opensource'" variant="body" as="div" class="leading-relaxed m-0 mb-4">
               {{ t("about.license_info_os_msg") }}
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
                 target="_blank"
-                class="tw:text-(--o2-text-link) tw:no-underline tw:font-medium tw:border-b tw:border-[color-mix(in_srgb,var(--o2-text-link)_35%,transparent)] tw:transition-colors tw:duration-200 tw:hover:border-(--o2-text-link)"
+                class="text-(--o2-text-link) no-underline font-medium border-b border-[color-mix(in_srgb,var(--o2-text-link)_35%,transparent)] transition-colors duration-200 hover:border-(--o2-text-link)"
               >GNU Affero General Public License (AGPL)</a>.
             </OText>
-            <OText v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" variant="body" as="div" class="tw:leading-relaxed">
+            <OText v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" variant="body" as="div" class="leading-relaxed">
               {{ t("about.license_info_msg") }}
             </OText>
-            <OBanner variant="info" icon="info" class="tw:mt-2">
+            <OBanner variant="info" icon="info" class="mt-2">
               {{ t("about.license_info_note") }}
             </OBanner>
           </div>
 
           <!-- Community Card (fallback for cloud) -->
-          <div v-else class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4">
-            <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-              <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] tw:text-(--o2-primary-color)">
+          <div v-else class="bg-(--o2-card-bg) rounded-[0.625rem] p-4">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--o2-primary-color)_12%,var(--o2-card-bg))] text-(--o2-primary-color)">
                 <OIcon name="groups" size="md" />
               </div>
-              <OText variant="page-title" as="h3" class="tw:m-0 tw:text-lg tw:font-medium tw:leading-6">{{ t("about.community_lbl") }}</OText>
+              <OText variant="page-title" as="h3" class="m-0 text-lg font-medium leading-6">{{ t("about.community_lbl") }}</OText>
             </div>
-            <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-4">{{ t("about.community_msg") }}</OText>
-            <div class="tw:flex tw:flex-wrap tw:gap-2">
+            <OText variant="body" class="leading-relaxed m-0 mb-4">{{ t("about.community_msg") }}</OText>
+            <div class="flex flex-wrap gap-2">
               <a
                 href="https://github.com/openobserve/openobserve"
                 target="_blank"
-                class="tw:inline-flex tw:items-center tw:gap-1.5 tw:py-2 tw:px-3.5 tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:no-underline tw:text-sm tw:font-medium tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_18%,transparent)] tw:transition-all tw:duration-200"
+                class="inline-flex items-center gap-1.5 py-2 px-3.5 rounded bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] text-(--o2-primary-color) no-underline text-sm font-medium border border-[color-mix(in_srgb,var(--o2-primary-color)_18%,transparent)] transition-all duration-200"
               >
                 <OIcon name="code" size="sm" />
                 GitHub
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <a
                 href="https://openobserve.ai"
                 target="_blank"
-                class="tw:inline-flex tw:items-center tw:gap-1.5 tw:py-2 tw:px-3.5 tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:text-(--o2-primary-color) tw:no-underline tw:text-sm tw:font-medium tw:border tw:border-[color-mix(in_srgb,var(--o2-primary-color)_18%,transparent)] tw:transition-all tw:duration-200"
+                class="inline-flex items-center gap-1.5 py-2 px-3.5 rounded bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] text-(--o2-primary-color) no-underline text-sm font-medium border border-[color-mix(in_srgb,var(--o2-primary-color)_18%,transparent)] transition-all duration-200"
               >
                 <OIcon name="language" size="sm" />
                 Website
@@ -192,55 +192,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Enterprise License Details ──────────────────────────── -->
-        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4">
+        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="bg-(--o2-card-bg) rounded-[0.625rem] p-4">
           <!-- Header: eyebrow + title + manage button -->
-          <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
-            <div class="tw:flex tw:items-start tw:gap-3">
-              <div class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-info)_12%,var(--o2-card-bg))] tw:text-(--o2-info)">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-start gap-3">
+              <div class="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--o2-info)_12%,var(--o2-card-bg))] text-(--o2-info)">
                 <OIcon name="workspace-premium" size="md" />
               </div>
               <div>
-                <OText variant="label" class="tw:uppercase tw:tracking-widest tw:m-0 tw:mb-1 tw:text-(--o2-primary-color)">License &amp; Usage</OText>
-                <h2 class="tw:text-xl tw:font-semibold tw:m-0 tw:text-text-heading">{{ t("about.ent_lincese_detail_lbl") }}</h2>
+                <OText variant="label" class="uppercase tracking-widest m-0 mb-1 text-(--o2-primary-color)">License &amp; Usage</OText>
+                <h2 class="text-xl font-semibold m-0 text-text-heading">{{ t("about.ent_lincese_detail_lbl") }}</h2>
               </div>
             </div>
             <OButton variant="primary" size="sm" @click="navigateToLicense">
               {{ t('about.manage_license') }}
             </OButton>
           </div>
-          <OText variant="body" class="tw:leading-relaxed tw:m-0 tw:mb-5">{{ t("about.license_info_msg") }}</OText>
+          <OText variant="body" class="leading-relaxed m-0 mb-5">{{ t("about.license_info_msg") }}</OText>
 
-          <div v-if="loadingLicense" class="tw:text-center tw:py-8">
+          <div v-if="loadingLicense" class="text-center py-8">
             <OSpinner size="md" />
-            <div class="tw:mt-3 tw:text-sm tw:text-(--o2-text-muted)">{{ t("about.loading_license_info") }}</div>
+            <div class="mt-3 text-sm text-(--o2-text-muted)">{{ t("about.loading_license_info") }}</div>
           </div>
 
-          <div v-else-if="!licenseData || !licenseData.license" class="tw:py-2">
+          <div v-else-if="!licenseData || !licenseData.license" class="py-2">
             <OBanner variant="warning" icon="warning">
-              <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
-              <p class="tw:text-sm tw:mb-2">{{ t("about.no_license_installed_msg") }}</p>
-              <div v-if="licenseData && licenseData.installation_id" class="tw:text-xs tw:flex tw:items-center tw:flex-wrap tw:gap-1">
+              <div class="font-semibold mb-1">{{ t("about.no_license_installed_lbl") }}</div>
+              <p class="text-sm mb-2">{{ t("about.no_license_installed_msg") }}</p>
+              <div v-if="licenseData && licenseData.installation_id" class="text-xs flex items-center flex-wrap gap-1">
                 {{ t("about.installation_id_lbl") }}:
-                <code class="tw:px-2 tw:py-0.5 tw:rounded tw:font-mono tw:border tw:border-solid tw:border-(--o2-border-color) tw:bg-(--o2-code-bg) tw:select-all">
+                <code class="px-2 py-0.5 rounded font-mono border border-solid border-(--o2-border-color) bg-(--o2-code-bg) select-all">
                   {{ licenseData.installation_id }}
                 </code>
               </div>
             </OBanner>
           </div>
 
-          <div v-else class="tw:grid tw:grid-cols-2 tw:gap-4">
+          <div v-else class="grid grid-cols-2 gap-4">
             <!-- License details table -->
-            <div class="tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
-              <table class="tw:w-full tw:border-collapse">
+            <div class="border border-(--o2-border-color) rounded-lg overflow-hidden">
+              <table class="w-full border-collapse">
                 <tbody>
-                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
-                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.lincese_id_lbl") }}</td>
-                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5 tw:font-mono">
-                      <div class="tw:flex tw:items-center tw:gap-1.5">
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">{{ t("about.lincese_id_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5 font-mono">
+                      <div class="flex items-center gap-1.5">
                         <span>{{ licenseData.license.license_id }}</span>
                         <button
                           @click="copyToClipboard(licenseData.license.license_id)"
-                          class="tw:inline-flex tw:items-center tw:justify-center tw:p-0.5 tw:rounded tw:border-none tw:bg-transparent tw:cursor-pointer tw:text-(--o2-text-muted) tw:hover:text-(--o2-primary-color) tw:transition-colors tw:duration-150"
+                          class="inline-flex items-center justify-center p-0.5 rounded border-none bg-transparent cursor-pointer text-(--o2-text-muted) hover:text-(--o2-primary-color) transition-colors duration-150"
                           title="Copy license ID"
                         >
                           <OIcon name="content-copy" size="sm" />
@@ -248,63 +248,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </td>
                   </tr>
-                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
-                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.status_lbl") }}</td>
-                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5">
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">{{ t("about.status_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">
                       <span
-                        class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-full tw:mr-1.5 tw:align-middle"
-                        :class="licenseData?.expired ? 'tw:bg-(--o2-negative)' : 'tw:bg-(--o2-positive)'"
+                        class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
+                        :class="licenseData?.expired ? 'bg-(--o2-negative)' : 'bg-(--o2-positive)'"
                       />
-                      <span :class="licenseData?.expired ? 'tw:text-red-500' : 'tw:text-green-600'">
+                      <span :class="licenseData?.expired ? 'text-red-500' : 'text-green-600'">
                         {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
                       </span>
                     </td>
                   </tr>
-                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
-                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">Edition</td>
-                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5">{{ t("about.value_license_enterprise") }}</td>
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">Edition</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">{{ t("about.value_license_enterprise") }}</td>
                   </tr>
-                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
-                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.create_at_lbl") }}</td>
-                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">{{ t("about.create_at_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.created_at) }}</td>
                   </tr>
-                  <tr class="tw:border-b tw:border-(--o2-border-color) tw:last:border-b-0">
-                    <td class="tw:w-2/5 tw:font-semibold tw:text-sm tw:text-(--o2-text-secondary) tw:py-2.5 tw:px-3.5 tw:border-r tw:border-(--o2-border-color) tw:whitespace-nowrap tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))]">{{ t("about.expires_at_lbl") }}</td>
-                    <td class="tw:text-sm tw:text-(--o2-text-body) tw:py-2.5 tw:px-3.5">{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
+                  <tr class="border-b border-(--color-table-row-divider) last:border-b-0">
+                    <td class="w-2/5 font-semibold text-sm text-(--color-table-header-text) py-2.5 px-3.5 border-r border-(--color-table-row-divider) whitespace-nowrap bg-[var(--color-table-header-bg)]">{{ t("about.expires_at_lbl") }}</td>
+                    <td class="text-sm text-(--color-text-body) py-2.5 px-3.5">{{ formatLicenseDate(licenseData.license.expires_at) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             <!-- Ingestion usage panel -->
-            <div class="tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))] tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-5">
-              <p class="tw:text-sm tw:font-semibold tw:m-0 tw:mb-1" style="color: var(--o2-text-heading)">{{ t("about.usage_limits") }}</p>
-              <p class="tw:text-xs tw:m-0 tw:mb-4" style="color: var(--o2-text-muted)">
+            <div class="bg-[color-mix(in_srgb,var(--o2-primary-color)_4%,var(--o2-card-bg))] border border-(--o2-border-color) rounded-lg p-5">
+              <p class="text-sm font-semibold m-0 mb-1" style="color: var(--o2-text-heading)">{{ t("about.usage_limits") }}</p>
+              <p class="text-xs m-0 mb-4" style="color: var(--o2-text-muted)">
                 {{ licenseData.license.limits?.Ingestion?.typ || 'PerDayCount' }}
                 · limit {{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day
               </p>
               <div v-if="licenseData.ingestion_used !== undefined">
-                <div class="tw:flex tw:items-baseline tw:gap-2 tw:mb-3">
+                <div class="flex items-baseline gap-2 mb-3">
                   <span
-                    class="tw:text-4xl tw:font-bold tw:text-(--o2-text-heading) tw:leading-none"
-                    :class="licenseData.ingestion_used > 90 ? 'tw:text-red-500' : licenseData.ingestion_used > 70 ? 'tw:text-orange-500' : ''"
+                    class="text-4xl font-bold text-(--o2-text-heading) leading-none"
+                    :class="licenseData.ingestion_used > 90 ? 'text-red-500' : licenseData.ingestion_used > 70 ? 'text-orange-500' : ''"
                   >{{ licenseData.ingestion_used.toFixed(2) }}%</span>
-                  <span class="tw:text-xs tw:text-(--o2-text-secondary)">of daily limit used today</span>
+                  <span class="text-xs text-(--o2-text-secondary)">of daily limit used today</span>
                 </div>
-                <div class="tw:h-1.5 tw:rounded-full tw:bg-(--o2-border-color) tw:overflow-hidden tw:mb-1.5">
+                <div class="h-1.5 rounded-full bg-(--o2-border-color) overflow-hidden mb-1.5">
                   <div
-                    class="tw:h-full tw:rounded-full tw:transition-[width] tw:duration-[400ms] tw:min-w-1"
-                    :class="licenseData.ingestion_used > 90 ? 'tw:bg-(--o2-negative)' : licenseData.ingestion_used > 70 ? 'tw:bg-(--o2-warning)' : 'tw:bg-(--o2-primary-color)'"
+                    class="h-full rounded-full transition-[width] duration-[400ms] min-w-1"
+                    :class="licenseData.ingestion_used > 90 ? 'bg-(--o2-negative)' : licenseData.ingestion_used > 70 ? 'bg-(--o2-warning)' : 'bg-(--o2-primary-color)'"
                     :style="{ width: Math.min(licenseData.ingestion_used, 100) + '%' }"
                   />
                 </div>
-                <div class="tw:flex tw:justify-between tw:text-xs tw:text-(--o2-text-muted) tw:mb-3.5">
+                <div class="flex justify-between text-xs text-(--o2-text-muted) mb-3.5">
                   <span>{{ ((licenseData.ingestion_used / 100) * (licenseData.license.limits?.Ingestion?.value || 50)).toFixed(0) }} GB today</span>
                   <span>{{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day</span>
                 </div>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-1.5 tw:text-xs tw:text-(--o2-positive) tw:bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))] tw:border tw:border-[color-mix(in_srgb,var(--o2-positive)_22%,transparent)] tw:rounded tw:py-2 tw:px-3">
-                <OIcon name="check-circle" size="sm" class="tw:shrink-0 tw:mt-0.5" />
+              <div class="flex items-start gap-1.5 text-xs text-(--o2-positive) bg-[color-mix(in_srgb,var(--o2-positive)_8%,var(--o2-card-bg))] border border-[color-mix(in_srgb,var(--o2-positive)_22%,transparent)] rounded py-2 px-3">
+                <OIcon name="check-circle" size="sm" class="shrink-0 mt-0.5" />
                 {{ t("about.feature_comparision_plan_detail") }}
               </div>
             </div>
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- ── Feature Comparison ──────────────────────────────────── -->
-        <div v-if="config.isCloud === 'false'" class="tw:bg-(--o2-card-bg) tw:rounded-[0.625rem] tw:p-4 tw:mb-5">
+        <div v-if="config.isCloud === 'false'" class="bg-(--o2-card-bg) rounded-[0.625rem] p-4 mb-5">
           <FeatureComparisonTable />
         </div>
 

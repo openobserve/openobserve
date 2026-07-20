@@ -31,16 +31,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ConstrainedPage size="lg" class="o2-section-hub" data-test="section-hub">
     <div>
-      <header v-if="title || description" class="tw:mb-6">
+      <header v-if="title || description" class="mb-6">
         <h1
           v-if="title"
-          class="tw:text-xl! tw:font-semibold! tw:text-text-primary"
+          class="text-xl! font-semibold! text-text-primary"
         >
           {{ title }}
         </h1>
         <p
           v-if="description"
-          class="tw:text-sm tw:text-text-secondary tw:mt-1"
+          class="text-sm text-text-secondary mt-1"
         >
           {{ description }}
         </p>
@@ -49,46 +49,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <section
         v-for="group in visibleGroups"
         :key="group.label || '_'"
-        class="tw:mb-8"
+        class="mb-8"
         :data-test="`section-hub-group-${group.label}`"
       >
         <h2
           v-if="group.label"
-          class="tw:text-sm! tw:font-semibold! tw:text-text-primary tw:mb-3"
+          class="text-sm! font-semibold! text-text-primary mb-3"
         >
           {{ group.label }}
         </h2>
         <div
-          class="tw:grid tw:grid-cols-1 tw:sm:grid-cols-2 tw:lg:grid-cols-3 tw:gap-4"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
         >
           <button
             v-for="item in group.items"
             :key="item.key"
             type="button"
-            class="o2-hub-card tw:group tw:flex tw:items-start tw:gap-3 tw:text-left tw:p-4 tw:rounded-lg tw:border tw:border-border-default tw:bg-surface-panel tw:transition-colors tw:hover:border-primary-500 tw:hover:bg-surface-subtle tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500"
+            class="o2-hub-card group flex items-start gap-3 text-left p-4 rounded-lg border border-border-default bg-surface-panel transition-colors hover:border-primary-500 hover:bg-surface-subtle outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             :data-test="item.dataTest || `section-hub-card-${item.key}`"
             @click="router.push(item.to)"
           >
             <span
-              class="tw:shrink-0 tw:mt-0.5 tw:inline-flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-md tw:bg-surface-subtle tw:text-text-secondary tw:transition-colors tw:group-hover:bg-primary-50 tw:group-hover:text-primary-600"
+              class="shrink-0 mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-md bg-surface-subtle text-text-secondary transition-colors group-hover:bg-primary-50 group-hover:text-primary-600"
             >
               <img
                 v-if="item.icon && isImg(item.icon)"
                 :src="item.icon.slice(4)"
-                class="tw:h-4 tw:w-4 tw:object-contain"
+                class="h-4 w-4 object-contain"
                 aria-hidden="true"
                 alt=""
               />
               <OIcon v-else-if="item.icon" :name="item.icon as any" size="sm" />
             </span>
-            <span class="tw:flex tw:flex-col tw:min-w-0">
+            <span class="flex flex-col min-w-0">
               <span
-                class="tw:text-sm tw:font-semibold tw:text-text-primary tw:transition-colors tw:group-hover:text-primary-600"
+                class="text-sm font-semibold text-text-primary transition-colors group-hover:text-primary-600"
                 >{{ item.label }}</span
               >
               <span
                 v-if="item.description"
-                class="tw:text-xs tw:text-text-secondary tw:mt-0.5 tw:leading-snug"
+                class="text-xs text-text-secondary mt-0.5 leading-snug"
                 >{{ item.description }}</span
               >
             </span>

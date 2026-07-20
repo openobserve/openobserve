@@ -44,11 +44,6 @@ vi.mock("@/components/icons/NotEqualIcon.vue", () => ({
   default: { template: "<span class='not-equal-icon' />" },
 }));
 
-vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  "arrow-back-ios": "arrow_back_ios",
-  "arrow-forward-ios": "arrow_forward_ios",
-}));
-
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
 const buildFieldValues = (count = 3, extra: Partial<any> = {}) => ({
@@ -130,7 +125,7 @@ describe("FieldValuesPanel.vue", () => {
 
     it("confines the loading overlay to its own box via a positioned wrapper", () => {
       // Regression: OInnerLoading is `absolute inset-0`, so its wrapper must be a
-      // positioning context. Without `tw:relative` the overlay escaped to the
+      // positioning context. Without `relative` the overlay escaped to the
       // nearest positioned ancestor (`.o-field-list__row`) and covered the field
       // row, blocking the click that collapses/cancels the request.
       wrapper = createWrapper({
@@ -141,15 +136,15 @@ describe("FieldValuesPanel.vue", () => {
       );
       expect(loading.exists()).toBe(true);
       const wrapperEl = loading.element.parentElement as HTMLElement;
-      expect(wrapperEl.classList.contains("tw:relative")).toBe(true);
+      expect(wrapperEl.classList.contains("relative")).toBe(true);
     });
 
     it("hides values list while loading with no interim cache", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: true, values: [], errMsg: "" },
       });
-      // After Quasar -> native HTML migration the values list is a <ul> that's
-      // always rendered, but its <li> children come from v-for over displayValues.
+      // The values list is a <ul> that's always rendered, but its <li>
+      // children come from v-for over displayValues.
       // With no cached values during loading, no row items should be present.
       const valueRows = wrapper.findAll('[data-test^="logs-search-subfield-add-"]');
       expect(valueRows.length).toBe(0);

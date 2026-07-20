@@ -19,22 +19,22 @@ const keepAlive = computed<boolean>(() => context?.value.keepAlive ?? false)
 const animated = computed<boolean>(() => context?.value.animated ?? false)
 
 const paddingClasses: Record<TabPanelPadding, string> = {
-  none: 'tw:p-0',
-  sm:   'tw:p-2',
-  md:   'tw:p-4',
+  none: 'p-0',
+  sm:   'p-2',
+  md:   'p-4',
 }
 
 const layoutClasses: Record<TabPanelLayout, string> = {
   block:     '',
-  'flex-col': 'tw:flex tw:flex-col',
-  'flex-row': 'tw:flex tw:flex-row',
+  'flex-col': 'flex flex-col',
+  'flex-row': 'flex flex-row',
 }
 
 const panelClasses = computed<string[]>(() => {
   const classes: string[] = ['o-tab-panel', paddingClasses[props.padding]]
   const layout = layoutClasses[props.layout]
   if (layout) classes.push(layout)
-  if (props.stretch) classes.push('tw:h-full')
+  if (props.stretch) classes.push('h-full')
   return classes
 })
 </script>

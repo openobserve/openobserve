@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:flex-col tw:w-full index-menu"
+    class="flex flex-col w-full index-menu"
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <OSelect
@@ -36,14 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #empty>
-        <li class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-          <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">{{ t("search.noResult") }}</div>
+        <li class="flex items-center gap-2 px-3 py-2">
+          <div class="flex flex-col flex-1 min-w-0">{{ t("search.noResult") }}</div>
         </li>
       </template>
     </OSelect>
-    <div class="metric-list tw:h-[calc(100vh-98px)] tw:w-full tw:overflow-x-hidden tw:overflow-y-auto">
+    <div class="metric-list h-[calc(100vh-98px)] w-full overflow-x-hidden overflow-y-auto">
       <div
-        class="metrics-label-table tw:mt-1 tw:w-full"
+        class="metrics-label-table mt-1 w-full"
         data-test="log-search-index-list-fields-table"
       >
         <OTable
@@ -52,17 +52,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="name"
           pagination="none"
           :show-global-filter="false"
-          class="field-table tw:w-full"
+          class="field-table w-full"
         >
           <template #cell-name="{ row }">
-            <div class="tw:p-0 tw:mb-0.5 tw:relative tw:overflow-visible tw:cursor-default tw:group tw:hover:shadow-[0px_4px_15px_rgba(0,0,0,0.17)] tw:dark:hover:shadow-[0px_4px_15px_rgb(255,255,255,0.1)]">
+            <div class="p-0 mb-0.5 relative overflow-visible cursor-default group hover:shadow-[0px_4px_15px_rgba(0,0,0,0.17)] dark:hover:shadow-[0px_4px_15px_rgb(255,255,255,0.1)]">
               <!-- TODO OK : Repeated code make separate component to display field  -->
               <template
                 v-if="
                   row.name === store.state.zoConfig.timestamp_column
                 "
               >
-                <OFieldLabel :field="row" class="tw:pl-4" />
+                <OFieldLabel :field="row" class="pl-4" />
               </template>
               <template v-else>
                 <OCollapsible
@@ -71,34 +71,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => { openMetricRows[row.name] = v; if (v) openFilterCreator(null, row); }"
                 >
                   <template #trigger>
-                    <div class="tw:flex tw:items-center tw:min-w-0">
-                      <OFieldLabel :field="row" class="tw:flex-1 tw:min-w-0" />
-                      <div class="tw:absolute tw:h-full tw:right-0 tw:top-0 tw:z-[5] tw:bg-[#e8e8e8] tw:px-[6px] tw:invisible tw:flex tw:items-center tw:group-hover:visible tw:group-hover:opacity-100 tw:dark:group-hover:bg-[#3f4143]">
+                    <div class="flex items-center min-w-0">
+                      <OFieldLabel :field="row" class="flex-1 min-w-0" />
+                      <!-- `bg-surface-subtle`, not a hex pair with a `dark:`
+                           override: the token already resolves in both themes,
+                           which is the whole point of having it. -->
+                      <div class="absolute h-full right-0 top-0 z-[5] bg-surface-subtle px-[0.375rem] invisible flex items-center group-hover:visible group-hover:opacity-100">
                         <OButton
                           icon-left="add"
                           :data-test="`metrics-list-add-${row.name}-label-btn`"
                           variant="ghost"
                           size="icon-xs"
-                          class="tw:mr-0"
+                          class="mr-0"
                           @click.stop="addValueToEditor(row.name, '', '=')"
                         />
                       </div>
                     </div>
                   </template>
-                  <div class="tw:pl-3 tw:pr-1 tw:py-1">
+                  <div class="pl-3 pr-1 py-1">
                       <div class="filter-values-container">
                         <div
                           v-show="
                             metricLabelValues[row.name]?.isLoading
                           "
-                          class="tw:pl-3 tw:py-1"
+                          class="pl-3 py-1"
                           style="height: 60px"
                         >
                           <OInnerLoading
                             :showing="
                               metricLabelValues[row.name]?.isLoading
                             "
-                            label="Fetching values..."
+                            :label="t('metrics.metricList.fetchingValues')"
                             size="xs"
                           />
                         </div>
@@ -108,9 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ?.length &&
                             !metricLabelValues[row.name]?.isLoading
                           "
-                          class="tw:pl-3 tw:py-1 tw:text-sm tw:font-medium"
+                          class="pl-3 py-1 text-sm font-medium"
                         >
-                          No values found
+                          {{ t('metrics.metricList.noValuesFound') }}
                         </div>
                         <div
                           v-for="value in metricLabelValues[row.name]
@@ -118,33 +121,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="value.key + value.count"
                         >
                           <ul>
-                            <label class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50 tw:pr-0">
+                            <label class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 pr-0">
                               <div
-                                class="tw:flex tw:flex wrap tw:justify-between"
+                                class="flex flex wrap justify-between"
                                 style="width: calc(100% - 46px)"
                                 :class="
                                   store.state.theme === 'dark'
-                                    ? 'tw:text-gray-300'
-                                    : 'tw:text-gray-500'
+                                    ? 'text-gray-300'
+                                    : 'text-gray-500'
                                 "
                               >
                                 <div
                                   :title="value.key"
-                                  class="tw:truncate tw:pr-1"
+                                  class="truncate pr-1"
                                   style="width: calc(100% - 50px)"
                                 >
                                   {{ value.key }}
                                 </div>
                                 <div
                                   :title="value.count?.toString()"
-                                  class="tw:truncate tw:text-right tw:pr-2"
+                                  class="truncate text-right pr-2"
                                   style="width: 50px"
                                 >
                                   {{ value.count }}
                                 </div>
                               </div>
                               <div
-                                class="tw:flex tw:flex"
+                                class="flex flex"
                                 :class="
                                   store.state.theme === 'dark'
                                     ? 'text-white'
@@ -152,10 +155,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 "
                               >
                                 <OButton
-                                  class="tw:mr-1"
+                                  class="mr-1"
                                   size="icon-xs"
                                   variant="ghost"
-                                  title="Include Term"
+                                  :title="t('metrics.metricList.includeTerm')"
                                   @click="
                                     addValueToEditor(
                                       row.name,
@@ -164,13 +167,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     )
                                   "
                                 >
-                                  <EqualIcon class="tw:size-3" />
+                                  <EqualIcon class="size-3" />
                                 </OButton>
                                 <OButton
-                                  class="tw:mr-1"
+                                  class="mr-1"
                                   size="icon-xs"
                                   variant="ghost"
-                                  title="Exclude Term"
+                                  :title="t('metrics.metricList.excludeTerm')"
                                   @click="
                                     addValueToEditor(
                                       row.name,
@@ -179,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     )
                                   "
                                 >
-                                  <NotEqualIcon class="tw:size-3" />
+                                  <NotEqualIcon class="size-3" />
                                 </OButton>
                               </div>
                             </label>
@@ -373,7 +376,7 @@ export default defineComponent({
           .catch(() => {
             toast({
               variant: "error",
-              message: "Error while fetching field values",
+              message: t("metrics.metricList.errorFetchingFieldValues"),
             });
           })
           .finally(() => {

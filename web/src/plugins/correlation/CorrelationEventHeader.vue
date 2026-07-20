@@ -18,25 +18,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Source Event Banner -->
   <div
     v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
-    class="source-event-banner tw:flex tw:items-start tw:gap-3 tw:px-4 tw:py-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    class="source-event-banner flex items-start gap-3 px-4 py-2 border-b border-solid border-[var(--o2-border-color)]"
   >
     <OTag
       v-if="sourceEvent.severity"
       type="logLevel"
       :value="sourceEvent.severity"
-      class="tw:shrink-0"
+      class="shrink-0"
     />
-    <span class="tw:text-xs tw:font-mono tw:text-typography-meta tw:shrink-0">
+    <span class="text-xs font-mono text-typography-meta shrink-0">
       {{ formatEventTimestamp(sourceEvent.timestamp) }}
     </span>
     <OSeparator
       v-if="sourceEvent.message"
       vertical
-      class="tw:mx-0"
+      class="mx-0"
     />
     <span
       v-if="sourceEvent.message"
-      class="tw:text-xs tw:flex-1 tw:font-mono tw:text-typography-meta source-event-message"
+      class="text-xs flex-1 font-mono text-typography-meta source-event-message"
       :title="sourceEvent.message"
     >
       {{ sourceEvent.message }}
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Chips Row -->
   <div
     v-if="hasChips || $slots['chip-actions']"
-    class="tw:flex tw:items-center tw:gap-6 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+    class="flex items-center gap-6 px-4 border-b border-solid border-[var(--o2-border-color)]"
   >
     <!-- Context chips (Correlated by) — flex-1 so it occupies exactly the space
          left after the shrink-0 subject section (toggles + dynamic badge). Its
@@ -54,10 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="contextChips && contextChips.length > 0"
       ref="containerRef"
-      class="tw:flex tw:items-center tw:gap-3  tw:py-2 tw:flex-1 tw:min-w-0"
+      class="flex items-center gap-3  py-2 flex-1 min-w-0"
     >
-      <span class="tw:text-2! tw:m-0 tw:text-typography-meta tw:shrink-0">Correlated by:</span>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0 tw:overflow-hidden">
+      <span class="text-2! m-0 text-typography-meta shrink-0">Correlated by:</span>
+      <div class="flex items-center gap-2 min-w-0 overflow-hidden">
         <ODimensionChip
           v-for="chip in displayedChips"
           :key="chip.key"
@@ -65,22 +65,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key-label="chip.label"
           :value="chip.value"
           :tooltip="false"
-          class="tw:min-w-0"
+          class="min-w-0"
           :data-test="`correlation-event-header-chip-${chip.key}`"
         />
 
-        <span v-if="hiddenChipCount > 0" class="tw:contents">
+        <span v-if="hiddenChipCount > 0" class="contents">
           <OTag
             type="correlationChip"
             value="overflow"
-            class="tw:cursor-default"
+            class="cursor-default"
             :data-test="`correlation-event-header-overflow-${hiddenChipCount}`"
           >
             <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount }}<template v-if="hiddenChipCount === contextChips.length"> Fields</template>
           </OTag>
           <OTooltip side="top" :disabled="hiddenChipCount === 0">
             <template #content>
-              <div class="tw:flex tw:flex-col tw:items-start tw:gap-1">
+              <div class="flex flex-col items-start gap-1">
                 <ODimensionChip
                   v-for="chip in hiddenChips"
                   :key="chip.key"
@@ -100,15 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Subject chips (View by) — shown when subjectChips are provided -->
     <div
       v-if="showSubjectSection"
-      class="tw:flex tw:items-center tw:gap-3 tw:shrink-0"
+      class="flex items-center gap-3 shrink-0"
     >
-      <OSeparator vertical class="tw:my-2" />
-      <span class="tw:text-2! tw:m-0 tw:text-typography-meta">View by:</span>
+      <OSeparator vertical class="my-2" />
+      <span class="text-2! m-0 text-typography-meta">View by:</span>
       <OToggleGroup
         :model-value="activeSubject ?? undefined"
         type="single"
         size="xs"
-        class="tw:h-7!"
+        class="h-7!"
         @update:model-value="(v: string | undefined) => emit('update:activeSubject', v ?? null)"
       >
         <OToggleGroupItem
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="chip.key"
           :value="chip.key"
           size="sm"
-          class="tw:h-5.5!"
+          class="h-5.5!"
           :disabled="!!chip.disabled"
           :data-test="`correlation-event-header-subject-${chip.key}`"
         >
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Slot for actions co-located with the chip row (e.g. wrap-text button) -->
-    <div v-if="$slots['chip-actions']" class="tw:ml-auto tw:shrink-0">
+    <div v-if="$slots['chip-actions']" class="ml-auto shrink-0">
       <slot name="chip-actions" />
     </div>
   </div>
@@ -205,7 +205,7 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLElement>();
 const containerWidth = ref(0);
 
-const CHIP_GAP = 8; // tw:gap-2 = 0.5rem = 8px
+const CHIP_GAP = 8; // gap-2 = 0.5rem = 8px
 const OVERFLOW_INDICATOR_WIDTH = 40;
 
 function estimateChipWidth(chip: DimensionChip): number {

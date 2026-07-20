@@ -15,29 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:px-4 tw:pt-3" style="min-height: inherit; overflow: auto">
-    <div v-if="!isChildOrg" class="tw:flex tw:justify-between tw:items-center">
-      <div>
-        <h1 class="tw:text-2xl tw:font-bold tw:leading-9 tw:text-(--o2-text-heading) tw:mt-0 tw:mr-0 tw:mb-2 tw:ml-0 tw:block">{{ t("billing.title") }}</h1>
-        <p class="tw:text-base tw:font-semibold tw:leading-[1.375rem] tw:text-(--o2-text-secondary) tw:m-0 tw:block">{{ t("billing.subtitle") }}</p>
-      </div>
-    </div>
+  <div class="rounded-md px-4 pt-3" style="min-height: inherit; overflow: auto">
+    <!-- Page title is supplied by the parent Billing.vue AppPageHeader; no local title here. -->
     <!-- Managed billing empty state for child orgs -->
     <div
       v-if="isChildOrg"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center tw:min-h-[calc(100vh-var(--navbar-height)-200px)] tw:py-12 tw:px-6"
+      class="flex flex-col items-center justify-center text-center min-h-[calc(100vh-var(--navbar-height)-200px)] py-12 px-6"
       data-test="plans-managed-billing-panel"
     >
-      <div class="tw:w-[100px] tw:h-[100px] tw:rounded-full tw:border tw:border-dashed tw:border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] tw:flex tw:items-center tw:justify-center tw:mb-7">
-        <div class="tw:w-[68px] tw:h-[68px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] tw:border-[1.5px] tw:border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] tw:border-solid tw:flex tw:items-center tw:justify-center">
-          <OIcon name="account-balance" size="lg" class="tw:text-(--color-primary-600) tw:opacity-85" />
+      <div class="w-[100px] h-[100px] rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-7">
+        <div class="w-[68px] h-[68px] rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] border-solid flex items-center justify-center">
+          <OIcon name="account-balance" size="lg" class="text-(--color-primary-600) opacity-85" />
         </div>
       </div>
 
-      <div class="tw:text-[1.2rem] tw:font-bold tw:tracking-[-0.2px] tw:mb-[10px]">
+      <div class="text-[1.2rem] font-bold tracking-[-0.2px] mb-[10px]">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
-      <div class="tw:text-[0.88rem] tw:leading-[1.65] tw:opacity-65 tw:max-w-[440px] tw:mb-6">
+      <div class="text-[0.88rem] leading-[1.65] opacity-65 max-w-[440px] mb-6">
         {{
           t("billing.billingGroup.plansManagedDescription", {
             name: membership?.payer_org_name,
@@ -46,16 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </div>
 
-      <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:justify-center tw:mb-8">
-        <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-[20px] tw:py-1 tw:px-3">
+      <div class="flex items-center gap-2 flex-wrap justify-center mb-8">
+        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
           <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
-        <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-[20px] tw:py-1 tw:px-3">
+        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
           <OIcon name="lock" size="xs" />
           {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
-        <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-[20px] tw:py-1 tw:px-3">
+        <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-[20px] py-1 px-3">
           <OIcon name="description" size="xs" />
           {{ t("billing.billingGroup.chipNoInvoices") }}
         </span>
@@ -63,25 +58,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="primary"
-        class="tw:h-10 tw:py-0 tw:px-6 tw:font-semibold"
+        class="h-10 py-0 px-6 font-semibold"
         data-test="plans-view-org-group-btn"
         @click="goToOrgGroup"
       >
         {{ t("billing.billingGroup.viewOrgGroup") }}
         <template #icon-right>
-          <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
+          <OIcon name="arrow-forward" size="sm" class="ml-1" />
         </template>
       </OButton>
     </div>
     <template v-else>
-    <trial-period class="tw:mb-3" currentPage="billing"></trial-period>
+    <trial-period class="mb-3" currentPage="billing"></trial-period>
     <!-- AI Credits card -->
-    <div v-if="aiUsage" class="tw:grid tw:grid-cols-1 tw:gap-4 tw:w-full tw:mb-4">
-      <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:shadow-none tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] tw:dark:bg-[var(--o2-card-background)] tw:dark:border-[var(--o2-border)]">
-        <div class="tw:min-h-full tw:rounded-lg tw:transition-all tw:duration-300 tw:ease-[cubic-bezier(0.4,0,0.2,1)] tw:text-center tw:flex tw:flex-col tw:justify-between">
-          <div class="tw:flex tw:flex-col tw:justify-between">
-            <div class="tw:flex tw:justify-between tw:items-center">
-              <div class="tw:text-base tw:font-medium tw:leading-5 tw:text-(--o2-text-heading) tw:text-left">{{ t("billing.aiCredits") }}</div>
+    <div v-if="aiUsage" class="grid grid-cols-1 gap-4 w-full mb-4">
+      <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] dark:bg-[var(--o2-card-background)] dark:border-[var(--o2-border)]">
+        <div class="min-h-full rounded-lg transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] text-center flex flex-col justify-between">
+          <div class="flex flex-col justify-between">
+            <div class="flex justify-between items-center">
+              <div class="text-base font-medium leading-5 text-(--o2-text-heading) text-left">{{ t("billing.aiCredits") }}</div>
               <div style="opacity: 0.8;">
                 <img :src="aiIcon" />
               </div>
@@ -89,24 +84,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               type="aiMode"
               :value="aiUsage.mode"
-              class="tw:mt-2"
+              class="mt-2"
               style="width: fit-content;"
             />
           </div>
-          <div class="tw:mt-3 tw:mb-2">
+          <div class="mt-3 mb-2">
             <OProgressBar
               :value="aiUsageRatio"
               size="sm"
               :variant="aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'"
             />
           </div>
-          <div class="tw:text-2xl tw:font-semibold tw:leading-7 tw:text-(--o2-text-heading) tw:text-left tw:flex tw:items-end">
+          <div class="text-2xl font-semibold leading-7 text-(--o2-text-heading) text-left flex items-end">
             {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
           </div>
-          <div v-if="aiUsage.mode === 'exhausted'" class="tw:text-red-500 tw:mt-2" style="font-size: 13px;">
+          <div v-if="aiUsage.mode === 'exhausted'" class="text-red-500 mt-2" style="font-size: 13px;">
             {{ t("billing.aiExhaustedMessage") }}
           </div>
-          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info tw:mt-2" style="font-size: 13px;">
+          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info mt-2" style="font-size: 13px;">
             {{ t("billing.aiPaygMessage") }}
           </div>
         </div>
@@ -117,15 +112,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.selectedOrganization.hasOwnProperty('note') &&
         store.state.selectedOrganization.note
       "
-      class="tw:flex tw:justify-start tw:items-center tw:gap-2 tw:text-red-500 tw:text-xl tw:font-semibold tw:pl-6 tw:pb-4"
+      class="flex justify-start items-center gap-2 text-red-500 text-xl font-semibold pl-6 pb-4"
     >
-      <OIcon name="warning" size="sm" class="tw:pt-2" />
+      <OIcon name="warning" size="sm" class="pt-2" />
       >{{ store.state.selectedOrganization.note }}
     </div>
-    <div v-if="loading" class="tw:text-xl tw:font-semibold text-weight-medium tw:text-center">
-      <OSpinner size="md" class="tw:mx-auto tw:block tw:text-center tw:mt-3" />
+    <div v-if="loading" class="text-xl font-semibold text-weight-medium text-center">
+      <OSpinner size="md" class="mx-auto block text-center mt-3" />
     </div>
-    <div v-else class="tw:grid tw:grid-cols-2 tw:gap-3 tw:mt-3">
+    <div v-else class="grid grid-cols-2 gap-3 mt-3">
       <pro-plan
         :planType="planType"
         :billingProvider="billingProvider"

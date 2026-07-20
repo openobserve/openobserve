@@ -1,10 +1,10 @@
 <template>
   <div
-    class="skeleton-box tw:bg-skeleton-base tw:relative tw:overflow-hidden tw:rounded"
+    class="skeleton-box bg-skeleton-base relative overflow-hidden rounded"
     :class="[
       variantClass,
-      rounded && 'tw:rounded-lg',
-      circle && 'tw:rounded-full tw:aspect-square'
+      rounded && 'rounded-lg',
+      circle && 'rounded-full aspect-square'
     ]"
     :style="{
       width: width,
@@ -48,11 +48,11 @@ const store = useStore()
 
 const variantClass = computed(() => {
   switch (props.variant) {
-    case 'text':    return 'tw:rounded-[3px]'
-    case 'title':   return 'tw:rounded'
-    case 'button':  return 'tw:rounded-md'
-    case 'avatar':  return 'tw:rounded-full'
-    case 'image':   return 'tw:rounded-lg'
+    case 'text':    return 'rounded-[3px]'
+    case 'title':   return 'rounded'
+    case 'button':  return 'rounded-md'
+    case 'avatar':  return 'rounded-full'
+    case 'image':   return 'rounded-lg'
     default:        return ''
   }
 })

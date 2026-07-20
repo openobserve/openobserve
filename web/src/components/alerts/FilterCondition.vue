@@ -1,11 +1,11 @@
 ﻿<template>
-    <div class="tw:flex tw:items-start tw:gap-1 tw:flex-no-wrap">
+    <div class="flex items-start gap-1 flex-no-wrap">
       <!-- V2: Fixed-width left column for alignment -->
       <!-- All conditions have the same width for the operator/label section -->
-      <div class="tw:flex tw:items-center tw:justify-center tw:mt-1 tw:min-w-[60px]">
+      <div class="flex items-center justify-center mt-1 min-w-[60px]">
         <!-- First condition in root group -->
         <template v-if="index === 0 && depth === 0">
-          <span class="tw:text-sm">if</span>
+          <span class="text-sm">{{ t('alerts.filters.if') }}</span>
         </template>
 
         <!-- First condition in nested groups: empty space for alignment -->
@@ -16,7 +16,7 @@
         <!-- Other conditions: show operator + toggle button -->
         <template v-else>
           <span
-            class="tw:text-sm tw:font-medium tw:min-w-[30px] tw:lowercase"
+            class="text-sm font-medium min-w-[30px] lowercase"
             data-test="alert-conditions-operator-label"
             :data-test-label="computedLabel"
           >
@@ -27,17 +27,20 @@
             data-test="alert-conditions-toggle-operator-btn"
             variant="ghost"
             size="icon-circle-sm"
-            class="tw:h-[26px] tw:flex-shrink-0 tw:text-(--o2-primary-btn-bg)! tw:hover:bg-[rgba(var(--o2-primary-btn-bg-rgb),0.1)]!"
+            class="h-[26px] flex-shrink-0 text-(--o2-primary-btn-bg)! hover:bg-[rgba(var(--o2-primary-btn-bg-rgb),0.1)]!"
             @click="toggleOperator"
           >
             <OIcon name="restart-alt" size="sm" />
-            <OTooltip content="Toggle between and/or" />
+            <OTooltip :content="t('alerts.filters.toggleOperatorTooltip')" />
           </OButton>
         </template>
       </div>
-        <div class="tw:ml-0">
-          <OSelect
-            v-model="condition.column"
+        <!-- All consumers render in FORM MODE: the three controls are name=-owned
+             by the TanStack form — no v-model, no manual error refs; schema errors
+             surface post-submit via the OForm* wrappers (R3). -->
+        <div class="ml-0">
+          <OFormSelect
+            :name="`${namePrefix}.column`"
             :options="filteredFields"
             :dropdownStyle="{ textTransform: 'lowercase' }"
             searchable
@@ -48,40 +51,31 @@
             :placeholder="t('alerts.column')"
             :creatable="props.allowCustomColumns"
             :class="[inputWidth ? inputWidth : '']"
-            :error="!!columnError"
-            :error-message="columnError"
             data-test="alert-conditions-select-column"
             @search="filterColumns"
-            @update:model-value="() => { columnError = ''; emits('input:update', 'conditions', condition) }"
-            @blur="validateColumn"
+            @update:model-value="() => emits('input:update', 'conditions', condition)"
           />
           <OTooltip v-if="condition.column && store.state.isAiChatEnabled" :content="condition.column" />
         </div>
-        <div class="tw:ml-0">
-          <OSelect
-            v-model="condition.operator"
+        <div class="ml-0">
+          <OFormSelect
+            :name="`${namePrefix}.operator`"
             :options="triggerOperators"
             :dropdownStyle="{ textTransform: 'capitalize' }"
-            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[70px]' : computedInputWidth)]"
-            :error="!!operatorError"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[70px]' : computedInputWidth)]"
             :searchable="false"
-            :error-message="operatorError"
             data-test="alert-conditions-operator-select"
-            @update:model-value="() => { operatorError = ''; emits('input:update', 'conditions', condition) }"
-            @blur="validateOperator"
+            @update:model-value="() => emits('input:update', 'conditions', condition)"
           />
           <OTooltip v-if="condition.operator && store.state.isAiChatEnabled" :content="condition.operator" />
         </div>
-        <div class="tw:ml-0">
-          <OInput
-            v-model="condition.value"
+        <div class="ml-0">
+          <OFormInput
+            :name="`${namePrefix}.value`"
             :placeholder="t('common.value')"
-            :error="!!valueError"
-            :error-message="valueError"
-            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'tw:w-[110px]' : computedValueWidth)]"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[110px]' : computedValueWidth)]"
             data-test="alert-conditions-value-input"
-            @update:model-value="() => { valueError = ''; emits('input:update', 'conditions', condition) }"
-            @blur="validateValue"
+            @update:model-value="() => emits('input:update', 'conditions', condition)"
           />
           <OTooltip v-if="condition.value && store.state.isAiChatEnabled" :content="condition.value" />
         </div>
@@ -90,9 +84,10 @@
 
   <script setup lang="ts">
   import OButton from '@/lib/core/Button/OButton.vue';
-  import OSelect from '@/lib/forms/Select/OSelect.vue';
-  import OInput from '@/lib/forms/Input/OInput.vue';
+  import OFormSelect from '@/lib/forms/Select/OFormSelect.vue';
+  import OFormInput from '@/lib/forms/Input/OFormInput.vue';
   import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+  import { FORM_CONTEXT_KEY } from '@/lib/forms/Form/OForm.types';
   const props = defineProps({
         condition: {
         type: Object,
@@ -140,9 +135,22 @@
         required: false,
         validator: (value: string) => ['alerts', 'pipelines'].includes(value),
     },
+    /**
+     * Dual-mode switch (alerts-migration.md §A). When set AND an OForm context
+     * is injectable, the three controls render as OForm* fields name=-bound to
+     * `${namePrefix}.column` / `.operator` / `.value` — the TanStack form owns
+     * their values (no v-model, no manual error refs). When empty (default)
+     * the component renders today's BARE markup unchanged (pipeline's
+     * NodeForm/Condition.vue consumes it bare — a permanent, sanctioned mode).
+     */
+    namePrefix: {
+        type: String,
+        default: '',
+        required: false,
+    },
     });
 
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -172,29 +180,9 @@ const store = useStore();
 
 const { t } = useI18n();
 
-// Inline error state (replaces Quasar :rules)
-const columnError = ref('');
-const operatorError = ref('');
-const valueError = ref('');
-
-const validateColumn = () => {
-  columnError.value = !props.condition.column ? 'Field is required!' : '';
-};
-const validateOperator = () => {
-  operatorError.value = !props.condition.operator ? 'Field is required!' : '';
-};
-const validateValue = () => {
-  valueError.value = !props.condition.value ? 'Field is required!' : '';
-};
-
-defineExpose({
-  validate: () => {
-    validateColumn();
-    validateOperator();
-    validateValue();
-    return !columnError.value && !operatorError.value && !valueError.value;
-  },
-});
+// The injected OForm — condition values are name-bound to it (form mode is the
+// only mode now); also used to write the AND/OR toggle below.
+const form = inject(FORM_CONTEXT_KEY, null);
 
 const deleteApiHeader = (field: any) => {
   emits("remove", field);
@@ -222,22 +210,24 @@ const computedLabel = computed(() => {
   return props.label;
 });
 
-// Toggle operator between AND/OR for this condition
+// Toggle operator between AND/OR for this condition. The condition is the
+// READONLY form read-view, so mutating it in place silently fails ("target is
+// readonly") — write through the injected form by its name path instead.
 const toggleOperator = () => {
-  if (props.condition.logicalOperator) {
-    props.condition.logicalOperator = props.condition.logicalOperator === 'AND' ? 'OR' : 'AND';
-    emits('input:update', 'conditions', props.condition);
-  }
+  if (!props.condition.logicalOperator) return;
+  const next = props.condition.logicalOperator === 'AND' ? 'OR' : 'AND';
+  form?.setFieldValue(`${props.namePrefix}.logicalOperator`, next);
+  emits('input:update', 'conditions', props.condition);
 };
 
 const computedInputWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'tw:xl:min-w-[200px] tw:lg:min-w-[90px] tw:lg:w-fit');
+  return props.inputWidth || (store.state.isAiChatEnabled ? '' : 'xl:min-w-[200px] lg:min-w-[90px] lg:w-fit');
 });
 
 const computedValueWidth = computed(() => {
   // If custom width is provided, use it; otherwise use default responsive width
-  return props.inputWidth || (store.state.isAiChatEnabled ? 'tw:w-[110px]' : 'tw:xl:min-w-[200px] tw:lg:w-fit tw:lg:min-w-[80px]');
+  return props.inputWidth || (store.state.isAiChatEnabled ? 'w-[110px]' : 'xl:min-w-[200px] lg:w-fit lg:min-w-[80px]');
 });
 
 

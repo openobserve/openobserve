@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="p-0 h-full flex flex-col">
     <!-- Standard page header: title + icon + subtitle, matching the Users page. -->
     <AppPageHeader
       :title="t('invitation.pendingInvitations')"
-      :subtitle="'Pending and sent member invitations'"
+      :subtitle="t('iam.invitationList.subtitle')"
       icon="mail"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     />
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :data="invitations"
           :columns="columns"
@@ -42,14 +42,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-invitations-list"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('invitation.search')"
                 data-test="invitation-list-search-input"
-                class="tw:flex-1"
+                class="flex-1"
               />
             </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="invitation-list-refresh-btn"
+              @click="fetchPendingInvitations"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamInvitationsRefresh" />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -62,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-role="{ row }">
             <OTag v-if="row.role" type="userRole" :value="row.role" />
-            <span v-else class="tw:text-text-primary">—</span>
+            <span v-else class="text-text-primary">—</span>
           </template>
           <template #cell-inviter_id="{ row }">
             <OUserCell :value="row.inviter_id" />
@@ -76,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <OButton
                 variant="primary"
                 size="sm"
@@ -96,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title tw:text-text-primary">
+            <span class="o2-table-footer-title">
               {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
             </span>
           </template>
@@ -134,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -149,6 +162,8 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "InvitationList",
@@ -156,6 +171,7 @@ export default defineComponent({
     AppPageHeader,
     OEmptyState,
     OButton,
+    OTooltip,
     OTag,
     OTimeCell,
     OUserCell,
@@ -251,7 +267,7 @@ export default defineComponent({
     const fetchPendingInvitations = async () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Loading pending invitations...",
+        message: t("iam.invitationList.loadingPending"),
               timeout: 0,
 });
 
@@ -272,7 +288,7 @@ export default defineComponent({
         toast({
           message:
             error.response?.data?.message ||
-            "Failed to load pending invitations",
+            t("iam.invitationList.failedLoadPending"),
           variant: "error",
         });
       } finally {
@@ -317,7 +333,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Accepting invitation...",
+        message: t("iam.invitationList.accepting"),
               timeout: 0,
 });
 
@@ -334,7 +350,7 @@ export default defineComponent({
 
         dismiss();
         toast({
-          message: "Invitation accepted successfully!",
+          message: t("iam.invitationList.acceptedSuccess"),
           variant: "success",
         });
 
@@ -353,7 +369,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            error.response?.data?.message || "Failed to accept invitation",
+            error.response?.data?.message || t("iam.invitationList.failedAccept"),
           variant: "error",
         });
       }
@@ -365,7 +381,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Rejecting invitation...",
+        message: t("iam.invitationList.rejecting"),
               timeout: 0,
 });
 
@@ -375,7 +391,7 @@ export default defineComponent({
         );
         dismiss();
         toast({
-          message: "Invitation rejected successfully!",
+          message: t("iam.invitationList.rejectedSuccess"),
           variant: "success",
         });
 
@@ -392,11 +408,15 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            error.response?.data?.message || "Failed to reject invitation",
+            error.response?.data?.message || t("iam.invitationList.failedReject"),
           variant: "error",
         });
       }
     };
+
+    useShortcuts([
+      { id: "iamInvitationsRefresh", handler: () => { if (!isInputFocused()) fetchPendingInvitations(); } },
+    ]);
 
     return {
       t,

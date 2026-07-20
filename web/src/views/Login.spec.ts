@@ -71,16 +71,11 @@ import organizationsService from "@/services/organizations";
 import * as zincutils from "@/utils/zincutils";
 import config from "@/aws-exports";
 
-// Mock Toast (replaces quasar notify)
+// Mock Toast
 const mockNotify = vi.fn(() => vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockNotify(...args),
 }));
-
-// Mock Quasar notification (kept for $q mock compatibility)
-const mockQuasar = {
-  notify: vi.fn(() => vi.fn()),
-};
 
 // Mock sessionStorage and localStorage
 const mockSessionStorage = {
@@ -246,7 +241,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -260,7 +254,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -273,7 +266,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -287,7 +279,6 @@ describe("Login.vue", () => {
           global: {
             plugins: [store, router, i18n],
             mocks: {
-              $q: mockQuasar,
             },
           },
         });
@@ -302,7 +293,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -346,7 +336,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -366,7 +355,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -387,7 +375,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -407,7 +394,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -453,7 +439,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -531,7 +516,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -734,7 +718,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test&id_token=test",
             },
@@ -761,7 +744,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -788,7 +770,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -817,7 +798,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -852,7 +832,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -879,7 +858,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -904,7 +882,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -928,7 +905,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "",
             },
@@ -949,7 +925,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -1041,7 +1016,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -1057,7 +1031,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -1084,7 +1057,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
           },
         },
       });
@@ -1099,7 +1071,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -1120,7 +1091,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -1198,7 +1168,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -1235,7 +1204,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },
@@ -1264,7 +1232,6 @@ describe("Login.vue", () => {
         global: {
           plugins: [store, router, i18n],
           mocks: {
-            $q: mockQuasar,
             $route: {
               hash: "#access_token=test",
             },

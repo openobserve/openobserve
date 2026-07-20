@@ -36,8 +36,8 @@ function handleUpdate(value: string) {
     :name="name"
     :aria-label="label"
     :class="[
-      'tw:flex tw:gap-2',
-      orientation === 'horizontal' ? 'tw:flex-row tw:flex-wrap' : 'tw:flex-col',
+      'flex gap-2',
+      orientation === 'horizontal' ? 'flex-row flex-wrap' : 'flex-col',
     ]"
     @update:model-value="handleUpdate"
   >

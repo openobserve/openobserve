@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #extra>
-      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
+      <div class="flex items-center justify-center gap-2 flex-wrap">
         <OButton
           v-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" alt="" />
+            <img :src="aiIconSrc" class="w-4 h-4 shrink-0" alt="" />
           </template>
           {{ t("traces.noEvents.askAi") }}
         </OButton>
@@ -201,7 +201,7 @@ const jumpTargetSublabel = computed(() => {
   const formatted = DateTime.fromMillis(lastDataUs / 1000)
     .setZone(zone)
     .toFormat("MMM d, yyyy HH:mm:ss");
-  return `Last data: ${formatted} (${zone})`;
+  return t("traces.tracesNoEventsState.lastData", { formatted, zone });
 });
 
 // --- time-range helpers (via shared composable) -----------------------------

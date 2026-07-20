@@ -1,6 +1,6 @@
 <template>
   <div
-    class="tw:relative"
+    class="relative"
     style="margin-top: 5px"
     data-no-autofocus
     data-test="common-auto-complete-container"
@@ -19,7 +19,7 @@
       </template>
     </OInput>
     <div
-      class="options-container tw:z-10 tw:absolute tw:left-0 tw:right-0 tw:top-[42px] tw:max-h-25 tw:overflow-y-auto tw:border tw:border-[#ccc]"
+      class="options-container z-10 absolute left-0 right-0 top-[42px] max-h-25 overflow-y-auto border border-[#ccc]"
       data-test="common-auto-complete-options-container"
       v-if="showOptions && fieldsFilteredOptions.length > 0"
       :style="{
@@ -29,7 +29,7 @@
       <div
         v-for="(option, index) in fieldsFilteredOptions"
         :key="index"
-        class="tw:p-2 tw:cursor-pointer tw:hover:bg-[#f0f0f0b1]"
+        class="p-2 cursor-pointer hover:bg-[#f0f0f0b1]"
         @mousedown="selectOption(option)"
         data-test="common-auto-complete-option"
       >

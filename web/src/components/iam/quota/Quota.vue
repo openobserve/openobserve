@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
 <template>
-  <div class="tw:rounded-md quota-page tw:text-left tw:h-full tw:flex tw:flex-col"
+  <div class="quota-page text-left h-full flex flex-col"
     :class="
       store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
     "
@@ -24,31 +24,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Standard page header: title + icon + subtitle, matching the other IAM pages. -->
     <AppPageHeader
       :title="t('quota.header')"
-      :subtitle="'Usage limits applied per role'"
+      title-data-test="user-title-text"
+      :subtitle="t('iam.quotaPage.subtitle')"
       icon="speed"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
-    >
-      <template #title>
-        <span data-test="user-title-text">{{ t("quota.header") }}</span>
-      </template>
-    </AppPageHeader>
-    <div :style="{ marginTop: 0 }" class="app-table-container tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
-      <div class="card-container tw:mb-[0.625rem] tw:mt-2.5">
-        <div class="tw:px-3 tw:py-2">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:mb-2">
-            <div class="tw:flex tw:items-center">
+      class="shrink-0 px-4 border-b border-border-default"
+    />
+    <div :style="{ marginTop: 0 }" class="app-table-container flex flex-col flex-1 min-h-0">
+      <div class="card-container mb-[0.625rem] mt-2.5">
+        <div class="px-3 py-2">
+          <div class="flex items-center justify-between w-full mb-2">
+            <div class="flex items-center">
               <OSelect
                 :loading="isOrgLoading"
                 :model-value="selectedOrganization?.value"
                 :options="organizationToDisplay"
                 searchable
-                placeholder="Select Organization"
-                class="tw:py-2 no-case tw:mr-3 tw:w-[300px] input-width org-select"
+                :placeholder="t('iam.quotaPage.selectOrganization')"
+                class="py-2 no-case mr-3 w-[300px] input-width org-select"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleOrgSelect"
               />
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+              <div class="app-tabs-container h-[36px] w-fit">
                 <app-tabs
                   data-test="quota-tabs"
                   class="tabs-selection-container"
@@ -58,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div class="tw:flex tw:items-center" v-if="selectedOrganization">
+            <div class="flex items-center" v-if="selectedOrganization">
               <OButton
                 v-if="!editTable"
                 data-test="edit-table-btn"
@@ -67,17 +64,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="activeTab == 'role-limits' && !expandedRow"
                 @click="editTableWithInput"
               >
-                Edit Quota
+                {{ t('iam.quotaPage.editQuota') }}
                 <template #icon-right>
                   <OIcon name="edit" size="sm" style="font-weight: 200; opacity: 0.7" />
                 </template>
               </OButton>
             </div>
           </div>
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:mb-2">
+          <div class="flex items-center justify-between w-full mb-2">
             <div
               v-if="selectedOrganization && activeType == 'table'"
-              class="tw:flex tw:items-center"
+              class="flex items-center"
             >
               <OSearchInput
                 data-test="pipeline-list-search-input"
@@ -97,9 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="apiCategories"
                 searchable
                 clearable
-                placeholder="Select API Category"
+                :placeholder="t('iam.quotaPage.selectApiCategory')"
                 style="padding: 0px"
-                class="no-case tw:mr-3 tw:w-[300px] input-width tw:ml-3 category-select"
+                class="no-case mr-3 w-[300px] input-width ml-3 category-select"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleApiCategorySelect"
@@ -107,9 +104,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="selectedOrganization"
-              class="tw:flex tw:items-center float-right tw:ml-auto"
+              class="flex items-center float-right ml-auto"
             >
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit tw:mr-3">
+              <div class="app-tabs-container h-[36px] w-fit mr-3">
                 <app-tabs
                   data-test="time-unit-tabs"
                   class="tabs-selection-container"
@@ -118,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:active-tab="updateTimeUnit"
                 />
               </div>
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
+              <div class="app-tabs-container h-[36px] w-fit">
                 <app-tabs
                   data-test="table-json-type-selection-tabs"
                   class="tabs-selection-container"
@@ -132,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- this table for api limits -->
-      <div v-if="activeTab == 'api-limits' && activeType == 'table'" class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div v-if="activeTab == 'api-limits' && activeType == 'table'" class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         :data="apiLimitsRows"
         :columns="generateColumns()"
@@ -167,12 +164,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               debounce="500"
               :class="{
                 'editable-cell': editTable,
-                'tw:px-[10px] tw:py-0': editTable && store.state.theme !== 'dark',
-                'tw:bg-[#f1f1ee]': editTable && store.state.theme !== 'dark',
-                'tw:px-[10px]': editTable && store.state.theme === 'dark',
+                'px-[10px] py-0': editTable && store.state.theme !== 'dark',
+                'bg-[#f1f1ee]': editTable && store.state.theme !== 'dark',
+                'px-[10px]': editTable && store.state.theme === 'dark',
                 'edited-input': isEdited(row.module_name, col),
-                'tw:bg-[#bfc3f4] tw:text-black tw:font-medium': isEdited(row.module_name, col) && store.state.theme !== 'dark',
-                'tw:bg-[#f6f6f6] tw:text-black tw:font-medium tw:[padding:0px!important]': isEdited(row.module_name, col) && store.state.theme === 'dark',
+                'bg-[#bfc3f4] text-black font-medium': isEdited(row.module_name, col) && store.state.theme !== 'dark',
+                'bg-[#f6f6f6] text-black font-medium [padding:0px!important]': isEdited(row.module_name, col) && store.state.theme === 'dark',
               }"
               @input="(event: any) => handleInputChange('', row.module_name, value, col, event.target.innerText)"
               @keypress="restrictToNumbers"
@@ -190,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="card-container tw:pb-[0.625rem] tw:flex-1 tw:min-h-0"
+        class="card-container pb-[0.625rem] flex-1 min-h-0"
         v-if="activeTab == 'api-limits' && activeType == 'json'"
       >
         <query-editor
@@ -205,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <!-- this table for role limits -->
-       <div v-if="activeTab == 'role-limits' && activeType == 'table'"  class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+       <div v-if="activeTab == 'role-limits' && activeType == 'table'"  class="card-container flex-1 min-h-0 overflow-hidden">
         <OTable
           :data="rolesLimitRows"
           :columns="roleLimitsColumns"
@@ -239,47 +236,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #expansion="{ row }">
             <template v-for="(moduleRow, index) in filteredRoleLevelModuleRows" :key="index">
-              <div v-if="!editTable" class="tw:flex tw:items-center tw:px-6 tw:py-1 tw:text-sm tw:border-b tw:border-[var(--color-table-row-divider)]">
-                <span class="tw:w-[200px]">{{ moduleRow.module_name }}</span>
-                <span v-for="col in roleLimitCrudColumnIds" :key="col" class="tw:flex-1 tw:text-center">
+              <div v-if="!editTable" class="flex items-center px-6 py-1 text-sm border-b border-[var(--color-table-row-divider)]">
+                <span class="w-[200px]">{{ moduleRow.module_name }}</span>
+                <span v-for="col in roleLimitCrudColumnIds" :key="col" class="flex-1 text-center">
                   <template v-if="moduleRow[col] == '-'">-</template>
                   <template v-else>{{ moduleRow[col] }}</template>
                 </span>
               </div>
-              <div v-else class="tw:flex tw:items-center tw:px-6 tw:py-1 tw:text-sm tw:border-b tw:border-[var(--color-table-row-divider)]">
-                <span class="tw:w-[200px]">{{ moduleRow.module_name }}</span>
-                <span v-for="col in roleLimitCrudColumnIds" :key="col" class="tw:flex-1 tw:text-center">
+              <div v-else class="flex items-center px-6 py-1 text-sm border-b border-[var(--color-table-row-divider)]">
+                <span class="w-[200px]">{{ moduleRow.module_name }}</span>
+                <span v-for="col in roleLimitCrudColumnIds" :key="col" class="flex-1 text-center">
                   <template v-if="moduleRow[col] == '-'">-</template>
                   <div v-else
                     contenteditable="true"
                     debounce="500"
                     :class="{
                       'editable-cell': true,
-                      'tw:px-[10px] tw:py-0': store.state.theme !== 'dark',
-                      'tw:bg-[#f1f1ee]': store.state.theme !== 'dark',
-                      'tw:px-[10px]': store.state.theme === 'dark',
+                      'px-[10px] py-0': store.state.theme !== 'dark',
+                      'bg-[#f1f1ee]': store.state.theme !== 'dark',
+                      'px-[10px]': store.state.theme === 'dark',
                       'edited-input': isEdited(moduleRow.module_name, col),
-                      'tw:bg-[#bfc3f4] tw:text-black tw:font-medium': isEdited(moduleRow.module_name, col) && store.state.theme !== 'dark',
-                      'tw:bg-[#f6f6f6] tw:text-black tw:font-medium tw:[padding:0px!important]': isEdited(moduleRow.module_name, col) && store.state.theme === 'dark',
+                      'bg-[#bfc3f4] text-black font-medium': isEdited(moduleRow.module_name, col) && store.state.theme !== 'dark',
+                      'bg-[#f6f6f6] text-black font-medium [padding:0px!important]': isEdited(moduleRow.module_name, col) && store.state.theme === 'dark',
                     }"
                     @input="(event: any) => handleInputChange(row.role_name, moduleRow.module_name, moduleRow[col], col, event.target.innerText)"
                     @keypress="restrictToNumbers"
                     @paste="preventNonNumericPaste"
-                    class="tw:inline-block tw:px-2 tw:py-0.5"
+                    class="inline-block px-2 py-0.5"
                   >
                     {{ changedValues[moduleRow.module_name]?.[col] ?? moduleRow[col] }}
                   </div>
                 </span>
               </div>
             </template>
-            <div v-if="isRoleLimitsLoading" class="tw:h-[50vh] tw:flex tw:justify-center tw:items-center">
+            <div v-if="isRoleLimitsLoading" class="h-[50vh] flex justify-center items-center">
               <OSpinner size="md" />
             </div>
           </template>
         </OTable>
       </div>
       <div
-        class="card-container tw:flex-1 tw:min-h-0"
+        class="card-container flex-1 min-h-0"
         v-if="activeTab == 'role-limits' && activeType == 'json'"
       >
         <query-editor
@@ -299,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           loading &&
           !apiLimitsRows.length
         "
-        class="tw:flex tw:justify-center tw:items-center"
+        class="flex justify-center items-center"
       >
         <OSpinner size="md" />
       </div>
@@ -319,8 +316,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:sticky tw:bottom-0 tw:top-0 tw:z-[100] tw:pr-3 tw:py-2 tw:gap-2 tw:border-t tw:border-border-default"
-        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-primary-background)]' : 'tw:bg-white'"
+        class="flex justify-end w-full ml-auto floating-buttons sticky bottom-0 top-0 z-[100] pr-3 py-2 gap-2 border-t border-border-default"
+        :class="store.state.theme === 'dark' ? 'bg-[var(--o2-primary-background)]' : 'bg-white'"
         v-if="editTable && activeType == 'table'"
       >
         <OButton
@@ -328,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           @click="cancelChanges"
         >
-          Cancel
+          {{ t('iam.quotaPage.cancel') }}
         </OButton>
         <OButton
           variant="primary"
@@ -336,12 +333,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="Object.keys(changedValues).length === 0"
           @click="saveChanges"
         >
-          Save
+          {{ t('iam.quotaPage.save') }}
         </OButton>
       </div>
       <div
-        class="tw:flex tw:justify-end tw:w-full tw:ml-auto floating-buttons tw:sticky tw:bottom-0 tw:top-0 tw:z-[100] tw:pr-3 tw:mt-3 tw:gap-2 tw:border-t tw:border-border-default"
-        :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-primary-background)]' : 'tw:bg-white'"
+        class="flex justify-end w-full ml-auto floating-buttons sticky bottom-0 top-0 z-[100] pr-3 mt-3 gap-2 border-t border-border-default"
+        :class="store.state.theme === 'dark' ? 'bg-[var(--o2-primary-background)]' : 'bg-white'"
         v-if="editTable && activeType == 'json'"
       >
         <OButton
@@ -350,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="cancelJsonChanges"
           :disabled="isSavingJson"
         >
-          Cancel
+          {{ t('iam.quotaPage.cancel') }}
         </OButton>
         <OButton
           variant="primary"
@@ -358,28 +355,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="saveJsonChanges"
           :disabled="isSavingJson"
         >
-          {{ isSavingJson ? 'Saving Changes...' : 'Save Changes' }}
+          {{ isSavingJson ? t('iam.quotaPage.savingChanges') : t('iam.quotaPage.saveChanges') }}
         </OButton>
       </div>
     </div>
 
     <ConfirmDialog
-      title="UnSaved Changes Detected"
-      message="save changes before switching tabs"
+      :title="t('iam.quotaPage.unsavedChangesDetected')"
+      :message="t('iam.quotaPage.saveBeforeSwitchingTabs')"
       @update:ok="saveChangesAndTabSwitch"
       @update:cancel="discardChangesTabSwitch"
       v-model="showConfirmDialogTabSwitch"
     />
     <ConfirmDialog
-      title="UnSaved Changes Detected"
-      message="save changes before expanding another row"
+      :title="t('iam.quotaPage.unsavedChangesDetected')"
+      :message="t('iam.quotaPage.saveBeforeExpandingRow')"
       @update:ok="saveChangesAndRoleSwitch"
       @update:cancel="discardChangesRoleSwitch"
       v-model="showConfirmDialogRowSwitch"
     />
     <ConfirmDialog
-      title="UnSaved Changes Detected"
-      message="save changes before switching Type"
+      :title="t('iam.quotaPage.unsavedChangesDetected')"
+      :message="t('iam.quotaPage.saveBeforeSwitchingType')"
       @update:ok="saveChangesAndTypeSwitch"
       @update:cancel="discardChangesTypeSwitch"
       v-model="showConfirmDialogTypeSwitch"
@@ -460,12 +457,12 @@ export default defineComponent({
 
     const tabs = ref<any[]>([
       {
-        label: "API Limits",
+        label: t("iam.quotaPage.apiLimits"),
         value: "api-limits",
         icon: "speed",
       },
       {
-        label: "Role Limits",
+        label: t("iam.quotaPage.roleLimits"),
         value: "role-limits",
         icon: "shield",
       },
@@ -473,17 +470,17 @@ export default defineComponent({
 
     const timeUnitTabs = ref<any[]>([
       {
-        label: "Per Second",
+        label: t("iam.quotaPage.perSecond"),
         value: "second",
         icon: "timer",
       },
       {
-        label: "Per Minute",
+        label: t("iam.quotaPage.perMinute"),
         value: "minute",
         icon: "schedule",
       },
       {
-        label: "Per Hour",
+        label: t("iam.quotaPage.perHour"),
         value: "hour",
         icon: "hourglass-empty",
       },
@@ -491,7 +488,7 @@ export default defineComponent({
 
     const typeTabs = computed(() => [
       {
-        label: "Table",
+        label: t("iam.quotaPage.table"),
         value: "table",
         icon: "table-chart",
       },
@@ -536,7 +533,7 @@ export default defineComponent({
           hideable: true,
           size: COL.name,
           minSize: 160,
-          meta: { align: "left", flex: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
+          meta: { align: "left", flex: true, cellClass: 'pl-4!', headerClass: 'pl-4!' },
         },
         {
           id: "list",
@@ -766,7 +763,7 @@ export default defineComponent({
       if (activeTab.value === "api-limits") {
         const newArray = [...organizations.value];
         newArray.unshift({
-          label: "global rules",
+          label: t("iam.quotaPage.globalRules"),
           value: "global_rules",
         });
         return newArray;
@@ -1036,7 +1033,7 @@ export default defineComponent({
           variant: "error",
           message:
             error.response.data.message ||
-            "Error while updating rate limits rule",
+            t("iam.quotaPage.errorUpdatingRateLimits"),
         });
         console.error("Error saving changes:", error);
       }
@@ -1109,7 +1106,7 @@ export default defineComponent({
           variant: "error",
           message:
             error.response.data.message ||
-            "Error while updating rate limits rule",
+            t("iam.quotaPage.errorUpdatingRateLimits"),
         });
         console.error("Error saving changes:", error);
       }
@@ -1158,7 +1155,7 @@ export default defineComponent({
       try {
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait while uploading rules...",
+          message: t("iam.quotaPage.uploadingRules"),
           timeout: 0,
         });
         uploadingRules.value = true;
@@ -1179,7 +1176,7 @@ export default defineComponent({
         dismiss();
       } catch (error) {
         uploadingRules.value = false;
-        uploadError.value = "Error while uploading rules";
+        uploadError.value = t("iam.quotaPage.errorUploadingRules");
       } finally {
         uploadingRules.value = false;
       }
@@ -1202,7 +1199,7 @@ export default defineComponent({
                 resolve(jsonArray);
               } catch (error) {
                 toast({
-                  message: `Error parsing JSON from file ${file.name}`,
+                  message: t("iam.quotaPage.errorParsingJson", { name: file.name }),
                   variant: "error",
                 });
                 resolve([]);
@@ -1300,7 +1297,7 @@ export default defineComponent({
           if (changedValues[moduleName][operation] === "") {
             toast({
               variant: "error",
-              message: "some values are empty please check",
+              message: t("iam.quotaPage.someValuesEmpty"),
             });
             isEmpty = true;
           }
@@ -1493,7 +1490,7 @@ export default defineComponent({
       if (isChanged) {
         toast({
           variant: "warning",
-          message: "Please save or cancel your changes before switching time units",
+          message: t("iam.quotaPage.saveBeforeSwitchingTimeUnits"),
         });
         // Revert back to previous time unit
         activeTimeUnit.value = activeTimeUnit.value;

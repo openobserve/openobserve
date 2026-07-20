@@ -1,5 +1,5 @@
 <template>
-    <div class="pipeline-view-tooltip container tw:w-125 tw:h-75 tw:overflow-auto">
+    <div class="pipeline-view-tooltip o2-scroll-container w-125 h-75 overflow-auto">
       <VueFlow
         ref="vueFlowRef"
         v-model:nodes="lockedNodes"

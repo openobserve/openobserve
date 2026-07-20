@@ -1,0 +1,62 @@
+[package]
+name = "common"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "dep:o2_dex",
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "config/enterprise",
+]
+cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
+
+[dependencies]
+openobserve-vrl.workspace = true
+axum.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+anyhow.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+dashmap.workspace = true
+arrow-schema.workspace = true
+hashbrown.workspace = true
+jsonwebtoken.workspace = true
+log.workspace = true
+maxminddb.workspace = true
+o2_dex = { workspace = true, optional = true }
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+opentelemetry.workspace = true
+parking_lot.workspace = true
+prost.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+rquickjs.workspace = true
+segment.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+snap.workspace = true
+strum.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true
+uaparser.workspace = true
+url.workspace = true
+utoipa.workspace = true
+config.workspace = true
+infra.workspace = true
+
+[dev-dependencies]
+expect-test.workspace = true

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <section class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto">
+    <section class="h-full min-w-0 min-h-0 overflow-y-auto">
       <router-view />
     </section>
   </PageLayout>
@@ -94,6 +94,14 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     icon: "forum",
     to: { name: "aiSessions", query: orgQuery.value },
     dataTest: "ai-secondary-nav-sessions",
+    group: "Monitor",
+  },
+  {
+    key: "agentGraph",
+    label: t("aiObservability.nav.agentGraph"),
+    icon: "hub",
+    to: { name: "aiAgentGraph", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-agent-graph",
     group: "Monitor",
   },
   {

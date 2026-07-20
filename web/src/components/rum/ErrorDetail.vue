@@ -15,34 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="error_details tw:w-[40vw]">
+  <div class="error_details w-[40vw]">
     <div
       data-test="error-detail-error-type"
       @click="handleErrorTypeClick"
-      class="tw:text-base tw:text-[var(--o2-info)] tw:capitalize tw:cursor-pointer"
+      class="text-base text-[var(--o2-info)] capitalize cursor-pointer"
     >
       {{ column.error_type || "Error" }}
     </div>
     <div
-      class="tw:text-sm tw:cursor-pointer tw:truncate tw:mt-1"
+      class="text-sm cursor-pointer truncate mt-1"
       :title="column.error_message"
     >
       {{ column.error_message }}
     </div>
-    <div class="tw:text-xs tw:flex tw:items-center tw:mt-1">
-      <span class="tw:mr-3 tw:text-gray-500"> {{ column.service }}</span>
+    <div class="text-xs flex items-center mt-1">
+      <span class="mr-3 text-gray-500"> {{ column.service }}</span>
       <div
-        class="tw:mr-3"
+        class="mr-3"
         :class="
           column.error_handling === 'unhandled'
-            ? 'text-red-6 tw:px-1 tw:border tw:border-[rgb(246,68,68)] tw:rounded'
-            : 'tw:text-gray-500'
+            ? 'text-red-6 px-1 border border-[rgb(246,68,68)] rounded'
+            : 'text-gray-500'
         "
       >
         {{ column.error_handling }}
       </div>
-      <OIcon name="schedule" size="sm" class="tw:text-gray-500" />
-      <span class="tw:pl-1 tw:text-gray-500">{{
+      <OIcon name="schedule" size="sm" class="text-gray-500" />
+      <span class="pl-1 text-gray-500">{{
         getFormattedDate(column.zo_sql_timestamp / 1000)
       }}</span>
     </div>

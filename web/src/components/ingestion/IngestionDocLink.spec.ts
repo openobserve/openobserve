@@ -48,10 +48,10 @@ describe("IngestionDocLink.vue", () => {
   it("applies the design-token classes to the anchor", () => {
     wrapper = createWrapper();
     const link = wrapper.find("a");
-    expect(link.classes()).toContain("tw:text-text-link");
-    expect(link.classes()).toContain("tw:hover:text-text-link-hover");
-    expect(link.classes()).toContain("tw:underline");
-    expect(link.classes()).toContain("tw:font-medium");
+    expect(link.classes()).toContain("text-text-link");
+    expect(link.classes()).toContain("hover:text-text-link-hover");
+    expect(link.classes()).toContain("underline");
+    expect(link.classes()).toContain("font-medium");
   });
 
   it("renders the default trailing text", () => {

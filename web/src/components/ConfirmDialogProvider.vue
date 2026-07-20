@@ -14,7 +14,7 @@
     @click:secondary="handleCancel"
     @update:open="handleUpdateOpen"
   >
-    <div class="tw:text-center">{{ currentDialog.message }}</div>
+    <div class="text-center">{{ currentDialog.message }}</div>
   </ODialog>
 </template>
 

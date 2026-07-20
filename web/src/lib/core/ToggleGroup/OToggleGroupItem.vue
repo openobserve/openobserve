@@ -17,9 +17,9 @@ const props = withDefaults(defineProps<ToggleGroupItemProps>(), {
 const slots = defineSlots<ToggleGroupItemSlots>();
 
 const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
-  md: "tw:h-9 tw:px-3 tw:text-sm",
-  sm: "tw:h-7 tw:px-2.5 tw:text-xs",
-  xs: "tw:h-5 tw:px-1.5 tw:text-xs",
+  md: "h-9 px-3 text-sm",
+  sm: "h-7 px-2.5 text-xs",
+  xs: "h-5 px-1.5 text-xs",
 };
 
 // Icon size mirrors the toggle size — md = sm icon (16px), sm/xs = xs icon (12px)
@@ -37,31 +37,31 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm"> =
     The span wrapper intercepts hover so cursor-not-allowed and the tooltip
     remain visible even when the inner item is disabled.
   -->
-  <span :class="props.disabled ? 'tw:cursor-not-allowed' : 'tw:contents'">
+  <span :class="props.disabled ? 'cursor-not-allowed' : 'contents'">
     <ToggleGroupItem
       v-bind="$attrs"
       :value="props.value"
       :disabled="props.disabled"
       :class="[
         // Layout
-        'tw:inline-flex tw:items-center tw:justify-center tw:gap-2',
+        'inline-flex items-center justify-center gap-2',
         sizeClasses[props.size],
         // Base state - inactive (transparent on track)
-        'tw:bg-toggle-item-bg tw:text-toggle-item-text tw:font-medium tw:whitespace-nowrap',
-        'tw:rounded-md',
-        'tw:transition-all tw:duration-150',
-        'tw:outline-none tw:cursor-pointer',
+        'bg-toggle-item-bg text-toggle-item-text font-medium whitespace-nowrap',
+        'rounded-md',
+        'transition-all duration-150',
+        'outline-none cursor-pointer',
         // Hover (inactive only)
-        'tw:hover:bg-toggle-item-hover-bg',
+        'hover:bg-toggle-item-hover-bg',
         // Active / pressed state (data-state=on) — white chip with shadow
-        'tw:data-[state=on]:bg-toggle-item-active-bg',
-        'tw:data-[state=on]:text-toggle-item-active-text',
-        'tw:data-[state=on]:shadow-sm',
+        'data-[state=on]:bg-toggle-item-active-bg',
+        'data-[state=on]:text-toggle-item-active-text',
+        'data-[state=on]:shadow-sm',
         // Focus ring
-        'tw:focus-visible:ring-2 tw:focus-visible:ring-toggle-focus-ring tw:focus-visible:ring-inset',
+        'focus-visible:ring-2 focus-visible:ring-toggle-focus-ring focus-visible:ring-inset',
         // Disabled — cursor is on the wrapper span; pointer-events-none prevents hover/active styles
-        'tw:data-disabled:text-toggle-item-disabled tw:data-disabled:opacity-60',
-        'tw:data-disabled:pointer-events-none',
+        'data-disabled:text-toggle-item-disabled data-disabled:opacity-60',
+        'data-disabled:pointer-events-none',
       ]"
     >
       <!-- Slot takes precedence; falls back to `icon-left` prop -->

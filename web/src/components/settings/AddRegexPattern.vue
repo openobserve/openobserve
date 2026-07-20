@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="add-regex-pattern-drawer"
   >
     <template #header-right>
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <div class="flex items-center gap-2">
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
           variant="ghost"
@@ -50,20 +50,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="fullscreen"
             size="xs"
-            :class="isFullScreen ? 'tw:text-[var(--o2-primary)]' : ''"
+            :class="isFullScreen ? 'text-[var(--o2-primary)]' : ''"
           />
         </OButton>
       </div>
     </template>
     <!-- form inputs starts here -->
-    <div class="tw:flex tw:w-[100%] tw:h-full">
+    <div class="flex w-[100%] h-full">
       <div
         :class="
           store.state.isAiChatEnabled
             ? isFullScreen
-              ? 'tw:w-[75%] tw:pl-2'
-              : 'tw:w-[65%] tw:pl-2'
-            : 'tw:w-[100%] tw:px-3'
+              ? 'w-[75%] pl-2'
+              : 'w-[65%] pl-2'
+            : 'w-[100%] px-3'
         "
       >
         <OForm
@@ -72,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :schema="addRegexPatternSchema"
           :default-values="addRegexPatternDefaults"
           @submit="saveRegexPattern"
-          class="tw:flex tw:flex-col tw:gap-4 tw:mt-2"
+          class="flex flex-col gap-4 mt-2"
         >
-          <div class="tw:flex tw:flex-col tw:gap-y-3">
+          <div class="flex flex-col gap-y-3">
             <OFormInput
               name="name"
               :readonly="isEdit"
@@ -82,16 +82,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('regex_patterns.name')"
               required
               data-test="add-regex-pattern-name-input"
-              placeholder="Eg. Internal Passwords"
+              :placeholder="t('settings.addRegexPattern.namePlaceholder')"
             />
             <OFormInput
               name="description"
               :readonly="isEdit"
               :disabled="isEdit"
               :label="t('regex_patterns.description')"
-              class="tw:pb-3"
+              class="pb-3"
               data-test="add-regex-pattern-description-input"
-              placeholder="Describe your pattern to help users understand"
+              :placeholder="t('settings.addRegexPattern.descriptionPlaceholder')"
             />
             <OBanner
               variant="info"
@@ -99,27 +99,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               data-test="add-regex-pattern-lookaround-note"
             >
-              <div class="tw:text-[12px] tw:font-normal tw:leading-[18px]">
+              <div class="text-[12px] font-normal leading-[18px]">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
                 <code
-                  class="tw:font-mono tw:text-[12px] tw:px-[4px] tw:py-[1px] tw:rounded-[4px] tw:bg-[var(--color-banner-info-border)]"
+                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-[var(--color-banner-info-border)]"
                   >(?=openobserve)\w+</code
                 >
                 <OIcon
                   name="arrow-right-alt"
                   size="xs"
-                  class="tw:inline-block tw:align-middle tw:mx-1"
+                  class="inline-block align-middle mx-1"
                 />
                 <code
-                  class="tw:font-mono tw:text-[12px] tw:px-[4px] tw:py-[1px] tw:rounded-[4px] tw:bg-[var(--color-banner-info-border)]"
+                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-[var(--color-banner-info-border)]"
                   >openobserve\w*</code
                 >
               </div>
             </OBanner>
             <div class="regex-pattern-input-container">
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <span class="tw:text-sm tw:font-bold tw:leading-5.25"> Regex Pattern </span>
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold leading-5.25">{{ t('settings.addRegexPattern.regexPatternLabel') }}</span>
                 <OButton
                   v-if="
                     config.isEnterprise == 'true' &&
@@ -131,38 +131,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <img
                     :src="goToAILogo"
-                    class="tw:w-[20px] tw:h-[20px] tw:mr-1"
+                    class="w-[20px] h-[20px] mr-1"
                   />
                   <span
-                    class="tw:text-[#5960B2] tw:text-sm tw:flex tw:items-center tw:gap-1"
+                    class="text-[#5960B2] text-sm flex items-center gap-1"
                   >
-                    Try O2 Assistant to write expressions
+                    {{ t('settings.addRegexPattern.tryAiAssistant') }}
                   </span>
                   <OIcon
                     size="sm"
                     name="arrow-right-alt"
-                    class="tw:text-[#5960B2] tw:w-[20px] tw:h-[20px] tw:ml-1"
+                    class="text-[#5960B2] w-[20px] h-[20px] ml-1"
                   />
                 </OButton>
               </div>
               <div class="regex-pattern-input">
                 <div
-                  class="tw:py-[2px] tw:h-[24px]"
+                  class="py-[2px] h-[24px]"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:bg-gray-500'
-                      : 'tw:bg-gray-200 '
+                      ? 'bg-gray-500'
+                      : 'bg-gray-200 '
                   "
                 >
                   <div
-                    class="tw:text-[12px] tw:font-[500] tw:px-2"
+                    class="text-[12px] font-[500] px-2"
                     :class="[
                       store.state.theme === 'dark'
-                        ? 'tw:text-[#ffffff]'
-                        : 'tw:text-[#6B7280]',
+                        ? 'text-[#ffffff]'
+                        : 'text-[#6B7280]',
                     ]"
                   >
-                    Write Pattern
+                    {{ t('settings.addRegexPattern.writePattern') }}
                   </div>
                 </div>
                 <OFormTextarea
@@ -171,16 +171,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="regex-pattern-input"
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  placeholder="Eg. \d....\d "
+                  :placeholder="t('settings.addRegexPattern.patternPlaceholder')"
                   :rows="5"
                 />
               </div>
             </div>
-            <OSeparator class="tw:my-2" />
+            <OSeparator class="my-2" />
             <div>
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <span class="tw:text-sm tw:font-bold tw:leading-5.25">
-                  Test Regex Pattern
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-bold leading-5.25">
+                  {{ t('settings.addRegexPattern.testRegexPattern') }}
                 </span>
                 <OButton
                   variant="primary"
@@ -188,20 +188,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!patternValue"
                   @click="testStringOutput"
                 >
-                  Test Input
+                  {{ t('settings.addRegexPattern.testInput') }}
                 </OButton>
               </div>
             </div>
-            <div class="regex-pattern-test-string-container tw:mb-2">
+            <div class="regex-pattern-test-string-container mb-2">
               <FullViewContainer
                 name="query"
                 v-model:is-expanded="expandState.regexTestString"
-                label="Input string"
-                class="tw:mt-1 tw:py-md tw:h-[24px]"
+                :label="t('settings.addRegexPattern.inputStringLabel')"
+                class="mt-1 py-md h-[24px]"
                 :labelClass="
                   store.state.theme === 'dark'
-                    ? 'tw:text-white tw:font-medium tw:text-xs tw:leading-[21px]'
-                    : 'tw:text-[#6b7280] tw:font-medium tw:text-xs tw:leading-[21px] tw:-ml-1'"
+                    ? 'text-white font-medium text-xs leading-[21px]'
+                    : 'text-[#6b7280] font-medium text-xs leading-[21px] -ml-1'"
               >
                 <template #right> </template>
               </FullViewContainer>
@@ -213,13 +213,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="testString"
                   data-test="add-regex-test-string-input"
                   class="regex-test-string-input"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'dark-mode-regex-test-string-input'
-                      : 'light-mode-regex-test-string-input tw:bg-white! tw:border-l! tw:border-l-[#e6e6e6]! tw:border-r! tw:border-r-[#e6e6e6]! tw:border-b! tw:border-b-[#e6e6e6]!'"
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  placeholder="Eg. 1234567890"
+                  :placeholder="t('settings.addRegexPattern.testStringPlaceholder')"
                   :rows="5"
                 />
               </div>
@@ -228,12 +224,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FullViewContainer
                 name="output"
                 v-model:is-expanded="expandState.outputString"
-                label="Output"
-                class="tw:mt-1 tw:py-md tw:h-[24px]"
+                :label="t('settings.addRegexPattern.outputLabel')"
+                class="mt-1 py-md h-[24px]"
                 :labelClass="
                   store.state.theme === 'dark'
-                    ? 'tw:text-white tw:font-medium tw:text-xs tw:leading-[21px]'
-                    : 'tw:text-[#6b7280] tw:font-medium tw:text-xs tw:leading-[21px] tw:-ml-1'"
+                    ? 'text-white font-medium text-xs leading-[21px]'
+                    : 'text-[#6b7280] font-medium text-xs leading-[21px] -ml-1'"
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
@@ -243,23 +239,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :readonly="true"
                   data-test="add-regex-output-string-input"
                   class="regex-test-string-input"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'dark-mode-regex-test-string-input'
-                      : 'light-mode-regex-test-string-input tw:bg-white! tw:border-l! tw:border-l-[#e6e6e6]! tw:border-r! tw:border-r-[#e6e6e6]! tw:border-b! tw:border-b-[#e6e6e6]!'"
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  placeholder="Output String"
+                  :placeholder="t('settings.addRegexPattern.outputStringPlaceholder')"
                   :rows="5"
                 />
                 <div
                   v-else
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[111px]"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tw:bg-(--o2-primary-background)! tw:border-l-2! tw:border-r-2! tw:border-b-2! tw:border-(--o2-primary-background)!'
-                      : 'tw:bg-white! tw:border-l! tw:border-r! tw:border-b! tw:border-[#e6e6e6]!'
-                  "
+                  class="flex flex-col items-center justify-center h-[111px] rounded-md border border-input-border bg-input-bg"
                 >
                   <div v-if="!testLoading && outputStringValue.length === 0">
                     <OIcon
@@ -267,24 +254,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="md"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-[#ffffff]'
-                          : 'tw:text-[#A8A8A8]'
+                          ? 'text-[#ffffff]'
+                          : 'text-[#A8A8A8]'
                       "
                     />
                     <span
-                      class="tw:text-[12px] tw:font-[400] tw:text-center"
+                      class="text-[12px] font-[400] text-center"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-[#ffffff]'
-                          : 'tw:text-[#4B5563]'
+                          ? 'text-[#ffffff]'
+                          : 'text-[#4B5563]'
                       "
                     >
-                      Please click Test Input to see the results
+                      {{ t('settings.addRegexPattern.clickTestInputHint') }}
                     </span>
                   </div>
                   <div v-else-if="testLoading">
                     <span
-                      class="tw:flex tw:items-center tw:justify-center tw:h-[111px]"
+                      class="flex items-center justify-center h-[111px]"
                     >
                       <OSpinner size="sm" />
                     </span>
@@ -296,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="tw:ml-2"
+        class="ml-2"
         v-if="store.state.isAiChatEnabled"
         style="
           width: 35%;
@@ -536,8 +523,8 @@ export default defineComponent({
         if (response.status == 200) {
           toast({
             message: props.isEdit
-              ? "Regex pattern updated successfully"
-              : "Regex pattern created successfully",
+              ? t("settings.addRegexPattern.updateSuccess")
+              : t("settings.addRegexPattern.createSuccess"),
             variant: "success",
           });
           emit("close");
@@ -549,8 +536,8 @@ export default defineComponent({
             message:
               error.response?.data?.message ||
               (props.isEdit
-                ? "Failed to update regex pattern"
-                : "Failed to create regex pattern"),
+                ? t("settings.addRegexPattern.updateFailed")
+                : t("settings.addRegexPattern.createFailed")),
             variant: "error",
           });
         }
@@ -578,7 +565,7 @@ export default defineComponent({
         );
       } catch (error) {
         toast({
-          message: error.response?.data?.message || "Failed to test string",
+          message: error.response?.data?.message || t("settings.addRegexPattern.testFailed"),
           variant: "error",
         });
       } finally {
@@ -640,10 +627,12 @@ export default defineComponent({
   padding-left: 0.5rem !important;
 }
 
-.light-mode-regex-test-string-input .monaco-editor-background {
-  background-color: #ffffff !important;
-}
-.dark-mode-regex-test-string-input .monaco-editor-background {
-  background-color: var(--o2-primary-background) !important;
+/* The section header strips (Write Pattern / Input string / Output) are flat
+   full-width bars. Square the textareas' own border box so each field reads as
+   one connected unit under its strip instead of a detached rounded box. */
+.regex-pattern-input .rounded-md.border,
+.regex-test-string-input .rounded-md.border {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
 }
 </style>

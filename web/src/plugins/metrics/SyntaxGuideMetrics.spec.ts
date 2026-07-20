@@ -19,17 +19,14 @@ import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
+import enLocale from "@/locales/languages/en-US.json";
 
-// Create i18n instance
+// The REAL locale file, not a hand-written stub: the guide's copy now comes from
+// `t()`, so a stub with a couple of keys would leave every other string
+// resolving to its raw key and the assertions testing nothing.
 const i18n = createI18n({
   locale: "en",
-  messages: {
-    en: {
-      search: {
-        syntaxGuideLabel: "Syntax Guide"
-      }
-    }
-  }
+  messages: { en: enLocale },
 });
 
 
@@ -512,7 +509,7 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
   const createWrapper = (propsData = {}) => {
     const i18nLocal = createI18n({
       locale: "en",
-      messages: { en: { search: { syntaxGuideLabel: "Syntax Guide" } } },
+      messages: { en: enLocale },
     });
     return mount(SyntaxGuideMetrics, {
       attachTo: document.body,
@@ -590,7 +587,7 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
     await button.trigger("click");
     await flushPromises();
     expect(document.querySelector(".answers ul")).toBeTruthy();
-    expect(document.querySelector(".answers .bg-highlight")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-surface-subtle")).toBeTruthy();
   });
 });
 
@@ -600,7 +597,7 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
   const createWrapper = (propsData = {}) => {
     const i18nLocal = createI18n({
       locale: "en",
-      messages: { en: { search: { syntaxGuideLabel: "Syntax Guide" } } },
+      messages: { en: enLocale },
     });
     return mount(SyntaxGuideMetrics, {
       attachTo: document.body,
@@ -695,7 +692,7 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
     await button.trigger("click");
     await flushPromises();
     expect(document.querySelector(".answers ul")).toBeTruthy();
-    expect(document.querySelector(".answers .bg-highlight")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-surface-subtle")).toBeTruthy();
   });
 });
 
@@ -705,7 +702,7 @@ describe("SyntaxGuideMetrics — q-menu theme class binding", () => {
   const createWrapper = (propsData = {}) => {
     const i18nLocal = createI18n({
       locale: "en",
-      messages: { en: { search: { syntaxGuideLabel: "Syntax Guide" } } },
+      messages: { en: enLocale },
     });
     return mount(SyntaxGuideMetrics, {
       global: {
@@ -727,7 +724,7 @@ describe("SyntaxGuideMetrics — q-menu theme class binding", () => {
   it("q-menu has theme-dark class when store theme is 'dark'", () => {
     store.state.theme = "dark";
     wrapper = createWrapper();
-    // Quasar renders q-menu as a portal; verify via vm that the binding resolves correctly
+    // The menu renders as a portal; verify via vm that the binding resolves correctly
     expect(wrapper.vm.store.state.theme).toBe("dark");
   });
 
@@ -754,7 +751,7 @@ describe("SyntaxGuideMetrics — mode switching content swap", () => {
   const createWrapper = (propsData = {}) => {
     const i18nLocal = createI18n({
       locale: "en",
-      messages: { en: { search: { syntaxGuideLabel: "Syntax Guide" } } },
+      messages: { en: enLocale },
     });
     return mount(SyntaxGuideMetrics, {
       attachTo: document.body,

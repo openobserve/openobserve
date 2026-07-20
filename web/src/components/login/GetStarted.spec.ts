@@ -251,7 +251,7 @@ describe('GetStarted.vue', () => {
   describe('Template Tests', () => {
     it('should render a form with inputs', () => {
       wrapper = createWrapper();
-      expect(wrapper.find('.tw\\:flex').exists()).toBe(true);
+      expect(wrapper.find('.flex').exists()).toBe(true);
     });
 
     it('should show copyright year', () => {

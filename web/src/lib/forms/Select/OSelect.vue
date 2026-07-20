@@ -67,6 +67,23 @@ type NormalizedOption = {
   colorPalette?: string[];
   /** Optional badge/chip text rendered inline next to the label (e.g. "recommended"). */
   badge?: string;
+  /**
+   * Tooltip for the badge. Use when the badge is abbreviated — a one-letter chip
+   * is compact but not self-explanatory, and this is what tells you `C` is
+   * "Counter" without costing a row of width.
+   */
+  badgeTitle?: string;
+  /**
+   * Per-option badge colours, e.g. `{ color, background }`. Without it the badge
+   * is a green outline — fine for a one-off "recommended" tag, wrong for a badge
+   * that CLASSIFIES (every option green says nothing). Supplying a style turns it
+   * into a filled pill in that option's own colour, right-aligned so the chips
+   * form a single scannable column instead of ragging along the label ends.
+   *
+   * The right-align applies only to STYLED badges: a bare "recommended" tag reads
+   * as part of the label and belongs next to it, so those are left where they are.
+   */
+  badgeStyle?: Record<string, string>;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -204,6 +221,14 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
       ? (rawColorPalette as string[])
       : undefined,
     badge: typeof option["badge"] === "string" ? (option["badge"] as string) : undefined,
+    badgeTitle:
+      typeof option["badgeTitle"] === "string"
+        ? (option["badgeTitle"] as string)
+        : undefined,
+    badgeStyle:
+      option["badgeStyle"] && typeof option["badgeStyle"] === "object"
+        ? (option["badgeStyle"] as Record<string, string>)
+        : undefined,
   };
 }
 
@@ -555,7 +580,27 @@ function close() {
   searchTerm.value = "";
 }
 
-defineExpose({ close });
+/** Focus the trigger programmatically (both listbox and native-select modes). */
+function focus() {
+  if (typeof document === "undefined") return;
+  document.getElementById(inputId.value)?.focus();
+}
+
+defineExpose({ close, focus });
+
+// Type-to-search on the closed trigger: a printable keystroke opens the
+// dropdown and seeds the filter, mirroring native <select> typeahead. The
+// event is consumed here so page-level single-letter shortcuts (logs "s",
+// "r", "h", …) never fire while the select has keyboard focus.
+function handleTriggerKeydown(e: KeyboardEvent) {
+  if (props.disabled) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length !== 1 || e.key === " ") return;
+  e.preventDefault();
+  e.stopPropagation();
+  popoverOpen.value = true;
+  if (inputEnabled.value) searchTerm.value = searchTerm.value + e.key;
+}
 
 // ── Virtual scroll (listbox mode) ─────────────────────────────────────────
 // Items are virtualised whenever the listbox has more than 50 entries, keeping
@@ -681,10 +726,10 @@ function getPaletteGradient(colors: string[]): string {
   return `linear-gradient(to right, ${colors.join(", ")})`;
 }
 
-// Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at Quasar's 14px base.
+// Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at the 14px html base.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
-  sm: "tw:h-6 tw:text-sm",
-  md: "tw:h-[2.125rem] tw:text-sm",
+  sm: "h-6 text-sm",
+  md: "h-[2.125rem] text-sm",
 };
 
 // Open-state tracking. Reka's PopoverTrigger / SelectTrigger expose
@@ -696,6 +741,19 @@ const selectOpen = ref(false);
 const isOpen = computed(() =>
   listboxModeEnabled.value ? popoverOpen.value : selectOpen.value,
 );
+
+// Clicking the field label opens the dropdown — mirroring how clicking an
+// OInput's label focuses its input. Reka's triggers open on `pointerdown`, so
+// the `click` a native <label for> forwards never opens them; open explicitly.
+// `.prevent` (on the template handler) stops the redundant native forwarding.
+function handleLabelClick() {
+  if (props.disabled) return;
+  if (listboxModeEnabled.value) {
+    popoverOpen.value = true;
+  } else {
+    selectOpen.value = true;
+  }
+}
 
 
 // When this OSelect is nested inside an ODropdown, signal its
@@ -850,7 +908,7 @@ onBeforeUnmount(() => {
 
 /**
  * Estimate a chip's rendered width in pixels from its label.
- * Chip styling: `tw:px-2 tw:py-0.5 tw:text-xs` (12px font), max-w-40 = 160px.
+ * Chip styling: `px-2 py-0.5 text-xs` (12px font), max-w-40 = 160px.
  * Roughly 6.5px per character at 12px font + 16px horizontal padding.
  */
 function estimateChipWidth(label: string): number {
@@ -869,7 +927,7 @@ const reservedTriggerSpace = computed(() => {
 });
 
 const overflowChipEstimatedWidth = 70; // "+N more" pill width approximation
-const chipGap = 4; // tw:gap-1 between chips
+const chipGap = 4; // gap-1 between chips
 
 /**
  * Number of chips that actually fit in the current trigger width. If
@@ -896,7 +954,7 @@ const dynamicMaxChips = computed(() => {
   for (let i = 0; i < total; i++) {
     const chipW = estimateChipWidth(selectedLabels.value[i]);
     const remaining = total - i - 1;
-    // If there'll be tw:hidden chips after this one, reserve space for the
+    // If there'll be hidden chips after this one, reserve space for the
     // "+N more" pill so it can still fit on the row.
     const overflowReserve =
       remaining > 0 ? overflowChipEstimatedWidth + chipGap : 0;
@@ -926,21 +984,21 @@ const overflowSelectedCount = computed(() =>
 // squeezes the content area — it does not shift the chevron position when the
 // clear button toggles into view.
 const triggerEndPadding = computed(() =>
-  props.clearable && hasSelection.value ? "tw:pe-12" : "tw:pe-7",
+  props.clearable && hasSelection.value ? "pe-12" : "pe-7",
 );
 
 const fieldWidthClass = computed(() => {
   switch (props.width) {
     case "xs":
-      return "tw:w-[var(--spacing-field-width-xs)]";
+      return "w-[var(--spacing-field-width-xs)]";
     case "sm":
-      return "tw:w-[var(--spacing-field-width-sm)]";
+      return "w-[var(--spacing-field-width-sm)]";
     case "md":
-      return "tw:w-[var(--spacing-field-width-md)]";
+      return "w-[var(--spacing-field-width-md)]";
     case "lg":
-      return "tw:w-[var(--spacing-field-width-lg)]";
+      return "w-[var(--spacing-field-width-lg)]";
     default:
-      return "tw:w-full";
+      return "w-full";
   }
 });
 </script>
@@ -949,9 +1007,9 @@ const fieldWidthClass = computed(() => {
   <div
     v-bind="wrapperAttrs"
     :class="[
-      'tw:flex tw:flex-col tw:gap-1',
+      'flex flex-col gap-1',
       fieldWidthClass,
-      labelPosition === 'inside' ? 'tw:min-w-0' : '',
+      labelPosition === 'inside' ? 'min-w-0' : '',
     ]"
   >
     <!-- Label -->
@@ -959,17 +1017,18 @@ const fieldWidthClass = computed(() => {
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1',
-        disabled && 'o-input-label--disabled',
+        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
+        disabled ? 'o-input-label--disabled' : 'cursor-pointer',
       ]"
+      @click.prevent="handleLabelClick"
     >
-      {{ label }}<span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+      {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help"
+        class="cursor-help"
         ><slot name="tooltip"
       /></OIcon>
     </label>
@@ -981,7 +1040,7 @@ const fieldWidthClass = computed(() => {
       >
         <div
           ref="triggerWrapperRef"
-          class="tw:relative tw:flex tw:items-center"
+          class="relative flex items-center"
         >
           <PopoverTrigger
             type="button"
@@ -989,6 +1048,9 @@ const fieldWidthClass = computed(() => {
             :name="name"
             :disabled="disabled"
             :tabindex="inputTabindex"
+            role="combobox"
+            :aria-expanded="popoverOpen"
+            @keydown="handleTriggerKeydown"
             :data-test="
               parentDataTest ? `${parentDataTest}-trigger` : undefined
             "
@@ -1001,42 +1063,42 @@ const fieldWidthClass = computed(() => {
             "
             :data-test-selected-label="triggerDisplayLabel"
             :class="[
-              'tw:relative tw:flex tw:w-full tw:rounded-md tw:border',
+              'relative flex w-full rounded-md border',
               // In inside-label mode padding is handled per-row; in normal mode it goes on the trigger
-              labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3'),
-              'tw:bg-select-bg',
+              labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'ps-2' : 'ps-3'),
+              'bg-select-bg',
               hasError
-                ? 'tw:border-select-border-error'
-                : 'tw:border-select-border tw:hover:border-select-border-hover tw:focus:border-select-border-focus',
+                ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
+                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
               /* Keep the red error border on focus; focus border color applies only when there's no error. */
-              'tw:focus:outline-none',
-              'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
-              'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
+              'focus:outline-none',
+              'transition-[color,background-color,border-color,box-shadow] duration-150',
+              'disabled:bg-select-disabled-bg disabled:cursor-not-allowed disabled:border-dashed',
               labelPosition === 'inside' && label
                 ? [
-                    'tw:flex-col tw:justify-between tw:py-0.5',
+                    'flex-col justify-between py-0.5',
                     heightClasses[size ?? 'md'],
                   ]
-                : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],
+                : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
             ]"
           >
             <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
             <span
               v-if="label && labelPosition === 'inside'"
-              class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
+              class="text-[0.625rem] leading-none whitespace-nowrap text-start text-select-placeholder select-none pointer-events-none ps-3 pe-7"
               >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
             >
 
             <!-- Content row: flex-row for inside-label; display:contents (transparent) for normal mode -->
             <div
               :class="labelPosition === 'inside' && label
-                ? ['tw:flex tw:items-center tw:flex-1 tw:w-full tw:min-w-0', triggerEndPadding, $slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3']
-                : 'tw:contents'"
+                ? ['flex items-center flex-1 w-full min-w-0', triggerEndPadding, $slots['icon-left'] ? 'ps-2' : 'ps-3']
+                : 'contents'"
             >
               <!-- Icon-left slot (inside trigger, left — matches OButton #icon-left) -->
               <span
                 v-if="$slots['icon-left']"
-                class="tw:flex tw:items-center tw:me-1.5 tw:text-select-placeholder tw:shrink-0"
+                class="flex items-center me-1.5 text-select-placeholder shrink-0"
               >
                 <slot name="icon-left" />
               </span>
@@ -1044,7 +1106,7 @@ const fieldWidthClass = computed(() => {
               <slot name="trigger" :value="modelValue">
                 <template v-if="multiple && selectedLabels.length > 0">
                   <div
-                    class="tw:flex-1 tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:overflow-hidden tw:pe-2"
+                    class="flex-1 flex flex-nowrap items-center gap-1 overflow-hidden pe-2"
                   >
                     <slot
                       v-for="(labelText, idx) in visibleSelectedLabels"
@@ -1054,14 +1116,14 @@ const fieldWidthClass = computed(() => {
                     >
                       <span
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:leading-none tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
+                        class="inline-flex items-center rounded px-2 py-0.5 text-xs leading-none bg-select-item-selected-bg text-select-item-selected-text max-w-40 truncate shrink-0"
                       >
                         {{ labelText }}
                       </span>
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
-                      class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-hover-bg tw:text-select-text tw:shrink-0"
+                      class="inline-flex items-center rounded px-2 py-0.5 text-xs bg-select-item-hover-bg text-select-text shrink-0"
                       data-test="o-select-overflow-chip"
                     >
                       +{{ overflowSelectedCount }} more
@@ -1072,15 +1134,15 @@ const fieldWidthClass = computed(() => {
                   v-else
                   :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
                   :class="[
-                    'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
+                    'flex-1 text-start truncate text-sm',
                     labelPosition === 'inside' && label
-                      ? 'tw:text-xs tw:leading-4'
+                      ? 'text-xs leading-4'
                       : '',
                     disabled
-                      ? 'tw:text-select-disabled-text'
+                      ? 'text-select-disabled-text'
                       : hasSelection
-                        ? 'tw:text-select-text'
-                        : 'tw:text-select-placeholder',
+                        ? 'text-select-text'
+                        : 'text-select-placeholder',
                   ]"
                 >
                   {{ hasSelection ? triggerDisplayLabel : placeholder }}
@@ -1098,7 +1160,7 @@ const fieldWidthClass = computed(() => {
             button in or out does not shift the chevron.
           -->
           <div
-            class="tw:absolute tw:end-2.5 tw:flex tw:items-center tw:gap-1.5 tw:pointer-events-none"
+            class="absolute end-2.5 flex items-center gap-1.5 pointer-events-none"
           >
             <button
               v-if="clearable && hasSelection"
@@ -1106,9 +1168,9 @@ const fieldWidthClass = computed(() => {
               tabindex="-1"
               aria-label="Clear selection"
               :class="[
-                'tw:flex tw:items-center tw:justify-center tw:size-3.5',
-                'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
-                'tw:transition-colors tw:pointer-events-auto',
+                'flex items-center justify-center size-3.5',
+                'text-input-clear-btn hover:text-input-clear-btn-hover',
+                'transition-colors pointer-events-auto',
               ]"
               @click.stop="handleClear"
             >
@@ -1116,7 +1178,7 @@ const fieldWidthClass = computed(() => {
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 16 16"
                 fill="currentColor"
-                class="tw:size-3.5"
+                class="size-3.5"
                 aria-hidden="true"
               >
                 <path
@@ -1130,9 +1192,9 @@ const fieldWidthClass = computed(() => {
               v-else
               aria-hidden="true"
               :class="[
-                'tw:flex tw:items-center tw:justify-center tw:text-select-icon',
-                'tw:transition-transform tw:duration-150',
-                isOpen ? 'tw:rotate-180' : '',
+                'flex items-center justify-center text-select-icon',
+                'transition-transform duration-150',
+                isOpen ? 'rotate-180' : '',
               ]"
             >
               <!-- chevron-down — rotates 180° when the popover is open -->
@@ -1140,7 +1202,7 @@ const fieldWidthClass = computed(() => {
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 16 16"
                 fill="currentColor"
-                class="tw:size-4"
+                class="size-4"
               >
                 <path
                   fill-rule="evenodd"
@@ -1163,27 +1225,26 @@ const fieldWidthClass = computed(() => {
               parentDataTest ? `${parentDataTest}-popover` : undefined
             "
             :class="[
-              'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
-              'tw:overflow-hidden tw:flex tw:flex-col',
-              'tw:rounded-md tw:shadow-lg',
-              'tw:bg-select-content-bg',
+              'z-[10001] min-w-(--reka-popover-trigger-width)',
+              'overflow-hidden flex flex-col',
+              'rounded-md shadow-lg',
+              'bg-select-content-bg',
             ]"
             :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
             @click.stop
-            @pointerdown.stop
           >
             <ListboxRoot
               :model-value="listboxStringModelValue"
               :multiple="multiple"
               :disabled="disabled"
-              class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0"
+              class="flex flex-col flex-1 min-h-0"
               @update:model-value="handleListboxUpdate"
             >
               <!-- Single bordered container wrapping search + list -->
               <div
                 :class="[
-                  'tw:rounded-md tw:border tw:border-input-border tw:overflow-hidden',
-                  'tw:bg-select-content-bg tw:flex tw:flex-col tw:flex-1 tw:min-h-0',
+                  'rounded-md border border-input-border overflow-hidden',
+                  'bg-select-content-bg flex flex-col flex-1 min-h-0',
                 ]"
               >
                 <ListboxFilter
@@ -1194,9 +1255,9 @@ const fieldWidthClass = computed(() => {
                     parentDataTest ? `${parentDataTest}-search` : undefined
                   "
                   :class="[
-                    'tw:w-full tw:px-3 tw:bg-transparent tw:text-input-text tw:shrink-0',
-                    'tw:placeholder:text-input-placeholder tw:outline-none',
-                    'tw:border-b tw:border-input-border',
+                    'w-full px-3 bg-transparent text-input-text shrink-0',
+                    'placeholder:text-input-placeholder outline-none',
+                    'border-b border-input-border',
                     heightClasses[size ?? 'md'],
                   ]"
                   :placeholder="searchPlaceholder"
@@ -1219,14 +1280,14 @@ const fieldWidthClass = computed(() => {
                     allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'
                   "
                   :class="[
-                    'tw:relative tw:flex tw:items-center tw:w-full tw:gap-2 tw:shrink-0',
-                    'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
-                    'tw:text-select-item-text tw:rounded-sm',
-                    'tw:cursor-pointer tw:select-none tw:outline-none',
-                    'tw:hover:bg-select-item-hover-bg',
-                    'tw:focus-visible:bg-select-item-hover-bg',
-                    'tw:transition-colors tw:duration-100',
-                    'tw:border-b tw:border-select-content-border tw:mb-1 tw:pb-1.5',
+                    'relative flex items-center w-full gap-2 shrink-0',
+                    'ps-3 pe-3 py-1.5 text-sm',
+                    'text-select-item-text rounded-sm',
+                    'cursor-pointer select-none outline-none',
+                    'hover:bg-select-item-hover-bg',
+                    'focus-visible:bg-select-item-hover-bg',
+                    'transition-colors duration-100',
+                    'border-b border-select-content-border mb-1 pb-1.5',
                   ]"
                   data-test="o-select-all"
                   @click="toggleAllSelections"
@@ -1235,11 +1296,11 @@ const fieldWidthClass = computed(() => {
                 >
                   <span
                     :class="[
-                      'tw:flex tw:items-center tw:justify-center tw:shrink-0',
-                      'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
+                      'flex items-center justify-center shrink-0',
+                      'size-3.5 rounded-sm border transition-colors',
                       allSelected
-                        ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
-                        : 'tw:bg-checkbox-bg tw:border-checkbox-border',
+                        ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
+                        : 'bg-checkbox-bg border-checkbox-border',
                     ]"
                     aria-hidden="true"
                   >
@@ -1252,12 +1313,12 @@ const fieldWidthClass = computed(() => {
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
+                      class="size-full p-0.5 text-checkbox-checked-fg"
                     >
                       <polyline points="2,6 5,9 10,3" />
                     </svg>
                   </span>
-                  <span class="tw:truncate tw:font-medium">Select all</span>
+                  <span class="truncate font-medium">Select all</span>
                 </div>
 
                 <!-- Consumer-supplied rows rendered above the option list -->
@@ -1265,10 +1326,10 @@ const fieldWidthClass = computed(() => {
 
                 <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
                    on the ListboxFilter input above. Items are index-highlighted reactively. -->
-                <div ref="listboxScrollEl" :class="['tw:overflow-auto', multiple && rowClickSingleSelect ? 'tw:flex-1 tw:min-h-[6rem]' : 'tw:max-h-60']">
+                <div ref="listboxScrollEl" :class="['overflow-auto', multiple && rowClickSingleSelect ? 'flex-1 min-h-[6rem]' : 'max-h-60']">
                   <div
                     v-if="filteredOptions.length === 0"
-                    class="tw:px-3 tw:py-2 tw:text-sm tw:text-select-placeholder"
+                    class="px-3 py-2 text-sm text-select-placeholder"
                   >
                     <slot name="empty">No options found</slot>
                   </div>
@@ -1295,15 +1356,15 @@ const fieldWidthClass = computed(() => {
                       }"
                     >
                       <!-- Group header — non-interactive label. Virtualisation
-                         renders each tw:flex as a sibling, so a real ListboxGroup
+                         renders each flex as a sibling, so a real ListboxGroup
                          can't wrap its items. Render a plain styled header
                          instead of misusing ListboxGroup/Label ARIA roles. -->
                       <div
                         v-if="filteredOptions[vRow.index].header"
                         :class="[
-                          'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-bold',
-                          'tw:text-select-item-text tw:bg-select-content-bg',
-                          'tw:select-none tw:pointer-events-none',
+                          'flex w-full h-full px-3 py-1 text-xs font-bold',
+                          'text-select-item-text bg-select-content-bg',
+                          'select-none pointer-events-none',
                         ]"
                       >
                         {{ filteredOptions[vRow.index].label }}
@@ -1316,7 +1377,7 @@ const fieldWidthClass = computed(() => {
                            the whole selection with just this item and close the dropdown. -->
                       <div
                         v-else
-                        class="tw:contents"
+                        class="contents"
                         @click.capture="handleItemClickCapture($event, toRekaString(filteredOptions[vRow.index].value))"
                       >
                       <ListboxItem
@@ -1334,38 +1395,38 @@ const fieldWidthClass = computed(() => {
                           String(filteredOptions[vRow.index].label ?? '')
                         "
                         :class="[
-                          'tw:relative tw:flex tw:w-full tw:h-full tw:gap-2',
-                          'tw:ps-3 tw:pe-3 tw:text-sm',
-                          'tw:text-select-item-text tw:rounded-sm',
-                          'tw:cursor-pointer tw:select-none tw:outline-none',
-                          'tw:transition-colors tw:duration-100',
+                          'relative flex w-full h-full gap-2',
+                          'ps-3 pe-3 text-sm',
+                          'text-select-item-text rounded-sm',
+                          'cursor-pointer select-none outline-none',
+                          'transition-colors duration-100',
                           // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
                           (filteredOptions[vRow.index].subLabel && !filteredOptions[vRow.index].subLabelInline) || filteredOptions[vRow.index].colorPalette?.length
-                            ? 'tw:flex-col tw:items-start tw:py-2'
-                            : 'tw:flex-row tw:items-center',
+                            ? 'flex-col items-start py-2'
+                            : 'flex-row items-center',
                           // highlightedIndex-based highlight — works with virtualised items.
                           // Reka's data-highlighted only fires for direct DOM children of
                           // ListboxRoot; virtual rows are not, so we track highlight ourselves.
                           vRow.index === highlightedIndex
-                            ? 'tw:bg-select-item-hover-bg'
-                            : 'tw:hover:bg-select-item-hover-bg',
+                            ? 'bg-select-item-hover-bg'
+                            : 'hover:bg-select-item-hover-bg',
                           multiple
                             ? ''
-                            : 'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
-                          'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none',
+                            : 'data-[state=checked]:bg-select-item-selected-bg data-[state=checked]:text-select-item-selected-text',
+                          'data-disabled:text-select-item-disabled data-disabled:cursor-not-allowed data-disabled:pointer-events-none',
                         ]"
                       >
                         <!-- Multi-select: always-visible checkbox indicator -->
                         <template v-if="multiple">
                           <span
                             :class="[
-                              'tw:flex tw:items-center tw:justify-center tw:shrink-0',
-                              'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
+                              'flex items-center justify-center shrink-0',
+                              'size-3.5 rounded-sm border transition-colors',
                               selectedValues.includes(
                                 filteredOptions[vRow.index].value,
                               )
-                                ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
-                                : 'tw:bg-checkbox-bg tw:border-checkbox-border',
+                                ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
+                                : 'bg-checkbox-bg border-checkbox-border',
                             ]"
                             aria-hidden="true"
                             data-select-checkbox
@@ -1384,7 +1445,7 @@ const fieldWidthClass = computed(() => {
                               stroke-width="2"
                               stroke-linecap="round"
                               stroke-linejoin="round"
-                              class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
+                              class="size-full p-0.5 text-checkbox-checked-fg"
                             >
                               <polyline points="2,6 5,9 10,3" />
                             </svg>
@@ -1392,7 +1453,7 @@ const fieldWidthClass = computed(() => {
                           <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
                           <span
                             v-if="rowClickSingleSelect"
-                            class="tw:w-px tw:shrink-0 tw:bg-[var(--o2-border-color)] tw:mx-1 tw:my-1"
+                            class="w-px shrink-0 bg-[var(--o2-border-color)] mx-1 my-1"
                             style="align-self: stretch"
                             aria-hidden="true"
                             data-select-separator
@@ -1403,9 +1464,9 @@ const fieldWidthClass = computed(() => {
                         <template
                           v-if="filteredOptions[vRow.index].subLabel && filteredOptions[vRow.index].subLabelInline"
                         >
-                          <span class="tw:font-medium tw:shrink-0">{{ filteredOptions[vRow.index].label }}</span>
-                          <span class="tw:text-select-placeholder tw:shrink-0 tw:mx-1">–</span>
-                          <span class="tw:text-text-secondary tw:truncate tw:text-xs">{{ filteredOptions[vRow.index].subLabel }}</span>
+                          <span class="font-medium shrink-0">{{ filteredOptions[vRow.index].label }}</span>
+                          <span class="text-select-placeholder shrink-0 mx-1">–</span>
+                          <span class="text-text-secondary truncate text-xs">{{ filteredOptions[vRow.index].subLabel }}</span>
                         </template>
 
                         <!-- Rich item: label + optional badge + optional subLabel + optional color palette swatch.
@@ -1414,22 +1475,34 @@ const fieldWidthClass = computed(() => {
                         <template
                           v-else-if="filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length || filteredOptions[vRow.index].badge"
                         >
-                          <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full tw:overflow-hidden">
-                            <span class="tw:flex tw:items-center tw:gap-1.5 tw:w-full tw:leading-snug">
-                              <span class="tw:truncate tw:font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
+                          <div class="flex flex-col gap-1 w-full overflow-hidden">
+                            <span class="flex items-center gap-1.5 w-full leading-snug">
+                              <span class="truncate font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
                               <span
                                 v-if="filteredOptions[vRow.index].badge"
-                                class="tw:shrink-0 tw:text-[10px] tw:font-medium tw:px-1 tw:py-px tw:rounded tw:border tw:border-solid tw:leading-tight"
-                                style="color: var(--o2-positive); border-color: var(--o2-positive);"
+                                class="shrink-0 rounded border border-solid"
+                                :class="[
+                                  filteredOptions[vRow.index].badgeTitle ? 'cursor-help' : undefined,
+                                  filteredOptions[vRow.index].badgeStyle
+                                    ? 'inline-flex items-center justify-center leading-none ml-auto min-w-[1.125rem] h-[1.125rem] px-1 text-xs font-semibold border-current'
+                                    : 'text-[10px] font-medium px-1 py-px leading-tight',
+                                ]"
+                                :title="filteredOptions[vRow.index].badgeTitle"
+                                :style="
+                                  filteredOptions[vRow.index].badgeStyle ?? {
+                                    color: 'var(--o2-positive)',
+                                    borderColor: 'var(--o2-positive)',
+                                  }
+                                "
                               >{{ filteredOptions[vRow.index].badge }}</span>
                             </span>
                             <span
                               v-if="filteredOptions[vRow.index].subLabel"
-                              class="tw:text-xs tw:text-text-secondary tw:line-clamp-2 tw:whitespace-normal tw:w-full tw:leading-snug"
+                              class="text-xs text-text-secondary line-clamp-2 whitespace-normal w-full leading-snug"
                             >{{ filteredOptions[vRow.index].subLabel }}</span>
                             <div
                               v-if="filteredOptions[vRow.index].colorPalette?.length"
-                              class="tw:h-1.5 tw:w-full tw:rounded-sm"
+                              class="h-1.5 w-full rounded-sm"
                               :style="{
                                 background: getPaletteGradient(
                                   filteredOptions[vRow.index].colorPalette!,
@@ -1448,19 +1521,19 @@ const fieldWidthClass = computed(() => {
                           <component
                             v-if="filteredOptions[vRow.index].iconComponent"
                             :is="filteredOptions[vRow.index].iconComponent"
-                            class="tw:shrink-0 tw:size-4"
+                            class="shrink-0 size-4"
                           />
                           <OIcon
                             v-else-if="filteredOptions[vRow.index].icon"
                             :name="filteredOptions[vRow.index].icon"
                             size="sm"
-                            class="tw:shrink-0"
+                            class="shrink-0"
                           />
                           <span
                             v-else-if="iconKey"
-                            class="tw:shrink-0 tw:size-4"
+                            class="shrink-0 size-4"
                           />
-                          <span class="tw:truncate" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{
+                          <span class="truncate" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{
                             filteredOptions[vRow.index].label
                           }}</span>
                         </template>
@@ -1473,28 +1546,28 @@ const fieldWidthClass = computed(() => {
                 <slot name="after-options" />
               <!-- rowClickSingleSelect hint bar — inside bordered container so the border wraps it -->
               <template v-if="multiple && rowClickSingleSelect">
-              <div class="tw:mx-2 tw:mt-1 tw:h-px tw:bg-input-border tw:shrink-0" aria-hidden="true" />
+              <div class="mx-2 mt-1 h-px bg-input-border shrink-0" aria-hidden="true" />
               <div
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:select-none tw:pointer-events-none tw:shrink-0"
+                class="flex items-center gap-2 px-3 py-2 select-none pointer-events-none shrink-0"
               >
                 <!-- Checkbox zone hint -->
-                <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
+                <span class="flex items-center gap-1.5 text-[0.6875rem] text-select-placeholder shrink-0">
                   <span
-                    class="tw:inline-flex tw:items-center tw:justify-center tw:size-3.5 tw:rounded-sm tw:border tw:border-select-placeholder tw:shrink-0"
+                    class="inline-flex items-center justify-center size-3.5 rounded-sm border border-select-placeholder shrink-0"
                     aria-hidden="true"
                   >
-                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tw:size-2.5 tw:p-px">
+                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-2.5 p-px">
                       <polyline points="1.5,5 4,8 8.5,2" />
                     </svg>
                   </span>
                   <span>Multi select</span>
                 </span>
 
-                <span class="tw:w-px tw:h-3.5 tw:bg-input-border tw:shrink-0" aria-hidden="true" />
+                <span class="w-px h-3.5 bg-input-border shrink-0" aria-hidden="true" />
 
                 <!-- Name zone hint -->
-                <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
-                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tw:size-3 tw:shrink-0" aria-hidden="true">
+                <span class="flex items-center gap-1.5 text-[0.6875rem] text-select-placeholder shrink-0">
+                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="size-3 shrink-0" aria-hidden="true">
                     <path d="M4 2h6M4 5h6M4 8h3" />
                   </svg>
                   <span>Single select</span>
@@ -1525,7 +1598,7 @@ const fieldWidthClass = computed(() => {
     >
       <div
         ref="selectTriggerWrapperRef"
-        class="tw:relative tw:flex tw:items-center"
+        class="relative flex items-center"
       >
         <SelectTrigger
           :id="inputId"
@@ -1534,50 +1607,50 @@ const fieldWidthClass = computed(() => {
             parentDataTest ? `${parentDataTest}-trigger` : undefined
           "
           :class="[
-            'tw:relative tw:flex tw:w-full tw:rounded-md tw:border',
+            'relative flex w-full rounded-md border',
             // In inside-label mode padding is handled per-row
-            labelPosition === 'inside' && label ? '' : 'tw:ps-3',
-            'tw:bg-select-bg',
+            labelPosition === 'inside' && label ? '' : 'ps-3',
+            'bg-select-bg',
             hasError
-              ? 'tw:border-select-border-error'
-              : 'tw:border-select-border tw:hover:border-select-border-hover tw:focus:border-select-border-focus',
+              ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
+              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
             /* Keep the red error border on focus; focus border color applies only when there's no error. */
-            'tw:focus:outline-none',
-            'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
-            'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
+            'focus:outline-none',
+            'transition-[color,background-color,border-color,box-shadow] duration-150',
+            'data-disabled:bg-select-disabled-bg data-disabled:cursor-not-allowed data-disabled:border-dashed',
             labelPosition === 'inside' && label
               ? [
-                  'tw:flex-col tw:justify-between tw:py-0.5',
+                  'flex-col justify-between py-0.5',
                   heightClasses[size ?? 'md'],
                 ]
-              : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],
+              : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
           ]"
         >
           <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
           <span
             v-if="label && labelPosition === 'inside'"
-            class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
+            class="text-[0.625rem] leading-none whitespace-nowrap text-start text-select-placeholder select-none pointer-events-none ps-3 pe-7"
             >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
           >
 
           <!-- Content row: flex-row for inside-label; display:contents for normal mode -->
           <div
             :class="labelPosition === 'inside' && label
-              ? ['tw:flex tw:items-center tw:flex-1 tw:w-full tw:min-w-0', triggerEndPadding, 'tw:ps-3']
-              : 'tw:contents'"
+              ? ['flex items-center flex-1 w-full min-w-0', triggerEndPadding, 'ps-3']
+              : 'contents'"
           >
             <SelectValue
               :placeholder="placeholder"
               :class="[
-                'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
+                'flex-1 text-start truncate text-sm',
                 labelPosition === 'inside' && label
-                  ? 'tw:text-xs tw:leading-4'
+                  ? 'text-xs leading-4'
                   : '',
                 disabled
-                  ? 'tw:text-select-disabled-text'
+                  ? 'text-select-disabled-text'
                   : hasSelection
-                    ? 'tw:text-select-text'
-                    : 'tw:text-select-placeholder',
+                    ? 'text-select-text'
+                    : 'text-select-placeholder',
               ]"
             >
               <slot name="trigger" :value="modelValue" />
@@ -1588,7 +1661,7 @@ const fieldWidthClass = computed(() => {
         <!-- Trailing icons: clear (left) then chevron (right). See note in
              the listbox branch above for the pointer-events strategy. -->
         <div
-          class="tw:absolute tw:end-2.5 tw:flex tw:items-center tw:gap-1.5 tw:pointer-events-none"
+          class="absolute end-2.5 flex items-center gap-1.5 pointer-events-none"
         >
           <button
             v-if="clearable && hasSelection"
@@ -1596,9 +1669,9 @@ const fieldWidthClass = computed(() => {
             tabindex="-1"
             aria-label="Clear selection"
             :class="[
-              'tw:flex tw:items-center tw:justify-center tw:size-3.5',
-              'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
-              'tw:transition-colors tw:pointer-events-auto',
+              'flex items-center justify-center size-3.5',
+              'text-input-clear-btn hover:text-input-clear-btn-hover',
+              'transition-colors pointer-events-auto',
             ]"
             @click.stop="handleClear"
           >
@@ -1606,7 +1679,7 @@ const fieldWidthClass = computed(() => {
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
               fill="currentColor"
-              class="tw:size-3.5"
+              class="size-3.5"
               aria-hidden="true"
             >
               <path
@@ -1620,9 +1693,9 @@ const fieldWidthClass = computed(() => {
             v-else
             aria-hidden="true"
             :class="[
-              'tw:flex tw:items-center tw:justify-center tw:text-select-icon',
-              'tw:transition-transform tw:duration-150',
-              isOpen ? 'tw:rotate-180' : '',
+              'flex items-center justify-center text-select-icon',
+              'transition-transform duration-150',
+              isOpen ? 'rotate-180' : '',
             ]"
           >
             <!-- chevron-down — rotates 180° when the dropdown is open -->
@@ -1630,7 +1703,7 @@ const fieldWidthClass = computed(() => {
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
               fill="currentColor"
-              class="tw:size-4"
+              class="size-4"
             >
               <path
                 fill-rule="evenodd"
@@ -1649,30 +1722,30 @@ const fieldWidthClass = computed(() => {
           :hide-when-detached="true"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
-            'tw:z-[10001] tw:min-w-(--reka-select-trigger-width)',
-            'tw:overflow-hidden',
-            'tw:rounded-md tw:border tw:shadow-md',
-            'tw:bg-select-content-bg tw:border-select-content-border',
+            'z-[10001] min-w-(--reka-select-trigger-width)',
+            'overflow-hidden',
+            'rounded-md border shadow-md',
+            'bg-select-content-bg border-select-content-border',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
             // ease-out-expo in (200ms), quick wipe out (140ms).
-            'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-            'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           ]"
           :style="[dropdownStyle, { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' }]"
           @click.stop
           @pointerdown.stop
         >
           <SelectScrollUpButton
-            class="tw:flex tw:items-center tw:justify-center tw:h-6 tw:text-select-icon"
+            class="flex items-center justify-center h-6 text-select-icon"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
               fill="currentColor"
-              class="tw:size-4"
+              class="size-4"
               aria-hidden="true"
             >
               <path
@@ -1683,7 +1756,7 @@ const fieldWidthClass = computed(() => {
             </svg>
           </SelectScrollUpButton>
 
-          <SelectViewport class="tw:p-1">
+          <SelectViewport class="p-1">
             <template v-if="normalizedOptions.length && !slots.default">
               <OSelectItem
                 v-for="opt in normalizedOptions"
@@ -1698,13 +1771,13 @@ const fieldWidthClass = computed(() => {
           </SelectViewport>
 
           <SelectScrollDownButton
-            class="tw:flex tw:items-center tw:justify-center tw:h-6 tw:text-select-icon"
+            class="flex items-center justify-center h-6 text-select-icon"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
               fill="currentColor"
-              class="tw:size-4"
+              class="size-4"
               aria-hidden="true"
             >
               <path
@@ -1722,7 +1795,7 @@ const fieldWidthClass = computed(() => {
     <span
       v-if="effectiveError && effectiveError.trim()"
       :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-      class="tw:text-xs tw:text-select-error-text tw:leading-none"
+      class="text-xs text-select-error-text leading-none"
       role="alert"
     >
       {{ effectiveError }}
@@ -1730,7 +1803,7 @@ const fieldWidthClass = computed(() => {
     <!-- Help text -->
     <span
       v-else-if="helpText"
-      class="tw:text-xs tw:text-input-help-text tw:leading-none"
+      class="text-xs text-input-help-text leading-none"
     >
       {{ helpText }}
     </span>

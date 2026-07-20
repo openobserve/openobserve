@@ -99,7 +99,7 @@ describe("SyntaxGuide.vue", () => {
     const button = wrapper.findComponent({ name: "OButton" });
     expect(button.exists()).toBe(true);
     expect(button.attributes("data-cy")).toBe("syntax-guide-button");
-    // OButton uses variant/size props instead of Quasar's dense/flat/icon props
+    // OButton uses variant/size props instead of dense/flat/icon props
     expect(button.props("variant")).toBe("ghost");
   });
 
@@ -334,8 +334,8 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ noBorder: true });
     const button = wrapper.findComponent({ name: "OButton" });
     // noBorder now toggles Tailwind utility classes instead of a scoped class
-    expect(button.classes()).toContain("tw:border-0!");
-    expect(button.classes()).not.toContain("tw:ml-1");
+    expect(button.classes()).toContain("border-0!");
+    expect(button.classes()).not.toContain("ml-1");
   });
 
   // Test 32: noBorder false keeps standard spacing classes
@@ -343,8 +343,8 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ noBorder: false });
     const button = wrapper.findComponent({ name: "OButton" });
     // noBorder false keeps the standard inline margin utility
-    expect(button.classes()).not.toContain("tw:border-0!");
-    expect(button.classes()).toContain("tw:ml-1");
+    expect(button.classes()).not.toContain("border-0!");
+    expect(button.classes()).toContain("ml-1");
   });
 
   // Test 33: label prop renders on button when noBorder is false

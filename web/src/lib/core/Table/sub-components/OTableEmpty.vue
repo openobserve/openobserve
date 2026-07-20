@@ -19,7 +19,7 @@ defineSlots<{
 <template>
   <div
     data-test="o2-table-empty"
-    class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:min-h-75"
+    class="flex flex-1 flex-col items-center justify-center min-h-75"
   >
     <slot>
       <OEmptyState size="inline" :title="message ?? t('search.noData')" />

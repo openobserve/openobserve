@@ -18,12 +18,13 @@ import { mount, flushPromises } from "@vue/test-utils";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 
 const i18n = createI18n({
   legacy: false,
   locale: "en",
-  messages: { en: {} },
+  messages: { en: enLocaleFull },
 });
 
 const mockStore = createStore({
@@ -549,7 +550,7 @@ describe("DynamicFunctionPopUp", () => {
       const labelInput = wrapper.find(
         '[data-test="dynamic-function-popup-label-input"]',
       );
-      expect(labelInput.classes()).not.toContain("tw:bg-gray-800");
+      expect(labelInput.classes()).not.toContain("bg-gray-800");
     });
 
     it("should apply dark theme to inputs", () => {
@@ -647,7 +648,7 @@ describe("DynamicFunctionPopUp", () => {
       wrapper = createWrapper();
       const container = wrapper.find('[data-test="dynamic-function-popup-root"]');
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("tw:flex");
+      expect(container.classes()).toContain("flex");
     });
 
     it("should apply correct label styles", () => {
@@ -656,7 +657,7 @@ describe("DynamicFunctionPopUp", () => {
         '[data-test="dynamic-function-popup-property-label"]',
       );
       expect(boldLabel.exists()).toBe(true);
-      expect(boldLabel.classes()).toContain("tw:font-semibold");
+      expect(boldLabel.classes()).toContain("font-semibold");
     });
 
     it("should apply correct normal label styles", () => {
@@ -665,16 +666,16 @@ describe("DynamicFunctionPopUp", () => {
         '[data-test="dynamic-function-popup-label-text"]',
       );
       expect(normalLabel.exists()).toBe(true);
-      expect(normalLabel.classes()).toContain("tw:font-normal");
+      expect(normalLabel.classes()).toContain("font-normal");
     });
 
     it("should have edit-input class on inputs", () => {
       wrapper = createWrapper();
-      // OInput applies tw:w-full from the class prop on its outer div
+      // OInput applies w-full from the class prop on its outer div
       const labelInput = wrapper.find(
         '[data-test="dynamic-function-popup-label-input"]',
       );
-      expect(labelInput.classes()).toContain("tw:w-full");
+      expect(labelInput.classes()).toContain("w-full");
     });
   });
 

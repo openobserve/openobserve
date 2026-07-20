@@ -22,13 +22,13 @@
         :persist-columns="true"
         table-id="score-config-list"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
             data-test="score-config-list-search-input"
             clearable
@@ -40,17 +40,34 @@
             :placeholder="t('onlineEvals.scoreConfig.allTypes')"
             size="md"
             width="sm"
-            class="tw:shrink-0"
+            class="shrink-0"
             data-test="score-config-list-type-filter"
           />
         </template>
 
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="score-config-list-refresh-btn"
+            @click="emit('refresh')"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="scoreConfigsRefresh" />
+          </OButton>
+        </template>
+
         <template #empty>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+          <div class="flex items-center justify-center py-8">
             <OEmptyState
               size="hero"
               preset="no-score-configs"
               :filtered="hasFilters"
+              :actions="[
+                { id: 'create', icon: 'add', titleKey: 'emptyState.noScoreConfigs.action', descriptionKey: 'emptyState.noScoreConfigs.actionDesc' },
+                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noScoreConfigs.import', descriptionKey: 'emptyState.noScoreConfigs.importDesc' },
+              ]"
               data-test="score-config-empty-state"
               @action="onEmptyAction"
             />
@@ -62,21 +79,21 @@
         </template>
 
         <template #cell-rangeValues="{ row }">
-          <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">{{ rangeOrValues(row) }}</span>
+          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">{{ rangeOrValues(row) }}</span>
         </template>
 
         <template #cell-healthy="{ row }">
-          <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs tw:font-semibold">{{ healthyDisplay(row) }}</span>
+          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs font-semibold">{{ healthyDisplay(row) }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="tw:inline-flex tw:items-center tw:gap-1.5 tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">
-            <span class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-(--o2-status-success-text) tw:inline-block" />v{{ row.version }}
+          <span class="inline-flex items-center gap-1.5 font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">
+            <span class="w-1.5 h-1.5 rounded-full bg-(--color-success-600) inline-block" />v{{ row.version }}
           </span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:text-xs">{{ usedByText(row) }}</span>
+          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -84,14 +101,14 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title tw:text-primary">
+          <span class="o2-table-footer-title">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
           </span>
           <OButton
             v-if="selectedIds.length > 0"
             variant="outline"
             size="sm"
-            class="tw:ml-3"
+            class="ml-3"
             icon-left="download"
             data-test="score-config-bulk-export-btn"
             @click="handleBulkExport"
@@ -101,7 +118,7 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               :data-test="`score-config-list-${row.name}-edit-btn`"
               data-row-action="edit"
@@ -139,6 +156,9 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -172,6 +192,7 @@ const emit = defineEmits<{
   (e: "open-library"): void;
   (e: "export", row: ScoreConfig): void;
   (e: "export-bulk", ids: string[]): void;
+  (e: "refresh"): void;
 }>();
 
 const { t } = useI18n();
@@ -300,6 +321,7 @@ const hasFilters = computed(
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
+  else if (id === "import") emit("import-custom");
   else if (id === "clear-filters") {
     emit("update:search", "");
     typeFilter.value = null;
@@ -366,9 +388,13 @@ function formatDateShort(value: number) {
 }
 
 function dtypeChipClass(dataType: string): string {
-  if (dataType === 'numeric') return 'tw:bg-[color-mix(in_srgb,var(--o2-status-info-text)_14%,transparent)] tw:text-(--o2-status-info-text)';
-  if (dataType === 'categorical') return 'tw:bg-[color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] tw:text-(--o2-status-warning-text)';
-  if (dataType === 'boolean') return 'tw:bg-[color-mix(in_srgb,var(--o2-status-success-text)_14%,transparent)] tw:text-(--o2-status-success-text)';
+  if (dataType === 'numeric') return 'bg-[color-mix(in_srgb,var(--color-info-700)_14%,transparent)] text-(--color-info-700)';
+  if (dataType === 'categorical') return 'bg-[color-mix(in_srgb,var(--color-warning-700)_14%,transparent)] text-(--color-warning-700)';
+  if (dataType === 'boolean') return 'bg-[color-mix(in_srgb,var(--color-success-600)_14%,transparent)] text-(--color-success-600)';
   return '';
 }
+
+useShortcuts([
+  { id: "scoreConfigsRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+]);
 </script>

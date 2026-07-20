@@ -31,11 +31,29 @@ export interface TraceCorrelationData {
   } | null;
 }
 
-export default function useTraceCorrelation(traceId: Ref<string>) {
+export interface CorrelationTimeRange {
+  /** µs */
+  startTime: number;
+  /** µs */
+  endTime: number;
+}
+
+export default function useTraceCorrelation(
+  traceId: Ref<string>,
+  timeRange?: Ref<CorrelationTimeRange | null>,
+) {
   const store = useStore();
   const correlationData = ref<TraceCorrelationData | null>(null);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);
+
+  // Callers correlating a specific event (e.g. an error) pass its time
+  // range; without one we fall back to the trailing hour.
+  const effectiveRange = (): CorrelationTimeRange =>
+    timeRange?.value ?? {
+      startTime: Date.now() * 1000 - 3600000000,
+      endTime: Date.now() * 1000,
+    };
 
   const hasBackendTrace = computed(() => {
     return correlationData.value?.has_backend_trace ?? false;
@@ -63,12 +81,14 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
     error.value = null;
 
     try {
+      const range = effectiveRange();
+
       // Query RUM data for this trace ID
       const rumQuery = {
         query: {
           sql: `select * from _rumdata where "_oo_trace_id" = '${traceId.value}' order by ${store.state.zoConfig.timestamp_column} desc`,
-          start_time: Date.now() * 1000 - 3600000000, // Last hour in microseconds
-          end_time: Date.now() * 1000,
+          start_time: range.startTime,
+          end_time: range.endTime,
           from: 0,
           size: 100,
         },
@@ -95,8 +115,8 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
         const traceQuery = {
           query: {
             sql: `select * from _traces where trace_id = '${traceId.value}' order by start_time`,
-            start_time: Date.now() * 1000 - 3600000000,
-            end_time: Date.now() * 1000,
+            start_time: range.startTime,
+            end_time: range.endTime,
             from: 0,
             size: 100,
           },

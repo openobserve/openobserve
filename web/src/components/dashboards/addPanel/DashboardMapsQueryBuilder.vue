@@ -17,18 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'maps'">
     <!-- name container -->
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="tw:whitespace-nowrap tw:min-w-[130px] tw:flex tw:items-center">
+    <div style="display: flex; flex-direction: row" class="pl-3">
+      <div class="whitespace-nowrap min-w-[130px] flex items-center">
         {{ t("panel.mapname") }}
-        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+        <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="tw:flex tw:items-center tw:ml-[2px] tw:mr-[2px]">:</span>
+      <span class="flex items-center ml-[2px] mr-[2px]">:</span>
       <div
-        class="axis-container tw:flex-1 tw:w-full tw:flex tw:flex-wrap droppable tw:border-transparent tw:border-dashed tw:border-2 scroll"
+        class="axis-container flex-1 w-full flex flex-wrap droppable border-transparent border-dashed border-2 scroll"
         :class="{
-          'tw:bg-[rgba(0,0,0,0.042)] tw:border-white tw:[border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
-          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+          'bg-[rgba(0,0,0,0.042)] border-white [border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
+          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'name',
         }"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-name-layout"
       >
         <OButtonGroup
-          class="axis-field tw:overflow-hidden tw:mr-2 tw:my-1"
+          class="axis-field overflow-hidden mr-2 my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
             >
               <div
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <div>
-                  <div class="tw:mr-1 tw:mb-2">
+                  <div class="mr-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
                         dashboardPanelData.data.queries[
@@ -129,31 +129,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+          class="text-xs text-weight-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.name == null
           "
         >
-          <div class="tw:mt-1">{{ Hint }}</div>
+          <div class="mt-1">{{ Hint }}</div>
         </div>
       </div>
     </div>
     <OSeparator />
     <!-- value for maps container -->
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="tw:whitespace-nowrap tw:min-w-[130px] tw:flex tw:items-center">
+    <div style="display: flex; flex-direction: row" class="pl-3">
+      <div class="whitespace-nowrap min-w-[130px] flex items-center">
         {{ t("panel.mapvalue") }}
-        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+        <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="tw:flex tw:items-center tw:ml-[2px] tw:mr-[2px]">:</span>
+      <span class="flex items-center ml-[2px] mr-[2px]">:</span>
       <div
-        class="axis-container tw:flex-1 tw:w-full tw:flex tw:flex-wrap droppable tw:border-transparent tw:border-dashed tw:border-2 scroll"
+        class="axis-container flex-1 w-full flex flex-wrap droppable border-transparent border-dashed border-2 scroll"
         :class="{
-          'tw:bg-[rgba(0,0,0,0.042)] tw:border-white tw:[border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
-          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+          'bg-[rgba(0,0,0,0.042)] border-white [border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
+          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea ==
               'value_for_maps',
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value_for_maps-layout"
       >
         <OButtonGroup
-          class="axis-field tw:overflow-hidden tw:mr-2 tw:my-1"
+          class="axis-field overflow-hidden mr-2 my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
             >
               <div
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <div>
-                  <div class="tw:mr-1 tw:mb-2">
+                  <div class="mr-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
                         dashboardPanelData.data.queries[
@@ -255,14 +255,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+          class="text-xs text-weight-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.value_for_maps == null
           "
         >
-          <div class="tw:mt-1">{{ Hint }}</div>
+          <div class="mt-1">{{ Hint }}</div>
         </div>
       </div>
     </div>
@@ -420,7 +420,13 @@ export default defineComponent({
           ) {
             const maxAllowedAxisFields = 1;
 
-            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+            const errorMessage = t(
+              "dashboard.dashboardMapsQueryBuilder.maxFieldAllowed",
+              {
+                count: maxAllowedAxisFields,
+                axis: targetAxis.toUpperCase(),
+              },
+            );
 
             showErrorNotification(errorMessage);
             cleanupDraggingFields();
@@ -445,7 +451,9 @@ export default defineComponent({
         )?.value;
 
         if (!firstFieldTypeArg) {
-          showErrorNotification("Without field, not able to drag");
+          showErrorNotification(
+            t("dashboard.dashboardMapsQueryBuilder.withoutFieldNotDrag"),
+          );
           cleanupDraggingFields();
           return;
         }

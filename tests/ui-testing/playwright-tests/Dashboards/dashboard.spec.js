@@ -517,10 +517,12 @@ test.describe("dashboard UI testcases", () => {
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
 
-    // Attempt to save the panel without a name
+    // Attempt to save the panel without a name. The name field is now an
+    // OForm field with a required-schema rule, so an empty name is blocked at
+    // the form layer with an inline field error (no error toast is produced).
     await pm.dashboardPanelActions.savePanel();
     await expect(
-      pm.dashboardPanelActions.getErrorToast().first()
+      pm.dashboardPanelActions.getPanelNameError().first()
     ).toBeVisible();
 
     // Add a panel name and save again

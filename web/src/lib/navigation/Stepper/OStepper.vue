@@ -71,45 +71,45 @@ const isHorizontal = computed(() => props.orientation !== 'vertical')
 // ΓöÇΓöÇ Horizontal header classes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 function indicatorClasses(step: StepRegistration): string {
   const base = [
-    'tw:flex tw:items-center tw:justify-center',
-    'tw:size-8 tw:rounded-full tw:shrink-0',
-    'tw:text-sm tw:font-semibold tw:leading-none',
-    'tw:transition-colors tw:duration-150',
+    'flex items-center justify-center',
+    'size-8 rounded-full shrink-0',
+    'text-sm font-semibold leading-none',
+    'transition-colors duration-150',
   ].join(' ')
 
   if (step.error) {
-    return `${base} tw:bg-stepper-indicator-error tw:text-stepper-indicator-fg`
+    return `${base} bg-stepper-indicator-error text-stepper-indicator-fg`
   }
   if (step.done) {
-    return `${base} tw:bg-stepper-indicator-done tw:text-stepper-indicator-fg`
+    return `${base} bg-stepper-indicator-done text-stepper-indicator-fg`
   }
   if (step.name === props.modelValue) {
-    return `${base} tw:bg-stepper-indicator-active tw:text-stepper-indicator-fg`
+    return `${base} bg-stepper-indicator-active text-stepper-indicator-fg`
   }
-  return `${base} tw:bg-stepper-indicator-default tw:text-stepper-indicator-default-text`
+  return `${base} bg-stepper-indicator-default text-stepper-indicator-default-text`
 }
 
 function titleClasses(step: StepRegistration): string {
-  if (step.name === props.modelValue) return 'tw:text-xs tw:font-medium tw:text-stepper-title-active'
-  if (step.done) return 'tw:text-xs tw:font-medium tw:text-stepper-title-done'
-  return 'tw:text-xs tw:font-medium tw:text-stepper-title-default'
+  if (step.name === props.modelValue) return 'text-xs font-medium text-stepper-title-active'
+  if (step.done) return 'text-xs font-medium text-stepper-title-done'
+  return 'text-xs font-medium text-stepper-title-default'
 }
 
 function triggerClasses(step: StepRegistration): string {
   const base = [
-    'tw:flex tw:flex-row tw:items-center tw:gap-2 tw:px-2 tw:py-1.5',
-    'tw:rounded-md tw:outline-none tw:select-none',
-    'tw:transition-colors tw:duration-150',
+    'flex flex-row items-center gap-2 px-2 py-1.5',
+    'rounded-md outline-none select-none',
+    'transition-colors duration-150',
   ].join(' ')
   if (canNavigateTo(step)) {
     return [
       base,
-      'tw:cursor-pointer',
-      'tw:hover:bg-stepper-trigger-hover',
-      'tw:focus-visible:ring-2 tw:focus-visible:ring-stepper-trigger-focus-ring',
+      'cursor-pointer',
+      'hover:bg-stepper-trigger-hover',
+      'focus-visible:ring-2 focus-visible:ring-stepper-trigger-focus-ring',
     ].join(' ')
   }
-  return `${base} tw:cursor-default`
+  return `${base} cursor-default`
 }
 </script>
 
@@ -117,22 +117,22 @@ function triggerClasses(step: StepRegistration): string {
   <div
     role="group"
     aria-label="Steps"
-    class="o-stepper tw:flex tw:flex-col"
+    class="o-stepper flex flex-col"
   >
     <!--
       Horizontal header bar ΓÇö rendered from registered step metadata.
-      OStep children register themselves on mount; this tw:flex re-renders
+      OStep children register themselves on mount; this flex re-renders
       reactively whenever a step's done/error state changes.
     -->
     <div
       v-if="isHorizontal"
       role="list"
       aria-label="Steps"
-      class="tw:flex tw:items-start tw:w-full tw:mb-6"
+      class="sticky top-0 z-10 flex items-start w-full pb-2 bg-[var(--o2-primary-background)]!"
     >
       <template v-for="(step, index) in sortedSteps" :key="step.name">
         <!-- Step trigger (indicator circle + title) -->
-        <div role="listitem" class="tw:flex tw:flex-col tw:items-center tw:shrink-0">
+        <div role="listitem" class="flex flex-col items-center shrink-0">
           <button
             type="button"
             :class="triggerClasses(step)"
@@ -143,22 +143,22 @@ function triggerClasses(step: StepRegistration): string {
           >
             <!-- Indicator circle -->
             <span :class="indicatorClasses(step)" aria-hidden="true">
-              <OIcon name="check" size="sm" v-if="step.done && !step.error" class="tw:size-4" :stroke-width="2.5" />
-              <OIcon name="error-outline" size="sm" v-else-if="step.error" class="tw:size-4" :stroke-width="2.5" />
-              <OIcon v-else-if="typeof step.icon === 'string'" :name="(step.icon as any)" class="tw:size-4" />
+              <OIcon name="check" size="sm" v-if="step.done && !step.error" class="size-4" :stroke-width="2.5" />
+              <OIcon name="error-outline" size="sm" v-else-if="step.error" class="size-4" :stroke-width="2.5" />
+              <OIcon v-else-if="typeof step.icon === 'string'" :name="(step.icon as any)" class="size-4" />
               <component
                 :is="step.icon as Component"
                 v-else-if="step.icon"
-                class="tw:size-4"
+                class="size-4"
               />
               <span v-else>{{ step.name }}</span>
             </span>
             <!-- Title + Description (stacked vertically, right of indicator) -->
-            <span class="tw:flex tw:flex-col tw:items-start tw:min-w-0">
+            <span class="flex flex-col items-start min-w-0">
               <span :class="titleClasses(step)">{{ step.title }}</span>
               <span
                 v-if="step.description"
-                class="tw:text-[11px] tw:text-text-secondary tw:mt-0.5 tw:leading-tight"
+                class="text-[11px] text-text-secondary mt-0.5 leading-tight"
               >
                 {{ step.description }}
               </span>
@@ -169,15 +169,15 @@ function triggerClasses(step: StepRegistration): string {
         <!-- Connector line between consecutive steps -->
         <div
           v-if="index < sortedSteps.length - 1"
-          class="tw:h-px tw:flex-1 tw:shrink tw:mt-[22px] tw:mx-1 tw:min-w-[8px]"
-          :class="step.done ? 'tw:bg-stepper-connector-done' : 'tw:bg-stepper-connector'"
+          class="h-px flex-1 shrink mt-[22px] mx-1 min-w-[8px]"
+          :class="step.done ? 'bg-stepper-connector-done' : 'bg-stepper-connector'"
           aria-hidden="true"
         />
       </template>
     </div>
 
     <!-- Step content panels (OStep children render here for both orientations) -->
-    <div :class="isHorizontal ? 'tw:flex-1 tw:min-w-0' : 'tw:flex tw:flex-col tw:gap-0'">
+    <div :class="isHorizontal ? 'flex-1 min-w-0' : 'flex flex-col gap-0'">
       <slot />
     </div>
   </div>

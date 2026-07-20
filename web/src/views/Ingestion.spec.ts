@@ -23,8 +23,6 @@ import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
 import segment from "@/services/segment_analytics";
 
-// Install Quasar plugins
-
 // Mock services with default resolved values
 vi.mock("@/services/organizations", () => ({
   default: {
@@ -101,7 +99,7 @@ vi.mock("@/aws-exports", () => ({
   }
 }));
 
-// Mock clipboard and toast (replaces deprecated Quasar mock)
+// Mock clipboard and toast
 const mockNotify = vi.fn();
 
 vi.mock("@/utils/clipboard", () => ({
@@ -207,7 +205,7 @@ describe("Ingestion", () => {
         return;
       }
       expect(wrapper.vm.rumRoutes).toEqual(["frontendMonitoring"]);
-      expect(wrapper.vm.metricRoutes).toEqual(["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"]);
+      expect(wrapper.vm.metricRoutes).toEqual(["prometheus", "vmagent", "otelCollector", "telegraf", "cloudwatchMetrics"]);
       expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP"]);
     });
   });
@@ -478,7 +476,7 @@ describe("Ingestion", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "error",
-        message: "API Key not found.",
+        message: "Passcode not found.",
         timeout: 5000,
       });
     });
@@ -567,7 +565,7 @@ describe("Ingestion", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "error",
-        message: "API Key not found.",
+        message: "Passcode not found.",
         timeout: 5000,
       });
     });

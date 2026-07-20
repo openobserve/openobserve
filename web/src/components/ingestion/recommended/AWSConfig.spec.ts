@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import AWSConfig from "./AWSConfig.vue";
 import { createI18n } from 'vue-i18n';
+import enUS from '@/locales/languages/en-US.json';
 import { nextTick } from 'vue';
 
 // Mock dependencies
@@ -103,10 +104,12 @@ const mockStore = createStore({
 });
 
 // Create mock i18n
+// Real locale messages: the component renders t() keys, and several
+// assertions below check the resulting English text.
 const mockI18n = createI18n({
   locale: 'en',
   messages: {
-    en: {}
+    en: enUS
   }
 });
 
@@ -255,9 +258,8 @@ describe("AWSConfig", () => {
     expect(content).toContain('Access Key: [BASIC_PASSCODE]');
   });
 
-  // Test 15: AWSQuickSetup component integration (replaces AWSIntegrationGrid)
-  it("should render AWSIntegrationGrid component", () => {
-    // Component now uses AWSQuickSetup and AWSIndividualServices instead of AWSIntegrationGrid
+  // Test 15: quick-setup panel is mounted
+  it("should render AWSQuickSetup component", () => {
     const quickSetup = wrapper.findComponent({ name: 'AWSQuickSetup' });
     expect(quickSetup.exists()).toBe(true);
   });
@@ -278,8 +280,8 @@ describe("AWSConfig", () => {
 
   // Test 18: Integration section structure
   it("should have correct integration section structure", () => {
-    expect(wrapper.find('.tw\\:mt-8').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:mb-4').exists()).toBe(true);
+    expect(wrapper.find('.mt-8').exists()).toBe(true);
+    expect(wrapper.find('.mb-4').exists()).toBe(true);
   });
 
   // Test 19: CopyContent component integration
@@ -296,7 +298,7 @@ describe("AWSConfig", () => {
 
   // Test 21: Template structure
   it("should have correct template structure", () => {
-    expect(wrapper.find('.tw\\:m-3').exists()).toBe(true);
+    expect(wrapper.find('.m-3').exists()).toBe(true);
     expect(
       wrapper.find('[data-test="aws-config-page-title"]').exists(),
     ).toBe(true);
@@ -466,7 +468,7 @@ describe("AWSConfig", () => {
     expect(quickSetupComponent.exists()).toBe(true);
 
     // Verify template structure
-    expect(wrapper.find('.tw\\:m-3').exists()).toBe(true);
+    expect(wrapper.find('.m-3').exists()).toBe(true);
     expect(
       wrapper.find('[data-test="aws-config-page-title"]').exists(),
     ).toBe(true);

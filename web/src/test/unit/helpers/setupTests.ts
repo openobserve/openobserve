@@ -29,7 +29,7 @@ import store from "./store";
 // (some specs mock it). Resolve OTag `labelKey`s against the raw English JSON so
 // registry-labelled badges render real text in component tests.
 import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
-import enMessages from "@/locales/languages/en.json";
+import enMessages from "@/locales/languages/en-US.json";
 setBadgeTranslator((key: string) =>
   key
     .split(".")
@@ -136,7 +136,6 @@ console.warn = (...args) => {
         // Suppress Vue component warnings from test stubs
         message.includes('Failed to resolve component:') ||
         message.includes('Component is missing template or render function') ||
-        message.includes('setup() return property "$q" should not start with "$"') ||
         message.includes('Unhandled error during execution of watcher callback') ||
         message.includes('Unhandled error during execution of native event handler') ||
         message.includes('Unhandled error during execution of activated hook') ||

@@ -24,272 +24,272 @@ defineSlots<ButtonSlots>();
 // Variant class map - every entry is a full token-based class string
 const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   primary: [
-    "tw:bg-button-primary tw:text-button-primary-foreground",
-    "tw:enabled:hover:bg-button-primary-hover",
-    "tw:enabled:active:bg-button-primary-active",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-primary-hover",
-    "tw:disabled:bg-button-primary-disabled tw:disabled:text-button-primary-foreground",
+    "bg-button-primary text-button-primary-foreground",
+    "enabled:hover:bg-button-primary-hover",
+    "enabled:active:bg-button-primary-active",
+    "focus-visible:ring-[3px] focus-visible:ring-button-primary-hover",
+    "disabled:bg-button-primary-disabled disabled:text-button-primary-foreground",
   ].join(" "),
   secondary: [
-    "tw:bg-button-secondary tw:text-button-secondary-foreground",
-    "tw:enabled:hover:bg-button-secondary-hover",
-    "tw:enabled:active:bg-button-secondary-active",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-secondary-focus-ring",
-    "tw:disabled:bg-button-secondary-disabled tw:disabled:text-text-disabled",
+    "bg-button-secondary text-button-secondary-foreground",
+    "enabled:hover:bg-button-secondary-hover",
+    "enabled:active:bg-button-secondary-active",
+    "focus-visible:ring-[3px] focus-visible:ring-button-secondary-focus-ring",
+    "disabled:bg-button-secondary-disabled disabled:text-text-disabled",
   ].join(" "),
   outline: [
-    "tw:bg-transparent tw:text-button-outline-text tw:border tw:border-button-outline-border",
-    "tw:enabled:hover:bg-button-outline-hover-bg tw:enabled:hover:border-button-outline-hover-border",
-    "tw:enabled:active:bg-button-outline-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-outline-hover-border",
-    "tw:disabled:opacity-50",
+    "bg-transparent text-button-outline-text border border-button-outline-border",
+    "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
+    "enabled:active:bg-button-outline-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-outline-hover-border",
+    "disabled:opacity-50",
   ].join(" "),
   ghost: [
-    "tw:bg-transparent tw:text-button-ghost-text tw:border-0",
-    "tw:enabled:hover:bg-button-ghost-hover-bg",
-    "tw:enabled:active:bg-button-ghost-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-focus-ring",
-    "tw:disabled:text-text-disabled",
+    "bg-transparent text-button-ghost-text border-0",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "enabled:active:bg-button-ghost-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
+    "disabled:text-text-disabled",
   ].join(" "),
   "ghost-primary": [
-    "tw:bg-transparent tw:text-button-ghost-primary-text tw:border-0",
-    "tw:enabled:hover:bg-button-ghost-primary-hover-bg",
-    "tw:enabled:active:bg-button-ghost-primary-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-primary-focus-ring",
-    "tw:disabled:text-text-disabled",
+    "bg-transparent text-button-ghost-primary-text border-0",
+    "enabled:hover:bg-button-ghost-primary-hover-bg",
+    "enabled:active:bg-button-ghost-primary-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:text-text-disabled",
   ].join(" "),
   "ghost-muted": [
-    "tw:bg-transparent tw:text-button-ghost-muted-text tw:border-0",
-    "tw:enabled:hover:text-button-ghost-muted-hover-text tw:enabled:hover:bg-button-ghost-muted-hover-bg",
-    "tw:enabled:active:bg-button-ghost-muted-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-muted-focus-ring",
-    "tw:disabled:text-text-disabled",
+    "bg-transparent text-button-ghost-muted-text border-0",
+    "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
+    "enabled:active:bg-button-ghost-muted-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-muted-focus-ring",
+    "disabled:text-text-disabled",
   ].join(" "),
   "ghost-subtle": [
-    "tw:bg-transparent tw:text-button-ghost-subtle-text tw:border-0 tw:opacity-60",
-    "tw:enabled:hover:opacity-100 tw:enabled:hover:bg-button-ghost-subtle-hover-bg",
-    "tw:enabled:active:bg-button-ghost-subtle-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-subtle-focus-ring",
-    "tw:disabled:text-text-disabled tw:disabled:opacity-30",
+    "bg-transparent text-button-ghost-subtle-text border-0 opacity-60",
+    "enabled:hover:opacity-100 enabled:hover:bg-button-ghost-subtle-hover-bg",
+    "enabled:active:bg-button-ghost-subtle-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-subtle-focus-ring",
+    "disabled:text-text-disabled disabled:opacity-30",
   ].join(" "),
   "ghost-destructive": [
-    "tw:bg-transparent tw:text-button-ghost-destructive-text tw:border-0",
-    "tw:enabled:hover:bg-button-ghost-destructive-hover-bg",
-    "tw:enabled:active:bg-button-ghost-destructive-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-destructive-focus-ring",
-    "tw:disabled:opacity-60",
+    "bg-transparent text-button-ghost-destructive-text border-0",
+    "enabled:hover:bg-button-ghost-destructive-hover-bg",
+    "enabled:active:bg-button-ghost-destructive-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-destructive-focus-ring",
+    "disabled:opacity-60",
   ].join(" "),
   "ghost-success": [
-    "tw:bg-transparent tw:text-button-ghost-success-text tw:border-0",
-    "tw:enabled:hover:bg-button-ghost-success-hover-bg",
-    "tw:enabled:active:bg-button-ghost-success-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-success-focus-ring",
-    "tw:disabled:opacity-60",
+    "bg-transparent text-button-ghost-success-text border-0",
+    "enabled:hover:bg-button-ghost-success-hover-bg",
+    "enabled:active:bg-button-ghost-success-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-success-focus-ring",
+    "disabled:opacity-60",
   ].join(" "),
   destructive: [
-    "tw:bg-button-destructive tw:text-button-destructive-foreground",
-    "tw:enabled:hover:bg-button-destructive-hover",
-    "tw:enabled:active:bg-button-destructive-hover",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-destructive-hover",
-    "tw:disabled:opacity-60",
+    "bg-button-destructive text-button-destructive-foreground",
+    "enabled:hover:bg-button-destructive-hover",
+    "enabled:active:bg-button-destructive-hover",
+    "focus-visible:ring-[3px] focus-visible:ring-button-destructive-hover",
+    "disabled:opacity-60",
   ].join(" "),
   "ghost-warning": [
-    "tw:bg-transparent tw:text-button-ghost-warning-text tw:border-0",
-    "tw:enabled:hover:bg-button-ghost-warning-hover-bg",
-    "tw:enabled:active:bg-button-ghost-warning-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-warning-focus-ring",
-    "tw:disabled:opacity-60",
+    "bg-transparent text-button-ghost-warning-text border-0",
+    "enabled:hover:bg-button-ghost-warning-hover-bg",
+    "enabled:active:bg-button-ghost-warning-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-warning-focus-ring",
+    "disabled:opacity-60",
   ].join(" "),
   warning: [
-    "tw:bg-button-warning tw:text-button-warning-foreground tw:border tw:border-button-warning-border",
-    "tw:enabled:hover:bg-button-warning-hover",
-    "tw:enabled:active:bg-button-warning-active",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-warning-focus-ring",
-    "tw:disabled:opacity-60",
+    "bg-button-warning text-button-warning-foreground border border-button-warning-border",
+    "enabled:hover:bg-button-warning-hover",
+    "enabled:active:bg-button-warning-active",
+    "focus-visible:ring-[3px] focus-visible:ring-button-warning-focus-ring",
+    "disabled:opacity-60",
   ].join(" "),
-  // Neutral ghost: inherits parent text color — used for compact tw:inline action buttons
+  // Neutral ghost: inherits parent text color — used for compact inline action buttons
   // where no color accent is desired (e.g. field adder buttons +X +Y +B +F)
   "ghost-neutral": [
-    "tw:bg-transparent tw:text-inherit tw:border-0",
-    "tw:enabled:hover:bg-button-ghost-hover-bg",
-    "tw:enabled:active:bg-button-ghost-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-focus-ring",
-    "tw:disabled:opacity-50",
+    "bg-transparent text-inherit border-0",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "enabled:active:bg-button-ghost-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
+    "disabled:opacity-50",
   ].join(" "),
   // Outline destructive: transparent bg + red border + red text — use for destructive actions
   // that need visible affordance without the full filled destructive background
   "outline-destructive": [
-    "tw:bg-transparent tw:text-button-ghost-destructive-text tw:border tw:border-button-ghost-destructive-text",
-    "tw:enabled:hover:bg-button-ghost-destructive-hover-bg",
-    "tw:enabled:active:bg-button-ghost-destructive-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-destructive-focus-ring",
-    "tw:disabled:opacity-50",
+    "bg-transparent text-button-ghost-destructive-text border border-button-ghost-destructive-text",
+    "enabled:hover:bg-button-ghost-destructive-hover-bg",
+    "enabled:active:bg-button-ghost-destructive-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-destructive-focus-ring",
+    "disabled:opacity-50",
   ].join(" "),
   // Panel collapse: ghost muted — for sidebar panel header collapse/expand.
   // Transparent bg, muted icon color, subtle hover. Blends into header without visual weight.
   "panel-collapse": [
-    "tw:bg-transparent tw:text-button-ghost-muted-text tw:border-0",
-    "tw:enabled:hover:text-button-ghost-muted-hover-text tw:enabled:hover:bg-button-ghost-muted-hover-bg",
-    "tw:enabled:active:bg-button-ghost-muted-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-muted-focus-ring",
-    "tw:disabled:opacity-50",
+    "bg-transparent text-button-ghost-muted-text border-0",
+    "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
+    "enabled:active:bg-button-ghost-muted-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-muted-focus-ring",
+    "disabled:opacity-50",
   ].join(" "),
   // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
   "sidebar-button": [
-    "tw:bg-button-primary tw:text-button-primary-foreground",
-    "tw:enabled:hover:bg-button-primary-hover",
-    "tw:enabled:active:bg-button-primary-active",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-primary-hover",
-    "tw:disabled:bg-button-primary-disabled tw:disabled:text-button-primary-foreground",
+    "bg-button-primary text-button-primary-foreground",
+    "enabled:hover:bg-button-primary-hover",
+    "enabled:active:bg-button-primary-active",
+    "focus-visible:ring-[3px] focus-visible:ring-button-primary-hover",
+    "disabled:bg-button-primary-disabled disabled:text-button-primary-foreground",
   ].join(" "),
   // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
   "sidebar-toggle": [
-    "tw:bg-surface-panel tw:text-button-ghost-text tw:border tw:border-border-default tw:shadow-sm",
-    "tw:enabled:hover:bg-button-ghost-hover-bg tw:enabled:hover:border-button-border-hover",
-    "tw:enabled:active:bg-button-ghost-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-focus-ring",
-    "tw:disabled:opacity-50",
+    "bg-surface-panel text-button-ghost-text border border-border-default shadow-sm",
+    "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover",
+    "enabled:active:bg-button-ghost-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
+    "disabled:opacity-50",
   ].join(" "),
   // AI-themed gradient — purple→pink gradient background, white text
   "ai-gradient": [
-    "tw:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)] tw:text-white tw:border-0",
-    "tw:enabled:hover:shadow-[0_4px_12px_rgba(139,92,246,0.4)]",
-    "tw:enabled:active:opacity-90",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-[#8B5CF6]",
-    "tw:disabled:opacity-40",
+    "bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)] text-white border-0",
+    "enabled:hover:shadow-[0_4px_12px_rgba(139,92,246,0.4)]",
+    "enabled:active:opacity-90",
+    "focus-visible:ring-[3px] focus-visible:ring-[#8B5CF6]",
+    "disabled:opacity-40",
   ].join(" "),
   // On-dark primary — white background with primary color text, for use on dark gradient panels
   "on-dark-primary": [
-    "tw:bg-white tw:text-primary-600 tw:font-bold tw:border-0 tw:shadow-md",
-    "tw:enabled:hover:shadow-xl",
-    "tw:enabled:active:opacity-90",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-white/50",
-    "tw:disabled:opacity-50",
+    "bg-white text-primary-600 font-bold border-0 shadow-md",
+    "enabled:hover:shadow-xl",
+    "enabled:active:opacity-90",
+    "focus-visible:ring-[3px] focus-visible:ring-white/50",
+    "disabled:opacity-50",
   ].join(" "),
   // On-dark ghost — transparent with white border/text, for use on dark gradient panels
   "on-dark-ghost": [
-    "tw:bg-transparent tw:text-white tw:border-2 tw:border-white/30",
-    "tw:enabled:hover:bg-white/10 tw:enabled:hover:border-white/50",
-    "tw:enabled:active:opacity-90",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-white/50",
-    "tw:disabled:opacity-50",
+    "bg-transparent text-white border-2 border-white/30",
+    "enabled:hover:bg-white/10 enabled:hover:border-white/50",
+    "enabled:active:opacity-90",
+    "focus-visible:ring-[3px] focus-visible:ring-white/50",
+    "disabled:opacity-50",
   ].join(" "),
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
   // preview-slack: Slack green (#007a5a)
   "preview-slack": [
-    "tw:bg-[#007a5a] tw:text-white tw:border-0 tw:!rounded tw:!text-sm tw:!h-auto tw:!py-2 tw:!px-3",
-    "tw:enabled:hover:bg-[#005a42]",
-    "tw:disabled:opacity-60",
+    "bg-[#007a5a] text-white border-0 !rounded !text-sm !h-auto !py-2 !px-3",
+    "enabled:hover:bg-[#005a42]",
+    "disabled:opacity-60",
   ].join(" "),
   // preview-teams: Microsoft Teams purple (#6264a7)
   "preview-teams": [
-    "tw:bg-[#6264a7] tw:text-white tw:border-0 tw:!rounded tw:!h-auto tw:!py-2 tw:!px-4",
-    "tw:enabled:hover:bg-[#464775]",
-    "tw:disabled:opacity-60",
+    "bg-[#6264a7] text-white border-0 !rounded !h-auto !py-2 !px-4",
+    "enabled:hover:bg-[#464775]",
+    "disabled:opacity-60",
   ].join(" "),
   // preview-email: Email blue (#007bff)
   "preview-email": [
-    "tw:bg-[#007bff] tw:text-white tw:border-0 tw:!rounded tw:!h-auto tw:!py-3 tw:!px-6",
-    "tw:enabled:hover:bg-[#0056b3]",
-    "tw:disabled:opacity-60",
+    "bg-[#007bff] text-white border-0 !rounded !h-auto !py-3 !px-6",
+    "enabled:hover:bg-[#0056b3]",
+    "disabled:opacity-60",
   ].join(" "),
   // preview-action: Generic action button for destination previews with no brand color
   "preview-action": [
-    "tw:bg-transparent tw:text-button-outline-text tw:border tw:border-button-outline-border tw:!rounded tw:!h-auto tw:!py-2 tw:!px-3 tw:!text-sm",
-    "tw:enabled:hover:bg-button-outline-hover-bg",
-    "tw:disabled:opacity-60",
+    "bg-transparent text-button-outline-text border border-button-outline-border !rounded !h-auto !py-2 !px-3 !text-sm",
+    "enabled:hover:bg-button-outline-hover-bg",
+    "disabled:opacity-60",
   ].join(" "),
   // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
   "webinar-dismiss": [
-    "tw:bg-transparent tw:border-0 tw:text-[#1e3a8a] tw:underline tw:font-bold tw:text-[0.8125rem] tw:whitespace-nowrap",
-    "tw:!h-auto tw:!p-0",
-    "tw:enabled:hover:text-[#1e40af]",
-    "tw:disabled:opacity-60",
+    "bg-transparent border-0 text-[#1e3a8a] underline font-bold text-[0.8125rem] whitespace-nowrap",
+    "!h-auto !p-0",
+    "enabled:hover:text-[#1e40af]",
+    "disabled:opacity-60",
   ].join(" "),
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
   // Use for edition/tier badges that must stand out without being a heavy CTA.
   "outline-primary": [
-    "tw:bg-button-ghost-primary-active-bg tw:text-button-ghost-primary-text tw:border tw:border-button-outline-hover-border",
-    "tw:enabled:hover:bg-button-ghost-primary-active-bg tw:enabled:hover:border-button-outline-hover-border",
-    "tw:enabled:active:bg-button-ghost-primary-active-bg",
-    "tw:focus-visible:ring-[3px] tw:focus-visible:ring-button-ghost-primary-focus-ring",
-    "tw:disabled:opacity-50",
+    "bg-button-ghost-primary-active-bg text-button-ghost-primary-text border border-button-outline-hover-border",
+    "enabled:hover:bg-button-ghost-primary-active-bg enabled:hover:border-button-outline-hover-border",
+    "enabled:active:bg-button-ghost-primary-active-bg",
+    "focus-visible:ring-[3px] focus-visible:ring-button-ghost-primary-focus-ring",
+    "disabled:opacity-50",
   ].join(" "),
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
-    "tw:bg-transparent tw:text-inherit tw:border tw:border-border-default",
-    "tw:!rounded-[20px] tw:!text-xs tw:!font-medium tw:!h-auto tw:!py-[5px] tw:!px-[14px] tw:!gap-[6px]",
-    "tw:transition-colors tw:duration-150",
-    "tw:enabled:hover:border-primary-600 tw:enabled:hover:text-primary-600 tw:enabled:hover:bg-button-ghost-hover-bg",
-    "tw:disabled:opacity-60",
+    "bg-transparent text-inherit border border-border-default",
+    "!rounded-[20px] !text-xs !font-medium !h-auto !py-[5px] !px-[14px] !gap-[6px]",
+    "transition-colors duration-150",
+    "enabled:hover:border-primary-600 enabled:hover:text-primary-600 enabled:hover:bg-button-ghost-hover-bg",
+    "disabled:opacity-60",
   ].join(" "),
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
-  xs: "tw:h-7 tw:ps-2.5 tw:pe-2.5 tw:text-xs tw:gap-1.5 tw:rounded",
+  xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded",
   // 34px control height per HANDOFF §11 — the workhorse compact button that
   // pairs with 34px inputs in toolbars/headers. (radius 8 = rounded-lg per §11.)
-  sm: "tw:h-[2.125rem] tw:ps-3 tw:pe-3 tw:text-sm tw:gap-2 tw:rounded-lg",
+  sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-lg",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar":
-    "tw:h-[1.875rem] tw:ps-2 tw:pe-2 tw:text-xs tw:gap-1.5 tw:rounded-md",
-  // Compact labeled size for tw:inline field chips (axis items) — ~28px, matches Quasar dense button
+    "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-md",
+  // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
-  chip: "tw:h-6 tw:ps-2 tw:pe-1.5 tw:text-xs tw:gap-1 tw:rounded tw:leading-none",
+  chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
-  // (needed because Quasar sets html font-size to 14px, making text-xs = 10.5px instead of 12px)
-  "chip-12": "tw:h-6 tw:ps-2 tw:pe-1.5 tw:!text-[12px] tw:gap-1 tw:rounded tw:leading-none",
+  // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
+  "chip-12": "h-6 ps-2 pe-1.5 !text-[12px] gap-1 rounded leading-none",
   "sm-action":
-    "tw:h-[2.125rem] tw:ps-3 tw:pe-3 tw:min-w-[80px] tw:text-sm tw:gap-2 tw:rounded-lg",
-  md: "tw:h-10 tw:ps-4 tw:pe-4 tw:text-sm tw:gap-2 tw:rounded-lg",
-  lg: "tw:h-12 tw:ps-6 tw:pe-6 tw:text-base tw:gap-3 tw:rounded-lg",
-  icon: "tw:size-6 tw:p-0 tw:rounded-md tw:gap-x-0",
-  "icon-xs": "tw:h-[30px] tw:px-2 tw:text-[18px] tw:rounded-md tw:gap-x-0",
-  // 24px round circle — for small tw:inline add/action icon buttons (e.g. + Joins, + Filters)
-  "icon-xs-circle": "tw:size-6 tw:p-0 tw:rounded-full tw:gap-x-0",
+    "h-[2.125rem] ps-3 pe-3 min-w-[80px] text-sm gap-2 rounded-lg",
+  md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-lg",
+  lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-lg",
+  icon: "size-6 p-0 rounded-md gap-x-0",
+  "icon-xs": "h-[30px] px-2 text-[18px] rounded-md gap-x-0",
+  // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
+  "icon-xs-circle": "size-6 p-0 rounded-full gap-x-0",
   // 28px square — matches xs chip height for paired close/remove buttons
-  "icon-xs-sq": "tw:h-7 tw:w-7 tw:p-0 tw:rounded-md tw:gap-x-0",
+  "icon-xs-sq": "h-7 w-7 p-0 rounded-md gap-x-0",
   // 24px square — matches chip size for paired close/remove buttons
-  "icon-chip": "tw:h-6 tw:w-6 tw:p-0 tw:rounded tw:gap-x-0",
-  "icon-sm": "tw:h-8 tw:w-8 tw:p-0 tw:rounded-md tw:gap-x-0",
-  "icon-md": "tw:h-10 tw:w-10 tw:p-0 tw:rounded-lg tw:gap-x-0",
-  "icon-lg": "tw:h-12 tw:w-12 tw:p-0 tw:rounded-lg tw:gap-x-0",
-  "icon-circle": "tw:size-8 tw:p-0 tw:rounded-full tw:gap-x-0",
-  "icon-circle-sm": "tw:size-7 tw:p-0 tw:rounded-full tw:gap-x-0",
+  "icon-chip": "h-6 w-6 p-0 rounded gap-x-0",
+  "icon-sm": "h-8 w-8 p-0 rounded-md gap-x-0",
+  "icon-md": "h-10 w-10 p-0 rounded-lg gap-x-0",
+  "icon-lg": "h-12 w-12 p-0 rounded-lg gap-x-0",
+  "icon-circle": "size-8 p-0 rounded-full gap-x-0",
+  "icon-circle-sm": "size-7 p-0 rounded-full gap-x-0",
   // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
-  "icon-toolbar": "tw:size-[1.875rem] tw:p-0 tw:rounded-md tw:gap-x-0",
+  "icon-toolbar": "size-[1.875rem] p-0 rounded-md gap-x-0",
   // 26px rounded-lg — compact modern icon button for panel header collapse/expand
-  "icon-panel": "tw:size-[1.625rem] tw:p-0 tw:rounded-lg tw:gap-x-0",
+  "icon-panel": "size-[1.625rem] p-0 rounded-lg gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
   "sidebar-button":
-    "tw:h-8 tw:w-3 tw:p-0 tw:rounded-sm tw:overflow-hidden tw:gap-x-0",
+    "h-8 w-3 p-0 rounded-sm overflow-hidden gap-x-0",
 };
 
 const activeClasses = [
-  "tw:bg-button-primary tw:text-button-primary-foreground",
-  "tw:enabled:hover:bg-button-primary-hover",
-  "tw:enabled:active:bg-button-primary-active",
+  "bg-button-primary text-button-primary-foreground",
+  "enabled:hover:bg-button-primary-hover",
+  "enabled:active:bg-button-primary-active",
 ].join(" ");
 
 const classes = computed<string[]>(() => [
   // Base - layout, typography, interaction
   props.block
-    ? "tw:flex tw:w-full tw:items-center tw:justify-center"
-    : "tw:inline-flex tw:items-center tw:justify-center",
+    ? "flex w-full items-center justify-center"
+    : "inline-flex items-center justify-center",
   // box-border so a variant's 1px border is drawn INSIDE the fixed size box
   // (outline/secondary/etc.) — otherwise a bordered icon button renders 2px
   // taller than a borderless ghost one of the same size.
-  "tw:relative tw:box-border",
-  "tw:whitespace-nowrap",
+  "relative box-border",
+  "whitespace-nowrap",
   // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
-  "tw:font-medium tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] tw:duration-150",
-  "tw:outline-none",
+  "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
+  "outline-none",
   /* Unified focus glow — identical to OInput/OSelect: a 2px translucent primary
      halo hugging the control (no ring-offset gap). The trailing `!` overrides
      each variant's own ring width/color below, so every button focuses with the
      exact same soft glow regardless of variant. */
-  "tw:focus-visible:ring-[0.125rem]! tw:focus-visible:ring-primary-500/25!",
-  "tw:disabled:cursor-not-allowed tw:enabled:cursor-pointer",
+  "focus-visible:ring-[0.125rem]! focus-visible:ring-primary-500/25!",
+  "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   props.active ? activeClasses : variantClasses[props.variant],
   sizeClasses[props.size],
@@ -318,15 +318,15 @@ function handleClick(event: MouseEvent): void {
     <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
     <span
       v-if="loading"
-      class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center tw:pointer-events-none"
+      class="absolute inset-0 flex items-center justify-center pointer-events-none"
       aria-hidden="true"
     >
-      <OIcon name="progress-activity" size="sm" class="tw:animate-spin" />
+      <OIcon name="progress-activity" size="sm" class="animate-spin" />
     </span>
 
     <!-- Original content — invisible (not hidden) when loading to preserve button dimensions -->
     <span
-      :class="loading ? 'tw:invisible tw:inline-flex tw:items-center' : 'tw:contents'"
+      :class="loading ? 'invisible inline-flex items-center' : 'contents'"
       :style="loading ? { gap: 'inherit' } : undefined"
     >
       <slot name="icon-left">

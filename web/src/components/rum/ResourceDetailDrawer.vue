@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-full tw:flex tw:flex-col">
+  <div class="h-full flex flex-col">
     <!-- Header -->
     <div
-      class="tw:p-[0.625rem] tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="p-[0.625rem] border-b border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:justify-between tw:items-center">
-        <div class="tw:font-bold tw:text-xl tw:font-semibold">Resource Details</div>
+      <div class="flex justify-between items-center">
+        <div class="font-bold text-xl font-semibold">Resource Details</div>
         <OButton
           icon-left="close"
           variant="ghost"
@@ -33,31 +33,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Content -->
-    <div class="tw:flex-1 tw:overflow-y-auto tw:p-[0.625rem]">
+    <div class="flex-1 overflow-y-auto p-[0.625rem]">
       <template v-if="resource">
         <!-- Resource Header -->
-        <div class="tw:mb-3">
-          <div class="tw:font-bold tw:text-base tw:font-medium tw:mb-2">
+        <div class="mb-3">
+          <div class="font-bold text-base font-medium mb-2">
             {{ resource.resource_method || "GET" }}
             {{ resource.resource_url }}
           </div>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:text-gray-400">
-            <div class="tw:flex tw:items-center">
-              <OIcon name="schedule" size="sm" class="tw:mr-1" />
+          <div class="flex items-center gap-2 text-gray-400">
+            <div class="flex items-center">
+              <OIcon name="schedule" size="sm" class="mr-1" />
               <span>{{
                 formatTimestamp(resource[store.state.zoConfig.timestamp_column])
               }}</span>
             </div>
             <OSeparator vertical />
-            <div class="tw:flex tw:items-center">
-              <OIcon name="access-time" size="sm" class="tw:mr-1" />
+            <div class="flex items-center">
+              <OIcon name="access-time" size="sm" class="mr-1" />
               <span>{{ formatDuration(resource.resource_duration) }}</span>
             </div>
             <OSeparator vertical />
-            <div class="tw:flex tw:items-center">
+            <div class="flex items-center">
               <OIcon
                 :name="getStatusIcon(resource.resource_status_code)"
-                :class="['tw:mr-1', getStatusColorClass(resource.resource_status_code)]"
+                :class="['mr-1', getStatusColorClass(resource.resource_status_code)]"
                 size="sm"
               />
               <span>{{ resource.resource_status_code || "N/A" }}</span>
@@ -65,54 +65,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSeparator class="tw:my-4" />
+        <OSeparator class="my-4" />
 
         <!-- Resource Details -->
-        <div class="tw:mb-3">
-          <div class="tw:text-base tw:text-[var(--o2-text-color)] tw:font-bold tw:ml-1 tw:mb-2">
+        <div class="mb-3">
+          <div class="text-base text-[var(--o2-text-color)] font-bold ml-1 mb-2">
             Resource Information
           </div>
           <div>
-            <div class="tw:flex tw:py-2 tw:px-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]" v-if="resource.resource_type">
-              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Type:</div>
-              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:break-words">{{ resource.resource_type }}</div>
+            <div class="flex py-2 px-3 border-b border-solid border-[var(--o2-border-color)]" v-if="resource.resource_type">
+              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Type:</div>
+              <div class="flex-1 text-[var(--o2-text-color)] break-words">{{ resource.resource_type }}</div>
             </div>
-            <div class="tw:flex tw:py-2 tw:px-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]" v-if="resource.resource_size">
-              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Size:</div>
-              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:break-words">
+            <div class="flex py-2 px-3 border-b border-solid border-[var(--o2-border-color)]" v-if="resource.resource_size">
+              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Size:</div>
+              <div class="flex-1 text-[var(--o2-text-color)] break-words">
                 {{ formatBytes(resource.resource_size) }}
               </div>
             </div>
             <div
-              class="tw:flex tw:py-2 tw:px-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+              class="flex py-2 px-3 border-b border-solid border-[var(--o2-border-color)]"
               v-if="resource.resource_render_blocking_status"
             >
-              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Render Blocking:</div>
-              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:break-words">
+              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Render Blocking:</div>
+              <div class="flex-1 text-[var(--o2-text-color)] break-words">
                 {{ resource.resource_render_blocking_status }}
               </div>
             </div>
-            <div class="tw:flex tw:py-2 tw:px-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]" v-if="resource.session?.id">
-              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Session ID:</div>
-              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:break-words">
+            <div class="flex py-2 px-3 border-b border-solid border-[var(--o2-border-color)]" v-if="resource.session?.id">
+              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Session ID:</div>
+              <div class="flex-1 text-[var(--o2-text-color)] break-words">
                 <code
                   data-test="resource-detail-drawer-session-id-text"
-                  class="tw:font-mono tw:text-sm tw:px-2 tw:py-1 tw:bg-(--color-surface-accent) tw:rounded tw:text-[var(--o2-text-color)]"
+                  class="font-mono text-sm px-2 py-1 bg-(--color-surface-accent) rounded text-[var(--o2-text-color)]"
                 >{{
                   formatSessionId(resource.session.id)
                 }}</code>
               </div>
             </div>
-            <div class="tw:flex tw:py-2 tw:px-3" v-if="resource.view?.url">
-              <div class="tw:w-[150px] tw:text-[var(--o2-text-secondary)] tw:font-medium tw:shrink-0">Page URL:</div>
-              <div class="tw:flex-1 tw:text-[var(--o2-text-color)] tw:truncate" :title="resource.view.url">
+            <div class="flex py-2 px-3" v-if="resource.view?.url">
+              <div class="w-[150px] text-[var(--o2-text-secondary)] font-medium shrink-0">Page URL:</div>
+              <div class="flex-1 text-[var(--o2-text-color)] truncate" :title="resource.view.url">
                 {{ resource.view.url }}
               </div>
             </div>
           </div>
         </div>
 
-        <OSeparator class="tw:my-4" />
+        <OSeparator class="my-4" />
 
         <!-- Trace Correlation -->
         <TraceCorrelationCard
@@ -126,25 +126,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Trace ID Notice -->
         <div
           v-else
-          class="tw:p-3 tw:text-center tw:bg-(--color-surface-accent) tw:rounded"
+          class="p-3 text-center bg-(--color-surface-accent) rounded"
         >
-          <OIcon name="info" size="md" class="tw:mb-2" />
-          <div class="tw:text-gray-400">
+          <OIcon name="info" size="md" class="mb-2" />
+          <div class="text-gray-400">
             No trace information available for this resource.
           </div>
-          <div class="tw:text-xs tw:text-gray-400 tw:mt-1">
+          <div class="text-xs text-gray-400 mt-1">
             Trace correlation requires browser SDK v0.3.3+ with trace
             propagation enabled.
           </div>
         </div>
 
         <!-- Session Context -->
-        <div v-if="resource.session?.id" class="tw:mt-3">
-          <OSeparator class="tw:my-4" />
-          <div class="tw:text-base tw:text-[var(--o2-text-color)] tw:font-bold tw:ml-1 tw:mb-2">
+        <div v-if="resource.session?.id" class="mt-3">
+          <OSeparator class="my-4" />
+          <div class="text-base text-[var(--o2-text-color)] font-bold ml-1 mb-2">
             Session Context
           </div>
-          <div class="tw:flex tw:gap-2">
+          <div class="flex gap-2">
             <OButton
               icon-left="play-circle"
               variant="outline"
@@ -256,11 +256,11 @@ const getStatusIcon = (statusCode: number) => {
 };
 
 const getStatusColorClass = (statusCode: number) => {
-  if (!statusCode) return "tw:text-gray-500";
-  if (statusCode >= 200 && statusCode < 300) return "tw:text-[var(--o2-positive)]";
-  if (statusCode >= 300 && statusCode < 400) return "tw:text-[var(--o2-info)]";
-  if (statusCode >= 400 && statusCode < 500) return "tw:text-[var(--o2-warning)]";
-  return "tw:text-[var(--o2-negative)]";
+  if (!statusCode) return "text-gray-500";
+  if (statusCode >= 200 && statusCode < 300) return "text-[var(--o2-positive)]";
+  if (statusCode >= 300 && statusCode < 400) return "text-[var(--o2-info)]";
+  if (statusCode >= 400 && statusCode < 500) return "text-[var(--o2-warning)]";
+  return "text-[var(--o2-negative)]";
 };
 
 const viewSessionReplay = () => {

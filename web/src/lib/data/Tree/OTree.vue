@@ -112,7 +112,7 @@ provide(TREE_CONTEXT_KEY, {
 <template>
   <ul
     role="tree"
-    class="tw:list-none tw:m-0 tw:p-0"
+    class="list-none m-0 p-0"
     v-bind="$attrs"
   >
     <OTreeNode

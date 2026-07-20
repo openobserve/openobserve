@@ -54,11 +54,6 @@ vi.mock("@tanstack/vue-virtual", () => ({
   }),
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return { ...actual, debounce: (fn: any) => fn };
-});
-
 vi.mock("vuex", () => ({
   useStore: () => ({
     state: {
@@ -225,7 +220,7 @@ describe("TenstackTable — generic features", () => {
 
   // ── meta.align ────────────────────────────────────────────────────────────
   describe("meta.align", () => {
-    it("should apply tw:text-center for center-aligned columns", () => {
+    it("should apply text-center for center-aligned columns", () => {
       wrapper = mountTable({
         columns: [
           {
@@ -239,10 +234,10 @@ describe("TenstackTable — generic features", () => {
         rows: [{ id: "x" }],
       });
       const tds = wrapper.findAll("td[data-test]");
-      expect(tds[0].classes()).toContain("tw:text-center!");
+      expect(tds[0].classes()).toContain("text-center!");
     });
 
-    it("should apply tw:text-right for right-aligned columns", () => {
+    it("should apply text-right for right-aligned columns", () => {
       wrapper = mountTable({
         columns: [
           {
@@ -256,7 +251,7 @@ describe("TenstackTable — generic features", () => {
         rows: [{ val: 42 }],
       });
       const tds = wrapper.findAll("td[data-test]");
-      expect(tds[0].classes()).toContain("tw:text-right!");
+      expect(tds[0].classes()).toContain("text-right!");
     });
 
     it("should apply no alignment class for default (left) columns", () => {
@@ -265,8 +260,8 @@ describe("TenstackTable — generic features", () => {
         rows: [{ name: "x" }],
       });
       const tds = wrapper.findAll("td[data-test]");
-      expect(tds[0].classes()).not.toContain("tw:text-center");
-      expect(tds[0].classes()).not.toContain("tw:text-right");
+      expect(tds[0].classes()).not.toContain("text-center");
+      expect(tds[0].classes()).not.toContain("text-right");
     });
   });
 
@@ -280,13 +275,13 @@ describe("TenstackTable — generic features", () => {
             accessorKey: "svc",
             header: "SVC",
             size: 150,
-            meta: { cellClass: "tw:text-[var(--o2-text-1)]" },
+            meta: { cellClass: "text-[var(--o2-text-1)]" },
           },
         ],
         rows: [{ svc: "auth" }],
       });
       const tds = wrapper.findAll("td[data-test]");
-      expect(tds[0].classes()).toContain("tw:text-[var(--o2-text-1)]");
+      expect(tds[0].classes()).toContain("text-[var(--o2-text-1)]");
     });
   });
 

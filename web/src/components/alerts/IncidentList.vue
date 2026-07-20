@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="tw:h-full">
+  <div data-test="incident-list" class="h-full">
     <PageLayout
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
     >
       <!-- Row 1: standard header — title + actions only. Search moved into the
            table's own toolbar below. -->
@@ -27,15 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="notifications-active"
           :subtitle="t('alerts.incidents.subtitle')"
         >
-          <template #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              :loading="loading"
-              @click="refreshIncidents"
-              data-test="incident-refresh-btn"
-            >{{ t('common.refresh') }}</OButton>
-          </template>
         </AppPageHeader>
       </template>
       <OTable
@@ -59,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="viewIncident"
       >
         <template #toolbar>
-          <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:w-full">
+          <div class="flex items-center justify-between gap-2 w-full">
             <OToggleGroup
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
@@ -84,12 +75,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="tw:w-64"
+              class="w-64"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
             />
           </div>
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="incident-list-refresh-btn"
+            @click="refreshIncidents"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertIncidentsRefresh" />
+          </OButton>
         </template>
         <template #cell-status="{ row }">
           <OTag
@@ -109,32 +112,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-title="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1">
+          <div class="flex items-center gap-1">
             <span>
               {{ row.title || formatDimensions(row.group_values) }}
             </span>
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:min-w-0 tw:overflow-hidden">
+          <div class="flex flex-nowrap items-center gap-1 min-w-0 overflow-hidden">
             <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
               :dim-key="key"
               :value="value"
               :tooltip="true"
-              class="tw:min-w-0"
+              class="min-w-0"
             />
             <OTag
               v-if="getSortedDimensions(row.group_values).length > 2"
               type="countChip"
               value="neutral"
-              class="tw:shrink-0"
+              class="shrink-0"
             >
               +{{ getSortedDimensions(row.group_values).length - 2 }} more
               <OTooltip :delay="300" :max-width="'28rem'">
                 <template #content>
-                  <div class="tw:space-y-1">
+                  <div class="space-y-1">
                     <div
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
@@ -157,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:justify-end tw:items-center">
+          <div class="flex justify-end items-center">
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
@@ -184,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Empty state -->
         <template #empty>
-          <div v-if="!loading" class="tw:flex tw:items-center tw:justify-center tw:w-full tw:h-full">
+          <div v-if="!loading" class="flex items-center justify-center w-full h-full">
             <OEmptyState
               size="hero"
               preset="no-incidents"
@@ -197,8 +200,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Bottom -->
         <template #bottom>
-          <div class="tw:flex tw:w-full tw:justify-between tw:items-center tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
+          <div class="flex w-full justify-between items-center h-[48px]">
+            <div class="o2-table-footer-title flex items-center w-[100px] mr-md">
               {{ visibleIncidents.length }} {{ visibleIncidents.length === 1 ? 'Incident' : 'Incidents' }}
             </div>
           </div>
@@ -223,6 +226,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -612,6 +617,10 @@ export default defineComponent({
         timeout: 1500,
       });
     };
+
+    useShortcuts([
+      { id: "alertIncidentsRefresh", handler: () => { if (!isInputFocused()) refreshIncidents(); } },
+    ]);
 
     return {
       t,

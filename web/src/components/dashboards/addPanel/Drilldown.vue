@@ -21,17 +21,17 @@
       :key="JSON.stringify(data) + index"
     >
       <div
-        class="tw:flex tw:justify-between tw:mb-1.25"
+        class="flex justify-between mb-1.25"
       >
         <div
           @click="onDrilldownClick(index)"
-          class="tw:cursor-pointer tw:pl-2.5 tw:w-62.5 tw:truncate"
+          class="cursor-pointer pl-2.5 w-62.5 truncate"
           :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
         >
           {{ index + 1 }}. {{ data.name }}
         </div>
         <OIcon
-          class="tw:mr-1 tw:cursor-pointer"
+          class="mr-1 cursor-pointer"
           size="sm"
           name="close"
           @click="removeDrilldownByIndex(index)"

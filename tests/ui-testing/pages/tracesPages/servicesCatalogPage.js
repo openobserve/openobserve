@@ -7,7 +7,6 @@
 //   - All locators live in constructor as class members
 //   - OInput convention: wrapper "X", inner input "X-field" (auto-derived)
 //   - OSelect option convention: "X-option" + data-test-value="<value>"
-//   - OPagination convention: "X-prev", "X-next", "X-page-{n}" (parent forwards)
 
 import { expect } from '@playwright/test';
 
@@ -23,8 +22,8 @@ export class ServicesCatalogPage {
     this.errorRatePrefix = 'services-catalog-error-rate-';
     this.requestsPrefix = 'services-catalog-requests-';
     this.errorsPrefix = 'services-catalog-errors-';
-    this.rowsPerPageDataTest = 'services-catalog-records-per-page';
-    this.paginationDataTest = 'services-catalog-pagination';
+    // The catalog now uses the shared OTable, whose pagination + sorting emit
+    // their own `o2-table-*` data-tests (not the old hand-rolled ones).
     this.filterInputDataTest = 'services-catalog-filter-input';
 
     // =====================================================================
@@ -36,23 +35,24 @@ export class ServicesCatalogPage {
     this.filterInputWrapper = page.locator(`[data-test="${this.filterInputDataTest}"]`);
     this.filterInputField = page.locator(`[data-test="${this.filterInputDataTest}-field"]`);
     this.filterClearBtn = page.locator(`[data-test="${this.filterInputDataTest}-clear"]`);
-    this.statusPill = page.locator('[data-test="services-catalog-status-pill"]');
-
-    // Status chips
+    // Status chips (health pills) — grouped in the toolbar. The old single
+    // "N services" total pill was removed; the per-tab type filter shows counts,
+    // and the OTable footer shows the total ("N Services").
+    this.statusPills = page.locator('[data-test="services-catalog-status-pills"]');
     this.pillCritical = page.locator('[data-test="services-catalog-pill-critical"]');
     this.pillWarning = page.locator('[data-test="services-catalog-pill-warning"]');
     this.pillDegraded = page.locator('[data-test="services-catalog-pill-degraded"]');
 
     // =====================================================================
     // Table locators
-    // TenstackTable forwards the consumer's `data-test` onto its root <div>
+    // OTable forwards the consumer's `data-test` onto its root <div>
     // (no `inheritAttrs: false`), and the inner <table> carries its own
     // `data-test="o2-table"`. We use `[data-test*="services-catalog-table"]`
     // composite to match either — keeps the wait deterministic if the source
     // ever forwards the attribute only to one element.
     // =====================================================================
     this.table = page.locator('[data-test="services-catalog-table"]');
-    // Inner TenstackTable <table> — always rendered once the wrapper mounts.
+    // Inner OTable <table> — always rendered once the wrapper mounts.
     this.tableInner = page.locator('[data-test="services-catalog-table"] [data-test="o2-table"]');
     this.emptyState = page.locator('[data-test="services-catalog-empty"]');
     this.loading = page.locator('[data-test="services-catalog-loading"]');
@@ -67,27 +67,17 @@ export class ServicesCatalogPage {
     ).first();
 
     // =====================================================================
-    // Pagination locators
+    // Pagination locators — OTable's built-in bottom pagination bar. OTable
+    // uses first/prev/next/last buttons (NOT numbered pages) and a "Showing
+    // X - Y of Z" info line; the current page is derived from that info.
     // =====================================================================
-    this.paginationBar = page.locator('[data-test="services-catalog-pagination-bar"]');
-    this.rowsPerPage = page.locator(`[data-test="${this.rowsPerPageDataTest}"]`);
-    this.rowsPerPagePopover = page.locator(`[data-test="${this.rowsPerPageDataTest}-popover"]`);
-    this.pagination = page.locator(`[data-test="${this.paginationDataTest}"]`);
-    this.prevPageBtn = page.locator(`[data-test="${this.paginationDataTest}-prev"]`);
-    this.nextPageBtn = page.locator(`[data-test="${this.paginationDataTest}-next"]`);
-    // All page-number buttons rendered inside the pagination component
-    this.pageNumberButtons = page.locator(
-      `[data-test^="${this.paginationDataTest}-page-"]`,
-    );
-
-    // =====================================================================
-    // Legend locators
-    // =====================================================================
-    this.legend = page.locator('[data-test="services-catalog-status-legend"]');
-    this.legendCritical = page.locator('[data-test="services-catalog-legend-critical"]');
-    this.legendWarning = page.locator('[data-test="services-catalog-legend-warning"]');
-    this.legendDegraded = page.locator('[data-test="services-catalog-legend-degraded"]');
-    this.legendHealthy = page.locator('[data-test="services-catalog-legend-healthy"]');
+    this.paginationBar = page.locator('[data-test="o2-table-pagination-bottom"]');
+    this.paginationInfo = page.locator('[data-test="o2-table-pagination-info"]');
+    this.rowsPerPage = page.locator('[data-test="o2-table-page-size-select"]');
+    this.firstPageBtn = page.locator('[data-test="o2-table-first-page-btn"]');
+    this.prevPageBtn = page.locator('[data-test="o2-table-prev-page-btn"]');
+    this.nextPageBtn = page.locator('[data-test="o2-table-next-page-btn"]');
+    this.lastPageBtn = page.locator('[data-test="o2-table-last-page-btn"]');
 
     // =====================================================================
     // Side panel — uses ServiceGraphNodeSidePanel.vue root data-test
@@ -122,27 +112,33 @@ export class ServicesCatalogPage {
     /** @param {string} name */
     this.getErrorsLocator = (name) =>
       page.locator(`[data-test="${this.errorsPrefix}${name}"]`);
-    /** @param {string|number} n */
-    this.getPageButton = (n) =>
-      page.locator(`[data-test="${this.paginationDataTest}-page-${n}"]`);
-    // OPagination marks the current page with data-test-active="true". Combined
-    // with the data-test^= page-prefix this stays strictly data-test only.
-    this.currentPageButton = page.locator(
-      `[data-test^="${this.paginationDataTest}-page-"][data-test-active="true"]`,
-    );
-    /** @param {string} columnId */
+    /**
+     * Sort click target for a column: OTable renders a per-<th> sort trigger
+     * `[data-test="o2-table-th-{id}"] [data-test="o2-table-th-sort-trigger"]`.
+     * @param {string} columnId
+     */
     this.getColumnSortClickTarget = (columnId) =>
-      page.locator(`[data-test="o2-table-th-sort-${columnId}"]`);
-    /** @param {string} columnId — TenstackTable session-shipped icon data-test. */
-    this.getColumnSortIcon = (columnId) =>
-      page.locator(`[data-test="o2-table-sort-icon-${columnId}"]`);
-    /** @param {string} status */
-    this.getLegendItem = (status) =>
-      page.locator(`[data-test="services-catalog-legend-${status}"]`);
-    /** @param {string} parentDataTest @param {string|number} count */
-    this.getRowsPerPageOption = (parentDataTest, count) =>
       page.locator(
-        `[data-test="${parentDataTest}-option"][data-test-value="${count}"]`,
+        `[data-test="o2-table-th-${columnId}"] [data-test="o2-table-th-sort-trigger"]`,
+      );
+    /**
+     * Sort icon for a column — OTable renders one of
+     * `o2-table-sort-icon-active` (asc/desc) or `o2-table-sort-icon-inactive`
+     * inside that column's <th>.
+     * @param {string} columnId
+     */
+    this.getColumnSortIcon = (columnId) =>
+      page.locator(
+        `[data-test="o2-table-th-${columnId}"] [data-test^="o2-table-sort-icon-"]`,
+      );
+    /**
+     * OTable page-size OSelect option. OSelect renders options as
+     * `[data-test="o2-table-page-size-select-option"][data-test-value="<n>"]`.
+     * @param {string|number} count
+     */
+    this.getRowsPerPageOption = (count) =>
+      page.locator(
+        `[data-test="o2-table-page-size-select-option"][data-test-value="${count}"]`,
       );
     /** @param {string} parent @param {string} streamName */
     this.getStreamOption = (parent, streamName) =>
@@ -279,7 +275,7 @@ export class ServicesCatalogPage {
   }
 
   async clearFilter() {
-    // Use fill('') instead of clicking Quasar's clear icon which sets value to null (bug #11689)
+    // Use fill('') instead of clicking the clear icon which sets value to null (bug #11689)
     await this.filterInputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
     await this.filterInputField.fill('');
     // Wait for input to reflect the cleared value (deterministic).
@@ -319,21 +315,21 @@ export class ServicesCatalogPage {
   // =========================================================================
 
   async getServiceCount() {
-    const text = await this.statusPill.textContent().catch(() => '0');
-    // Match all numbers; return the last one (total in "N/M", "N of M", "N services", etc.)
-    const matches = text.match(/\d+/g);
-    if (!matches || matches.length === 0) return 0;
-    return parseInt(matches[matches.length - 1], 10);
+    // The old "N services" total pill was removed; the OTable footer/pagination
+    // reports the true total ("Showing X - Y of Z"). Fall back to the rendered
+    // row count if the pagination bar isn't present (few rows / empty).
+    try {
+      const { total } = await this._getPaginationInfo();
+      return total;
+    } catch {
+      return await this.getRowCount().catch(() => 0);
+    }
   }
 
   async getFilteredCount() {
-    const text = await this.statusPill.textContent().catch(() => '0/0');
-    // Match "N/M" (filtered) or just "N" (unfiltered total)
-    const filteredMatch = text.match(/^(\d+)\//);
-    if (filteredMatch) return parseInt(filteredMatch[1], 10);
-    // Unfiltered state — pill shows just the total, so "filtered" equals total
-    const totalMatch = text.match(/^(\d+)/);
-    return totalMatch ? parseInt(totalMatch[1], 10) : 0;
+    // With a filter applied the table shows only matching rows; the pagination
+    // total reflects the filtered set. Same source as getServiceCount.
+    return await this.getServiceCount();
   }
 
   async getCriticalCount() {
@@ -355,8 +351,9 @@ export class ServicesCatalogPage {
   }
 
   async isStatusPillVisible() {
-    // Wait briefly for the pill to appear — it renders once services are loaded
-    return await this.statusPill
+    // The health-status pill group renders once services are loaded (only when
+    // there are unhealthy services). Wait briefly for the group to appear.
+    return await this.statusPills
       .waitFor({ state: 'visible', timeout: 8000 })
       .then(() => true)
       .catch(() => false);
@@ -379,7 +376,7 @@ export class ServicesCatalogPage {
   // =========================================================================
 
   async getRowCount() {
-    // Count service-name links (one per row, scoped to TenstackTable body)
+    // Count service-name links (one per row, scoped to OTable body)
     // Uses service-link prefix to avoid matching status-pill / status-legend in the toolbar
     // Wait briefly for at least one row to render — virtual scrolling may delay row DOM
     await this.firstServiceLink.waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
@@ -433,7 +430,7 @@ export class ServicesCatalogPage {
 
   async clickServiceRow(serviceName) {
     // Click the service name cell which has a direct @click.stop="handleRowClick(item)"
-    // handler on the <TraceServiceCell> — this bypasses TenstackTable's row-level
+    // handler on the <TraceServiceCell> — this bypasses OTable's row-level
     // emission layer (ServicesCatalog.vue:279). The status badge is also clickable
     // (bubbles to @click:dataRow on <tr>) but the direct cell handler is more reliable.
     // If the caller passes an empty / falsy name (because getFirstServiceName()
@@ -458,22 +455,44 @@ export class ServicesCatalogPage {
   // PAGINATION
   // =========================================================================
 
+  // OTable's pagination is prev/next based with a "Showing X - Y of Z" line —
+  // there are no numbered page buttons. Page number / count are derived from
+  // that info line together with the current page size.
+
+  /** Parse the "Showing X - Y of Z" info into { from, to, total }. */
+  async _getPaginationInfo() {
+    await this.paginationInfo.waitFor({ state: 'attached', timeout: 5000 });
+    const text = (await this.paginationInfo.textContent()) || '';
+    // e.g. "Showing 1 - 25 of 42"
+    const m = text.match(/(\d+)\s*-\s*(\d+)\s+\D+\s*(\d+)/);
+    if (!m) {
+      // Fallback: any three trailing numbers.
+      const nums = (text.match(/\d+/g) || []).map((n) => parseInt(n, 10));
+      if (nums.length >= 3) return { from: nums[0], to: nums[1], total: nums[2] };
+      throw new Error(`_getPaginationInfo: could not parse "${text}"`);
+    }
+    return {
+      from: parseInt(m[1], 10),
+      to: parseInt(m[2], 10),
+      total: parseInt(m[3], 10),
+    };
+  }
+
   async getRowsPerPage() {
+    // The page-size OSelect trigger shows the current size as its text.
     await this.rowsPerPage.waitFor({ state: 'attached', timeout: 5000 });
     const text = await this.rowsPerPage.textContent();
-    const val = parseInt(text, 10);
+    const val = parseInt((text || '').replace(/\D/g, ''), 10);
     if (Number.isNaN(val)) throw new Error(`getRowsPerPage: could not parse "${text}"`);
     return val;
   }
 
   async setRowsPerPage(count) {
     await this.rowsPerPage.click();
-    // OSelect option uses data-test="${parent}-option" + data-test-value=<value>
-    const opt = this.getRowsPerPageOption(this.rowsPerPageDataTest, count);
-    // Wait for popover + option to render (deterministic).
+    const opt = this.getRowsPerPageOption(count);
     await opt.waitFor({ state: 'visible', timeout: 5000 });
     await opt.click();
-    // After selection, the OSelect trigger reflects the new value — poll until it does.
+    // The trigger reflects the new value — poll until it does.
     await expect.poll(
       async () => await this.rowsPerPage.textContent().then((t) => (t || '').trim()),
       { timeout: 5000, intervals: [50, 100, 200] },
@@ -481,20 +500,32 @@ export class ServicesCatalogPage {
   }
 
   async getPageCount() {
-    // Page-number buttons emitted by OPagination as parent-page-{n}
-    return await this.pageNumberButtons.count();
+    // Derived: ceil(total / pageSize).
+    const { total } = await this._getPaginationInfo();
+    const pageSize = await this.getRowsPerPage();
+    if (!pageSize) return 1;
+    return Math.max(1, Math.ceil(total / pageSize));
   }
 
   async goToPage(n) {
-    const pageBtn = this.getPageButton(n);
-    await pageBtn.waitFor({ state: 'visible', timeout: 5000 });
-    await pageBtn.click();
-    // After navigation, the OPagination sets data-test-active="true" on the
-    // clicked button — wait for that to converge before returning.
-    await expect.poll(
-      async () => await pageBtn.getAttribute('data-test-active'),
-      { timeout: 5000, intervals: [50, 100, 200] },
-    ).toBe('true');
+    // OTable has no numbered buttons — step with next/prev to reach page n.
+    let current = await this.getCurrentPage();
+    let guard = 0;
+    while (current !== n && guard++ < 100) {
+      if (current < n) {
+        if (await this.isNextDisabled()) break;
+        await this.nextPageBtn.click();
+      } else {
+        if (await this.isPrevDisabled()) break;
+        await this.prevPageBtn.click();
+      }
+      const prev = current;
+      await expect.poll(
+        async () => await this.getCurrentPage().catch(() => prev),
+        { timeout: 5000, intervals: [50, 100, 200] },
+      ).not.toBe(prev);
+      current = await this.getCurrentPage();
+    }
   }
 
   async isPrevDisabled() {
@@ -506,16 +537,12 @@ export class ServicesCatalogPage {
   }
 
   async getCurrentPage() {
-    // OPagination sets data-test-active="true" on the active page button.
-    // Combined with the data-test^= page-prefix and data-test-value="<page>"
-    // it lets us identify the active page using only data-test attributes.
-    await this.currentPageButton.waitFor({ state: 'attached', timeout: 5000 });
-    const val = await this.currentPageButton.getAttribute('data-test-value');
-    const parsed = parseInt(val, 10);
-    if (Number.isNaN(parsed)) {
-      throw new Error(`getCurrentPage: could not parse data-test-value "${val}"`);
-    }
-    return parsed;
+    // Derived from the "Showing from" index and the current page size:
+    // page = floor((from - 1) / pageSize) + 1.
+    const { from } = await this._getPaginationInfo();
+    const pageSize = await this.getRowsPerPage();
+    if (!pageSize) return 1;
+    return Math.floor((from - 1) / pageSize) + 1;
   }
 
   async isPaginationVisible() {
@@ -527,26 +554,18 @@ export class ServicesCatalogPage {
   // =========================================================================
 
   async sortByColumn(columnKey) {
-    // Click the sortable inner div which has @click="handleHeaderSortClick",
-    // NOT the <th> — TenstackTable's sort handler is on the child div with
-    // data-test="o2-table-th-sort-{id}" (TenstackTable.vue:228-236).
-    // JavaScript's el.click() on the <th> dispatches a click that bubbles UP
-    // to ancestors and never reaches the child div's handler.
-    //
-    // Resilient fallback: if the `o2-table-th-sort-{id}` div isn't attached
-    // (older / pivot header layouts), click the visible sort icon instead —
-    // it sits inside the same div and the click bubbles to the handler.
-    const sortDiv = this.getColumnSortClickTarget(columnKey);
+    // OTable renders a per-<th> sort trigger:
+    //   [data-test="o2-table-th-{id}"] [data-test="o2-table-th-sort-trigger"]
+    // Clicking it toggles the column's sort. The sort icon inside the same <th>
+    // carries `data-test-sort-direction` (asc | desc | none) — poll it to wait
+    // for the sort to actually change (deterministic, no fixed sleep).
+    const trigger = this.getColumnSortClickTarget(columnKey);
     const sortIcon = this.getColumnSortIcon(columnKey);
-    // Capture current icon state so we can poll for change after click —
-    // this gives a deterministic wait instead of a fixed sleep.
     const before = await sortIcon
       .getAttribute('data-test-sort-direction')
       .catch(() => null);
-    const target = (await sortDiv.count()) > 0 ? sortDiv : sortIcon;
-    await target.waitFor({ state: 'visible', timeout: 15000 });
-    await target.click();
-    // Wait for sort state to actually change (direction attribute flips).
+    await trigger.waitFor({ state: 'visible', timeout: 15000 });
+    await trigger.click();
     await expect.poll(
       async () =>
         await sortIcon.getAttribute('data-test-sort-direction').catch(() => null),
@@ -555,25 +574,18 @@ export class ServicesCatalogPage {
   }
 
   async getSortIcon(columnKey) {
-    // TenstackTable renders one of two icons inside the column header,
-    // scoped per-column via `data-test="o2-table-sort-icon-{columnId}"`:
-    //   - data-test-sort-state="active"   with data-test-sort-direction "asc" | "desc"
-    //   - data-test-sort-state="inactive" with data-test-sort-direction "none"
-    // Test legacy convention used 'arrow_downward' / 'arrow_upward' / 'unfold_more'
-    // (Quasar material-icons text content). Normalize the OIcon sort attribute to
-    // that form so existing test assertions keep working.
+    // OTable renders one sort icon inside the column header, carrying
+    // `data-test-sort-direction` ("asc" | "desc" | "none"). Normalize to the
+    // legacy 'arrow_upward' / 'arrow_downward' / 'unfold_more' values the tests
+    // assert against.
     const icon = this.getColumnSortIcon(columnKey);
-
     if (!(await icon.count())) return '';
-    const state = await icon.getAttribute('data-test-sort-state').catch(() => null);
-    const dir = await icon.getAttribute('data-test-sort-direction').catch(() => null);
-
-    if (state === 'active') {
-      if (dir === 'desc') return 'arrow_downward';
-      if (dir === 'asc') return 'arrow_upward';
-      return 'arrow_unknown';
-    }
-    if (state === 'inactive') return 'unfold_more';
+    const dir = await icon
+      .getAttribute('data-test-sort-direction')
+      .catch(() => null);
+    if (dir === 'desc') return 'arrow_downward';
+    if (dir === 'asc') return 'arrow_upward';
+    if (dir === 'none') return 'unfold_more';
     return '';
   }
 
@@ -596,30 +608,15 @@ export class ServicesCatalogPage {
   }
 
   // =========================================================================
-  // LEGEND
-  // =========================================================================
-
-  async isLegendVisible() {
-    return await this.legend.isVisible().catch(() => false);
-  }
-
-  async getLegendCount(status) {
-    const el = this.getLegendItem(status);
-    const text = await el.textContent().catch(() => '0');
-    const match = text.match(/(\d+)/);
-    return match ? parseInt(match[1], 10) : 0;
-  }
-
-  // =========================================================================
   // EMPTY STATE / TABLE VISIBILITY
   // =========================================================================
 
   async isTableVisible() {
-    // TenstackTable forwards `data-test="services-catalog-table"` to its root
+    // OTable forwards `data-test="services-catalog-table"` to its root
     // <div> via attribute inheritance. The inner `<table data-test="o2-table">`
     // is always rendered once the wrapper mounts. Check either selector — the
     // wrapper is the canonical match; the inner table is the fallback if the
-    // attribute forwarding changes in a future TenstackTable refactor.
+    // attribute forwarding changes in a future OTable refactor.
     const wrapper = this.table;
     const inner = this.tableInner;
     const visible = await wrapper

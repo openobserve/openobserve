@@ -102,7 +102,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-success-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-success-soft-bg");
     });
 
     it("should apply success class when code is 201", () => {
@@ -110,7 +110,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-success-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-success-soft-bg");
     });
 
     it("should apply success class when code is 299", () => {
@@ -118,7 +118,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-success-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-success-soft-bg");
     });
 
     it("should apply info class when code is 301", () => {
@@ -126,7 +126,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-blue-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-blue-soft-bg");
     });
 
     it("should apply info class when code is 304", () => {
@@ -134,7 +134,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-blue-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-blue-soft-bg");
     });
 
     it("should apply warning class when code is 404", () => {
@@ -142,7 +142,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-warning-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-warning-soft-bg");
     });
 
     it("should apply warning class when code is 400", () => {
@@ -150,7 +150,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-warning-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-warning-soft-bg");
     });
 
     it("should apply warning class when code is 499", () => {
@@ -158,7 +158,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-warning-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-warning-soft-bg");
     });
 
     it("should apply error class when code is 500", () => {
@@ -166,7 +166,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-error-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-error-soft-bg");
     });
 
     it("should apply error class when code is 503", () => {
@@ -174,7 +174,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-error-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-error-soft-bg");
     });
 
     it("should apply neutral class when code is outside all known HTTP ranges", () => {
@@ -182,7 +182,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-default-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-default-soft-bg");
     });
   });
 
@@ -203,8 +203,8 @@ describe("SpanStatusCodeBadge", () => {
       wrapper = mountBadge({ code: 200, grpcCode: 2 });
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
-      expect(badge.classes()).toContain("tw:bg-badge-success-soft-bg");
-      expect(badge.classes()).not.toContain("tw:bg-badge-error-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-success-soft-bg");
+      expect(badge.classes()).not.toContain("bg-badge-error-soft-bg");
     });
 
     it("should use HTTP error class instead of grpc success when code is 500 and grpcCode is 0", () => {
@@ -212,7 +212,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.text()).toBe("500");
-      expect(badge.classes()).toContain("tw:bg-badge-error-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-error-soft-bg");
     });
   });
 
@@ -226,7 +226,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-success-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-success-soft-bg");
     });
 
     it("should apply error class when grpcCode is 2 and no HTTP code is provided", () => {
@@ -234,7 +234,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-error-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-error-soft-bg");
     });
 
     it("should apply error class when grpcCode is 14 (UNAVAILABLE) and no HTTP code is provided", () => {
@@ -242,7 +242,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-error-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-error-soft-bg");
     });
 
     it("should show the badge and not the empty indicator when grpcCode is 0", () => {
@@ -293,7 +293,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-warning-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-warning-soft-bg");
     });
 
     it("should render '404' as text when code is the string '404'", () => {
@@ -320,7 +320,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-success-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-success-soft-bg");
     });
 
     it("should apply error class when grpcCode is the string '2'", () => {
@@ -328,7 +328,7 @@ describe("SpanStatusCodeBadge", () => {
       const badge = wrapper.find('[data-test="span-status-code-badge"]');
 
       expect(badge.exists()).toBe(true);
-      expect(badge.classes()).toContain("tw:bg-badge-error-soft-bg");
+      expect(badge.classes()).toContain("bg-badge-error-soft-bg");
     });
   });
 });

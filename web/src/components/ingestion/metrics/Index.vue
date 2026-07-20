@@ -34,6 +34,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               label="Prometheus"
             />
             <ORouteTab
+              name="vmagent"
+              data-test="ingestion-metrics-tab-vmagent"
+              :to="{
+                name: 'vmagent',
+                query: {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                },
+              }"
+              :icon="'img:' + getImageURL('images/ingestion/vmagent.svg')"
+              label="vmagent"
+            />
+            <ORouteTab
               name="otelCollector"
               :to="{
                 name: 'otelCollector',
@@ -68,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
     </template>
 
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-full tw:overflow-y-auto tw:pt-0.5">
+      <div class="w-full h-full">
+        <div class="card-container h-full overflow-y-auto pt-0.5">
           <router-view
             :title="ingestiontabs"
             :currOrgIdentifier="currOrgIdentifier"
@@ -123,6 +135,7 @@ export default defineComponent({
     onBeforeMount(() => {
       const ingestRoutes = [
         "prometheus",
+        "vmagent",
         "otelCollector",
         "telegraf",
         "cloudwatchMetrics",

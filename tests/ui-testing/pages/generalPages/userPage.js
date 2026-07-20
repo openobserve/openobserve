@@ -159,21 +159,14 @@ export class UserPage {
     }
 
     async verifyOrgNameRequiredError(expectedMessage) {
-        // ux-revamp behavior: the ODrawer primary (Save) button is bound to
-        // `:primaryButtonDisabled="(!organizationData.name || !isValidOrgName) && !proPlanRequired"`
-        // in AddUpdateOrganization.vue, so a blank org-name keeps Save in a
-        // disabled state — the inline `${parent}-error` only renders via
-        // `showNameError = true` after onSubmit, which never fires while
-        // Save is disabled. Assert the disabled state as the validation
-        // signal; if the inline error happens to be visible (touched-state
-        // binding re-applied in a future change) also verify its message.
-        await expect(this.addOrgDrawerSaveButton).toBeDisabled({ timeout: 15000 });
-        const inlineErrorVisible = await this.orgNameFieldError
-            .isVisible({ timeout: 1000 })
-            .catch(() => false);
-        if (inlineErrorVisible) {
-            await expect(this.orgNameFieldError).toContainText(expectedMessage);
-        }
+        // Zod migration (R3): Save is always ENABLED; the AddUpdateOrganization
+        // schema gates the submit, and the inline `${parent}-error` is revealed on
+        // SUBMIT (revalidateLogic: submit-then-change). So click Save with a blank
+        // name and assert the inline required error appears with its message.
+        await expect(this.addOrgDrawerSaveButton).toBeEnabled({ timeout: 15000 });
+        await this.addOrgDrawerSaveButton.click();
+        await expect(this.orgNameFieldError).toBeVisible({ timeout: 15000 });
+        await expect(this.orgNameFieldError).toContainText(expectedMessage);
     }
 
     async verifySuccessMessage(expectedMessage) {

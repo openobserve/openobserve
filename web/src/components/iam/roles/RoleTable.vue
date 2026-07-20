@@ -25,7 +25,16 @@ const emit = defineEmits<{
   edit: [row: any];
   delete: [row: any];
   "bulk-delete": [];
+  create: [];
 }>();
+
+const onEmptyStateAction = (id?: string) => {
+  if (id === "clear-filters") {
+    emit("update:globalFilter", "");
+    return;
+  }
+  if (id === "create") emit("create");
+};
 
 const columns: OTableColumnDef[] = [
   {
@@ -79,19 +88,22 @@ const columns: OTableColumnDef[] = [
     @update:global-filter="emit('update:globalFilter', $event)"
   >
     <template #toolbar>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+      <div class="flex items-center gap-2 w-full">
         <OSearchInput
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"
-          class="tw:flex-1"
+          class="flex-1"
           data-test="iam-roles-search-input"
           @update:model-value="emit('update:globalFilter', $event)"
         />
       </div>
     </template>
+    <template #toolbar-trailing>
+      <slot name="toolbar-trailing" />
+    </template>
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">
-      <div class="tw:flex tw:items-center tw:justify-center">
+      <div class="flex items-center justify-center">
         <OButton
           :data-test="`iam-roles-edit-${row.role_name}-role-icon`"
           data-row-action="edit"
@@ -120,13 +132,12 @@ const columns: OTableColumnDef[] = [
         size="hero"
         preset="no-roles"
         :filtered="!!globalFilter"
-        :hide-action="!globalFilter"
-        @action="emit('update:globalFilter', '')"
+        @action="onEmptyStateAction"
       />
     </template>
 
     <template #bottom>
-      <span class="o2-table-footer-title tw:text-text-primary">{{ data.length }} {{ t("iam.roles") }}</span>
+      <span class="o2-table-footer-title">{{ data.length }} {{ t("iam.roles") }}</span>
       <OButton
         v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"

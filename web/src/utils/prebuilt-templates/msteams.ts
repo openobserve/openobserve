@@ -15,14 +15,28 @@
 import { PrebuiltConfig } from './types';
 
 const TEAMS_WEBHOOK_ALLOWED_HOSTS = ['outlook.office.com', 'webhook.office.com'];
+const TEAMS_WORKFLOW_ALLOWED_HOST_SUFFIXES = ['.logic.azure.com', '.api.powerplatform.com'];
+
+function hasTeamsWorkflowPath(pathname: string): boolean {
+  const path = pathname.toLowerCase();
+  return path.includes('/workflows/') && path.includes('/triggers/manual/paths/invoke');
+}
+
+function isTeamsWorkflowHost(hostname: string): boolean {
+  return TEAMS_WORKFLOW_ALLOWED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
+}
 
 function isValidTeamsWebhookUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.toLowerCase();
+    if (parsed.protocol !== 'https:') {
+      return false;
+    }
+
     return (
-      parsed.protocol === 'https:' &&
-      TEAMS_WEBHOOK_ALLOWED_HOSTS.includes(hostname)
+      TEAMS_WEBHOOK_ALLOWED_HOSTS.includes(hostname) ||
+      (isTeamsWorkflowHost(hostname) && hasTeamsWorkflowPath(parsed.pathname))
     );
   } catch {
     return false;
@@ -102,12 +116,14 @@ export const msteamsConfig: PrebuiltConfig = {
   credentialFields: [
     {
       key: 'webhookUrl',
-      label: 'Microsoft Teams Webhook URL',
+      labelKey: 'alerts.prebuiltDestinations.msteamsWebhookUrl',
       type: 'text',
       required: true,
-      hint: 'Get your webhook URL from Teams channel connectors',
+      hint: 'Get your webhook URL from Teams channel connectors or Workflows',
       validator: (url: string) =>
-        isValidTeamsWebhookUrl(url) || 'Invalid Microsoft Teams webhook URL'
+        isValidTeamsWebhookUrl(url) || {
+          key: 'alerts.prebuiltDestinations.invalidMsteamsWebhookUrl'
+        }
     }
   ]
 };

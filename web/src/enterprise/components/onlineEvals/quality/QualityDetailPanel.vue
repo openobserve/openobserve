@@ -1,5 +1,5 @@
 ﻿<template>
-  <section class="tw:flex tw:flex-col tw:gap-3 tw:px-5 tw:pt-4 tw:pb-6 tw:min-h-full tw:overflow-auto" data-test="quality-detail-panel">
+  <section class="flex flex-col gap-3 px-5 pt-4 pb-6 min-h-full overflow-auto" data-test="quality-detail-panel">
     <!-- Title row + type badge + version + description moved up into the
          ODrawer header (QualityPage) so the panel content starts straight
          from the KPI tiles without a duplicated identification block. -->
@@ -26,32 +26,32 @@
       <!-- KPI tiles reuse the exact card layout + text styles as the LLM
            Sessions detail page (.kpi-card) so the AI module stays visually
            consistent across pages. -->
-      <div class="tw:grid tw:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] tw:gap-2.5">
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-2.5">
         <div
           v-for="kpi in kpis"
           :key="kpi.id"
-          class="kpi-card tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:transition-shadow tw:duration-200"
+          class="kpi-card rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-(--color-surface-base) border border-(--color-border-default) transition-shadow duration-200"
           :data-test="`quality-detail-kpi-${kpi.id}`"
         >
-          <div class="tw:text-[0.7rem] tw:font-semibold tw:text-[var(--o2-text-muted)]">
+          <div class="text-[0.7rem] font-semibold text-[var(--color-text-secondary)]">
             {{ kpiTitle(kpi) }}
           </div>
-          <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-            <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]">
+          <div class="flex items-baseline gap-[0.2rem]">
+            <span class="text-[1.4rem] font-bold leading-none text-[var(--color-grey-600)]">
               {{ formatKpi(kpi) }}
             </span>
           </div>
         </div>
       </div>
 
-      <section v-if="dataType === 'numeric'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
-        <header class="tw:mb-[6px]">
-          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">
+      <section v-if="dataType === 'numeric'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+        <header class="mb-[6px]">
+          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">
             {{ t("onlineEvals.quality.detail.trendTitle") }}
-            <span class="tw:font-normal tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-[11px]">— {{ config.name }}</span>
+            <span class="font-normal text-(--color-text-secondary) text-[11px]">— {{ config.name }}</span>
           </h4>
         </header>
-        <div class="tw:h-[260px]">
+        <div class="h-[260px]">
           <QualityTrendChart
             v-if="numericTrend.length > 0"
             :points="numericTrend"
@@ -62,15 +62,15 @@
             :legend-p95="t('onlineEvals.quality.detail.legendP95')"
             :legend-threshold-fmt="t('onlineEvals.quality.detail.legendThreshold')"
           />
-          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'numeric'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
-        <header class="tw:mb-[6px]">
-          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
+      <section v-if="dataType === 'numeric'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+        <header class="mb-[6px]">
+          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">{{ t("onlineEvals.quality.detail.distributionTitle") }}</h4>
         </header>
-        <div class="tw:h-[220px]">
+        <div class="h-[220px]">
           <QualityDistributionChart
             v-if="numericDistribution.length > 0"
             :buckets="numericDistribution"
@@ -78,33 +78,33 @@
             :legend-healthy="t('onlineEvals.quality.detail.legendHealthy')"
             :legend-unhealthy="t('onlineEvals.quality.detail.legendUnhealthy')"
           />
-          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
-        <header class="tw:mb-[6px]">
-          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">
+      <section v-if="dataType === 'boolean'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+        <header class="mb-[6px]">
+          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">
             {{ t("onlineEvals.quality.detail.passRateTitle") }}
-            <span class="tw:font-normal tw:text-(--color-text-secondary,var(--o2-text-secondary)) tw:text-[11px]">— {{ config.name }}</span>
+            <span class="font-normal text-(--color-text-secondary) text-[11px]">— {{ config.name }}</span>
           </h4>
         </header>
-        <div class="tw:h-[260px]">
+        <div class="h-[260px]">
           <QualityBooleanTrendChart
             v-if="booleanTrendSeries.length > 0"
             :series="booleanTrendSeries"
             :points="booleanTrend"
             :legend-pass-rate="t('onlineEvals.quality.detail.legendHealthy')"
           />
-          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'boolean'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
-        <header class="tw:mb-[6px]">
-          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
+      <section v-if="dataType === 'boolean'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+        <header class="mb-[6px]">
+          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">{{ t("onlineEvals.quality.detail.trueFalseTitle") }}</h4>
         </header>
-        <div class="tw:h-[120px]">
+        <div class="h-[120px]">
           <QualityBooleanBarsChart
             v-if="booleanCounts.trueCount + booleanCounts.falseCount > 0"
             :true-count="booleanCounts.trueCount"
@@ -112,21 +112,21 @@
             :legend-true="`true (${booleanCounts.trueCount})`"
             :legend-false="`false (${booleanCounts.falseCount})`"
           />
-          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
 
-      <section v-if="dataType === 'categorical'" class="card-container tw:py-3 tw:px-[14px] tw:pb-[14px] tw:bg-(--o2-card-bg) tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
-        <header class="tw:mb-[6px]">
-          <h4 class="tw:m-0 tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
+      <section v-if="dataType === 'categorical'" class="card-container py-3 px-[14px] pb-[14px] bg-(--color-surface-base) border border-(--color-border-default) rounded-md">
+        <header class="mb-[6px]">
+          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">{{ t("onlineEvals.quality.detail.categoryDistributionTitle") }}</h4>
         </header>
-        <div class="tw:h-[260px]">
+        <div class="h-[260px]">
           <QualityCategoryBarsChart
             v-if="categoricalRows.length > 0"
             :rows="categoricalRows"
             :healthy-categories="healthyCategories"
           />
-          <p v-else class="tw:m-0 tw:h-full tw:flex tw:items-center tw:justify-center tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ t("onlineEvals.quality.detail.noData") }}</p>
+          <p v-else class="m-0 h-full flex items-center justify-center text-xs text-(--color-text-secondary)">{{ t("onlineEvals.quality.detail.noData") }}</p>
         </div>
       </section>
     </template>
@@ -224,10 +224,10 @@ function formatKpi(kpi: DetailKpi): string {
   align-items: center;
   gap: 8px;
   padding: 28px 12px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
+  border: 1px dashed var(--color-dialog-header-border);
   border-radius: 6px;
   text-align: center;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 

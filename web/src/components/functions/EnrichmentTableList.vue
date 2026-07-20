@@ -19,9 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="enrichment-tables-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
-    <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+    <div v-if="!showAddJSTransformDialog" class="flex flex-col h-full min-h-0">
       <!-- Standard section header: title + actions only. Type filter + search
            moved into the table's own toolbar below. -->
       <AppPageHeader
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="dataset"
         :subtitle="t('function.enrichmentTablesSubtitle')"
         tabs-below
-        class="tw:shrink-0 tw:px-4"
+        class="shrink-0 px-4"
       >
         <template #tabs>
           <PipelineSectionTabs />
@@ -45,8 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </AppPageHeader>
-      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="card-container tw:h-full">
+      <div class="w-full flex-1 min-h-0 overflow-hidden">
+        <div class="card-container h-full">
             <OTable
               ref="qTable"
               :frame="false"
@@ -69,11 +69,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selected-ids="selectedEnrichmentTableIds"
               @update:selected-ids="handleSelectedIdsUpdate"
               width="100%"
-              class="tw:w-full tw:h-full"
+              class="w-full h-full"
             >
               <!-- Toolbar: type filter + search -->
               <template #toolbar>
-                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+                <div class="flex items-center gap-2 w-full">
                   <OToggleGroup
                     :model-value="selectedFilter"
                     @update:model-value="(v) => { selectedFilter = v as string; updateActiveTab(); }"
@@ -95,10 +95,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSearchInput
                     data-test="enrichment-tables-search-input"
                     v-model="filterQuery"
-                    class="tw:ml-auto tw:w-64"
+                    class="ml-auto w-64"
                     :placeholder="t('function.searchEnrichmentTable')"
                   />
                 </div>
+              </template>
+              <template #toolbar-trailing>
+                <OButton
+                  variant="outline"
+                  size="icon-sm"
+                  icon-left="refresh"
+                  :loading="loading"
+                  data-test="enrichment-tables-list-refresh-btn"
+                  @click="refreshList"
+                >
+                  <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="enrichmentTablesRefresh" />
+                </OButton>
               </template>
               <template #empty>
                 <OEmptyState
@@ -116,20 +128,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-type="{ row }">
                 <div
                   :data-test="`${row.name}-type-cell`"
-                  class="tw:flex tw:items-center tw:gap-2"
+                  class="flex items-center gap-2"
                 >
                   <OTag v-if="!row.urlJobs || row.urlJobs.length === 0" type="enrichmentType" value="file" :data-test="`${row.name}-type-file`" />
                   <template v-else>
                     <span
                       :data-test="`${row.name}-type-url-trigger`"
-                      class="tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-1"
+                      class="cursor-pointer inline-flex items-center gap-1"
                       @click="showUrlJobsDialog(row)"
                     >
                       <OTag type="enrichmentType" value="url" />
-                      <span v-if="row.urlJobs.length > 1" class="tw:text-text-primary"> ({{ row.urlJobs.length }})</span>
+                      <span v-if="row.urlJobs.length > 1" class="text-text-primary"> ({{ row.urlJobs.length }})</span>
                     </span>
                     <span v-if="row.aggregateStatus === 'completed'">
-                      <OIcon name="check-circle" size="sm" class="tw:text-(--o2-positive)">
+                      <OIcon name="check-circle" size="sm" class="text-(--o2-positive)">
                         <OTooltip>
                           <template #content>
                             <div style="max-width: 300px;">
@@ -143,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OIcon>
                     </span>
                     <span v-else-if="row.aggregateStatus === 'processing'">
-                      <OIcon name="sync" size="sm" class="tw:[animation:rotate_1s_linear_infinite]">
+                      <OIcon name="sync" size="sm" class="[animation:rotate_1s_linear_infinite]">
                         <OTooltip>
                           <template #content>
                             <div style="max-width: 300px;">
@@ -160,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         name="warning"
                         size="sm"
-                        class="tw:cursor-pointer"
+                        class="cursor-pointer"
                         @click="showUrlJobsDialog(row)"
                       >
                         <OTooltip>
@@ -193,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #cell-actions="{ row }">
-                <div class="tw:flex tw:items-center tw:justify-center">
+                <div class="flex items-center justify-center">
                   <OButton
                     v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
                     :data-test="`${row.name}-explore-btn`"
@@ -256,8 +268,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #bottom>
-                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
-                  <div class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4">
+                <div class="flex items-center justify-between w-full py-2">
+                  <div class="flex items-center o2-table-footer-title mr-4">
                     {{ resultTotal }} {{ t('function.enrichmentTables') }}
                   </div>
                   <OButton
@@ -308,17 +320,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showUrlJobsDialogState"
       size="lg"
     >
-      <div class="tw:p-4">
-        <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
-          <div class="tw:text-xl tw:font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
+      <div class="p-4">
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-xl font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
-          <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
-            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
-                <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
-                <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
+          <ul class="flex flex-col divide-y divide-border">
+            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="flex items-center gap-2 p-4">
+              <div class="flex flex-col flex-1 min-w-0">
+                <span class="text-sm font-bold">Job {{ index + 1 }}</span>
+                <span class="block text-xs text-muted-foreground">{{ job.url }}</span>
+                <span class="block text-xs text-muted-foreground mt-2">
                   <OTag
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"
@@ -326,18 +338,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :value="job.status"
                   />
                 </span>
-                <span v-if="job.status === 'completed'" class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
+                <span v-if="job.status === 'completed'" class="block text-xs text-muted-foreground mt-2">
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
                     Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
                   </span>
-                  <span v-if="job.status === 'failed'" :data-test="`enrichment-url-jobs-item-${index}-error`" class="tw:block tw:text-xs tw:text-red-500 tw:mt-2">
+                  <span v-if="job.status === 'failed'" :data-test="`enrichment-url-jobs-item-${index}-error`" class="block text-xs text-red-500 mt-2">
                     Error: {{ job.error_message }}
                   </span>
                 </div>
               </li>
             </ul>
           </div>
-          <div v-else class="tw:text-center tw:p-3 tw:text-gray-400">
+          <div v-else class="text-center p-3 text-gray-400">
             No URL jobs found
           </div>
       </div>
@@ -376,6 +388,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
@@ -436,7 +450,7 @@ export default defineComponent({
       { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, resizable: true, hideable: true, meta: { align: "right" }, size: COL.count },
       { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, resizable: true, hideable: true, meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: COL.sizeBytes },
       { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, resizable: true, hideable: true, meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: COL.sizeBytes },
-      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "tw:!text-center tw:!justify-center", actionCount: 4 }, isAction: true },
+      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "!text-center !justify-center", actionCount: 4 }, isAction: true },
     ];
 
     const selectedEnrichmentTableIds = computed(() =>
@@ -902,6 +916,11 @@ export default defineComponent({
     watch(visibleRows, (newVisibleRows) => {
       resultTotal.value = newVisibleRows.length;
     }, { immediate: true });
+
+    useShortcuts([
+      { id: "enrichmentTablesRefresh", handler: () => { if (!isInputFocused()) refreshList(); } },
+    ]);
+
     return {
       t,
       qTable,

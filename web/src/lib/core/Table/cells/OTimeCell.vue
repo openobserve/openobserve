@@ -167,10 +167,10 @@ const tooltip = computed(() => {
 <template>
   <span
     v-if="display === null"
-    class="tw:text-text-primary tw:text-xs"
+    class="text-text-primary text-xs"
   >{{ emptyLabel }}</span>
   <template v-else>
-    <span class="tw:tabular-nums tw:whitespace-nowrap">{{ display }}</span>
+    <span class="tabular-nums whitespace-nowrap">{{ display }}</span>
     <OTooltip v-if="tooltip" :content="tooltip" />
   </template>
 </template>

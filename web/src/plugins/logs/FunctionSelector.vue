@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="tw:p-0 float-left tw:mr-1 function-selector element-box-shadow tw:border tw:border-button-outline-border"
+    class="p-0 float-left mr-1 function-selector element-box-shadow border border-button-outline-border"
   >
-    <div v-if="!hideToggle" class="tw:flex tw:items-center tw:px-1">
+    <div v-if="!hideToggle" class="flex items-center px-1">
       <OSwitch
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
@@ -31,15 +31,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
-          class="tw:ml-1!"
+          class="ml-1!"
           size="icon-toolbar"
         >
-          <img :src="functionIconUrl" alt="Function" class="tw:size-4" />
-          <OIcon name="arrow-drop-down" size="sm" class="tw:-ml-0.5" />
+          <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
+          <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
           <OTooltip :content="selectedFunctionTooltip" :side-offset="2" />
         </OButton>
       </template>
-      <div data-test="logs-search-saved-function-list" class="tw:py-0">
+      <div data-test="logs-search-saved-function-list" class="py-0">
         <!-- Search Input -->
         <div>
           <OSearchInput
@@ -51,21 +51,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div v-if="filteredFunctionOptions.length" class="tw:max-h-72 tw:overflow-y-auto">
+        <div v-if="filteredFunctionOptions.length" class="max-h-72 overflow-y-auto">
           <ODropdownItem
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"
             :data-test="`logs-search-saved-function-${item.name}`"
-            class="saved-view-item tw:border-b tw:border-(--o2-border-color) tw:rounded-none tw:last:border-none"
+            class="saved-view-item border-b border-(--o2-border-color) rounded-none last:border-none"
             @select="applyFunction(item, true)"
           >
             {{ item.name }}
           </ODropdownItem>
         </div>
         <div v-else>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-              <span class="tw:text-sm">{{
+          <div class="flex items-center gap-2 px-3 py-2">
+            <div class="flex flex-col flex-1 min-w-0">
+              <span class="text-sm">{{
                 t("search.savedFunctionNotFound")
               }}</span>
             </div>

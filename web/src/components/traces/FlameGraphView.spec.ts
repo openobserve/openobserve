@@ -15,7 +15,10 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, config } from "@vue/test-utils";
+import i18n from "@/locales";
 import FlameGraphView from "@/components/traces/FlameGraphView.vue";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 
 // Stub ChartRenderer globally so defineAsyncComponent resolves synchronously
@@ -335,7 +338,7 @@ describe("FlameGraphView", () => {
         },
       });
 
-      expect(wrapper.find(".tw\\:flex-1").exists()).toBe(true);
+      expect(wrapper.find(".flex-1").exists()).toBe(true);
     });
   });
 

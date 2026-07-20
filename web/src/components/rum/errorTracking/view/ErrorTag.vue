@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODimensionChip
     :dim-key="tag.key"
     :value="tag.value"
-    class="tw:mr-2 tw:mt-2"
+    class="mr-2 mt-2"
   />
 </template>
 

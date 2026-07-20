@@ -19,11 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <Transition name="fade">
       <div
         v-if="modelValue"
-        class="retry-dialog-backdrop tw:fixed tw:top-0 tw:left-0 tw:w-full tw:h-full tw:bg-[rgba(0,0,0,0.5)] tw:flex tw:justify-center tw:items-center tw:z-[9999]"
+        class="retry-dialog-backdrop fixed top-0 left-0 w-full h-full bg-[rgba(0,0,0,0.5)] flex justify-center items-center z-[9999]"
         @click="handleBackdropClick"
       >
         <div
-          class="retry-dialog tw:bg-white tw:dark:bg-[#1e1e1e] tw:dark:text-[var(--o2-border)] tw:rounded-lg tw:shadow-[0_4px_20px_rgba(0,0,0,0.15)] tw:w-[90%] tw:max-w-[600px] tw:max-h-[90vh] tw:flex tw:flex-col tw:overflow-hidden"
+          class="retry-dialog bg-white dark:bg-[#1e1e1e] dark:text-[var(--o2-border)] rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.15)] w-[90%] max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden"
           ref="dialogRef"
           @click.stop
           role="dialog"
@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header -->
           <div
-            class="retry-dialog-header tw:flex tw:justify-between tw:items-center tw:py-5 tw:px-6 tw:border-b tw:border-[#eaeaea] tw:dark:border-[#3a3a3a]"
+            class="retry-dialog-header flex justify-between items-center py-5 px-6 border-b border-[#eaeaea] dark:border-[#3a3a3a]"
           >
             <h3
-              class="retry-dialog-title tw:text-lg tw:font-semibold tw:m-0 tw:text-[#333] tw:dark:text-[var(--o2-border)]"
+              class="retry-dialog-title text-lg font-semibold m-0 text-[#333] dark:text-[var(--o2-border)]"
             >Retry Enrichment Table Job</h3>
             <OButton
               variant="ghost"
@@ -47,25 +47,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Content -->
           <div
-            class="retry-dialog-content tw:p-6 tw:overflow-y-auto tw:flex-1"
+            class="retry-dialog-content p-6 overflow-y-auto flex-1"
           >
             <div
-              class="table-info tw:mb-5 tw:p-4 tw:bg-[#f8f9fa] tw:dark:bg-[#2a2a2a] tw:rounded-md"
+              class="table-info mb-5 p-4 bg-[#f8f9fa] dark:bg-[#2a2a2a] rounded-md"
             >
               <div
-                class="info-row tw:flex tw:mb-2 tw:last:mb-0"
+                class="info-row flex mb-2 last:mb-0"
               >
-                <span class="tw:font-semibold tw:min-w-[60px] tw:text-[#666]"
+                <span class="font-semibold min-w-[60px] text-[#666]"
                 >Table:</span>
-                <span class="tw:text-[#333] tw:break-words"
+                <span class="text-[#333] break-words"
                 >{{ tableName }}</span>
               </div>
               <div
-                class="info-row tw:flex tw:mb-2 tw:last:mb-0"
+                class="info-row flex mb-2 last:mb-0"
               >
-                <span class="tw:font-semibold tw:min-w-[60px] tw:text-[#666]"
+                <span class="font-semibold min-w-[60px] text-[#666]"
                 >URL:</span>
-                <span class="tw:text-[#333] tw:break-words tw:font-mono tw:text-[13px]"
+                <span class="text-[#333] break-words font-mono text-[13px]"
                 >{{ url }}</span>
               </div>
             </div>
@@ -73,11 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Range Support Warning -->
             <div
               v-if="!supportsRange"
-              class="warning-banner tw:flex tw:gap-3 tw:p-4 tw:bg-[#fff3cd] tw:dark:bg-[#3d3516] tw:border tw:border-[#ffc107] tw:dark:border-[#a67c00] tw:rounded-md tw:mb-5"
+              class="warning-banner flex gap-3 p-4 bg-[#fff3cd] dark:bg-[#3d3516] border border-[#ffc107] dark:border-[#a67c00] rounded-md mb-5"
             >
-              <OIcon name="warning" size="sm" class="tw:text-[#ff9800] tw:shrink-0" />
+              <OIcon name="warning" size="sm" class="text-[#ff9800] shrink-0" />
               <div
-                class="warning-text tw:flex-1"
+                class="warning-text flex-1"
               >
                 <strong>Range requests not supported</strong>
                 <p>
@@ -90,40 +90,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Retry Options (only shown if range is supported) -->
             <div
               v-if="supportsRange"
-              class="tw:mt-5"
+              class="mt-5"
             >
               <p
-                class="options-title tw:font-semibold tw:mb-4 tw:text-[#333] tw:dark:text-[var(--o2-border)]"
+                class="options-title font-semibold mb-4 text-[#333] dark:text-[var(--o2-border)]"
               >How would you like to retry?</p>
 
               <div
-                class="option-card tw:border-2 tw:border-(--o2-border) tw:dark:border-[#3a3a3a] tw:rounded-lg tw:mb-3 tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:border-[#1976d2] tw:hover:bg-[#f5f9ff] tw:dark:hover:border-[#1976d2] tw:dark:hover:bg-[#1a2332]"
+                class="option-card border-2 border-(--o2-border) dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
                 :class="[
                   { selected: !resumeFromLast },
-                  !resumeFromLast ? 'tw:border-[#1976d2]! tw:bg-[#e3f2fd]!' : ''
+                  !resumeFromLast ? 'border-[#1976d2]! bg-[#e3f2fd]!' : ''
                 ]"
               >
                 <label
-                  class="tw:block tw:p-4 tw:cursor-pointer tw:w-full"
+                  class="block p-4 cursor-pointer w-full"
                 >
                   <input
                     type="radio"
                     name="retryOption"
                     :value="false"
                     v-model="resumeFromLast"
-                   class="tw:absolute tw:opacity-0 tw:cursor-pointer"
+                   class="absolute opacity-0 cursor-pointer"
                   />
                   <div
-                    class="tw:flex tw:flex-col tw:gap-2"
+                    class="flex flex-col gap-2"
                   >
                     <div
-                      class="option-header tw:flex tw:items-center tw:gap-[10px] tw:font-semibold tw:text-[#333] tw:dark:text-[var(--o2-border)]"
+                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-[var(--o2-border)]"
                     >
-                      <OIcon name="refresh" size="sm" class="tw:text-[#1976d2]" />
-                      <span class="tw:flex-1">Start from Beginning</span>
+                      <OIcon name="refresh" size="sm" class="text-[#1976d2]" />
+                      <span class="flex-1">Start from Beginning</span>
                     </div>
                     <p
-                      class="tw:m-0 tw:text-sm tw:text-[#666] tw:leading-normal"
+                      class="m-0 text-sm text-[#666] leading-normal"
                     >
                       Download the entire file from scratch. All previous progress will be discarded.
                     </p>
@@ -132,36 +132,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="option-card tw:border-2 tw:border-(--o2-border) tw:dark:border-[#3a3a3a] tw:rounded-lg tw:mb-3 tw:transition-all tw:duration-200 tw:cursor-pointer tw:hover:border-[#1976d2] tw:hover:bg-[#f5f9ff] tw:dark:hover:border-[#1976d2] tw:dark:hover:bg-[#1a2332]"
+                class="option-card border-2 border-(--o2-border) dark:border-[#3a3a3a] rounded-lg mb-3 transition-all duration-200 cursor-pointer hover:border-[#1976d2] hover:bg-[#f5f9ff] dark:hover:border-[#1976d2] dark:hover:bg-[#1a2332]"
                 :class="[
                   { selected: resumeFromLast },
-                  resumeFromLast ? 'tw:border-[#1976d2]! tw:bg-[#e3f2fd]!' : ''
+                  resumeFromLast ? 'border-[#1976d2]! bg-[#e3f2fd]!' : ''
                 ]"
               >
                 <label
-                  class="tw:block tw:p-4 tw:cursor-pointer tw:w-full"
+                  class="block p-4 cursor-pointer w-full"
                 >
                   <input
                     type="radio"
                     name="retryOption"
                     :value="true"
                     v-model="resumeFromLast"
-                    class="tw:absolute tw:opacity-0 tw:cursor-pointer"
+                    class="absolute opacity-0 cursor-pointer"
                   />
                   <div
-                    class="tw:flex tw:flex-col tw:gap-2"
+                    class="flex flex-col gap-2"
                   >
                     <div
-                      class="option-header tw:flex tw:items-center tw:gap-[10px] tw:font-semibold tw:text-[#333] tw:dark:text-[var(--o2-border)]"
+                      class="option-header flex items-center gap-[10px] font-semibold text-[#333] dark:text-[var(--o2-border)]"
                     >
-                      <OIcon name="play-arrow" size="sm" class="tw:text-[#1976d2]" />
-                      <span class="tw:flex-1">Resume from Last Position</span>
+                      <OIcon name="play-arrow" size="sm" class="text-[#1976d2]" />
+                      <span class="flex-1">Resume from Last Position</span>
                       <span
-                        class="tw:bg-[#4caf50] tw:text-white tw:py-[2px] tw:px-2 tw:rounded-full tw:text-[11px] tw:font-semibold tw:uppercase"
+                        class="bg-[#4caf50] text-white py-[2px] px-2 rounded-full text-[11px] font-semibold uppercase"
                       >Recommended</span>
                     </div>
                     <p
-                      class="tw:m-0 tw:text-sm tw:text-[#666] tw:leading-normal"
+                      class="m-0 text-sm text-[#666] leading-normal"
                     >
                       Continue downloading from where it stopped.
                       <span v-if="lastBytePosition > 0">
@@ -176,13 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Footer -->
           <div
-            class="retry-dialog-footer tw:py-4 tw:px-6 tw:border-t tw:border-[#eaeaea] tw:dark:border-[#3a3a3a] tw:flex tw:justify-end tw:gap-3"
+            class="retry-dialog-footer py-4 px-6 border-t border-[#eaeaea] dark:border-[#3a3a3a] flex justify-end gap-3"
           >
             <OButton
               variant="outline"
               size="sm-action"
               @click="handleCancel"
-              class="tw:min-w-[100px]"
+              class="min-w-[100px]"
             >
               Cancel
             </OButton>
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm-action"
               @click="handleConfirm"
-              class="tw:min-w-[100px]"
+              class="min-w-[100px]"
             >
               Retry
             </OButton>

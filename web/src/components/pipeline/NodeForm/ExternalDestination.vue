@@ -26,18 +26,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondaryButtonLabel="!createNewDestination ? t('alerts.cancel') : undefined"
     :neutralButtonLabel="!createNewDestination && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutralButtonVariant="outline-destructive"
-    @click:primary="saveDestination"
+    form-id="external-destination-form"
     @click:secondary="handleCancel"
     @click:neutral="openDeleteDialog"
   >
-    <div class="tw:w-full tw:pt-3 tw:pb-3 tw:px-3 tw:flex tw:flex-col tw:gap-4">
+    <div class="w-full pt-3 pb-3 px-3 flex flex-col gap-4">
+      <!-- Mode toggle — stays a bare UI control OUTSIDE the form: it swaps the
+           select-existing form for the CreateDestinationForm create child. -->
       <OSwitch
         data-test="create-stream-toggle"
         :label="'Create new Destination'"
         v-model="createNewDestination"
       />
 
-      <div v-if="createNewDestination" class="tw:w-full">
+      <div v-if="createNewDestination" class="w-full">
         <!-- Create New Destination Form -->
         <CreateDestinationForm
           @created="handleDestinationCreated"
@@ -46,15 +48,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Select Existing Destination -->
-      <template v-else>
-        <OSelect
+      <OForm
+        v-else
+        id="external-destination-form"
+        ref="formRef"
+        :schema="externalDestinationSchema"
+        :default-values="externalDestinationDefaults"
+        @submit="saveDestination"
+      >
+        <OFormSelect
           data-test="external-destination-select"
-          v-model="selectedDestination"
-          :label="'Destination *'"
+          name="selectedDestination"
+          :label="'Destination'"
+          required
           :options="getFormattedDestinations"
           tabindex="0"
         />
-      </template>
+      </OForm>
     </div>
   </ODrawer>
   <confirm-dialog
@@ -73,11 +83,16 @@ import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import CreateDestinationForm from "./CreateDestinationForm.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeExternalDestinationSchema,
+  type ExternalDestinationForm,
+} from "./ExternalDestination.schema";
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
 const emit = defineEmits(["get:destinations", "cancel:hideform"]);
@@ -94,11 +109,26 @@ function handleDrawerClose(v: boolean) {
 const store = useStore();
 const { t } = useI18n();
 
+// Schema built here so its required message stays i18n-driven; bound in the
+// template via <OForm :schema="externalDestinationSchema">.
+const externalDestinationSchema = makeExternalDestinationSchema(t);
+
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 const createNewDestination = ref(false);
-const selectedDestination = ref<string>(
+
+// OForm instance ref — exposed so the drawer footer (form-id bridge) and specs
+// can drive/read the real form. Typed `any` because OForm is generic.
+const formRef = ref<any>(null);
+
+// Seed for the form's `:default-values` (edit prefill / a just-created
+// destination). The form owns the live value after mount.
+const selectedDestinationSeed = ref<string>(
   pipelineObj.currentSelectedNodeData?.data?.destination_name ?? "",
 );
+const externalDestinationDefaults = computed((): ExternalDestinationForm => ({
+  selectedDestination: selectedDestinationSeed.value,
+}));
+
 const destinations = ref([]);
 
 const dialog = ref({
@@ -168,28 +198,29 @@ const getDestinations = () => {
     .finally(() => dismiss());
 };
 
-const saveDestination = () => {
+// @submit handler — OForm only calls it once the schema passes
+// (selectedDestination required), so the schema gates the save (the old
+// imperative toast guard is gone).
+const saveDestination = (value: ExternalDestinationForm) => {
   const destinationData = {
-    destination_name: selectedDestination.value,
+    destination_name: value.selectedDestination,
     node_type: "remote_stream",
     io_type: "output",
     org_id: store.state.selectedOrganization.identifier,
   };
-  if (!selectedDestination.value) {
-    toast({
-      variant: "warning",
-      message: "Please select External destination from the list",
-    });
-    return;
-  }
   addNode(destinationData);
   emit("cancel:hideform");
 };
 
 const handleDestinationCreated = (destinationName: string) => {
-  // Switch back to selection mode and select the newly created destination
-  selectedDestination.value = destinationName;
+  // Switch back to selection mode and select the newly created destination.
+  // Seed it so the form re-mounts (when toggling out of create mode) with the
+  // value; if the select form is already mounted, push it in directly.
+  selectedDestinationSeed.value = destinationName;
   createNewDestination.value = false;
+  if (formRef.value?.form) {
+    formRef.value.form.setFieldValue("selectedDestination", destinationName);
+  }
   getDestinations();
 };
 
@@ -213,11 +244,15 @@ const deleteRoute = () => {
 defineExpose({
   getDestinations,
   saveDestination,
-  selectedDestination,
+  formRef,
+  selectedDestinationSeed,
   destinations,
   getFormattedDestinations,
   createNewDestination,
   pipelineObj,
+  dialog,
+  openDeleteDialog,
+  deleteRoute,
   handleDestinationCreated,
   handleCancel,
 });

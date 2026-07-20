@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap searchdetaildialog"
+    class="flex flex-col h-full flex-nowrap searchdetaildialog"
     data-test="dialog-box"
   >
     <!-- Single Tab Row -->
-    <div class="tw:flex tw:justify-between tw:pt-2 tw:items-center">
-      <div class="tw:flex tw:items-center tw:gap-2 tw:-mb-0.75">
+    <div class="flex justify-between pt-2 items-center">
+      <div class="flex items-center gap-2 -mb-0.75">
         <OTabs v-model="tab" align="left">
           <OTab
             data-test="log-detail-json-tab"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OTabs>
       </div>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:pr-3 tw:shrink-0">
+      <div class="flex items-center gap-2 pr-3 shrink-0">
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       :class="[
-        'tw:flex tw:flex-col tw:h-full',
-        tab.startsWith('correlated-') ? 'tw:overflow-hidden full-height-panels' : 'tw:overflow-y-auto',
+        'flex flex-col h-full',
+        tab.startsWith('correlated-') ? 'overflow-hidden full-height-panels' : 'overflow-y-auto',
       ]"
     >
     <OTabPanels
@@ -83,12 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="tab"
       keep-alive
       grow
-      class="tw:overflow-y-auto!"
+      class="overflow-y-auto!"
     >
       <OTabPanel name="json">
         <OCardSection
           data-test="log-detail-json-content"
-          class="tw:p-0 tw:mb-6 tw:pt-2"
+          class="p-0 mb-6 pt-2"
         >
           <json-preview
             :value="rowData"
@@ -109,11 +109,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
       <OTabPanel name="table">
         <OCardSection
-          class="tw:p-[0.675rem] tw:mb-6"
+          class="p-[0.675rem] mb-6"
           data-test="log-detail-table-content"
         >
-          <div v-if="rowData.length == 0" class="tw:pt-3 tw:max-w-[350px]">
-            No data available.
+          <div v-if="rowData.length == 0" class="pt-3 max-w-[350px]">
+            {{ t('logs.detailTable.noDataAvailable') }}
           </div>
           <OTable
             v-else
@@ -123,17 +123,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="_rowKey"
             pagination="none"
             :default-columns="false"
-            class="o2-table o2-row-md o2-schema-table log-detail-source-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+            class="o2-table o2-row-md o2-schema-table log-detail-source-table w-full border border-solid border-[var(--o2-border-color)]"
             :class="store.state.theme === 'dark' && 'dark'"
           >
             <template #cell-field="{ row, value }">
               <div
                 :data-test="`log-detail-${value}-key`"
-                class="tw:text-left"
+                class="text-left"
                 :class="
                   store.state.theme == 'dark'
-                    ? 'tw:text-[#f67a7aff]'
-                    : 'tw:text-[#B71C1C]'
+                    ? 'text-[#f67a7aff]'
+                    : 'text-[#B71C1C]'
                 "
               >
                 {{ value }}
@@ -141,8 +141,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-value="{ row }">
-              <div class="tw:text-left" :class="!shouldWrapValues ? 'ellipsis' : ''">
-                <div class="tw:flex tw:items-start tw:gap-2">
+              <div class="text-left" :class="!shouldWrapValues ? 'ellipsis' : ''">
+                <div class="flex items-start gap-2">
                   <ODropdown v-model:open="tableDropdownOpenMap[row.field]" side="bottom" align="start">
                     <template #trigger>
                       <OButton
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="icon-xs"
                         variant="ghost"
                         class="log-json-field-dropdown-btn"
-                        aria-label="Add icon"
+                        :aria-label="t('logs.detailTable.addIcon')"
                       >
                         <OIcon :name="tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
                       </OButton>
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="log-details-include-field-btn"
                       @select="toggleIncludeSearchTerm(row.field, row.value, 'include')"
                     >
-                      <template #icon-left><EqualIcon class="tw:size-2.5" /></template>
+                      <template #icon-left><EqualIcon class="size-2.5" /></template>
                       {{ t("common.includeSearchTerm") }}
                     </ODropdownItem>
                     <ODropdownItem
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="log-details-exclude-field-btn"
                       @select="toggleExcludeSearchTerm(row.field, row.value, 'exclude')"
                     >
-                      <template #icon-left><NotEqualIcon class="tw:size-2.5" /></template>
+                      <template #icon-left><NotEqualIcon class="size-2.5" /></template>
                       {{ t("common.excludeSearchTerm") }}
                     </ODropdownItem>
                     <template v-if="row.field !== store.state.zoConfig.timestamp_column">
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <img :src="getBtnLogo" width="14" height="14" alt="" />
                       </template>
-                      Send to AI Chat
+                      {{ t('logs.detailTable.sendToAiChat') }}
                     </ODropdownItem>
                     <ODropdownItem
                       v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
@@ -235,11 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdown>
                   <pre
                     :data-test="`log-detail-${row.field}-value`"
-                    class="table-pre tw:flex-1 tw:min-w-0"
+                    class="table-pre flex-1 min-w-0"
                     :class="
                       !shouldWrapValues
-                        ? 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis'
-                        : 'tw:whitespace-pre-wrap'
+                        ? 'whitespace-nowrap overflow-hidden text-ellipsis'
+                        : 'whitespace-pre-wrap'
                     "
                   ><ChunkedContent
                       v-if="getContentSize(row.value) > 50000"
@@ -280,24 +280,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :hide-search-term-actions="false"
           :hide-dimension-filters="true"
           :hide-reset-filters-button="true"
-          class="tw:pr-3!"
+          class="pr-3!"
           @sendToAiChat="sendToAiChat"
           @addSearchTerm="addSearchTerm"
         />
         <!-- Loading/Empty state when no data -->
         <div
           v-else
-          class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
+          class="flex items-center justify-center h-full py-20"
         >
-          <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
+          <div class="text-center">
+            <OSpinner v-if="correlationLoading" size="lg" class="mb-4" data-test="logs-correlation-loading-indicator" />
             <div
               v-else-if="correlationError"
-              class="tw:text-base tw:text-red-500"
+              class="text-base text-red-500"
             >
               {{ correlationError }}
             </div>
-            <div v-else class="tw:text-base tw:text-gray-500">
+            <div v-else class="text-base text-gray-500">
               {{ t("correlation.clickToLoadLogs") }}
             </div>
           </div>
@@ -328,11 +328,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
-          <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+        <div v-else class="flex items-center justify-center h-full py-20">
+          <div class="text-center">
+            <OSpinner v-if="correlationLoading" size="lg" class="mb-4" data-test="logs-correlation-loading-indicator" />
+            <div v-else-if="correlationError" class="text-base text-red-500">{{ correlationError }}</div>
+            <div v-else class="text-base text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
         </div>
       </OTabPanel>
@@ -361,11 +361,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @close="tab = 'json'"
         />
         <!-- Loading/Empty state when no data -->
-        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
-          <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
+        <div v-else class="flex items-center justify-center h-full py-20">
+          <div class="text-center">
+            <OSpinner v-if="correlationLoading" size="lg" class="mb-4" data-test="logs-correlation-loading-indicator" />
+            <div v-else-if="correlationError" class="text-base text-red-500">{{ correlationError }}</div>
+            <div v-else class="text-base text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
         </div>
       </OTabPanel>
@@ -374,16 +374,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <OSeparator v-if="tab === 'json' || tab === 'table'" />
-    <OCardSection v-if="tab === 'json' || tab === 'table'" class="tw:p-4 tw:pb-4 tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:z-10">
-      <div class="tw:flex tw:items-center tw:flex-nowrap tw:justify-between">
-        <div class="tw:w-1/12">
+    <OCardSection v-if="tab === 'json' || tab === 'table'" class="p-4 pb-4 sticky bottom-0 bg-dialog-bg z-10">
+      <div class="flex items-center flex-nowrap justify-between">
+        <div class="w-1/12">
           <OButton
             data-test="log-detail-previous-detail-btn"
             variant="outline"
             size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-          ><OIcon name="navigate-before" size="sm" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
+          ><OIcon name="navigate-before" size="sm" class="mr-1" />{{ t('common.previous') }}</OButton>
         </div>
         <div
           v-show="
@@ -391,9 +391,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.stream.selectedStream.length <= 1 &&
             hasAggregationQuery == false
           "
-          class="tw:flex tw:items-center tw:gap-2"
+          class="flex items-center gap-2"
         >
-          <label class="tw:font-bold tw:whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
+          <label class="font-bold whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
           <OSelect
             v-model="selectedRelativeValue"
             :options="recordSizeOptions"
@@ -407,14 +407,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="searchTimeBoxed(rowData, selectedRelativeValue)"
           >{{ t('common.searchAround') }}</OButton>
         </div>
-        <div class="tw:w-1/12 tw:items-end" style="display: contents;">
+        <div class="w-1/12 items-end" style="display: contents;">
           <OButton
             data-test="log-detail-next-detail-btn"
             variant="outline"
             size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-          >{{ t('common.next') }}<OIcon name="navigate-next" size="sm" class="tw:ml-1" /></OButton>
+          >{{ t('common.next') }}<OIcon name="navigate-next" size="sm" class="ml-1" /></OButton>
         </div>
       </div>
     </OCardSection>
@@ -705,7 +705,7 @@ export default defineComponent({
 
     const copyContentToClipboard = (log: any) => {
       copyToClipboard(JSON.stringify(log), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: t("logs.detailTable.contentCopiedSuccessfully"),
         timeout: 1000,
       });
     };

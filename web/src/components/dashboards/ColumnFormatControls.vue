@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:divide-y tw:divide-[rgba(128,128,128,0.08)]">
+  <div class="divide-y divide-[rgba(128,128,128,0.08)]">
     <!-- Field type -->
-    <div class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">
+    <div class="px-3 py-2">
+      <div class="o-input-label block mb-1.5">
         {{ t("dashboard.sectionFieldType") }}
       </div>
       <OToggleGroup
-        class="cf-seg tw:h-8"
+        class="cf-seg h-8"
         type="single"
         v-model="col.fieldType"
       >
@@ -39,32 +39,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Value formatting (numeric only) -->
-    <div v-if="isNumeric" class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">
+    <div v-if="isNumeric" class="px-3 py-2">
+      <div class="o-input-label block mb-1.5">
         {{ t("dashboard.sectionValueFormatting") }}
       </div>
       <OSelect
         v-model="col.unit"
         :options="unitOptions"
-        class="tw:w-full tw:max-w-[22.5rem]"
+        class="w-full max-w-[22.5rem]"
         :data-test="`o2-format-unit-${col.field}`"
       />
       <OInput
         v-if="col.unit === 'custom'"
         v-model="col.customUnit"
         :label="t('dashboard.customunitLabel')"
-        class="tw:w-full tw:max-w-[22.5rem] tw:mt-2"
+        class="w-full max-w-[22.5rem] mt-2"
         :data-test="`o2-format-custom-unit-${col.field}`"
       />
     </div>
 
     <!-- Alignment -->
-    <div class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">
+    <div class="px-3 py-2">
+      <div class="o-input-label block mb-1.5">
         {{ t("dashboard.sectionAlignment") }}
       </div>
       <OToggleGroup
-        class="cf-seg tw:h-8"
+        class="cf-seg h-8"
         type="single"
         v-model="alignmentModel"
       >
@@ -81,18 +81,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <!-- Styling -->
-    <div class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">{{ t("dashboard.sectionStyling") }}</div>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
-        <span class="o-input-label tw:shrink-0 tw:w-24">{{ t("dashboard.textColor") }}</span>
+    <div class="px-3 py-2">
+      <div class="o-input-label block mb-1.5">{{ t("dashboard.sectionStyling") }}</div>
+      <div class="flex items-center gap-2 mt-2 flex-wrap">
+        <span class="o-input-label shrink-0 w-24">{{ t("dashboard.textColor") }}</span>
         <ColorSwatchPicker
           v-model="col.textColor"
           :swatches="TEXT_SWATCHES"
           :data-test="`o2-format-text-color-${col.field}`"
         />
       </div>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
-        <span class="o-input-label tw:shrink-0 tw:w-24">{{ t("dashboard.bgColor") }}</span>
+      <div class="flex items-center gap-2 mt-2 flex-wrap">
+        <span class="o-input-label shrink-0 w-24">{{ t("dashboard.bgColor") }}</span>
         <ColorSwatchPicker
           v-model="col.bgColor"
           :swatches="BG_SWATCHES"
@@ -101,49 +101,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <button
         type="button"
-        class="tw:inline-flex tw:items-center tw:gap-2 tw:py-1.5 tw:px-2.5 tw:mt-3 tw:rounded-md tw:border tw:border-[rgba(128,128,128,0.28)] tw:bg-transparent tw:cursor-pointer tw:text-left tw:transition-colors tw:hover:border-[var(--color-primary-600)]"
+        class="inline-flex items-center gap-2 py-1.5 px-2.5 mt-3 rounded-md border border-[rgba(128,128,128,0.28)] bg-transparent cursor-pointer text-left transition-colors hover:border-[var(--color-primary-600)]"
         :class="{ 'cf-toggle-active': col.autoColor }"
         :data-test="`o2-format-unique-color-${col.field}`"
         @click="col.autoColor = !col.autoColor"
       >
-        <OCheckbox :model-value="col.autoColor" size="sm" class="tw:pointer-events-none" />
-        <span class="o-input-label tw:cursor-pointer">{{
+        <OCheckbox :model-value="col.autoColor" size="sm" class="pointer-events-none" />
+        <span class="o-input-label cursor-pointer">{{
           t("dashboard.overrideConfigUniqueValueColor")
         }}</span>
       </button>
     </div>
 
     <!-- Conditional (numeric only) -->
-    <div v-if="isNumeric" class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">
+    <div v-if="isNumeric" class="px-3 py-2">
+      <div class="o-input-label block mb-1.5">
         {{ t("dashboard.sectionConditionalStyling") }}
       </div>
       <div
         v-if="!col.conditions.length"
-        class="tw:text-[length:var(--text-sm)] tw:text-[var(--color-text-secondary,#9e9e9e)] tw:mb-1.5"
+        class="text-[length:var(--text-sm)] text-[var(--color-text-secondary,#9e9e9e)] mb-1.5"
       >
         {{ t("dashboard.conditionNoRules") }}
       </div>
       <div
         v-for="(rule, ruleIdx) in col.conditions"
         :key="ruleIdx"
-        class="tw:flex tw:flex-col tw:gap-2 tw:py-2 tw:px-2.5 tw:mb-1.5 tw:rounded-md tw:bg-[rgba(128,128,128,0.04)] tw:border tw:border-[rgba(128,128,128,0.1)]"
+        class="flex flex-col gap-2 py-2 px-2.5 mb-1.5 rounded-md bg-[rgba(128,128,128,0.04)] border border-[rgba(128,128,128,0.1)]"
       >
-        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-          <span class="o-input-label tw:shrink-0 tw:w-28">{{ t("dashboard.conditionIfValue") }}</span>
-          <div class="tw:w-52 tw:shrink-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="o-input-label shrink-0 w-28">{{ t("dashboard.conditionIfValue") }}</span>
+          <div class="w-52 shrink-0">
             <OSelect
               v-model="rule.operator"
               :options="conditionOperators"
-              class="tw:w-full"
+              class="w-full"
             />
           </div>
-          <div class="tw:w-28 tw:shrink-0">
+          <div class="w-28 shrink-0">
             <OInput
               v-model="rule.threshold"
               type="number"
               :placeholder="t('dashboard.conditionThreshold')"
-              class="tw:w-full"
+              class="w-full"
             />
           </div>
           <OButton
@@ -151,20 +151,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-xs"
             icon-left="close"
             :title="t('common.remove')"
-            class="tw:shrink-0 tw:ml-auto"
+            class="shrink-0 ml-auto"
             @click="col.conditions.splice(ruleIdx, 1)"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-          <span class="o-input-label tw:shrink-0 tw:w-28 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionThenText") }}</span>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="o-input-label shrink-0 w-28 text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionThenText") }}</span>
           <ColorSwatchPicker
             v-model="rule.textColor"
             :swatches="TEXT_SWATCHES"
             :data-test="`o2-format-cond-text-${col.field}-${ruleIdx}`"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-          <span class="o-input-label tw:shrink-0 tw:w-28 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionAndBg") }}</span>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="o-input-label shrink-0 w-28 text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionAndBg") }}</span>
           <ColorSwatchPicker
             v-model="rule.bgColor"
             :swatches="BG_SWATCHES"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm"
-        class="tw:mt-1"
+        class="mt-1"
         :data-test="`o2-format-add-rule-${col.field}`"
         @click="col.conditions.push(emptyConditionalRule())"
       >

@@ -26,14 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondaryButtonLabel="!createNewFunction ? t('alerts.cancel') : undefined"
     :neutralButtonLabel="!createNewFunction && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutralButtonVariant="outline-destructive"
-    @click:primary="saveFunction"
+    form-id="associate-function-form"
     @click:secondary="openCancelDialog"
     @click:neutral="openDeleteDialog"
   >
     <div
       data-test="add-function-node-routing-section"
-      class="tw:flex tw:flex-col tw:h-full"
-      :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
+      class="flex flex-col h-full"
+      :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
     >
 
 
@@ -41,16 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSpinner
         v-if="loading"
         size="md"
-        class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
         data-test="associate-function-loading-indicator"
       />
     </div>
     <div
       v-else
       data-test="associate-function-routing-container"
-      class="tw:rounded-lg tw:w-full tw:pt-3 tw:pb-3 tw:flex tw:flex-col tw:gap-4 tw:flex-1 tw:min-h-0"
+      class="rounded-lg w-full pt-3 pb-3 flex flex-col gap-4 flex-1 min-h-0"
     >
-      <div class="tw:flex tw:items-center tw:gap-3 tw:px-(--spacing-dialog-header-px)">
+      <div class="flex items-center gap-3 px-(--spacing-dialog-header-px)">
         <OSwitch
           data-test="create-function-toggle"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
@@ -58,64 +58,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="createNewFunction"
-          class="tw:text-sm tw:text-gray-600"
+          class="text-sm text-gray-600 dark:text-gray-300"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-4" :class="[!createNewFunction ? 'tw:px-3' : 'tw:flex-1 tw:min-h-0']">
-        <div
+      <div class="flex flex-col gap-4" :class="[!createNewFunction ? 'px-3' : 'flex-1 min-h-0']">
+        <!-- Select-existing branch — form-owned fields inside <OForm>. -->
+        <OForm
           v-if="!createNewFunction"
-          class="tw:w-full"
+          id="associate-function-form"
+          :form="form"
+          class="flex flex-col gap-4"
         >
-          <OSelect
-            v-model="selectedFunction"
-            :options="props.functions"
-            :label="t('function.selectFunction') + ' *'"
-            searchable
-            :readonly="isUpdating"
-            :disabled="isUpdating"
-            :error="functionExists || (showFunctionRequiredError && !selectedFunction)"
-            :error-message="
-              functionExists
-                ? 'Function is already associated'
-                : (showFunctionRequiredError && !selectedFunction)
-                  ? 'Field is required'
-                  : ''
+          <div class="w-full">
+            <OFormSelect
+              name="selectedFunction"
+              :options="props.functions"
+              :label="t('function.selectFunction')"
+              required
+              searchable
+              :readonly="isUpdating"
+              :disabled="isUpdating"
+              data-test="associate-function-select-function-input"
+            />
+          </div>
+
+          <!-- Function Definition Display -->
+          <div
+            v-if="
+              selectedFunction &&
+              pipelineObj.functions[selectedFunction]
             "
-            data-test="associate-function-select-function-input"
-          />
-        </div>
+            data-test="associate-function-definition-section"
+            class="mt-4 mb-4"
+          >
+            <OCard class="function-definition-card border border-[#e1e5e9] dark:border-[#2d3748] rounded-lg shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] overflow-hidden dark:bg-[#1a202c]">
+              <OCardSection role="header" class="function-definition-header bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b border-b-[#e2e8f0] dark:border-b-[#4a5568]">
+                <div class="text-base font-semibold text-[#2d3748] dark:text-white">
+                  {{ t("function.function_definition") }}
+                </div>
+              </OCardSection>
+              <OSeparator />
+              <OCardSection class="p-0 function-definition-content">
+                <div class="function-code-container bg-[#fafbfc] dark:bg-[#0d1117] dark:border dark:border-[#21262d] rounded-none max-w-[584px] max-h-[250px] overflow-y-auto relative">
+                  <pre class="function-code text-[#2d3748] dark:text-[#f7fafc] bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-[13px] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text">{{
+                    pipelineObj.functions[selectedFunction]?.function ||
+                    "No definition available"
+                  }}</pre>
+                </div>
+              </OCardSection>
+            </OCard>
+          </div>
 
-        <!-- Function Definition Display -->
-        <div
-          v-if="
-            !createNewFunction &&
-            selectedFunction &&
-            pipelineObj.functions[selectedFunction]
-          "
-          data-test="associate-function-definition-section"
-          class="tw:mt-4 tw:mb-4"
-        >
-          <OCard class="function-definition-card tw:border tw:border-[#e1e5e9] tw:dark:border-[#2d3748] tw:rounded-lg tw:shadow-[0_2px_4px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] tw:overflow-hidden tw:dark:bg-[#1a202c]">
-            <OCardSection role="header" class="function-definition-header tw:bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] tw:dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] tw:border-b tw:border-b-[#e2e8f0] tw:dark:border-b-[#4a5568]">
-              <div class="tw:text-base tw:font-semibold tw:text-[#2d3748] tw:dark:text-white">
-                {{ t("function.function_definition") }}
-              </div>
-            </OCardSection>
-            <OSeparator />
-            <OCardSection class="tw:p-0 function-definition-content">
-              <div class="function-code-container tw:bg-[#fafbfc] tw:dark:bg-[#0d1117] tw:dark:border tw:dark:border-[#21262d] tw:rounded-none tw:max-w-[584px] tw:max-h-[250px] tw:overflow-y-auto tw:relative">
-                <pre class="function-code tw:text-[#2d3748] tw:dark:text-[#f7fafc] tw:bg-transparent tw:m-0 tw:p-4 tw:font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] tw:text-[13px] tw:leading-normal tw:whitespace-pre-wrap tw:break-words tw:border-0 tw:font-normal tw:cursor-default tw:select-text">{{
-                  pipelineObj.functions[selectedFunction]?.function ||
-                  "No definition available"
-                }}</pre>
-              </div>
-            </OCardSection>
-          </OCard>
-        </div>
+          <div class="w-full flex flex-col gap-3">
+            <OFormSwitch
+              data-test="associate-function-after-flattening-toggle"
+              name="afterFlattening"
+              :label="t('pipeline.flatteningLbl')"
+            />
 
-        <div v-if="createNewFunction" class="pipeline-add-function tw:w-full tw:flex-1 tw:min-h-0">
+            <!-- Info note explaining RAF/RBF -->
+            <div class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2">
+              <div class="text-sm text-[#2d3748]">
+                Function Execution Guidelines:
+              </div>
+              <div class="flex flex-col gap-1 text-sm text-[#2d3748]">
+                <div class="flex items-start gap-2">
+                  <OIcon
+                    name="info"
+                    size="sm"
+                    class="shrink-0 mt-0.5 text-amber-500"
+                  />
+                  <span>
+                    <span class="font-bold text-[#007bff]">RBF (Run Before Flattening):</span>
+                    Function executes before data structure is flattened
+                  </span>
+                </div>
+                <div class="flex items-start gap-2">
+                  <OIcon
+                    name="info"
+                    size="sm"
+                    class="shrink-0 mt-0.5 text-amber-500"
+                  />
+                  <span>
+                    <span class="font-bold text-[#007bff]">RAF (Run After Flattening):</span>
+                    Function executes after data structure is flattened
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </OForm>
+
+        <div v-if="createNewFunction" class="pipeline-add-function w-full flex-1 min-h-0">
           <AddFunction
             ref="addFunctionRef"
             :is-updated="isUpdating"
@@ -124,50 +160,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :heightOffset="75"
           />
         </div>
-
-        <div
-          class="tw:w-full tw:flex tw:flex-col tw:gap-3"
-          v-if="!createNewFunction"
-        >
-          <OSwitch
-            data-test="associate-function-after-flattening-toggle"
-            :label="t('pipeline.flatteningLbl')"
-            v-model="afterFlattening"
-          />
-
-          <!-- Info note explaining RAF/RBF -->
-          <div class="tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:flex tw:flex-col tw:gap-2">
-            <div class="tw:text-sm tw:text-[#2d3748]">
-              Function Execution Guidelines:
-            </div>
-            <div class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-[#2d3748]">
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
-                />
-                <span>
-                  <span class="tw:font-bold tw:text-[#007bff]">RBF (Run Before Flattening):</span>
-                  Function executes before data structure is flattened
-                </span>
-              </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon
-                  name="info"
-                  size="sm"
-                  class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500"
-                />
-                <span>
-                  <span class="tw:font-bold tw:text-[#007bff]">RAF (Run After Flattening):</span>
-                  Function executes after data structure is flattened
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-
       </div>
     </div>
     </div>
@@ -197,12 +189,19 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import {
+  makeAssociateFunctionSchema,
+  type AssociateFunctionForm,
+} from "./AssociateFunction.schema";
 
 interface RouteCondition {
   column: string;
@@ -269,13 +268,14 @@ const addFunctionRef: any = ref(null);
 
 const isUpdating = ref(false);
 
-const selectedFunction = ref(
+// Seeds for the form's `:default-values` (edit prefill).
+const selectedFunctionSeed = ref(
   (pipelineObj.currentSelectedNodeData?.data as { name?: string })?.name || "",
 );
 
 const loading = ref(false);
 
-const afterFlattening = ref(
+const afterFlatteningSeed = ref(
   (pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })
     ?.after_flatten ?? true,
 );
@@ -286,14 +286,33 @@ const createNewFunction = ref(false);
 
 const store = useStore();
 
-const functionExists = ref(false);
-// Toggle for "Field is required" — flipped on save when no function is selected.
-const showFunctionRequiredError = ref(false);
+// Co-located schema (factory) — uniqueness reads the CURRENT associatedFunctions
+// prop + isUpdating at validation time via getters. selectedFunction required +
+// "already associated" uniqueness are both schema-driven now.
+const associateFunctionSchema = makeAssociateFunctionSchema(
+  t,
+  () => (props.associatedFunctions as string[]) ?? [],
+  () => isUpdating.value,
+);
 
-// Clear the "Field is required" error as soon as the user picks a function.
-watch(selectedFunction, (next) => {
-  if (next) showFunctionRequiredError.value = false;
+// Typed dynamic (edit-prefill) defaults — read once at OForm mount.
+const associateFunctionDefaults = computed((): AssociateFunctionForm => ({
+  selectedFunction: selectedFunctionSeed.value,
+  afterFlattening: afterFlatteningSeed.value,
+}));
+
+// Rule ③ OWNER pattern: this component OWNS <OForm> and needs the live
+// `selectedFunction` for the function-definition card's `v-if` + display, so it
+// creates the form here with useOForm and reads it reactively via form.useStore
+// — a SINGLE source of truth (no mirror ref, no store.subscribe). The form is
+// handed to <OForm :form="form">.
+const form = useOForm<AssociateFunctionForm>({
+  defaultValues: associateFunctionDefaults.value,
+  schema: associateFunctionSchema,
+  onSubmit: (value) => saveFunction(value),
 });
+
+const selectedFunction = form.useStore((s: any) => s.values.selectedFunction);
 
 const nodeLink = ref({
   from: "",
@@ -359,54 +378,29 @@ const openDeleteDialog = () => {
   dialog.value.okCallback = deleteFunction;
 };
 
-const saveFunction = () => {
-  functionExists.value = false;
-
-  if (createNewFunction.value) {
-    if (addFunctionRef.value.formData.name == "") {
-      toast({
-        message: "Function Name is required",
-        variant: "warning",
-      });
-      return;
-    }
-    return;
-  }
-
-  // Validate that a function has been selected before allowing save.
-  if (!selectedFunction.value) {
-    showFunctionRequiredError.value = true;
-    return;
-  }
-  showFunctionRequiredError.value = false;
-
-  if (
-    !isUpdating.value &&
-    selectedFunction.value &&
-    props.associatedFunctions.includes(selectedFunction.value)
-  ) {
-    functionExists.value = true;
-    return;
-  }
-
+// @submit handler for the select-existing branch — OForm only calls it once the
+// schema passes (selectedFunction required + uniqueness via superRefine), so the
+// schema gates the save (no manual functionExists / required guards). The
+// create-new branch delegates to AddFunction (its own validation) and renders no
+// footer Save, so @submit only fires here.
+const saveFunction = (value: AssociateFunctionForm) => {
   const functionNode = {
-    name: selectedFunction.value,
-    after_flatten: afterFlattening.value,
+    name: value.selectedFunction,
+    after_flatten: value.afterFlattening,
   };
   addNode(functionNode);
-  // emit("update:node", {
-  //   data: { name: selectedFunction.value, order: functionOrder.value },
-  //   link: nodeLink.value,
-  // });
   emit("cancel:hideform");
 };
 
 const onFunctionCreation = async (_function: any) => {
-  // Assign newly created function to the block
+  // Assign newly created function to the block. Seed it so the select form
+  // re-mounts (when toggling out of create mode) with the value, then push it in
+  // once the form is mounted.
+  selectedFunctionSeed.value = _function.name;
   createNewFunction.value = false;
   emit("add:function", _function);
   await nextTick();
-  selectedFunction.value = _function.name;
+  form.setFieldValue("selectedFunction", _function.name);
 };
 
 const cancelFunctionCreation = () => {

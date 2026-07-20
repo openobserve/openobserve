@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp tw:w-72 tw:bg-(--o2-card-bg-solid) tw:border tw:border-(--o2-border) tw:rounded-[0.625rem] tw:overflow-hidden tw:shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] tw:[animation:wcpIn_0.15s_ease-out]"
-    :class="{ 'tw:[animation-name:wcpInUp]': flipUpward }"
+    class="wcp w-72 bg-(--o2-card-bg-solid) border border-(--o2-border) rounded-[0.625rem] overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:wcpIn_0.15s_ease-out]"
+    :class="{ '[animation-name:wcpInUp]': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"
     @mouseenter="$emit('popoverEnter')"
@@ -27,68 +27,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- ── Header ── -->
     <div
-      class="wcp__header tw:flex tw:items-center tw:justify-between tw:gap-2 tw:pt-[0.625rem] tw:px-3 tw:pb-[0.375rem]"
+      class="wcp__header flex items-center justify-between gap-2 pt-[0.625rem] px-3 pb-[0.375rem]"
     >
       <div
-        class="wcp__header-left tw:flex tw:items-center tw:gap-[0.375rem] tw:min-w-0"
+        class="wcp__header-left flex items-center gap-[0.375rem] min-w-0"
       >
         <OTag
           type="fieldType"
           :value="tokenType"
           :label="tokenType"
-          class="wcp__type-badge tw:shrink-0 tw:font-mono tw:font-bold"
+          class="wcp__type-badge shrink-0 font-mono font-bold"
         />
         <span
-          class="wcp__title tw:text-[0.8125rem] tw:font-semibold tw:text-(--o2-text-heading) tw:truncate"
-        >Variable slot · {{ tokenType }}</span>
+          class="wcp__title text-[0.8125rem] font-semibold text-(--o2-text-heading) truncate"
+        >{{ t('logs.wildcardValuePopover.variableSlot', { type: tokenType }) }}</span>
       </div>
       <div
-        class="wcp__header-right tw:flex tw:items-baseline tw:gap-1 tw:shrink-0"
+        class="wcp__header-right flex items-baseline gap-1 shrink-0"
       >
         <span
-          class="wcp__unique-count tw:text-sm tw:font-bold tw:text-(--o2-text-heading) tw:[font-variant-numeric:tabular-nums]"
+          class="wcp__unique-count text-sm font-bold text-(--o2-text-heading) [font-variant-numeric:tabular-nums]"
         >{{ displayValues.length }}</span>
         <span
-          class="wcp__unique-label tw:text-[0.6875rem] tw:text-(--o2-text-caption)"
-        >unique</span>
+          class="wcp__unique-label text-[0.6875rem] text-(--o2-text-caption)"
+        >{{ t('logs.wildcardValuePopover.unique') }}</span>
       </div>
     </div>
 
 
     <!-- ── Value rows ── -->
     <div
-      class="wcp__body tw:py-1 tw:max-h-80 tw:overflow-y-auto"
+      class="wcp__body py-1 max-h-80 overflow-y-auto"
     >
       <div
         v-for="(item, i) in displayValues.slice(0, 10)"
         :key="i"
-        class="wcp__row tw:px-3 tw:pt-[0.375rem] tw:pb-1"
+        class="wcp__row px-3 pt-[0.375rem] pb-1"
         :data-test="`wildcard-value-row-${i}`"
       >
         <!-- Value name + count -->
         <div
-          class="wcp__row-top tw:flex tw:items-baseline tw:justify-between tw:gap-2 tw:mb-1"
+          class="wcp__row-top flex items-baseline justify-between gap-2 mb-1"
         >
           <span
-            class="wcp__row-value tw:text-xs tw:font-semibold tw:font-mono tw:text-(--o2-text-body) tw:truncate tw:flex-1 tw:min-w-0"
-          >{{ item.value || "(empty)" }}</span>
+            class="wcp__row-value text-xs font-semibold font-mono text-(--o2-text-body) truncate flex-1 min-w-0"
+          >{{ item.value || t('logs.wildcardValuePopover.empty') }}</span>
           <span
-            class="wcp__row-count tw:text-[0.8125rem] tw:font-bold tw:text-(--o2-text-heading) tw:[font-variant-numeric:tabular-nums] tw:shrink-0"
+            class="wcp__row-count text-[0.8125rem] font-bold text-(--o2-text-heading) [font-variant-numeric:tabular-nums] shrink-0"
           >{{ item.count.toLocaleString() }}</span>
         </div>
         <!-- Full-width progress bar -->
         <div
-          class="wcp__bar-track tw:w-full tw:h-1 tw:bg-(--o2-border-color) tw:rounded-full tw:overflow-hidden tw:mb-[0.1875rem]"
+          class="wcp__bar-track w-full h-1 bg-(--o2-border-color) rounded-full overflow-hidden mb-[0.1875rem]"
         >
           <div
-            class="wcp__bar-fill tw:h-full tw:rounded-full tw:transition-[width] tw:duration-200"
+            class="wcp__bar-fill h-full rounded-full transition-[width] duration-200"
             :class="barColorClass"
             :style="{ width: barWidth(item.count) }"
           />
         </div>
         <!-- Percentage -->
         <div
-          class="wcp__row-pct tw:text-[0.625rem] tw:text-(--o2-text-caption) tw:[font-variant-numeric:tabular-nums]"
+          class="wcp__row-pct text-[0.625rem] text-(--o2-text-caption) [font-variant-numeric:tabular-nums]"
         >
           {{ totalOccurrences > 0 ? ((item.count / totalOccurrences) * 100).toFixed(1) + '%' : '' }}
         </div>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="displayValues.length === 0"
-        class="wcp__empty tw:py-6 tw:px-3 tw:text-center tw:text-[0.6875rem] tw:text-(--o2-text-muted)"
+        class="wcp__empty py-6 px-3 text-center text-[0.6875rem] text-(--o2-text-muted)"
       >
         {{ t("search.patternNoValuesAvailable") }}
       </div>
@@ -105,11 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Footer ── -->
     <div
       v-if="displayValues.length > 0 && totalOccurrences > 0"
-      class="wcp__footer tw:flex tw:items-center tw:justify-end tw:py-[0.4375rem] tw:px-3 tw:border-t tw:border-(--o2-border-color)"
+      class="wcp__footer flex items-center justify-end py-[0.4375rem] px-3 border-t border-(--o2-border-color)"
     >
       <span
-        class="wcp__occurrences tw:text-[0.6875rem] tw:font-semibold tw:text-(--o2-text-caption) tw:[font-variant-numeric:tabular-nums]"
-      >{{ totalOccurrences.toLocaleString() }} occurrences</span>
+        class="wcp__occurrences text-[0.6875rem] font-semibold text-(--o2-text-caption) [font-variant-numeric:tabular-nums]"
+      >{{ t('logs.wildcardValuePopover.occurrences', { count: totalOccurrences.toLocaleString() }) }}</span>
     </div>
   </div>
 </template>
@@ -155,11 +155,11 @@ const barWidth = (count: number): string => {
 
 const barColorClass = computed(() => {
   const cls = wildcardChipColor(props.token, props.displayValues);
-  if (cls.includes("blue"))   return "tw:bg-(--o2-wildcard-bar-blue)";
-  if (cls.includes("green"))  return "tw:bg-(--o2-wildcard-bar-green)";
-  if (cls.includes("orange")) return "tw:bg-(--o2-wildcard-bar-orange)";
-  if (cls.includes("purple")) return "tw:bg-(--o2-wildcard-bar-purple)";
-  return "tw:bg-(--o2-primary-color)";
+  if (cls.includes("blue"))   return "bg-(--o2-wildcard-bar-blue)";
+  if (cls.includes("green"))  return "bg-(--o2-wildcard-bar-green)";
+  if (cls.includes("orange")) return "bg-(--o2-wildcard-bar-orange)";
+  if (cls.includes("purple")) return "bg-(--o2-wildcard-bar-purple)";
+  return "bg-(--o2-primary-color)";
 });
 
 // ── Positioning ──────────────────────────────────────────────────────────────

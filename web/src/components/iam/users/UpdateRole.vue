@@ -23,30 +23,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div>
-      <div>
-        <OInput
-          v-model="orgMemberData.first_name"
+      <OForm
+        id="update-role-form"
+        :schema="updateRoleSchema"
+        :default-values="updateRoleDefaults"
+        @submit="onSubmit"
+        v-slot="{ isSubmitting }"
+      >
+        <OFormInput
+          name="first_name"
           :label="t('user.name')"
-          class="tw:py-3 showLabelOnTop"
+          class="py-3 showLabelOnTop"
           readonly
         />
 
-        <OSelect
-          v-model="orgMemberData.role"
+        <OFormSelect
+          name="role"
           :label="t('user.role')"
           :options="roleOptions"
-          :error="!!roleError"
-          :error-message="roleError"
-          class="tw:pt-3 tw:pb-2 showLabelOnTop"
+          required
+          class="pt-3 pb-2 showLabelOnTop"
           data-test="iam-update-role-select"
-          @update:model-value="roleError = ''"
         />
 
-        <div class="tw:flex tw:justify-center tw:mt-4 tw:gap-2">
+        <div class="flex justify-center mt-4 gap-2">
           <OButton
             @click="$emit('update:open', false)"
             variant="outline"
             size="sm-action"
+            :disabled="isSubmitting"
             data-test="iam-update-role-cancel-btn"
           >
             {{ t('user.cancel') }}
@@ -54,29 +59,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="primary"
             size="sm-action"
-            @click="onSubmit"
+            type="submit"
+            :loading="isSubmitting"
             data-test="iam-update-role-save-btn"
           >
             {{ t('user.save') }}
           </OButton>
         </div>
-      </div>
+      </OForm>
     </div>
   </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { getImageURL } from "@/utils/zincutils";
 
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeUpdateRoleSchema, type UpdateRoleForm } from "./UpdateRole.schema";
 
 const defaultValue: any = () => {
   return {
@@ -86,11 +93,10 @@ const defaultValue: any = () => {
     email: "",
   };
 };
-let callOrgMember: any;
 
 export default defineComponent({
   name: "ComponentUpdateUser",
-  components: { OButton, ODialog, OInput, OSelect },
+  components: { OButton, ODialog, OForm, OFormInput, OFormSelect },
   props: {
     open: {
       type: Boolean,
@@ -102,73 +108,70 @@ export default defineComponent({
     },
   },
   emits: ["update:modelValue", "updated", "finish", "update:open"],
-  setup() {
+  setup(props) {
     const store: any = useStore();
     const { t } = useI18n();
     const roleOptions = ["admin"];
-    const orgMemberData: any = ref(defaultValue());
-    const roleError: any = ref('');
 
+    const updateRoleSchema = makeUpdateRoleSchema(t);
+
+    // EDIT-prefill: the OForm owns role/first_name; this typed computed seeds them
+    // from the externally-provided modelValue each time the dialog body mounts.
+    // org_member_id/email stay non-form data (read from modelValue at submit).
+    const updateRoleDefaults = computed((): UpdateRoleForm => ({
+      role: props.modelValue?.role ?? "",
+      first_name: props.modelValue?.first_name ?? "",
+    }));
+
+    // Options-API: the schema (and the defaults computed) MUST be returned from
+    // setup() — a bare module import is out of the template's scope, so :schema
+    // would resolve to undefined and validation would silently no-op.
     return {
       t,
-      orgMemberData,
       store,
       roleOptions,
-      roleError,
-      getImageURL,
+      updateRoleSchema,
+      updateRoleDefaults,
     };
   },
-  created() {
-    if (this.modelValue) {
-      this.orgMemberData = {
-        org_member_id: this.modelValue.org_member_id,
-        role: this.modelValue.role,
-        first_name: this.modelValue.first_name,
-        email: this.modelValue.email,
-      };
-    }
-  },
   methods: {
-    onSubmit() {
-      if (!this.orgMemberData.role) {
-        this.roleError = 'Role is required';
-        return;
-      }
+    // Plain async @submit handler — fires only after the Zod schema passes
+    // (role required), so no manual roleError guard. Awaited by OForm, so the
+    // Save button's spinner spans the request.
+    async onSubmit(value: UpdateRoleForm) {
+      try {
+        const res = await organizationsService.update_member_role(
+          {
+            id: parseInt(this.modelValue?.org_member_id),
+            role: value.role,
+            organization_id: parseInt(this.store.state.selectedOrganization.id),
+          },
+          this.store.state.selectedOrganization.identifier,
+        );
 
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait...",
-        timeout: 0,
-      });
-
-      callOrgMember = organizationsService.update_member_role(
-        {
-          id: parseInt(this.orgMemberData.org_member_id),
-          role: this.orgMemberData.role,
-          organization_id: parseInt(this.store.state.selectedOrganization.id),
-        },
-        this.store.state.selectedOrganization.identifier
-      );
-
-      callOrgMember.then((res: { data: any }) => {
         if (res?.data?.error_members != null) {
           toast({
             variant: "error",
-            message: "Error while updating organization member",
+            message: this.t("iam.updateRole.errorUpdatingMember"),
             timeout: 15000,
           });
         } else {
           toast({
             variant: "success",
-            message: "Organization member updated successfully.",
+            message: this.t("iam.updateRole.memberUpdatedSuccessfully"),
           });
         }
 
         this.$emit("updated", res?.data);
         this.$emit("update:open", false);
-        this.roleError = '';
-        dismiss();
-      });
+      } catch (err: any) {
+        toast({
+          variant: "error",
+          message:
+            err?.response?.data?.message ||
+            this.t("iam.updateRole.errorUpdatingMember"),
+        });
+      }
     },
   },
 });

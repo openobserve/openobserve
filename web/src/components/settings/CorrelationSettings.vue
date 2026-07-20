@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+  <div class="flex flex-col h-full min-h-0">
     <AppPageHeader
       icon="group-work"
-      subtitle="Telemetry correlation configuration"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      :subtitle="t('settings.correlationSettingsPage.subtitle')"
+      class="shrink-0 px-4 border-b border-border-default"
       data-test="correlation-settings-header"
     >
       <template #title>
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Tab bar -->
-    <div class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-subtle" data-test="correlation-settings-tabs">
+    <div class="shrink-0 px-4 border-b border-border-subtle" data-test="correlation-settings-tabs">
       <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
         <OTab
           name="services"
@@ -51,12 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Tab content -->
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div v-show="activeTab === 'services'" class="tw:h-full">
+    <div class="flex-1 min-h-0 overflow-hidden">
+      <div v-show="activeTab === 'services'" class="h-full">
         <DiscoveredServices @navigate-to-configuration="onTabChange('discovery')" />
       </div>
 
-      <div v-show="activeTab === 'discovery'" class="tw:h-full tw:overflow-y-auto tw:px-4 tw:py-3">
+      <div v-show="activeTab === 'discovery'" class="h-full overflow-y-auto px-4 py-3">
         <ServiceIdentitySetup
           :org-identifier="store.state.selectedOrganization.identifier"
           :semantic-groups="semanticGroups"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'alert-correlation'" class="tw:h-full tw:overflow-y-auto tw:px-4">
+      <div v-show="activeTab === 'alert-correlation'" class="h-full overflow-y-auto px-4">
         <OrganizationDeduplicationSettings
           :org-id="store.state.selectedOrganization.identifier"
           :config="store.state.organizationSettings?.deduplication_config"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'field-aliases'" class="tw:h-full tw:overflow-y-auto tw:px-4">
+      <div v-show="activeTab === 'field-aliases'" class="h-full overflow-y-auto px-4">
         <SemanticFieldGroupsConfig
           :key="`field-aliases-${fieldAliasesEditorKey}`"
           :semantic-field-groups="draftSemanticGroups"

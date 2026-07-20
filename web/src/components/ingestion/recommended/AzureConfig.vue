@@ -15,45 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3 tw:mt-1 tw:max-w-[860px]">
+  <div class="m-3 mt-1 max-w-4xl">
     <!-- Header -->
-    <div class="tw:flex tw:items-start tw:gap-4 tw:mb-6">
-      <OIcon
-        name="cloud"
-        size="xl"
-        class="tw:flex-shrink-0"
-      />
+    <div class="flex items-start gap-4 mb-6">
+      <OIcon name="cloud" size="xl" class="flex-shrink-0" />
       <div>
-        <div class="tw:text-sm tw:font-medium tw:m-0 tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
-          Azure Activity Logs
+        <div
+          data-test="azure-config-page-title"
+          class="text-sm font-medium m-0 mb-1 text-text-heading"
+        >
+          {{ t("ingestion.azureSetup.activityLogsTitle") }}
         </div>
-        <div class="tw:text-sm tw:m-0" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
-          Stream Azure subscription activity logs to OpenObserve via Event Hub.
-          The ARM template sets up the Event Hub infrastructure — you then
-          configure Azure to export logs to it.
+        <div class="text-sm m-0 text-text-secondary">
+          {{ t("ingestion.azureSetup.activityLogsDescription") }}
         </div>
       </div>
     </div>
 
     <!-- Step 1 -->
     <div
-      class="tw:mb-4 tw:p-4 tw:rounded tw:border-l-[3px] tw:border-l-solid"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(255,255,255,0.04)] tw:border-l-[#404040]' : 'tw:bg-[#fafafa] tw:border-l-[#e0e0e0]'"
+      class="mb-4 p-4 rounded border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
     >
-      <div
-        style="
-          display: grid;
-          grid-template-columns: 28px 1fr;
-          gap: 12px;
-          align-items: start;
-        "
-      >
-        <div class="tw:w-7 tw:h-7 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:font-bold tw:text-[0.85rem] tw:shrink-0 tw:bg-[#1976d2] tw:text-white">1</div>
+      <div class="flex gap-3 items-start">
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text">1</div>
         <div>
-          <div class="tw:font-semibold tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
+          <div class="font-semibold mb-1 text-text-heading">
             Deploy ARM Template
           </div>
-          <div class="tw:text-sm tw:m-0 tw:mb-3" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
+          <div class="text-sm m-0 mb-3 text-text-secondary">
             Creates an Event Hub namespace, Event Hub, and all required
             resources in your Azure subscription.
           </div>
@@ -74,36 +63,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 2 -->
     <div
-      class="tw:mb-4 tw:p-4 tw:rounded tw:border-l-[3px] tw:border-l-solid"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(255,255,255,0.04)] tw:border-l-[#404040]' : 'tw:bg-[#fafafa] tw:border-l-[#e0e0e0]'"
+      class="mb-4 p-4 rounded border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
     >
-      <div
-        style="
-          display: grid;
-          grid-template-columns: 28px 1fr;
-          gap: 12px;
-          align-items: start;
-        "
-      >
-        <div class="tw:w-7 tw:h-7 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:font-bold tw:text-[0.85rem] tw:shrink-0 tw:bg-[#1976d2] tw:text-white">2</div>
+      <div class="flex gap-3 items-start">
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text">2</div>
         <div>
-          <div class="tw:font-semibold tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
+          <div class="font-semibold mb-1 text-text-heading">
             Configure Diagnostic Settings
           </div>
-          <div class="tw:text-sm tw:mb-3" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
+          <div class="text-sm mb-3 text-text-secondary">
             After the ARM deployment completes, route Activity Logs to the Event
             Hub that was created.
           </div>
 
           <!-- Portal / CLI toggle -->
-          <OToggleGroup v-model="step2Mode" class="tw:mb-4">
+          <OToggleGroup v-model="step2Mode" class="mb-4">
             <OToggleGroupItem value="portal">Azure Portal</OToggleGroupItem>
             <OToggleGroupItem value="cli">Azure CLI</OToggleGroupItem>
           </OToggleGroup>
 
           <!-- Portal instructions -->
           <div v-if="step2Mode === 'portal'">
-            <ol class="tw:text-sm tw:pl-4 tw:space-y-1" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
+            <ol class="text-sm pl-4 space-y-1 text-text-secondary">
               <li>
                 Go to
                 <strong
@@ -131,12 +112,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- CLI: inputs + generated curl command -->
           <div v-else>
             <!-- Categories -->
-            <div class="tw:mb-4">
-              <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-                <div class="tw:text-xs tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#d0d0d0]' : 'tw:text-[#333]'">
+            <div class="mb-4">
+              <div class="flex items-center justify-between mb-2">
+                <div class="text-xs font-semibold text-text-heading">
                   Log categories to enable
                 </div>
-                <div class="tw:flex tw:gap-2">
+                <div class="flex gap-2">
                   <OButton
                     variant="ghost-primary"
                     size="xs"
@@ -153,14 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
               </div>
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: repeat(4, 1fr);
-                  gap: 4px;
-                  width: 100%;
-                "
-              >
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-1 w-full">
                 <OCheckbox
                   v-for="cat in LOG_CATEGORIES"
                   :key="cat.value"
@@ -171,16 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div
-              style="
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 16px;
-                margin-bottom: 16px;
-              "
-            >
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <div class="tw:text-xs tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#d0d0d0]' : 'tw:text-[#333]'">
+                <div class="text-xs mb-1 text-text-heading">
                   Resource Group
                 </div>
                 <OInput
@@ -191,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div>
-                <div class="tw:text-xs tw:mb-1" :class="store.state.theme === 'dark' ? 'tw:text-[#d0d0d0]' : 'tw:text-[#333]'">
+                <div class="text-xs mb-1 text-text-heading">
                   Deployment Name
                 </div>
                 <OInput
@@ -205,12 +172,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               v-if="enabledCategories.length === 0"
-              class="tw:text-sm tw:text-red-500 tw:mb-3"
+              class="text-sm text-status-error-text mb-3"
             >
               Select at least one log category above.
             </div>
             <div v-else>
-              <div class="tw:text-xs tw:mb-2" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
+              <div class="text-xs mb-2 text-text-secondary">
                 Run this command after your ARM deployment completes:
               </div>
               <CopyContent
@@ -224,9 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Manual Configuration -->
-    <div class="tw:mt-6">
-      <div class="tw:font-semibold tw:text-sm tw:mb-2" :class="store.state.theme === 'dark' ? 'tw:text-[#d0d0d0]' : 'tw:text-[#333]'">
-        Manual Configuration (for reference)
+    <div class="mt-6">
+      <div class="font-semibold text-sm mb-2 text-text-heading">
+        {{ t("ingestion.azureSetup.manualTitle") }}
       </div>
       <CopyContent :content="manualContent" />
     </div>
@@ -235,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -271,10 +239,12 @@ const activityLogsIntegration = azureIntegrations.find(
 
 export default defineComponent({
   name: "AzureConfig",
-  components: { CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput,
+  components: {
+    CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput,
     OIcon,
-},
+  },
   setup() {
+    const { t } = useI18n();
     const store = useStore();
 
     let endpoint: any = null;
@@ -347,6 +317,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       LOG_CATEGORIES,
       step2Mode,

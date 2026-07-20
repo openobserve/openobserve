@@ -53,44 +53,44 @@ const pageSizeSelectOptions = computed(() =>
 <template>
   <div
     :data-test="`o2-table-pagination-${position}`"
-    class="tw:flex tw:items-center tw:flex-wrap tw:justify-between tw:gap-x-3 tw:gap-y-1 tw:py-1 tw:px-3 tw:border-t tw:border-border-default tw:min-h-10"
+    class="flex items-center flex-wrap justify-between gap-x-3 gap-y-1 py-1 px-3 border-t border-border-default min-h-10"
   >
-    <!-- Left: bulk actions slot or row count -->
-    <div class="tw:flex tw:items-center tw:gap-2">
+    <!-- Left: bulk actions slot or row count.
+         The footer-title typography lives on this wrapper so BOTH the default
+         row count and any custom #bottom (actions) slot content inherit it —
+         consumers don't need to remember to add `o2-table-footer-title`. -->
+    <div class="flex items-center gap-2 o2-table-footer-title">
       <!-- Loading: always skeleton, regardless of slot/count -->
       <span
         v-if="loading"
-        class="o2-pag-skel tw:inline-block tw:h-3 tw:w-24 tw:rounded-md tw:[background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-pag-shimmer_1.5s_ease-in-out_infinite]"
+        class="o2-pag-skel inline-block h-3 w-24 rounded-md [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-pag-shimmer_1.5s_ease-in-out_infinite]"
         aria-hidden="true"
         data-test="o2-table-pagination-count-skel"
       />
       <slot v-else-if="slots.actions" name="actions" />
-      <span
-        v-else
-        class="o2-table-footer-title tw:text-primary"
-      >
+      <span v-else>
         {{ totalCount.toLocaleString() }} {{ title }}
       </span>
     </div>
 
     <!-- Right: controls -->
-    <div class="tw:flex tw:items-center tw:gap-3">
+    <div class="flex items-center gap-3">
       <span
         v-if="loading"
-        class="o2-pag-skel tw:inline-block tw:h-3 tw:w-36 tw:rounded-md tw:[background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-pag-shimmer_1.5s_ease-in-out_infinite]"
+        class="o2-pag-skel inline-block h-3 w-36 rounded-md [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-pag-shimmer_1.5s_ease-in-out_infinite]"
         aria-hidden="true"
         data-test="o2-table-pagination-info-skel"
       />
       <span
         v-else
-        class="tw:text-primary tw:text-xs tw:whitespace-nowrap"
+        class="text-primary text-xs whitespace-nowrap"
         data-test="o2-table-pagination-info"
       >
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString() }}
       </span>
-      <div class="tw:w-px tw:h-4 tw:bg-border-default tw:shrink-0" v-if="pageSizeOptions.length > 0" />
-      <div v-if="pageSizeOptions.length > 0" class="tw:flex tw:items-center tw:gap-1.5 tw:text-primary tw:text-xs">
-        <span class="tw:whitespace-nowrap">{{ t("search.recordsPerPage") }}</span>
+      <div class="w-px h-4 bg-border-default shrink-0" v-if="pageSizeOptions.length > 0" />
+      <div v-if="pageSizeOptions.length > 0" class="flex items-center gap-1.5 text-primary text-xs">
+        <span class="whitespace-nowrap">{{ t("search.recordsPerPage") }}</span>
         <OSelect
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"
@@ -100,7 +100,7 @@ const pageSizeSelectOptions = computed(() =>
         />
       </div>
 
-      <div class="tw:flex tw:items-center tw:gap-1">
+      <div class="flex items-center gap-1">
         <OButton
           variant="outline"
           size="icon"

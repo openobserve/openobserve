@@ -124,13 +124,41 @@ export class EditionFeaturesPage {
     await expect(item, `"${CLOUD_ONLY_FEATURE_NAME}" must stay hidden outside Cloud`).toBeHidden();
   }
 
+  // Opens the popup for a link locator and returns the new page.
+  //
+  // The click and the popup wait are deliberately NOT raced inside one Promise.all
+  // any more. They used to be, and the popup wait (15s) is shorter than the click's
+  // own action timeout (45s in CI) — so a click that was merely slow to become
+  // actionable lost the race and surfaced as a misleading
+  // "waitForEvent: Timeout 15000ms exceeded while waiting for event 'page'", hiding
+  // the real reason and offering no second chance. Settle the target first, then
+  // click, then wait for the popup; a click that opens nothing is retried once and,
+  // failing that, reported as exactly what it is.
+  async openPopup(locator, attempts = 2) {
+    await locator.scrollIntoViewIfNeeded();
+    await expect(locator, 'link element should be visible before clicking').toBeVisible();
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      // Arm the listener before clicking — window.open fires during the click.
+      const popupPromise = this.page
+        .context()
+        .waitForEvent('page', { timeout: 15000 })
+        .catch(() => null);
+      await locator.click();
+      const popup = await popupPromise;
+      if (popup) return popup;
+      testLogger.warn('Click did not open a popup window', { attempt, attempts });
+    }
+
+    throw new Error(
+      `Clicking the link opened no popup window after ${attempts} attempts — window.open never fired`,
+    );
+  }
+
   // Clicks a locator that triggers window.open and returns the popup's final URL
   // after the o2.ws short link redirects to openobserve.ai.
   async clickAndCapturePopupUrl(locator) {
-    const [popup] = await Promise.all([
-      this.page.context().waitForEvent('page', { timeout: 15000 }),
-      locator.click(),
-    ]);
+    const popup = await this.openPopup(locator);
     try {
       // Resolve as soon as the o2.ws short link commits to an openobserve.ai URL.
       // Use waitUntil:'commit' (not the default 'load') — the marketing/docs pages

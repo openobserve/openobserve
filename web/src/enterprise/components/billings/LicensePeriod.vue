@@ -1,10 +1,10 @@
 <template>
-    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" data-test="license-period-container" class="tw:w-full tw:p-3 tw:border tw:border-[#D7D7D7] tw:rounded-md tw:[background:linear-gradient(to_right,transparent_60%,#f7f7ff_70%,#cdf7e4_100%)] tw:dark:[background:linear-gradient(to_right,transparent_60%,#24262F_70%,#2C3934_100%)] tw:dark:border-[#454F5B]">
-        <div class="tw:flex" >
-        <div class="tw:flex tw:flex-col">
-        <span data-test="license-period-message" class="tw:text-lg tw:font-semibold tw:leading-8">{{ getLicenseExpiryMessage() }}</span>
+    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" data-test="license-period-container" class="w-full p-3 border border-[#D7D7D7] rounded-md [background:linear-gradient(to_right,transparent_60%,#f7f7ff_70%,#cdf7e4_100%)] dark:[background:linear-gradient(to_right,transparent_60%,#24262F_70%,#2C3934_100%)] dark:border-[#454F5B]">
+        <div class="flex" >
+        <div class="flex flex-col">
+        <span data-test="license-period-message" class="text-lg font-semibold leading-8">{{ getLicenseExpiryMessage() }}</span>
         <br />
-        <span data-test="license-period-subtitle" class="tw:text-base tw:font-normal tw:leading-5.5">Please update your license by contacting your administrator.</span>
+        <span data-test="license-period-subtitle" class="text-base font-normal leading-5.5">Please update your license by contacting your administrator.</span>
         </div>
   </div>
     </div>

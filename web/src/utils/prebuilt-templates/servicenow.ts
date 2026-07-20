@@ -80,33 +80,40 @@ export const servicenowConfig: PrebuiltConfig = {
   credentialFields: [
     {
       key: 'instanceUrl',
-      label: 'ServiceNow Instance URL',
+      labelKey: 'alerts.prebuiltDestinations.servicenowInstanceUrl',
       type: 'text',
       required: true,
       hint: 'https://your-instance.service-now.com/api/now/table/incident',
       validator: (url: string) =>
-        isValidServiceNowIncidentUrl(url) ||
-        'URL should be like https://instance.service-now.com/api/now/table/incident'
+        isValidServiceNowIncidentUrl(url) || {
+          key: 'alerts.prebuiltDestinations.servicenowInstanceUrlFormat'
+        }
     },
     {
       key: 'username',
-      label: 'Username',
+      labelKey: 'common.username',
       type: 'text',
       required: true,
       hint: 'ServiceNow username with incident creation permissions',
-      validator: (value: string) => value.trim().length > 0 || 'Username is required'
+      validator: (value: string) =>
+        value.trim().length > 0 || {
+          key: 'alerts.prebuiltDestinations.usernameRequired'
+        }
     },
     {
       key: 'password',
-      label: 'Password',
+      labelKey: 'common.password',
       type: 'password',
       required: true,
       hint: 'ServiceNow password or API token',
-      validator: (value: string) => value.trim().length > 0 || 'Password is required'
+      validator: (value: string) =>
+        value.trim().length > 0 || {
+          key: 'alerts.prebuiltDestinations.passwordRequired'
+        }
     },
     {
       key: 'assignmentGroup',
-      label: 'Assignment Group (optional)',
+      labelKey: 'alerts.prebuiltDestinations.servicenowAssignmentGroup',
       type: 'text',
       required: false,
       hint: 'Group to assign incidents to (e.g., IT Operations)'

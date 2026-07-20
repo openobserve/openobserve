@@ -4,28 +4,28 @@
 
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
     <div>
-      <div class="tw:flex tw:flex-row tw:items-center tw:pl-2">
+      <div class="flex flex-row items-center pl-2">
         <div
           data-test="promql-builder-options-label"
-          class="tw:whitespace-nowrap tw:min-w-21.5 tw:text-sm tw:flex tw:items-center"
+          class="whitespace-nowrap min-w-21.5 text-sm flex items-center"
         >{{ t("panel.options") }}</div>
-        <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
+        <span class="flex items-center ml-0.5 mr-0.5">:</span>
         <div
           data-test="promql-builder-options-axis-container"
-          class="tw:my-0.5 tw:mx-1.25 tw:flex tw:gap-2 tw:flex-wrap tw:items-center"
+          class="my-0.5 mx-1.25 flex gap-2 flex-wrap items-center"
         >
           <!-- Legend -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5"
+            class="flex flex-row items-center gap-2 ml-2.5"
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85"
+              class="text-[11px] font-medium whitespace-nowrap opacity-85"
             >{{ t("dashboard.legendLabel") }}</span>
             <div
               data-test="promql-builder-options-field-input-wrapper"
-              class="tw:relative tw:inline-block"
+              class="relative inline-block"
             >
               <OCombobox
                 v-model="
@@ -43,11 +43,11 @@
                 name="info"
                 size="sm"
                 data-test="promql-builder-options-field-info-icon"
-                class="tw:cursor-pointer tw:absolute tw:right-2 tw:top-1/2 tw:-translate-y-1/2 tw:z-10 tw:opacity-60 tw:hover:opacity-100 tw:pointer-events-auto"
+                class="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 z-10 opacity-60 hover:opacity-100 pointer-events-auto"
               >
                 <OTooltip side="top" max-width="250px">
                   <template #content>
-                    ({{ t("dashboard.optional") }}) <b>Legend - </b>
+                    ({{ t("dashboard.optional") }}) <b>{{ t('metrics.promQLBuilderOptions.legend') }}</b>
                     {{ t("dashboard.overrideMessage") }}
                     <br />
                     {{ t("dashboard.overrideMessageExample") }}
@@ -60,11 +60,11 @@
           <!-- Step Value -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5"
+            class="flex flex-row items-center gap-2 ml-2.5"
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85"
+              class="text-[11px] font-medium whitespace-nowrap opacity-85"
             >{{ t("dashboard.stepValue") }}</span>
             <OInput
               v-model="
@@ -73,15 +73,15 @@
                 ].config.step_value
               "
               type="text"
-              placeholder="e.g., 30s, 1m"
+              :placeholder="t('metrics.promQLBuilderOptions.stepValuePlaceholder')"
               data-test="dashboard-promql-builder-step-value"
               style="width: 140px"
             >
               <template v-slot:icon-right>
-                <OIcon name="info" size="sm" class="tw:cursor-pointer">
+                <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" max-width="250px">
                     <template #content>
-                      ({{ t("dashboard.optional") }}) <b>Step - </b>
+                      ({{ t("dashboard.optional") }}) <b>{{ t('metrics.promQLBuilderOptions.step') }}</b>
                       {{ t("dashboard.stepValueTooltip") }}
                       <br />
                       {{ t("dashboard.stepValueTooltipInfo") }}
@@ -97,11 +97,11 @@
           <!-- Query Type Select (Range/Instant) -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5"
+            class="flex flex-row items-center gap-2 ml-2.5"
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85"
+              class="text-[11px] font-medium whitespace-nowrap opacity-85"
             >{{ t("common.type") }}</span>
             <OSelect
               v-model="
@@ -114,19 +114,21 @@
               valueKey="value"
               data-test="dashboard-promql-builder-query-type"
               style="width: 120px"
+            />
+            <OIcon
+              name="info"
+              size="sm"
+              data-test="promql-builder-options-field-info-icon"
+              class="cursor-pointer"
             >
-              <template v-slot:append>
-                <OIcon name="info" size="sm" class="tw:cursor-pointer">
-                  <OTooltip side="top" max-width="250px">
-                    <template #content>
-                      <b>Query Type - </b><br />
-                      Range: Returns time series data over a time range.<br />
-                      Instant: Returns single value at a specific point in time.
-                    </template>
-                  </OTooltip>
-                </OIcon>
-              </template>
-            </OSelect>
+              <OTooltip side="top" max-width="250px">
+                <template #content>
+                  <b>{{ t('metrics.promQLBuilderOptions.queryType') }}</b><br />
+                  {{ t('metrics.promQLBuilderOptions.rangeDescription') }}<br />
+                  {{ t('metrics.promQLBuilderOptions.instantDescription') }}
+                </template>
+              </OTooltip>
+            </OIcon>
           </div>
         </div>
       </div>
@@ -175,11 +177,11 @@ export default defineComponent({
     // Query type options for q-select
     const queryTypeOptions = [
       {
-        label: "Range",
+        label: t("metrics.promQLBuilderOptions.range"),
         value: "range",
       },
       {
-        label: "Instant",
+        label: t("metrics.promQLBuilderOptions.instant"),
         value: "instant",
       },
     ];

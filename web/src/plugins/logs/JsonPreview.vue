@@ -1,9 +1,9 @@
 <template>
   <div>
-    <div class="tw:pb-1 tw:flex tw:justify-start tw:px-3 copy-log-btn">
+    <div class="pb-1 flex justify-start px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="tw:mb-[0.375rem] logs-json-preview-tabs tw:mr-2 tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.25rem] tw:text-[]"
+        class="mb-[0.375rem] logs-json-preview-tabs mr-2 border border-solid border-[var(--o2-border-color)] rounded-[0.25rem] text-[]"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -14,31 +14,31 @@
         :label="t('common.copyToClipboard')"
         size="xs"
         variant="outline"
-        class="tw:mb-[0.375rem] tw:mr-2"
+        class="mb-[0.375rem] mr-2"
         @click="copyLogToClipboard"
-      ><OIcon name="content-copy" size="xs" class="tw:mr-1" />{{ t('common.copyToClipboard') }}</OButton>
+      ><OIcon name="content-copy" size="xs" class="mr-1" />{{ t('common.copyToClipboard') }}</OButton>
         <OButton
         v-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
-        class="tw:mb-[0.375rem] tw:mr-2"
+        class="mb-[0.375rem] mr-2"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <OIcon name="link" size="xs" class="tw:mr-1" />{{ t('search.viewRelated') }}
+        <OIcon name="link" size="xs" class="mr-1" />{{ t('search.viewRelated') }}
         <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <div
         v-if="
           showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
         "
-        class="o2-input tw:flex tw:items-center logs-trace-selector"
+        class="o2-input flex items-center logs-trace-selector"
       >
         <OSelect
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
           :options="tracesStreams"
-          class="tw:w-[auto] tw:flex-shrink-0"
+          class="w-[auto] flex-shrink-0"
           :loading="isTracesStreamsLoading"
           :disabled="isTracesStreamsLoading"
           size="sm"
@@ -49,10 +49,10 @@
           size="sm-action"
           variant="outline"
           @click="redirectToTraces"
-        ><OIcon name="account-tree" size="sm" class="tw:mr-1" />{{ t('search.viewTrace') }}</OButton>
+        ><OIcon name="account-tree" size="sm" class="mr-1" />{{ t('search.viewTrace') }}</OButton>
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened'" class="tw:pl-3">
+    <div v-show="activeTab === 'unflattened'" class="pl-3">
       <OSpinner size="md" />
       <div v-if="!loading">
         <!-- Editor sizing is inlined here because it was originally scoped to this
@@ -63,16 +63,16 @@
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-          class="tw:w-[calc(100%-16px)]!"
-          :class="[mode, mode === 'expanded' ? 'tw:h-[300px]! tw:max-w-[1024px]!' : 'tw:h-[calc(100vh-250px)]!']"
+          class="w-[calc(100%-16px)]!"
+          :class="[mode, mode === 'expanded' ? 'h-[300px]! max-w-[1024px]!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
       </div>
     </div>
-    <div v-show="activeTab !== 'unflattened'" class="tw:pl-3">
+    <div v-show="activeTab !== 'unflattened'" class="pl-3">
       {
       <div
-        class="log_json_content tw:flex"
+        class="log_json_content flex"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
         :data-test="`log-detail-row-${key}`"
@@ -88,8 +88,8 @@
               data-test="log-details-include-exclude-field-btn"
               size="xs"
               variant="ghost"
-              class="tw:ml-2 log-json-field-dropdown-btn"
-              aria-label="Add icon"
+              class="ml-2 log-json-field-dropdown-btn"
+              :aria-label="t('logs.jsonPreview.addIcon')"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
             </OButton>
@@ -105,7 +105,7 @@
             data-test="log-details-include-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'include')"
           >
-            <template #icon-left><EqualIcon class="tw:size-2.5" /></template>
+            <template #icon-left><EqualIcon class="size-2.5" /></template>
             {{ t("common.includeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
@@ -119,7 +119,7 @@
             data-test="log-details-exclude-field-btn"
             @select.stop="addSearchTerm(key, value[key], 'exclude')"
           >
-            <template #icon-left><NotEqualIcon class="tw:size-2.5" /></template>
+            <template #icon-left><NotEqualIcon class="size-2.5" /></template>
             {{ t("common.excludeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
@@ -151,7 +151,7 @@
             <template #icon-left>
               <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
-            Send to AI Chat
+            {{ t('logs.jsonPreview.sendToAiChat') }}
           </ODropdownItem>
           <ODropdownItem
             v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
@@ -166,7 +166,7 @@
         </ODropdown>
 
         <span
-          class="tw:pl-1"
+          class="pl-1"
           :data-test="`log-expand-detail-key-${key}`"
           :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
@@ -203,17 +203,17 @@
         "
       >
         <div class="context-menu-item" @click="copySelectedText">
-          <OIcon name="content-copy" size="sm" class="tw:mr-2" />
-          Copy
+          <OIcon name="content-copy" size="sm" class="mr-2" />
+          {{ t('logs.jsonPreview.copy') }}
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
           <img
             :src="regexIconForContextMenu"
-            class="tw:mr-2"
+            class="mr-2"
             style="width: 14px; height: 14px"
             alt=""
           />
-          Create regex pattern
+          {{ t('logs.jsonPreview.createRegexPattern') }}
         </div>
       </div>
     </div>
@@ -221,7 +221,7 @@
       v-if="config.isEnterprise == 'true'"
       v-model:open="typeOfRegexPattern"
       size="lg"
-      title="What is the type of regex pattern you want to create?"
+      :title="t('logs.jsonPreview.regexPatternTypeTitle')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
       @click:secondary="typeOfRegexPattern = false"
@@ -230,7 +230,7 @@
       <OInput
         data-test="regex-pattern-type-input"
         v-model="regexPatternType"
-        label="Type of regex pattern (e.g. email, phone number, etc.)"
+        :label="t('logs.jsonPreview.regexPatternTypeLabel')"
       />
     </ODialog>
   </div>
@@ -720,7 +720,8 @@ export default {
         loading.value = false;
         toast({
           message:
-            err.response?.data?.message || "Failed to get the Original data",
+            err.response?.data?.message ||
+            t('logs.jsonPreview.failedToGetOriginalData'),
           variant: "error",
         });
       } finally {
@@ -867,8 +868,8 @@ export default {
     const copySelectedText = () => {
       if (selectedText.value) {
         copyToClipboard(selectedText.value, {
-          successMessage: "Text copied to clipboard",
-          errorMessage: "Failed to copy text",
+          successMessage: t('logs.jsonPreview.textCopiedToClipboard'),
+          errorMessage: t('logs.jsonPreview.failedToCopyText'),
           timeout: 1500,
         }).then((success) => {
           if (success) {

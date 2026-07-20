@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="tw:flex tw:justify-start tw:items-end">
+    <div class="flex justify-start items-end">
       <!-- select new folder -->
       <OSelect
         v-model="selectedFolder"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`${type}-index-dropdown-stream_type`"
         labelKey="label"
         valueKey="value"
-        class="tw:mr-1 tw:flex-1"
+        class="mr-1 flex-1"
         :disabled="disableDropdown"
       >
         <template #empty>{{ t("search.noResult") }}</template>
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="icon-xs-sq"
-          class="tw:h-8! tw:w-8!"
+          class="h-8! w-8!"
           :data-test="`${type}-folder-move-new-add`"
           title="Add Folder"
           :disabled="disableDropdown"

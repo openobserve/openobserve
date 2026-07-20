@@ -10,17 +10,17 @@ describe("OCard", () => {
 
   it("applies card background token class", () => {
     const wrapper = mount(OCard);
-    expect(wrapper.classes().join(" ")).toContain("tw:bg-card-bg");
+    expect(wrapper.classes().join(" ")).toContain("bg-card-bg");
   });
 
   it("applies card text token class", () => {
     const wrapper = mount(OCard);
-    expect(wrapper.classes().join(" ")).toContain("tw:text-card-text");
+    expect(wrapper.classes().join(" ")).toContain("text-card-text");
   });
 
   it("forwards additional class via attrs", () => {
-    const wrapper = mount(OCard, { attrs: { class: "tw:w-full" } });
-    expect(wrapper.classes()).toContain("tw:w-full");
+    const wrapper = mount(OCard, { attrs: { class: "w-full" } });
+    expect(wrapper.classes()).toContain("w-full");
   });
 
   it("forwards data-test via attrs", () => {

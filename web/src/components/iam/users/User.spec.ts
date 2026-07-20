@@ -26,7 +26,7 @@ import {
 import { mount, flushPromises } from "@vue/test-utils";
 import User from "@/components/iam/users/User.vue";
 import { createI18n } from "vue-i18n";
-import enLocale from "@/locales/languages/en.json";
+import enLocale from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import usersService from "@/services/users";
@@ -139,7 +139,7 @@ const ODialogStub = {
 };
 
 // Lightweight stubs for embedded child dialogs / table helpers so the
-// component renders without trying to set up the real Quasar table.
+// component renders without trying to set up the real table.
 const UpdateUserRoleStub = {
   name: "UpdateUserRole",
   props: ["open", "modelValue"],
@@ -185,7 +185,7 @@ const mountUser = () =>
         MemberInvitation: MemberInvitationStub,
         NoData: NoDataStub,
         QTablePagination: QTablePaginationStub,
-        // Keep Quasar components shallow so we don't depend on real
+        // Keep the table components shallow so we don't depend on real
         // table internals; we still render their slots.
         "q-page": { template: "<div><slot /></div>" },
         "q-table": {

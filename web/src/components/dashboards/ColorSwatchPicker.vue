@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="isActive(c)"
         name="check"
         size="xs"
-        :class="isDark(c) ? 'tw:text-white' : 'tw:text-black'"
+        :class="isDark(c) ? 'text-white' : 'text-black'"
       />
     </button>
 
@@ -62,13 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="!isCustomActive"
         name="colorize"
         size="xs"
-        class="tw:opacity-70"
+        class="opacity-70"
       />
       <OIcon
         v-else
         name="check"
         size="xs"
-        :class="isDark(modelValue) ? 'tw:text-white' : 'tw:text-black'"
+        :class="isDark(modelValue) ? 'text-white' : 'text-black'"
       />
       <input
         type="color"

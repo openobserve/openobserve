@@ -226,6 +226,19 @@ pub async fn len() -> usize {
     }
 }
 
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database (only for SQLite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+
+    Ok(())
+}
+
 pub async fn clear() -> Result<(), errors::Error> {
     // make sure only one client is writing to the database(only for sqlite)
     let _lock = get_lock().await;

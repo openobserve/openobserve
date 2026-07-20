@@ -9,24 +9,24 @@ const props = withDefaults(defineProps<SpinnerProps>(), {
 
 // px dimensions per size token
 const sizeClasses: Record<NonNullable<SpinnerProps["size"]>, string> = {
-  xs: "tw:size-4",   // 16px
-  sm: "tw:size-5",   // 20px
-  md: "tw:size-8",   // 32px
-  lg: "tw:size-12",  // 48px
-  xl: "tw:size-16",  // 64px
+  xs: "size-4",   // 16px
+  sm: "size-5",   // 20px
+  md: "size-8",   // 32px
+  lg: "size-12",  // 48px
+  xl: "size-16",  // 64px
 };
 
 // Dot sizes are scaled-down from the ring size
 const dotSizeClasses: Record<NonNullable<SpinnerProps["size"]>, string> = {
-  xs: "tw:size-1",
-  sm: "tw:size-1.5",
-  md: "tw:size-2",
-  lg: "tw:size-3",
-  xl: "tw:size-4",
+  xs: "size-1",
+  sm: "size-1.5",
+  md: "size-2",
+  lg: "size-3",
+  xl: "size-4",
 };
 
 const containerClasses = computed(() => [
-  "tw:inline-flex tw:items-center tw:justify-center tw:shrink-0",
+  "inline-flex items-center justify-center shrink-0",
   sizeClasses[props.size ?? "md"],
 ]);
 </script>
@@ -41,7 +41,7 @@ const containerClasses = computed(() => [
     aria-live="polite"
   >
     <svg
-      class="tw:animate-spin tw:size-full tw:text-spinner"
+      class="animate-spin size-full text-spinner"
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -54,7 +54,7 @@ const containerClasses = computed(() => [
         r="10"
         stroke="currentColor"
         stroke-width="3"
-        class="tw:opacity-20"
+        class="opacity-20"
       />
       <!-- Spinning arc -->
       <path
@@ -62,7 +62,7 @@ const containerClasses = computed(() => [
         stroke="currentColor"
         stroke-width="3"
         stroke-linecap="round"
-        class="tw:text-spinner"
+        class="text-spinner"
       />
     </svg>
   </span>
@@ -71,7 +71,7 @@ const containerClasses = computed(() => [
   <span
     v-else
     :class="[
-      'tw:inline-flex tw:items-center tw:justify-center tw:gap-1 tw:shrink-0',
+      'inline-flex items-center justify-center gap-1 shrink-0',
       sizeClasses[size ?? 'md'],
     ]"
     role="status"
@@ -82,7 +82,7 @@ const containerClasses = computed(() => [
       v-for="i in 3"
       :key="i"
       :class="[
-        'tw:rounded-full tw:bg-spinner tw:animate-bounce',
+        'rounded-full bg-spinner animate-bounce',
         dotSizeClasses[size ?? 'md'],
       ]"
       :style="{ animationDelay: `${(i - 1) * 0.15}s` }"

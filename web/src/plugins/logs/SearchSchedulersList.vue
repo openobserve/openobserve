@@ -1,33 +1,40 @@
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:min-h-0">
-    <div v-if="!showSearchResults" class="tw:h-full tw:flex tw:flex-col tw:min-h-0">
+  <div class="w-full h-full flex flex-col min-h-0">
+    <div v-if="!showSearchResults" class="h-full flex flex-col min-h-0">
       <AppPageHeader
         :title="t('search_scheduler_job.title')"
         icon="schedule"
         :back="{ onClick: closeSearchHistory }"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
-          <div>
+          <div class="flex items-center gap-1">
+            <OTableColumnToggle
+              :columns="columnsToBeRendered"
+              :column-visibility="columnVisibility"
+              @update:column-visibility="setColumnVisibility"
+            />
             <OButton
-              variant="primary"
-              size="sm"
-              class="tw:ml-3"
-              @click="fetchSearchHistory"
-              :disabled="isLoading"
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              class=""
+              :loading="isLoading"
               data-test="search-scheduler-get-jobs-btn"
+              @click="fetchSearchHistory"
             >
-              {{ t('search_scheduler_job.get_jobs') }}
+              <OTooltip side="bottom" :content="t('search_scheduler_job.get_jobs')" shortcut-id="searchSchedulersRefresh" />
             </OButton>
           </div>
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 overflow-hidden">
           <OTable
             :frame="false"
             data-test="search-scheduler-table"
             :data="dataToBeLoaded"
             :columns="columnsToBeRendered"
+            :column-visibility="columnVisibility"
             row-key="trace_id"
             :loading="isLoading"
             pagination="client"
@@ -112,23 +119,23 @@
               <div class="app-tabs-schedule-list report-list-tabs">
                 <app-tabs
                   data-test="expanded-list-tabs"
-                  class="tw:mr-3"
+                  class="mr-3"
                   :tabs="tabs"
                   v-model:active-tab="activeTab"
                 />
               </div>
               <div v-if="activeTab == 'query'">
-                <div class="tw:text-left tw:px-2 tw:mb-2 expanded-content">
-                  <div class="tw:flex tw:items-center tw:py-2">
+                <div class="text-left px-2 mb-2 expanded-content">
+                  <div class="flex items-center py-2">
                     <strong
                       >{{ t('search_scheduler_job.sql_query') }} :
                       <span>
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="copy-btn-sql tw:ml-2"
+                          class="copy-btn-sql ml-2"
                           data-test="search-scheduler-copy-sql-btn"
-                          @click.stop="copyToClipboard(row.sql, { successMessage: `SQL Query ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
+                          @click.stop="copyToClipboard(row.sql, { successMessage: `${t('logs.searchSchedulersList.sqlQuery')} ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
                           <OIcon name="content-copy" size="sm" />
                         </OButton></span
@@ -136,7 +143,7 @@
                     <OButton
                       variant="ghost-destructive"
                       size="sm"
-                      class="copy-btn tw:mx-2"
+                      class="copy-btn mx-2"
                       data-test="search-scheduler-go-to-logs-btn"
                       :disabled="
                         row.status_code == 0 ||
@@ -148,7 +155,7 @@
                       {{ t('search_scheduler_job.logs') }}
                     </OButton>
                   </div>
-                  <div class="tw:flex tw:items-start tw:justify-center">
+                  <div class="flex items-start justify-center">
                     <div class="scrollable-content expanded-sql">
                       <pre style="text-wrap: wrap">{{ row?.sql }}</pre>
                     </div>
@@ -156,33 +163,33 @@
                 </div>
                 <div
                   v-if="row?.function"
-                  class="tw:text-left tw:mb-2 tw:px-2 expanded-content"
+                  class="text-left mb-2 px-2 expanded-content"
                 >
-                  <div class="tw:flex tw:items-center tw:py-2">
+                  <div class="flex items-center py-2">
                     <strong
                       >{{ t('search_scheduler_job.function_definition') }} :
                       <span>
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="copy-btn-function tw:ml-2"
-                          @click.stop="copyToClipboard(row.function, { successMessage: `Function Defination ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
+                          class="copy-btn-function ml-2"
+                          @click.stop="copyToClipboard(row.function, { successMessage: `${t('logs.searchSchedulersList.functionDefinationCopy')} ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
                           <OIcon name="content-copy" size="sm" />
                         </OButton></span
                     ></strong>
                   </div>
 
-                  <div class="tw:flex tw:items-start tw:justify-center">
+                  <div class="flex items-start justify-center">
                     <div class="scrollable-content expanded-function">
                       <pre style="text-wrap: wrap">{{ row?.function }}</pre>
                     </div>
                   </div>
                 </div>
               </div>
-              <div class="tw:py-3" v-else>
+              <div class="py-3" v-else>
                 <div
-                  class="tw:text-left tw:px-2 tw:mb-2 expanded-content tw:flex tw:flex-col"
+                  class="text-left px-2 mb-2 expanded-content flex flex-col"
                 >
                   <query-editor
                     style="height: 130px"
@@ -198,15 +205,15 @@
               </div>
             </template>
             <template #bottom>
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md">
+              <div class="flex items-center justify-between w-full h-[48px]">
+                <div class="o2-table-footer-title flex items-center w-[100px] mr-md">
                   {{ resultTotal }} {{ t('search_scheduler_job.results') }}
                 </div>
-                <div class="tw:ml-auto tw:mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
+                <div class="ml-auto mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
               </div>
             </template>
             <template #empty>
-              <div v-if="!isLoading" class="tw:flex tw:w-full">
+              <div v-if="!isLoading" class="flex w-full">
                 <OEmptyState size="hero" preset="no-search-jobs" />
               </div>
             </template>
@@ -258,9 +265,11 @@ import searchService from "@/services/search";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
-import { formatDate } from "@/utils/date";
+import { convertUnixToDateFormat } from "@/utils/date";
 import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -272,11 +281,14 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "SearchSchedulersList",
@@ -284,6 +296,7 @@ export default defineComponent({
     DateTime,
     OEmptyState,
     OTable,
+    OTableColumnToggle,
     OTimeCell,
     OUserCell,
     OTag,
@@ -292,6 +305,7 @@ export default defineComponent({
     AppTabs,
     JsonPreview,
     OButton,
+    OTooltip,
     OSpinner,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
@@ -329,6 +343,9 @@ export default defineComponent({
       endTime: 0,
     });
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
+    const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+      "logs-search-schedulers-list",
+    );
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
     const isDateTimeChanged = ref(false);
@@ -363,11 +380,11 @@ export default defineComponent({
       if (data && data.length === 0) return [];
 
       return [
-        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, size: COL.owner, meta: { align: "left", autoWidth: true } },
-        { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
-        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
-        { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, size: COL.duration, meta: { align: "left" } },
-        { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, size: COL.status, meta: { align: "left" } },
+        { id: "user_id", header: t('search_scheduler_job.user_id'), accessorKey: "user_id", sortable: true, hideable: true, size: COL.owner, meta: { align: "left", autoWidth: true } },
+        { id: "created_at", header: t('search_scheduler_job.created_at'), accessorKey: "created_at", sortable: true, hideable: true, size: COL.createdAt, meta: { align: "left" } },
+        { id: "start_time", header: t('search_scheduler_job.start_time'), accessorKey: "start_time", sortable: true, hideable: true, size: COL.date, meta: { align: "left" } },
+        { id: "duration", header: t('search_scheduler_job.duration'), accessorKey: "duration", sortable: false, hideable: true, size: COL.duration, meta: { align: "left" } },
+        { id: "status", header: t('search_scheduler_job.status'), accessorKey: "status", cell: " ", sortable: false, hideable: true, size: COL.status, meta: { align: "left" } },
         { id: "actions", header: t('search_scheduler_job.actions'), isAction: true, size: 120, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
       ];
     };
@@ -424,17 +441,17 @@ export default defineComponent({
               element.toBeStoredStartTime = element.start_time;
               element.toBeStoredEndTime = element.end_time;
               element.toBeCreatedAt = element.created_at;
-              element.start_time = convertUnixToQuasarFormat(
+              element.start_time = convertUnixToDateFormat(
                 element.start_time,
               );
-              element.end_time = convertUnixToQuasarFormat(element.end_time);
-              element.created_at = convertUnixToQuasarFormat(
+              element.end_time = convertUnixToDateFormat(element.end_time);
+              element.created_at = convertUnixToDateFormat(
                 element.created_at,
               );
-              element.started_at = convertUnixToQuasarFormat(
+              element.started_at = convertUnixToDateFormat(
                 element.started_at,
               );
-              element.ended_at = convertUnixToQuasarFormat(element.ended_at);
+              element.ended_at = convertUnixToDateFormat(element.ended_at);
               element.status_code = element.status;
               element["sql"] = JSON.parse(element.payload).query.sql;
 
@@ -584,41 +601,41 @@ export default defineComponent({
       let result = "";
 
       if (durationSeconds < 60) {
-        result = `${durationSeconds.toFixed(2)} seconds`;
+        result = t('logs.searchSchedulersList.durationSeconds', { n: durationSeconds.toFixed(2) });
       } else if (durationSeconds < 3600) {
         const minutes = Math.floor(durationSeconds / 60);
         const seconds = durationSeconds % 60;
-        result = `${minutes} minutes`;
+        result = t('logs.searchSchedulersList.durationMinutes', { n: minutes });
         if (seconds > 0) {
-          result += ` and ${seconds.toFixed(2)} seconds`;
+          result += t('logs.searchSchedulersList.durationAndSeconds', { n: seconds.toFixed(2) });
         }
       } else if (durationSeconds < 86400) {
         const hours = Math.floor(durationSeconds / 3600);
         const minutes = Math.floor((durationSeconds % 3600) / 60);
-        result = `${hours} hours`;
+        result = t('logs.searchSchedulersList.durationHours', { n: hours });
         if (minutes > 0) {
-          result += ` and ${minutes} minutes`;
+          result += t('logs.searchSchedulersList.durationAndMinutes', { n: minutes });
         }
       } else if (durationSeconds < 2592000) {
         const days = Math.floor(durationSeconds / 86400);
         const hours = Math.floor((durationSeconds % 86400) / 3600);
-        result = `${days} days`;
+        result = t('logs.searchSchedulersList.durationDays', { n: days });
         if (hours > 0) {
-          result += ` and ${hours} hours`;
+          result += t('logs.searchSchedulersList.durationAndHours', { n: hours });
         }
       } else if (durationSeconds < 31536000) {
         const months = Math.floor(durationSeconds / 2592000);
         const days = Math.floor((durationSeconds % 2592000) / 86400);
-        result = `${months} months`;
+        result = t('logs.searchSchedulersList.durationMonths', { n: months });
         if (days > 0) {
-          result += ` and ${days} days`;
+          result += t('logs.searchSchedulersList.durationAndDays', { n: days });
         }
       } else {
         const years = Math.floor(durationSeconds / 31536000);
         const months = Math.floor((durationSeconds % 31536000) / 2592000);
-        result = `${years} years`;
+        result = t('logs.searchSchedulersList.durationYears', { n: years });
         if (months > 0) {
-          result += ` and ${months} months`;
+          result += t('logs.searchSchedulersList.durationAndMonths', { n: months });
         }
       }
 
@@ -687,6 +704,8 @@ export default defineComponent({
     watch(
       () => props.isClicked,
       (value) => {
+        // v-show sub-view of the Logs page: own the keyboard scope only while visible.
+        getManager()?.setScope(value ? "search-schedulers" : "logs");
         if (value && !isLoading.value) {
           fetchSearchHistory();
         }
@@ -726,15 +745,15 @@ export default defineComponent({
     const getStatusColorClass = (status) => {
       switch (status) {
         case 0:
-          return "tw:text-orange-500"; // Pending
+          return "text-orange-500"; // Pending
         case 1:
-          return "tw:text-blue-500"; // Running
+          return "text-blue-500"; // Running
         case 2:
-          return "tw:text-green-500"; // Finished
+          return "text-green-500"; // Finished
         case 3:
-          return "tw:text-red-500"; // Cancelled
+          return "text-red-500"; // Cancelled
         default:
-          return "tw:text-gray-500"; // Unknown
+          return "text-gray-500"; // Unknown
       }
     };
     const getStatusColor = (status) => {
@@ -752,17 +771,18 @@ export default defineComponent({
       }
     };
 
-    function convertUnixToQuasarFormat(unixMicroseconds: any) {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-    }
     const fetchSearchResults = (row) => {
       searchObj.meta.jobId = row.id;
       goToLogs(row);
     };
+    useShortcuts([
+      { id: "searchSchedulersRefresh", handler: () => { if (!isInputFocused()) fetchSearchHistory(); } },
+    ]);
+    // useShortcuts activates this sub-view's scope on mount, but it mounts while
+    // hidden inside the Logs page — restore the logs scope until it's shown.
+    onMounted(() => {
+      if (!props.isClicked) getManager()?.setScope("logs");
+    });
     return {
       searchObj,
       store,
@@ -770,6 +790,8 @@ export default defineComponent({
       fetchSearchHistory,
       dataToBeLoaded,
       columnsToBeRendered,
+      columnVisibility,
+      setColumnVisibility,
       config,
       t,
       route,
@@ -805,7 +827,7 @@ export default defineComponent({
       toBeCancelled,
       confirmCancel,
       calculateDuration,
-      convertUnixToQuasarFormat,
+      convertUnixToDateFormat,
       dateTimeToBeSent,
       isDateTimeChanged,
       router,

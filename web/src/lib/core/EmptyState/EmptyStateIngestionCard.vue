@@ -22,17 +22,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="es-ing-card tw:relative tw:flex tw:items-center tw:gap-3 tw:w-[18rem] tw:max-w-full tw:min-h-16 tw:py-2.5 tw:pr-3.5 tw:pl-3 tw:rounded-xl tw:border tw:border-border-default tw:bg-surface-base tw:shadow-sm tw:text-left tw:cursor-pointer tw:outline-none tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150"
+    class="es-ing-card relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-xl border border-border-default bg-surface-base shadow-sm text-left cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150"
     @click="emit('click')"
   >
-    <span class="es-ing-card__icon tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:bg-tabs-active-bg tw:text-tabs-active-text tw:transition-[background-color,color] tw:duration-150" :class="iconClass">
+    <span class="es-ing-card__icon inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-tabs-active-bg text-tabs-active-text transition-[background-color,color] duration-150" :class="iconClass">
       <OIcon :name="icon" size="md" />
     </span>
-    <span class="es-ing-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-0.5">
-      <span class="tw:text-[length:var(--text-sm)] tw:font-semibold tw:text-text-primary tw:truncate">{{ label }}</span>
-      <span v-if="sublabel" class="tw:text-[length:var(--text-xs)] tw:text-text-secondary tw:leading-[1.4]">{{ sublabel }}</span>
+    <span class="es-ing-card__body flex-1 min-w-0 flex flex-col gap-0.5">
+      <span class="text-[length:var(--text-sm)] font-semibold text-text-primary truncate">{{ label }}</span>
+      <span v-if="sublabel" class="text-[length:var(--text-xs)] text-text-secondary leading-[1.4]">{{ sublabel }}</span>
     </span>
-    <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron tw:shrink-0 tw:text-text-disabled tw:transition-[transform,color] tw:duration-150" />
+    <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron shrink-0 text-text-disabled transition-[transform,color] duration-150" />
   </button>
 </template>
 

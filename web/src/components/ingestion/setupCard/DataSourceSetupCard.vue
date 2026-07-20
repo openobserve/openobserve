@@ -68,7 +68,7 @@ const content = computed(() => getDataSourceCard(props.slug, subs.value));
 <template>
   <!-- Mirrors AIIntegrationDetail's wrapper padding so data-source cards and AI
        integration cards sit identically in their panels. -->
-  <div class="tw:p-2">
+  <div class="p-2">
     <SetupCardRenderer
       v-if="content"
       :content="content"

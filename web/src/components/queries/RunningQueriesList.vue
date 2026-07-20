@@ -36,6 +36,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       @update:selected-ids="handleSelectedIdsUpdate"
     >
+      <template #toolbar>
+        <div class="flex items-center gap-3 flex-1 min-w-0">
+          <span
+            class="text-xs font-bold whitespace-nowrap"
+            data-test="running-queries-last-refresh"
+          >
+            Last Data Refresh Time: {{ lastRefreshed }}
+          </span>
+          <div class="flex-1"></div>
+          <OToggleGroup
+            v-if="searchTypes && searchTypes.length"
+            :model-value="searchType"
+            @update:model-value="$emit('update:searchType', $event)"
+            data-test="running-queries-search-type-tabs"
+          >
+            <OToggleGroupItem
+              v-for="visual in searchTypes"
+              :key="visual as string"
+              :value="visual as string"
+              size="sm"
+            >
+              {{ (searchTypeLabels as Record<string, string>)?.[visual as string] ?? visual }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+        </div>
+      </template>
+      <template #toolbar-trailing>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          class="shrink-0"
+          icon-left="refresh"
+          data-test="running-queries-refresh-btn"
+          @click="$emit('refresh')"
+        >
+          <OTooltip side="bottom" :content="t('common.refresh')" />
+        </OButton>
+      </template>
       <template #empty>
         <OEmptyState
           size="hero"
@@ -106,6 +144,9 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { getDuration, durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -117,7 +158,7 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, OEmptyState, OButton, ODrawer, OSpinner, OTable, OUserCell, OTag },
+  components: { QueryList, OEmptyState, OButton, OTooltip, OToggleGroup, OToggleGroupItem, ODrawer, OSpinner, OTable, OUserCell, OTag },
   props: {
     rows: {
       type: Array,
@@ -131,13 +172,31 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    lastRefreshed: {
+      type: String,
+      default: "",
+    },
+    searchType: {
+      type: String,
+      default: "",
+    },
+    searchTypes: {
+      type: Array,
+      default: () => [],
+    },
+    searchTypeLabels: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   emits: [
+    "update:searchType",
     "update:selectedRows",
     "delete:queries",
     "delete:query",
     "show:schema",
     "clear:filters",
+    "refresh",
   ],
   setup(props, { emit }) {
     const store = useStore();

@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import FilterCondition from './FilterCondition.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { nextTick } from 'vue';
+import enMessages from '@/locales/languages/en-US.json';
+import { nextTick, defineComponent, reactive } from 'vue';
+import { z } from 'zod';
+import OForm from '@/lib/forms/Form/OForm.vue';
+import OFormSelect from '@/lib/forms/Select/OFormSelect.vue';
+import OFormInput from '@/lib/forms/Input/OFormInput.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import {
+  conditionGroupNodeSchema,
+  refineConditionsTree,
+} from './steps/QueryConfig.schema';
 
 const mockStore = createStore({
   state: {
@@ -11,18 +22,12 @@ const mockStore = createStore({
   },
 });
 
+// Mount the REAL en.json messages (not a hand-written stub): the component's
+// user-facing strings are i18n keys, so a stub would make every t() fall back to
+// its raw key path and silently weaken the text assertions below.
 const mockI18n = createI18n({
   locale: 'en',
-  messages: {
-    en: {
-      alerts: {
-        column: 'Column',
-      },
-      common: {
-        value: 'Value',
-      },
-    },
-  },
+  messages: { en: enMessages },
 });
 
 
@@ -352,26 +357,6 @@ describe('FilterCondition.vue Branch Coverage', () => {
   });
 
   describe('Event Emission Branch Coverage', () => {
-    it('should emit events on model updates', async () => {
-      const wrapper = mount(FilterCondition, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
-        },
-      });
-
-      // Test column update event — OSelect replaces QSelect post-migration
-      const columnSelect = wrapper.findComponent({ name: 'OSelect' });
-      await columnSelect.vm.$emit('update:model-value', 'field1');
-
-      // Should emit input:update event
-      expect(wrapper.emitted('input:update')).toBeTruthy();
-      expect(wrapper.emitted('input:update')?.[0]).toEqual(['conditions', defaultProps.condition]);
-    });
-
     it('should call delete, add, and add-group functions', async () => {
       const wrapper = mount(FilterCondition, {
         props: defaultProps,
@@ -442,4 +427,176 @@ describe('FilterCondition.vue Branch Coverage', () => {
       expect((wrapper.vm as any).computedLabel).toBe('');
     });
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORM MODE (alerts-migration.md §A): namePrefix + injected OForm context.
+// The three controls become OForm* fields name=-bound into the REAL TanStack
+// form (no v-model, no manual error refs); the schema (refineConditionsTree)
+// owns validation, surfaced only after the first submit (R3).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('FilterCondition.vue Form Mode (namePrefix + OForm)', () => {
+  const streamFields = [
+    { label: 'Field 1', value: 'field1' },
+    { label: 'Field 2', value: 'field2' },
+  ];
+
+  const makeCondition = (overrides: Record<string, unknown> = {}) => ({
+    filterType: 'condition',
+    column: '',
+    operator: '=',
+    value: '',
+    values: [],
+    logicalOperator: 'AND',
+    id: 'cond-1',
+    ...overrides,
+  });
+
+  // Host with a REAL <OForm> whose schema runs the refineConditionsTree walker
+  // (basePath ["tree"] — the same wiring the QueryConfig phase will use with
+  // ["query_condition", "conditions"]).
+  const mountFormHost = (
+    condition: Record<string, unknown>,
+    { namePrefix = 'tree.conditions[0]' }: { namePrefix?: string } = {},
+  ) => {
+    const tree = reactive({
+      filterType: 'group',
+      logicalOperator: 'AND',
+      groupId: 'root',
+      conditions: [condition],
+    });
+    const onSubmit = vi.fn();
+    const testSchema = z
+      .object({ tree: conditionGroupNodeSchema })
+      .superRefine((val, ctx) =>
+        refineConditionsTree(val.tree, ctx, ['tree'], 'Field is required!'),
+      );
+
+    const Host = defineComponent({
+      components: { OForm, FilterCondition },
+      setup() {
+        return {
+          tree,
+          onSubmit,
+          testSchema,
+          defaults: { tree },
+          streamFields,
+          namePrefix,
+        };
+      },
+      template: `
+        <OForm :schema="testSchema" :default-values="defaults" @submit="onSubmit">
+          <FilterCondition
+            :condition="tree.conditions[0]"
+            :stream-fields="streamFields"
+            :index="0"
+            label="and"
+            :depth="0"
+            :is-first-in-group="true"
+            :name-prefix="namePrefix"
+          />
+        </OForm>`,
+    });
+
+    const wrapper = mount(Host, {
+      global: {
+        plugins: [mockI18n],
+        provide: { store: mockStore },
+      },
+    });
+    const form = (wrapper.findComponent(OForm).vm as any).form;
+    return { wrapper, onSubmit, form, tree };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders OFormSelect/OFormSelect/OFormInput name=-bound to `${namePrefix}.column/.operator/.value`', () => {
+    const { wrapper } = mountFormHost(
+      makeCondition({ column: 'field1', operator: '=', value: 'abc' }),
+    );
+
+    const selects = wrapper.findAllComponents(OFormSelect);
+    expect(selects.map((s) => s.props('name'))).toEqual([
+      'tree.conditions[0].column',
+      'tree.conditions[0].operator',
+    ]);
+    const input = wrapper.findComponent(OFormInput);
+    expect(input.props('name')).toBe('tree.conditions[0].value');
+
+    // The rendered controls read their values from the FORM (name-bound).
+    expect(selects[0].findComponent(OSelect).props('modelValue')).toBe('field1');
+    expect(selects[1].findComponent(OSelect).props('modelValue')).toBe('=');
+    expect(input.findComponent(OInput).props('modelValue')).toBe('abc');
+
+    // data-tests are carried verbatim into form mode.
+    expect(wrapper.find('[data-test="alert-conditions-select-column"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-conditions-operator-select"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-conditions-value-input"]').exists()).toBe(true);
+  });
+
+  it('shows NO errors before the first submit (R3)', () => {
+    const { wrapper } = mountFormHost(
+      makeCondition({ column: '', operator: '', value: '' }),
+    );
+
+    expect(wrapper.text()).not.toContain('Field is required!');
+    for (const select of wrapper.findAllComponents(OSelect)) {
+      expect(select.props('error')).toBeFalsy();
+    }
+    expect(wrapper.findComponent(OInput).props('error')).toBeFalsy();
+  });
+
+  it('blocks submit and surfaces schema errors on empty column/operator after form.handleSubmit()', async () => {
+    const { wrapper, onSubmit, form } = mountFormHost(
+      makeCondition({ column: '', operator: '', value: 'ok' }),
+    );
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(form.state.isValid).toBe(false);
+
+    const selects = wrapper.findAllComponents(OFormSelect);
+    expect(selects[0].findComponent(OSelect).props('error')).toBe(true); // column
+    expect(selects[1].findComponent(OSelect).props('error')).toBe(true); // operator
+    // value was filled → no error there.
+    expect(wrapper.findComponent(OFormInput).findComponent(OInput).props('error')).toBe(false);
+    expect(wrapper.text()).toContain('Field is required!');
+  });
+
+  it('blocks submit on an empty value ("") with the error on the value input', async () => {
+    const { wrapper, onSubmit, form } = mountFormHost(
+      makeCondition({ column: 'field1', operator: '=', value: '' }),
+    );
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(form.state.isValid).toBe(false);
+    expect(wrapper.findComponent(OFormInput).findComponent(OInput).props('error')).toBe(true);
+    const selects = wrapper.findAllComponents(OFormSelect);
+    expect(selects[0].findComponent(OSelect).props('error')).toBe(false);
+    expect(selects[1].findComponent(OSelect).props('error')).toBe(false);
+  });
+
+  it('value is ZERO-SAFE: numeric 0 passes and the form submits', async () => {
+    const { wrapper, onSubmit, form } = mountFormHost(
+      makeCondition({ column: 'field1', operator: '=', value: 0 }),
+    );
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(form.state.isValid).toBe(true);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].tree.conditions[0].value).toBe(0);
+    expect(wrapper.text()).not.toContain('Field is required!');
+  });
+
+  // Bare-mode fallback tests removed: FilterCondition is now form-mode only
+  // (all consumers pass a name-prefix inside an OForm); there is no bare v-else.
 });

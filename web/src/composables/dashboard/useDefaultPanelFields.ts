@@ -18,12 +18,20 @@ import {
   buildDefaultSqlFields,
   SKIP_SEED_TYPES,
 } from "@/utils/dashboard/defaultFields";
+import {
+  applyPromqlSeed,
+  isAutoSeededSlot,
+} from "@/utils/dashboard/promqlSeed";
 
 /**
  * Shared default-field seeding for the Add Panel and Metrics pages (both render
  * the same PanelEditor). Seeds the current query based on queryType + stream_type:
- * PromQL -> `${stream}{}`; SQL logs/traces -> count(_timestamp); SQL metrics ->
- * avg(value) if the stream has a "value" column, else count(_timestamp).
+ * PromQL -> the metrics rule set's default for the stream (the same query, unit
+ * and chart type the Metrics Explorer would chart it with — `sum(rate(...))` for
+ * a counter, a heatmap for a histogram, …), falling back to the bare `${stream}{}`
+ * when the rule set has nothing better; SQL logs/traces -> count(_timestamp);
+ * SQL metrics -> avg(value) if the stream has a "value" column, else
+ * count(_timestamp).
  */
 const useDefaultPanelFields = (pageKey: string = "dashboard") => {
   const {
@@ -47,7 +55,12 @@ const useDefaultPanelFields = (pageKey: string = "dashboard") => {
     query.customQuery = false;
 
     if (queryType === "promql") {
-      if (stream) query.query = `${stream}{}`;
+      // Only a slot that still holds what we put there. The Builder toggle comes
+      // back through here on a panel the user has been building in, and seeding
+      // it again would drop their label filters and operations.
+      if (stream && isAutoSeededSlot(dashboardPanelData)) {
+        applyPromqlSeed(dashboardPanelData, stream);
+      }
       return;
     }
 

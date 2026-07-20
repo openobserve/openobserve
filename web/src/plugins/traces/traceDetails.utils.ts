@@ -17,7 +17,7 @@
  * Pure helpers for `TraceDetails.vue`. Extracted so we can unit-test
  * the small derivations (session ID resolution, etc.) without mounting
  * the SFC, which has a heavy dependency footprint (echarts, monaco,
- * quasar, vuex, several composables).
+ * vuex, several composables).
  */
 
 /**

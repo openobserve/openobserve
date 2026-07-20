@@ -1,5 +1,5 @@
 <template>
-  <div class="tw:flex tw:items-center tw:w-full">
+  <div class="flex items-center w-full">
     <ODropdown
       v-if="hasDropdownSlot"
       v-model:open="isDropdownOpen"
@@ -16,11 +16,11 @@
           <OIcon :name="isDropdownOpen ? 'expand-less' : 'expand-more'" size="xs" />
         </OButton>
       </template>
-      <div class="logs-table-list tw:min-w-[180px]">
+      <div class="logs-table-list min-w-[180px]">
         <slot name="dropdown" :field="field" :value="value" />
       </div>
     </ODropdown>
-    <span class="tw:pl-1 tw:truncate">{{ value }}</span>
+    <span class="pl-1 truncate">{{ value }}</span>
   </div>
 </template>
 

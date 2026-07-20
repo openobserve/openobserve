@@ -15,13 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:m-3 tw:mt-1">
-    <div class="tw:mb-4">
-      <div data-test="aws-config-page-title" class="tw:text-2xl tw:font-semibold tw:leading-[1.3] tw:m-0 tw:mb-1.5" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
-        AWS Integrations
+  <div class="m-3 mt-1">
+    <div class="mb-4">
+      <div
+        data-test="aws-config-page-title"
+        class="text-2xl font-semibold leading-tight m-0 mb-1.5 text-text-heading"
+      >
+        {{ t("ingestion.awsSetup.title") }}
       </div>
-      <div data-test="aws-config-page-description" class="tw:text-sm tw:m-0 tw:mb-4" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
-        Set up AWS monitoring in one click or configure individual services for granular control.
+      <div
+        data-test="aws-config-page-description"
+        class="text-sm m-0 mb-4 text-text-secondary"
+      >
+        {{ t("ingestion.awsSetup.description") }}
       </div>
 
       <OTabs
@@ -30,12 +36,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="aws-tabs"
         align="left"
       >
-        <OTab name="quick-setup" label="Quick Setup" data-test="aws-quick-setup-tab" />
-        <OTab name="individual-services" label="Individual Services" data-test="aws-individual-services-tab" />
+        <OTab
+          name="quick-setup"
+          :label="t('ingestion.awsSetup.quickSetup')"
+          data-test="aws-quick-setup-tab"
+        />
+        <OTab
+          name="individual-services"
+          :label="t('ingestion.awsSetup.individualServices')"
+          data-test="aws-individual-services-tab"
+        />
       </OTabs>
     </div>
 
-    <OSeparator class="tw:mb-6" />
+    <OSeparator class="mb-6" />
 
     <OTabPanels v-model="activeTab" animated>
       <OTabPanel name="quick-setup">
@@ -47,13 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
     </OTabPanels>
 
-    <div class="tw:mt-8">
-      <div class="tw:mb-3">
-        <div class="tw:text-base tw:font-semibold tw:m-0" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#333]'">
-          Manual Configuration
+    <div class="mt-8">
+      <div class="mb-3">
+        <div class="text-base font-semibold m-0 text-text-heading">
+          {{ t("ingestion.awsSetup.manualTitle") }}
         </div>
-        <div class="tw:text-sm tw:m-0" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
-          Use these credentials for custom AWS integrations or manual setup.
+        <div class="text-sm m-0 text-text-secondary">
+          {{ t("ingestion.awsSetup.manualDescription") }}
         </div>
       </div>
       <CopyContent :content="content" />
@@ -68,6 +82,7 @@ import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
@@ -98,6 +113,7 @@ export default defineComponent({
     AWSIndividualServices,
   },
   setup(props) {
+    const { t } = useI18n();
     const store = useStore();
     const route = useRoute();
 
@@ -137,6 +153,7 @@ export default defineComponent({
 Access Key: [BASIC_PASSCODE]`;
 
     return {
+      t,
       store,
       config,
       endpoint,

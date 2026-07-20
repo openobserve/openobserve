@@ -16,61 +16,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:w-full service-identity-setup tw:mt-2"
+    class="w-full service-identity-setup mt-2"
     :class="{ 'sis-dark': store.state.theme === 'dark' }"
   >
     <!-- Loading skeleton while fetching recommendations -->
-    <div v-if="loading" class="tw:flex tw:flex-col tw:gap-4 tw:py-4">
-      <OSkeleton class="tw:rounded-lg tw:h-14 tw:w-full" />
-      <OSkeleton class="tw:rounded-lg tw:h-14 tw:w-full" />
-      <OSkeleton class="tw:rounded-lg tw:h-10 tw:w-40" />
+    <div v-if="loading" class="flex flex-col gap-4 py-4">
+      <OSkeleton class="rounded-lg h-14 w-full" />
+      <OSkeleton class="rounded-lg h-14 w-full" />
+      <OSkeleton class="rounded-lg h-10 w-40" />
     </div>
 
     <div v-else>
       <!-- Section 1: Service Configuration -->
       <div
-        class="tw:mb-3 tw:rounded-lg tw:overflow-hidden"
+        class="mb-3 rounded-lg overflow-hidden"
         style="border: 1px solid var(--o2-border-color)"
       >
-        <div class="tw:p-3 tw:flex tw:flex-col tw:gap-3">
+        <div class="p-3 flex flex-col gap-3">
           <!-- Service name source banner -->
           <div
             v-if="!serviceOptional"
-            class="tw:rounded-lg tw:border tw:overflow-hidden tw:transition-all"
+            class="rounded-lg border overflow-hidden transition-all"
             :class="
               serviceNameDetected
                 ? store.state.theme === 'dark'
-                  ? 'tw:bg-sky-900/10 tw:border-sky-300/30'
-                  : 'tw:bg-sky-50/80 tw:border-sky-200'
+                  ? 'bg-sky-900/10 border-sky-300/30'
+                  : 'bg-sky-50/80 border-sky-200'
                 : store.state.theme === 'dark'
-                  ? 'tw:bg-amber-900/10 tw:border-amber-800/30'
-                  : 'tw:bg-amber-50/80 tw:border-amber-200'
+                  ? 'bg-amber-900/10 border-amber-800/30'
+                  : 'bg-amber-50/80 border-amber-200'
             "
           >
             <!-- Collapsed row -->
             <div
               data-test="service-identity-service-name-header"
-              class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:opacity-80 tw:transition-opacity"
+              class="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
               @click="serviceNameExpanded = !serviceNameExpanded"
             >
               <OIcon
                 :name="serviceNameDetected ? 'check-circle' : 'warning'"
                 size="sm"
-                :class="serviceNameDetected ? 'tw:text-[var(--o2-positive)]' : 'tw:text-amber-500'"
+                :class="serviceNameDetected ? 'text-[var(--o2-positive)]' : 'text-amber-500'"
               />
-              <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
+              <div class="flex-1 min-w-0 text-[13px] leading-tight">
                 <template v-if="serviceNameDetected">
-                  Service name detected from
-                  <span class="tw:font-bold tw:text-primary">Service</span>
-                  field alias
-                  <span class="tw:text-xs tw:opacity-60"
+                  {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
+                  <span class="font-bold text-primary">Service</span>
+                  {{ t("settings.serviceIdentitySetup.fieldAlias") }}
+                  <span class="text-xs opacity-60"
                     >({{
                       detectedServiceFields.length + unseenServiceFields.length
                     }})</span
                   >
                 </template>
                 <template v-else>
-                  <span class="tw:font-semibold">{{
+                  <span class="font-semibold">{{
                     t("settings.correlation.serviceNameNotDetected")
                   }}</span>
                 </template>
@@ -82,67 +82,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'keyboard-arrow-down'
                 "
                 size="sm"
-                class="tw:opacity-40 tw:shrink-0"
+                class="opacity-40 shrink-0"
               />
             </div>
 
             <!-- Expanded detail -->
             <div
               v-if="serviceNameExpanded"
-              class="tw:px-3 tw:pb-3 tw:pt-2 tw:border-t"
+              class="px-3 pb-3 pt-2 border-t"
               :class="
                 serviceNameDetected
                   ? store.state.theme === 'dark'
-                    ? 'tw:border-sky-300/30'
-                    : 'tw:border-sky-200'
+                    ? 'border-sky-300/30'
+                    : 'border-sky-200'
                   : store.state.theme === 'dark'
-                    ? 'tw:border-amber-800/30'
-                    : 'tw:border-amber-200'
+                    ? 'border-amber-800/30'
+                    : 'border-amber-200'
               "
             >
               <!-- Inner card -->
               <div
-                class="tw:rounded-lg tw:p-2.5"
+                class="rounded-lg p-2.5"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:bg-gray-700/60'
-                    : 'tw:bg-gray-50'
+                    ? 'bg-gray-700/60'
+                    : 'bg-gray-50'
                 "
               >
                 <div
-                  class="tw:text-xs tw:font-medium tw:mb-2"
+                  class="text-xs font-medium mb-2"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-gray-300'
-                      : 'tw:text-gray-400'
+                      ? 'text-gray-300'
+                      : 'text-gray-400'
                   "
                 >
                   {{ t("settings.correlation.serviceNameExpandedHelp") }}
                 </div>
 
                 <!-- Field pills -->
-                <div class="tw:flex tw:flex-wrap tw:gap-1.5 tw:mb-3">
+                <div class="flex flex-wrap gap-1.5 mb-3">
                   <!-- Detected fields (with stream type dots) -->
                   <div
                     v-for="field in detectedServiceFields"
                     :key="field.name"
-                    class="tw:inline-flex tw:items-center tw:gap-1.5 tw:px-2.5 tw:py-1 tw:rounded-md tw:font-mono tw:text-xs tw:font-medium"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md font-mono text-xs font-medium"
                     style="border: 1px solid var(--o2-border-color)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:bg-gray-600 tw:text-gray-100'
-                        : 'tw:bg-white tw:text-gray-500 tw:shadow-sm'
+                        ? 'bg-gray-600 text-gray-100'
+                        : 'bg-white text-gray-500 shadow-sm'
                     "
                   >
-                    <div class="tw:flex tw:items-center tw:gap-0.5 tw:mr-0.5">
+                    <div class="flex items-center gap-0.5 mr-0.5">
                       <span
                         v-for="st in field.streamTypes"
                         :key="st"
-                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full"
+                        class="w-1.5 h-1.5 rounded-full"
                         :class="{
-                          'tw:bg-blue-500': st === 'logs',
-                          'tw:bg-orange-500': st === 'traces',
-                          'tw:bg-green-500': st === 'metrics',
+                          'bg-blue-500': st === 'logs',
+                          'bg-orange-500': st === 'traces',
+                          'bg-green-500': st === 'metrics',
                         }"
                         :title="st"
                       />
@@ -154,12 +154,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="field in unseenServiceFields"
                     :key="field"
-                    class="tw:inline-flex tw:items-center tw:px-2.5 tw:py-1 tw:rounded-md tw:border-dashed tw:font-mono tw:text-xs"
+                    class="inline-flex items-center px-2.5 py-1 rounded-md border-dashed font-mono text-xs"
                     style="border: 1px dashed var(--o2-border-color)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
+                        ? 'text-gray-400'
+                        : 'text-gray-400'
                     "
                     :title="
                       t('settings.correlation.serviceNameConfiguredNotSeen')
@@ -171,40 +171,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Legend row -->
                 <div
-                  class="tw:flex tw:flex-wrap tw:items-center tw:justify-between tw:gap-2"
+                  class="flex flex-wrap items-center justify-between gap-2"
                 >
                   <div
-                    class="tw:flex tw:flex-wrap tw:items-center tw:gap-3 tw:text-[10px]"
+                    class="flex flex-wrap items-center gap-3 text-[10px]"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
+                        ? 'text-gray-400'
+                        : 'text-gray-400'
                     "
                   >
-                    <div class="tw:flex tw:items-center tw:gap-1">
+                    <div class="flex items-center gap-1">
                       <span
-                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-blue-500"
+                        class="w-1.5 h-1.5 rounded-full bg-blue-500"
                       />
                       {{ t("settings.correlation.foundInLogs") }}
                     </div>
-                    <div class="tw:flex tw:items-center tw:gap-1">
+                    <div class="flex items-center gap-1">
                       <span
-                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-orange-500"
+                        class="w-1.5 h-1.5 rounded-full bg-orange-500"
                       />
                       {{ t("settings.correlation.foundInTraces") }}
                     </div>
-                    <div class="tw:flex tw:items-center tw:gap-1">
+                    <div class="flex items-center gap-1">
                       <span
-                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-green-500"
+                        class="w-1.5 h-1.5 rounded-full bg-green-500"
                       />
                       {{ t("settings.correlation.foundInMetrics") }}
                     </div>
                     <div
                       v-if="unseenServiceFields.length > 0"
-                      class="tw:flex tw:items-center tw:gap-1"
+                      class="flex items-center gap-1"
                     >
                       <span
-                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:border tw:border-dashed tw:border-grey-4"
+                        class="w-1.5 h-1.5 rounded-full border border-dashed border-grey-4"
                       />
                       {{
                         t("settings.correlation.serviceNameConfiguredNotSeen")
@@ -214,8 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Customize link -->
                   <a
-                    class="config-link-btn tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:border tw:border-blue-500 tw:text-blue-600 tw:bg-blue-500/[.08] tw:transition-[background]"
-                    :class="store.state.theme === 'dark' ? 'tw:border-[#60a5fa] tw:text-[#93c5fd] tw:bg-[rgba(96,165,250,0.12)]' : ''"
+                    class="config-link-btn cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold no-underline border border-blue-500 text-blue-600 bg-blue-500/[.08] transition-[background]"
+                    :class="store.state.theme === 'dark' ? 'border-[#60a5fa] text-[#93c5fd] bg-[rgba(96,165,250,0.12)]' : ''"
                     @click.prevent="emit('navigate-to-aliases', 'service')"
                   >
                     {{ t("settings.correlation.customizeFieldMappings") }}
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click:secondary="showFieldMappingDialog = false"
             @click:primary="saveFieldMappings"
           >
-            <TagInput
+            <OTagInput
               :model-value="editableServiceFields"
               @update:model-value="editableServiceFields = $event"
               :placeholder="t('settings.correlation.fieldMappingPlaceholder')"
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODialog>
 
           <!-- Service Optional toggle -->
-          <div data-test="service-identity-service-optional" class="tw:mb-3">
+          <div data-test="service-identity-service-optional" class="mb-3">
             <OSwitch
               data-test="service-identity-service-optional-btn"
               v-model="serviceOptional"
@@ -255,11 +255,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
             />
             <div
-              class="tw:text-xs tw:mt-1 tw:leading-snug tw:ml-9"
+              class="text-xs mt-1 leading-snug ml-9"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-400'
-                  : 'tw:text-gray-400'
+                  ? 'text-gray-400'
+                  : 'text-gray-400'
               "
             >
               {{ t("settings.correlation.serviceOptionalHelp") }}
@@ -268,18 +268,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Disambiguation Fields -->
           <div>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:mb-1">
-              <span class="tw:font-bold tw:text-sm">{{
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-bold text-sm">{{
                 t("settings.correlation.distinguishByLabel")
               }}</span>
-              <span class="tw:flex-1"><OSeparator /></span>
+              <span class="flex-1"><OSeparator /></span>
             </div>
             <div
-              class="tw:text-xs tw:mb-3"
+              class="text-xs mb-3"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-400'
-                  : 'tw:text-gray-400'
+                  ? 'text-gray-400'
+                  : 'text-gray-400'
               "
             >
               {{ t("settings.correlation.distinguishByHelp") }}
@@ -288,28 +288,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Empty state: nothing configured anywhere -->
             <div
               v-if="allConfiguredEnvs.length === 0 && !addingToEnv"
-              class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-3 tw:px-4 tw:rounded-md tw:border tw:border-dashed"
+              class="flex flex-col items-center gap-2 py-3 px-4 rounded-md border border-dashed"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:border-grey-7 tw:bg-gray-700/40'
-                  : 'tw:border-grey-4 tw:bg-gray-50'
+                  ? 'border-grey-7 bg-gray-700/40'
+                  : 'border-grey-4 bg-gray-50'
               "
             >
-              <OIcon name="tune" size="lg" class="tw:text-gray-400 tw:mb-1" />
+              <OIcon name="tune" size="lg" class="text-gray-400 mb-1" />
               <span
-                class="tw:text-sm tw:font-medium"
+                class="text-sm font-medium"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-gray-300'
-                    : 'tw:text-gray-400'
+                    ? 'text-gray-300'
+                    : 'text-gray-400'
                 "
               >
-                No fields configured yet
+                {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
               </span>
               <OButton
                 variant="outline"
                 size="sm"
-                class="tw:mt-1"
+                class="mt-1"
                 data-test="service-identity-add-distinguish-btn"
                 @click="addingToEnv = activeEnvironment"
               >
@@ -319,21 +319,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- All configured env groups -->
-            <div v-else class="tw:flex tw:flex-col tw:gap-2">
+            <div v-else class="flex flex-col gap-2">
               <!-- Auto-suggested banner (only when fields came from suggestion, not saved config) -->
               <div
                 v-if="isAutoSuggested"
-                class="tw:flex tw:items-start tw:gap-2 tw:px-3 tw:py-2 tw:rounded-md tw:text-xs"
+                class="flex items-start gap-2 px-3 py-2 rounded-md text-xs"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:bg-blue-900/15 tw:text-blue-300'
-                    : 'tw:bg-blue-50 tw:text-blue-700'
+                    ? 'bg-blue-900/15 text-blue-300'
+                    : 'bg-blue-50 text-blue-700'
                 "
               >
                 <OIcon
                   name="auto-awesome"
                   size="xs"
-                  class="tw:shrink-0 tw:mt-0.5"
+                  class="shrink-0 mt-0.5"
                 />
                 <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
               </div>
@@ -346,34 +346,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Environment label -->
                 <div
                   v-if="allConfiguredEnvs.length > 1"
-                  class="tw:flex tw:items-center tw:gap-2 tw:mt-1"
-                  :class="{ 'tw:pt-2 tw:border-t': envIdx > 0 }"
+                  class="flex items-center gap-2 mt-1"
+                  :class="{ 'pt-2 border-t': envIdx > 0 }"
                 >
                   <span
-                    class="tw:text-[10px] tw:font-bold"
+                    class="text-[10px] font-bold"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
+                        ? 'text-gray-400'
+                        : 'text-gray-400'
                     "
                   >
                     {{ getIdentitySetLabel(envKey) }}
                   </span>
                 </div>
 
-                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                   <!-- Pills for this env's fields -->
                   <div
                     v-for="fieldId in (setDistinguishBy[envKey] ?? []).filter(
                       Boolean,
                     )"
                     :key="fieldId"
-                    class="tw:flex tw:items-center tw:gap-1 tw:pl-3 tw:pr-1 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:transition-colors"
+                    class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors"
                     style="border: 1px solid var(--o2-border-color)"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:bg-gray-700 tw:text-gray-100 tw:shadow-sm'
-                        : 'tw:bg-white tw:text-gray-500 tw:shadow-sm'
+                        ? 'bg-gray-700 text-gray-100 shadow-sm'
+                        : 'bg-white text-gray-500 shadow-sm'
                     "
                   >
                     <span>{{
@@ -474,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)"
               >
                 <div
-                  class="tw:flex tw:flex-wrap tw:items-center tw:gap-2 tw:pt-2"
+                  class="flex flex-wrap items-center gap-2 pt-2"
                   style="border-top: 1px solid var(--o2-border-color)"
                 >
                   <OSelect
@@ -520,7 +520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Add group + Save — bottom row -->
               <div
                 v-if="!addingToEnv"
-                class="tw:flex tw:items-center tw:justify-between tw:mt-2"
+                class="flex items-center justify-between mt-2"
               >
                 <OButton
                   variant="outline"
@@ -556,35 +556,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Section 3: Workload Detection -->
       <div
         v-if="workloadDetectedGroups.length > 0"
-        class="tw:mb-3 tw:rounded-lg tw:overflow-hidden"
+        class="mb-3 rounded-lg overflow-hidden"
         style="border: 1px solid var(--o2-border-color)"
       >
         <!-- Section header -->
         <div
-          class="tw:px-4 tw:py-3 tw:flex tw:items-center tw:gap-2"
+          class="px-4 py-3 flex items-center gap-2"
           style="border-bottom: 1px solid var(--o2-border-color)"
         >
-          <OIcon name="radar" size="sm" class="tw:text-teal-6" />
-          <span class="tw:font-bold tw:text-sm">Workload Detection</span>
+          <OIcon name="radar" size="sm" class="text-teal-6" />
+          <span class="font-bold text-sm">{{ t("settings.serviceIdentitySetup.workloadDetection") }}</span>
         </div>
 
         <!-- Collapsible: Workload detected using fields (N) -->
         <div
-          class="tw:mx-3 tw:mt-3 tw:rounded-lg tw:border tw:overflow-hidden tw:transition-all"
+          class="mx-3 mt-3 rounded-lg border overflow-hidden transition-all"
           :class="
             store.state.theme === 'dark'
-              ? 'tw:bg-sky-900/10 tw:border-sky-300/30'
-              : 'tw:bg-sky-50/80 tw:border-sky-200'
+              ? 'bg-sky-900/10 border-sky-300/30'
+              : 'bg-sky-50/80 border-sky-200'
           "
         >
           <div
-            class="tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:opacity-80 tw:transition-opacity"
+            class="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
             @click="trackedAliasExpanded = !trackedAliasExpanded"
           >
             <OIcon name="check-circle" size="sm" />
-            <div class="tw:flex-1 tw:min-w-0 tw:text-[13px] tw:leading-tight">
-              Workload detected using fields
-              <span class="tw:text-xs tw:opacity-60"
+            <div class="flex-1 min-w-0 text-[13px] leading-tight">
+              {{ t("settings.serviceIdentitySetup.workloadDetectedUsingFields") }}
+              <span class="text-xs opacity-60"
                 >({{ trackedAliasIds.length }})</span
               >
             </div>
@@ -595,57 +595,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'keyboard-arrow-down'
               "
               size="sm"
-              class="tw:opacity-40 tw:shrink-0"
+              class="opacity-40 shrink-0"
             />
           </div>
 
           <div
             v-if="trackedAliasExpanded"
-            class="tw:px-3 tw:pb-3 tw:pt-2 tw:border-t"
+            class="px-3 pb-3 pt-2 border-t"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:border-sky-300/30'
-                : 'tw:border-sky-200'
+                ? 'border-sky-300/30'
+                : 'border-sky-200'
             "
           >
             <div
-              class="tw:rounded-lg tw:p-2.5"
+              class="rounded-lg p-2.5"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:bg-gray-700/60'
-                  : 'tw:bg-gray-50'
+                  ? 'bg-gray-700/60'
+                  : 'bg-gray-50'
               "
             >
               <div
-                class="tw:text-xs tw:mb-3"
+                class="text-xs mb-3"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-gray-400'
-                    : 'tw:text-gray-400'
+                    ? 'text-gray-400'
+                    : 'text-gray-400'
                 "
               >
-                Only these field alias groups are used for workload detection
-                and recommendations. Fields not in this list will not influence
-                service discovery results. Cannot be empty.
+                {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
                 <a
-                  class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle tw:border tw:border-blue-500 tw:text-blue-600 tw:bg-blue-500/[.08] tw:transition-[background]"
-                  :class="store.state.theme === 'dark' ? 'tw:border-[#60a5fa] tw:text-[#93c5fd] tw:bg-[rgba(96,165,250,0.12)]' : ''"
+                  class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded text-xs font-semibold no-underline align-middle border border-blue-500 text-blue-600 bg-blue-500/[.08] transition-[background]"
+                  :class="store.state.theme === 'dark' ? 'border-[#60a5fa] text-[#93c5fd] bg-[rgba(96,165,250,0.12)]' : ''"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
-                  >Go to Field Aliases</a
+                  >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</a
                 >
-                to configure individual field mappings.
+                {{ t("settings.serviceIdentitySetup.toConfigureFieldMappings") }}
               </div>
-              <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-2">
+              <div class="flex flex-wrap items-center gap-2">
                 <!-- Pills for tracked aliases -->
                 <div
                   v-for="alias in resolvedTrackedAliases"
                   :key="alias.id"
-                  class="tw:flex tw:items-center tw:gap-1 tw:pl-3 tw:pr-1 tw:py-1 tw:rounded-md tw:text-xs tw:font-medium tw:transition-colors"
+                  class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-md text-xs font-medium transition-colors"
                   style="border: 1px solid var(--o2-border-color)"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:bg-gray-700 tw:text-gray-100 tw:shadow-sm'
-                      : 'tw:bg-white tw:text-gray-500 tw:shadow-sm'
+                      ? 'bg-gray-700 text-gray-100 shadow-sm'
+                      : 'bg-white text-gray-500 shadow-sm'
                   "
                 >
                   <span>{{ alias.label }}</span>
@@ -684,7 +682,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     labelKey="label"
                     valueKey="value"
                     searchable
-                    placeholder="Select alias group"
+                    :placeholder="t('settings.serviceIdentitySetup.selectAliasGroup')"
                     style="width: 13.75rem"
                     :dropdown-style="{ minWidth: '18.75rem' }"
                     @update:model-value="onAddTrackedAlias($event)"
@@ -722,10 +720,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="addingTrackedAlias = true"
                   icon-left="add"
                 >
-                  Add field
+                  {{ t("settings.correlation.addField") }}
                 </OButton>
               </div>
-              <div class="tw:flex tw:justify-end tw:mt-3">
+              <div class="flex justify-end mt-3">
                 <OButton
                   variant="primary"
                   size="sm-action"
@@ -740,42 +738,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:px-4 tw:pt-3 tw:pb-1">
+        <div class="px-4 pt-3 pb-1">
           <div
-            class="tw:text-xs"
+            class="text-xs"
             :class="
-              store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
+              store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
             "
           >
-            We discovered these deployment patterns in your streams. Use them to
-            configure service correlation.
+            {{ t("settings.serviceIdentitySetup.discoveredPatternsHelp") }}
             <a
-              class="config-link-btn tw:cursor-pointer tw:inline-block tw:mx-1 tw:px-2 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:no-underline tw:align-middle tw:border tw:border-blue-500 tw:text-blue-600 tw:bg-blue-500/[.08] tw:transition-[background]"
-              :class="store.state.theme === 'dark' ? 'tw:border-[#60a5fa] tw:text-[#93c5fd] tw:bg-[rgba(96,165,250,0.12)]' : ''"
+              class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded text-xs font-semibold no-underline align-middle border border-blue-500 text-blue-600 bg-blue-500/[.08] transition-[background]"
+              :class="store.state.theme === 'dark' ? 'border-[#60a5fa] text-[#93c5fd] bg-[rgba(96,165,250,0.12)]' : ''"
               @click.prevent="emit('navigate-to-services')"
-              >Go to Services</a
+              >{{ t("settings.serviceIdentitySetup.goToServices") }}</a
             >
-            <span>to see the actual discovered services.</span>
+            <span>{{ t("settings.serviceIdentitySetup.toSeeDiscoveredServices") }}</span>
           </div>
         </div>
 
         <!-- Environment Tabs (Chrome-style) -->
         <div
-          class="tw:flex tw:items-end tw:gap-0 tw:px-4"
+          class="flex items-end gap-0 px-4"
           style="border-bottom: 1px solid var(--o2-border-color)"
         >
           <div
             v-for="env in detectedEnvironments"
             :key="env.key"
-            class="tw:relative tw:px-4 tw:py-2 tw:cursor-pointer tw:transition-all tw:text-xs tw:font-medium tw:min-w-[70px] tw:text-center tw:rounded-t-lg tw:border tw:border-b-0"
+            class="relative px-4 py-2 cursor-pointer transition-all text-xs font-medium min-w-[70px] text-center rounded-t-lg border border-b-0"
             :class="
               activeEnvironment === env.key
                 ? store.state.theme === 'dark'
-                  ? 'tw:text-gray-500-1'
-                  : 'tw:text-gray-600'
+                  ? 'text-gray-500-1'
+                  : 'text-gray-600'
                 : store.state.theme === 'dark'
-                  ? 'tw:bg-transparent tw:text-gray-400 tw:border-transparent tw:hover:text-gray-200'
-                  : 'tw:bg-transparent tw:text-gray-400 tw:border-transparent tw:hover:text-gray-400'
+                  ? 'bg-transparent text-gray-400 border-transparent hover:text-gray-200'
+                  : 'bg-transparent text-gray-400 border-transparent hover:text-gray-400'
             "
             :style="
               activeEnvironment === env.key
@@ -789,8 +786,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="
                 (setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0
               "
-              class="tw:absolute tw:top-1 tw:right-1 tw:w-1.5 tw:h-1.5 tw:rounded-full tw:bg-green-500"
-              :title="`${(setDistinguishBy[env.key] ?? []).filter(Boolean).length} field(s) configured`"
+              class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-green-500"
+              :title="t('settings.serviceIdentitySetup.fieldsConfigured', { n: (setDistinguishBy[env.key] ?? []).filter(Boolean).length })"
             />
           </div>
         </div>
@@ -798,51 +795,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tab content panel — connects to active tab -->
         <div
           v-if="primaryDim"
-          class="tw:overflow-hidden tw:px-4 tw:pt-4 tw:pb-2"
+          class="overflow-hidden px-4 pt-4 pb-2"
         >
           <!-- Stat cards -->
-          <div class="tw:flex tw:items-stretch tw:gap-3">
+          <div class="flex items-stretch gap-3">
             <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
               <!-- Plus connector between cards -->
-              <div v-if="idx > 0" class="tw:flex tw:items-center tw:shrink-0">
-                <OIcon name="add" size="sm" class="tw:text-gray-400" />
+              <div v-if="idx > 0" class="flex items-center shrink-0">
+                <OIcon name="add" size="sm" class="text-gray-400" />
               </div>
 
               <!-- Dim card -->
               <div
-                class="dim-stat-card tw:flex-1 tw:min-w-0 tw:rounded-lg tw:p-3 tw:flex tw:flex-col"
+                class="dim-stat-card flex-1 min-w-0 rounded-lg p-3 flex flex-col"
                 :style="
                   store.state.theme === 'dark'
                     ? card.theme.borderDark
                     : card.theme.borderLight
                 "
               >
-                <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
+                <div class="flex items-center gap-2 mb-2">
                   <OIcon
                     :name="card.theme.icon"
                     size="sm"
                     :class="card.theme.iconClass"
                   />
                   <span
-                    class="tw:text-[11px] tw:font-medium"
+                    class="text-[11px] font-medium"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-gray-300'
-                        : 'tw:text-gray-400'
+                        ? 'text-gray-300'
+                        : 'text-gray-400'
                     "
                     >{{ card.label }}</span
                   >
                   <span
-                    class="tw:text-lg tw:font-bold tw:ml-auto"
+                    class="text-lg font-bold ml-auto"
                     :class="card.theme.countClass"
                     >{{ card.count }}</span
                   >
                 </div>
-                <div class="dim-stat-pills tw:flex tw:flex-wrap tw:gap-1 tw:overflow-hidden">
+                <div class="dim-stat-pills flex flex-wrap gap-1 overflow-hidden">
                   <span
                     v-for="val in card.values.slice(0, 5)"
                     :key="val"
-                    class="tw:max-w-[calc(50%-4px)] tw:h-[22px] tw:box-border tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer tw:hover:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
+                    class="max-w-[calc(50%-4px)] h-[22px] box-border text-[11px] py-0.5 px-2 rounded-full border cursor-pointer hover:opacity-70 transition-opacity inline-flex items-center gap-1"
                     :class="
                       store.state.theme === 'dark'
                         ? card.theme.pillDark
@@ -850,21 +847,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :title="val"
                     @click.stop="openInsightDialogByIdx(val, idx)"
-                    ><span class="tw:truncate">{{ val }}</span
+                    ><span class="truncate">{{ val }}</span
                     ><span
                       v-if="card.dim"
-                      class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"
+                      class="inline-flex gap-0.5 ml-0.5 shrink-0"
                       ><span
                         v-for="st in getValueStreamTypes(
                           card.dim.group_id,
                           val,
                         )"
                         :key="st"
-                        class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
+                        class="w-1.5 h-1.5 rounded-full inline-block"
                         :class="{
-                          'tw:bg-blue-500': st === 'logs',
-                          'tw:bg-orange-500': st === 'traces',
-                          'tw:bg-green-500': st === 'metrics',
+                          'bg-blue-500': st === 'logs',
+                          'bg-orange-500': st === 'traces',
+                          'bg-green-500': st === 'metrics',
                         }" /></span
                   ></span>
                   <ODropdown
@@ -875,25 +872,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #trigger>
                       <span
-                        class="tw:max-w-[calc(50%-4px)] tw:h-[22px] tw:box-border tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:cursor-pointer tw:hover:opacity-70 tw:transition-opacity"
+                        class="max-w-[calc(50%-4px)] h-[22px] box-border text-[11px] py-0.5 px-2 rounded-full cursor-pointer hover:opacity-70 transition-opacity"
                         :class="
                           store.state.theme === 'dark'
-                            ? 'tw:text-gray-300'
-                            : 'tw:text-gray-400'
+                            ? 'text-gray-300'
+                            : 'text-gray-400'
                         "
                         >+{{ card.values.length - 5 }}</span
                       >
                     </template>
                     <div
-                      class="tw:p-2 tw:flex tw:flex-wrap tw:gap-1 tw:max-w-[280px] tw:max-h-[200px] tw:overflow-y-auto"
+                      class="p-2 flex flex-wrap gap-1 max-w-[280px] max-h-[200px] overflow-y-auto"
                       :class="
-                        store.state.theme === 'dark' ? 'tw:bg-gray-800' : ''
+                        store.state.theme === 'dark' ? 'bg-gray-800' : ''
                       "
                     >
                       <span
                         v-for="val in card.values.slice(5)"
                         :key="val"
-                        class="tw:text-[11px] tw:py-0.5 tw:px-2 tw:rounded-full tw:border tw:cursor-pointer tw:hover:opacity-70 tw:transition-opacity tw:inline-flex tw:items-center tw:gap-1"
+                        class="text-[11px] py-0.5 px-2 rounded-full border cursor-pointer hover:opacity-70 transition-opacity inline-flex items-center gap-1"
                         :class="
                           store.state.theme === 'dark'
                             ? card.theme.pillDark
@@ -901,21 +898,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :title="val"
                         @click.stop="openInsightDialogByIdx(val, idx); dimCardMoreMenuOpen[idx] = false"
-                        ><span class="tw:truncate">{{ val }}</span
+                        ><span class="truncate">{{ val }}</span
                         ><span
                           v-if="card.dim"
-                          class="tw:inline-flex tw:gap-0.5 tw:ml-0.5 tw:shrink-0"
+                          class="inline-flex gap-0.5 ml-0.5 shrink-0"
                           ><span
                             v-for="st in getValueStreamTypes(
                               card.dim.group_id,
                               val,
                             )"
                             :key="st"
-                            class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block"
+                            class="w-1.5 h-1.5 rounded-full inline-block"
                             :class="{
-                              'tw:bg-blue-500': st === 'logs',
-                              'tw:bg-orange-500': st === 'traces',
-                              'tw:bg-green-500': st === 'metrics',
+                              'bg-blue-500': st === 'logs',
+                              'bg-orange-500': st === 'traces',
+                              'bg-green-500': st === 'metrics',
                             }" /></span
                       ></span>
                     </div>
@@ -926,45 +923,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Stream type legend -->
-          <div class="tw:flex tw:items-center tw:gap-3 tw:mt-2 tw:ml-1">
+          <div class="flex items-center gap-3 mt-2 ml-1">
             <div
-              class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
+              class="flex items-center gap-1 text-[10px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-400'
-                  : 'tw:text-gray-400'
+                  ? 'text-gray-400'
+                  : 'text-gray-400'
               "
             >
               <span
-                class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block tw:bg-blue-500"
+                class="w-1.5 h-1.5 rounded-full inline-block bg-blue-500"
               />
-              <span>Found in Logs</span>
+              <span>{{ t("settings.correlation.foundInLogs") }}</span>
             </div>
             <div
-              class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
+              class="flex items-center gap-1 text-[10px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-400'
-                  : 'tw:text-gray-400'
+                  ? 'text-gray-400'
+                  : 'text-gray-400'
               "
             >
               <span
-                class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block tw:bg-orange-500"
+                class="w-1.5 h-1.5 rounded-full inline-block bg-orange-500"
               />
-              <span>Found in Traces</span>
+              <span>{{ t("settings.correlation.foundInTraces") }}</span>
             </div>
             <div
-              class="tw:flex tw:items-center tw:gap-1 tw:text-[10px]"
+              class="flex items-center gap-1 text-[10px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-400'
-                  : 'tw:text-gray-400'
+                  ? 'text-gray-400'
+                  : 'text-gray-400'
               "
             >
               <span
-                class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:inline-block tw:bg-green-500"
+                class="w-1.5 h-1.5 rounded-full inline-block bg-green-500"
               />
-              <span>Found in Metrics</span>
+              <span>{{ t("settings.correlation.foundInMetrics") }}</span>
             </div>
           </div>
         </div>
@@ -977,42 +974,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !suggestionDismissed &&
             !suggestionAlreadyApplied
           "
-          class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2.5"
+          class="flex items-center gap-3 px-4 py-2.5"
           :class="
-            store.state.theme === 'dark' ? 'tw:bg-gray-700/30' : 'tw:bg-gray-50/30'
+            store.state.theme === 'dark' ? 'bg-gray-700/30' : 'bg-gray-50/30'
           "
         >
           <div
-            class="tw:flex-1 tw:min-w-0 tw:text-xs tw:truncate"
+            class="flex-1 min-w-0 text-xs truncate"
             :class="
-              store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-400'
+              store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-400'
             "
           >
             <span
-              class="tw:font-bold"
+              class="font-bold"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-100'
-                  : 'tw:text-gray-500'
+                  ? 'text-gray-100'
+                  : 'text-gray-500'
               "
-              >Recommended:</span
+              >{{ t("settings.serviceIdentitySetup.recommended") }}</span
             >
-            {{ " " }}Use
-            <span class="tw:font-semibold">{{
+            {{ " " }}{{ t("settings.serviceIdentitySetup.recommendedUse") }}
+            <span class="font-semibold">{{
               suggestedConfig.distinguish_by
                 .map((id) => getGroupByValue(id)?.display ?? id)
                 .join(" + ")
             }}</span>
-            — covers {{ activeEnvCoverage ?? "–" }}% of your telemetry.
+            {{ t("settings.serviceIdentitySetup.coversTelemetry", { coverage: activeEnvCoverage ?? "–" }) }}
           </div>
-          <div class="tw:shrink-0 tw:flex tw:items-center tw:gap-1">
+          <div class="shrink-0 flex items-center gap-1">
             <OButton variant="outline" size="sm" @click="applySuggestion">
-              Apply
+              {{ t("settings.serviceIdentitySetup.apply") }}
             </OButton>
             <OButton
               variant="ghost"
               size="icon"
-              class="tw:opacity-40 tw:hover:opacity-100"
+              class="opacity-40 hover:opacity-100"
               @click="dismissSuggestion"
             >
               <OIcon name="cancel" size="xs" />
@@ -1026,19 +1023,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:open="insightDialogOpen"
           :width="insightPanelWidthPct"
         >
-          <!-- #header kept: first line combines plain subtitle text with an tw:inline theme-colored badge
-               containing the title + tooltip; second line is a conditional coverage tw:flex with icon.
+          <!-- #header kept: first line combines plain subtitle text with an inline theme-colored badge
+               containing the title + tooltip; second line is a conditional coverage flex with icon.
                Cannot be expressed cleanly with title + sub-title props alone. -->
           <template #header>
-            <div class="tw:flex-1 tw:min-w-0">
-              <div class="tw:text-[16px] tw:flex tw:items-center">
+            <div class="flex-1 min-w-0">
+              <div class="text-[16px] flex items-center">
                 {{ insightData.subtitle }}
                 <span
                   :class="[
-                    'tw:font-semibold tw:px-2 tw:py-0.5 tw:rounded-md tw:ml-2 tw:inline-block',
+                    'font-semibold px-2 py-0.5 rounded-md ml-2 inline-block',
                     store.state.theme === 'dark'
-                      ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                      : 'tw:text-blue-600 tw:bg-blue-50',
+                      ? 'text-blue-400 bg-blue-900/50'
+                      : 'text-blue-600 bg-blue-50',
                   ]"
                 >
                   {{ insightData.title }}
@@ -1054,16 +1051,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !(insightData as any).isCardLevel &&
                   insightData.coverage !== null
                 "
-                class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:mt-1"
+                class="flex items-center gap-1.5 text-xs mt-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-gray-300'
-                    : 'tw:text-gray-400'
+                    ? 'text-gray-300'
+                    : 'text-gray-400'
                 "
               >
-                <OIcon name="verified" size="xs" class="tw:text-green-500" />
+                <OIcon name="verified" size="xs" class="text-green-500" />
                 <span
-                  >{{ insightData.coverage }}% of services
+                  >{{ t("settings.serviceIdentitySetup.percentOfServices", { coverage: insightData.coverage }) }}
                   <span
                     v-if="
                       insightData.count !== null && insightData.total !== null
@@ -1075,47 +1072,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <!-- Stream contribution chart (single-value only) -->
-          <div class="tw:px-5 tw:py-4 tw:flex tw:flex-col tw:h-full">
+          <div class="px-5 py-4 flex flex-col h-full">
           <template
             v-if="
               !(insightData as any).isCardLevel &&
               (insightData as any).streamDetails?.length > 0
             "
           >
-            <div class="tw:mb-3 tw:shrink-0">
+            <div class="mb-3 shrink-0">
               <div
-                class="tw:text-[11px] tw:tracking-wide tw:font-medium tw:mb-2"
+                class="text-[11px] tracking-wide font-medium mb-2"
                 style="color: var(--color-text-primary)"
               >
-                Stream Sources
+                {{ t("settings.serviceIdentitySetup.streamSources") }}
               </div>
               <div style="height: 40vh; min-height: 180px">
                 <CustomChartRenderer :data="insightChartData.options" />
               </div>
               <!-- Legend -->
               <div
-                class="tw:flex tw:items-center tw:justify-center tw:gap-4 tw:mt-2"
+                class="flex items-center justify-center gap-4 mt-2"
               >
                 <div
                   v-for="sd in (insightData as any).streamDetails"
                   :key="sd.streamType"
-                  class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px]"
+                  class="flex items-center gap-1.5 text-[11px]"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-gray-300'
-                      : 'tw:text-gray-400'
+                      ? 'text-gray-300'
+                      : 'text-gray-400'
                   "
                 >
                   <span
-                    class="tw:w-2 tw:h-2 tw:rounded-full"
+                    class="w-2 h-2 rounded-full"
                     :class="{
-                      'tw:bg-blue-500': sd.streamType === 'logs',
-                      'tw:bg-orange-500': sd.streamType === 'traces',
-                      'tw:bg-green-500': sd.streamType === 'metrics',
+                      'bg-blue-500': sd.streamType === 'logs',
+                      'bg-orange-500': sd.streamType === 'traces',
+                      'bg-green-500': sd.streamType === 'metrics',
                     }"
                   />
-                  <span class="tw:capitalize">{{ sd.streamType }}</span>
-                  <span class="tw:font-medium">{{
+                  <span class="capitalize">{{ sd.streamType }}</span>
+                  <span class="font-medium">{{
                     sd.streamNames.length
                   }}</span>
                 </div>
@@ -1123,7 +1120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <OSeparator class="tw:mb-3 tw:shrink-0" />
+          <OSeparator class="mb-3 shrink-0" />
 
           <!-- Card-level: all values with bars -->
           <template
@@ -1133,53 +1130,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <div
-              class="tw:text-[11px] tw:font-medium tw:mb-3"
+              class="text-[11px] font-medium mb-3"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-400'
-                  : 'tw:text-gray-400'
+                  ? 'text-gray-400'
+                  : 'text-gray-400'
               "
             >
-              All values ({{ insightData.children.length }})
+              {{ t("settings.serviceIdentitySetup.allValues", { count: insightData.children.length }) }}
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-2.5">
+            <div class="flex flex-col gap-2.5">
               <div
                 v-for="child in insightData.children"
                 :key="child.name"
-                class="tw:flex tw:flex-col tw:gap-1"
+                class="flex flex-col gap-1"
               >
                 <div
-                  class="tw:flex tw:items-center tw:justify-between tw:text-xs"
+                  class="flex items-center justify-between text-xs"
                 >
-                  <span class="tw:truncate tw:min-w-0 tw:font-medium">{{
+                  <span class="truncate min-w-0 font-medium">{{
                     child.name
                   }}</span>
                   <span
-                    class="tw:shrink-0 tw:ml-2 tw:tabular-nums"
+                    class="shrink-0 ml-2 tabular-nums"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-gray-300'
-                        : 'tw:text-gray-400'
+                        ? 'text-gray-300'
+                        : 'text-gray-400'
                     "
                     >{{ child.count }} {{ insightData.childCountLabel }}</span
                   >
                 </div>
                 <div
-                  class="tw:w-full tw:h-2 tw:rounded-full tw:overflow-hidden"
+                  class="w-full h-2 rounded-full overflow-hidden"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:bg-gray-600'
-                      : 'tw:bg-gray-100'
+                      ? 'bg-gray-600'
+                      : 'bg-gray-100'
                   "
                 >
                   <div
-                    class="tw:h-full tw:rounded-full tw:transition-all"
+                    class="h-full rounded-full transition-all"
                     :class="
                       insightDialogLevel === 'primary'
-                        ? 'tw:bg-blue-5'
+                        ? 'bg-blue-5'
                         : insightDialogLevel === 'secondary'
-                          ? 'tw:bg-teal-5'
-                          : 'tw:bg-purple-5'
+                          ? 'bg-teal-5'
+                          : 'bg-purple-5'
                     "
                     :style="{
                       width: `${Math.max((child.count / insightData.maxChildCount) * 100, 6)}%`,
@@ -1199,75 +1196,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Explanation -->
             <div
-              class="tw:flex tw:items-center tw:gap-1.5 tw:text-[11px] tw:mb-2 tw:shrink-0 tw:py-1.5 tw:px-2.5 tw:rounded-md"
+              class="flex items-center gap-1.5 text-[11px] mb-2 shrink-0 py-1.5 px-2.5 rounded-md"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:bg-gray-700 tw:text-gray-400'
-                  : 'tw:bg-blue-1/40 tw:text-gray-400'
+                  ? 'bg-gray-700 text-gray-400'
+                  : 'bg-blue-1/40 text-gray-400'
               "
             >
               <OIcon name="info" size="xs" />
               <span
-                >These are the related
+                >{{ t("settings.serviceIdentitySetup.relatedValuesPre") }}
                 <strong>{{
                   formatDimLabels((insightData as any).relatedDimensions)
                 }}</strong>
-                values co-occurring with
+                {{ t("settings.serviceIdentitySetup.valuesCoOccurringWith") }}
                 <strong>{{ insightData.title }}</strong
                 >.</span
               >
             </div>
-            <div class="tw:flex tw:flex-1 tw:min-h-0 tw:py-3">
+            <div class="flex flex-1 min-h-0 py-3">
               <div
                 v-for="(dim, dimIdx) in (insightData as any).relatedDimensions"
                 :key="dim.label + dimIdx"
-                class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:px-3"
+                class="flex-1 min-w-0 flex flex-col px-3"
                 :class="[
                   dimIdx > 0
                     ? store.state.theme === 'dark'
-                      ? 'tw:border-l tw:border-grey-8'
-                      : 'tw:border-l tw:border-grey-3'
+                      ? 'border-l border-grey-8'
+                      : 'border-l border-grey-3'
                     : '',
                 ]"
               >
                 <div
-                  class="tw:text-[13px] tw:font-bold tw:mb-2"
+                  class="text-[13px] font-bold mb-2"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:text-gray-200'
-                      : 'tw:text-gray-500'
+                      ? 'text-gray-200'
+                      : 'text-gray-500'
                   "
                 >
                   {{ dim.label }}
                   <span
-                    class="tw:font-normal"
+                    class="font-normal"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
+                        ? 'text-gray-400'
+                        : 'text-gray-400'
                     "
                     >({{ dim.values.length }})</span
                   >
                 </div>
                 <div
-                  class="tw:flex tw:flex-col tw:gap-1 tw:flex-1 tw:overflow-y-auto tw:min-h-0"
+                  class="flex flex-col gap-1 flex-1 overflow-y-auto min-h-0"
                 >
                   <span
                     v-for="dVal in dim.values"
                     :key="dVal"
-                    class="tw:text-[13px] tw:py-1 tw:px-2.5 tw:rounded-md tw:border tw:truncate tw:shrink-0"
+                    class="text-[13px] py-1 px-2.5 rounded-md border truncate shrink-0"
                     :class="{
-                      'tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3':
+                      'bg-teal-10/30 border-teal-9/50 text-teal-3':
                         dim.color === 'teal' && store.state.theme === 'dark',
-                      'tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8':
+                      'bg-teal-1/50 border-teal-2 text-teal-8':
                         dim.color === 'teal' && store.state.theme !== 'dark',
-                      'tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3':
+                      'bg-purple-10/30 border-purple-9/50 text-purple-3':
                         dim.color === 'purple' && store.state.theme === 'dark',
-                      'tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8':
+                      'bg-purple-1/50 border-purple-2 text-purple-8':
                         dim.color === 'purple' && store.state.theme !== 'dark',
-                      'tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3':
+                      'bg-blue-10/30 border-blue-9/50 text-blue-3':
                         dim.color === 'blue' && store.state.theme === 'dark',
-                      'tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8':
+                      'bg-blue-1/50 border-blue-2 text-blue-8':
                         dim.color === 'blue' && store.state.theme !== 'dark',
                     }"
                     :title="dVal"
@@ -1275,13 +1272,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                   <span
                     v-if="dim.values.length === 0"
-                    class="tw:text-xs tw:italic"
+                    class="text-xs italic"
                     :class="
                       store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
+                        ? 'text-gray-400'
+                        : 'text-gray-400'
                     "
-                    >No values</span
+                    >{{ t("settings.serviceIdentitySetup.noValues") }}</span
                   >
                 </div>
               </div>
@@ -1292,14 +1289,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Section 3: Warnings -->
-      <div v-if="warnings.length > 0" class="tw:mb-6">
+      <div v-if="warnings.length > 0" class="mb-6">
         <OBanner
           variant="warning"
           icon="warning"
           data-test="service-identity-warnings-banner"
         >
-          <div class="tw:flex tw:flex-col tw:gap-1">
-            <div v-for="(warn, idx) in warnings" :key="idx" class="tw:text-sm">
+          <div class="flex flex-col gap-1">
+            <div v-for="(warn, idx) in warnings" :key="idx" class="text-sm">
               {{ warn }}
             </div>
           </div>
@@ -1323,10 +1320,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="primaryDim?.display"
         :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
       >
-        <OCardSection class="tw:flex tw:flex-col tw:gap-4 tw:p-0 tw:border-t">
+        <OCardSection class="flex flex-col gap-4 p-0 border-t">
           <!-- Header section with cardinality details -->
-          <div class="tw:flex tw:items-center tw:gap-3 tw:p-4 tw:border-b">
-            <span class="tw:font-medium">Cardinality:</span>
+          <div class="flex items-center gap-3 p-4 border-b">
+            <span class="font-medium">{{ t("settings.serviceIdentitySetup.cardinality") }}</span>
             <OTag
               type="cardinalityClass"
               :value="
@@ -1334,8 +1331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'Unknown'
               "
             >
-              {{ dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }}
-              unique values
+              {{ t("settings.serviceIdentitySetup.uniqueValues", { n: dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }) }}
             </OTag>
             <OTag
               type="cardinalityClass"
@@ -1352,15 +1348,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selectedFieldAnalytics?.sample_values &&
               Object.keys(selectedFieldAnalytics.sample_values).length
             "
-            class="tw:flex tw:h-[300px]"
+            class="flex h-[300px]"
           >
             <!-- Left Pane: Streams List -->
             <div
-              class="tw:w-1/3 tw:border-r tw:bg-gray-50 tw:dark:bg-dark tw:flex tw:flex-col"
+              class="w-1/3 border-r bg-gray-50 dark:bg-dark flex flex-col"
             >
               <!-- Static column header — never scrolls, never gets covered -->
               <div
-                class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-gray-400 tw:border-b tw:flex tw:items-center tw:justify-between tw:shrink-0"
+                class="px-4 py-2 font-medium text-xs uppercase text-gray-400 border-b flex items-center justify-between shrink-0"
                 :style="{
                   backgroundColor:
                     store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
@@ -1372,11 +1368,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     (t) => selectedFieldAnalytics.sample_values[t],
                   )
                 }}</span>
-                <span class="tw:text-gray-400">Streams</span>
+                <span class="text-gray-400">{{ t("settings.serviceIdentitySetup.streams") }}</span>
               </div>
 
               <!-- Scrollable content -->
-              <div class="tw:overflow-y-auto tw:flex-1">
+              <div class="overflow-y-auto flex-1">
                 <!-- Filtered to one type: no section header needed -->
                 <template
                   v-if="
@@ -1389,9 +1385,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       selectedFieldAnalytics.sample_values[selectedStreamType],
                     )"
                     :key="streamName"
-                    class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate tw:hover:bg-primary/10"
+                    class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"
                     :class="{
-                      'tw:bg-primary/20 tw:text-primary tw:font-medium':
+                      'bg-primary/20 text-primary font-medium':
                         activeStreamId === streamName,
                     }"
                     @click="activeStreamId = streamName"
@@ -1412,7 +1408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="typeIdx > 0"
-                      class="tw:px-4 tw:py-1 tw:text-[10px] tw:font-bold tw:uppercase tw:text-gray-400 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:border-t"
+                      class="px-4 py-1 text-[10px] font-bold uppercase text-gray-400 sticky top-0 z-10 border-b border-t"
                       :style="{
                         backgroundColor:
                           store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
@@ -1425,9 +1421,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         selectedFieldAnalytics.sample_values[typeName],
                       )"
                       :key="typeName + '-' + streamName"
-                      class="tw:px-4 tw:py-3 tw:cursor-pointer tw:transition-colors tw:text-sm tw:font-mono tw:truncate tw:hover:bg-primary/10"
+                      class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"
                       :class="{
-                        'tw:bg-primary/20 tw:text-primary tw:font-medium':
+                        'bg-primary/20 text-primary font-medium':
                           activeStreamId === streamName &&
                           activeStreamType === typeName,
                       }"
@@ -1445,7 +1441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Right Pane: N-1 hierarchy columns -->
             <div
-              class="tw:flex-1 tw:flex tw:overflow-x-auto"
+              class="flex-1 flex overflow-x-auto"
               :style="{
                 backgroundColor:
                   store.state.theme === 'dark' ? '#1d1d1d' : '#ffffff',
@@ -1454,11 +1450,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(col, colIdx) in popupColumns"
                 :key="col.group_id"
-                class="tw:min-w-[160px] tw:flex-1 tw:overflow-y-auto"
-                :class="{ 'tw:border-l': colIdx > 0 }"
+                class="min-w-[160px] flex-1 overflow-y-auto"
+                :class="{ 'border-l': colIdx > 0 }"
               >
                 <div
-                  class="tw:px-4 tw:py-2 tw:font-medium tw:text-xs tw:uppercase tw:text-gray-400 tw:sticky tw:top-0 tw:z-10 tw:border-b"
+                  class="px-4 py-2 font-medium text-xs uppercase text-gray-400 sticky top-0 z-10 border-b"
                   :style="{
                     backgroundColor:
                       store.state.theme === 'dark' ? '#1d1d1d' : '#eeeeee',
@@ -1466,11 +1462,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ col.display }}
                 </div>
-                <div class="tw:p-4 tw:flex tw:flex-col tw:gap-2">
+                <div class="p-4 flex flex-col gap-2">
                   <div
                     v-for="val in getPopupColumnValues(colIdx)"
                     :key="val"
-                    class="tw:px-3 tw:py-2 tw:rounded tw:border tw:transition-colors tw:cursor-pointer tw:font-mono tw:truncate"
+                    class="px-3 py-2 rounded border transition-colors cursor-pointer font-mono truncate"
                     :style="
                       popupColumnSelections[colIdx] === val
                         ? {}
@@ -1485,7 +1481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :class="
                       popupColumnSelections[colIdx] === val
-                        ? 'tw:bg-primary/15 tw:border-primary/40 tw:text-primary tw:ring-1 tw:ring-primary/30'
+                        ? 'bg-primary/15 border-primary/40 text-primary ring-1 ring-primary/30'
                         : ''
                     "
                     @click="selectPopupColumnValue(colIdx, val)"
@@ -1494,24 +1490,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="getPopupColumnValues(colIdx).length === 0"
-                    class="tw:text-gray-400 tw:text-xs tw:italic tw:p-2"
+                    class="text-gray-400 text-xs italic p-2"
                   >
-                    No values
+                    {{ t("settings.serviceIdentitySetup.noValues") }}
                   </div>
                 </div>
               </div>
               <!-- Fallback when no ranked dims beyond the selected field -->
               <div
                 v-if="popupColumns.length === 0"
-                class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:text-gray-400 tw:text-sm tw:italic"
+                class="flex items-center justify-center flex-1 text-gray-400 text-sm italic"
               >
-                No additional dimensions detected.
+                {{ t("settings.serviceIdentitySetup.noAdditionalDimensions") }}
               </div>
             </div>
           </div>
 
-          <div v-else class="tw:text-gray-500 tw:italic tw:p-4 tw:text-center">
-            No sample data available for this field.
+          <div v-else class="text-gray-500 italic p-4 text-center">
+            {{ t("settings.serviceIdentitySetup.noSampleData") }}
           </div>
         </OCardSection>
       </ODialog>
@@ -1525,7 +1521,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
-import TagInput from "@/components/alerts/TagInput.vue";
+import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1900,62 +1896,62 @@ const DIM_CARD_THEMES = [
   {
     // blue
     icon: "cloud",
-    iconClass: "tw:text-blue-5",
-    countClass: "tw:text-blue-6",
+    iconClass: "text-blue-5",
+    countClass: "text-blue-6",
     borderDark:
       "border: 1px solid rgba(59,130,246,0.4); background: rgba(59,130,246,0.06)",
     borderLight:
       "border: 1px solid rgba(59,130,246,0.3); background: rgba(59,130,246,0.05)",
-    pillDark: "tw:bg-blue-10/30 tw:border-blue-9/50 tw:text-blue-3",
-    pillLight: "tw:bg-blue-1/50 tw:border-blue-2 tw:text-blue-8",
+    pillDark: "bg-blue-10/30 border-blue-9/50 text-blue-3",
+    pillLight: "bg-blue-1/50 border-blue-2 text-blue-8",
   },
   {
     // teal
     icon: "folder-open",
-    iconClass: "tw:text-teal-5",
-    countClass: "tw:text-teal-6",
+    iconClass: "text-teal-5",
+    countClass: "text-teal-6",
     borderDark:
       "border: 1px solid rgba(20,184,166,0.4); background: rgba(20,184,166,0.06)",
     borderLight:
       "border: 1px solid rgba(20,184,166,0.3); background: rgba(20,184,166,0.05)",
-    pillDark: "tw:bg-teal-10/30 tw:border-teal-9/50 tw:text-teal-3",
-    pillLight: "tw:bg-teal-1/50 tw:border-teal-2 tw:text-teal-8",
+    pillDark: "bg-teal-10/30 border-teal-9/50 text-teal-3",
+    pillLight: "bg-teal-1/50 border-teal-2 text-teal-8",
   },
   {
     // purple
     icon: "widgets",
-    iconClass: "tw:text-purple-5",
-    countClass: "tw:text-purple-6",
+    iconClass: "text-purple-5",
+    countClass: "text-purple-6",
     borderDark:
       "border: 1px solid rgba(168,85,247,0.4); background: rgba(168,85,247,0.06)",
     borderLight:
       "border: 1px solid rgba(168,85,247,0.3); background: rgba(168,85,247,0.05)",
-    pillDark: "tw:bg-purple-10/30 tw:border-purple-9/50 tw:text-purple-3",
-    pillLight: "tw:bg-purple-1/50 tw:border-purple-2 tw:text-purple-8",
+    pillDark: "bg-purple-10/30 border-purple-9/50 text-purple-3",
+    pillLight: "bg-purple-1/50 border-purple-2 text-purple-8",
   },
   {
     // amber
     icon: "lan",
-    iconClass: "tw:text-amber-5",
-    countClass: "tw:text-amber-6",
+    iconClass: "text-amber-5",
+    countClass: "text-amber-6",
     borderDark:
       "border: 1px solid rgba(245,158,11,0.4); background: rgba(245,158,11,0.06)",
     borderLight:
       "border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.05)",
-    pillDark: "tw:bg-amber-10/30 tw:border-amber-9/50 tw:text-amber-3",
-    pillLight: "tw:bg-amber-1/50 tw:border-amber-2 tw:text-amber-8",
+    pillDark: "bg-amber-10/30 border-amber-9/50 text-amber-3",
+    pillLight: "bg-amber-1/50 border-amber-2 text-amber-8",
   },
   {
     // rose
     icon: "hub",
-    iconClass: "tw:text-red-4",
-    countClass: "tw:text-red-5",
+    iconClass: "text-red-4",
+    countClass: "text-red-5",
     borderDark:
       "border: 1px solid rgba(244,63,94,0.4); background: rgba(244,63,94,0.06)",
     borderLight:
       "border: 1px solid rgba(244,63,94,0.3); background: rgba(244,63,94,0.05)",
-    pillDark: "tw:bg-red-10/30 tw:border-red-9/50 tw:text-red-3",
-    pillLight: "tw:bg-red-1/50 tw:border-red-2 tw:text-red-8",
+    pillDark: "bg-red-10/30 border-red-9/50 text-red-3",
+    pillLight: "bg-red-1/50 border-red-2 text-red-8",
   },
 ] as const;
 
@@ -2134,7 +2130,7 @@ function formatDimLabels(dims: any[]): string {
   return labels.slice(0, -1).join(", ") + ", and " + labels[labels.length - 1];
 }
 
-/** Returns tw:inline style for selected dimension pill — subtle primary highlight */
+/** Returns inline style for selected dimension pill — subtle primary highlight */
 function getDimSelectedStyle(_color: string): Record<string, string> {
   const isDark = store.state.theme === "dark";
   return {
@@ -2171,7 +2167,7 @@ const insightData = computed(() => {
       children.sort((a, b) => b.count - a.count);
       return {
         title: workloadSummary.value.primaryLabel,
-        subtitle: `${allValues.length} unique values detected`,
+        subtitle: t("settings.serviceIdentitySetup.uniqueValuesDetected", { n: allValues.length }),
         coverage: null,
         count: null,
         total: dim?.service_count ?? null,
@@ -2280,7 +2276,7 @@ const insightData = computed(() => {
       children.sort((a, b) => b.count - a.count);
       return {
         title: workloadSummary.value.secondaryLabel,
-        subtitle: `${allVals.length} unique values detected`,
+        subtitle: t("settings.serviceIdentitySetup.uniqueValuesDetected", { n: allVals.length }),
         coverage: null,
         count: null,
         total: dim?.service_count ?? null,
@@ -2372,12 +2368,12 @@ const insightData = computed(() => {
     children.sort((a, b) => b.count - a.count);
     return {
       title: workloadSummary.value.tertiaryLabel,
-      subtitle: `${allVals.length} unique values detected`,
+      subtitle: t("settings.serviceIdentitySetup.uniqueValuesDetected", { n: allVals.length }),
       coverage: null,
       count: null,
       total: dim?.service_count ?? null,
       childLabel: "",
-      childCountLabel: "locations",
+      childCountLabel: t("settings.serviceIdentitySetup.locations"),
       children,
       maxChildCount: Math.max(...children.map((c) => c.count), 1),
       isCardLevel: true,
@@ -3117,7 +3113,7 @@ function getDisambiguationOptions(rowIndex: number) {
     }));
 }
 
-/** Returns a Quasar color token for a stream type chip */
+/** Returns a color token for a stream type chip */
 function streamTypeColor(streamType: string): string {
   const map: Record<string, string> = {
     logs: "blue",
@@ -3294,13 +3290,20 @@ function getFieldCardinalityTooltip(fieldId: string): string | null {
   const formatted = cardClass
     ? cardClass.replace(/([a-z])([A-Z])/g, "$1 $2")
     : "";
-  const classLabel = formatted ? ` (${formatted} cardinality)` : "";
-  return `${count} unique values${classLabel} — fewer values = better for grouping`;
+  const classLabel = formatted
+    ? t("settings.serviceIdentitySetup.cardinalityClassLabel", {
+        cardinality: formatted,
+      })
+    : "";
+  return t("settings.serviceIdentitySetup.fieldCardinalityTooltip", {
+    count,
+    classLabel,
+  });
 }
 
 /**
  * Whether the current fields are from auto-suggestion (no saved config existed).
- * We track this so we can show an tw:inline hint only on first setup.
+ * We track this so we can show an inline hint only on first setup.
  */
 const isAutoSuggested = computed(() => {
   return (
@@ -3309,7 +3312,7 @@ const isAutoSuggested = computed(() => {
   );
 });
 
-/** Options for the tw:inline "add field" select for a specific env */
+/** Options for the inline "add field" select for a specific env */
 function getAddFieldOptionsForEnv(envKey: string) {
   // Exclude fields already added in the current env AND all other envs
   const allUsedFields = Object.values(setDistinguishBy.value)
@@ -3335,7 +3338,7 @@ function getAddFieldOptionsForEnv(envKey: string) {
     });
 }
 
-/** Called when user picks a field in the tw:inline select for a specific env */
+/** Called when user picks a field in the inline select for a specific env */
 function onAddFieldToEnv(envKey: string, val: unknown) {
   if (!val || typeof val !== "string") return;
   const current = setDistinguishBy.value[envKey] ?? [];
@@ -3355,8 +3358,7 @@ function applySuggestion() {
   suggestionDismissed.value = true;
   toast({
     variant: "success",
-    message:
-      'Recommended configuration applied. Click "Save Configuration" to save.',
+    message: t("settings.serviceIdentitySetup.recommendedConfigApplied"),
   });
 }
 
@@ -3616,7 +3618,7 @@ async function saveConfig() {
     if (trackedAliasIds.value.length === 0) {
       toast({
         variant: "warning",
-        message: "Select at least one tracked alias group.",
+        message: t("settings.serviceIdentitySetup.selectAtLeastOneTrackedAlias"),
       });
       return;
     }

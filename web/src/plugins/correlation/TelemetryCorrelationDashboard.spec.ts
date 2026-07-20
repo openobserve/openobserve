@@ -534,6 +534,45 @@ describe("TelemetryCorrelationDashboard.vue", () => {
     });
   });
 
+  describe("clearing the metric selection", () => {
+    // Regression (o2-enterprise#2188): deselecting the last checked metric left
+    // its chart on screen. Both reload paths were gated on a non-empty
+    // selection, so nothing ever tore the rendered dashboard down.
+    it("should drop the rendered charts when the last metric is deselected", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = createWrapper();
+
+        // Stand in for a loaded dashboard with one metric charted.
+        wrapper.vm.initialLoadCompleted = true;
+        wrapper.vm.selectedMetricStreams = [...mockMetricStreams.slice(0, 1)];
+        await nextTick();
+        wrapper.vm.dashboardData = {
+          tabs: [{ panels: [{ id: `${mockMetricStreams[0].stream_name}_1` }] }],
+        };
+        wrapper.vm.groupedDashboardData = {
+          compute: { tabs: [{ panels: [{ id: "p1" }] }] },
+        };
+        await nextTick();
+
+        // Uncheck it — the selection is now empty.
+        wrapper.vm.toggleMetricStream(mockMetricStreams[0]);
+        await nextTick();
+        expect(wrapper.vm.selectedMetricStreams.length).toBe(0);
+
+        // The stream watcher debounces before acting.
+        vi.advanceTimersByTime(500);
+        await flushPromises();
+
+        expect(wrapper.vm.dashboardData).toBeNull();
+        expect(wrapper.vm.groupedDashboardData).toEqual({});
+        expect(wrapper.vm.activeDashboardForGroup).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("toggleGroupCollapse", () => {
     it("should add group to collapsedGroups when not collapsed", async () => {
       wrapper = createWrapper();

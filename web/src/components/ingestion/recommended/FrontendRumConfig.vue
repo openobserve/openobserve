@@ -73,14 +73,14 @@ const subs = computed<CardSubstitutions>(() => ({
 </script>
 
 <template>
-  <div class="tw:p-2">
+  <div class="p-2">
     <SetupCardRenderer
       v-if="rumToken"
       :content="content"
       :subs="subs"
       data-test="rum-web-setup-card"
     />
-    <p v-else class="tw:mt-1" data-test="rum-web-no-token-message">
+    <p v-else class="mt-1" data-test="rum-web-no-token-message">
       {{ t("ingestion.generateRUMTokenMessage") }}
     </p>
   </div>

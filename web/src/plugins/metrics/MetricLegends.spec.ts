@@ -20,8 +20,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
-// Install Quasar plugins
-
 /**
  * Helper to query the dropdown theme wrapper div. The migrated component
  * places the theme class on the first child <div> of the ODropdown default
@@ -217,15 +215,15 @@ describe("MetricLegends", () => {
 
     it("should render separator", () => {
       // The migrated component uses a native border div instead of <q-separator>
-      const separator = wrapper.find('.tw\\:border-t');
+      const separator = wrapper.find('.border-t');
       expect(separator.exists()).toBe(true);
     });
 
     it("should render legend grid", () => {
       // legend-grid scoped class replaced by Tailwind grid utilities
-      const legendGrid = wrapper.find(".legends .tw\\:grid");
+      const legendGrid = wrapper.find(".legends .grid");
       expect(legendGrid.exists()).toBe(true);
-      expect(legendGrid.classes()).toContain("tw:grid-cols-2");
+      expect(legendGrid.classes()).toContain("grid-cols-2");
     });
   });
 
@@ -556,7 +554,7 @@ describe("MetricLegends", () => {
 
     it("should render an icon alongside each legend item label", () => {
       // Each legend item must have both an icon and a non-empty text label —
-      // the "tw:mr-2" spacing class is a visual detail handled by CSS, not a
+      // the "mr-2" spacing class is a visual detail handled by CSS, not a
       // behavioral assertion.
       const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
       expect(legendItems.length).toBe(4);

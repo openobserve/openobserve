@@ -18,25 +18,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="plan-node" data-test="query-plan-node">
     <!-- Node content -->
     <div
-      class="node-line tw:flex tw:items-center tw:gap-0 tw:py-[2px] tw:whitespace-pre"
+      class="node-line flex items-center gap-0 py-[2px] whitespace-pre"
     >
       <!-- Parent prefix indentation -->
       <span
         v-if="parentPrefix"
         data-test="query-plan-node-tree-indent"
-        class="tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:whitespace-pre tw:dark:text-[rgba(255,255,255,0.3)]"
+        class="text-[rgba(0,0,0,0.3)] font-bold select-none whitespace-pre dark:text-[rgba(255,255,255,0.3)]"
       >{{ parentPrefix }}</span>
 
       <!-- Tree connector -->
       <span
         data-test="query-plan-node-tree-connector"
-        class="tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:pr-1 tw:dark:text-[rgba(255,255,255,0.3)]"
+        class="text-[rgba(0,0,0,0.3)] font-bold select-none pr-1 dark:text-[rgba(255,255,255,0.3)]"
       >{{ connector }}</span>
 
       <!-- Expand/collapse icon for nodes with children -->
       <span
         v-if="node.children.length > 0"
-        class="expand-icon tw:cursor-pointer tw:select-none tw:text-(--q-primary) tw:text-[10px] tw:w-4 tw:inline-block tw:text-center tw:hover:opacity-70"
+        class="expand-icon cursor-pointer select-none text-(--q-primary) text-[10px] w-4 inline-block text-center hover:opacity-70"
         data-test="query-plan-node-expand-icon"
         @click="toggleChildrenExpanded"
       >
@@ -45,22 +45,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-else
         data-test="query-plan-node-expand-icon-spacer"
-        class="tw:w-4 tw:inline-block"
+        class="w-4 inline-block"
       ></span>
 
       <!-- Operator name -->
       <span
         data-test="query-plan-node-operator-name"
-        class="tw:font-semibold tw:text-[rgba(0,0,0,0.87)] tw:pl-1 tw:dark:text-[rgba(255,255,255,0.87)]"
+        class="font-semibold text-[rgba(0,0,0,0.87)] pl-1 dark:text-[rgba(255,255,255,0.87)]"
       >{{ node.name }}</span>
 
       <!-- Inline details (clickable to expand if truncated) -->
       <span
         v-if="inlineDetails"
-        class="inline-details tw:text-[rgba(0,0,0,0.7)] tw:font-normal tw:text-xs tw:italic tw:dark:text-[rgba(255,255,255,0.7)]"
+        class="inline-details text-[rgba(0,0,0,0.7)] font-normal text-xs italic dark:text-[rgba(255,255,255,0.7)]"
         :class="{
-          'tw:cursor-pointer': hasLongDetails,
-          'tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis] tw:max-w-[600px] truncated': !detailsExpanded && hasLongDetails,
+          'cursor-pointer': hasLongDetails,
+          'whitespace-nowrap overflow-hidden [text-overflow:ellipsis] max-w-[600px] truncated': !detailsExpanded && hasLongDetails,
           clickable: hasLongDetails,
         }"
         data-test="query-plan-node-inline-details"
@@ -73,19 +73,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-if="inlineDetails && (isAnalyze && hasMetrics)"
         data-test="query-plan-node-separator"
-        class="tw:text-[rgba(0,0,0,0.4)] tw:px-2 tw:font-normal tw:select-none tw:dark:text-[rgba(255,255,255,0.4)]"
+        class="text-[rgba(0,0,0,0.4)] px-2 font-normal select-none dark:text-[rgba(255,255,255,0.4)]"
       >·</span>
 
       <!-- Metrics (for ANALYZE mode) -->
       <span
         v-if="isAnalyze && hasMetrics"
         data-test="query-plan-node-metrics-inline"
-        class="tw:flex tw:gap-2"
+        class="flex gap-2"
       >
         <span
           v-if="node.metrics.output_rows !== undefined"
           data-test="query-plan-node-metric-badge"
-          class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[2px] tw:px-2 tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:rounded tw:text-[11px] tw:font-medium tw:text-(--q-primary) tw:whitespace-nowrap tw:dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
+          class="inline-flex items-center gap-1 py-[2px] px-2 bg-[rgba(var(--q-primary-rgb),0.1)] rounded text-[11px] font-medium text-(--q-primary) whitespace-nowrap dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
         >
           <OIcon name="format-list-numbered" size="xs" />
           {{ formatNumber(node.metrics.output_rows) }} rows
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-if="node.metrics.elapsed_compute"
           data-test="query-plan-node-metric-badge"
-          class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[2px] tw:px-2 tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:rounded tw:text-[11px] tw:font-medium tw:text-(--q-primary) tw:whitespace-nowrap tw:dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
+          class="inline-flex items-center gap-1 py-[2px] px-2 bg-[rgba(var(--q-primary-rgb),0.1)] rounded text-[11px] font-medium text-(--q-primary) whitespace-nowrap dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
         >
           <OIcon name="schedule" size="xs" />
           {{ node.metrics.elapsed_compute }}
@@ -105,10 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="detailsExpanded && hasLongDetails"
       data-test="query-plan-node-details"
-      class="tw:pt-[2px] tw:pb-[2px] tw:text-[rgba(0,0,0,0.7)] tw:text-xs tw:italic tw:whitespace-pre-wrap tw:break-words tw:dark:text-[rgba(255,255,255,0.7)]"
+      class="pt-[2px] pb-[2px] text-[rgba(0,0,0,0.7)] text-xs italic whitespace-pre-wrap break-words dark:text-[rgba(255,255,255,0.7)]"
     >
       <span
-        class="tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:whitespace-pre tw:dark:text-[rgba(255,255,255,0.3)]"
+        class="text-[rgba(0,0,0,0.3)] font-bold select-none whitespace-pre dark:text-[rgba(255,255,255,0.3)]"
       >{{ childPrefix }}  </span>
       <span>{{ inlineDetails }}</span>
     </div>

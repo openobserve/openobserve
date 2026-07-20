@@ -38,23 +38,6 @@ vi.mock("date-fns-tz", () => ({
   toZonedTime: vi.fn((date, tz) => new Date(date))
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    date: {
-      subtractFromDate: vi.fn((date, obj) => {
-        const result = new Date(date);
-        if (obj.minutes) result.setMinutes(result.getMinutes() - obj.minutes);
-        if (obj.hours) result.setHours(result.getHours() - obj.hours);  
-        if (obj.days) result.setDate(result.getDate() - obj.days);
-        return result;
-      })
-    },
-    useQuasar: vi.fn(() => ({}))
-  };
-});
-
 describe("DateTime Component", () => {
   let wrapper: any = null;
 

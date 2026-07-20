@@ -8,7 +8,7 @@ defineSlots<TimelineSlots>();
 
 <template>
   <ol
-    class="tw:relative tw:list-none tw:m-0 tw:p-0"
+    class="relative list-none m-0 p-0"
     v-bind="$attrs"
   >
     <slot />

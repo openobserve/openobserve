@@ -159,9 +159,20 @@ function updateScrollState(): void {
     canScrollRight.value = false
     return
   }
-  hasOverflow.value = el.scrollWidth > el.clientWidth + 1
+  // Measure the tabs, not scrollWidth: the sliding underline's transformed
+  // bounds extend scrollWidth and would flash the arrows mid-animation.
+  let contentWidth = 0
+  const list = tablistRef.value
+  if (list) {
+    for (const tab of list.querySelectorAll<HTMLElement>('[role="tab"]')) {
+      const right = tab.offsetLeft + tab.offsetWidth
+      if (right > contentWidth) contentWidth = right
+    }
+    if (contentWidth > 0) contentWidth += 3 // tablist px-[3px] right padding
+  }
+  hasOverflow.value = contentWidth > el.clientWidth + 1
   canScrollLeft.value = el.scrollLeft > 1
-  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+  canScrollRight.value = el.scrollLeft + el.clientWidth < contentWidth - 1
   // Tab geometry can shift on resize (wrap/overflow) — keep the bar aligned.
   updateIndicator()
 }
@@ -174,6 +185,15 @@ function scrollTabs(direction: 1 | -1): void {
 
 let ro: ResizeObserver | null = null
 let mo: MutationObserver | null = null
+let scrollStateRaf = 0
+
+// Re-measure now and on the next frame: mutation callbacks can sample
+// mid-update layout, and a wrong hasOverflow would never self-correct.
+function updateScrollStateSettled(): void {
+  updateScrollState()
+  cancelAnimationFrame(scrollStateRaf)
+  scrollStateRaf = requestAnimationFrame(() => updateScrollState())
+}
 
 onMounted(() => {
   if (isVertical.value) return
@@ -183,11 +203,10 @@ onMounted(() => {
   ro = new ResizeObserver(updateScrollState)
   ro.observe(el)
   if (tablistRef.value) ro.observe(tablistRef.value)
-  // Reordering tabs changes their order without changing modelValue or the
-  // tablist size, so the ResizeObserver won't fire. Watch the child list (and
-  // the active-state attribute) so the underline re-measures after a reorder.
+  // Reorders and add/removes don't resize the stretched tablist, so the
+  // ResizeObserver misses them — watch the child list instead.
   if (tablistRef.value) {
-    mo = new MutationObserver(() => updateIndicator())
+    mo = new MutationObserver(() => updateScrollStateSettled())
     mo.observe(tablistRef.value, {
       childList: true,
       subtree: true,
@@ -206,6 +225,7 @@ onUnmounted(() => {
   scrollRef.value?.removeEventListener('scroll', updateScrollState)
   ro?.disconnect()
   mo?.disconnect()
+  cancelAnimationFrame(scrollStateRaf)
 })
 
 // Auto-scroll to reveal the active tab when modelValue changes
@@ -229,10 +249,10 @@ watch(() => props.modelValue, async () => {
 
 // ── CSS classes ────────────────────────────────────────────────────────────
 const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
-  left:    'tw:justify-start',
-  center:  'tw:justify-center',
-  right:   'tw:justify-end',
-  justify: 'tw:justify-stretch',
+  left:    'justify-start',
+  center:  'justify-center',
+  right:   'justify-end',
+  justify: 'justify-stretch',
 }
 </script>
 
@@ -249,7 +269,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     <TabsList as-child :loop="true">
       <div
         ref="tablistRef"
-        :class="['o-tabs tw:flex tw:flex-col tw:gap-0.5 tw:relative tw:p-1', alignClasses[align], { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]"
+        :class="['o-tabs flex flex-col gap-0.5 relative p-1', alignClasses[align], { 'border-b border-solid border-[var(--o2-border-color)]': bordered }]"
         @dragstart="onTabDragStart"
         @dragover="onTabDragOver"
         @drop="onTabDrop"
@@ -269,7 +289,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
     as-child
     @update:model-value="(v) => onTabClick(v as string | number)"
   >
-    <div :class="['tw:flex tw:flex-row tw:items-stretch', { 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]': bordered }]">
+    <div :class="['flex flex-row items-stretch', { 'border-b border-solid border-[var(--o2-border-color)]': bordered }]">
       <!-- Left arrow -->
       <button
         v-show="hasOverflow"
@@ -277,7 +297,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
         type="button"
         aria-hidden="true"
         tabindex="-1"
-        class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:cursor-pointer tw:text-tabs-active-text tw:enabled:hover:text-tabs-indicator tw:disabled:opacity-30 tw:disabled:cursor-default tw:border-b-2 tw:border-transparent tw:bg-transparent tw:outline-none"
+        class="flex items-center justify-center shrink-0 w-10 cursor-pointer text-tabs-active-text enabled:hover:text-tabs-indicator disabled:opacity-30 disabled:cursor-default border-b-2 border-transparent bg-transparent outline-none"
         @click="scrollTabs(-1)"
       >
         <OIcon name="chevron-left" size="md" />
@@ -286,12 +306,12 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
       <!-- Overflow-hidden scroll container -->
       <div
         ref="scrollRef"
-        class="tw:flex-1 tw:overflow-x-hidden tw:relative tw:pt-0.75"
+        class="flex-1 overflow-x-hidden relative pt-0.75"
       >
         <TabsList as-child :loop="true">
           <div
             ref="tablistRef"
-            :class="['o-tabs tw:flex tw:flex-row tw:relative tw:px-[3px]', alignClasses[align]]"
+            :class="['o-tabs flex flex-row relative px-[3px]', alignClasses[align]]"
             @focusin="handleFocusin"
             @dragstart="onTabDragStart"
             @dragover="onTabDragOver"
@@ -304,8 +324,8 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
               v-show="indicator.visible"
               aria-hidden="true"
               data-test="otabs-active-indicator"
-              class="tw:absolute tw:bottom-0 tw:left-0 tw:h-0.5 tw:rounded-full tw:bg-tabs-indicator tw:pointer-events-none tw:z-10"
-              :class="indicatorReady ? 'tw:transition-[transform,width] tw:duration-300 tw:ease-out' : ''"
+              class="absolute bottom-0 left-0 h-0.5 rounded-full bg-tabs-indicator pointer-events-none z-10"
+              :class="indicatorReady ? 'transition-[transform,width] duration-300 ease-out' : ''"
               :style="{
                 transform: `translateX(${indicator.left}px)`,
                 width: `${indicator.width}px`,
@@ -323,7 +343,7 @@ const alignClasses: Record<NonNullable<OTabsProps['align']>, string> = {
         type="button"
         aria-hidden="true"
         tabindex="-1"
-        class="tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:cursor-pointer tw:text-tabs-active-text tw:enabled:hover:text-tabs-indicator tw:disabled:opacity-30 tw:disabled:cursor-default tw:border-b-2 tw:border-transparent tw:bg-transparent tw:outline-none"
+        class="flex items-center justify-center shrink-0 w-10 cursor-pointer text-tabs-active-text enabled:hover:text-tabs-indicator disabled:opacity-30 disabled:cursor-default border-b-2 border-transparent bg-transparent outline-none"
         @click="scrollTabs(1)"
       >
         <OIcon name="chevron-right" size="md" />

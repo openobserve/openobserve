@@ -1,10 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+
+const { t } = useI18n();
 
 const performanceOpen = ref(false);
 
@@ -60,29 +63,29 @@ const hasPerformanceData = computed(
 const metadataRows = computed(() =>
   [
     {
-      label: "DB System",
+      label: t("traces.dbSpanDetails.dbSystem"),
       value: String(dbSystem.value || ""),
       key: "db-system",
     },
     {
-      label: "Operation",
+      label: t("traces.dbSpanDetails.operation"),
       value: String(props.span.db_operation_name ?? ""),
       key: "operation",
     },
     {
-      label: "Database",
+      label: t("traces.dbSpanDetails.database"),
       value: String(props.span.db_namespace ?? props.span.db_name ?? ""),
       key: "namespace",
     },
     {
-      label: "Table / Collection",
+      label: t("traces.dbSpanDetails.tableCollection"),
       value: String(tableDisplay.value || ""),
       key: "table",
     },
-    { label: "Host", value: hostDisplay.value, key: "host" },
-    { label: "User", value: String(props.span.db_user ?? ""), key: "user" },
+    { label: t("traces.dbSpanDetails.host"), value: hostDisplay.value, key: "host" },
+    { label: t("traces.dbSpanDetails.user"), value: String(props.span.db_user ?? ""), key: "user" },
     {
-      label: "Stored Procedure",
+      label: t("traces.dbSpanDetails.storedProcedure"),
       value: String(props.span.db_stored_procedure_name ?? ""),
       key: "stored-proc",
     },
@@ -91,15 +94,15 @@ const metadataRows = computed(() =>
 </script>
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full tw:overflow-auto tw:gap-3">
+  <div class="flex flex-col h-full overflow-auto gap-3">
     <OCard data-test="traces-db-span-details-metadata-grid">
-      <OCardSection class="tw:py-0! tw:px-0!">
-        <div class="tw:flex tw:flex-wrap tw:gap-2">
+      <OCardSection class="py-0! px-0!">
+        <div class="flex flex-wrap gap-2">
           <span
             v-for="row in metadataRows"
             :key="row.key"
             :data-test="`traces-db-span-details-tag-${row.key}`"
-            class="tw:inline-flex tw:items-center tw:gap-1 tw:rounded-md tw:px-2 tw:py-1 tw:text-[0.85rem]"
+            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.85rem]"
             style="
               background: var(--o2-card-background);
               border: 1px solid var(--o2-border);
@@ -109,18 +112,18 @@ const metadataRows = computed(() =>
             <span style="color: var(--o2-text-secondary)"
               >{{ row.label }}:</span
             >
-            <span class="tw:break-all">{{ row.value }}</span>
+            <span class="break-all">{{ row.value }}</span>
           </span>
         </div>
       </OCardSection>
     </OCard>
 
     <OCard
-      class="tw:flex-1 tw:flex tw:flex-col"
+      class="flex-1 flex flex-col"
       data-test="traces-db-span-details-query-editor"
     >
       <OCardSection
-        class="tw:flex-1 tw:flex tw:flex-col tw:p-0 tw:min-h-[18.75rem] tw:p-[0.375rem]!"
+        class="flex-1 flex flex-col p-0 min-h-[18.75rem] p-[0.375rem]!"
       >
         <CodeQueryEditor
           v-if="queryText"
@@ -130,15 +133,15 @@ const metadataRows = computed(() =>
           :showAutoComplete="false"
           :showAiIcon="false"
           editorId="db-span-query-editor"
-          class="tw:flex-1"
+          class="flex-1"
         />
         <div
           v-else
           data-test="traces-db-span-details-no-query"
-          class="tw:p-4 tw:text-sm"
+          class="p-4 text-sm"
           style="color: var(--o2-text-secondary)"
         >
-          No query text recorded for this span.
+          {{ t("traces.dbSpanDetails.noQueryText") }}
         </div>
       </OCardSection>
     </OCard>
@@ -146,35 +149,35 @@ const metadataRows = computed(() =>
     <OCollapsible
       v-if="hasPerformanceData"
       v-model="performanceOpen"
-      label="Performance"
+      :label="t('traces.dbSpanDetails.performance')"
       data-test="traces-db-span-details-performance"
     >
-      <div class="tw:py-2 tw:px-3">
-          <div class="tw:grid tw:grid-cols-2 tw:gap-x-4 tw:gap-y-1">
+      <div class="py-2 px-3">
+          <div class="grid grid-cols-2 gap-x-4 gap-y-1">
             <template v-if="span.db_response_returned_rows">
-              <div class="tw:text-xs" style="color: var(--o2-text-secondary)">
-                Rows Returned
+              <div class="text-xs" style="color: var(--o2-text-secondary)">
+                {{ t("traces.dbSpanDetails.rowsReturned") }}
               </div>
-              <div class="tw:text-xs">{{ span.db_response_returned_rows }}</div>
+              <div class="text-xs">{{ span.db_response_returned_rows }}</div>
             </template>
             <template v-if="span.db_operation_batch_size">
-              <div class="tw:text-xs" style="color: var(--o2-text-secondary)">
-                Batch Size
+              <div class="text-xs" style="color: var(--o2-text-secondary)">
+                {{ t("traces.dbSpanDetails.batchSize") }}
               </div>
-              <div class="tw:text-xs">{{ span.db_operation_batch_size }}</div>
+              <div class="text-xs">{{ span.db_operation_batch_size }}</div>
             </template>
             <template v-if="span.db_query_summary">
-              <div class="tw:text-xs" style="color: var(--o2-text-secondary)">
-                Query Summary
+              <div class="text-xs" style="color: var(--o2-text-secondary)">
+                {{ t("traces.dbSpanDetails.querySummary") }}
               </div>
-              <div class="tw:text-xs">{{ span.db_query_summary }}</div>
+              <div class="text-xs">{{ span.db_query_summary }}</div>
             </template>
             <template v-if="span.db_response_status_code">
-              <div class="tw:text-xs" style="color: var(--o2-text-secondary)">
-                Response Status
+              <div class="text-xs" style="color: var(--o2-text-secondary)">
+                {{ t("traces.dbSpanDetails.responseStatus") }}
               </div>
               <div
-                class="tw:text-xs"
+                class="text-xs"
                 style="color: var(--o2-status-error-text)"
               >
                 {{ span.db_response_status_code }}

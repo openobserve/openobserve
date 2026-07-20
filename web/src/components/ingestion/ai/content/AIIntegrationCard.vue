@@ -67,12 +67,12 @@ const renderedSections = computed(() =>
 </script>
 
 <template>
-  <div class="o2-card tw:min-w-0" data-test="ai-integration-card">
-    <div class="o2-card-inner tw:min-w-0">
+  <div class="o2-card min-w-0" data-test="ai-integration-card">
+    <div class="o2-card-inner min-w-0">
       <!-- Header chrome -->
-      <header class="tw:mb-5">
-        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-          <h2 class="tw:text-xl tw:font-semibold tw:m-0 tw:leading-tight">
+      <header class="mb-5">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h2 class="text-xl font-semibold m-0 leading-tight">
             {{ metadata.displayName }}
           </h2>
           <OTag v-if="metadata.category" type="integrationMeta" value="category">
@@ -84,7 +84,7 @@ const renderedSections = computed(() =>
         </div>
         <p
           v-if="metadata.tagline"
-          class="tw:text-sm tw:opacity-60 tw:mt-1.5 tw:mb-0"
+          class="text-sm opacity-60 mt-1.5 mb-0"
         >
           {{ metadata.tagline }}
         </p>
@@ -96,21 +96,21 @@ const renderedSections = computed(() =>
         :key="`warn-${i}`"
         variant="warning"
         :content="w"
-        class="tw:mb-5"
+        class="mb-5"
       />
 
       <!-- Sections (all open — install guides read top to bottom) -->
       <section
         v-for="section in renderedSections"
         :key="section.title"
-        class="o2-section tw:min-w-0"
+        class="o2-section min-w-0"
       >
         <h3 class="o2-section-title">{{ section.title }}</h3>
         <template v-for="(seg, j) in section.segments" :key="j">
           <div
             v-if="seg.type === 'html'"
-            class="o2-card-md tw:prose tw:prose-sm tw:max-w-none tw:min-w-0"
-            :class="{ 'tw:prose-invert': isDark }"
+            class="o2-card-md prose prose-sm max-w-none min-w-0"
+            :class="{ 'prose-invert': isDark }"
             v-html="seg.html"
           ></div>
           <OCodeBlock v-else :code="seg.code" :lang="seg.lang" data-test="ai-md-code" />
@@ -119,7 +119,7 @@ const renderedSections = computed(() =>
 
       <!-- Documentation link — identical markup to the legacy ingestion cards
            (AIIntegrationDetail.vue) so it looks the same across all sections. -->
-      <div v-if="docUrl" class="tw:font-bold tw:pt-6 tw:pb-2">
+      <div v-if="docUrl" class="font-bold pt-6 pb-2">
         Click
         <a
           :href="safeHttpUrl(docUrl)"

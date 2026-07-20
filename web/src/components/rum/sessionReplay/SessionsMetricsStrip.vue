@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="tw:grid tw:grid-cols-2 tw:lg:grid-cols-5 tw:gap-2 tw:p-2"
+    class="grid grid-cols-2 lg:grid-cols-5 gap-2 p-2"
     data-test="rum-sessions-metrics-strip"
     aria-label="Session metrics summary"
   >
@@ -24,11 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="card in cards"
       :key="card.key"
       type="button"
-      class="metric-card tw:flex tw:flex-col tw:items-start tw:gap-0.5 tw:text-left tw:rounded-lg tw:border tw:p-3 tw:transition-colors"
+      class="metric-card flex flex-col items-start gap-0.5 text-left rounded-lg border p-3 transition-colors"
       :class="
         card.key === activeCard
-          ? 'tw:border-[var(--o2-primary-color)]'
-          : 'tw:border-border-default'
+          ? 'border-[var(--o2-primary-color)]'
+          : 'border-border-default'
       "
       :aria-pressed="card.key === activeCard"
       :disabled="!card.selectable"
@@ -36,20 +36,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="card.selectable && emit('select', card.key)"
     >
       <span
-        class="tw:text-xs tw:font-medium tw:uppercase tw:tracking-wide tw:text-[var(--o2-text-label)]"
-      >{{ card.label }}</span>
-      <span class="tw:flex tw:items-baseline tw:gap-1.5">
+        class="text-xs font-medium uppercase tracking-wide text-[var(--o2-text-label)]"
+        >{{ card.label }}</span
+      >
+      <span class="flex items-baseline gap-1.5">
         <span
-          class="tw:text-2xl tw:font-semibold tw:tabular-nums"
+          class="text-2xl font-semibold tabular-nums"
           :class="card.valueClass"
           :data-test="`rum-sessions-metric-${card.key}-value`"
-        >{{ card.value }}</span>
+          >{{ card.value }}</span
+        >
         <span
           v-if="card.rate"
-          class="tw:text-sm tw:text-[var(--o2-text-secondary)] tw:tabular-nums"
-        >· {{ card.rate }}</span>
+          class="text-sm text-[var(--o2-text-secondary)] tabular-nums"
+          >· {{ card.rate }}</span
+        >
       </span>
-      <small :class="card.captionClass || 'tw:text-[var(--o2-text-caption)]'">{{
+      <small :class="card.captionClass || 'text-[var(--o2-text-caption)]'">{{
         card.caption
       }}</small>
     </button>
@@ -125,10 +128,10 @@ const deltaCaption = (
     // More sessions is neutral; more errors/frustration is bad, fewer is good.
     captionClass:
       suffix === "%"
-        ? "tw:text-[var(--o2-text-caption)]"
+        ? "text-[var(--o2-text-caption)]"
         : delta > 0
-          ? "tw:text-[var(--o2-status-error-text)]"
-          : "tw:text-[var(--o2-status-success-text)]",
+          ? "text-[var(--o2-status-error-text)]"
+          : "text-[var(--o2-status-success-text)]",
   };
 };
 
@@ -137,7 +140,7 @@ const cards = computed(() => [
     key: "sessions" as const,
     label: t("rum.sessions"),
     value: props.total.toLocaleString(),
-    valueClass: "tw:text-[var(--o2-text-heading)]",
+    valueClass: "text-[var(--o2-text-heading)]",
     rate: "",
     ...deltaCaption(props.sessionsDeltaPct, t("rum.inTimeRange"), "%"),
     selectable: true,
@@ -148,8 +151,8 @@ const cards = computed(() => [
     value: props.errorSessions.toLocaleString(),
     valueClass:
       props.errorSessions > 0
-        ? "tw:text-[var(--o2-severity-error-color)]"
-        : "tw:text-[var(--o2-text-heading)]",
+        ? "text-[var(--o2-severity-error-color)]"
+        : "text-[var(--o2-text-heading)]",
     rate: rate(props.errorSessions),
     ...deltaCaption(props.errorsDelta, t("rum.sessionsWithErrors")),
     selectable: true,
@@ -160,8 +163,8 @@ const cards = computed(() => [
     value: props.frustratedSessions.toLocaleString(),
     valueClass:
       props.frustratedSessions > 0
-        ? "tw:text-[var(--o2-severity-warning-color)]"
-        : "tw:text-[var(--o2-text-heading)]",
+        ? "text-[var(--o2-severity-warning-color)]"
+        : "text-[var(--o2-text-heading)]",
     rate: rate(props.frustratedSessions),
     ...deltaCaption(props.frustratedDelta, t("rum.rageDeadClicks")),
     selectable: true,
@@ -170,7 +173,7 @@ const cards = computed(() => [
     key: "duration" as const,
     label: t("rum.avgDuration"),
     value: formatMs(props.avgDurationMs),
-    valueClass: "tw:text-[var(--o2-text-heading)]",
+    valueClass: "text-[var(--o2-text-heading)]",
     rate: "",
     caption: `${t("rum.median")} ${formatMs(props.medianDurationMs)}`,
     captionClass: "",
@@ -180,7 +183,7 @@ const cards = computed(() => [
     key: "bounced" as const,
     label: t("rum.bounceRate"),
     value: bounceRate.value,
-    valueClass: "tw:text-[var(--o2-text-heading)]",
+    valueClass: "text-[var(--o2-text-heading)]",
     rate: "",
     caption: t("rum.ofTotal", {
       count: props.bouncedSessions,

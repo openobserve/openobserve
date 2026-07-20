@@ -1,15 +1,15 @@
 ﻿<template>
-  <aside class="tw:flex tw:flex-col tw:gap-2.5 tw:p-3 tw:pb-4 tw:bg-(--o2-card-bg) tw:border tw:border-dialog-header-border tw:rounded-md tw:min-h-0 tw:max-h-[calc(100vh-var(--navbar-height)-200px)] tw:overflow-hidden" data-test="quality-config-sidebar">
-    <header class="tw:flex tw:items-baseline tw:gap-2">
-      <span class="tw:text-[11px] tw:font-semibold tw:text-text-secondary">{{ t("onlineEvals.quality.overview.title") }}</span>
-      <span class="tw:text-[11px] tw:text-text-secondary tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:px-1.5 tw:py-px tw:rounded-[4px] tw:[font-variant-numeric:tabular-nums]">{{ filteredRows.length }}</span>
+  <aside class="flex flex-col gap-2.5 p-3 pb-4 bg-(--color-surface-base) border border-dialog-header-border rounded-md min-h-0 max-h-[calc(100vh-var(--navbar-height)-200px)] overflow-hidden" data-test="quality-config-sidebar">
+    <header class="flex items-baseline gap-2">
+      <span class="text-[11px] font-semibold text-text-secondary">{{ t("onlineEvals.quality.overview.title") }}</span>
+      <span class="text-[11px] text-text-secondary bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] px-1.5 py-px rounded-[4px] [font-variant-numeric:tabular-nums]">{{ filteredRows.length }}</span>
     </header>
 
     <OInput
       v-model="filter"
       :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
       size="sm"
-      class="tw:w-full"
+      class="w-full"
       data-test="quality-sidebar-filter"
     >
       <template #icon-left>
@@ -19,7 +19,7 @@
 
     <button
       type="button"
-      class="qcs__all tw:inline-flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:py-[2px] tw:px-0 tw:text-xs tw:text-(--color-primary-600,#3F7994) tw:cursor-pointer tw:w-max tw:hover:underline"
+      class="qcs__all inline-flex items-center gap-1 bg-transparent border-0 py-[2px] px-0 text-xs text-(--color-primary-600,#3F7994) cursor-pointer w-max hover:underline"
       data-test="quality-sidebar-all-configs"
       @click="$emit('clear')"
     >
@@ -27,43 +27,43 @@
       {{ t("onlineEvals.quality.sidebar.allConfigs") }}
     </button>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-auto tw:flex tw:flex-col tw:gap-1">
+    <div class="flex-1 min-h-0 overflow-auto flex flex-col gap-1">
       <button
         v-for="row in filteredRows"
         :key="row.configId"
         type="button"
-        class="qcs-item tw:flex tw:gap-2 tw:py-[10px] tw:px-[10px] tw:pb-2 tw:bg-transparent tw:border tw:border-transparent tw:rounded-md tw:text-left tw:cursor-pointer tw:w-full tw:[font:inherit] tw:text-inherit tw:transition-[background,border-color] tw:duration-[120ms] tw:hover:bg-[color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]"
-        :class="String(row.config.id) === selectedId ? ['qcs-item--selected', 'tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_14%,transparent)]', 'tw:border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_45%,transparent)]', 'tw:relative'] : []"
+        class="qcs-item flex gap-2 py-[10px] px-[10px] pb-2 bg-transparent border border-transparent rounded-md text-left cursor-pointer w-full [font:inherit] text-inherit transition-[background,border-color] duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]"
+        :class="String(row.config.id) === selectedId ? ['qcs-item--selected', 'bg-[color-mix(in_srgb,var(--color-primary-600)_14%,transparent)]', 'border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)]', 'relative'] : []"
         :data-test="`quality-sidebar-item-${row.name}`"
         @click="$emit('select', row)"
       >
         <OTag type="qualityStatus" :value="row.status" label="" :aria-label="row.status" />
 
-        <div class="qcs-item__main tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-1">
-          <div class="tw:flex tw:items-center tw:gap-[6px]">
-            <span class="qcs-item__name tw:flex-1 tw:min-w-0 tw:font-semibold tw:text-[13px] tw:text-(--color-text-primary,currentColor) tw:truncate tw:font-mono">{{ row.name }}</span>
-            <span class="qcs-item__type tw:shrink-0 tw:px-1 tw:rounded-[2px] tw:font-bold tw:text-[4px] tw:leading-[1.4] tw:tracking-[0.02em]" :class="{ 'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]': row.dataType === 'numeric', 'tw:bg-[color-mix(in_srgb,#9333ea_14%,transparent)] tw:text-[#7c3aed]': row.dataType === 'categorical', 'tw:bg-[color-mix(in_srgb,#16a34a_14%,transparent)] tw:text-[#15803d]': row.dataType === 'boolean' }">
+        <div class="qcs-item__main flex-1 min-w-0 flex flex-col gap-1">
+          <div class="flex items-center gap-[6px]">
+            <span class="qcs-item__name flex-1 min-w-0 font-semibold text-[13px] text-(--color-text-primary) truncate font-mono">{{ row.name }}</span>
+            <span class="qcs-item__type shrink-0 px-1 rounded-[2px] font-bold text-[4px] leading-[1.4] tracking-[0.02em]" :class="{ 'bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] text-[#4f5bcf]': row.dataType === 'numeric', 'bg-[color-mix(in_srgb,#9333ea_14%,transparent)] text-[#7c3aed]': row.dataType === 'categorical', 'bg-[color-mix(in_srgb,#16a34a_14%,transparent)] text-[#15803d]': row.dataType === 'boolean' }">
               {{ shortType(row.dataType) }}
             </span>
           </div>
 
-          <div class="tw:flex tw:items-center tw:gap-[6px] tw:[font-variant-numeric:tabular-nums]">
-            <div v-if="row.hasThreshold" class="qcs-item__bar tw:flex-1 tw:h-1 tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:rounded-full tw:overflow-hidden">
+          <div class="flex items-center gap-[6px] [font-variant-numeric:tabular-nums]">
+            <div v-if="row.hasThreshold" class="qcs-item__bar flex-1 h-1 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] rounded-full overflow-hidden">
               <div
-                class="qcs-item__bar-fill tw:h-full"
-                :class="{ 'tw:bg-[var(--o2-status-warning-text,#b25400)]': row.status === 'unhealthy' || row.status === 'warn', 'tw:bg-[var(--o2-status-success-text,#2e7d32)]': row.status === 'healthy', 'tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_30%,transparent)]': row.status === 'noThreshold' }"
+                class="qcs-item__bar-fill h-full"
+                :class="{ 'bg-[var(--color-status-warning-text)]': row.status === 'unhealthy' || row.status === 'warn', 'bg-[var(--color-status-success-text)]': row.status === 'healthy', 'bg-[color-mix(in_srgb,var(--color-text-secondary)_30%,transparent)]': row.status === 'noThreshold' }"
                 :style="{ width: `${Math.min(100, row.unhealthyPct ?? 0)}%` }"
               />
             </div>
-            <span v-if="row.hasThreshold" class="qcs-item__pct tw:shrink-0 tw:text-[11px] tw:font-semibold tw:text-(--o2-status-warning-text,#b25400)">{{ formatPct(row.unhealthyPct) }}</span>
-            <span v-else class="qcs-item__pct--muted tw:shrink-0 tw:text-[11px] tw:font-semibold tw:text-(--color-text-secondary,var(--o2-text-secondary))">—</span>
-            <span class="tw:shrink-0 tw:text-[11px] tw:text-(--color-text-secondary,var(--o2-text-secondary))">{{ formatCount(row.totalScores) }}</span>
+            <span v-if="row.hasThreshold" class="qcs-item__pct shrink-0 text-[11px] font-semibold text-(--color-warning-700)">{{ formatPct(row.unhealthyPct) }}</span>
+            <span v-else class="qcs-item__pct--muted shrink-0 text-[11px] font-semibold text-(--color-text-secondary)">—</span>
+            <span class="shrink-0 text-[11px] text-(--color-text-secondary)">{{ formatCount(row.totalScores) }}</span>
           </div>
 
           <svg
             v-if="row.trendSparkline.length > 0"
-            class="qcs-item__spark tw:w-full tw:h-5"
-            :class="{ 'tw:text-[var(--o2-status-warning-text,#b25400)]': row.status === 'unhealthy' || row.status === 'warn', 'tw:text-[var(--o2-status-success-text,#2e7d32)]': row.status === 'healthy', 'tw:text-[color-mix(in_srgb,var(--color-text-secondary)_50%,transparent)]': row.status === 'noThreshold' }"
+            class="qcs-item__spark w-full h-5"
+            :class="{ 'text-[var(--color-status-warning-text)]': row.status === 'unhealthy' || row.status === 'warn', 'text-[var(--color-status-success-text)]': row.status === 'healthy', 'text-[color-mix(in_srgb,var(--color-text-secondary)_50%,transparent)]': row.status === 'noThreshold' }"
             viewBox="0 0 100 20"
             preserveAspectRatio="none"
             aria-hidden="true"
@@ -78,7 +78,7 @@
         </div>
       </button>
 
-      <div v-if="filteredRows.length === 0" class="tw:py-5 tw:px-2 tw:text-center tw:text-xs tw:text-text-secondary">
+      <div v-if="filteredRows.length === 0" class="py-5 px-2 text-center text-xs text-text-secondary">
         {{ t("onlineEvals.quality.sidebar.empty") }}
       </div>
     </div>

@@ -12,12 +12,12 @@ defineSlots<DropdownGroupSlots>();
     <DropdownMenuLabel
       v-if="props.label || $slots['label-action']"
       :class="[
-        'tw:flex tw:items-center tw:px-3 tw:py-1 tw:text-xs tw:font-semibold',
-        'tw:text-dropdown-label tw:select-none',
+        'flex items-center px-3 py-1 text-xs font-semibold',
+        'text-dropdown-label select-none',
       ]"
     >
       <span>{{ props.label }}</span>
-      <span v-if="$slots['label-action']" class="tw:ml-auto tw:flex tw:items-center">
+      <span v-if="$slots['label-action']" class="ml-auto flex items-center">
         <slot name="label-action" />
       </span>
     </DropdownMenuLabel>

@@ -15,33 +15,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="dashboard-color-palette-root">
     <div
       data-test="dashboard-color-palette-flex-container"
-      class="tw:flex tw:items-center"
+      class="flex items-center"
     >
       <!-- dropdown to select color palette type/mode -->
       <OSelect
         data-test="dashboard-color-palette-select"
         v-model="dashboardPanelData.data.config.color.mode"
         :label="t('dashboard.colorPalette')"
-        class="showLabelOnTop tw:flex-1"
+        class="showLabelOnTop flex-1"
         @update:model-value="onColorModeChange"
         :dropdownStyle="{ width: '240px' }"
       >
         <template #trigger>
-          <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0 tw:flex-1">
+          <div class="flex items-center gap-1.5 min-w-0 flex-1">
             <span
               v-if="selectedOptionPalette.length"
-              class="tw:inline-flex tw:items-center tw:gap-[0.1875rem] tw:flex-shrink-0"
+              class="inline-flex items-center gap-[0.1875rem] flex-shrink-0"
               aria-hidden="true"
             >
               <span
                 v-for="(color, i) in selectedOptionPalette.slice(0, 3)"
                 :key="i"
-                class="tw:w-2 tw:h-2 tw:rounded-full tw:flex-shrink-0"
+                class="w-2 h-2 rounded-full flex-shrink-0"
                 :style="{ background: color }"
               />
             </span>
             <span
-              class="tw:flex-1 tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-sm"
+              class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm"
               :style="{ color: 'var(--color-text-primary)' }"
               >{{ selectedOptionLabel }}</span
             >
@@ -56,21 +56,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="opt.value"
             :label="opt.label"
           >
-            <div class="tw:flex tw:items-center tw:gap-1.5 tw:w-full tw:min-w-0">
+            <div class="flex items-center gap-1.5 w-full min-w-0">
               <span
                 v-if="opt.colorPalette?.length"
-                class="tw:inline-flex tw:items-center tw:gap-[0.1875rem] tw:flex-shrink-0"
+                class="inline-flex items-center gap-[0.1875rem] flex-shrink-0"
                 aria-hidden="true"
               >
                 <span
                   v-for="(c, i) in opt.colorPalette.slice(0, 5)"
                   :key="i"
-                  class="tw:w-2 tw:h-2 tw:rounded-full tw:flex-shrink-0"
+                  class="w-2 h-2 rounded-full flex-shrink-0"
                   :style="{ background: c }"
                 />
               </span>
               <span
-                class="tw:flex-1 tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
+                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
                 >{{ opt.label }}</span
               >
             </div>
@@ -88,15 +88,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="opt.value"
             :label="opt.label"
           >
-            <div class="tw:flex tw:items-center tw:gap-1.5 tw:w-full tw:min-w-0">
+            <div class="flex items-center gap-1.5 w-full min-w-0">
               <span
                 v-if="opt.colorPalette?.length"
-                class="tw:block tw:w-10 tw:h-2 tw:rounded-[0.1875rem] tw:flex-shrink-0"
+                class="block w-10 h-2 rounded-[0.1875rem] flex-shrink-0"
                 aria-hidden="true"
                 :style="{ background: `linear-gradient(to right, ${opt.colorPalette.join(', ')})` }"
               />
               <span
-                class="tw:flex-1 tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
+                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
                 >{{ opt.label }}</span
               >
             </div>
@@ -107,12 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- color picker for fixed and shades typed color mode -->
       <div
         v-if="['fixed', 'shades'].includes(dashboardPanelData.data.config.color.mode)"
-        class="tw:inline-flex tw:items-center tw:flex-shrink-0 tw:mt-[1.875rem] tw:ml-1.5 tw:relative"
+        class="inline-flex items-center flex-shrink-0 mt-[1.875rem] ml-1.5 relative"
         data-test="dashboard-color-palette-color-input-wrapper"
       >
         <button
           type="button"
-          class="tw:w-8 tw:h-8 tw:rounded-full tw:cursor-pointer tw:flex-shrink-0 tw:transition-[box-shadow,border-color] tw:duration-200 tw:ease tw:border-2 tw:border-solid tw:[border-color:var(--color-border-default)] tw:hover:[border-color:var(--color-button-primary)] tw:hover:[box-shadow:0_0_0_0.125rem_var(--color-button-primary-focus-ring)] tw:focus-visible:[outline:2px_solid_var(--color-button-primary-focus-ring)] tw:focus-visible:outline-offset-[0.125rem]"
+          class="w-8 h-8 rounded-full cursor-pointer flex-shrink-0 transition-[box-shadow,border-color] duration-200 ease border-2 border-solid [border-color:var(--color-border-default)] hover:[border-color:var(--color-button-primary)] hover:[box-shadow:0_0_0_0.125rem_var(--color-button-primary-focus-ring)] focus-visible:[outline:2px_solid_var(--color-button-primary-focus-ring)] focus-visible:outline-offset-[0.125rem]"
           :aria-label="`Panel color: ${dashboardPanelData.data.config.color.fixedColor[0]}`"
           :style="{ background: dashboardPanelData.data.config.color.fixedColor[0] }"
           data-test="dashboard-color-palette-swatch-btn"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <input
           ref="colorInput"
           type="color"
-          class="tw:absolute tw:w-0 tw:h-0 tw:opacity-0 tw:pointer-events-none"
+          class="absolute w-0 h-0 opacity-0 pointer-events-none"
           v-model="dashboardPanelData.data.config.color.fixedColor[0]"
           data-test="dashboard-color-palette-color-input"
           tabindex="-1"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- color by button group -->
     <div
-      class="tw:pt-3"
+      class="pt-3"
       v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')"
     >
       {{ t("dashboard.colorSeriesBy") }}

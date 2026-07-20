@@ -16,45 +16,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div data-test="error-tags-title" class="tw:text-base tw:font-bold tw:ml-1">{{ t("rum.tags") }}</div>
-    <div class="tw:flex tw:items-center">
-      <div class="tw:mr-4 tw:items-center">
+    <div data-test="error-tags-title" class="text-base font-bold ml-1">{{ t("rum.tags") }}</div>
+    <div class="flex items-center">
+      <div class="mr-4 items-center">
         <img
           :src="ip"
-          alt="IP"
-          class="tw:mr-2 tw:inline-block tw:w-[1.875rem]! tw:h-auto!"
+          :alt="t('rum.ipLabel')"
+          class="mr-2 inline-block w-[1.875rem]! h-auto!"
         />
-        <div class="tw:inline-block">
-          <div class="tw:pl-1">IP</div>
-          <span class="tw:pl-1"> {{ error.ip }} </span>
+        <div class="inline-block">
+          <div class="pl-1">{{ t("rum.ipLabel") }}</div>
+          <span class="pl-1"> {{ error.ip }} </span>
         </div>
       </div>
       <OSeparator vertical />
-      <div class="tw:mx-4 tw:items-center">
+      <div class="mx-4 items-center">
         <img
           :src="browserIcon"
-          alt="Chrome"
-          class="tw:mr-3 tw:inline-block tw:h-auto tw:w-[1.875rem]"
+          :alt="t('rum.browserImageAlt')"
+          class="mr-3 inline-block h-auto w-[1.875rem]"
         />
-        <div class="tw:inline-block">
-          <div class="tw:pl-1">{{ error.user_agent_user_agent_family }}</div>
-          <span class="tw:pl-1"> {{ getBrowserVersion }} </span>
+        <div class="inline-block">
+          <div class="pl-1">{{ error.user_agent_user_agent_family }}</div>
+          <span class="pl-1"> {{ getBrowserVersion }} </span>
         </div>
       </div>
       <OSeparator vertical />
-      <div class="tw:mx-4 tw:items-center">
+      <div class="mx-4 items-center">
         <img
           :src="osIcon"
-          alt="OS"
-          class="tw:mr-3 tw:inline-block tw:h-auto tw:w-[1.875rem]"
+          :alt="t('rum.osImageAlt')"
+          class="mr-3 inline-block h-auto w-[1.875rem]"
         />
-        <div class="tw:inline-block">
-          <div class="tw:pl-1">{{ error.user_agent_os_family }}</div>
-          <div class="tw:pl-1 tw:flex">{{ getOsVersion }}</div>
+        <div class="inline-block">
+          <div class="pl-1">{{ error.user_agent_os_family }}</div>
+          <div class="pl-1 flex">{{ getOsVersion }}</div>
         </div>
       </div>
     </div>
-    <div class="tw:flex tw:items-center tw:flex-wrap tw:mt-3">
+    <div class="flex items-center flex-wrap mt-3">
       <template v-for="(value, tag) in getTags" :key="tag">
         <ErrorTag :tag="{ key: tag, value }" />
       </template>
@@ -136,9 +136,9 @@ const getOsIcon = () => {
 };
 
 const getOsVersion = computed(() => {
-  let version = "Version ";
+  let version = t("rum.versionPrefix");
 
-  if (!props.error.user_agent_os_major) return version + "Unknown";
+  if (!props.error.user_agent_os_major) return version + t("rum.unknown");
 
   if (props.error.user_agent_os_major)
     version += props.error.user_agent_os_major;
@@ -153,9 +153,9 @@ const getOsVersion = computed(() => {
 });
 
 const getBrowserVersion = computed(() => {
-  let version = "Version ";
+  let version = t("rum.versionPrefix");
 
-  if (!props.error.user_agent_user_agent_major) return version + "Unknown";
+  if (!props.error.user_agent_user_agent_major) return version + t("rum.unknown");
 
   if (props.error.user_agent_user_agent_major)
     version += props.error.user_agent_user_agent_major;
@@ -175,13 +175,13 @@ const getTags = computed(() => {
     url: props.error.view_url,
     handled: props.error.error_handling === "handled",
     location: getLocation(),
-    service: props.error.service || "Unknown",
-    source: props.error.source || "Unknown",
+    service: props.error.service || t("rum.unknown"),
+    source: props.error.source || t("rum.unknown"),
     device: getDevice(),
     browser: props.error.user_agent_user_agent_family,
     level: "error",
     sdk_version: props.error.sdk_version,
-    user_email: props.error.usr_email || "Unknown User",
+    user_email: props.error.usr_email || t("rum.unknownUser"),
   };
 });
 
@@ -190,7 +190,7 @@ const getDevice = () => {
     !props.error.user_agent_device_brand &&
     !props.error.user_agent_device_family
   )
-    return "Unknown";
+    return t("rum.unknown");
 
   if (!props.error.user_agent_device_brand)
     return props.error.user_agent_device_family;
@@ -207,7 +207,7 @@ const getDevice = () => {
 
 const getLocation = () => {
   if (!props.error.geo_info_country && !props.error.geo_info_city)
-    return "Unknown";
+    return t("rum.unknown");
   if (!props.error.geo_info_country) return props.error.geo_info_city;
   if (!props.error.geo_info_city) return props.error.geo_info_country;
 

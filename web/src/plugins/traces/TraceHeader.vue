@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:justify-start tw:items-center tw:bg-[color-mix(in_srgb,currentColor_5%,transparent)] tw:h-7.5 tw:top-0 tw:z-1999 tw:sticky tw:rounded-t-lg"
+    class="flex justify-start items-center bg-[color-mix(in_srgb,currentColor_5%,transparent)] h-7.5 top-0 z-1999 sticky rounded-t-lg"
     data-test="trace-header"
     :style="
       isSidebarOpen && {
@@ -25,15 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="tw:relative tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:px-2"
+      class="relative flex justify-start items-center flex-nowrap flex px-2"
       :style="{
         width: splitterWidth + 'px',
       }"
       data-test="trace-header-operation-name"
     >
-      Operation Name
+      {{ t('traces.traceHeader.operationName') }}
       <div
-        class="tw:bg-(--o2-primary) tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:absolute tw:-right-2.5 tw:-top-0.5 tw:z-10 tw:cursor-col-resize"
+        class="bg-(--o2-primary) inline-flex items-center justify-center w-5 h-5 rounded-full absolute -right-2.5 -top-0.5 z-10 cursor-col-resize"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:relative"
+      class="flex justify-start items-center flex-nowrap flex relative"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
@@ -51,25 +51,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div
-        class="tw:w-1/4 tw:text-xs tw:pl-3"
+        class="w-1/4 text-xs pl-3"
         data-test="trace-header-tic-label-0"
       >
         {{ baseTracePosition.tics?.[0]?.label || "" }}
       </div>
       <div
-        class="tw:w-1/4 tw:text-xs tw:pl-1"
+        class="w-1/4 text-xs pl-1"
         data-test="trace-header-tic-label-1"
       >
         {{ baseTracePosition.tics?.[1]?.label || "" }}
       </div>
       <div
-        class="tw:w-1/4 tw:text-xs tw:pl-1"
+        class="w-1/4 text-xs pl-1"
         data-test="trace-header-tic-label-2"
       >
         {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
       <div
-        class="tw:w-1/4 tw:text-xs tw:flex tw:justify-between tw:items-center tw:px-1"
+        class="w-1/4 text-xs flex justify-between items-center px-1"
         data-test="trace-header-tic-label-3"
       >
         <div>{{ baseTracePosition.tics?.[3]?.label || "" }}</div>
@@ -77,10 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
-        class="trace-tic tw:absolute tw:-top-0.75 tw:w-px tw:bg-[#cacaca] tw:z-1 tw:h-6.5"
+        class="trace-tic absolute -top-0.75 w-px bg-[#cacaca] z-1 h-6.5"
         :class="{
-          'tw:z-5 tw:hidden': index === 0,
-          'tw:bg-[#3c3c3c]': store.state.theme === 'dark',
+          'z-5 hidden': index === 0,
+          'bg-[#3c3c3c]': store.state.theme === 'dark',
         }"
         :key="tick.value + index"
         :style="{
@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
@@ -126,8 +127,10 @@ export default defineComponent({
 
   setup() {
     const store = useStore();
+    const { t } = useI18n();
     return {
       store,
+      t,
     };
   },
 });

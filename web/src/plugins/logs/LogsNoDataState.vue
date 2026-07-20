@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Each card routes to a distinct, real ingestion path in OpenObserve.
 -->
 <template>
-  <OEmptyState illustration="hourglass" size="hero" :hide-action="true">
+  <OEmptyState illustration="connect" size="hero" :hide-action="true">
     <template #title>{{ t("logs.noData.title") }}</template>
 
     <template #description>
@@ -58,36 +58,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #extra>
-      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
-        <span class="tw:text-sm tw:font-semibold tw:text-text-secondary tw:mr-1">
+      <div class="flex items-center justify-center gap-2 flex-wrap">
+        <span class="text-sm font-semibold text-text-secondary mr-1">
           {{ t("logs.noData.or") }}
         </span>
         <EmptyStateIngestionChip
           data-test="logs-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
         >
-          <img :src="getImageURL('images/common/kubernetes.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          <img :src="getImageURL('images/common/kubernetes.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
           {{ t("logs.noData.kubernetes") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           data-test="logs-no-data-aws-btn"
           @click="go('AWSConfig')"
         >
-          <img :src="getImageURL('images/ingestion/aws.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          <img :src="getImageURL('images/ingestion/aws.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
           {{ t("logs.noData.aws") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           data-test="logs-no-data-linux-btn"
           @click="go('ingestFromLinux')"
         >
-          <img :src="getImageURL('images/common/linux.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          <img :src="getImageURL('images/common/linux.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
           {{ t("logs.noData.linux") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           data-test="logs-no-data-windows-btn"
           @click="go('ingestFromWindows')"
         >
-          <img :src="getImageURL('images/common/windows.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          <img :src="getImageURL('images/common/windows.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
           {{ t("logs.noData.windows") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
         >
-          <img :src="aiIconSrc" class="tw:w-3.5 tw:h-3.5 tw:shrink-0" alt="" />
+          <img :src="aiIconSrc" class="w-3.5 h-3.5 shrink-0" alt="" />
           {{ t("logs.noData.askAi") }}
         </EmptyStateIngestionChip>
       </div>

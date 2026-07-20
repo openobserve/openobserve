@@ -1,36 +1,36 @@
 <template>
-  <aside class="tw:min-w-0 tw:overflow-auto tw:p-4.5 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
-    <section class="tw:py-[14px] tw:px-4 tw:mb-3 tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
-      <header class="tw:flex tw:items-center tw:gap-[6px] tw:mb-[6px] tw:text-(--color-text-secondary,var(--o2-text-secondary))">
+  <aside class="flex-[3.5] min-w-0 overflow-auto p-2 bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
+    <section class="py-[14px] px-4 mb-3 border border-(--color-dialog-header-border,var(--o2-border)) rounded-md">
+      <header class="flex items-center gap-[6px] mb-[6px] text-(--color-text-secondary,var(--o2-text-secondary))">
         <OIcon name="visibility" size="xs" />
-        <span class="tw:m-0 tw:text-[0.8125rem] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.title") }}</span>
+        <span class="m-0 text-[0.8125rem] font-semibold text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.title") }}</span>
       </header>
-      <div v-if="!stream" class="tw:m-0 tw:text-text-secondary tw:text-xs tw:leading-normal">
+      <div v-if="!stream" class="m-0 text-text-secondary text-xs leading-normal">
         {{ t("onlineEvals.job.preview.hint") }}
       </div>
-      <div v-else-if="!filterReady" class="tw:m-0 tw:text-text-secondary tw:text-xs tw:leading-normal">
+      <div v-else-if="!filterReady" class="m-0 text-text-secondary text-xs leading-normal">
         {{ t("onlineEvals.job.preview.matchedIncomplete") }}
       </div>
-      <div v-else-if="matchedLoading" class="tw:m-0 tw:text-text-secondary tw:text-xs tw:leading-normal">
+      <div v-else-if="matchedLoading" class="m-0 text-text-secondary text-xs leading-normal">
         {{ t("onlineEvals.job.preview.matchedLoading") }}
       </div>
-      <div v-else-if="matchedError" class="tw:m-0 tw:text-xs tw:text-(--o2-status-error-text,#c62828)">
+      <div v-else-if="matchedError" class="m-0 text-xs text-(--color-status-error-text)">
         {{ t("onlineEvals.job.preview.matchedError") }}
       </div>
-      <div v-else class="tw:flex tw:items-baseline tw:gap-1.5">
-        <span class="tw:text-2xl tw:font-bold tw:text-(--color-text-primary,currentColor) tw:[font-variant-numeric:tabular-nums]">{{ formattedCount }}</span>
-        <span class="tw:text-xs tw:text-(--color-text-secondary,var(--o2-text-secondary))">
+      <div v-else class="flex items-baseline gap-1.5">
+        <span class="text-2xl font-bold text-(--color-grey-600) [font-variant-numeric:tabular-nums]">{{ formattedCount }}</span>
+        <span class="text-xs text-(--color-text-secondary,var(--o2-text-secondary))">
           {{ t("onlineEvals.job.preview.matchedSuffix") }}
         </span>
       </div>
     </section>
 
-    <section class="tw:py-[14px] tw:px-4 tw:mb-0 tw:border tw:border-(--color-dialog-header-border,var(--o2-border)) tw:rounded-md">
-      <header class="tw:flex tw:items-center tw:gap-[6px] tw:mb-[6px] tw:text-(--color-text-secondary,var(--o2-text-secondary))">
+    <section class="py-[14px] px-4 mb-0 border border-(--color-dialog-header-border,var(--o2-border)) rounded-md">
+      <header class="flex items-center gap-[6px] mb-[6px] text-(--color-text-secondary,var(--o2-text-secondary))">
         <OIcon name="info" size="xs" />
-        <span class="tw:m-0 tw:text-[0.8125rem] tw:font-semibold tw:text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
+        <span class="m-0 text-[0.8125rem] font-semibold text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
       </header>
-      <dl class="tw:grid tw:grid-cols-[96px_1fr] tw:gap-x-3 tw:gap-y-2 tw:m-0 tw:text-xs [&_dt]:tw:text-text-secondary [&_dd]:tw:m-0 [&_dd]:tw:text-text-primary">
+      <dl class="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 m-0 text-xs [&_dt]:text-text-secondary [&_dd]:m-0 [&_dd]:text-text-primary">
         <dt>{{ t("onlineEvals.job.preview.summaryName") }}</dt>
         <dd>{{ name || t("onlineEvals.job.preview.emptyValue") }}</dd>
         <dt>{{ t("onlineEvals.job.preview.summaryType") }}</dt>

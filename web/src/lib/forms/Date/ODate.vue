@@ -119,40 +119,40 @@ function onFocusOut(e: FocusEvent) {
 }
 
 const heightClasses: Record<NonNullable<DateProps["size"]>, string> = {
-  sm: "tw:h-8 tw:text-xs",
-  md: "tw:h-10 tw:text-sm",
+  sm: "h-6 text-sm",
+  md: "h-8.5 text-sm",
 };
 
 const wrapperClasses = computed(() => [
-  "tw:flex tw:items-center tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
-  "tw:ring-offset-1 tw:ring-offset-surface-base",
-  "tw:bg-datepicker-bg",
+  "flex items-center w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "ring-offset-1 ring-offset-surface-base",
+  "bg-datepicker-bg",
   hasError.value
-    ? "tw:border-datepicker-error-border"
-    : "tw:border-datepicker-border tw:hover:border-datepicker-hover-border",
-  "tw:focus-within:border-datepicker-focus-border",
-  "tw:focus-within:ring-2 tw:focus-within:ring-datepicker-focus-ring",
+    ? "border-datepicker-error-border"
+    : "border-datepicker-border hover:border-datepicker-hover-border",
+  "focus-within:border-datepicker-focus-border",
+  "focus-within:ring-[0.125rem] focus-within:ring-primary-500/25",
   props.disabled
-    ? "tw:bg-datepicker-disabled-bg tw:border-datepicker-disabled-border tw:opacity-60"
+    ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60"
     : "",
   heightClasses[props.size ?? "md"],
 ]);
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="wrapperAttrs" class="flex flex-col gap-1 w-full">
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="tw:text-xs tw:font-medium tw:text-datepicker-label tw:leading-none tw:flex tw:items-center tw:gap-1"
+      class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help tw:text-datepicker-label"
+        class="cursor-help text-datepicker-label"
       ><slot name="tooltip" /></OIcon>
     </label>
 
@@ -176,7 +176,7 @@ const wrapperClasses = computed(() => [
       >
         <!-- Calendar trigger (calendar icon) -->
         <DatePickerTrigger
-          class="tw:flex tw:items-center tw:ps-3 tw:text-datepicker-icon tw:shrink-0 tw:outline-none tw:cursor-pointer tw:disabled:cursor-not-allowed"
+          class="flex items-center ps-3 text-datepicker-icon shrink-0 outline-none cursor-pointer disabled:cursor-not-allowed"
           aria-label="Open calendar"
         >
           <OIcon name="calendar-month" size="sm" aria-hidden="true" />
@@ -187,8 +187,8 @@ const wrapperClasses = computed(() => [
           :id="inputId"
           :tabindex="inputTabindex"
           :class="[
-            'tw:flex tw:items-center tw:flex-1 tw:min-w-0 tw:ps-2 tw:gap-px tw:outline-none',
-            clearable ? 'tw:pe-2' : 'tw:pe-3',
+            'flex items-center flex-1 min-w-0 ps-2 gap-px outline-none',
+            clearable ? 'pe-2' : 'pe-3',
             heightClasses[size ?? 'md'],
           ]"
         >
@@ -197,10 +197,10 @@ const wrapperClasses = computed(() => [
               <DatePickerInput
                 :part="seg.part"
                 :class="[
-                  'tw:text-datepicker-text',
+                  'text-datepicker-text',
                   seg.part !== 'literal'
-                    ? 'tw:rounded-sm tw:px-px tw:outline-none tw:tabular-nums tw:data-placeholder:text-datepicker-placeholder tw:focus:bg-datepicker-segment-focus-bg tw:focus:text-datepicker-segment-focus-text tw:focus:data-placeholder:text-datepicker-segment-focus-text'
-                    : 'tw:select-none tw:text-datepicker-placeholder',
+                    ? 'rounded-sm px-px outline-none tabular-nums data-placeholder:text-datepicker-placeholder focus:bg-datepicker-segment-focus-bg focus:text-datepicker-segment-focus-text focus:data-placeholder:text-datepicker-segment-focus-text'
+                    : 'select-none text-datepicker-placeholder',
                 ]"
               >{{ seg.value }}</DatePickerInput>
             </template>
@@ -213,14 +213,14 @@ const wrapperClasses = computed(() => [
           type="button"
           tabindex="-1"
           aria-label="Clear"
-          class="tw:flex tw:items-center tw:pe-2 tw:text-datepicker-icon tw:hover:opacity-80 tw:transition-colors"
+          class="flex items-center pe-2 text-datepicker-icon hover:opacity-80 transition-colors"
           @click="handleClear"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 16 16"
             fill="currentColor"
-            class="tw:size-3.5"
+            class="size-3.5"
             aria-hidden="true"
           >
             <path
@@ -234,20 +234,20 @@ const wrapperClasses = computed(() => [
       <DatePickerContent
         :side-offset="4"
         align="start"
-        class="tw:z-50 tw:rounded-lg tw:border tw:shadow-md tw:p-3 tw:bg-datepicker-popup-bg tw:border-datepicker-popup-border"
+        class="z-50 rounded-lg border shadow-md p-3 bg-datepicker-popup-bg border-datepicker-popup-border"
       >
         <DatePickerCalendar v-slot="{ weekDays, grid }">
           <DatePickerHeader
-            class="tw:flex tw:items-center tw:justify-between tw:mb-3"
+            class="flex items-center justify-between mb-3"
           >
             <DatePickerPrev
-              class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+              class="flex items-center justify-center size-7 rounded transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 16 16"
                 fill="currentColor"
-                class="tw:size-4"
+                class="size-4"
                 aria-hidden="true"
               >
                 <path
@@ -259,17 +259,17 @@ const wrapperClasses = computed(() => [
             </DatePickerPrev>
 
             <DatePickerHeading
-              class="tw:text-sm tw:font-medium tw:text-datepicker-heading-text"
+              class="text-sm font-medium text-datepicker-heading-text"
             />
 
             <DatePickerNext
-              class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+              class="flex items-center justify-center size-7 rounded transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 16 16"
                 fill="currentColor"
-                class="tw:size-4"
+                class="size-4"
                 aria-hidden="true"
               >
                 <path
@@ -286,11 +286,11 @@ const wrapperClasses = computed(() => [
             :key="month.value.toString()"
           >
             <DatePickerGridHead>
-              <DatePickerGridRow class="tw:flex tw:gap-1 tw:mb-1">
+              <DatePickerGridRow class="flex gap-1 mb-1">
                 <DatePickerHeadCell
                   v-for="day in weekDays"
                   :key="day"
-                  class="tw:w-8 tw:h-6 tw:flex tw:items-center tw:justify-center tw:text-xs tw:font-medium tw:text-datepicker-weekday-text"
+                  class="w-8 h-6 flex items-center justify-center text-xs font-medium text-datepicker-weekday-text"
                 >
                   {{ day }}
                 </DatePickerHeadCell>
@@ -301,7 +301,7 @@ const wrapperClasses = computed(() => [
               <DatePickerGridRow
                 v-for="(weekDates, idx) in month.rows"
                 :key="idx"
-                class="tw:flex tw:gap-1 tw:mb-1"
+                class="flex gap-1 mb-1"
               >
                 <DatePickerCell
                   v-for="date in weekDates"
@@ -311,7 +311,7 @@ const wrapperClasses = computed(() => [
                   <DatePickerCellTrigger
                     :day="date"
                     :month="month.value"
-                    class="tw:flex tw:items-center tw:justify-center tw:size-8 tw:rounded tw:text-xs tw:cursor-pointer tw:outline-none tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-day-text tw:hover:bg-datepicker-day-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:data-selected:bg-datepicker-day-selected-bg tw:data-selected:text-datepicker-day-selected-text tw:data-today:border tw:data-today:border-datepicker-day-today-border tw:data-outside-view:text-datepicker-day-outside-text tw:data-unavailable:text-datepicker-day-disabled-text tw:data-unavailable:cursor-not-allowed tw:data-unavailable:hover:bg-transparent"
+                    class="flex items-center justify-center size-8 rounded text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-unavailable:hover:bg-transparent"
                   >
                     {{ date.day }}
                   </DatePickerCellTrigger>
@@ -322,28 +322,28 @@ const wrapperClasses = computed(() => [
         </DatePickerCalendar>
 
         <!-- Apply button (only when autoApply=false) -->
-        <div v-if="autoApply === false" class="tw:flex tw:justify-end tw:mt-2 tw:pt-2 tw:border-t tw:border-datepicker-popup-border">
+        <div v-if="autoApply === false" class="flex justify-end mt-2 pt-2 border-t border-datepicker-popup-border">
           <button
             type="button"
             :disabled="disabled"
-            class="tw:px-4 tw:py-1.5 tw:rounded tw:text-xs tw:font-medium tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:hover:opacity-90 tw:transition-[box-shadow] tw:duration-150 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+            class="px-4 py-1.5 rounded text-xs font-medium bg-datepicker-day-selected-bg text-datepicker-day-selected-text outline-none ring-offset-1 ring-offset-surface-base hover:opacity-90 transition-[box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
             @click="handleApply"
           >Apply</button>
         </div>
       </DatePickerContent>
     </DatePickerRoot>
 
-    <div v-if="effectiveError || helpText" class="tw:flex tw:items-center tw:gap-2">
+    <div v-if="effectiveError || helpText" class="flex items-center gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
-        class="tw:text-xs tw:text-datepicker-error-text tw:leading-none"
+        class="text-xs text-datepicker-error-text leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
       <span
         v-else-if="helpText"
-        class="tw:text-xs tw:text-datepicker-label tw:leading-none"
+        class="text-xs text-datepicker-label leading-none"
       >
         {{ helpText }}
       </span>

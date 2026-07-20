@@ -182,7 +182,7 @@ describe("CrossLinkManager Component", () => {
 
     it("should hide subtitle when empty", () => {
       wrapper = createWrapper({ subtitle: "" });
-      const subtitleElements = wrapper.findAll(".tw\\:text-xs");
+      const subtitleElements = wrapper.findAll(".text-xs");
       const hasSubtitle = subtitleElements.some(
         (el: any) => el.text().length > 0 && !el.text().includes("Show link"),
       );

@@ -17,20 +17,38 @@ keywords = [
 license = "AGPL-3.0"
 name = "openobserve"
 repository = "https://github.com/openobserve/openobserve/"
-version = "0.92.0"
+version = "0.93.0"
 publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
 default = []
-enterprise = []
-vectorscan = []
-cloud = []
-vortex = ["config/vortex"]
+enterprise = [
+    "openobserve-api/enterprise",
+    "openobserve-core/enterprise",
+    "openobserve-jobs/enterprise",
+]
+vectorscan = [
+    "openobserve-api/vectorscan",
+    "openobserve-core/vectorscan",
+    "openobserve-jobs/vectorscan",
+]
+cloud = [
+    "openobserve-api/cloud",
+    "openobserve-core/cloud",
+    "openobserve-jobs/cloud",
+]
+vortex = [
+    "config/vortex",
+    "openobserve-api/vortex",
+    "openobserve-core/vortex",
+    "openobserve-jobs/vortex",
+]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = [
     "jemalloc",
+    "openobserve-api/profiling",
     "dep:tikv-jemalloc-ctl",
     "dep:tikv-jemalloc-sys",
     "dep:jemalloc_pprof",
@@ -41,6 +59,7 @@ tokio-console = ["dep:console-subscriber"]
 [profile.release]
 debug = false
 strip = true
+codegen-units = 4
 
 [profile.release-ci]
 inherits = "release"
@@ -61,8 +80,11 @@ lto = "thin"
 inherits = "release"
 debug = true
 strip = false
-codegen-units = 4
-split-debuginfo = "packed"
+
+# tikv-jemalloc-sys is a link-time dependency: it forces the "profiling"
+# feature on the jemalloc sys crate that jemalloc_pprof requires.
+[package.metadata.cargo-machete]
+ignored = ["tikv-jemalloc-sys"]
 
 [dependencies]
 axum.workspace = true
@@ -72,11 +94,8 @@ axum-client-ip.workspace = true
 tower.workspace = true
 tower-http.workspace = true
 http.workspace = true
-http-body.workspace = true
 http-body-util.workspace = true
-hyper.workspace = true
-hyper-util.workspace = true
-mime_guess = "2.0"
+mime_guess.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
@@ -84,8 +103,7 @@ async-trait.workspace = true
 async-recursion.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
-bitflags = "2.11"
-blake3 = { version = "1.8", features = ["rayon"] }
+bitflags.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 chrono.workspace = true
@@ -97,11 +115,10 @@ clap = { version = "4.5", default-features = false, features = [
     "cargo",
 ] }
 cron.workspace = true
-csv = "1.3"
+csv.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
-datafusion-functions-aggregate-common.workspace = true
 datafusion-functions-json.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
@@ -116,11 +133,11 @@ futures.workspace = true
 hashlink.workspace = true
 hashbrown.workspace = true
 hex.workspace = true
-http-auth-basic = "0.3"
+http-auth-basic.workspace = true
 itertools.workspace = true
-jsonwebtoken = { version = "10.3", features = ["aws_lc_rs"] }
+jsonwebtoken.workspace = true
 log.workspace = true
-maxminddb = "0.27"
+maxminddb.workspace = true
 md5.workspace = true
 memchr.workspace = true
 mimalloc = { version = "0.1.48", features = ["v3"], optional = true }
@@ -130,7 +147,7 @@ opentelemetry-otlp.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prometheus.workspace = true
-promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
+promql-parser.workspace = true
 prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
@@ -141,7 +158,7 @@ regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
 rquickjs.workspace = true
-rust-embed-for-web = "11.3"
+rust-embed-for-web.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true
 webpki-roots.workspace = true
@@ -163,22 +180,10 @@ tikv-jemallocator = { version = "0.6", optional = true, features = [
     "stats",
     "unprefixed_malloc_on_supported_platforms",
 ] }
-tikv-jemalloc-ctl = { version = "0.6", optional = true, features = [
-    "use_std",
-    "stats",
-    "profiling",
-] }
-tikv-jemalloc-sys = { version = "0.6", optional = true, features = [
-    "profiling",
-] }
-jemalloc_pprof = { version = "0.8", optional = true, features = [
-    "symbolize",
-    "flamegraph",
-] }
-pprof = { version = "0.15", optional = true, features = [
-    "flamegraph",
-    "protobuf-codec",
-] }
+tikv-jemalloc-ctl = { workspace = true, optional = true }
+tikv-jemalloc-sys = { workspace = true, optional = true }
+jemalloc_pprof = { workspace = true, optional = true }
+pprof = { workspace = true, optional = true }
 tempfile.workspace = true
 tiktoken-rs.workspace = true
 tokio.workspace = true
@@ -189,14 +194,13 @@ tracing.workspace = true
 tracing-appender.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
-uaparser = "0.6.4"
+uaparser.workspace = true
 url.workspace = true
 utoipa.workspace = true
-utoipa-axum.workspace = true
 utoipa-swagger-ui.workspace = true
-version-compare = "0.2.0"
+version-compare.workspace = true
 vector-enrichment.workspace = true
-x509-parser = "0.18.0"
+x509-parser.workspace = true
 vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
@@ -210,29 +214,38 @@ tantivy.workspace = true
 tantivy-fst.workspace = true
 tantivy_utils.workspace = true
 zip.workspace = true
-futures-util = "0.3.31"
-tokio-util.workspace = true
+futures-util.workspace = true
 tokio-stream.workspace = true
-mime = "0.3.17"
+mime.workspace = true
 pin-project-lite.workspace = true
-futures-core = "0.3.31"
-derive_more = { version = "2.1", features = ["full"] }
-brotli = "8.0.2"
-tokio-rustls.workspace = true
-roaring.workspace = true
 flight.workspace = true
 async-stream.workspace = true
-sourcemap = "9.3.2"
+sourcemap.workspace = true
+openobserve-api.workspace = true
+openobserve-core.workspace = true
+openobserve-jobs.workspace = true
+openobserve-mcp.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
-base64 = "0.22"
-float-cmp = "0.10"
-multer = "3.1"
-rcgen = "0.14.4"
+base64.workspace = true
+float-cmp.workspace = true
+multer.workspace = true
+rcgen.workspace = true
 
 [workspace]
 members = [
+    "src/api",
+    "src/api_management",
+    "src/api_query",
+    "src/api_common",
+    "src/common",
+    "src/core",
+    "src/vrl",
+    "src/search",
+    "src/promql",
+    "src/jobs",
+    "src/mcp",
     "src/config",
     "src/infra",
     "src/ingester",
@@ -241,6 +254,7 @@ members = [
     "src/report_server",
     "src/flight",
     "src/tantivy_utils",
+    "src/web",
 ]
 resolver = "2"
 
@@ -258,6 +272,24 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
+web = { path = "src/web" }
+openobserve-core = { path = "src/core" }
+common = { path = "src/common" }
+openobserve-vrl = { path = "src/vrl" }
+search = { path = "src/search" }
+promql = { path = "src/promql" }
+openobserve-api = { path = "src/api" }
+openobserve-api-management = { path = "src/api_management" }
+openobserve-api-query = { path = "src/api_query" }
+openobserve-api-common = { path = "src/api_common" }
+openobserve-jobs = { path = "src/jobs" }
+openobserve-mcp = { path = "src/mcp" }
+o2_dex = { path = "src/enterprise/o2_dex" }
+o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
+o2_openfga = { path = "src/enterprise/o2_openfga" }
+o2_ratelimit = { path = "src/enterprise/o2_ratelimit" }
+vortex = { path = "src/enterprise/vortex" }
+vortex-datafusion = { path = "src/enterprise/vortex-datafusion" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
@@ -269,6 +301,29 @@ axum-extra = { version = "0.12", features = [
 axum-server = { version = "0.8", features = ["tls-rustls"] }
 axum-client-ip = "1.3"
 async-fs = "2.2"
+bitflags = "2.11"
+csv = "1.3"
+float-cmp = "0.10"
+futures-util = "0.3.31"
+http-auth-basic = "0.3"
+jemalloc_pprof = { version = "0.8", features = ["symbolize", "flamegraph"] }
+jsonwebtoken = { version = "10.3", features = ["aws_lc_rs"] }
+maxminddb = "0.27"
+mime = "0.3.17"
+mime_guess = "2.0"
+multer = "3.1"
+pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
+promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
+rcgen = "0.14.4"
+rmcp-openapi = { version = "0.23.2", git = "https://github.com/openobserve/rmcp-openapi", branch = "v0.23.2-feat" }
+rust-embed-for-web = "11.4.1"
+sourcemap = "9.3.2"
+tikv-jemalloc-ctl = { version = "0.6", features = [
+    "use_std",
+    "stats",
+    "profiling",
+] }
+tikv-jemalloc-sys = { version = "0.6", features = ["profiling"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = [
     "cors",
@@ -301,6 +356,7 @@ async-stream = "0.3"
 async-trait = "0.1"
 async-recursion = "1.0"
 aws-config = "1.8"
+aws-credential-types = "1.2.14"
 aws-sdk-sns = { version = "1.97", default-features = false, features = [
     "behavior-version-latest",
     "default-https-client",
@@ -399,13 +455,14 @@ reqwest = { version = "0.13", default-features = false, features = [
     "query",
     "form",
 ] }
-roaring = "0.11.3"
 rquickjs = { version = "0.11.0", features = ["array-buffer", "classes"] }
 rustls = { version = "0.23", default-features = false, features = [
     "std",
     "tls12",
 ] }
 rustls-native-certs = "0.8"
+uaparser = "0.6.4"
+version-compare = "0.2.0"
 webpki-roots = "1.0"
 sea-orm = { version = "1.1.20", features = [
     "sqlx-postgres",
@@ -475,6 +532,7 @@ vrl = { version = "0.31", features = [
     "compiler",
     "test",
 ] }
+x509-parser = "0.18.0"
 zip = "8.0"
 zstd = "0.13"
 

@@ -15,7 +15,11 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { defineComponent } from "vue";
+import { z } from "zod";
 import CompareWithPast from "./CompareWithPast.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import i18n from "@/locales";
 
 
@@ -588,5 +592,108 @@ describe("CompareWithPast.vue", () => {
       expect(emitted![0][0][0]).toHaveProperty("offSet");
       expect(emitted![0][0][0]).toHaveProperty("uuid");
     });
+  });
+});
+
+// ── DESCENDANT mode: bridged into an ancestor AddAlert-like <OForm> ──────────
+// CustomDateTimePicker is a genuine NON-form widget (kept bare), so the
+// multi_time_range array is BRIDGED into the ONE form via setFieldValue (no
+// emit). An owner host mirrors AddAlert: it owns the form and feeds the row
+// array back down as the prop so the round-trip closes.
+describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", () => {
+  const dtStore = () => ({
+    state: { theme: "light" },
+    dispatch: vi.fn(),
+    commit: vi.fn(),
+  });
+
+  function makeHost(initialRows: any[] = []) {
+    return defineComponent({
+      components: { OForm, CompareWithPast },
+      setup() {
+        const form = useOForm({
+          defaultValues: {
+            query_condition: { multi_time_range: initialRows },
+          },
+          schema: z.looseObject({
+            query_condition: z.looseObject({}).optional(),
+          }),
+          onSubmit: () => {},
+        });
+        // Feed the form's array back down as the prop (mirrors AddAlert's
+        // :multiTimeRange="formData.query_condition.multi_time_range").
+        const rows = form.useStore(
+          (s: any) => s.values.query_condition.multi_time_range,
+        );
+        return { form, rows };
+      },
+      template: `
+        <OForm :form="form">
+          <CompareWithPast
+            :multi-time-range="rows"
+            :selected-tab="'sql'"
+            :period="10"
+            :frequency="10"
+          />
+        </OForm>
+      `,
+    });
+  }
+
+  function mountHost(initialRows: any[] = []) {
+    return mount(makeHost(initialRows), {
+      global: {
+        mocks: { $store: dtStore() },
+        provide: { store: dtStore() },
+        plugins: [i18n],
+      },
+    });
+  }
+
+  it("does NOT render its own <OForm> and writes adds into the PARENT form (no emit)", async () => {
+    const host = mountHost();
+    expect(host.findAllComponents({ name: "OForm" }).length).toBe(1);
+    const parentForm = (host.vm as any).form;
+
+    host.findComponent(CompareWithPast).vm.addTimeShift();
+    await flushPromises();
+
+    expect(parentForm.state.values.query_condition.multi_time_range.length).toBe(
+      1,
+    );
+    expect(
+      parentForm.state.values.query_condition.multi_time_range[0].offSet,
+    ).toBe("15m");
+    // form-owned in descendant mode → the bare-mode emit does NOT fire
+    expect(
+      host.findComponent(CompareWithPast).emitted("update:multiTimeRange"),
+    ).toBeFalsy();
+  });
+
+  it("deleting a NON-last window leaves the PARENT form + rendered pickers correct", async () => {
+    const host = mountHost([
+      { offSet: "15m", uuid: "u1" },
+      { offSet: "30m", uuid: "u2" },
+      { offSet: "45m", uuid: "u3" },
+    ]);
+    const parentForm = (host.vm as any).form;
+
+    const renderedOffsets = () =>
+      host
+        .findAllComponents({ name: "CustomDateTimePicker" })
+        .map((c: any) => c.props("picker").offSet);
+
+    expect(renderedOffsets()).toEqual(["15m", "30m", "45m"]);
+
+    // delete the MIDDLE window
+    host.findComponent(CompareWithPast).vm.removeTimeShift(1);
+    await flushPromises();
+
+    expect(
+      parentForm.state.values.query_condition.multi_time_range.map(
+        (r: any) => r.offSet,
+      ),
+    ).toEqual(["15m", "45m"]);
+    expect(renderedOffsets()).toEqual(["15m", "45m"]);
   });
 });

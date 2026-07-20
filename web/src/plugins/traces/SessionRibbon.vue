@@ -21,20 +21,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:pt-[1rem] tw:px-[1rem] tw:pb-[0.625rem] tw:flex tw:flex-col"
+    class="card-container rounded-lg border border-[var(--color-border-default)] pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
     data-test="session-ribbon"
   >
     <!-- Header: title + subtitle (left) · metric toggle (right) -->
-    <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-[0.5rem] tw:mb-[0.75rem]">
+    <div class="flex items-baseline justify-between gap-[0.5rem] mb-[0.75rem]">
       <div>
-        <div class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
+        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
           {{ t('traces.sessionDetail.ribbon.title') }}
         </div>
-        <div class="tw:text-[0.7rem] tw:leading-normal tw:text-[var(--o2-text-secondary)] tw:mt-[0.1rem]">
+        <div class="text-[0.7rem] leading-normal text-[var(--color-text-secondary)] mt-[0.1rem]">
           {{ t('traces.sessionDetail.ribbon.subtitle') }}
         </div>
       </div>
-      <OToggleGroup v-model="metric" class="tw:flex-shrink-0">
+      <OToggleGroup v-model="metric" class="flex-shrink-0">
         <OToggleGroupItem value="cost" size="sm">
           {{ t('traces.sessionDetail.kpi.cost') }}
         </OToggleGroupItem>
@@ -51,11 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          (y-axis + bars) grows; the x-axis row sits beneath it, offset by the
          y-axis width so the turn numbers stay aligned under their bars. Shows the
          whole session when it fits, otherwise just the selected window. -->
-    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
+    <div class="flex flex-col flex-1 min-h-0">
       <!-- chart region: y-axis labels + bars, sharing the grown height -->
-      <div class="tw:flex tw:gap-[0.5rem] tw:flex-1 tw:min-h-0">
+      <div class="flex gap-[0.5rem] flex-1 min-h-0">
         <div
-          class="tw:flex tw:flex-col tw:justify-between tw:items-end tw:h-full tw:w-[2.75rem] tw:flex-shrink-0 tw:text-[0.6rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+          class="flex flex-col justify-between items-end h-full w-[2.75rem] flex-shrink-0 text-[0.6rem] text-[var(--color-text-muted)] tabular-nums"
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="tw:relative tw:flex-1 tw:min-w-0 tw:min-h-0 tw:flex tw:items-end tw:gap-[3px] tw:border-l tw:border-b tw:border-[var(--o2-border-color)]"
+          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-[3px] border-l border-b border-[var(--color-border-default)]"
         >
           <!-- gridlines (top + mid) to echo the dashboard chart grid -->
-          <div class="tw:absolute tw:inset-x-0 tw:top-0 tw:border-t tw:border-[var(--o2-border-color)] tw:opacity-60" />
-          <div class="tw:absolute tw:inset-x-0 tw:top-1/2 tw:border-t tw:border-[var(--o2-border-color)] tw:opacity-40" />
+          <div class="absolute inset-x-0 top-0 border-t border-[var(--color-border-default)] opacity-60" />
+          <div class="absolute inset-x-0 top-1/2 border-t border-[var(--color-border-default)] opacity-40" />
 
           <TurnPreviewCard
             v-for="bar in detailBars"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :delay="40"
           >
             <div
-              class="tw:relative tw:flex-1 tw:min-w-0 tw:rounded-t-[2px] tw:cursor-pointer tw:transition-[height] tw:duration-300 tw:ease-out hover:tw:brightness-110"
+              class="relative flex-1 min-w-0 rounded-t-[2px] cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
               :style="{ height: bar.pct + '%', background: bar.color }"
               @click="emit('jump', bar.index + 1)"
             />
@@ -89,14 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- x-axis + title, offset by the y-axis column width so the numbers stay
            aligned under their bars. With the window capped at WINDOW turns, every
            visible bar is wide enough to print its turn number. -->
-      <div class="tw:flex tw:gap-[0.5rem] tw:flex-shrink-0">
-        <div class="tw:w-[2.75rem] tw:flex-shrink-0" />
-        <div class="tw:flex-1 tw:min-w-0">
-          <div class="tw:flex tw:gap-[3px] tw:mt-[0.25rem]">
+      <div class="flex gap-[0.5rem] flex-shrink-0">
+        <div class="w-[2.75rem] flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <div class="flex gap-[3px] mt-[0.25rem]">
             <span
               v-for="bar in detailBars"
               :key="bar.index"
-              class="tw:flex-1 tw:min-w-0 tw:text-center tw:text-[0.6rem] tw:text-[var(--o2-text-muted)] tw:tabular-nums"
+              class="flex-1 min-w-0 text-center text-[0.6rem] text-[var(--color-text-muted)] tabular-nums"
             >
               {{ detailLabeled.has(bar.index + 1) ? bar.index + 1 : "" }}
             </span>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- x-axis title — matches the dashboard axis name (nameLocation
                "middle" + nameTextStyle bold/14px). -->
           <div
-            class="tw:text-center tw:text-[14px] tw:font-bold tw:text-[var(--o2-text-primary)] tw:mt-[0.25rem]"
+            class="text-center text-[14px] font-bold text-[var(--color-text-heading)] mt-[0.25rem]"
           >
             {{ t('traces.sessionDetail.turnLabel') }}
           </div>
@@ -121,20 +121,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          up with the bars above. -->
     <div
       v-if="windowed"
-      class="tw:flex tw:gap-[0.5rem] tw:flex-shrink-0 tw:mt-[0.625rem]"
+      class="flex gap-[0.5rem] flex-shrink-0 mt-[0.625rem]"
     >
-      <div class="tw:w-[2.75rem] tw:flex-shrink-0" />
+      <div class="w-[2.75rem] flex-shrink-0" />
       <div
         ref="overviewTrackRef"
-        class="tw:relative tw:flex-1 tw:min-w-0 tw:h-[26px] tw:flex tw:items-end tw:gap-[1px] tw:select-none tw:touch-none"
-        :class="dragging ? 'tw:cursor-grabbing' : 'tw:cursor-grab'"
+        class="relative flex-1 min-w-0 h-[26px] flex items-end gap-[1px] select-none touch-none"
+        :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
         @pointerdown="onTrackPointerDown"
         data-test="session-ribbon-overview"
       >
         <div
           v-for="bar in bars"
           :key="bar.index"
-          class="tw:flex-1 tw:min-w-0 tw:rounded-t-[1px] tw:transition-opacity"
+          class="flex-1 min-w-0 rounded-t-[1px] transition-opacity"
           :style="{
             height: Math.max(2, bar.pct) + '%',
             background: bar.color,
@@ -143,24 +143,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- selected window: drag the body to pan, or either edge to resize -->
         <div
-          class="tw:absolute tw:top-0 tw:bottom-0 tw:rounded-[2px] tw:border tw:border-[color-mix(in_srgb,var(--o2-text-primary)_45%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)]"
-          :class="dragging ? 'tw:cursor-grabbing' : 'tw:cursor-grab'"
+          class="absolute top-0 bottom-0 rounded-[2px] border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
+          :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
           :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
           @pointerdown.stop="(e) => beginDrag('pan', e)"
         >
           <!-- left resize handle (overhangs the edge so it's easy to grab) -->
           <div
-            class="tw:absolute tw:top-0 tw:bottom-0 tw:-left-[4px] tw:w-[9px] tw:cursor-ew-resize tw:flex tw:items-center tw:justify-center"
+            class="absolute top-0 bottom-0 -left-[4px] w-[9px] cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-left', e)"
           >
-            <div class="tw:w-[2px] tw:h-[55%] tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_60%,transparent)]" />
+            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
           <!-- right resize handle -->
           <div
-            class="tw:absolute tw:top-0 tw:bottom-0 tw:-right-[4px] tw:w-[9px] tw:cursor-ew-resize tw:flex tw:items-center tw:justify-center"
+            class="absolute top-0 bottom-0 -right-[4px] w-[9px] cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-right', e)"
           >
-            <div class="tw:w-[2px] tw:h-[55%] tw:rounded tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_60%,transparent)]" />
+            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
         </div>
       </div>

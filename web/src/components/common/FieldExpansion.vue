@@ -18,17 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCollapsible
     :model-value="isExpanded"
     @update:model-value="handleToggle"
-    class="field-expansion-item tw:w-full tw:rounded tw:overflow-hidden"
-    trigger-class="tw:px-0! tw:py-0!"
+    class="field-expansion-item w-full rounded overflow-hidden"
+    trigger-class="px-0! py-0!"
   >
     <template #trigger>
       <OFieldRow
         :data-test="`log-search-expand-${field.name}-field-btn`"
         :highlight="isFieldSelected"
       >
-        <span class="tw:w-[0.55rem] tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:mr-1">
+        <span class="w-[0.55rem] shrink-0 flex items-center justify-center mr-1">
           <OIcon
-            class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-4 tw:text-[var(--o2-text-muted)]"
+            class="inline-flex items-center justify-center shrink-0 w-4 text-[var(--o2-text-muted)]"
             :name="isExpanded ? 'expand-more' : 'chevron-right'"
             size="sm"
           />
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
           v-if="showQuickMode"
           variant="ghost-neutral"
-          class="tw:gap-0! tw:mr-1"
+          class="gap-0! mr-1"
           :title="
             field.isInterestingField
               ? 'Remove from interesting fields'
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showVisibilityToggle && !isFieldSelected"
             variant="ghost-neutral"
             size="icon"
-            class="tw:gap-0!"
+            class="gap-0!"
             @click.stop="$emit('toggle-field', field)"
           >
             <OIcon name="visibility" size="sm" />
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
             v-if="showVisibilityToggle && isFieldSelected"
             variant="ghost-neutral"
-            class="tw:gap-0!"
+            class="gap-0!"
             size="icon"
             @click.stop="$emit('toggle-field', field)"
           >
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
             v-if="showQuickMode"
             variant="ghost-neutral"
-            class="tw:gap-0!"
+            class="gap-0!"
             :title="
               field.isInterestingField
                 ? 'Remove from interesting fields'
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OFieldRow>
     </template>
 
-    <div class="tw:pl-4 tw:pr-0 tw:py-0">
+    <div class="pl-4 pr-0 py-0">
         <slot name="body">
           <FieldValuesPanel
             ref="fieldValuesPanelRef"

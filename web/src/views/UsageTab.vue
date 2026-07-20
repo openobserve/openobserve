@@ -14,14 +14,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="usage-tab tw:h-full">
+  <div class="usage-tab h-full">
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-y-auto tw:[padding-right:0.625rem]"
+      class="w-full h-full flex flex-col overflow-y-auto [padding-right:0.625rem]"
     >
       <!-- Banners -->
-      <div class="banners-wrapper tw:shrink-0 tw:flex tw:flex-col tw:gap-2">
+      <div class="banners-wrapper shrink-0 flex flex-col gap-2">
         <div>
           <TrialPeriod></TrialPeriod>
         </div>
@@ -35,16 +35,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Streams overview section -->
       <div
-        class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)]"
+        class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
         role="region"
         aria-label="Streams overview section"
       >
-        <div class="tw:flex tw:justify-between tw:items-center tw:mb-3">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
+        <div class="flex justify-between items-center mb-3">
+          <div class="flex items-center gap-2">
+            <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
               <OIcon name="window" size="md" />
             </div>
-            <div class="tw:text-(length:--text-lg) tw:font-semibold tw:[line-height:1.4]">{{ t("home.streams") }}</div>
+            <div class="text-(length:--text-lg) font-semibold [line-height:1.4]">{{ t("home.streams") }}</div>
           </div>
           <OButton
             variant="ghost"
@@ -69,37 +69,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     store.state.selectedOrganization?.identifier,
                 },
               }"
-              class="tw:absolute tw:inset-0"
+              class="absolute inset-0"
               aria-label="Navigate to streams page"
             ></router-link>
           </OButton>
         </div>
 
         <!-- Tiles -->
-        <div class="tw:grid tw:[grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))] tw:gap-3">
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]">
+        <div class="grid [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))] gap-3">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
             <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Streams count statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.streams") }}</div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="streamsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.streams") }}</div>
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="streamsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-success-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
               <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-streams-count"
               >
@@ -108,29 +108,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
             <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Events count statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="recordsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="recordsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-success-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
               <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-events-count"
               >
@@ -139,31 +139,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
             <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Ingested data size statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
                     {{ t("home.totalDataIngested") }}
                   </div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="ingestedSizeIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="ingestedSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-error-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-error-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-error-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-error-text)]"
                 >
                   <OIcon name="arrow-downward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
               <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-ingested-size"
               >
@@ -172,31 +172,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
             <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Compressed data size statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
                     {{ t("home.totalDataCompressed") }}
                   </div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="compressedSizeIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="compressedSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-success-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 2.89% from last
                   week
                 </div>
               </div>
               <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-compressed-size"
               >
@@ -205,29 +205,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
+          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
             <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
+              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
               role="article"
               aria-label="Index size statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="indexSizeIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
+              <div class="flex flex-col justify-between">
+                <div class="flex justify-between">
+                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
+                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                    <img :src="indexSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                 </div>
                 <div
                   v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-success-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-success-text)]"
+                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
                 >
                   <OIcon name="arrow-upward" size="xs" /> 0.00% from last
                   week
                 </div>
               </div>
               <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-index-size"
               >
@@ -239,27 +239,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Charts section -->
-      <div class="tw:grid tw:[grid-template-columns:minmax(min-content,max-content)_1fr_2fr] tw:gap-3 tw:mt-4 tw:items-stretch tw:flex-1 tw:min-h-0">
+      <div class="grid [grid-template-columns:minmax(min-content,max-content)_1fr_2fr] gap-3 mt-4 items-stretch flex-1 min-h-0">
         <!-- Functions and Dashboards tiles -->
-        <div class="tw:flex tw:flex-col tw:gap-4 tw:w-full">
-          <div class="tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
+        <div class="flex flex-col gap-4 w-full">
+          <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="tw:rounded tw:p-4 tw:w-full tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
+              class="rounded p-4 w-full bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-center flex flex-col justify-between"
               role="article"
               aria-label="Functions count statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
+              <div class="flex flex-col justify-between">
                 <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
+                  class="flex items-center gap-2 flex-nowrap w-full"
                 >
                   <div
-                    class="tw:bg-[rgba(238,95,38,0.2)] tw:border tw:border-[rgba(238,95,38,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg tw:flex-shrink-0"
+                    class="bg-[rgba(238,95,38,0.2)] border border-[rgba(238,95,38,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg flex-shrink-0"
                     aria-hidden="true"
                   >
-                    <img :src="functionsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
+                    <img :src="functionsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                   <div
-                    class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis"
                   >
                     {{ t("home.functionTitle") }}
                   </div>
@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'view-button-light'
                     "
                     aria-label="View all functions"
-                    class="tw:flex-shrink-0"
+                    class="flex-shrink-0"
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-functions-btn"
                   >
@@ -287,14 +287,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             store.state.selectedOrganization?.identifier,
                         },
                       }"
-                      class="tw:absolute tw:inset-0"
+                      class="absolute inset-0"
                       aria-label="Navigate to functions page"
                     ></router-link>
                   </OButton>
                 </div>
               </div>
               <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-functions-count"
               >
@@ -303,24 +303,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
+          <div class="flex-1 flex min-w-0 w-full">
             <div
-              class="tw:rounded tw:p-4 tw:w-full tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
+              class="rounded p-4 w-full bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-center flex flex-col justify-between"
               role="article"
               aria-label="Dashboards count statistics"
             >
-              <div class="tw:flex tw:flex-col tw:justify-between">
+              <div class="flex flex-col justify-between">
                 <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
+                  class="flex items-center gap-2 flex-nowrap w-full"
                 >
                   <div
-                    class="tw:bg-[rgba(238,95,38,0.2)] tw:border tw:border-[rgba(238,95,38,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg tw:flex-shrink-0"
+                    class="bg-[rgba(238,95,38,0.2)] border border-[rgba(238,95,38,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg flex-shrink-0"
                     aria-hidden="true"
                   >
-                    <img :src="dashboardsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
+                    <img :src="dashboardsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                   </div>
                   <div
-                    class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+                    class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis"
                   >
                     {{ t("home.dashboardTitle") }}
                   </div>
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'view-button-light'
                     "
                     aria-label="View all dashboards"
-                    class="tw:flex-shrink-0"
+                    class="flex-shrink-0"
                     :title="t('home.viewButton')"
                     data-test="home-usage-tab-view-dashboards-btn"
                   >
@@ -348,14 +348,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             store.state.selectedOrganization?.identifier,
                         },
                       }"
-                      class="tw:absolute tw:inset-0"
+                      class="absolute inset-0"
                       aria-label="Navigate to dashboards page"
                     ></router-link>
                   </OButton>
                 </div>
               </div>
               <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
+                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
                 aria-live="polite"
                 data-test="home-usage-tab-dashboards-count"
               >
@@ -367,15 +367,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts chart -->
         <div
-          class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:min-h-0"
+          class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] flex flex-col min-h-0"
           role="region"
           aria-label="Alerts overview section"
         >
-          <div class="tw:gap-2 tw:mb-3">
-            <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
-                <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                  <img :src="alertsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
+          <div class="gap-2 mb-3">
+            <div class="flex justify-between items-center">
+              <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
+                <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                  <img :src="alertsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                 </div>
                 {{ t("home.alertTitle") }}
               </span>
@@ -402,18 +402,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  class="tw:absolute tw:inset-0"
+                  class="absolute inset-0"
                   aria-label="Navigate to alerts page"
                 ></router-link>
               </OButton>
             </div>
-            <div class="tw:flex tw:pt-2 tw:gap-[1em]">
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">{{
+            <div class="flex pt-2 gap-[1em]">
+              <div class="flex flex-col">
+                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">{{
                   t("home.scheduledAlert")
                 }}</span>
                 <span
-                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
+                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-scheduled-alerts-count"
                 >{{
@@ -421,10 +421,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
               </div>
               <OSeparator :vertical="true" />
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.rtAlert") }}</span>
+              <div class="flex flex-col">
+                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">{{ t("home.rtAlert") }}</span>
                 <span
-                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
+                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-rt-alerts-count"
                 >{{
@@ -434,27 +434,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-first-chart tw:flex-1 tw:min-h-[200px] tw:w-full"
+            class="custom-first-chart flex-1 min-h-[200px] w-full"
           >
             <CustomChartRenderer
               :key="alertsPanelDataKey"
               :data="alertsPanelData"
-              class="tw:w-full tw:h-full"
+              class="w-full h-full"
             />
           </div>
         </div>
 
         <!-- Pipelines chart -->
         <div
-          class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:min-h-0"
+          class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] flex flex-col min-h-0"
           role="region"
           aria-label="Pipelines overview section"
         >
-          <div class="tw:gap-2 tw:mb-3">
-            <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
-                <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                  <img :src="pipelinesIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
+          <div class="gap-2 mb-3">
+            <div class="flex justify-between items-center">
+              <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
+                <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
+                  <img :src="pipelinesIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
                 </div>
                 {{ t("home.pipelineTitle") }}
               </span>
@@ -481,18 +481,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         store.state.selectedOrganization?.identifier,
                     },
                   }"
-                  class="tw:absolute tw:inset-0"
+                  class="absolute inset-0"
                   aria-label="Navigate to pipelines page"
                 ></router-link>
               </OButton>
             </div>
-            <div class="tw:flex tw:pt-2 tw:gap-[1em]">
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">
+            <div class="flex pt-2 gap-[1em]">
+              <div class="flex flex-col">
+                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">
                   {{ t("home.schedulePipelineTitle") }}</span
                 >
                 <span
-                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
+                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-scheduled-pipelines-count"
                 >{{
@@ -500,12 +500,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
               </div>
               <OSeparator :vertical="true" />
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">{{
+              <div class="flex flex-col">
+                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">{{
                   t("home.rtPipelineTitle")
                 }}</span>
                 <span
-                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
+                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
                   aria-live="polite"
                   data-test="home-usage-tab-rt-pipelines-count"
                 >{{
@@ -515,12 +515,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="custom-second-chart tw:flex-1 tw:min-h-[200px] tw:w-full"
+            class="custom-second-chart flex-1 min-h-[200px] w-full"
           >
             <CustomChartRenderer
               :key="pipelinesPanelDataKey"
               :data="pipelinesPanelData"
-              class="tw:w-full tw:h-full"
+              class="w-full h-full"
             />
           </div>
         </div>
@@ -530,7 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state when no data ingested -->
     <div
       v-if="no_data_ingest && !isLoadingSummary"
-      class="tw:flex tw:flex-col tw:h-full"
+      class="flex flex-col h-full"
       data-test="home-usage-tab-no-data"
     >
       <TrialPeriod />

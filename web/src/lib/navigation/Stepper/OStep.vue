@@ -113,48 +113,48 @@ function handleClick(): void {
 // ΓöÇΓöÇ Vertical indicator classes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 const indicatorClasses = computed<string>(() => {
   const base = [
-    'tw:flex tw:items-center tw:justify-center',
-    'tw:size-8 tw:rounded-full tw:shrink-0',
-    'tw:text-sm tw:font-semibold tw:leading-none',
-    'tw:transition-colors tw:duration-150',
+    'flex items-center justify-center',
+    'size-8 rounded-full shrink-0',
+    'text-sm font-semibold leading-none',
+    'transition-colors duration-150',
   ].join(' ')
 
-  const cursor = canClick.value ? 'tw:cursor-pointer' : 'tw:cursor-default'
+  const cursor = canClick.value ? 'cursor-pointer' : 'cursor-default'
 
   if (props.error) {
-    return `${base} ${cursor} tw:bg-stepper-indicator-error tw:text-stepper-indicator-fg`
+    return `${base} ${cursor} bg-stepper-indicator-error text-stepper-indicator-fg`
   }
   if (props.done) {
-    return `${base} ${cursor} tw:bg-stepper-indicator-done tw:text-stepper-indicator-fg`
+    return `${base} ${cursor} bg-stepper-indicator-done text-stepper-indicator-fg`
   }
   if (isActive.value) {
-    return `${base} ${cursor} tw:bg-stepper-indicator-active tw:text-stepper-indicator-fg`
+    return `${base} ${cursor} bg-stepper-indicator-active text-stepper-indicator-fg`
   }
-  return `${base} ${cursor} tw:bg-stepper-indicator-default tw:text-stepper-indicator-default-text`
+  return `${base} ${cursor} bg-stepper-indicator-default text-stepper-indicator-default-text`
 })
 
 const titleClasses = computed<string>(() => {
-  const base = 'tw:text-sm tw:font-medium tw:leading-tight'
-  if (isActive.value) return `${base} tw:text-stepper-title-active`
-  if (props.done) return `${base} tw:text-stepper-title-done`
-  return `${base} tw:text-stepper-title-default`
+  const base = 'text-sm font-medium leading-tight'
+  if (isActive.value) return `${base} text-stepper-title-active`
+  if (props.done) return `${base} text-stepper-title-done`
+  return `${base} text-stepper-title-default`
 })
 
 const triggerClasses = computed<string>(() => {
   const base = [
-    'tw:flex tw:items-center tw:gap-3 tw:w-full tw:text-start',
-    'tw:rounded-md tw:px-1.5 tw:py-1.5 tw:outline-none tw:select-none',
-    'tw:transition-colors tw:duration-150',
+    'flex items-center gap-3 w-full text-start',
+    'rounded-md px-1.5 py-1.5 outline-none select-none',
+    'transition-colors duration-150',
   ].join(' ')
   if (canClick.value) {
     return [
       base,
-      'tw:cursor-pointer',
-      'tw:hover:bg-stepper-trigger-hover',
-      'tw:focus-visible:ring-2 tw:focus-visible:ring-stepper-trigger-focus-ring',
+      'cursor-pointer',
+      'hover:bg-stepper-trigger-hover',
+      'focus-visible:ring-2 focus-visible:ring-stepper-trigger-focus-ring',
     ].join(' ')
   }
-  return `${base} tw:cursor-default`
+  return `${base} cursor-default`
 })
 </script>
 
@@ -164,9 +164,9 @@ const triggerClasses = computed<string>(() => {
     The header (indicator circle + title) is above the indented content area.
     The connecting line is the left border on the content area.
   -->
-  <div v-if="isVertical" class="o-step tw:flex tw:flex-row tw:min-w-0">
+  <div v-if="isVertical" class="o-step flex flex-row min-w-0">
     <!-- Left column: indicator + vertical connector line -->
-    <div class="tw:flex tw:flex-col tw:items-center tw:me-3 tw:shrink-0">
+    <div class="flex flex-col items-center me-3 shrink-0">
       <!-- Indicator circle (the clickable trigger in vertical mode) -->
       <button
         type="button"
@@ -177,24 +177,24 @@ const triggerClasses = computed<string>(() => {
         :title="title"
         @click="handleClick"
       >
-        <OIcon name="check" size="sm" v-if="done && !error" class="tw:size-4" :stroke-width="2.5" />
-        <OIcon name="error-outline" size="sm" v-else-if="error" class="tw:size-4" :stroke-width="2.5" />
-        <OIcon v-else-if="typeof icon === 'string'" :name="(icon as any)" class="tw:size-4" />
-        <component :is="icon as Component" v-else-if="icon" class="tw:size-4" />
+        <OIcon name="check" size="sm" v-if="done && !error" class="size-4" :stroke-width="2.5" />
+        <OIcon name="error-outline" size="sm" v-else-if="error" class="size-4" :stroke-width="2.5" />
+        <OIcon v-else-if="typeof icon === 'string'" :name="(icon as any)" class="size-4" />
+        <component :is="icon as Component" v-else-if="icon" class="size-4" />
         <span v-else aria-hidden="true">{{ name }}</span>
       </button>
       <!-- Vertical connector line below the indicator (hidden for the last step
            via CSS). Turns "done" once this step is complete, so a checklist
            shows progress flowing down the rail. -->
       <div
-        class="tw:flex-1 tw:w-px tw:mt-1 tw:[.o-step:last-child_&]:hidden"
-        :class="done ? 'tw:bg-stepper-connector-done' : 'tw:bg-stepper-connector'"
+        class="flex-1 w-px mt-1 [.o-step:last-child_&]:hidden"
+        :class="done ? 'bg-stepper-connector-done' : 'bg-stepper-connector'"
         aria-hidden="true"
       />
     </div>
 
     <!-- Right column: title button + content panel -->
-    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:pb-6">
+    <div class="flex flex-col flex-1 min-w-0 pb-6">
       <!-- Title row (also clickable when navigable) -->
       <button
         type="button"
@@ -203,14 +203,14 @@ const triggerClasses = computed<string>(() => {
         :aria-current="isActive ? 'step' : undefined"
         @click="handleClick"
       >
-        <span class="tw:flex tw:flex-col tw:items-start tw:min-w-0">
-          <span class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+        <span class="flex flex-col items-start min-w-0">
+          <span class="flex items-center gap-2 flex-wrap">
             <span :class="titleClasses">{{ title }}</span>
             <slot name="title-suffix" />
           </span>
           <span
             v-if="description"
-            class="tw:text-xs tw:text-text-secondary tw:mt-0.5 tw:leading-tight"
+            class="text-xs text-text-secondary mt-0.5 leading-tight"
           >
             {{ description }}
           </span>
@@ -219,7 +219,7 @@ const triggerClasses = computed<string>(() => {
 
       <!-- Content panel. Expanded (checklist) mode: always rendered, no
            transition. Wizard mode: only the active step, animated. -->
-      <div class="tw:mt-2 tw:min-w-0">
+      <div class="mt-2 min-w-0">
         <div v-if="expanded">
           <slot />
         </div>
@@ -252,7 +252,7 @@ const triggerClasses = computed<string>(() => {
     <!-- Expanded (checklist) mode: always rendered, no transition. -->
     <div
       v-if="expanded"
-      class="o-step-content tw:w-full tw:min-w-0"
+      class="o-step-content w-full min-w-0"
       role="region"
       :aria-label="`${title}`"
     >
@@ -270,7 +270,7 @@ const triggerClasses = computed<string>(() => {
         <div
           v-if="isActive"
           :key="name"
-          class="o-step-content tw:w-full tw:min-w-0"
+          class="o-step-content w-full min-w-0"
           role="region"
           :aria-label="`${title}`"
         >
@@ -279,7 +279,7 @@ const triggerClasses = computed<string>(() => {
       </Transition>
       <div
         v-else-if="!animated && isActive"
-        class="o-step-content tw:w-full tw:min-w-0"
+        class="o-step-content w-full min-w-0"
         role="region"
         :aria-label="`${title}`"
       >

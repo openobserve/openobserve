@@ -3,12 +3,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createRouter, createMemoryHistory } from "vue-router";
+import { createI18n } from "vue-i18n";
 import ONavbar from "./ONavbar.vue";
 import type { NavItem } from "./ONavbar.types";
 
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [{ path: "/", component: { template: "<div />" } }],
+});
+
+// Minimal i18n so ONavbar's useI18n()/group-title t() resolve (keys echo back).
+const i18n = createI18n({
+  locale: "en",
+  legacy: false,
+  messages: { en: {} },
+  missingWarn: false,
+  fallbackWarn: false,
 });
 
 // All daily-use (top-level) names — none of these belong to a flyout group, so
@@ -51,7 +61,7 @@ describe("ONavbar", () => {
         ...props,
       },
       global: {
-        plugins: [router],
+        plugins: [router, i18n],
         stubs: {
           "menu-link": menuLinkStub,
           ONavGroup: navGroupStub,

@@ -59,6 +59,28 @@ export interface SaveAlertContext {
   handleAlertError: (err: any) => void;
 }
 
+/**
+ * Drop the FORM-ONLY keys added by the OForm migration. These are seeded into
+ * the form by `withFormExtras` and are not part of the alert resource:
+ *   _ui        → display-only state (the "Check every" hours/minutes value the
+ *                user sees; the real value is trigger_condition.frequency)
+ *   _meta      → schema discriminators (tab / mode / org floor)
+ *   logGroupBy → the logs group-by field array (mirrored into
+ *                query_condition.aggregation.group_by)
+ * Pre-migration formData had none of these, so dropping them restores the
+ * pre-migration shape exactly (Rule ④). Mutates and returns `obj`.
+ *
+ * BOTH save paths must use this: the normal one (getAlertPayload) and the JSON
+ * editor one (prepareAndSaveAlert). It is also applied to the JSON editor's
+ * displayed data, so users never see or edit these internal keys.
+ */
+export const stripFormExtras = <T>(obj: T): T => {
+  delete (obj as any)._ui;
+  delete (obj as any)._meta;
+  delete (obj as any).logGroupBy;
+  return obj;
+};
+
 export const getAlertPayload = (
   formData: PayloadFormData,
   context: PayloadContext,
@@ -68,6 +90,10 @@ export const getAlertPayload = (
 
   // Deleting uuid from payload as it was added for reference of frontend
   if (payload.uuid) delete payload.uuid;
+
+  // Same reason: `payload` is a cloneDeep of the whole form value set, so
+  // anything seeded into the form leaks to the backend unless dropped here.
+  stripFormExtras(payload);
 
   payload.is_real_time = payload.is_real_time === "true";
 
@@ -118,6 +144,40 @@ export const getAlertPayload = (
     payload.query_condition.sql = "";
   }
 
+  // `having.value` and `promql_condition.value` arrive here as the RAW STRING the
+  // input produced. Both are name=-owned OFormInputs, and OFormInput registers
+  // `v-bind="$attrs"` BEFORE its own @update:model-value="field.handleChange" — so
+  // QueryConfig's Number()-coercing consumer handler runs FIRST and handleChange
+  // commits the raw string LAST, overwriting it. Pre-migration both went out as
+  // numbers (promql via `v-model.number`; having via a direct Number() write onto
+  // inputData), so without this the saved type silently drifts string-vs-number.
+  //
+  // Coerced HERE rather than in the form, for two reasons:
+  //   • it is the same last-mile rescue threshold/period/frequency/silence already
+  //     get above — one place owns payload numerics;
+  //   • form state must stay the raw string while typing. Coercing on each
+  //     keystroke would fight the user: "5." (mid-way to "5.5") is Number-ed to 5,
+  //     snapping the field back and eating the decimal point.
+  const toNumericValue = (v: unknown) => {
+    if (v === "" || v === null || v === undefined) return v;
+    const n = Number(v);
+    // Zero-safe (Number("0") === 0). A non-numeric value is passed through
+    // untouched rather than shipped as NaN (which JSON-serializes to null).
+    return Number.isNaN(n) ? v : n;
+  };
+
+  if (payload.query_condition.aggregation?.having) {
+    payload.query_condition.aggregation.having.value = toNumericValue(
+      payload.query_condition.aggregation.having.value,
+    );
+  }
+
+  if (payload.query_condition.promql_condition) {
+    payload.query_condition.promql_condition.value = toNumericValue(
+      payload.query_condition.promql_condition.value,
+    );
+  }
+
   if (formData.query_condition.vrl_function) {
     payload.query_condition.vrl_function = b64EncodeUnicode(
       formData.query_condition.vrl_function.trim(),
@@ -153,7 +213,11 @@ export const prepareAndSaveAlert = async (
   } = context;
 
   const payload = cloneDeep(data);
-  
+
+  // The JSON editor's data comes from the form value set, so it can carry the
+  // form-only keys. Pre-migration formData had none of them (Rule ④).
+  stripFormExtras(payload);
+
   if (!isAggregationEnabled.value) {
     payload.query_condition.aggregation = null;
   }

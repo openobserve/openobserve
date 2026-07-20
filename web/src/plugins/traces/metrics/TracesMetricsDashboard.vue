@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard tw:w-full tw:overflow-hidden">
+  <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard w-full overflow-hidden">
     <!-- Charts Section -->
     <transition name="slide-fade">
       <div
         v-if="show"
-        class="charts-wrapper tw:py-0! tw:min-h-[8.5rem] tw:h-[10rem] tw:overflow-hidden tw:will-change-[transform,opacity]"
+        class="charts-wrapper py-0! min-h-[8.5rem] h-[10rem] overflow-hidden will-change-[transform,opacity]"
       >
-        <div class="tw:dark:border-[rgba(255,255,255,0.1)] tw:dark:hover:shadow-[0_2px_8px_rgba(255,255,255,0.08)]">
+        <div class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-[0_2px_8px_rgba(255,255,255,0.08)]">
           <RenderDashboardCharts
             v-if="show"
             ref="dashboardChartsRef"
@@ -87,7 +87,6 @@ import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
-import useParser from "@/composables/useParser";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -119,7 +118,7 @@ const emit = defineEmits<{
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
-const { searchObj } = useTraces();
+const { searchObj, tracesParser } = useTraces();
 const { t } = useI18n();
 
 
@@ -208,7 +207,6 @@ const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuValue = ref(0);
 const contextMenuFieldName = ref("");
 const contextMenuData = ref<any>(null);
-const sqlParser = ref<any>(null);
 
 const getBaseFilters = () => {
   let baseFilters = [];
@@ -232,13 +230,13 @@ const getBaseFilters = () => {
   if (effectiveFilter.value?.trim().length) {
     const parsed = parseDurationWhereClause(
       effectiveFilter.value.trim(),
-      sqlParser.value,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
     baseFilters.push(
       parseSpanKindWhereClause(
         typeof parsed === "string" ? parsed : effectiveFilter.value.trim(),
-        sqlParser.value,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       ),
     );
@@ -275,7 +273,7 @@ const loadDashboard = async () => {
           // and span_kind labels back to numeric OTEL keys.
           const parsedFilter = parseDurationWhereClause(
             effectiveFilter.value.trim(),
-            sqlParser.value,
+            tracesParser.value,
             searchObj.data.stream.selectedStream.value,
           );
           errorFilters.push(
@@ -283,7 +281,7 @@ const loadDashboard = async () => {
               typeof parsedFilter === "string"
                 ? parsedFilter
                 : effectiveFilter.value.trim(),
-              sqlParser.value,
+              tracesParser.value,
               searchObj.data.stream.selectedStream.value,
             ),
           );
@@ -702,10 +700,8 @@ const stopAutoRefresh = () => {
   }
 };
 
-onMounted(async () => {
+onMounted(() => {
   loadDashboard();
-  const { sqlParser: loadSqlParser } = useParser();
-  sqlParser.value = await loadSqlParser();
 });
 
 onBeforeUnmount(() => {

@@ -390,7 +390,7 @@ mod tests {
     fn test_retention_decision_keeps_extended_retention_day() {
         let (day_start, day_end) = day_bounds(2026, 5, 15).unwrap();
         let day_range = TimeRange::new(day_start.timestamp_micros(), day_end.timestamp_micros());
-        let extended = vec![TimeRange::new(
+        let extended = [TimeRange::new(
             Utc.with_ymd_and_hms(2026, 5, 14, 0, 0, 0)
                 .single()
                 .unwrap()

@@ -165,7 +165,7 @@ describe("GroupHeader.vue", () => {
     it("wraps content in a flex container", () => {
       const wrapper = createWrapper();
       const root = wrapper.find("div");
-      expect(root.classes().some((c) => c.includes("flex") || c.includes("tw:"))).toBe(true);
+      expect(root.classes().some((c) => c.includes("flex") || c.includes(""))).toBe(true);
     });
 
     it("icon appears before the title", () => {

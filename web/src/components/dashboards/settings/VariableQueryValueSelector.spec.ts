@@ -14,9 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, config } from "@vue/test-utils";
 import { nextTick } from "vue";
+import i18n from "@/locales";
 import VariableQueryValueSelector from "./VariableQueryValueSelector.vue";
+
+// Install the real app i18n for every mount in this file so components
+// that call useI18n() during setup have an active i18n instance.
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Mock lodash debounce - improved version
 vi.mock("lodash-es", () => ({
@@ -67,7 +72,7 @@ describe("VariableQueryValueSelector", () => {
     { label: "Custom Test", value: "custom-test::_o2_custom" }
   ];
 
-  // OSelect stub that exposes the Quasar-style methods the component still
+  // OSelect stub that exposes the methods the component still
   // calls on its selectRef (updateInputValue/blur/hidePopup).
   const OSelectStub = {
     name: "OSelect",
@@ -517,8 +522,7 @@ describe("VariableQueryValueSelector", () => {
       expect(wrapper.vm.isAllSelected).toBe(true);
     });
 
-    it("should close popup after select all", async () => {
-      // Test the behavior through public API
+    it("should NOT close popup after select all in multi-select mode", async () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
@@ -526,12 +530,47 @@ describe("VariableQueryValueSelector", () => {
         close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
-      
+
       await wrapper.vm.toggleSelectAll();
 
-      // Verify the popup closing behavior occurred — closePopUpWhenValueIsSet calls close()
-      expect(mockRef.close).toHaveBeenCalled();
+      // Dropdown stays open (close not called), but the value is still applied/emitted.
+      expect(mockRef.close).not.toHaveBeenCalled();
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([["_o2_all_"]]);
+    });
+
+    it("should close popup after select all in single-select mode", async () => {
+      wrapper = createWrapper({ variableItem: defaultVariableItem });
+      const mockRef = {
+        updateInputValue: vi.fn(),
+        blur: vi.fn(),
+        hidePopup: vi.fn(),
+        close: vi.fn(),
+      };
+      wrapper.vm.selectRef = mockRef;
+
+      await wrapper.vm.toggleSelectAll();
+
+      expect(mockRef.close).toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual(["_o2_all_"]);
+    });
+
+    it("should keep popup open and emit [] when deselecting all in multi-select mode", async () => {
+      const mockRef = {
+        updateInputValue: vi.fn(),
+        blur: vi.fn(),
+        hidePopup: vi.fn(),
+        close: vi.fn(),
+      };
+      wrapper.vm.selectRef = mockRef;
+      wrapper.vm.selectedValue = ["_o2_all_"];
+      await nextTick();
+
+      await wrapper.vm.toggleSelectAll();
+
+      expect(wrapper.vm.selectedValue).toEqual([]);
+      expect(mockRef.close).not.toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([[]]);
     });
   });
 

@@ -22,7 +22,7 @@ const emit = defineEmits<{
     :model-value="props.modelValue"
     @update:model-value="$emit('update:modelValue', String($event || ''))"
     :placeholder="t('dashboard.configPanelSearchPlaceholder')"
-    class="tw:flex tw:flex-col config-panel-search"
+    class="flex flex-col config-panel-search"
     size="xs"
     clearable
     autofocus

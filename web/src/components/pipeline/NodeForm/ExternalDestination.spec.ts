@@ -78,8 +78,10 @@ const sampleDestinations = [
   { name: "dest2", url: "http://dest2.example.com", destination_type_name: "splunk" },
 ];
 
-// ODrawer stub — renders slot content, title, and action buttons so tests can
-// interact with save/cancel/delete controls.
+// ODrawer stub — renders slot content (so the REAL <OForm> mounts inside it and
+// the schema runs), title, and action buttons. The footer Save is wired to the
+// form via form-id; tests drive the form's own handleSubmit() so the validate →
+// @submit → save chain is awaited deterministically.
 const ODrawerStub = {
   name: "ODrawer",
   props: [
@@ -89,11 +91,12 @@ const ODrawerStub = {
     "title",
     "width",
     "persistent",
+    "formId",
     "primaryButtonLabel",
     "secondaryButtonLabel",
     "neutralButtonLabel",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:secondary", "click:neutral"],
   template: `
     <div class="o-drawer-stub">
       <div class="o-drawer-title">{{ title }}</div>
@@ -106,7 +109,8 @@ const ODrawerStub = {
       <button
         v-if="primaryButtonLabel"
         data-test="add-destination-save-btn"
-        @click="$emit('click:primary')"
+        type="submit"
+        form="external-destination-form"
       >{{ primaryButtonLabel }}</button>
       <button
         v-if="neutralButtonLabel"
@@ -141,6 +145,7 @@ function createWrapper(pipelineObjOverrides: Record<string, any> = {}) {
   }));
 
   return mount(ExternalDestination, {
+    props: { open: true },
     global: {
       plugins: [i18n, store],
       stubs: {
@@ -159,6 +164,16 @@ function createWrapper(pipelineObjOverrides: Record<string, any> = {}) {
     },
   });
 }
+
+// Form helpers — selectedDestination is form-owned now.
+const setDestination = (w: any, val: unknown) =>
+  w.vm.formRef.form.setFieldValue("selectedDestination", val);
+const formDestination = (w: any) =>
+  w.vm.formRef.form.state.values.selectedDestination;
+const submitForm = async (w: any) => {
+  await w.vm.formRef.form.handleSubmit();
+  await flushPromises();
+};
 
 // --------------------------------------------------------------------------
 // Test suite
@@ -209,35 +224,21 @@ describe("ExternalDestination.vue", () => {
       expect(wrapper.vm.destinations).toHaveLength(2);
     });
 
-    it("1.4 initialises selectedDestination with empty string by default", async () => {
+    it("1.4 initialises form selectedDestination with empty string by default", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.vm.selectedDestination).toBe("");
+      expect(formDestination(wrapper)).toBe("");
     });
 
-    it("1.5 pre-populates selectedDestination when currentSelectedNodeData has a destination_name", async () => {
-      // Re-mock useDnD before mounting with an existing destination
-      vi.mocked(useDnD).mockImplementation(() => ({
-        pipelineObj: buildMockPipelineObj({
-          currentSelectedNodeData: {
-            data: { destination_name: "existing-dest" },
-          },
-          isEditNode: true,
-        }),
-        addNode: mockAddNode,
-        deletePipelineNode: mockDeletePipelineNode,
-      }));
-
-      const w = mount(ExternalDestination, {
-        global: {
-          plugins: [i18n, store],
-          stubs: { ConfirmDialog: true, CreateDestinationForm: true },
+    it("1.5 pre-populates form selectedDestination when currentSelectedNodeData has a destination_name", async () => {
+      wrapper = createWrapper({
+        currentSelectedNodeData: {
+          data: { destination_name: "existing-dest" },
         },
+        isEditNode: true,
       });
       await flushPromises();
-
-      expect(w.vm.selectedDestination).toBe("existing-dest");
-      w.unmount();
+      expect(formDestination(wrapper)).toBe("existing-dest");
     });
 
     it("1.6 pipelineObj is accessible from component", async () => {
@@ -289,9 +290,6 @@ describe("ExternalDestination.vue", () => {
     it("2.4 handles 403 error silently without modifying destinations", async () => {
       wrapper = createWrapper();
       await flushPromises();
-
-      // Store current destinations count
-      const before = wrapper.vm.destinations.length;
 
       vi.mocked(destinationService.list).mockRejectedValueOnce({
         response: { status: 403 },
@@ -382,7 +380,7 @@ describe("ExternalDestination.vue", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 4. saveDestination
+  // 4. saveDestination (schema-gated submit through the real OForm)
   // -----------------------------------------------------------------------
 
   describe("4. saveDestination", () => {
@@ -391,9 +389,9 @@ describe("ExternalDestination.vue", () => {
       await flushPromises();
     });
 
-    it("4.1 calls addNode with correct payload when a destination is selected", () => {
-      wrapper.vm.selectedDestination = "dest1";
-      wrapper.vm.saveDestination();
+    it("4.1 calls addNode with correct payload when a destination is selected", async () => {
+      setDestination(wrapper, "dest1");
+      await submitForm(wrapper);
 
       expect(mockAddNode).toHaveBeenCalledWith({
         destination_name: "dest1",
@@ -403,41 +401,48 @@ describe("ExternalDestination.vue", () => {
       });
     });
 
-    it("4.2 emits cancel:hideform after a successful save", () => {
-      wrapper.vm.selectedDestination = "dest1";
-      wrapper.vm.saveDestination();
+    it("4.2 emits cancel:hideform after a successful save", async () => {
+      setDestination(wrapper, "dest1");
+      await submitForm(wrapper);
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
       expect(wrapper.emitted()["cancel:hideform"]).toHaveLength(1);
     });
 
-    it("4.3 does NOT call addNode when selectedDestination value is empty", () => {
-      wrapper.vm.selectedDestination = "";
-      wrapper.vm.saveDestination();
+    it("4.3 blocks submit and does NOT call addNode when selectedDestination is empty", async () => {
+      setDestination(wrapper, "");
+      await submitForm(wrapper);
+      expect(wrapper.vm.formRef.form.state.isValid).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
-    it("4.4 uses the store selectedOrganization identifier as org_id", () => {
-      wrapper.vm.selectedDestination = "dest2";
-      wrapper.vm.saveDestination();
+    it("4.4 uses the store selectedOrganization identifier as org_id", async () => {
+      setDestination(wrapper, "dest2");
+      await submitForm(wrapper);
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ org_id: "default" }),
       );
     });
 
-    it("4.5 sets correct node_type as remote_stream", () => {
-      wrapper.vm.selectedDestination = "dest1";
-      wrapper.vm.saveDestination();
+    it("4.5 sets correct node_type as remote_stream", async () => {
+      setDestination(wrapper, "dest1");
+      await submitForm(wrapper);
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ node_type: "remote_stream" }),
       );
     });
 
-    it("4.6 sets correct io_type as output", () => {
-      wrapper.vm.selectedDestination = "dest1";
-      wrapper.vm.saveDestination();
+    it("4.6 sets correct io_type as output", async () => {
+      setDestination(wrapper, "dest1");
+      await submitForm(wrapper);
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ io_type: "output" }),
       );
+    });
+
+    it("4.7 marks the form valid when a destination is selected", async () => {
+      setDestination(wrapper, "dest1");
+      await submitForm(wrapper);
+      expect(wrapper.vm.formRef.form.state.isValid).toBe(true);
     });
   });
 
@@ -451,20 +456,23 @@ describe("ExternalDestination.vue", () => {
       await flushPromises();
     });
 
-    it("5.1 sets selectedDestination to the newly created destination name", async () => {
-      await wrapper.vm.handleDestinationCreated("brand-new-dest");
-      expect(wrapper.vm.selectedDestination).toBe("brand-new-dest");
+    it("5.1 selects the newly created destination in the form", async () => {
+      wrapper.vm.handleDestinationCreated("brand-new-dest");
+      await flushPromises();
+      expect(formDestination(wrapper)).toBe("brand-new-dest");
     });
 
     it("5.2 switches createNewDestination back to false", async () => {
       wrapper.vm.createNewDestination = true;
-      await wrapper.vm.handleDestinationCreated("brand-new-dest");
+      await nextTick();
+      wrapper.vm.handleDestinationCreated("brand-new-dest");
+      await flushPromises();
       expect(wrapper.vm.createNewDestination).toBe(false);
     });
 
     it("5.3 calls getDestinations after creation to refresh the list", async () => {
       vi.mocked(destinationService.list).mockClear();
-      await wrapper.vm.handleDestinationCreated("brand-new-dest");
+      wrapper.vm.handleDestinationCreated("brand-new-dest");
       await flushPromises();
       expect(destinationService.list).toHaveBeenCalled();
     });
@@ -610,8 +618,8 @@ describe("ExternalDestination.vue", () => {
       expect(typeof wrapper.vm.handleCancel).toBe("function");
     });
 
-    it("10.5 exposes selectedDestination ref", () => {
-      expect(wrapper.vm.selectedDestination).toBeDefined();
+    it("10.5 exposes the real OForm via formRef", () => {
+      expect(wrapper.vm.formRef?.form).toBeDefined();
     });
 
     it("10.6 exposes destinations ref", () => {

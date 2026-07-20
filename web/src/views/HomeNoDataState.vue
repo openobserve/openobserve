@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #extra>
-      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
-        <span class="tw:text-sm tw:font-semibold tw:text-text-secondary tw:mr-1">
+      <div class="flex items-center justify-center gap-2 flex-wrap">
+        <span class="text-sm font-semibold text-text-secondary mr-1">
           {{ t("home.noDataState.or") }}
         </span>
         <EmptyStateIngestionChip
@@ -73,14 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="home-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
         >
-          <img :src="getImageURL('images/common/kubernetes.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          <img :src="getImageURL('images/common/kubernetes.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
           {{ t("home.noDataState.kubernetes") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           data-test="home-no-data-aws-btn"
           @click="go('AWSConfig')"
         >
-          <img :src="getImageURL('images/ingestion/aws.svg')" class="tw:w-3.5 tw:h-3.5 tw:shrink-0 tw:object-contain" alt="" />
+          <img :src="getImageURL('images/ingestion/aws.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
           {{ t("home.noDataState.aws") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip

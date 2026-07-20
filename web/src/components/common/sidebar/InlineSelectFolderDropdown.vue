@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-center tw:gap-1">
+  <div class="flex items-center gap-1">
     <OSelect
       :model-value="modelValue"
       :options="folderOptions"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!disable"
       variant="outline"
       size="icon"
-      class="tw:shrink-0"
+      class="shrink-0"
       title="Add Folder"
       @click="showDialog = true"
     >

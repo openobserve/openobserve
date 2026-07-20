@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:inline-flex tw:items-center tw:justify-center" data-test="frustration-badge-container">
+  <div class="inline-flex items-center justify-center" data-test="frustration-badge-container">
     <OTag
       v-if="count > 0"
       type="frustrationSeverity"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="tooltipText"
       data-test-tooltip="frustration-badge-tooltip"
     >{{ count }}</OTag>
-    <span v-else class="tw:text-gray-400" data-test="frustration-badge-none">—</span>
+    <span v-else class="text-gray-400" data-test="frustration-badge-none">—</span>
   </div>
 </template>
 

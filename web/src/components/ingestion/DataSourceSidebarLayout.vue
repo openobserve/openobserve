@@ -35,21 +35,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="splitterWidthModel"
     unit="px"
     :horizontal="false"
-    class="tw:h-full"
+    class="h-full"
   >
     <template #before>
-      <div class="tw:w-full tw:h-full">
-        <div class="tw:h-full tw:bg-surface-panel tw:border-r tw:border-border-default">
+      <div class="w-full h-full">
+        <div class="h-full bg-surface-panel border-r border-border-default">
           <div
-            :class="['tw:overflow-hidden tw:h-full', { 'tw:pt-1.5': !searchable }]"
+            :class="['overflow-hidden h-full', { 'pt-1.5': !searchable }]"
             :data-test="panelDataTest || undefined"
           >
-            <div v-if="searchable" class="tw:p-2">
+            <div v-if="searchable" class="p-2">
               <OSearchInput
                 v-model="filter"
                 :data-test="searchDataTest || undefined"
                 clearable
-                class="tw:w-full indexlist-search-input"
+                class="w-full indexlist-search-input"
                 :placeholder="searchPlaceholder || t('common.search')"
               />
             </div>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :model-value="modelValue"
               orientation="vertical"
               dense
-              :class="['tw:px-1', tabsClass]"
+              :class="['px-1', tabsClass]"
               @update:model-value="(v) => emit('update:modelValue', v)"
             >
               <slot name="tabs" :tabs="filteredTabs" :filter="filter">

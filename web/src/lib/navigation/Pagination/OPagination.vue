@@ -58,18 +58,18 @@ const navigate = (page: number) => {
 <template>
   <div
     role="navigation"
-    class="tw:inline-flex tw:items-center tw:gap-0.5 tw:select-none"
+    class="inline-flex items-center gap-0.5 select-none"
     aria-label="Pagination"
     v-bind="$attrs"
   >
     <!-- Previous page -->
     <button
       type="button"
-      class="o-pagination__btn tw:flex tw:size-7 tw:items-center tw:justify-center tw:rounded tw:transition-colors"
+      class="o-pagination__btn flex size-7 items-center justify-center rounded transition-colors"
       :class="[
         isFirst || disable
-          ? 'tw:text-pagination-nav-disabled-text tw:cursor-not-allowed tw:opacity-50'
-          : 'tw:text-pagination-nav-text tw:hover:bg-pagination-nav-hover-bg tw:cursor-pointer',
+          ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'
+          : 'text-pagination-nav-text hover:bg-pagination-nav-hover-bg cursor-pointer',
       ]"
       :disabled="isFirst || disable"
       aria-label="Previous page"
@@ -84,13 +84,13 @@ const navigate = (page: number) => {
       v-for="page in pages"
       :key="page"
       type="button"
-      class="o-pagination__btn tw:flex tw:size-7 tw:items-center tw:justify-center tw:rounded tw:text-sm tw:font-medium tw:transition-colors"
+      class="o-pagination__btn flex size-7 items-center justify-center rounded text-sm font-medium transition-colors"
       :class="[
         page === modelValue
-          ? 'tw:bg-pagination-item-active-bg tw:text-pagination-item-active-text tw:cursor-default'
+          ? 'bg-pagination-item-active-bg text-pagination-item-active-text cursor-default'
           : disable
-            ? 'tw:text-pagination-item-disabled-text tw:cursor-not-allowed tw:opacity-50'
-            : 'tw:text-pagination-item-text tw:hover:bg-pagination-item-hover-bg tw:cursor-pointer',
+            ? 'text-pagination-item-disabled-text cursor-not-allowed opacity-50'
+            : 'text-pagination-item-text hover:bg-pagination-item-hover-bg cursor-pointer',
       ]"
       :disabled="disable && page !== modelValue"
       :aria-label="`Page ${page}`"
@@ -106,11 +106,11 @@ const navigate = (page: number) => {
     <!-- Next page -->
     <button
       type="button"
-      class="o-pagination__btn tw:flex tw:size-7 tw:items-center tw:justify-center tw:rounded tw:transition-colors"
+      class="o-pagination__btn flex size-7 items-center justify-center rounded transition-colors"
       :class="[
         isLast || disable
-          ? 'tw:text-pagination-nav-disabled-text tw:cursor-not-allowed tw:opacity-50'
-          : 'tw:text-pagination-nav-text tw:hover:bg-pagination-nav-hover-bg tw:cursor-pointer',
+          ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'
+          : 'text-pagination-nav-text hover:bg-pagination-nav-hover-bg cursor-pointer',
       ]"
       :disabled="isLast || disable"
       aria-label="Next page"

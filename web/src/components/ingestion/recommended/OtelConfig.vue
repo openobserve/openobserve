@@ -1,11 +1,11 @@
 <template>
   <div>
-    <div class="tw:p-2 tw:pt-1">
-      <div class="tw:text-base tw:font-medium tw:font-bold">OTLP HTTP</div>
-      <ContentCopy class="tw:mt-2" :content="getOtelHttpConfig" />
+    <div class="p-2 pt-1">
+      <div class="text-base font-medium font-bold">OTLP HTTP</div>
+      <ContentCopy class="mt-2" :content="getOtelHttpConfig" />
     </div>
-    <div class="tw:p-3" v-if="config.isCloud == 'false'">
-      <div class="tw:text-base tw:font-medium tw:font-bold">OTLP gRPC</div>
+    <div class="p-3" v-if="config.isCloud == 'false'">
+      <div class="text-base font-medium font-bold">OTLP gRPC</div>
       <ContentCopy :content="getOtelGrpcConfig" />
     </div>
   </div>

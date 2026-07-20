@@ -28,8 +28,11 @@ export class IamPage {
         // open at a time, so we target by the common slug rather than the
         // (different) parent slugs of delete vs. refresh dialogs.
         this.addServiceAccountButton = page.locator('[data-test="service-accounts-add-btn"]');
-        this.identifierInput = page.locator('[data-test="iam-add-service-account-identifier-input-field"]');
-        this.identifierInputError = page.locator('[data-test="iam-add-service-account-identifier-input-error"]');
+        // Service accounts are created from a NAME (lowercase slug); the UI
+        // synthesizes the identifier as `<name>.<org>@sa.internal`
+        // (see AddServiceAccount.schema.ts).
+        this.nameInput = page.locator('[data-test="iam-add-service-account-name-input-field"]');
+        this.nameInputError = page.locator('[data-test="iam-add-service-account-name-input-error"]');
         this.descriptionInput = page.locator('[data-test="iam-add-service-account-description-input-field"]');
         // Add/Edit service account dialog footer uses ODialog's built-in
         // primary/secondary buttons; scope to the dialog to avoid colliding
@@ -128,29 +131,34 @@ export class IamPage {
     }
 
 
-    async iamPageAddServiceAccountEmailValidation() {
+    async iamPageAddServiceAccountNameValidation() {
 
         await this.saveButton.click();
 
-        // OInput error message renders with data-test="<parent>-error"
-        await expect(this.identifierInputError).toBeVisible({ timeout: 10000 });
-        await expect(this.identifierInputError).toHaveText('Please enter a valid email address');
+        // OInput error message renders with data-test="<parent>-error".
+        // An empty name fails the slug rule (serviceAccounts.nameInvalid);
+        // the trailing char count is org-dependent, so match the fixed prefix.
+        await expect(this.nameInputError).toBeVisible({ timeout: 10000 });
+        await expect(this.nameInputError).toContainText('Use lowercase letters, numbers and hyphens');
 
 
     }
 
-    async enterEmailServiceAccount(emailName) {
+    async enterNameServiceAccount(name) {
 
-        await this.identifierInput.click();
-        await this.identifierInput.fill(emailName);
+        await this.nameInput.click();
+        await this.nameInput.fill(name);
 
     }
 
-    async enterSameEmailServiceAccount() {
-
-        await this.identifierInput.click();
-        await this.identifierInput.fill(process.env["ZO_ROOT_USER_EMAIL"] || process.env["ALPHA1_USER_EMAIL"]);
-
+    /**
+     * The identifier the UI synthesizes for a service account name:
+     * `<name>.<org>@sa.internal` (lowercased) — this is what list rows and
+     * API endpoints are keyed by.
+     */
+    serviceAccountEmailFor(name) {
+        const orgName = process.env.ORGNAME || 'default';
+        return `${name}.${orgName}@sa.internal`.toLowerCase();
     }
 
     async enterFirstLastNameServiceAccount() {
@@ -188,7 +196,8 @@ export class IamPage {
     async validateServiceAccountToken() {
 
         await expect(this.tokenDialog).toBeVisible();
-        await expect(this.tokenDialog).toContainText('Service Account Token');
+        // Token reveal dialog title (serviceAccounts.tokenReveal.step1Title)
+        await expect(this.tokenDialog).toContainText('Copy your token');
 
     }
 
@@ -203,7 +212,7 @@ export class IamPage {
 
     async clickCopyToken() {
 
-        // ODialog renders via reka-ui's DialogPortal, not a Quasar
+        // ODialog renders via reka-ui's DialogPortal, not a
         // #q-portal--dialog--N container, so scope by the token dialog's
         // own data-test attribute instead.
         await this.tokenCopyButton.click();

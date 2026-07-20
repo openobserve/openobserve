@@ -28,7 +28,8 @@ const openGroupKey = moduleRef<string | null>(null);
  *
  *  • Link + subnav (`parentItem` provided) — the tile IS a navigating MenuLink
  *    (e.g. Data → /streams). Hovering reveals its sub-pages; clicking lands on
- *    the main page. No pinning (the click navigates away).
+ *    the main page while the flyout stays open under the pointer (it closes on
+ *    mouse-leave / outside click / Escape). No pinning.
  *
  *  • Pure group (no `parentItem`) — the tile is a non-navigating MenuLink
  *    trigger. Hover opens; clicking pins the flyout open until an outside
@@ -75,7 +76,7 @@ const isLinkMode = computed(() => !!props.parentItem);
 // over the layered Tailwind color utility, tinting the link text/icon primary.
 const isDark = computed(() => store.state.theme === "dark");
 const flyoutTextClass = computed(() =>
-  isDark.value ? "tw:text-dropdown-item-text!" : "tw:text-black!",
+  isDark.value ? "text-dropdown-item-text!" : "text-black!",
 );
 const flyoutIconClass = flyoutTextClass;
 
@@ -262,7 +263,7 @@ function onTriggerClick() {
 }
 
 function onLinkClick() {
-  close();
+  open();
 }
 
 function onTileKeydown(event: KeyboardEvent) {
@@ -362,7 +363,7 @@ function onChildMouseenter(event: MouseEvent) {
   <div
     ref="wrapperRef"
     :data-test="`nav-group-${groupKey}`"
-    class="nav-group tw:relative tw:shrink-0"
+    class="nav-group relative shrink-0"
     @mouseenter="scheduleOpen"
     @mouseleave="scheduleClose"
   >
@@ -402,22 +403,23 @@ function onChildMouseenter(event: MouseEvent) {
         :data-test="`nav-group-flyout-${groupKey}`"
         role="menu"
         :aria-label="title"
-        class="nav-group-flyout tw:min-w-52 tw:p-1 tw:rounded-lg tw:border tw:border-dropdown-border tw:bg-dropdown-bg tw:shadow-md"
+        class="nav-group-flyout min-w-52 p-1 rounded-lg border border-dropdown-border bg-dropdown-bg shadow-md"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
         @keydown="onFlyoutKeydown"
       >
         <div
-          class="tw:px-3 tw:pt-1.5 tw:pb-1 tw:text-[11px] tw:font-semibold"
+          class="px-3 pt-1.5 pb-1 text-[11px] font-semibold"
           :class="flyoutTextClass"
         >
           {{ title }}
         </div>
-        <template v-for="row in flyoutRows" :key="row.key">
+        <template v-for="(row, rowIndex) in flyoutRows" :key="row.key">
           <div
             v-if="row.kind === 'header'"
-            class="tw:px-3 tw:pt-2 tw:pb-1 tw:text-[10.5px] tw:font-medium tw:text-tabs-inactive-text"
+            class="px-3 pb-1 text-[10.5px] font-medium text-tabs-inactive-text"
+            :class="rowIndex === 0 ? 'pt-2' : 'pt-4'"
           >
             {{ row.label }}
           </div>
@@ -426,12 +428,12 @@ function onChildMouseenter(event: MouseEvent) {
             :data-test="`nav-group-item-${row.child.name}`"
             role="menuitem"
             :to="childTo(row.child)"
-            class="nav-group-item tw:flex tw:items-center tw:gap-2.5 tw:px-3 tw:py-1.5 tw:rounded-md tw:text-sm tw:[text-decoration:none]! tw:cursor-pointer tw:select-none tw:outline-none tw:transition-colors tw:duration-150 tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500"
+            class="nav-group-item flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm [text-decoration:none]! cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500"
             :class="[
               flyoutTextClass,
               isChildActive(row.child)
-                ? 'tw:bg-select-item-selected-bg tw:font-medium'
-                : 'tw:hover:bg-dropdown-item-hover-bg',
+                ? 'bg-select-item-selected-bg font-medium'
+                : 'hover:bg-dropdown-item-hover-bg',
             ]"
             :aria-current="isChildActive(row.child) ? 'page' : undefined"
             @click="onChildClick"
@@ -439,8 +441,8 @@ function onChildMouseenter(event: MouseEvent) {
           >
             <!-- Icon color is locked to the text color so it never picks up a
                  primary tint via currentColor inheritance. -->
-            <OIcon :name="row.child.icon" size="sm" class="tw:shrink-0" :class="flyoutIconClass" />
-            <span class="tw:leading-none">{{ t(row.child.titleKey) }}</span>
+            <OIcon :name="row.child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
+            <span class="leading-none">{{ t(row.child.titleKey) }}</span>
           </router-link>
         </template>
       </div>

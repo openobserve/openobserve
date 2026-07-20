@@ -134,6 +134,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             return "pipeline_ids"
           case "reports":
             return "report_ids"
+          case "synthetics":
+            return "synthetic_ids"
           default:
             return "alert_ids"
         }

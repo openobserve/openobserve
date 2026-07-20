@@ -1,10 +1,10 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <template>
-  <div class="tw:min-w-0">
+  <div class="min-w-0">
     <OSelect
       :model-value="selectValue"
       :options="flatOptions"
-      label="Select Field"
+      :label="t('dashboard.streamFieldSelect.selectField')"
       label-position="inside"
       searchable
       data-test="stream-field-select"
@@ -16,6 +16,7 @@
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed, inject } from "vue";
+import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -42,6 +43,8 @@ export default defineComponent({
   components: { OSelect },
 
   setup(props, { emit }) {
+    const { t } = useI18n();
+
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -169,6 +172,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       flatOptions,
       selectValue,
       onSelect,

@@ -1,13 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:px-3 tw:bg-surface-panel tw:border-r tw:border-border-default">
-    <div class="tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:my-3">
-      <span class="tw:text-base tw:font-bold">{{ t("panel.fields") }}</span>
+  <div class="w-full h-full flex flex-col px-3 bg-surface-panel border-r border-border-default">
+    <div class="flex items-center justify-between shrink-0 my-3">
+      <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         variant="outline"
         size="icon-xs-sq"
-        class="tw:rotate-90"
+        class="rotate-90"
         icon-left="unfold-less"
         :title="t('panel.collapseFields')"
         data-test="panel-field-list-collapse-btn"
@@ -16,7 +16,7 @@
     </div>
     <OFieldList
       ref="fieldListRef"
-      class="tw:flex-1 tw:min-h-0"
+      class="flex-1 min-h-0"
       :fields="flattenGroupedFields"
       :search="dashboardPanelData.meta.stream.filterField"
       :search-placeholder="t('search.searchField')"
@@ -41,20 +41,23 @@
             :label="t('dashboard.selectStreamType')"
             :options="streamTypeOptions"
             data-test="index-dropdown-stream_type"
-            class="tw:mb-1"
+            class="mb-1"
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
             @update:model-value="onStreamTypeChange"
           />
+          <!-- Metric type as a LETTER (C/G/H/S/O), not a glyph. It used to be an
+               icon per type (a hash for Counter, bars for Histogram, a speedometer
+               for Gauge…) with no way to tell which was which. The `badge` renders
+               inline beside the name and costs no row height. -->
           <OSelect
             :model-value="currentStream"
             :label="t('dashboard.selectIndex')"
-            :options="filteredStreamsWithIcons"
+            :options="streamOptions"
             data-test="index-dropdown-stream"
             :loading="streamListLoading"
             label-key="name"
             value-key="name"
-            :icon-key="currentStreamType === 'metrics' ? '_icon' : undefined"
             searchable
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
@@ -62,27 +65,16 @@
             option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
-          >
-            <template
-              v-if="currentStreamType === 'metrics' && selectedMetricTypeIcon"
-              #icon-left
-            >
-              <OIcon
-                size="sm"
-                :name="metricsIconMapping[selectedMetricTypeIcon || '']"
-                class="tw:mb-0.5"
-              />
-            </template>
-          </OSelect>
+          />
       </template>
 
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="tw:h-7! tw:w-full tw:flex tw:justify-between tw:items-center tw:rounded tw:font-semibold tw:pl-2 tw:pr-1 tw:text-xs tw:cursor-default tw:select-none tw:bg-(--o2-section-header-bg) tw:text-(--o2-text-secondary)"
+          class="h-7! w-full flex justify-between items-center rounded font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-(--o2-section-header-bg) text-(--o2-text-secondary)"
           :title="row.groupName"
         >
-          <div class="tw:flex-1 tw:min-w-0">{{ row.groupName }}</div>
+          <div class="flex-1 min-w-0">{{ row.groupName }}</div>
         </div>
       </template>
 
@@ -94,7 +86,7 @@
             name="drag-indicator"
             size="sm"
             :class="[
-              'o-field-list__drag-icon tw:text-field-list-drag-icon',
+              'o-field-list__drag-icon text-field-list-drag-icon',
               isDragEnabled
                 ? 'o-field-list__drag-icon--enabled'
                 : 'o-field-list__drag-icon--disabled',
@@ -109,7 +101,7 @@
             <!-- Standard chart actions -->
             <div
               v-if="showStandardActions(row, index)"
-              class="tw:flex tw:items-center tw:gap-0.5"
+              class="flex items-center gap-0.5"
             >
               <OButton
                 variant="ghost-neutral"
@@ -191,7 +183,7 @@
         <!-- Geomap actions -->
         <div
           v-if="showGeomapActions(row, index)"
-          class="tw:flex tw:items-center tw:gap-0.5"
+          class="flex items-center gap-0.5"
         >
           <OButton
             variant="ghost-neutral"
@@ -255,7 +247,7 @@
         <!-- Maps actions -->
         <div
           v-if="showMapsActions(row, index)"
-          class="tw:flex tw:items-center tw:gap-0.5"
+          class="flex items-center gap-0.5"
         >
           <OButton
             variant="ghost-neutral"
@@ -296,7 +288,7 @@
         <!-- Sankey actions -->
         <div
           v-if="showSankeyActions(row, index)"
-          class="tw:flex tw:items-center tw:gap-0.5"
+          class="flex items-center gap-0.5"
         >
           <OButton
             variant="ghost-neutral"
@@ -362,17 +354,17 @@
 
       <!-- Loading state -->
       <template #loading>
-        <div class="tw:flex tw:flex-col">
+        <div class="flex flex-col">
           <div
             v-for="i in 6"
             :key="i"
-            class="tw:flex tw:items-center tw:gap-2 tw:py-[0.25rem]"
+            class="flex items-center gap-2 py-[0.25rem]"
           >
             <OSkeleton
               type="rect"
-              class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:flex-shrink-0"
+              class="w-[0.875rem] h-[0.875rem] rounded-sm flex-shrink-0"
             />
-            <OSkeleton type="text" class="tw:flex-1" />
+            <OSkeleton type="text" class="flex-1" />
           </div>
         </div>
       </template>
@@ -380,10 +372,10 @@
       <!-- Empty state -->
       <template #empty>
         <div
-          class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
+          class="text-center py-[0.725rem] flex items-center justify-center"
         >
           <OIcon name="info" size="xs" />
-          <span class="tw:pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+          <span class="pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
         </div>
       </template>
 
@@ -392,7 +384,7 @@
       <template #after-list="bottomProps">
         <div
           v-if="bottomProps.totalPages > 1"
-          class="field-list-pagination tw:flex tw:items-center tw:justify-center tw:gap-1 tw:py-1"
+          class="field-list-pagination flex items-center justify-center gap-1 py-1"
           data-test="field-list-pagination"
         >
           <OTooltip
@@ -447,6 +439,13 @@ import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
+import {
+  applyPromqlSeed,
+  metricsStreamsOf,
+} from "@/utils/dashboard/promqlSeed";
+import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
+import { buildTypeFilterBuckets } from "@/utils/metrics/metricFamily";
+import { BADGE_LABELS, getBadgeStyle } from "@/utils/metrics/metricPalette";
 import useNotifications from "@/composables/useNotifications";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -506,22 +505,38 @@ const currentPage = ref(1);
 
 const hideAllFieldsSelection = computed(() => props.hideAllFieldsSelection ?? false);
 
-// ── Stream type icons ─────────────────────────────────────────────────
+// ── Metric type labels ────────────────────────────────────────────────
 
-const metricsIconMapping: Record<string, string> = {
-  Summary: "description",
-  Gauge: "speed",
-  Histogram: "bar-chart",
-  Counter: "tag",
-};
+/**
+ * The badge is the type's INITIAL — `C`ounter, `G`auge, `H`istogram, `S`ummary,
+ * `O`ther — not the whole word: it sits beside metric names that are already
+ * long, and a full word pushed them into truncation. A letter is still learnable
+ * in a way the old per-type icons (a hash, bars, a speedometer) were not.
+ */
+const initialOf = (label: string) => label.charAt(0).toUpperCase();
 
-const selectedMetricTypeIcon = computed(() => {
-  return dashboardPanelData.meta.stream.streamResults.find(
-    (it: any) =>
-      it.name ==
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .fields.stream,
-  )?.metrics_meta?.metric_type;
+/**
+ * Stream name -> type-filter BUCKET id (`counter`, `gauge`, …), not its label.
+ *
+ * The bucket id is what both the label and the colour are keyed on, so it is
+ * what gets carried around. Mapping to the label here and recovering the id
+ * later with `label.toLowerCase()` worked only for as long as every label stayed
+ * the capitalized spelling of its id — the day one reads "Gauge (native)", or is
+ * translated, the lookup misses and the badge silently turns grey. Deriving the
+ * label from the id is safe; deriving the id from the label is not.
+ */
+const metricTypeBuckets = computed<Record<string, string>>(() => {
+  if (currentStreamType.value !== "metrics") return {};
+  const streams = (dashboardPanelData.meta.stream.streamResults ?? []) as any[];
+
+  // `buildTypeFilterBuckets`, not `buildMetricCards`: a badge needs one word per
+  // stream, and building the whole rule set — every variant, expression, legend
+  // and unit for every metric in the org — to get it was a heavy pass on a list
+  // that can run to thousands. This one runs the family model and the card-kind
+  // dispatch and stops. It also answers for the metadata-only family bases that
+  // `buildMetricCards` suppresses but the dropdown still lists, so the declared-
+  // type fallback that used to patch those up is gone.
+  return buildTypeFilterBuckets(streams);
 });
 
 // ── Stream type / stream v-model bridges ──────────────────────────────
@@ -590,14 +605,44 @@ watch(
 );
 
 if (isEditPanel) {
-  const stopEditInitialLoad = watch(
-    () => currentQueryFields().stream,
-    (streamName) => {
-      if (!streamName) return;
-      stopEditInitialLoad();
+  // In edit mode the panel's own data arrives asynchronously, so the list waits
+  // for a stream rather than fetching against a half-built query.
+  //
+  // The watch is armed in `onMounted`, NOT at setup, and `immediate` is what
+  // handles a stream that is already set. Two reasons it must be this shape:
+  //
+  //  - A parent that seeds the query in its own `onMounted` (the metrics
+  //    Visualize workspace does exactly that) sets the stream BEFORE this child
+  //    exists, so a change-only watcher never fires — the Stream dropdown then
+  //    sits on "No options found" under a stream that is plainly selected.
+  //  - `immediate` at setup would run the callback SYNCHRONOUSLY, before the
+  //    `getStreamList` const below is initialised — a TDZ ReferenceError thrown
+  //    inside a promise, which is silent in tests and fatal in the browser.
+  //    By `onMounted` every declaration in this setup body exists.
+  //
+  // `loaded` (not the stop handle) enforces "only once": the handle is still in
+  // its own TDZ during an immediate first pass.
+  onMounted(() => {
+    let loaded = false;
+    let stopEditInitialLoad: (() => void) | undefined;
+    const onStream = (streamName: string) => {
+      if (loaded) return;
+      // Metrics visualize starts blank by design; load the metric stream list
+      // immediately so the stream dropdown is selectable without a preseeded stream.
+      if (!streamName && dashboardPanelDataPageKey !== "metrics") return;
+      loaded = true;
+      // Undefined on the immediate pass — `watch` has not returned yet, so the
+      // handle does not exist. `loaded` is what stops a second run; this is only
+      // here to free the watcher when the stream arrives later.
+      stopEditInitialLoad?.();
       loadStreamsListBasedOnType();
-    },
-  );
+    };
+    stopEditInitialLoad = watch(() => currentQueryFields().stream, onStream, {
+      immediate: true,
+    });
+    // The immediate pass could not stop a watcher that did not exist yet.
+    if (loaded) stopEditInitialLoad();
+  });
 } else {
   onMounted(() => {
     loadStreamsListBasedOnType();
@@ -620,13 +665,30 @@ watch(
   { immediate: true },
 );
 
-const filteredStreamsWithIcons = computed(() =>
-  (filteredStreams.value as any[]).map((s) => ({
-    ...s,
-    _icon: s.metrics_meta
-      ? metricsIconMapping[s.metrics_meta.metric_type] || undefined
-      : undefined,
-  })),
+const isDarkTheme = computed(() => store.state.theme === "dark");
+
+const streamOptions = computed(() =>
+  (filteredStreams.value as any[]).map((s) => {
+    // The bucket id drives BOTH the label and the colour, so neither is
+    // reconstructed from the other.
+    const bucket = metricTypeBuckets.value[s.name];
+    const type = bucket ? (BADGE_LABELS[bucket] ?? "Other") : undefined;
+    return {
+      ...s,
+      // The chip is the initial; hovering it spells the type out. `C` alone is
+      // compact but ambiguous (Counter? Count?) — the title is what resolves it.
+      badge: type ? initialOf(type) : undefined,
+      badgeTitle: type,
+      // Colour-coded from the SAME palette the Metrics Explorer badges use —
+      // Counter blue, Gauge green, Histogram purple, Summary orange, Other grey —
+      // so a type looks the same wherever you meet it. A badge that classifies
+      // must be colour-coded to be worth anything; the default green-on-every-row
+      // outline carried no information at all.
+      badgeStyle: bucket
+        ? getBadgeStyle(bucket, isDarkTheme.value)
+        : undefined,
+    };
+  }),
 );
 
 // ── Stream fields ──────────────────────────────────────────────────────
@@ -709,7 +771,7 @@ watch(
         .fields.stream_type === dashboardPanelData.meta.stream.streamResultsType
     ) {
       try {
-        // On stream change in PromQL mode, reset the query to `${stream}{}`.
+        // On stream change in PromQL mode, re-seed the query for the new stream.
         // Metrics: custom + builder. Add Panel: PromQL custom only (builder
         // regenerates via DashboardQueryBuilder; SQL is excluded — promql-only block).
         const promqlQuery =
@@ -746,9 +808,34 @@ watch(
           }
 
           if (!metricName || metricName !== streamName) {
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].query = streamName + "{}";
+            // Seed the metrics rule set's default for the new stream — the same
+            // query/unit/chart type the Metrics Explorer charts it with — rather
+            // than the bare `stream{}`, which is a raw cumulative counter.
+            //
+            // Only when the query is still one we generated. A query the user
+            // wrote is LEFT ALONE, which is stricter than the old behaviour: it
+            // reset the query to `stream{}` on every stream change, so a moment
+            // of curiosity about another metric silently destroyed a query that
+            // may have taken a while to get right. In Custom mode the query is
+            // what actually runs — the stream field only drives label
+            // suggestions — so leaving the two out of step is recoverable, and
+            // deleting their work is not. This is what the builder-mode path in
+            // DashboardQueryBuilder already does.
+            const streams = metricsStreamsOf(dashboardPanelData);
+            const slot =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ];
+            const seedOpts = {
+              chartType: dashboardPanelData.data.type,
+              requireBuilder: !slot?.customQuery,
+            };
+
+            if (isAutoSeededQuery(slot?.query, metricName, streams, seedOpts)) {
+              applyPromqlSeed(dashboardPanelData, streamName, {
+                previousStream: metricName,
+              });
+            }
           }
 
           fetchPromQLLabels(

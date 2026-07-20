@@ -57,7 +57,7 @@ function resetToDefault(): void {
 <template>
   <ODropdown align="end" side="bottom" :side-offset="4">
     <template #trigger>
-      <div class="tw:relative tw:inline-flex">
+      <div class="relative inline-flex">
         <OButton
           variant="outline"
           size="icon-sm"
@@ -74,7 +74,7 @@ function resetToDefault(): void {
         </OButton>
         <span
           v-if="hiddenCount > 0"
-          class="tw:absolute tw:-top-1 tw:-right-1 tw:inline-flex tw:items-center tw:justify-center tw:rounded-full tw:bg-[var(--color-primary-600)] tw:text-white tw:text-[10px] tw:font-medium tw:w-4 tw:h-4 tw:leading-none tw:pointer-events-none"
+          class="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-[var(--color-primary-600)] text-white text-[10px] font-medium w-4 h-4 leading-none pointer-events-none"
           data-test="o2-table-column-toggle-hidden-badge"
         >
           {{ hiddenCount }}
@@ -84,10 +84,10 @@ function resetToDefault(): void {
 
     <!-- Column list panel -->
     <div
-      class="tw:py-1 tw:min-w-44"
+      class="py-1 min-w-44"
       data-test="o2-table-column-toggle-panel"
     >
-      <p class="tw:px-3 tw:py-1 tw:text-xs tw:font-medium tw:text-[var(--color-text-secondary)]">
+      <p class="px-3 py-1 text-xs font-medium text-[var(--color-text-secondary)]">
         Columns
       </p>
 
@@ -95,7 +95,7 @@ function resetToDefault(): void {
         <li
           v-for="col in toggleableColumns"
           :key="col.id"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer tw:rounded tw:hover:bg-surface-panel tw:transition-colors"
+          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded hover:bg-surface-panel transition-colors"
           :data-test="`o2-table-column-toggle-item-${col.id}`"
           @click.stop="toggleColumn(col.id)"
         >
@@ -106,7 +106,7 @@ function resetToDefault(): void {
             @update:model-value="toggleColumn(col.id)"
             @click.stop
           />
-          <span class="tw:text-sm tw:text-text-primary tw:select-none tw:flex-1">
+          <span class="text-sm text-text-primary select-none flex-1">
             {{ typeof col.header === "string" ? col.header : col.id }}
           </span>
         </li>
@@ -115,25 +115,25 @@ function resetToDefault(): void {
       <!-- Reset buttons — same px-3 gap-2 structure as list items for alignment -->
       <div
         v-if="hiddenCount > 0 || props.hasResizedColumns"
-        class="tw:border-t tw:border-[var(--color-border-default)] tw:mt-1 tw:pt-1 tw:pb-1"
+        class="border-t border-[var(--color-border-default)] mt-1 pt-1 pb-1"
       >
         <button
           v-if="hiddenCount > 0"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:w-full tw:text-sm tw:cursor-pointer tw:rounded tw:hover:bg-surface-panel tw:transition-colors tw:text-text-primary"
+          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded hover:bg-surface-panel transition-colors text-text-primary"
           data-test="o2-table-column-toggle-reset-btn"
           @click="resetToDefault"
         >
-          <OIcon name="refresh" size="sm" class="tw:shrink-0" />
-          <span class="tw:select-none">Reset to default</span>
+          <OIcon name="refresh" size="sm" class="shrink-0" />
+          <span class="select-none">Reset to default</span>
         </button>
         <button
           v-if="props.hasResizedColumns"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:w-full tw:text-sm tw:cursor-pointer tw:rounded tw:hover:bg-surface-panel tw:transition-colors tw:text-text-primary"
+          class="flex items-center gap-2 px-3 py-1.5 w-full text-sm cursor-pointer rounded hover:bg-surface-panel transition-colors text-text-primary"
           data-test="o2-table-column-resize-reset-btn"
           @click="emit('reset:columnSizes')"
         >
-          <OIcon name="refresh" size="sm" class="tw:shrink-0" />
-          <span class="tw:select-none">Reset column widths</span>
+          <OIcon name="refresh" size="sm" class="shrink-0" />
+          <span class="select-none">Reset column widths</span>
         </button>
       </div>
     </div>

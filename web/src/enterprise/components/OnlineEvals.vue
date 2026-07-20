@@ -7,8 +7,8 @@ the Free Software Foundation, either version 3 of the License, or
 
 <template>
   <div
-    class="tw:flex tw:flex-col tw:gap-2.5 tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-0 tw:pt-1 tw:px-2.5 tw:pb-2.5 tw:text-(--o2-text)"
-    :class="{ 'tw:h-full! tw:p-0! tw:gap-0!': hideTabBar }"
+    class="flex flex-col gap-2.5 h-[calc(100vh-var(--navbar-height))] min-h-0 pt-1 px-2.5 pb-2.5 text-(--o2-text)"
+    :class="{ 'h-full! p-0! gap-0!': hideTabBar }"
     data-test="online-evals-page"
   >
     <!-- Full-page forms (jobs / scorers) -->
@@ -54,9 +54,9 @@ the Free Software Foundation, either version 3 of the License, or
     />
 
     <template v-else>
-      <div v-if="!hideTabBar" class="online-evals__header card-container tw:flex tw:items-center tw:justify-between tw:gap-4 tw:min-h-17 tw:py-2.5 tw:px-4 tw:shrink-0 tw:bg-(--o2-card-bg)">
+      <div v-if="!hideTabBar" class="online-evals__header card-container flex items-center justify-between gap-4 min-h-17 py-2.5 px-4 shrink-0 bg-(--o2-card-bg)">
         <div>
-          <h1 class="tw:m-0 tw:text-[var(--text-lg)] tw:font-semibold tw:text-[var(--color-text-heading)] tw:[letter-spacing:0]">{{ t("onlineEvals.title") }}</h1>
+          <h1 class="m-0 text-[var(--text-lg)] font-semibold text-[var(--color-text-heading)] [letter-spacing:0]">{{ t("onlineEvals.title") }}</h1>
         </div>
       </div>
 
@@ -65,7 +65,7 @@ the Free Software Foundation, either version 3 of the License, or
         :title="embeddedHeader.title"
         :subtitle="embeddedHeader.subtitle"
         :icon="embeddedHeader.icon"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="shrink-0 px-4 border-b border-border-default"
       >
         <template
           v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'"
@@ -90,12 +90,12 @@ the Free Software Foundation, either version 3 of the License, or
                   : goToImportScoreConfig()
               "
             >
-              <div class="tw:flex tw:flex-col">
+              <div class="flex flex-col">
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.customLabel`) }}
                 </span>
                 <span
-                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                  class="text-xs text-dropdown-item-text opacity-60"
                 >
                   {{ t(`onlineEvals.${importI18nKey}.import.customSubtitle`) }}
                 </span>
@@ -109,12 +109,12 @@ the Free Software Foundation, either version 3 of the License, or
                   : openScoreConfigLibrary()
               "
             >
-              <div class="tw:flex tw:flex-col">
+              <div class="flex flex-col">
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.libraryLabel`) }}
                 </span>
                 <span
-                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
+                  class="text-xs text-dropdown-item-text opacity-60"
                 >
                   {{ t(`onlineEvals.${importI18nKey}.import.librarySubtitle`) }}
                 </span>
@@ -155,7 +155,7 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
                ORefreshButton renders no border of its own. -->
           <div
-            class="tw:inline-flex tw:items-center tw:border tw:border-border-default tw:rounded-md tw:px-1 tw:h-[2rem] tw:overflow-hidden"
+            class="inline-flex items-center border border-border-default rounded-md px-1 h-[2rem] overflow-hidden"
           >
             <ORefreshButton
               :last-run-at="qualityLastRunAt"
@@ -168,13 +168,13 @@ the Free Software Foundation, either version 3 of the License, or
         </template>
       </AppPageHeader>
 
-      <section class="online-evals__content card-container tw:flex tw:flex-1 tw:flex-col tw:min-h-0 tw:overflow-hidden tw:bg-(--o2-card-bg)">
-        <div v-if="!hideTabBar" class="online-evals__tabs tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:py-0 tw:px-3.5 tw:bg-transparent tw:border-b tw:border-(--o2-border)">
+      <section class="online-evals__content card-container flex flex-1 flex-col min-h-0 overflow-hidden bg-(--o2-card-bg)">
+        <div v-if="!hideTabBar" class="online-evals__tabs flex items-center gap-2 shrink-0 py-0 px-3.5 bg-transparent border-b border-(--o2-border)">
           <button
             v-for="tab in tabs"
             :key="tab.value"
-            class="online-evals__tab tw:inline-flex tw:items-center tw:gap-1.75 tw:h-9.5 tw:py-0 tw:px-3.5 tw:bg-transparent tw:border-0 tw:border-b-2 tw:border-b-transparent tw:text-(--o2-text-muted) tw:cursor-pointer tw:font-semibold tw:text-[13px]"
-            :class="activeTab === tab.value ? 'is-active tw:text-[var(--o2-text)] tw:border-b-[var(--o2-brand)] tw:-mb-px' : ''"
+            class="online-evals__tab inline-flex items-center gap-1.75 h-9.5 py-0 px-3.5 bg-transparent border-0 border-b-2 border-b-transparent text-(--o2-text-muted) cursor-pointer font-semibold text-[13px]"
+            :class="activeTab === tab.value ? 'is-active text-[var(--o2-text)] border-b-[var(--o2-brand)] -mb-px' : ''"
             type="button"
             @click="activeTab = tab.value"
           >
@@ -182,7 +182,7 @@ the Free Software Foundation, either version 3 of the License, or
           </button>
         </div>
 
-        <div class="online-evals__body tw:flex tw:flex-1 tw:min-h-0">
+        <div class="online-evals__body flex flex-1 min-h-0">
           <QualityPage
             v-if="activeTab === 'quality'"
             ref="qualityPageRef"
@@ -212,6 +212,7 @@ the Free Software Foundation, either version 3 of the License, or
             @import-custom="goToImportScoreConfig"
             @export="exportScoreConfigRow"
             @export-bulk="exportScoreConfigBulk"
+            @refresh="loadAll(orgId)"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
@@ -232,6 +233,7 @@ the Free Software Foundation, either version 3 of the License, or
             @export="exportScorerRow"
             @export-bulk="exportScorerBulk"
             @add-provider="goToAddProvider"
+            @refresh="loadAll(orgId)"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
@@ -246,6 +248,8 @@ the Free Software Foundation, either version 3 of the License, or
             @activate="(row: EvalJob) => activateJob(row)"
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
+            @delete-bulk="(ids: string[]) => deleteJobsBulk(ids)"
+            @refresh="loadAll(orgId)"
           />
         </div>
       </section>
@@ -343,12 +347,8 @@ the Free Software Foundation, either version 3 of the License, or
 
       <ConfirmDialog
         v-model="confirmDeleteOpen"
-        :title="pendingDeleteLabel"
-        :message="
-          t('onlineEvals.deleteConfirmMessage', {
-            name: pendingDeleteRow?.name ?? '',
-          })
-        "
+        :title="deleteDialogTitle"
+        :message="deleteDialogMessage"
         @update:ok="performDelete"
         @update:cancel="cancelDelete"
       />
@@ -477,6 +477,9 @@ const pendingJobStatusId = ref<string | null>(null);
 const confirmDeleteOpen = ref(false);
 const pendingDeleteRow = ref<AnyRow | null>(null);
 const pendingDeleteTab = ref<ActiveTab | null>(null);
+// Ids for a pending bulk delete (jobs tab). Non-empty => the confirm dialog and
+// performDelete operate on the whole batch instead of a single `pendingDeleteRow`.
+const pendingBulkDeleteIds = ref<string[]>([]);
 const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
@@ -785,6 +788,24 @@ const pendingDeleteLabel = computed(() => {
     label: t(`onlineEvals.singular.${tab}`),
   });
 });
+
+const isBulkDelete = computed(() => pendingBulkDeleteIds.value.length > 0);
+
+const deleteDialogTitle = computed(() =>
+  isBulkDelete.value
+    ? t("onlineEvals.job.deleteBulkTitle")
+    : pendingDeleteLabel.value,
+);
+
+const deleteDialogMessage = computed(() =>
+  isBulkDelete.value
+    ? t("onlineEvals.job.deleteBulkConfirm", {
+        count: pendingBulkDeleteIds.value.length,
+      })
+    : t("onlineEvals.deleteConfirmMessage", {
+        name: pendingDeleteRow.value?.name ?? "",
+      }),
+);
 
 watch(activeTab, (next) => {
   filterQuery.value = "";
@@ -1124,6 +1145,10 @@ function exportScoreConfigBulk(ids: string[]) {
 function syncFromRoute() {
   // Route is the source of truth — reset everything first.
   formPage.value = null;
+  // The import wizard renders off local `importingEntity` (it isn't route-
+  // driven), so it must be torn down here too — otherwise it stays stranded on
+  // screen when the user navigates to another AI section.
+  importingEntity.value = null;
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
   viewRow.value = null;
@@ -1187,13 +1212,25 @@ function deleteRow(row: AnyRow) {
   confirmDeleteOpen.value = true;
 }
 
+function deleteJobsBulk(ids: string[]) {
+  if (ids.length === 0) return;
+  pendingBulkDeleteIds.value = [...ids];
+  pendingDeleteTab.value = "jobs";
+  confirmDeleteOpen.value = true;
+}
+
 function cancelDelete() {
   confirmDeleteOpen.value = false;
   pendingDeleteRow.value = null;
   pendingDeleteTab.value = null;
+  pendingBulkDeleteIds.value = [];
 }
 
 async function performDelete() {
+  if (pendingBulkDeleteIds.value.length > 0) {
+    await performBulkJobsDelete();
+    return;
+  }
   const row = pendingDeleteRow.value;
   const tab = pendingDeleteTab.value;
   if (!row || !tab) return;
@@ -1227,11 +1264,42 @@ async function performDelete() {
     pendingDeleteTab.value = null;
   }
 }
+
+// Bulk-delete the selected eval jobs. Deletions run in parallel; if any fail we
+// surface an error but still reload so the successfully deleted rows disappear.
+async function performBulkJobsDelete() {
+  const ids = [...pendingBulkDeleteIds.value];
+  if (ids.length === 0) return;
+  try {
+    const results = await Promise.allSettled(
+      ids.map((id) => onlineEvalsService.jobs.delete(orgId.value, id)),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) {
+      showError(
+        (results.find((r) => r.status === "rejected") as PromiseRejectedResult)
+          ?.reason,
+        t("onlineEvals.deleteError", {
+          label: t("onlineEvals.singular.jobs").toLowerCase(),
+        }),
+      );
+    } else {
+      toast({
+        variant: "success",
+        message: t("onlineEvals.job.deletedBulk", { count: ids.length }),
+      });
+    }
+    await loadAll(orgId.value);
+  } finally {
+    pendingBulkDeleteIds.value = [];
+    pendingDeleteTab.value = null;
+  }
+}
 </script>
 
 <!-- Non-scoped @media-only rule: responsive override for the form side rail
      (.eval-form-page__side is used by ScorerTestPanel). Kept as a plain style
-     block per the "don't convert @media to tw:" rule. -->
+     block per the "don't convert @media to " rule. -->
 <style>
 @media (max-width: 960px) {
   .eval-form-page__side {

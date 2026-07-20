@@ -149,7 +149,7 @@ describe("DashboardHeader", () => {
 
       expect(backButton.props('variant')).toBe('outline');
       expect(backButton.props('size')).toBe('icon-xs');
-      // Migration replaced q-mr-sm with tw:mr-2.
+      // Migration replaced q-mr-sm with mr-2.
       expect(backButton.classes().some((c) => c.includes("mr-2"))).toBe(true);
     });
 
@@ -260,7 +260,7 @@ describe("DashboardHeader", () => {
     it("should have correct CSS classes for layout", () => {
       wrapper = createWrapper({ backButton: true });
 
-      // Migrated component uses tailwind layout, not Quasar grid.
+      // Migrated component uses tailwind layout, not a grid layout.
       expect(findTitle(wrapper)?.exists()).toBe(true);
 
       // Only the back button div and right slot container exist post-migration.
@@ -273,7 +273,7 @@ describe("DashboardHeader", () => {
 
       const separator = wrapper.findComponent({ name: 'OSeparator' });
       expect(separator.exists()).toBe(true);
-      // Spacing now lives on the header row (tw:my-2 tw:mx-2); the separator
+      // Spacing now lives on the header row (my-2 mx-2); the separator
       // itself carries no margin class after the OTable/layout migration.
       expect(separator.attributes("data-test")).toBe(
         "dashboard-header-separator",
@@ -366,7 +366,7 @@ describe("DashboardHeader", () => {
 
       const titleElement = findTitle(wrapper);
       expect(titleElement?.exists()).toBe(true);
-      // The migrated heading uses tw:text-base + tw:font-semibold.
+      // The migrated heading uses text-base + font-semibold.
       expect(
         titleElement?.classes().some((c) => c.includes("text-base")),
       ).toBe(true);

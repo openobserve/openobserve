@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        another card-container would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div
-    class="tw:bg-transparent tw:h-full tw:flex tw:flex-col tw:px-2.5"
+    class="bg-transparent h-full flex flex-col px-2.5"
   >
     <!-- Toolbar: Stream/Agent mode tab (left) + the matching picker (right) —
          hidden when no streams are available. Padding lives on the toolbar +
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-4 tw:py-[0.5rem]"
+      class="flex items-center justify-end gap-[0.5rem] px-4 py-[0.5rem]"
     >
       <!-- Filter mode: view a whole Stream, or a single Agent. Sits directly
            beside the picker so switching mode and choosing the value are one
@@ -41,15 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="llm-insights-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="stream" size="sm">Stream</OToggleGroupItem>
-        <OToggleGroupItem value="agent" size="sm">Agent</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{ t('traces.lLMInsightsDashboard.stream') }}</OToggleGroupItem>
+        <OToggleGroupItem value="agent" size="sm">{{ t('traces.lLMInsightsDashboard.agent') }}</OToggleGroupItem>
       </OToggleGroup>
 
       <!-- Picker: Stream tab → stream picker; Agent tab → agent picker. -->
       <div
         v-if="filterMode === 'stream'"
         data-test="llm-insights-stream-selector"
-        class="tw:w-[14rem] tw:flex-shrink-0"
+        class="w-[14rem] flex-shrink-0"
       >
         <OSelect
           v-model="activeStream"
@@ -58,14 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="tw:w-full tw:rounded"
+          class="w-full rounded"
           @update:model-value="onStreamChange"
         />
       </div>
       <div
         v-else
         data-test="llm-insights-agent-selector"
-        class="tw:w-[14rem] tw:flex-shrink-0"
+        class="w-[14rem] flex-shrink-0"
       >
         <!-- Hold a picker-shaped skeleton until the agents list lands the first
              time, so the dropdown doesn't flash an empty "Agent" picker before
@@ -79,12 +79,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-else
           v-model="activeAgent"
-          label="Agent"
+          :label="t('traces.lLMInsightsDashboard.agent')"
           label-position="inside"
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="tw:w-full tw:rounded"
+          class="w-full rounded"
           @update:model-value="onAgentChange"
         />
       </div>
@@ -97,21 +97,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LLMInsightsSkeleton
       v-if="!streamsLoaded || switching"
       :hide-toolbar="streamsLoaded"
-      class="tw:flex-1 tw:px-4"
+      class="flex-1 px-4"
     />
 
     <!-- Generic error state — kept separate because a failed request is a
          different signal from "no data yet". Once we have a result we fall
          through to the consolidated empty / dashboard branches below. -->
-    <EvalEmptyState
+    <OEmptyState
       v-else-if="error && hasLoadedOnce"
+      size="hero"
+      illustration="broken-panel"
+      variant="error"
       data-test="llm-insights-empty-error"
-      icon="error-outline"
-      title="Failed to load LLM Insights"
+      :title="t('traces.lLMInsightsDashboard.failedToLoad')"
       :description="error || ''"
-      cta-label="Retry"
-      cta-data-test="llm-insights-retry-btn"
-      @create="loadInsights()"
+      :action-label="t('traces.lLMInsightsDashboard.retry')"
+      action-icon="refresh"
+      @action="loadInsights()"
     />
 
     <!-- Consolidated empty state — single OEmptyState covers all three
@@ -122,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the preset's "Instrument with OpenTelemetry" call to action. -->
     <div
       v-else-if="isEmpty"
-      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center tw:px-4"
+      class="flex-1 min-h-0 flex items-center justify-center px-4"
       data-test="llm-insights-empty"
     >
       <OEmptyState
@@ -137,15 +139,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back to the Stream tab. -->
     <div
       v-else-if="agentEmpty"
-      class="tw:flex-1 tw:min-h-0 tw:flex tw:items-center tw:justify-center tw:px-4"
+      class="flex-1 min-h-0 flex items-center justify-center px-4"
       data-test="llm-insights-agent-empty"
     >
       <OEmptyState
         size="hero"
         illustration="constellation"
-        title="No Agents In This Range"
-        description="No GenAI agents were detected for the selected time window. Try a wider range, switch to the Stream tab, or configure agent mapping in settings."
-        action-label="View by Stream"
+        :title="t('traces.lLMInsightsDashboard.noAgentsInRange')"
+        :description="t('traces.lLMInsightsDashboard.noAgentsDescription')"
+        :action-label="t('traces.lLMInsightsDashboard.viewByStream')"
         @action="onFilterModeChange('stream')"
       />
     </div>
@@ -153,35 +155,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Dashboard content — scrollable panel area. Horizontal padding lives
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
-    <div v-else class="tw:flex-1 tw:overflow-y-auto tw:px-4 tw:pb-3">
+    <div v-else class="flex-1 overflow-y-auto px-4 pb-3">
       <!-- KPI strip: keep a skeleton until the first KPI result lands so the
            cards never flash zeros. The panels below render regardless, so
            their queries fire in parallel with the KPI fetch. -->
       <LLMInsightsSkeleton
         v-if="loading || !hasLoadedOnce"
         kpi-only
-        class="tw:mt-[0.625rem] tw:mb-[0.625rem]"
+        class="mt-[0.625rem] mb-[0.625rem]"
       />
       <!-- KPI Cards Row -->
       <div
         v-else
-        class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem] tw:mt-[0.625rem] tw:mb-[0.625rem]"
+        class="grid grid-cols-5 gap-[0.625rem] mt-[0.625rem] mb-[0.625rem]"
       >
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="card-container tw:rounded-lg tw:flex tw:flex-col tw:px-3.5 tw:pt-2.5 tw:pb-2.5 tw:gap-1 tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+          class="card-container rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-(--color-surface-base) border border-(--color-border-default) transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
                LLMInsightsSkeleton). Its sparkline comes from the histogram, but
                showing a chart before the number reads as ready, so we hold both. -->
           <template v-if="card.loading">
-            <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
+            <div class="flex flex-col gap-[0.25rem]">
               <SkeletonBox width="60%" height="12px" rounded />
               <SkeletonBox width="55%" height="22px" rounded />
             </div>
-            <div class="tw:flex tw:items-end tw:gap-[0.15rem] tw:h-[32px] tw:mt-auto">
+            <div class="flex items-end gap-[0.15rem] h-[32px] mt-auto">
               <SkeletonBox
                 v-for="bar in 16"
                 :key="bar"
@@ -192,17 +194,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-else>
-            <div class="tw:flex tw:flex-col tw:gap-[0.25rem]">
-              <div class="tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem] tw:text-(--o2-text-muted)">
-                {{ card.label }}
+            <div class="flex flex-col gap-[0.25rem]">
+              <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
+                <div class="text-[0.7rem] leading-normal font-semibold text-(--color-text-secondary) min-w-0 truncate">
+                  {{ card.label }}
+                </div>
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md bg-(--color-surface-subtle) text-(--color-text-secondary)"
+                >
+                  <OIcon :name="card.icon" size="sm" />
+                </span>
               </div>
-              <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-                <span class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-(--o2-text-primary)">
+              <div class="flex items-baseline gap-[0.2rem]">
+                <span class="text-[1.4rem] font-bold leading-none text-(--color-grey-600)">
                   {{ card.value }}
                 </span>
                 <span
                   v-if="card.unit"
-                  class="tw:text-[0.8rem] tw:font-semibold tw:text-(--o2-text-secondary)"
+                  class="text-[0.8rem] font-semibold text-(--color-text-secondary)"
                 >
                   {{ card.unit }}
                 </span>
@@ -213,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data="card.sparkData"
               :color="card.sparkColor"
               :height="32"
-              class="tw:mt-auto"
+              class="mt-auto"
             />
           </template>
         </div>
@@ -226,11 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            remount is what lets it restore an already-fetched result instead of
            re-querying. Same selection + window → instant cache hit; a new one →
            a clean miss that fetches. -->
-      <div class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem]">
+      <div class="grid grid-cols-2 gap-[0.625rem]">
         <div
           v-for="panel in LLM_INSIGHTS_PANELS"
           :key="`${panel.id}::${panelCacheDashboardId}`"
-          :class="panel.layout.colSpan === 2 ? 'tw:col-span-2' : ''"
+          :class="panel.layout.colSpan === 2 ? 'col-span-2' : ''"
         >
           <!-- Table panels use OTable (interactive, app-navigation) — matches
                the other AI Observability tables; every chart panel renders
@@ -278,7 +287,7 @@ import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import EvalEmptyState from "@/components/EvalEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -627,6 +636,8 @@ function onEmptyAction(id?: string) {
 
 interface KpiCard {
   label: string;
+  /** Material-symbol icon name (OIcon) shown in the card's corner tile. */
+  icon: string;
   value: string;
   unit?: string;
   sparkData?: number[];
@@ -649,7 +660,8 @@ const kpiCards = computed<KpiCard[]>(() => {
   // If it's 0, either there are no LLM spans in the window or the SDK
   // isn't emitting cost; either way we render "$0".
   const costCard: KpiCard = {
-    label: "Total Cost",
+    label: t('traces.lLMInsightsDashboard.totalCost'),
+    icon: "payments",
     ...splitCost(kpi.value.totalCost),
     sparkData: sparklines.value.cost,
     sparkColor: "#0ea5e9",
@@ -658,21 +670,24 @@ const kpiCards = computed<KpiCard[]>(() => {
   return [
     costCard,
     {
-      label: "Total Tokens",
+      label: t('traces.lLMInsightsDashboard.totalTokens'),
+      icon: "tag",
       value: tokens.value,
       unit: tokens.unit,
       sparkData: sparklines.value.tokens,
       sparkColor: "#a855f7",
     },
     {
-      label: "Total Traces",
+      label: t('traces.lLMInsightsDashboard.totalTraces'),
+      icon: "account-tree",
       value: traces.value,
       unit: traces.unit,
       sparkData: sparklines.value.traces,
       sparkColor: "#3b82f6",
     },
     {
-      label: "P95 Latency",
+      label: t('traces.lLMInsightsDashboard.p95Latency'),
+      icon: "schedule",
       value: p95.value,
       unit: p95.unit,
       sparkData: sparklines.value.p95Micros,
@@ -680,7 +695,8 @@ const kpiCards = computed<KpiCard[]>(() => {
       loading: p95Loading.value,
     },
     {
-      label: "Error Rate",
+      label: t('traces.lLMInsightsDashboard.errorRate'),
+      icon: "error",
       value: errorRate.toFixed(1),
       unit: "%",
       sparkData: sparklines.value.errorRate,

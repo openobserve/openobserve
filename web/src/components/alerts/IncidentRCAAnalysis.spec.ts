@@ -470,13 +470,13 @@ describe("IncidentRCAAnalysis", () => {
       });
 
       const bannerBefore = findByTestId(wrapper, "rca-inflight-container");
-      expect(bannerBefore.classes()).toContain("tw:bg-indigo-50");
+      expect(bannerBefore.classes()).toContain("bg-indigo-50");
 
       await wrapper.setProps({ isDarkMode: true });
       await flushPromises();
 
       const bannerAfter = findByTestId(wrapper, "rca-inflight-container");
-      expect(bannerAfter.classes()).toContain("tw:bg-indigo-900/20");
+      expect(bannerAfter.classes()).toContain("bg-indigo-900/20");
     });
 
     it("should apply correct dark mode styles during loading", () => {
@@ -486,7 +486,7 @@ describe("IncidentRCAAnalysis", () => {
       });
 
       const container = findByTestId(wrapper, "rca-inflight-container");
-      expect(container.classes()).toContain("tw:bg-indigo-900/20");
+      expect(container.classes()).toContain("bg-indigo-900/20");
     });
   });
 

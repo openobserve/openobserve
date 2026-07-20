@@ -43,11 +43,6 @@ vi.mock("@tanstack/vue-virtual", () => ({
   }),
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return { ...actual, debounce: (fn: any) => fn };
-});
-
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: mockCopyToClipboard,
 }));
@@ -690,25 +685,29 @@ describe("TenstackTable", () => {
       expect(resizers.length).toBeGreaterThan(0);
     });
 
-    it("should give the resizer an always-visible border-color background", () => {
+    it("should give the resizer an always-visible border-color line", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).toContain("tw:bg-[var(--o2-border-color)]!");
+      // The visible divider is now a short inner line (matches the OTable
+      // column separator): a child element painted with the border token.
+      const line = resizer.find("div");
+      expect(line.exists()).toBe(true);
+      expect(line.classes()).toContain("bg-[var(--color-border-default)]");
     });
 
     it("should not carry a transparent background class on the resizer", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).not.toContain("tw:bg-transparent");
+      expect(resizer.classes()).not.toContain("bg-transparent");
     });
 
     it("should not carry a hover-only background class on the resizer", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).not.toContain("tw:hover:bg-[var(--o2-border-color)]");
+      expect(resizer.classes()).not.toContain("hover:bg-[var(--o2-border-color)]");
     });
   });
 
@@ -851,7 +850,7 @@ describe("TenstackTable", () => {
       expect(style).toContain("min-height: 70px");
     });
 
-    it("should render column labels from Quasar column format", () => {
+    it("should render column labels from legacy column format", () => {
       wrapper = mountTable({
         columns: dashboardColumns,
         rows: dashboardRows,
@@ -953,16 +952,16 @@ describe("TenstackTable", () => {
     });
   });
 
-  // ── tbody tw:relative class ───────────────────────────────────────────────
-  describe("tbody tw:relative class", () => {
-    it("should have tw:relative on tbody when useVirtualScroll=true and showPagination=false", () => {
+  // ── tbody relative class ───────────────────────────────────────────────
+  describe("tbody relative class", () => {
+    it("should have relative on tbody when useVirtualScroll=true and showPagination=false", () => {
       wrapper = mountTable();
       expect(
         wrapper.find('[data-test="o2-table-body"]').classes(),
-      ).toContain("tw:relative");
+      ).toContain("relative");
     });
 
-    it("should not have tw:relative on tbody when useVirtualScroll=false", () => {
+    it("should not have relative on tbody when useVirtualScroll=false", () => {
       wrapper = mountTable({
         columns: [{ name: "name", label: "NAME", field: "name" }],
         rows: [],
@@ -970,14 +969,14 @@ describe("TenstackTable", () => {
       });
       expect(
         wrapper.find('[data-test="o2-table-body"]').classes(),
-      ).not.toContain("tw:relative");
+      ).not.toContain("relative");
     });
 
-    it("should not have tw:relative on tbody when showPagination=true", () => {
+    it("should not have relative on tbody when showPagination=true", () => {
       wrapper = mountTable({ showPagination: true });
       expect(
         wrapper.find('[data-test="o2-table-body"]').classes(),
-      ).not.toContain("tw:relative");
+      ).not.toContain("relative");
     });
   });
 

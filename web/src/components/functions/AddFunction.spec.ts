@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import AddFunction from './AddFunction.vue';
+import OForm from '@/lib/forms/Form/OForm.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { nextTick } from 'vue';
@@ -9,8 +10,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 // Mock dependencies
 vi.mock('@/services/jstransform', () => ({
   default: {
-    create: vi.fn(),
-    update: vi.fn(),
+    create: vi.fn(() => Promise.resolve({ data: { message: 'Function created successfully' } })),
+    update: vi.fn(() => Promise.resolve({ data: { message: 'Function updated successfully' } })),
   },
 }));
 
@@ -88,389 +89,158 @@ describe('AddFunction.vue Branch Coverage', () => {
     vi.clearAllMocks();
   });
 
-  describe('Form Validation Branch Coverage', () => {
-    it('should validate function name correctly', async () => {
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': true,
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
+  // Function name / method-name validation is now owned by the Zod schema —
+  // covered by AddFunction.schema.spec.ts and the real-OForm gating tests below
+  // ("Schema wiring"), not by internal helper methods. (`params` is a hidden
+  // constant merged at submit, no longer a validated field.)
+
+  // The save now flows through the REAL <OForm> (no validate() shim). Driving
+  // form.handleSubmit() runs the schema then calls onSubmit(value).
+  const stubs = {
+    'query-editor': true,
+    'TestFunction': true,
+    'FunctionsToolbar': true,
+    'FullViewContainer': true,
+    'ConfirmDialog': true,
+    'O2AIChat': true,
+  };
+  const mountAddFunction = (props: any = defaultProps) =>
+    mount(AddFunction, {
+      props,
+      global: {
+        plugins: [mockI18n, mockRouter],
+        provide: { store: mockStore },
+        stubs,
+      },
+    });
+  const getForm = (wrapper: any) =>
+    (wrapper.findComponent(OForm).vm as any).form;
+
+  describe('Update vs Create Logic (real OForm submit)', () => {
+    it('calls create when not updating and the name is valid', async () => {
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createSpy = vi.spyOn(jsTransformService, 'create');
+
+      const wrapper = mountAddFunction({ ...defaultProps, isUpdated: false });
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'testFunction');
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect((wrapper.vm as any).beingUpdated).toBe(false);
+      // Payload parity (Rule ④): assert the EXACT object — keys AND value types —
+      // handed to the save service, not merely that it was called. `transType`
+      // MUST be a number (parseInt), guarding the string→number type-drift class
+      // that broke dashboards' max_record_size; `function`/`params` are the
+      // Monaco body + hidden constant merged in from `formData` at submit.
+      expect(createSpy).toHaveBeenCalledWith('test-org', {
+        name: 'testFunction',
+        function: '',
+        params: 'row',
+        transType: 0,
       });
-
-      const vm = wrapper.vm as any;
-
-      // Branch: valid function name (line 315-318)
-      vm.formData.name = 'validFunctionName';
-      expect(vm.isValidMethodName()).toBe(true);
-
-      // Branch: invalid function name (line 317)
-      vm.formData.name = '123invalid-name';
-      expect(vm.isValidMethodName()).toBe('Invalid Function name.');
-
-      // Branch: empty name validation (line 336)
-      vm.formData.name = '';
-      expect(vm.formData.name.trim().length > 0).toBe(false);
-
-      vm.formData.name = 'validName';
-      expect(vm.formData.name.trim().length > 0).toBe(true);
+      const createPayload = createSpy.mock.calls[0][1] as any;
+      expect(typeof createPayload.transType).toBe('number');
+      expect(wrapper.emitted('update:list')).toBeTruthy();
     });
 
-    it('should validate parameters correctly', async () => {
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': true,
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
+    it('calls update when updating and the name is valid', async () => {
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const updateSpy = vi.spyOn(jsTransformService, 'update');
+
+      const wrapper = mountAddFunction({ ...defaultProps, isUpdated: true });
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'testFunction');
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect((wrapper.vm as any).beingUpdated).toBe(true);
+      // Same exact-payload + numeric-transType parity check for the update path.
+      expect(updateSpy).toHaveBeenCalledWith('test-org', {
+        name: 'testFunction',
+        function: '',
+        params: 'row',
+        transType: 0,
       });
-
-      const vm = wrapper.vm as any;
-
-      // Branch: valid params (line 311)
-      vm.formData.params = 'row';
-      expect(vm.isValidParam()).toBe(true);
-
-      vm.formData.params = 'row,data';
-      expect(vm.isValidParam()).toBe(true);
-
-      // Branch: invalid params (line 311)
-      vm.formData.params = 'row-invalid';
-      expect(vm.isValidParam()).toBe('Invalid params.');
-
-      vm.formData.params = '';
-      expect(vm.isValidParam()).toBe('Invalid params.');
+      const updatePayload = updateSpy.mock.calls[0][1] as any;
+      expect(typeof updatePayload.transType).toBe('number');
     });
   });
 
-  describe('Update vs Create Logic Branch Coverage', () => {
-    it('should handle create function submission', async () => {
-      const mockCreate = vi.fn().mockResolvedValue({ 
-        data: { message: 'Function created successfully' } 
-      });
-      vi.doMock('@/services/jstransform', () => ({
-        default: { create: mockCreate, update: vi.fn() }
-      }));
+  describe('Schema wiring (real OForm)', () => {
+    it('blocks submit for an empty required name — service NOT called', async () => {
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createSpy = vi.spyOn(jsTransformService, 'create');
 
-      const wrapper = mount(AddFunction, {
-        props: {
-          ...defaultProps,
-          isUpdated: false, // Branch condition: create mode
-        },
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': {
-              template: '<div><form ref="addFunctionForm"><button @click="$emit(\'save\')">Save</button></form></div>',
-              methods: {
-                validate: () => Promise.resolve(true),
-              },
-            },
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
+      const wrapper = mountAddFunction({ ...defaultProps, isUpdated: false });
+      const form = getForm(wrapper);
+      await form.handleSubmit();
+      await flushPromises();
 
-      const vm = wrapper.vm as any;
-      
-      // Set valid form data
-      vm.formData = {
-        name: 'testFunction',
-        function: 'test code',
-        params: 'row',
-        transType: '0',
-      };
-
-      // Mock functionsToolbarRef
-      vm.functionsToolbarRef = {
-        addFunctionForm: {
-          validate: () => Promise.resolve(true),
-        },
-      };
-
-      // Branch: !beingUpdated.value (line 356-366)
-      await vm.onSubmit();
-
-      await nextTick();
-      await nextTick();
-
-      expect(vm.beingUpdated).toBe(false);
+      expect(form.state.isValid).toBe(false);
+      expect(createSpy).not.toHaveBeenCalled();
     });
 
-    it('should handle update function submission', async () => {
-      const mockUpdate = vi.fn().mockResolvedValue({ 
-        data: { message: 'Function updated successfully' } 
-      });
-      vi.doMock('@/services/jstransform', () => ({
-        default: { create: vi.fn(), update: mockUpdate }
-      }));
+    it('blocks submit for an invalid method name — service NOT called', async () => {
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createSpy = vi.spyOn(jsTransformService, 'create');
 
-      const wrapper = mount(AddFunction, {
-        props: {
-          ...defaultProps,
-          isUpdated: true, // Branch condition: update mode
-        },
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': {
-              template: '<div><form ref="addFunctionForm"><button @click="$emit(\'save\')">Save</button></form></div>',
-              methods: {
-                validate: () => Promise.resolve(true),
-              },
-            },
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
+      const wrapper = mountAddFunction({ ...defaultProps, isUpdated: false });
+      const form = getForm(wrapper);
+      form.setFieldValue('name', '123-invalid');
+      await form.handleSubmit();
+      await flushPromises();
 
-      const vm = wrapper.vm as any;
-      
-      // Set valid form data
-      vm.formData = {
-        name: 'testFunction',
-        function: 'test code',
-        params: 'row',
-        transType: '0',
-      };
-
-      // Mock functionsToolbarRef
-      vm.functionsToolbarRef = {
-        addFunctionForm: {
-          validate: () => Promise.resolve(true),
-        },
-      };
-
-      // Branch: beingUpdated.value (line 367-378)
-      await vm.onSubmit();
-
-      expect(vm.beingUpdated).toBe(true);
-    });
-  });
-
-  describe('Function Type Handling Branch Coverage', () => {
-    it('should handle VRL function type (transType 0)', async () => {
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': true,
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
-
-      const vm = wrapper.vm as any;
-      
-      // Branch: transType != "1" (line 325-327)
-      vm.formData.transType = '0';
-      vm.updateEditorContent();
-      
-      expect(vm.prefixCode).toBe('');
-      expect(vm.suffixCode).toBe('');
+      expect(form.state.isValid).toBe(false);
+      expect(createSpy).not.toHaveBeenCalled();
     });
 
-    it('should handle JavaScript function type (transType 1)', async () => {
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': true,
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
+    it('blocks submit for a name with trailing whitespace — raw value validated, service NOT called', async () => {
+      // End-to-end regression guard: OForm SAVES the raw form value, so a schema
+      // .trim() would let "myfunc " pass validation yet persist the space. The
+      // raw value must be rejected and the save blocked (no auto-strip-then-save).
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createSpy = vi.spyOn(jsTransformService, 'create');
 
-      const vm = wrapper.vm as any;
+      const wrapper = mountAddFunction({ ...defaultProps, isUpdated: false });
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'myfunc ');
+      await form.handleSubmit();
+      await flushPromises();
 
-      // Branch: transType == "1" (JavaScript - no prefix/suffix)
-      vm.formData.transType = '1';
-      vm.updateEditorContent();
-
-      // JavaScript functions don't get prefix/suffix - written as-is
-      expect(vm.prefixCode).toBe('');
-      expect(vm.suffixCode).toBe('');
-    });
-
-    it('should clear params for JavaScript functions during submission', async () => {
-      const wrapper = mount(AddFunction, {
-        props: {
-          ...defaultProps,
-          isUpdated: false,
-        },
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': {
-              template: '<div><form ref="addFunctionForm"></form></div>',
-            },
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
-
-      const vm = wrapper.vm as any;
-
-      // Branch: transType == 1 (JavaScript)
-      vm.formData = {
-        name: 'testJavaScriptFunction',
-        function: 'function transform(row) { return row; }',
-        params: 'row,data',
-        transType: 1,
-      };
-
-      // Directly test the condition logic
-      if (vm.formData.transType == 1) {
-        vm.formData.params = '';
-      }
-
-      expect(vm.formData.params).toBe('');
+      expect(form.state.isValid).toBe(false);
+      expect(createSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('Error Handling Branch Coverage', () => {
-    it('should handle function validation errors', async () => {
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': {
-              template: '<div><form ref="addFunctionForm"></form></div>',
-            },
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
-      });
+    it('does not call the service when validation fails', async () => {
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      const createSpy = vi.spyOn(jsTransformService, 'create');
 
-      const vm = wrapper.vm as any;
-      
-      // Mock functionsToolbarRef with validation failure
-      vm.functionsToolbarRef = {
-        addFunctionForm: {
-          validate: () => Promise.resolve(false), // Branch: !valid (line 345-347)
-        },
-      };
+      const wrapper = mountAddFunction({ ...defaultProps, isUpdated: false });
+      const form = getForm(wrapper);
+      // empty name → schema invalid
+      await form.handleSubmit();
+      await flushPromises();
 
-      await vm.onSubmit();
-      // Since validation failed, the form should not proceed
-      expect(vm.functionsToolbarRef).toBeDefined();
+      expect(form.state.isValid).toBe(false);
+      expect(createSpy).not.toHaveBeenCalled();
     });
 
-    it('should handle API errors during submission', async () => {
-      const mockCreate = vi.fn().mockRejectedValue({
-        response: {
-          data: { message: 'API Error occurred' }
-        }
-      });
-      vi.doMock('@/services/jstransform', () => ({
-        default: { create: mockCreate, update: vi.fn() }
-      }));
-
-      const wrapper = mount(AddFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n, mockRouter],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'query-editor': true,
-            'TestFunction': true,
-            'FunctionsToolbar': {
-              template: '<div><form ref="addFunctionForm"></form></div>',
-            },
-            'FullViewContainer': true,
-            'ConfirmDialog': true,
-            'O2AIChat': true,
-          },
-        },
+    it('captures API errors into compilationErr', async () => {
+      const jsTransformService = (await import('@/services/jstransform')).default;
+      vi.spyOn(jsTransformService, 'create').mockRejectedValueOnce({
+        response: { data: { message: 'API Error occurred' } },
       });
 
-      const vm = wrapper.vm as any;
-      
-      vm.formData = {
-        name: 'testFunction',
-        function: 'test code',
-        params: 'row',
-        transType: '0',
-      };
+      const wrapper = mountAddFunction({ ...defaultProps, isUpdated: false });
+      const form = getForm(wrapper);
+      form.setFieldValue('name', 'testFunction');
+      await form.handleSubmit();
+      await flushPromises();
 
-      vm.functionsToolbarRef = {
-        addFunctionForm: {
-          validate: () => Promise.resolve(true),
-        },
-      };
-
-      // Branch: catch error handling (line 397-405)
-      await vm.onSubmit();
-      
-      // The error handling should be triggered
-      expect(vm.compilationErr).toBeDefined();
+      expect((wrapper.vm as any).compilationErr).toBe('API Error occurred');
     });
 
     it('should handle function error from TestFunction component', async () => {
@@ -697,10 +467,10 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       // Branch: store.state.isAiChatEnabled && !isAddFunctionComponent
-      const mainContainerClasses = wrapper.find('.tw\\:flex.tw\\:overflow-hidden.tw\\:min-h-0');
-      expect(mainContainerClasses.classes()).toContain('tw:w-3/4');
+      const mainContainerClasses = wrapper.find('.flex.overflow-hidden.min-h-0');
+      expect(mainContainerClasses.classes()).toContain('w-3/4');
 
-      const chatContainer = wrapper.find('.tw\\:w-1\\/4');
+      const chatContainer = wrapper.find('.w-1\\/4');
       expect(chatContainer.exists()).toBe(true);
     });
 
@@ -731,10 +501,10 @@ describe('AddFunction.vue Branch Coverage', () => {
       });
 
       // Branch: !store.state.isAiChatEnabled || isAddFunctionComponent
-      const mainContainerClasses = wrapper.find('.tw\\:flex.tw\\:overflow-hidden.tw\\:min-h-0');
-      expect(mainContainerClasses.classes()).toContain('tw:w-full');
+      const mainContainerClasses = wrapper.find('.flex.overflow-hidden.min-h-0');
+      expect(mainContainerClasses.classes()).toContain('w-full');
 
-      const chatContainer = wrapper.find('.tw\\:w-1\\/4');
+      const chatContainer = wrapper.find('.w-1\\/4');
       expect(chatContainer.exists()).toBe(false);
     });
   });

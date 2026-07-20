@@ -6,6 +6,7 @@
  */
 
 const testLogger = require('./test-logger.js');
+const { rumTestContext } = require('./rum-env.js');
 
 /**
  * Ingest RUM error events to OpenObserve
@@ -16,10 +17,9 @@ const testLogger = require('./test-logger.js');
 async function ingestRumErrors(page, errorCount = 3) {
   testLogger.info('Starting RUM error ingestion', { errorCount });
 
-  const orgId = process.env["ORGNAME"] || 'default';
-  const baseUrl = process.env["ZO_BASE_URL"] || 'http://localhost:5080';
-  const email = process.env["ZO_ROOT_USER_EMAIL"];
-  const password = process.env["ZO_ROOT_USER_PASSWORD"];
+  // Validated env context: org-id allowlist, plain-HTTP guard, and preference
+  // for a dedicated least-privilege account (ZO_RUM_TEST_EMAIL/PASSWORD).
+  const { orgId, baseUrl, email, password } = rumTestContext();
 
   try {
     // Fetch RUM token

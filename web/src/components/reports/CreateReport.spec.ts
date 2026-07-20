@@ -12,14 +12,23 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// CreateReport is migrated to OForm + Zod (CreateReport.schema.ts). These tests
+// mount the REAL <OForm> (it is NOT stubbed) and assert behavior through the
+// form: an empty/invalid required field blocks submit (schema gates it, save NOT
+// called); a valid form submits and calls the report service. They also cover the
+// restored BEFORE-baseline rules (title/emails required when !cached, name
+// resource check, cron required) and keep the folder/dashboard/variables coverage.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { nextTick } from "vue";
 import * as vueRouter from "vue-router";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
 import dashboardService from "@/services/dashboards";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import CreateReport from "./CreateReport.vue";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
@@ -88,7 +97,6 @@ vi.mock("@/utils/commons", () => ({
 
 const platform = { is: { desktop: true, mobile: false }, has: { touch: false } };
 
-
 const MOCK_FOLDERS = [
   { name: "Default", folderId: "folder-1" },
   { name: "Reports", folderId: "folder-2" },
@@ -112,13 +120,17 @@ const MOCK_REPORT = {
     {
       folder: "folder-1",
       dashboard: "dash-1",
-      tabs: "tab-1",
+      tabs: ["tab-1"],
       variables: [],
       timerange: { type: "relative", period: "30m", from: 0, to: 0 },
+      report_type: "pdf",
+      email_attachment_type: "standard",
+      attachment_dimensions: null,
     },
   ],
   destinations: [{ email: "dest@example.com" }],
   enabled: true,
+  imagePreview: false,
   title: "Report Title",
   message: "Hello",
   orgId: "test-org",
@@ -147,21 +159,57 @@ function mountComponent(routeQuery: Record<string, string> = {}) {
 
   const wrapper = mount(CreateReport, {
     global: {
-      plugins: [[{ platform }], i18n],
+      plugins: [store, i18n],
       provide: { store, platform },
       stubs: {
         DateTime: { template: '<div data-test="datetime-stub" />' },
         VariablesInput: { template: '<div data-test="variables-stub" />' },
         ConfirmDialog: { template: '<div data-test="confirm-dialog-stub" />' },
-        "q-stepper": { template: "<div><slot /></div>" },
-        "q-step": { template: "<div><slot /></div>" },
-        "q-stepper-navigation": { template: "<div><slot /></div>" },
+        SelectFolderDropdown: { template: '<div data-test="folder-dropdown-stub" />' },
       },
     },
     attachTo: document.body,
   });
 
   return { wrapper, mockRouter };
+}
+
+// Drive the REAL form's submit so the schema runs + the handler is awaited
+// deterministically (a fire-and-forget native submit would not be).
+async function submitForm(w: VueWrapper) {
+  await (w.vm as any).form.handleSubmit();
+  await flushPromises();
+}
+
+function setField(w: VueWrapper, name: string, value: unknown) {
+  (w.vm as any).form.setFieldValue(name, value);
+}
+
+// Drive a real OFormSelect's inner OSelect the way a user click does — emit
+// `update:modelValue` from the actual rendered OSelect. This exercises the full
+// path: OFormSelect's internal `field.handleChange` AND the consumer's
+// `@update:model-value` handler (merged onto the same event via $attrs), which is
+// exactly the wiring the cascade depends on.
+async function pickFromSelect(w: VueWrapper, name: string, value: unknown) {
+  const target = w
+    .findAllComponents(OSelect)
+    .find((s) => s.props("name") === name);
+  if (!target) throw new Error(`OSelect[name="${name}"] not rendered`);
+  target.vm.$emit("update:modelValue", value);
+  await flushPromises();
+}
+
+// Fill every required field for the default (once / scheduleNow / not-cached)
+// mode so the whole schema passes. The dashboard row is now a form-owned
+// field-array (dashboards[0].*).
+async function fillValidForm(w: VueWrapper) {
+  setField(w, "dashboards[0].folder", "folder-1");
+  setField(w, "dashboards[0].dashboard", "dash-1");
+  setField(w, "dashboards[0].tabs", "tab-1");
+  setField(w, "name", "new-report");
+  setField(w, "title", "Test Title");
+  setField(w, "emails", "user@example.com");
+  await flushPromises();
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -187,8 +235,8 @@ describe("CreateReport", () => {
     store.state.selectedOrganization = {
       identifier: "test-org",
       name: "Test Org",
-    };
-    store.state.userInfo = { email: "user@test.com" };
+    } as any;
+    store.state.userInfo = { email: "user@test.com" } as any;
     store.state.theme = "light";
   });
 
@@ -243,6 +291,323 @@ describe("CreateReport", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="report-cached-toggle-btn"]').exists()).toBe(true);
     });
+
+    it("should keep the Save button enabled (R3) and submit type", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      const save = wrapper.find('[data-test="add-report-save-btn"]');
+      expect(save.exists()).toBe(true);
+      expect(save.attributes("disabled")).toBeUndefined();
+    });
+
+    it("associates the footer Save with the OForm via form-id (R4 Enter/footer submit)", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      // The id falls through onto OForm's <form>; the footer Save (outside the
+      // form) is linked to it via the native form="<id>" attribute.
+      const formEl = wrapper.find("form.create-report-form");
+      const save = wrapper.find('[data-test="add-report-save-btn"]');
+      expect(formEl.attributes("id")).toBe("create-report-form");
+      expect(save.attributes("type")).toBe("submit");
+      expect(save.attributes("form")).toBe("create-report-form");
+    });
+  });
+
+  // ── Real OForm schema validation (the key wiring proof) ───────────────────
+
+  describe("OForm schema validation (real form)", () => {
+    it("blocks submit and does NOT call the service when required fields are empty", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(reports.createReportV2).not.toHaveBeenCalled();
+    });
+
+    it("submits and calls createReportV2 when the schema passes", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects a name with invalid resource characters", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+      setField(wrapper, "name", "bad name?");
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(reports.createReportV2).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit in cron mode when the cron expression is empty", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+      setField(wrapper, "frequencyType", "cron");
+      setField(wrapper, "timezone", "UTC");
+      setField(wrapper, "cron", "");
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(reports.createReportV2).not.toHaveBeenCalled();
+    });
+
+    it("form-owns the whole dashboard row as a field-array (dashboards[0].*)", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      setField(wrapper, "dashboards[0].report_type", "png");
+      setField(wrapper, "dashboards[0].email_attachment_type", "inline");
+      setField(wrapper, "dashboards[0].attachmentWidth", 1440);
+      setField(wrapper, "dashboards[0].attachmentHeight", 900);
+      await flushPromises();
+      const row = (wrapper.vm as any).form.state.values.dashboards[0];
+      expect(row.report_type).toBe("png");
+      expect(row.email_attachment_type).toBe("inline");
+      expect(row.attachmentWidth).toBe(1440);
+      expect(row.attachmentHeight).toBe(900);
+    });
+
+    it("coerces the STRING emitted by the number inputs into a numeric attachment_dimensions payload", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+
+      // report_type is "pdf" by default → the Custom Dimensions section renders.
+      // Expand it so the width/height number inputs mount.
+      await wrapper
+        .find('[data-test="add-report-custom-dimensions-section"] .cursor-pointer')
+        .trigger("click");
+      await flushPromises();
+
+      // Type through the REAL <input type="number">. An OInput number field (no
+      // `.number` modifier) emits the RAW STRING the DOM input holds — exactly what
+      // a user's keystrokes produce — so this drives the z.coerce.number() path the
+      // schema exists for, not a pre-made JS number handed straight to the form.
+      await wrapper
+        .find('[data-test="add-report-dimension-width"] input')
+        .setValue("1440");
+      await wrapper
+        .find('[data-test="add-report-dimension-height"] input')
+        .setValue("900");
+      await flushPromises();
+
+      // The form holds the raw STRING the number input emitted (pre-coercion).
+      const row = (wrapper.vm as any).form.state.values.dashboards[0];
+      expect(row.attachmentWidth).toBe("1440");
+      expect(row.attachmentHeight).toBe("900");
+
+      await submitForm(wrapper);
+
+      // …but the SAVED payload carries NUMBERS — attachment_dimensions matches the
+      // API contract (guards the dashboards `max_record_size` string-leak class of
+      // regression: a plain z.number() / a leaked "1440" would fail this).
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+      const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
+      expect(payload.dashboards[0].attachment_dimensions).toEqual({
+        width: 1440,
+        height: 900,
+      });
+      expect(typeof payload.dashboards[0].attachment_dimensions.width).toBe(
+        "number",
+      );
+      expect(typeof payload.dashboards[0].attachment_dimensions.height).toBe(
+        "number",
+      );
+    });
+
+    it("submits in cron mode with a valid cron + timezone", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+      setField(wrapper, "frequencyType", "cron");
+      setField(wrapper, "timezone", "UTC");
+      setField(wrapper, "cron", "0 0 12 * * ?");
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── Restored BEFORE-baseline rules (title / emails required when !cached) ──
+
+  describe("restored dropped validations", () => {
+    it("requires a title when the report is NOT cached", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+      setField(wrapper, "title", "");
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(reports.createReportV2).not.toHaveBeenCalled();
+    });
+
+    it("requires valid emails when the report is NOT cached", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+      setField(wrapper, "emails", "not-an-email");
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(reports.createReportV2).not.toHaveBeenCalled();
+    });
+
+    it("does NOT require title/emails for a cached report", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      // Cached report: only dashboard + name required.
+      setField(wrapper, "dashboards[0].folder", "folder-1");
+      setField(wrapper, "dashboards[0].dashboard", "dash-1");
+      setField(wrapper, "dashboards[0].tabs", "tab-1");
+      setField(wrapper, "name", "cached-report");
+      setField(wrapper, "isCachedReport", true);
+      setField(wrapper, "title", "");
+      setField(wrapper, "emails", "");
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+      // Cached reports persist no destinations.
+      const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
+      expect(payload.destinations).toEqual([]);
+    });
+
+    it("blocks submit in Schedule Later mode when date/time are empty", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+      setField(wrapper, "selectedTimeTab", "scheduleLater");
+      setField(wrapper, "timezone", "UTC");
+      // Start Date + Start Time left empty → the restored rule blocks the save.
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(reports.createReportV2).not.toHaveBeenCalled();
+    });
+
+    it("submits in Schedule Later mode with a valid date + time", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await fillValidForm(wrapper);
+      setField(wrapper, "selectedTimeTab", "scheduleLater");
+      setField(wrapper, "timezone", "UTC");
+      setField(wrapper, "date", "2027-12-29"); // ISO YYYY-MM-DD (ODate value)
+      setField(wrapper, "time", "10:30"); // HH:MM (OTime value)
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── Step error jump ───────────────────────────────────────────────────────
+
+  describe("OStepper error jump", () => {
+    it("jumps to step 1 when a dashboard field is missing on submit", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      (wrapper.vm as any).step = 2;
+      // Leave the dashboard fields empty → first error is on step 1.
+      await submitForm(wrapper);
+      expect((wrapper.vm as any).step).toBe(1);
+    });
+
+    it("reveals the dashboard-folder field error only after the first submit", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      const form = (wrapper.vm as any).form;
+      // Before any submit → the OFormSelect field has no error (submit-then-change).
+      expect(
+        (form.getFieldMeta("dashboards[0].folder")?.errors ?? []).length,
+      ).toBe(0);
+      await submitForm(wrapper);
+      // After submit with an empty folder → the field's error is populated, so
+      // the OFormSelect renders it.
+      expect(
+        (form.getFieldMeta("dashboards[0].folder")?.errors ?? []).length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  // ── Cascade through the REAL OSelect (@update merge — the flagged risk) ────
+  // These drive the actual rendered OSelect (not the handler directly), proving
+  // that selecting an option both updates the form value (field binding) AND runs
+  // the folder→dashboard→tabs cascade (the consumer @update handler). If the
+  // $attrs event-merge dropped either handler, these fail.
+
+  describe("dashboard cascade through the real OSelect", () => {
+    it("picking a folder updates the form value AND loads dashboards + clears dependents", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      // Stale dependents that the cascade must clear.
+      setField(wrapper, "dashboards[0].dashboard", "stale-dash");
+      setField(wrapper, "dashboards[0].tabs", "stale-tab");
+      await flushPromises();
+
+      await pickFromSelect(wrapper, "dashboards[0].folder", "folder-1");
+
+      const row = (wrapper.vm as any).form.state.values.dashboards[0];
+      // field.handleChange fired (the merge kept the form binding):
+      expect(row.folder).toBe("folder-1");
+      // onFolderSelection fired (cascade): options loaded + dependents cleared:
+      expect(vi.mocked(dashboardService.list)).toHaveBeenCalledWith(
+        0,
+        10000,
+        "name",
+        false,
+        "",
+        "test-org",
+        "folder-1",
+        "",
+      );
+      expect(row.dashboard).toBe("");
+      expect(row.tabs).toBe("");
+    });
+
+    it("picking a dashboard updates the form value AND clears tabs", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      await pickFromSelect(wrapper, "dashboards[0].folder", "folder-1");
+      setField(wrapper, "dashboards[0].tabs", "stale-tab");
+      await flushPromises();
+
+      await pickFromSelect(wrapper, "dashboards[0].dashboard", "dash-1");
+
+      const row = (wrapper.vm as any).form.state.values.dashboards[0];
+      expect(row.dashboard).toBe("dash-1");
+      expect(row.tabs).toBe("");
+      // tab options were populated for the picked dashboard
+      expect((wrapper.vm as any).dashboardTabOptions).toEqual([
+        { label: "Tab 1", value: "tab-1" },
+      ]);
+    });
   });
 
   // ── Edit mode ────────────────────────────────────────────────────────────
@@ -266,12 +631,28 @@ describe("CreateReport", () => {
     });
 
     it("should set isEditingReport to true", () => {
-      expect(wrapper.vm.isEditingReport).toBe(true);
+      expect((wrapper.vm as any).isEditingReport).toBe(true);
     });
 
-    it("should populate formData from the fetched report", () => {
-      expect(wrapper.vm.formData.name).toBe(MOCK_REPORT.name);
-      expect(wrapper.vm.formData.description).toBe(MOCK_REPORT.description);
+    it("should prefill the form-owned name from the fetched report", () => {
+      expect((wrapper.vm as any).form.state.values.name).toBe(
+        MOCK_REPORT.name,
+      );
+    });
+
+    it("should prefill the dashboard row without the cascade wiping it", () => {
+      // The cascade (@update) must NOT fire on programmatic reset/prefill — so
+      // the resolved folder/dashboard/tabs survive into the form.
+      const row = (wrapper.vm as any).form.state.values.dashboards[0];
+      expect(row.folder).toBe("folder-1");
+      expect(row.dashboard).toBe("dash-1");
+      expect(row.tabs).toBe("tab-1");
+      expect(row.timerange).toMatchObject({ type: "relative", period: "30m" });
+    });
+
+    it("should call updateReport when submitting a valid edit", async () => {
+      await submitForm(wrapper);
+      expect(vi.mocked(reports.updateReport)).toHaveBeenCalled();
     });
 
     it("should handle getReport non-403 error without crashing", async () => {
@@ -280,7 +661,7 @@ describe("CreateReport", () => {
       });
       const { wrapper: w } = mountComponent({ name: "bad-report" });
       await flushPromises();
-      expect(w.vm.isFetchingReport).toBe(false);
+      expect((w.vm as any).isFetchingReport).toBe(false);
       w.unmount();
     });
 
@@ -290,7 +671,7 @@ describe("CreateReport", () => {
       });
       const { wrapper: w } = mountComponent({ name: "forbidden-report" });
       await flushPromises();
-      expect(w.vm.isFetchingReport).toBe(false);
+      expect((w.vm as any).isFetchingReport).toBe(false);
       w.unmount();
     });
   });
@@ -309,16 +690,81 @@ describe("CreateReport", () => {
   // ── Cached report toggle ─────────────────────────────────────────────────
 
   describe("cached report toggle", () => {
-    it("should initialize isCachedReport as false", async () => {
-      ({ wrapper } = mountComponent());
-      await flushPromises();
-      expect(wrapper.vm.isCachedReport).toBe(false);
-    });
-
     it("should set isCachedReport=true when query param type=cached", async () => {
       ({ wrapper } = mountComponent({ type: "cached" }));
       await flushPromises();
-      expect(wrapper.vm.isCachedReport).toBe(true);
+      expect((wrapper.vm as any).form.state.values.isCachedReport).toBe(true);
+    });
+
+    // Reactivity guard (the OWNER pattern fix): the Share step is driven by a
+    // form.useStore view of isCachedReport, so toggling it must reactively hide
+    // the step. A non-reactive form.state computed (the pre-fix code) would not.
+    it("reactively hides the Share step when isCachedReport is toggled on", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="add-report-share-step"]').exists(),
+      ).toBe(true);
+
+      setField(wrapper, "isCachedReport", true);
+      await flushPromises();
+
+      expect((wrapper.vm as any).isCachedReportValue).toBe(true);
+      expect(
+        wrapper.find('[data-test="add-report-share-step"]').exists(),
+      ).toBe(false);
+    });
+
+    // Regression: enabling "Cached Report" AFTER a Continue click must not leave
+    // the report unsavable. A Continue click validates via validateField("submit");
+    // because the schema is form-level, that run records EVERY failing path —
+    // including the still-empty, out-of-step title/emails — into the form-level
+    // errorMap.onDynamic. Enabling Cached Report drops those requirements, but
+    // handleSubmit() re-validates only fields, never re-running/clearing that
+    // form-level result, so in the real browser Save stayed silently blocked
+    // (isFormValid stayed false). The values watcher now clears the form-level
+    // error SYNCHRONOUSLY once the schema passes.
+    //
+    // Timing note: assert after nextTick, NOT flushPromises. Without the fix,
+    // jsdom's async onDynamicAsync validator eventually re-runs and clears the
+    // stale error on the next flush — which masks the bug — but that async clear
+    // does not happen in the real browser. The fix's watcher clears it on the
+    // same tick as the value change, so the nextTick assertion is what actually
+    // distinguishes fixed from unfixed.
+    it("clears the stale form-level error synchronously when cached is enabled after a Continue click", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+
+      // Step 1 & 2 valid; NOT cached; Share (title/emails) left empty.
+      setField(wrapper, "dashboards[0].folder", "folder-1");
+      setField(wrapper, "dashboards[0].dashboard", "dash-1");
+      setField(wrapper, "dashboards[0].tabs", "tab-1");
+      setField(wrapper, "name", "continue-then-cache");
+      await flushPromises();
+
+      // Click "Continue" on step 1 → the form-level schema runs and stamps the
+      // out-of-step title/emails errors onto the form's errorMap.onDynamic.
+      await wrapper
+        .find('[data-test="add-report-step1-continue-btn"]')
+        .trigger("click");
+      await flushPromises();
+      const form = (wrapper.vm as any).form;
+      expect(form.state.errorMap?.onDynamic).toBeTruthy();
+      expect(form.state.isValid).toBe(false);
+
+      // Enable Cached Report → title/emails become irrelevant. The watcher must
+      // clear the stale form-level error on THIS tick (no async round-trip).
+      setField(wrapper, "isCachedReport", true);
+      await nextTick();
+      expect(form.state.errorMap?.onDynamic ?? null).toBe(null);
+      expect(form.state.isValid).toBe(true);
+      expect(form.state.canSubmit).toBe(true);
+
+      // Save now goes through (regressed: the stale form-level error blocked it).
+      await submitForm(wrapper);
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+      const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
+      expect(payload.destinations).toEqual([]);
     });
   });
 
@@ -336,8 +782,8 @@ describe("CreateReport", () => {
     it("should populate folderOptions after fetch", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      expect(wrapper.vm.folderOptions).toHaveLength(MOCK_FOLDERS.length);
-      expect(wrapper.vm.folderOptions[0].label).toBe("Default");
+      expect((wrapper.vm as any).folderOptions).toHaveLength(MOCK_FOLDERS.length);
+      expect((wrapper.vm as any).folderOptions[0].label).toBe("Default");
     });
   });
 
@@ -347,7 +793,7 @@ describe("CreateReport", () => {
     it("should load dashboards when a folder is selected", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      await wrapper.vm.onFolderSelection("folder-1");
+      await (wrapper.vm as any).onFolderSelection("folder-1");
       expect(vi.mocked(dashboardService.list)).toHaveBeenCalledWith(
         0,
         10000,
@@ -363,11 +809,12 @@ describe("CreateReport", () => {
     it("should clear dashboard and tabs selection when folder changes", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      wrapper.vm.formData.dashboards[0].dashboard = "dash-old";
-      wrapper.vm.formData.dashboards[0].tabs = "tab-old";
-      await wrapper.vm.onFolderSelection("folder-1");
-      expect(wrapper.vm.formData.dashboards[0].dashboard).toBe("");
-      expect(wrapper.vm.formData.dashboards[0].tabs).toBe("");
+      setField(wrapper, "dashboards[0].dashboard", "dash-old");
+      setField(wrapper, "dashboards[0].tabs", "tab-old");
+      await (wrapper.vm as any).onFolderSelection("folder-1");
+      const row = (wrapper.vm as any).form.state.values.dashboards[0];
+      expect(row.dashboard).toBe("");
+      expect(row.tabs).toBe("");
     });
   });
 
@@ -377,245 +824,89 @@ describe("CreateReport", () => {
     it("should clear tabs when dashboard changes", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      await wrapper.vm.onFolderSelection("folder-1");
-      wrapper.vm.formData.dashboards[0].tabs = "tab-old";
-      wrapper.vm.onDashboardSelection("dash-1");
-      expect(wrapper.vm.formData.dashboards[0].tabs).toBe("");
+      await (wrapper.vm as any).onFolderSelection("folder-1");
+      setField(wrapper, "dashboards[0].tabs", "tab-old");
+      (wrapper.vm as any).onDashboardSelection("dash-1");
+      expect(
+        (wrapper.vm as any).form.state.values.dashboards[0].tabs,
+      ).toBe("");
     });
   });
 
-  // ── updateDateTime ───────────────────────────────────────────────────────
+  // ── Form-owned timerange + toggle groups (OFormDateTimeRange/OFormToggleGroup) ──
 
-  describe("updateDateTime", () => {
-    it("should update timerange type for relative", async () => {
+  describe("form-owned composites", () => {
+    it("seeds a default timerange into the form (OFormDateTimeRange)", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      wrapper.vm.updateDateTime({
-        valueType: "relative",
-        startTime: 0,
-        endTime: 0,
-        relativeTimePeriod: "1h",
-      });
-      expect(wrapper.vm.formData.dashboards[0].timerange.type).toBe("relative");
-      expect(wrapper.vm.formData.dashboards[0].timerange.period).toBe("1h");
+      const tr = (wrapper.vm as any).form.state.values.dashboards[0]
+        .timerange;
+      expect(tr).toMatchObject({ type: "relative", period: "30m" });
     });
 
-    it("should update timerange type for absolute", async () => {
+    it("exposes frequencyType + selectedTimeTab from the form (OFormToggleGroup)", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      wrapper.vm.updateDateTime({
-        valueType: "absolute",
-        startTime: 1000,
-        endTime: 2000,
-        relativeTimePeriod: null,
-      });
-      expect(wrapper.vm.formData.dashboards[0].timerange.type).toBe("absolute");
-      expect(wrapper.vm.formData.dashboards[0].timerange.from).toBe(1000);
-      expect(wrapper.vm.formData.dashboards[0].timerange.to).toBe(2000);
+      // Defaults.
+      expect((wrapper.vm as any).frequencyType).toBe("once");
+      expect((wrapper.vm as any).selectedTimeTab).toBe("scheduleNow");
+      // Driven by the form field (what OFormToggleGroup writes).
+      setField(wrapper, "frequencyType", "custom");
+      setField(wrapper, "selectedTimeTab", "scheduleLater");
+      await flushPromises();
+      expect((wrapper.vm as any).frequencyType).toBe("custom");
+      expect((wrapper.vm as any).selectedTimeTab).toBe("scheduleLater");
     });
 
-    it("should map relative-custom to relative type", async () => {
+    it("carries the form timerange into the save payload", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      wrapper.vm.updateDateTime({
-        valueType: "relative-custom",
-        startTime: 0,
-        endTime: 0,
-        relativeTimePeriod: "2d",
+      await fillValidForm(wrapper);
+      setField(wrapper, "dashboards[0].timerange", {
+        type: "absolute",
+        from: 111,
+        to: 222,
+        period: "30m",
       });
-      expect(wrapper.vm.formData.dashboards[0].timerange.type).toBe("relative");
+      await flushPromises();
+
+      await submitForm(wrapper);
+
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+      const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
+      expect(payload.dashboards[0].timerange).toMatchObject({
+        type: "absolute",
+        from: 111,
+        to: 222,
+      });
     });
   });
 
   // ── Dashboard variables ──────────────────────────────────────────────────
 
-  describe("addDashboardVariable / removeDashboardVariable", () => {
-    it("should add a new variable entry", async () => {
+  // `variables` are now form-owned (VariablesInput renders in form mode,
+  // name-prefix="variables"). The old component-owned add/remove handlers are
+  // gone — coverage now proves the form owns the value and it reaches the
+  // saved dashboards[0].variables payload in the {key,value} shape (Rule ④).
+  describe("dashboard variables (form-owned)", () => {
+    it("defaults variables to an empty array on the form", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      const before = wrapper.vm.formData.dashboards[0].variables.length;
-      wrapper.vm.addDashboardVariable();
-      expect(wrapper.vm.formData.dashboards[0].variables).toHaveLength(before + 1);
+      expect((wrapper.vm as any).form.state.values.variables).toEqual([]);
     });
 
-    it("should remove a variable by id", async () => {
+    it("includes form-owned variables in the saved dashboards[0].variables payload", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      wrapper.vm.addDashboardVariable();
-      const vars = wrapper.vm.formData.dashboards[0].variables;
-      const added = vars[vars.length - 1];
-      wrapper.vm.removeDashboardVariable(added);
-      expect(
-        wrapper.vm.formData.dashboards[0].variables.find(
-          (v: any) => v.id === added.id,
-        ),
-      ).toBeUndefined();
-    });
-  });
+      await fillValidForm(wrapper);
+      setField(wrapper, "variables", [{ key: "env", value: "prod" }]);
+      await submitForm(wrapper);
 
-  // ── Timezone filter ──────────────────────────────────────────────────────
-
-  describe("filterColumns / timezoneFilterFn", () => {
-    it("should return all timezone options when val is empty", async () => {
-      ({ wrapper } = mountComponent());
-      await flushPromises();
-      const options = ["UTC", "America/New_York", "Asia/Tokyo"];
-      let result: string[] = [];
-      wrapper.vm.filterColumns(options, "", (fn: Function) => {
-        fn();
-        result = wrapper.vm.filteredTimezone;
-      });
-      // filterColumns returns the filtered list; just verify it doesn't throw
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should filter timezone options by substring", async () => {
-      ({ wrapper } = mountComponent());
-      await flushPromises();
-      const options = ["UTC", "America/New_York", "Asia/Tokyo"];
-      let result: string[] = [];
-      const returned = wrapper.vm.filterColumns(options, "America", (fn: Function) => {
-        fn();
-      });
-      expect(returned).toHaveLength(1);
-      expect(returned[0]).toBe("America/New_York");
-    });
-  });
-
-  // ── saveReport (create) ──────────────────────────────────────────────────
-
-  describe("saveReport — create mode", () => {
-    function setupValidForm(w: VueWrapper) {
-      // Fill minimum required form data for validation to pass
-      w.vm.formData.name = "new-report";
-      w.vm.formData.dashboards[0].folder = "folder-1";
-      w.vm.formData.dashboards[0].dashboard = "dash-1";
-      w.vm.formData.dashboards[0].tabs = "tab-1";
-      w.vm.formData.frequency = { interval: 1, type: "once", cron: "" };
-      w.vm.formData.start = 1000;
-      w.vm.formData.timezone = "UTC";
-      w.vm.formData.title = "Test Title";
-      w.vm.emails = "user@example.com";
-      w.vm.scheduling = { date: "01-01-2025", time: "10:00", timezone: "UTC" };
-      // Quasar form ref not attached in jsdom — mock validate() to return true
-      w.vm.addReportFormRef = { validate: vi.fn().mockResolvedValue(true) };
-    }
-
-    it("should call createReport when not editing", async () => {
-      ({ wrapper, mockRouter } = mountComponent());
-      await flushPromises();
-      setupValidForm(wrapper);
-
-      await wrapper.vm.saveReport();
-      await flushPromises();
-
-      expect(vi.mocked(reports.createReportV2)).toHaveBeenCalled();
-    });
-
-    it("should navigate to reports list after successful create", async () => {
-      ({ wrapper, mockRouter } = mountComponent());
-      await flushPromises();
-      setupValidForm(wrapper);
-
-      await wrapper.vm.saveReport();
-      await flushPromises();
-
-      // goToReports uses router.replace (not push)
-      expect(mockRouter.replace).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "reports" }),
-      );
-    });
-  });
-
-  // ── saveReport (update) ──────────────────────────────────────────────────
-
-  describe("saveReport — edit mode", () => {
-    it("should call updateReport when editing", async () => {
-      ({ wrapper } = mountComponent({ name: "existing-report" }));
-      await flushPromises();
-
-      // setupEditingReport blanks dashboard fields; set them for validation to pass
-      wrapper.vm.formData.dashboards[0].folder = "folder-1";
-      wrapper.vm.formData.dashboards[0].dashboard = "dash-1";
-      wrapper.vm.formData.dashboards[0].tabs = "tab-1";
-      wrapper.vm.emails = "user@example.com";
-      wrapper.vm.scheduling = { date: "01-01-2025", time: "10:00", timezone: "UTC" };
-      wrapper.vm.formData.title = "Updated Title";
-      wrapper.vm.addReportFormRef = { validate: vi.fn().mockResolvedValue(true) };
-
-      await wrapper.vm.saveReport();
-      await flushPromises();
-
-      expect(vi.mocked(reports.updateReport)).toHaveBeenCalled();
-    });
-  });
-
-  // ── validateReportData ───────────────────────────────────────────────────
-
-  describe("validateReportData", () => {
-    it("should set step to 1 when folder is missing", async () => {
-      ({ wrapper } = mountComponent());
-      await flushPromises();
-      wrapper.vm.formData.dashboards[0].folder = "";
-      wrapper.vm.step = 2;
-      await wrapper.vm.validateReportData();
-      expect(wrapper.vm.step).toBe(1);
-    });
-
-    it("should set step to 1 when dashboard is missing", async () => {
-      ({ wrapper } = mountComponent());
-      await flushPromises();
-      wrapper.vm.formData.dashboards[0].folder = "folder-1";
-      wrapper.vm.formData.dashboards[0].dashboard = "";
-      wrapper.vm.step = 2;
-      await wrapper.vm.validateReportData();
-      expect(wrapper.vm.step).toBe(1);
-    });
-
-    it("should set step to 1 when tabs are missing", async () => {
-      ({ wrapper } = mountComponent());
-      await flushPromises();
-      wrapper.vm.formData.dashboards[0].folder = "folder-1";
-      wrapper.vm.formData.dashboards[0].dashboard = "dash-1";
-      wrapper.vm.formData.dashboards[0].tabs = "";
-      wrapper.vm.step = 2;
-      await wrapper.vm.validateReportData();
-      expect(wrapper.vm.step).toBe(1);
-    });
-
-    it("should set step to 3 when title is missing", async () => {
-      ({ wrapper } = mountComponent());
-      await flushPromises();
-      wrapper.vm.formData.name = "valid-name";
-      wrapper.vm.formData.dashboards[0].folder = "folder-1";
-      wrapper.vm.formData.dashboards[0].dashboard = "dash-1";
-      wrapper.vm.formData.dashboards[0].tabs = "tab-1";
-      wrapper.vm.formData.start = 1000;
-      wrapper.vm.formData.frequency = { interval: 1, type: "once", cron: "" };
-      wrapper.vm.formData.title = "";
-      wrapper.vm.emails = "valid@example.com";
-      wrapper.vm.scheduling = { date: "01-01-2025", time: "10:00", timezone: "UTC" };
-      wrapper.vm.step = 1;
-      await wrapper.vm.validateReportData();
-      expect(wrapper.vm.step).toBe(3);
-    });
-  });
-
-  // ── isValidName computed ─────────────────────────────────────────────────
-
-  describe("isValidName computed", () => {
-    it("should return true for a valid alphanumeric name", async () => {
-      ({ wrapper } = mountComponent());
-      await flushPromises();
-      wrapper.vm.formData.name = "valid-report_1";
-      expect(wrapper.vm.isValidName).toBe(true);
-    });
-
-    it("should return false when name contains spaces", async () => {
-      ({ wrapper } = mountComponent());
-      await flushPromises();
-      wrapper.vm.formData.name = "invalid name";
-      expect(wrapper.vm.isValidName).toBe(false);
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+      const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
+      expect(payload.dashboards[0].variables).toEqual([
+        { key: "env", value: "prod" },
+      ]);
     });
   });
 });

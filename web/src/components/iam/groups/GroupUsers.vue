@@ -15,21 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex flex-col h-full">
     <div
       data-test="iam-users-selection-filters"
-      class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
+      class="flex justify-start px-3 py-2 card-container flex-shrink-0"
     >
-      <div data-test="iam-users-selection-show-toggle" class="tw:mr-3">
-        <div class="tw:flex tw:items-center">
+      <div data-test="iam-users-selection-show-toggle" class="mr-3">
+        <div class="flex items-center">
           <span
             data-test="iam-users-selection-show-text"
             style="font-size: 14px"
           >
-            Show
+            {{ t("iam.groupUsers.show") }}
           </span>
           <OToggleGroup
-            class="tw:ml-1"
+            class="ml-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -47,18 +47,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="iam-users-selection-search-input"
-        class="tw:mr-3"
+        class="mr-3"
       >
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="tw:h-[36px] tw:w-[200px]"
-          placeholder="Search User"
+          class="h-[36px] w-[200px]"
+          :placeholder="t('iam.groupUsers.searchUser')"
         />
       </div>
 
       <div
-          class="tw:mx-2 current-organization"
+          class="mx-2 current-organization"
         >
         <OSelect
           v-if="
@@ -73,12 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchable
           class="organizationlist"
           @update:model-value="updateOrganization"
-          placeholder="Select Organization"
+          :placeholder="t('iam.groupUsers.selectOrganization')"
         />
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
+    <div data-test="iam-users-selection-table" class="flex-1 min-h-0 card-container">
       <OTable
         :data="rows"
         :columns="columns"
@@ -101,24 +101,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             :data-test="`iam-users-selection-table-body-row-${row.email}-checkbox`"
             :model-value="row.isInGroup"
-            class="filter-check-box tw:cursor-pointer"
+            class="filter-check-box cursor-pointer"
             @update:model-value="toggleUserSelection(row)"
           />
         </template>
         <template #cell-email="{ row }">
-          <div class="tw:flex tw:items-center">
+          <div class="flex items-center">
             <OUserCell :value="row.email" />
             <OTooltip v-if="shouldShowWarning(row)" side="right">
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
+                class="ml-1 cursor-pointer"
                 :data-test="`iam-external-user-warning-icon-${row.email}`"
               />
               <template #content>
                 <div style="font-size: 12px; line-height: 1.5;">
                   <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
-                  <div class="tw:mt-1">{{ t("iam.externalUserWarningMessage") }}</div>
+                  <div class="mt-1">{{ t("iam.externalUserWarningMessage") }}</div>
                 </div>
               </template>
             </OTooltip>
@@ -194,16 +194,17 @@ const rows: Ref<any[]> = ref([]);
 const usersDisplay = ref("selected");
 
 const store = useStore();
-const orgOptions = ref([{ label: "All", value: "all" }]);
+const { t } = useI18n();
+const orgOptions = ref([{ label: t("iam.groupUsers.all"), value: "all" }]);
 const selectedOrg = ref(orgOptions.value[0]);
 const orgList = ref([...orgOptions.value]);
 const usersDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.groupUsers.all"),
     value: "all",
   },
   {
-    label: "Selected",
+    label: t("iam.groupUsers.selected"),
     value: "selected",
   },
 ];
@@ -216,7 +217,6 @@ const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
     );
   });
 };
-const { t } = useI18n();
 
 const userSearchKey = ref("");
 
@@ -257,7 +257,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   if (store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org) {
     baseColumns.push({
       id: "organization",
-      header: "Organizations",
+      header: t("iam.groupUsers.organizations"),
       accessorKey: "org",
       sortable: true,
       resizable: true,
@@ -293,7 +293,7 @@ onBeforeMount(async () => {
     otherOrgOptions.sort((a:any, b:any) => a.label.localeCompare(b.label));
 
     // Prepend "All" option to the sorted list
-    orgOptions.value = [{ label: "All", value: "all" }, ...otherOrgOptions];
+    orgOptions.value = [{ label: t("iam.groupUsers.all"), value: "all" }, ...otherOrgOptions];
   }
   selectedOrg.value = orgOptions.value[0]; // Default to "All"
 });

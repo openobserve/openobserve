@@ -71,11 +71,14 @@ export class IngestionTokensPage {
     }
 
     async fillTokenName(name) {
-        await this.page.getByRole('textbox', { name: 'Name *' }).fill(name);
+        // Migration: the label now uses the `required` prop (the `*` is
+        // aria-hidden), so the input's accessible name is "Name" not "Name *".
+        // Target it by data-test instead of role-name.
+        await this.page.locator('[data-test="ingestion-token-name-input"] input').fill(name);
     }
 
     async fillTokenDescription(desc) {
-        await this.page.getByRole('textbox', { name: 'Description' }).fill(desc);
+        await this.page.locator('[data-test="ingestion-token-description-input"] input').fill(desc);
     }
 
     async clickCreate() {

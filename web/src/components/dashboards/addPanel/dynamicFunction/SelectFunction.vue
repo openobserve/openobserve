@@ -1,32 +1,32 @@
 <template>
-  <div class="tw:flex tw:flex-col">
-    <div class="tw:w-60 tw:flex-none">
+  <div class="flex flex-col">
+    <div class="w-60 flex-none">
       <OSelect
         v-model="fields.functionName"
-        label="Select Function"
+        :label="t('dashboard.selectFunction.selectFunction')"
         label-position="inside"
         :options="filteredFunctions"
         data-test="dashboard-function-dropdown"
-        class="tw:w-full"
+        class="w-full"
         @search="onFunctionSearch"
       />
     </div>
-    <div class="tw:w-full tw:mt-2">
+    <div class="w-full mt-2">
       <!-- Loop through the args for the first n-1 arguments -->
-      <div class="tw:w-full">
+      <div class="w-full">
         <div
           v-for="(arg, argIndex) in fields.args"
           :key="argIndex + '-' + arg.type"
-          class="tw:w-full tw:flex tw:flex-col"
+          class="w-full flex flex-col"
         >
           <div
-            class="tw:flex"
+            class="flex"
             :style="{ marginLeft: isChild ? '-48px' : '0px' }"
           >
-            <div class="tw:mr-2 tw:relative tw:w-3" style="min-height: 50px">
+            <div class="mr-2 relative w-3" style="min-height: 50px">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="tw:absolute tw:top-0 tw:w-px tw:bg-[#001495] tw:opacity-50"
+                class="absolute top-0 w-px bg-[#001495] opacity-50"
                 :style="{
                   bottom:
                     argIndex === fields.args.length - 1
@@ -37,18 +37,18 @@
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="tw:absolute" style="top: 30px; left: 5px">
+              <div class="absolute" style="top: 30px; left: 5px">
                 <SubTaskArrow />
               </div>
             </div>
 
-            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-              <div class="tw:flex tw:items-center tw:gap-x-2">
+            <div class="flex flex-col flex-1 min-w-0">
+              <div class="flex items-center gap-x-2">
                 <label :for="'arg-' + argIndex">{{
                   getParameterLabel(fields.functionName, argIndex)
                 }}</label>
               </div>
-              <div class="tw:flex tw:items-start">
+              <div class="flex items-start">
                 <!-- type selector -->
                 <OSelect
                   v-model="fields.args[argIndex].type"
@@ -61,7 +61,7 @@
                   "
                   icon-key="icon"
                   label-position="inside"
-                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5 tw:w-fit! tw:flex-none!"
+                  class="o2-custom-select-dashboard arg-type-select mr-0.5 w-fit! flex-none!"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
@@ -75,7 +75,7 @@
                 </OSelect>
                 <!-- Left field selector using StreamFieldSelect -->
                 <div
-                  class="tw:w-52"
+                  class="w-52"
                   v-if="fields.args[argIndex]?.type === 'field'"
                 >
                   <StreamFieldSelect
@@ -87,13 +87,13 @@
 
                 <div
                   v-if="fields.args[argIndex]?.type === 'string'"
-                  class="tw:w-52 tw:flex-none"
+                  class="w-52 flex-none"
                 >
                   <OInput
                     type="text"
                     v-model="fields.args[argIndex].value"
-                    placeholder="Enter string"
-                    class="tw:w-full"
+                    :placeholder="t('dashboard.selectFunction.enterString')"
+                    class="w-full"
                     :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
                   />
                 </div>
@@ -102,15 +102,15 @@
                   v-if="fields.args[argIndex]?.type === 'number'"
                   type="number"
                   v-model.number="fields.args[argIndex].value"
-                  placeholder="Enter number"
-                  class="tw:w-52"
+                  :placeholder="t('dashboard.selectFunction.enterNumber')"
+                  class="w-52"
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
 
                 <!-- histogram interval for sql queries -->
                 <div
                   v-if="fields.args[argIndex]?.type === 'histogramInterval'"
-                  class="tw:w-52 tw:flex-none"
+                  class="w-52 flex-none"
                 >
                   <HistogramIntervalDropDown
                     :model-value="fields.args[argIndex].value"
@@ -119,7 +119,7 @@
                         fields.args[argIndex].value = newValue;
                       }
                     "
-                    class="tw:w-full"
+                    class="w-full"
                     :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
                   />
                 </div>
@@ -156,16 +156,17 @@
       variant="outline"
       size="sm"
       @click="addArgument()"
-      class="tw:mt-3"
+      class="mt-3"
       :data-test="`dashboard-function-dropdown-add-argument-button`"
     >
-      + Add
+      + {{ t('dashboard.selectFunction.add') }}
     </OButton>
   </div>
 </template>
 
 <script lang="ts">
 import { ref, watch, toRef, computed, inject } from "vue";
+import { useI18n } from "vue-i18n";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
@@ -206,6 +207,7 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+    const { t } = useI18n();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -505,7 +507,7 @@ export default {
       const funcValidation: any = getValidationForFunction(functionName);
 
       if (!funcValidation) {
-        return `Parameter ${argIndex + 1}`;
+        return t("dashboard.selectFunction.parameter", { n: argIndex + 1 });
       }
 
       const argsValidation = funcValidation?.args || [];
@@ -520,11 +522,13 @@ export default {
 
       // Return the label from validation, or fallback to default
       return (
-        argsValidation[adjustedIndex]?.label || `Parameter ${argIndex + 1}`
+        argsValidation[adjustedIndex]?.label ||
+        t("dashboard.selectFunction.parameter", { n: argIndex + 1 })
       );
     };
 
     return {
+      t,
       fields,
       // availableFunctions,
       getValidationForFunction,
@@ -551,7 +555,7 @@ export default {
 
 <style>
 /* Make the trigger compact - only show the icon + chevron (no label text) */
-.arg-type-select span[class~="tw:flex-1"][class~="tw:truncate"] {
+.arg-type-select span[class~="flex-1"][class~="truncate"] {
   display: none !important;
 }
 

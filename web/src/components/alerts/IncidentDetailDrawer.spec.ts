@@ -21,7 +21,7 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-// Mock toast so tests don't need $q
+// Mock toast
 const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToast(...args),
@@ -57,8 +57,6 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-
-// Install Quasar globally
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -692,23 +690,23 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "This is **bold** text";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">bold</strong>');
+      expect(formatted).toContain('<strong class="font-semibold">bold</strong>');
     });
 
     it("should format h2 headers", () => {
       const content = "## Header 2";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-bold");
-      expect(formatted).toContain("tw:text-lg");
-      expect(formatted).toContain("tw:text-blue-600");
+      expect(formatted).toContain("font-bold");
+      expect(formatted).toContain("text-lg");
+      expect(formatted).toContain("text-blue-600");
     });
 
     it("should format h3 headers", () => {
       const content = "### Header 3";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-semibold");
+      expect(formatted).toContain("font-semibold");
     });
 
     it("should format unordered lists", () => {
@@ -732,8 +730,8 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">Issue</strong>');
-      expect(formatted).toContain("tw:font-bold");
+      expect(formatted).toContain('<strong class="font-semibold">Issue</strong>');
+      expect(formatted).toContain("font-bold");
       expect(formatted).toContain("rca-ul");
     });
   });

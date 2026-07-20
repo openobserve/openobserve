@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-center">
+  <div class="flex items-center">
     <!-- Compact mode: Simple toggle button with dropdown menu -->
     <ODropdown
       v-if="isCompact"
@@ -32,15 +32,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="update"
-            :class="isAnimating ? 'tw:![animation:rotate_2s_linear_infinite] tw:![transform-origin:center_center] tw:!inline-block' : ''"
+            :class="isAnimating ? '![animation:rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : ''"
             size="sm"
           />
           <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
         </OButton>
       </template>
-      <div class="tw:w-75 tw:p-2">
-        <div class="tw:flex">
-          <div class="tw:flex tw:flex-col tw:w-full tw:p-2" style="text-align: center">
+      <div class="w-75 p-2">
+        <div class="flex">
+          <div class="flex flex-col w-full p-2" style="text-align: center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
@@ -52,12 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <hr class="tw:border-0 tw:border-t tw:border-solid tw:border-(--o2-border) tw:my-0" />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="tw:flex">
+        <hr class="border-0 border-t border-solid border-(--o2-border) my-0" />
+        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="flex">
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
-            class="tw:flex tw:flex-col tw:w-1/3 tw:p-2"
+            class="flex flex-col w-1/3 p-2"
             style="text-align: center"
           >
             <OButton
@@ -94,25 +94,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="variant"
           size="sm-toolbar"
         >
-          <div class="tw:flex tw:items-center tw:flex-nowrap">
+          <div class="flex items-center flex-nowrap">
             <OIcon
               left
               name="update"
               size="sm"
               :class="[
-                isAnimating ? 'tw:![animation:rotate_2s_linear_infinite] tw:![transform-origin:center_center] tw:!inline-block' : '',
+                isAnimating ? '![animation:rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : '',
                 isAnimating ? 'text-primary' : '',
-                'tw:mr-0.5',
+                'mr-0.5',
               ]"
             />
-            <div class="tw:text-center tw:text-[0.8125rem] tw:leading-4">{{ selectedLabel }}</div>
-            <OIcon name="arrow-drop-down" size="sm" class="tw:ml-0.5" />
+            <div class="text-center text-[0.8125rem] leading-4">{{ selectedLabel }}</div>
+            <OIcon name="arrow-drop-down" size="sm" class="ml-0.5" />
           </div>
         </OButton>
       </template>
-      <div class="tw:w-75 tw:p-2">
-        <div class="tw:flex">
-          <div class="tw:flex tw:flex-col tw:w-full tw:p-2" style="text-align: center">
+      <div class="w-75 p-2">
+        <div class="flex">
+          <div class="flex flex-col w-full p-2" style="text-align: center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
@@ -130,11 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <ODropdownSeparator />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="tw:flex">
+        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="flex">
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
-            class="tw:flex tw:flex-col tw:w-1/3 tw:p-2"
+            class="flex flex-col w-1/3 p-2"
             style="text-align: center"
           >
             <OButton

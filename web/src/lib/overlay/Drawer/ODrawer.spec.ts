@@ -113,7 +113,7 @@ describe("ODrawer", () => {
       props: { open: true },
     });
     const content = wrapper.find("[data-o2-drawer]");
-    expect(content.classes().join(" ")).toContain("tw:right-0");
+    expect(content.classes().join(" ")).toContain("right-0");
   });
 
   it("applies left-side classes when side=left", () => {
@@ -121,7 +121,7 @@ describe("ODrawer", () => {
       props: { open: true, side: "left" },
     });
     const content = wrapper.find("[data-o2-drawer]");
-    expect(content.classes().join(" ")).toContain("tw:left-0");
+    expect(content.classes().join(" ")).toContain("left-0");
   });
 
   it("accepts open prop changes without error (controlled mode)", async () => {
@@ -149,8 +149,8 @@ describe("ODrawer", () => {
         slots: { "header-right": '<button data-testid="hr-btn">Action</button>' },
       });
       const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
-      expect(hrWrapper.className).toContain("tw:shrink-0");
-      expect(hrWrapper.className).not.toContain("tw:flex-1");
+      expect(hrWrapper.className).toContain("shrink-0");
+      expect(hrWrapper.className).not.toContain("flex-1");
     });
 
     it("spacer appears before header-right in DOM (keeps content right-aligned)", () => {
@@ -162,7 +162,7 @@ describe("ODrawer", () => {
       const headerEl = closeBtn.element.parentElement!;
       const children = Array.from(headerEl.children) as HTMLElement[];
       const spacer = children.find(
-        (el) => el.className.includes("tw:flex-1") && !el.className.includes("tw:min-w-0"),
+        (el) => el.className.includes("flex-1") && !el.className.includes("min-w-0"),
       );
       const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
       expect(spacer).toBeDefined();
@@ -178,7 +178,7 @@ describe("ODrawer", () => {
       // The close button is a direct child of the header div
       const closeBtn = wrapper.find('button[aria-label="Close drawer"]');
       const headerEl = closeBtn.element.parentElement;
-      expect(headerEl?.className).toContain("tw:shrink-0");
+      expect(headerEl?.className).toContain("shrink-0");
     });
 
     it("body has flex-1 and min-h-0 so it fills available space and the footer stays anchored", () => {
@@ -188,9 +188,9 @@ describe("ODrawer", () => {
       });
       const bodyContent = wrapper.find('[data-testid="body-content"]');
       const bodyEl = bodyContent.element.parentElement;
-      expect(bodyEl?.className).toContain("tw:flex-1");
-      expect(bodyEl?.className).toContain("tw:min-h-0");
-      expect(bodyEl?.className).toContain("tw:overflow-y-auto");
+      expect(bodyEl?.className).toContain("flex-1");
+      expect(bodyEl?.className).toContain("min-h-0");
+      expect(bodyEl?.className).toContain("overflow-y-auto");
     });
 
     it("footer has shrink-0 class (does not expand to fill space)", () => {
@@ -200,9 +200,9 @@ describe("ODrawer", () => {
       });
       const footerBtn = wrapper.find('[data-testid="footer-btn"]');
       const footerEl = footerBtn.element.parentElement;
-      expect(footerEl?.className).toContain("tw:shrink-0");
-      expect(footerEl?.className).not.toContain("tw:flex-1");
-      expect(footerEl?.className).not.toContain("tw:mt-auto");
+      expect(footerEl?.className).toContain("shrink-0");
+      expect(footerEl?.className).not.toContain("flex-1");
+      expect(footerEl?.className).not.toContain("mt-auto");
     });
   });
 

@@ -16,12 +16,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FieldListPagination from "./FieldListPagination.vue";
+import enLocaleFull from "@/locales/languages/en-US.json";
+
+// Resolve real locale messages so migrated i18n keys render actual text
+// (with {placeholder} interpolation) instead of the raw key path.
+const resolveMessage = (key: string): unknown =>
+  key
+    .split(".")
+    .reduce<any>((obj, part) => (obj == null ? undefined : obj[part]), enLocaleFull);
 
 vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) => {
+      const message = resolveMessage(key);
+      if (typeof message !== "string") return key;
+      if (!params) return message;
+      return message.replace(/\{(\w+)\}/g, (match, name) =>
+        params[name] != null ? String(params[name]) : match
+      );
+    },
+  }),
 }));
 
-const quasarStubs = {
+const componentStubs = {
   OToggleGroup: {
     name: "OToggleGroup",
     template:
@@ -87,7 +104,7 @@ function createWrapper(props = {}) {
   return mount(FieldListPagination, {
     props: { ...defaultProps, ...props },
     global: {
-      stubs: quasarStubs,
+      stubs: componentStubs,
     },
   });
 }
@@ -439,7 +456,7 @@ describe("FieldListPagination", () => {
       const page2Btn = wrapper.find(
         '[data-test="logs-page-fields-list-pagination-page-2-button"]'
       );
-      expect(page2Btn.classes()).toContain("tw:bg-button-primary");
+      expect(page2Btn.classes()).toContain("bg-button-primary");
     });
 
     it("does not apply active class to non-current page buttons", () => {
@@ -452,7 +469,7 @@ describe("FieldListPagination", () => {
       const page1Btn = wrapper.find(
         '[data-test="logs-page-fields-list-pagination-page-1-button"]'
       );
-      expect(page1Btn.classes()).not.toContain("tw:bg-button-primary");
+      expect(page1Btn.classes()).not.toContain("bg-button-primary");
     });
   });
 
@@ -477,7 +494,7 @@ describe("FieldListPagination", () => {
     it("applies flex layout when showUserDefinedSchemaToggle is true", () => {
       const wrapper = createWrapper({ showUserDefinedSchemaToggle: true });
       const container = wrapper.find("div");
-      expect(container.classes()).toContain("tw:flex");
+      expect(container.classes()).toContain("flex");
     });
 
     it("applies flex layout when showQuickMode is true", () => {
@@ -486,7 +503,7 @@ describe("FieldListPagination", () => {
         showQuickMode: true,
       });
       const container = wrapper.find("div");
-      expect(container.classes()).toContain("tw:flex");
+      expect(container.classes()).toContain("flex");
     });
 
     it("does not apply flex layout when both toggles are false", () => {
@@ -495,7 +512,7 @@ describe("FieldListPagination", () => {
         showQuickMode: false,
       });
       const container = wrapper.find("div");
-      expect(container.classes()).not.toContain("tw:flex");
+      expect(container.classes()).not.toContain("flex");
     });
   });
 

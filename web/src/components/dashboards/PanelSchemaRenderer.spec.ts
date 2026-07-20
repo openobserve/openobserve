@@ -17,9 +17,6 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 
-// Quasar was removed entirely — no Quasar plugin mock required.
-// (Dialog.create / exportFile no longer used in the component.)
-
 // Mock all the heavy dependencies
 vi.mock("@/composables/dashboard/usePanelDataLoader", () => ({
   usePanelDataLoader: vi.fn(() => ({
@@ -165,6 +162,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { copyToClipboard } from "@/utils/clipboard";
+import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 
 
 describe("PanelSchemaRenderer", () => {
@@ -607,22 +605,12 @@ describe("PanelSchemaRenderer", () => {
   });
 
   describe("Download Functionality", () => {
-    let mockExportFile: any;
     let mockShowErrorNotification: any;
     let mockShowPositiveNotification: any;
 
     beforeEach(() => {
-      mockExportFile = vi.fn().mockReturnValue(true);
       mockShowErrorNotification = vi.fn();
       mockShowPositiveNotification = vi.fn();
-
-      vi.doMock("quasar", async (importOriginal) => {
-        const actual = await importOriginal();
-        return {
-          ...actual,
-          exportFile: mockExportFile,
-        };
-      });
     });
 
     it("should have downloadDataAsCSV method", () => {
@@ -687,7 +675,7 @@ describe("PanelSchemaRenderer", () => {
       // Mock the data for the component
       wrapper.vm.data = { value: mockPromQLData };
 
-      // Mock the quasar exportFile function to return true
+      // Mock the exportFile function to return true
       const originalExportFile = vi.fn().mockReturnValue(true);
 
       // Mock showPositiveNotification
@@ -2315,7 +2303,7 @@ describe("PanelSchemaRenderer", () => {
       },
     ];
 
-    const mountMetric = async (series = metricSeries()) => {
+    const mountMetric = async (series: any[] = metricSeries()) => {
       const w = createWrapper({
         panelSchema: { ...defaultProps.panelSchema, type: "metric" },
       });
@@ -2341,7 +2329,15 @@ describe("PanelSchemaRenderer", () => {
     });
 
     it("hides the copy button for zero-valued metrics", async () => {
-      const layout = { left: 0, top: 0, width: 100, height: 40, cx: 50 };
+      const layout = {
+        left: 0,
+        top: 0,
+        width: 100,
+        height: 40,
+        cx: 50,
+        cy: 20,
+        fontSize: 12,
+      };
       wrapper = await mountMetric([
         { _metricText: "0", _metricLayout: { ...layout } },
         { _metricText: "0.00", _metricLayout: { ...layout } },
@@ -2375,9 +2371,9 @@ describe("PanelSchemaRenderer", () => {
     it("positions the icon beside the number, clamped inside the cell", async () => {
       wrapper = await mountMetric();
       const style = wrapper.vm.metricIconStyle(wrapper.vm.metricItems[0]);
-      // jsdom has no layout so calculateWidthText returns 0:
-      // left = (cx 100 - left 0) + 0/2 + 2 = 102; maxLeft = 200 - 28 - 2 = 170.
-      expect(style.left).toBe("102px");
+      // left = cx (100) + measured text width / 2 + 2px gap, inside the cell
+      const textWidth = calculateWidthText("1.50KB", "24px");
+      expect(style.left).toBe(`${100 + textWidth / 2 + 2}px`);
       expect(style.top).toBe("50px");
       expect(style.transform).toBe("translateY(-50%)");
     });

@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0"
+  <div class="p-0"
   >
     <AppPageHeader
       :back="{
         label: t('pipeline_destinations.header'),
         onClick: () => emit('cancel'),
       }"
-      class="tw:rounded-lg tw:px-3 tw:border-b tw:border-border-default"
+      class="px-3 border-b border-border-default"
     >
       <template #title>
         <span data-test="pipeline-destination-editor-title">
@@ -35,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="tw:rounded-lg tw:py-2 tw:px-3 tw:overflow-auto">
-      <div class="tw:w-full">
+    <div class="rounded-lg py-2 px-3 overflow-auto">
+      <div class="w-full">
         <CreateDestinationForm
           :destination="destination"
           @created="handleDestinationCreated"

@@ -15,85 +15,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:py-6">
-    <div class="tw:flex tw:justify-between tw:items-start tw:relative tw:max-w-[1200px] tw:mx-auto tw:px-4 stepper-container">
+  <div class="w-full py-6">
+    <div class="flex justify-between items-start relative max-w-[1200px] mx-auto px-4 stepper-container">
       <div
         v-for="(step, index) in steps"
         :key="step.id"
-        class="step-item tw:flex tw:flex-col tw:items-center tw:flex-1 tw:relative tw:cursor-pointer tw:transition-all tw:duration-300 tw:ease-in-out"
+        class="step-item flex flex-col items-center flex-1 relative cursor-pointer transition-all duration-300 ease-in-out"
         :class="{
           'step-active': currentStep === step.id,
           'step-completed': completedSteps.includes(step.id),
           'step-disabled': !canNavigateToStep(step.id),
           'step-error': step.hasError,
-          'tw:cursor-not-allowed tw:opacity-50': !canNavigateToStep(step.id)
+          'cursor-not-allowed opacity-50': !canNavigateToStep(step.id)
         }"
         @click="handleStepClick(step.id)"
       >
         <!-- Step indicator -->
-        <div class="step-indicator-wrapper tw:flex tw:items-center tw:w-full tw:relative">
+        <div class="step-indicator-wrapper flex items-center w-full relative">
           <div
-            class="step-indicator tw:w-[40px] tw:h-[40px] tw:rounded-full tw:flex tw:items-center tw:justify-center tw:font-semibold tw:text-base tw:transition-all tw:duration-300 tw:ease-in-out tw:relative tw:z-[2] tw:shrink-0 tw:border-2"
+            class="step-indicator w-[40px] h-[40px] rounded-full flex items-center justify-center font-semibold text-base transition-all duration-300 ease-in-out relative z-[2] shrink-0 border-2"
             :class="
               step.hasError
-                ? 'tw:bg-[#d32f2f] tw:text-white tw:border-[#d32f2f]'
+                ? 'bg-[#d32f2f] text-white border-[#d32f2f]'
                 : completedSteps.includes(step.id) && currentStep !== step.id
-                  ? 'tw:bg-[#2e7d32] tw:text-white tw:border-[#2e7d32]'
+                  ? 'bg-[#2e7d32] text-white border-[#2e7d32]'
                   : currentStep === step.id
                     ? isDarkMode
-                      ? 'tw:bg-[#1976d2] tw:text-white tw:border-[#1976d2] tw:shadow-[0_0_0_4px_rgba(25,118,210,0.2)]'
-                      : 'tw:bg-[#1976d2] tw:text-white tw:border-[#1976d2] tw:shadow-[0_0_0_4px_rgba(25,118,210,0.1)]'
+                      ? 'bg-[#1976d2] text-white border-[#1976d2] shadow-[0_0_0_4px_rgba(25,118,210,0.2)]'
+                      : 'bg-[#1976d2] text-white border-[#1976d2] shadow-[0_0_0_4px_rgba(25,118,210,0.1)]'
                     : isDarkMode
-                      ? 'tw:bg-[#424242] tw:text-[#9e9e9e] tw:border-[#616161]'
-                      : 'tw:bg-[#f5f5f5] tw:text-[#757575] tw:border-[var(--o2-border)]'
+                      ? 'bg-[#424242] text-[#9e9e9e] border-[#616161]'
+                      : 'bg-[#f5f5f5] text-[#757575] border-[var(--o2-border)]'
             "
           >
             <OIcon
               v-if="completedSteps.includes(step.id) && currentStep !== step.id"
               name="check"
               size="sm"
-              class="tw:text-white"
+              class="text-white"
             />
             <OIcon
               v-else-if="step.hasError"
               name="error-outline"
               size="sm"
-              class="tw:text-white"
+              class="text-white"
             />
             <span v-else>{{ index + 1 }}</span>
           </div>
           <!-- Connector line -->
           <div
             v-if="index < steps.length - 1"
-            class="step-connector tw:flex-1 tw:h-[2px] tw:mx-2 tw:transition-all tw:duration-300 tw:ease-in-out"
+            class="step-connector flex-1 h-[2px] mx-2 transition-all duration-300 ease-in-out"
             :class="
               completedSteps.includes(step.id)
-                ? 'tw:bg-[#2e7d32]'
+                ? 'bg-[#2e7d32]'
                 : isDarkMode
-                  ? 'tw:bg-[#616161]'
-                  : 'tw:bg-[var(--o2-border)]'
+                  ? 'bg-[#616161]'
+                  : 'bg-[var(--o2-border)]'
             "
           ></div>
         </div>
 
         <!-- Step label -->
-        <div class="step-label tw:mt-3 tw:text-center tw:max-w-[150px]">
+        <div class="step-label mt-3 text-center max-w-[150px]">
           <div
-            class="tw:text-sm tw:font-semibold tw:mb-1"
+            class="text-sm font-semibold mb-1"
             :class="
               currentStep === step.id
                 ? isDarkMode
-                  ? 'tw:text-white'
-                  : 'tw:text-[#1976d2] tw:font-bold'
+                  ? 'text-white'
+                  : 'text-[#1976d2] font-bold'
                 : isDarkMode
-                  ? 'tw:text-[var(--o2-border)]'
-                  : 'tw:text-[#424242]'
+                  ? 'text-[var(--o2-border)]'
+                  : 'text-[#424242]'
             "
           >{{ step.label }}</div>
           <div
             v-if="step.description"
-            class="tw:text-xs tw:opacity-70"
-            :class="isDarkMode ? 'tw:text-[#bdbdbd]' : 'tw:text-[#757575]'"
+            class="text-xs opacity-70"
+            :class="isDarkMode ? 'text-[#bdbdbd]' : 'text-[#757575]'"
           >
             {{ step.description }}
           </div>

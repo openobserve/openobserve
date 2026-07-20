@@ -51,7 +51,7 @@ const props = withDefaults(
     /** Hide the content when the trigger scrolls out of view (Floating UI). */
     hideWhenDetached?: boolean;
     ariaLabel?: string;
-    /** Content stacking order. Default sits above the Quasar header/drawer (2000/3000). */
+    /** Content stacking order. Default sits above the app header/drawer (2000/3000). */
     zIndex?: number;
     /** Extra classes merged onto the content surface. */
     contentClass?: string;
@@ -217,14 +217,14 @@ onBeforeUnmount(() => {
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[
-          'tw:outline-none',
+          'outline-none',
           // Surface
-          'tw:bg-dropdown-bg tw:border tw:border-dropdown-border tw:rounded-lg tw:shadow-md',
+          'bg-dropdown-bg border border-dropdown-border rounded-lg shadow-md',
           // Open/close reveal animation (matches ODropdown)
-          'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-          'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+          'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+          'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           contentClass,
         ]"
       >

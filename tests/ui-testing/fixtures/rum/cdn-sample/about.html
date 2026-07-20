@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About — OpenObserve RUM CDN Sample</title>
+
+  <link rel="preconnect" href="https://browsersdk.openobserve.ai" crossorigin />
+  <link rel="dns-prefetch" href="https://browsersdk.openobserve.ai" />
+
+  <!-- Same RUM + Logs async loader stub as every page -->
+  <script>
+    (function (h, o, u, n, g) {
+      h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
+      var s = o.createElement(u); s.async = 1; s.src = n;
+      var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-logs.js', 'OO_LOGS');
+    (function (h, o, u, n, g) {
+      h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
+      var s = o.createElement(u); s.async = 1; s.src = n;
+      var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-rum.js', 'OO_RUM');
+  </script>
+
+  <script src="./oo-rum.js"></script>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <nav class="site-nav" aria-label="Primary">
+    <span class="brand">O2 RUM Demo</span>
+    <a href="./index.html" data-test="nav-home-link">Home</a>
+    <a href="./products.html" data-test="nav-products-link">Products</a>
+    <a href="./checkout.html" data-test="nav-checkout-link">Checkout</a>
+    <a href="./about.html" data-test="nav-about-link" aria-current="page">About</a>
+  </nav>
+
+  <main>
+    <h1>About this demo</h1>
+    <p class="sub">A static multi-page site instrumented with OpenObserve RUM + Logs via the CDN.</p>
+
+    <section>
+      <h2>What gets captured</h2>
+      <ul>
+        <li>A RUM <strong>view</strong> for every page you open (Home, Products, Checkout, About).</li>
+        <li>A continuous <strong>Session Replay</strong> across those navigations.</li>
+        <li><strong>User actions</strong>, <strong>resource timing</strong>, <strong>long tasks</strong>, and <strong>errors</strong>.</li>
+        <li>Structured <strong>logs</strong> sent through the Logs SDK.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Generate a failed resource</h2>
+      <p>This triggers a 404 resource error, visible in RUM error tracking.</p>
+      <div class="row">
+        <button data-test="about-broken-resource-btn" onclick="window.aboutDemo.loadBrokenResource()">
+          Load missing image
+        </button>
+      </div>
+      <div id="about-result" data-test="about-result" class="status"></div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      window.aboutDemo = {
+        loadBrokenResource: function () {
+          var img = new Image();
+          img.onerror = function () {
+            document.getElementById('about-result').textContent =
+              'Image failed to load (404) — captured as a resource error.';
+            if (window.OO_LOGS) window.OO_LOGS.onReady(function () {
+              window.OO_LOGS.logger.error('Failed to load image asset');
+            });
+          };
+          img.src = './assets/this-image-does-not-exist-' + Date.now() + '.png';
+          document.body.appendChild(img);
+        },
+      };
+    })();
+  </script>
+</body>
+</html>

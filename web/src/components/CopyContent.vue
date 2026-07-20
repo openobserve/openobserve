@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:relative tw:rounded-lg tw:overflow-hidden copy-content-block" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(255,255,255,0.06)]' : 'tw:bg-[rgba(0,0,0,0.05)]'">
-    <div class="tw:absolute tw:top-2 tw:right-2 tw:z-10">
+  <div class="relative rounded-lg overflow-hidden copy-content-block" :class="store.state.theme === 'dark' ? 'bg-[rgba(255,255,255,0.06)]' : 'bg-[rgba(0,0,0,0.05)]'">
+    <div class="absolute top-2 right-2 z-10">
       <OButton
         data-test="rum-copy-btn"
         variant="ghost"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip content="Copy" side="top" />
       </OButton>
     </div>
-    <pre data-test="rum-content-text" class="tw:text-sm tw:whitespace-pre-wrap tw:wrap-break-word tw:m-0 tw:p-3 tw:pr-10 tw:leading-5">{{ computedContent }}</pre>
+    <pre data-test="rum-content-text" class="text-sm whitespace-pre-wrap wrap-break-word m-0 p-3 pr-10 leading-5">{{ computedContent }}</pre>
   </div>
 </template>
 

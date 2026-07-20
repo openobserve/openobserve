@@ -171,8 +171,10 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     // Ensure we start without a metrics_data blob in URL
     const hasBlobBefore = await pm.metricsPage.hasMetricsDataParam();
     if (hasBlobBefore) {
-      // Re-navigate cleanly
-      const baseUrl = `${process.env.ZO_BASE_URL}/web/metrics`;
+      // Re-navigate cleanly. Must target the editor explicitly: a bare
+      // `/metrics` carries no editor params, so it lands on the Metrics
+      // Explorer — which has no query bar for the Apply below to use.
+      const baseUrl = `${process.env.ZO_BASE_URL}/web/metrics/editor`;
       const orgId = process.env.ORGNAME || 'default';
       await pm.metricsPage.navigateToMetricsUrl(`${baseUrl}?org_identifier=${orgId}`);
     }
@@ -420,8 +422,12 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
       testLogger.warn('Share success toast not detected after loading');
     });
 
-    // Loading should be cleared after completion
-    await page.waitForTimeout(500);
+    // Loading should be cleared after completion. Poll the real loading state until
+    // it clears rather than sleeping a fixed 500ms and asserting into a race.
+    await expect.poll(
+      async () => await pm.metricsPage.isShareButtonLoading(),
+      { timeout: 10000, intervals: [200, 400, 800] }
+    ).toBe(false);
     const isLoadingAfter = await pm.metricsPage.isShareButtonLoading();
     testLogger.info(`Share button loading after completion: ${isLoadingAfter}`);
     expect(isLoadingAfter).toBe(false);

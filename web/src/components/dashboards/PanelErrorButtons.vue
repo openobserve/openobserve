@@ -8,7 +8,7 @@
       (isPartialData && !isPanelLoading) ||
       (lastTriggeredAt && !viewOnly && !simplifiedPanelView)
     "
-    class="tw:flex tw:items-center tw:flex-nowrap"
+    class="flex items-center flex-nowrap"
   >
     <OButton
       v-if="error"
@@ -18,7 +18,7 @@
       icon-left="warning"
       data-test="panel-error-data"
     >
-      <OTooltip side="bottom" align="end" max-width="220px">
+      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
         <template #content><div style="white-space: pre-wrap">{{ error }}</div></template>
       </OTooltip>
     </OButton>
@@ -29,7 +29,7 @@
       icon-left="warning"
       data-test="panel-max-duration-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="220px">
+      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
         <template #content><div data-test="panel-max-duration-warning-content" style="white-space: pre-wrap">{{ maxQueryRangeWarning }}</div></template>
       </OTooltip>
     </OButton>
@@ -42,7 +42,7 @@
       <template #icon-left
         ><OIcon name="data-info-alert" size="sm"
       /></template>
-      <OTooltip side="bottom" align="end">
+      <OTooltip side="bottom" align="end" hoverable>
         <template #content><div style="white-space: pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template>
       </OTooltip>
     </OButton>
@@ -53,7 +53,7 @@
       icon-left="warning"
       data-test="panel-x-alias-inconsistency-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="260px">
+      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
         <template #content>
           <div style="white-space: pre-wrap">{{ t('dashboard.xAliasInconsistencyWarning') }}</div>
         </template>
@@ -68,7 +68,7 @@
       <template #icon-left
         ><OIcon name="running-with-errors" size="sm"
       /></template>
-      <OTooltip side="bottom" align="end" content="The data shown is cached and is different from the selected time range." />
+      <OTooltip side="bottom" align="end" hoverable :content="t('dashboard.panelErrorButtons.cachedDataDiffers')" />
     </OButton>
     <OButton
       v-if="isPartialData && !isPanelLoading"
@@ -79,24 +79,24 @@
       <template #icon-left
         ><OIcon name="clock-loader-20" size="sm"
       /></template>
-      <OTooltip side="bottom" align="end" content="The data shown is incomplete because the loading was interrupted. Refresh to load complete data." />
+      <OTooltip side="bottom" align="end" hoverable :content="t('dashboard.panelErrorButtons.partialData')" />
     </OButton>
 
     <!-- Universal Last Refreshed Clock Icon and Time -->
     <span
       v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
-      class="lastRefreshedAt tw:text-[smaller] tw:ml-1.25 tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
+      class="lastRefreshedAt text-[smaller] ml-1.25 whitespace-nowrap overflow-hidden text-ellipsis"
       data-test="panel-last-refreshed-at"
     >
-      <span class="lastRefreshedAtIcon tw:text-[smaller] tw:mr-0.5">
+      <span class="lastRefreshedAtIcon text-[smaller] mr-0.5">
         🕑
         <OTooltip side="bottom" align="end">
-          <template #content>Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" /></template>
+          <template #content>{{ t('dashboard.panelErrorButtons.lastRefreshed') }}<RelativeTime :timestamp="lastTriggeredAt" /></template>
         </OTooltip>
       </span>
       <RelativeTime
         :timestamp="lastTriggeredAt"
-        fullTimePrefix="Last Refreshed At: "
+        :fullTimePrefix="t('dashboard.panelErrorButtons.lastRefreshedAt')"
       />
     </span>
   </div>

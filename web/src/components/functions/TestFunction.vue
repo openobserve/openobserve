@@ -1,11 +1,11 @@
 <template>
   <div
     data-test="test-function-section"
-    class="tw:flex tw:items-center tw:flex-wrap tw:pb-2"
+    class="flex items-center flex-wrap pb-2"
   >
     <div
       data-test="test-function-query-section"
-      class="test-function-query-container tw:w-[100%]"
+      class="test-function-query-container w-[100%]"
     >
       <FullViewContainer
           data-test="test-function-query-title-section"
@@ -17,7 +17,7 @@
             <OIcon
               v-if="!!sqlQueryErrorMsg"
               name="info-outline"
-              class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+              class="text-red-600 mx-1 cursor-pointer"
               size="sm"
             >
               <OTooltip
@@ -35,26 +35,26 @@
               :disabled="!selectedStream.name || !inputQuery || loading.events"
               @click="getResults"
             >
-              <OIcon name="search" size="sm"  class="tw:mr-1" />
+              <OIcon name="search" size="sm"  class="mr-1" />
               {{ t('search.runQuery') }}
             </OButton>
           </template>
         </FullViewContainer>
         <div
-          class="tw:flex tw:items-center tw:flex-wrap tw:py-2 tw:w-[100%]"
+          class="flex items-center flex-wrap gap-x-3 py-2 w-[100%]"
           :class="
-            store.state.theme === 'dark' ? 'tw:bg-gray-950' : ' tw:bg-white'
+            store.state.theme === 'dark' ? 'bg-gray-950' : ' bg-white'
           "
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input tw:w-[120px] tw:pr-3">
+          <div class="function-stream-select-input w-[100px]">
             <div
-              class="tw:text-[12px]"
+              class="text-[12px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
+                  ? 'text-gray-200'
+                  : 'text-gray-700'
               "
             >
               {{ t("alerts.streamType") + " *" }}
@@ -69,13 +69,13 @@
               style="width: 100px"
             />
           </div>
-          <div class="function-stream-select-input tw:w-[300px]">
+          <div class="function-stream-select-input w-[300px]">
             <div
-              class="tw:text-[12px]"
+              class="text-[12px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
+                  ? 'text-gray-200'
+                  : 'text-gray-700'
               "
             >
               {{ t("alerts.stream_name") + " *" }}
@@ -91,13 +91,13 @@
               @update:model-value="updateQuery"
             />
           </div>
-          <div class="functions-duration-input tw:w-[330px]">
+          <div class="functions-duration-input w-[330px]">
             <div
-              class="tw:text-[12px]"
+              class="text-[12px]"
               :class="
                 store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
+                  ? 'text-gray-200'
+                  : 'text-gray-700'
               "
             >
               {{ t("common.duration") + " *" }}
@@ -105,7 +105,7 @@
 
             <DateTime
               label="Start Time"
-              class="tw:py-1 tw:w-full"
+              class="py-1 w-full"
               auto-apply
               :default-type="dateTime.type"
               :default-absolute-time="{
@@ -119,23 +119,23 @@
           </div>
 
           <div
-            class="tw:text-[12px] tw:w-[100%] tw:mt-1"
+            class="text-[12px] w-[100%] mt-1"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-200'
-                : 'tw:text-gray-700'
+                ? 'text-gray-200'
+                : 'text-gray-700'
             "
           >
             {{ t("common.query") + " *" }}
           </div>
           <div
-            class="tw:border-[1px] tw:border-gray-200 tw:relative tw:w-[100%]"
+            class="relative w-[100%]"
           >
             <query-editor
               data-test="vrl-function-test-sql-editor"
               ref="queryEditorRef"
               editor-id="test-function-query-input-editor"
-              class="tw:w-full tw:min-h-40"
+              class="w-full min-h-40"
               v-model:query="inputQuery"
               language="sql"
               :keywords="effectiveKeywords"
@@ -145,14 +145,14 @@
             />
             <div
               v-if="!inputQuery && queryEditorPlaceholderFlag"
-              class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:p-[0.1875rem_0.5rem_0_2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
+              class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
             >
-              <span class="query-editor-placeholder-typewriter tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis" :class="store.state.theme === 'dark' ? 'tw:text-[#718096]' : ''">{{ queryEditorPlaceholder }}</span>
+              <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] whitespace-nowrap overflow-hidden text-ellipsis" :class="store.state.theme === 'dark' ? 'text-[#718096]' : ''">{{ queryEditorPlaceholder }}</span>
             </div>
             <div
-              class="tw:text-red-500 tw:p-1 invalid-sql-error tw:min-h-[22px]"
+              class="text-red-500 p-1 invalid-sql-error min-h-[22px]"
             >
-              <span v-show="!!sqlQueryErrorMsg" class="tw:text-[13px]">
+              <span v-show="!!sqlQueryErrorMsg" class="text-[13px]">
                 Error: {{ sqlQueryErrorMsg }}</span
               >
             </div>
@@ -172,17 +172,17 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+            class="text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
           >
             <OSpinner size="xs" />
-            <div class="tw:relative tw:top-[2px]">
+            <div class="relative top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
           <OIcon
             v-if="!!eventsErrorMsg"
             name="info-outline"
-            class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+            class="text-red-600 mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
@@ -199,28 +199,28 @@
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24px"
             imageWidth="24px"
-            :class="'tw:px-2 tw:mr-4'"
+            :class="'px-2 mr-4'"
             style="width: 32px !important; height: 32px !important; min-width: 32px !important; min-height: 32px !important;"
            />
           </template>
       </FullViewContainer>
       <div
         v-show="expandState.events"
-        class="tw:border-[1px] tw:border-gray-200 tw:relative"
+        class="relative"
         data-test="test-function-input-editor-section"
       >
         <query-editor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
-          class="test-function-input-editor tw:w-full tw:min-h-40"
+          class="test-function-input-editor w-full min-h-40"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="inputEvents"
           language="json"
         />
       </div>
     </div>
-    <div class="tw:mt-2">
+    <div class="mt-2">
       <FullViewContainer
         name="function"
         v-model:is-expanded="expandState.output"
@@ -231,10 +231,10 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="tw:text-sm tw:font-medium text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+            class="text-sm font-medium text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
           >
             <OSpinner size="xs" />
-            <div class="tw:relative tw:top-[2px]">
+            <div class="relative top-[2px]">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
@@ -242,7 +242,7 @@
           <OIcon
             v-if="!!outputEventsErrorMsg"
             name="info-outline"
-            class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+            class="text-red-600 mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
@@ -257,24 +257,24 @@
 
       <div
         v-show="expandState.output"
-        class="tw:border-[1px] tw:border-gray-200 tw:relative"
+        class="relative"
         data-test="test-function-output-editor-section"
       >
         <div
           v-if="!outputEvents"
-          class="tw:absolute tw:z-10 tw:flex tw:flex-col tw:justify-center tw:items-center tw:w-full tw:h-full tw:opacity-90"
+          class="absolute z-10 flex flex-col justify-center items-center w-full h-full opacity-90"
         >
           <OIcon
             name="lightbulb"
             size="xl"
-            class="tw:text-orange-400"
+            class="text-orange-400"
           />
           <div
-            class="tw:text-[15px] tw:text-gray-600"
+            class="text-[15px]"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:text-gray-200'
-                : 'tw:text-gray-600'
+                ? 'text-gray-200'
+                : 'text-gray-600'
             "
           >
             {{ outputMessage }}
@@ -284,7 +284,7 @@
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
-          class="test-function-output-editor tw:w-full tw:min-h-40"
+          class="test-function-output-editor w-full min-h-40"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="outputEvents"
           language="json"
@@ -315,6 +315,10 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
@@ -377,11 +381,15 @@ const eventsErrorMsg = ref<string>("");
 
 const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
+// Server-error highlight ranges, forwarded to the SQL editor by the composable.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+
 const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
   useSqlEditorDiagnostics({
     queryEditorRef,
     sqlMode: computed(() => true),
     query: inputQuery,
+    externalErrors: sqlErrorRanges,
   });
 
 const onQueryEditorFocus = () => {
@@ -633,7 +641,7 @@ const getResults = async () => {
     .search({
       org_identifier: store.state.selectedOrganization.identifier,
       query,
-      page_type: "logs",
+      page_type: selectedStream.value.type,
     })
     .then((res: any) => {
       expandState.value.stream = false;
@@ -645,11 +653,24 @@ const getResults = async () => {
         2,
       );
       sqlQueryErrorMsg.value = "";
+      sqlErrorRanges.value = [];
     })
     .catch((err: any) => {
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
         : "Invalid SQL Query";
+
+      // Locate the offending token in the SQL and squiggle it in the editor.
+      rangesFromServerError({
+        code: err.response?.data?.code,
+        message: err.response?.data?.message,
+        errorDetail: err.response?.data?.error_detail,
+        sqlMode: true,
+        query: inputQuery.value,
+        streamName: selectedStream.value?.name,
+      }).then((ranges) => {
+        sqlErrorRanges.value = ranges;
+      });
 
       // Show error only if it is not real time alert
       // This case happens when user enters invalid query and then switches to real time alert

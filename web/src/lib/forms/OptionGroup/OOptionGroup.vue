@@ -48,8 +48,8 @@ const checkboxValue = computed<(string | number)[]>(() => {
 
 const optionLayoutClasses = computed(() =>
   props.orientation === "horizontal"
-    ? "tw:flex tw:flex-row tw:flex-wrap tw:gap-3"
-    : "tw:flex tw:flex-col tw:gap-2",
+    ? "flex flex-row flex-wrap gap-3"
+    : "flex flex-col gap-2",
 );
 
 function handleRadio(val: OptionPrimitive) {
@@ -64,21 +64,21 @@ function handleCheckbox(val: (string | number)[]) {
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-2 tw:w-full">
+  <div v-bind="wrapperAttrs" class="flex flex-col gap-2 w-full">
     <div
       v-if="$slots.label || label || $slots.tooltip"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1',
+        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
         disabled && 'o-input-label--disabled',
       ]"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help"
+        class="cursor-help"
       ><slot name="tooltip" /></OIcon>
     </div>
 
@@ -123,17 +123,17 @@ function handleCheckbox(val: (string | number)[]) {
       </div>
     </OCheckboxGroup>
 
-    <div v-if="effectiveError || helpText" class="tw:flex tw:items-center tw:gap-2">
+    <div v-if="effectiveError || helpText" class="flex items-center gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
-        class="tw:text-xs tw:text-option-group-error-text tw:leading-none"
+        class="text-xs text-option-group-error-text leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
       <span
         v-else-if="helpText"
-        class="tw:text-xs tw:text-option-group-label tw:leading-none"
+        class="text-xs text-option-group-label leading-none"
       >
         {{ helpText }}
       </span>

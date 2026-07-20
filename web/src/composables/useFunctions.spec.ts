@@ -29,10 +29,6 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-vi.mock("quasar", () => ({
-  useQuasar: vi.fn(() => ({})),
-}));
-
 vi.mock("@/services/jstransform", () => ({
   default: {
     list: vi.fn(),

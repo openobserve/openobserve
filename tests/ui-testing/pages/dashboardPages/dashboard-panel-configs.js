@@ -74,6 +74,9 @@ export default class DashboardPanelConfigs {
     this.overrideConfig = page.locator(
       '[data-test="dashboard-addpanel-config-override-config-add-btn"]'
     );
+    this.tableFiltering = page.locator(
+      '[data-test="dashboard-config-table-filtering"]'
+    );
 
     // Column Formatting dialog (override config)
     this.overrideDialog = page.locator(
@@ -381,6 +384,18 @@ export default class DashboardPanelConfigs {
     await this.overrideConfig.click();
   }
 
+  /** Toggle the "Filtering" switch (config.table_filtering) in the Table config section. */
+  async toggleTableFiltering() {
+    await this.scrollSidebarToElement(this.tableFiltering);
+    const innerBtn = this.tableFiltering.locator('[data-test$="-btn"]');
+    await innerBtn.click();
+  }
+
+  /** Returns true if column filtering is currently enabled. */
+  async isTableFilteringEnabled() {
+    return this.getToggleState(this.tableFiltering);
+  }
+
   /**
    * Open the Column Formatting dialog, add the first field, force it numeric so the
    * unit applies, select a unit, then save. Strictly data-test driven.
@@ -389,8 +404,25 @@ export default class DashboardPanelConfigs {
    */
   async configureOverrideWithUnit({ unitName = "Bytes" } = {}) {
     await this.openOverrideConfig();
+    await this.addFirstOverrideField();
 
-    // Add the first available field via the "Add field" dropdown
+    const unitSelect = this.getOverrideUnitSelect();
+    if (!(await unitSelect.isVisible().catch(() => false))) {
+      await this.selectFieldType("num");
+    }
+    await this.selectFormatUnit(unitName);
+
+    await this.overrideSaveBtn.click();
+    await this.overrideDialog.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+  }
+
+  /**
+   * Click "Add field" and select the first available field in the dropdown.
+   * The dropdown lists columns in panel order (x-axis/_timestamp first, then y-axis
+   * fields), so this targets the x-axis column — useful when a genuinely text/date
+   * column is wanted (e.g. auto/unique-color tests).
+   */
+  async addFirstOverrideField() {
     await this.overrideAddFieldBtn.waitFor({ state: "visible", timeout: 10000 });
     await this.overrideAddFieldBtn.click();
     const firstField = this.page
@@ -398,27 +430,43 @@ export default class DashboardPanelConfigs {
       .first();
     await firstField.waitFor({ state: "visible", timeout: 5000 });
     await firstField.click();
+  }
 
-    const unitSelect = this.page.locator('[data-test^="o2-format-unit-"]').first();
-    if (!(await unitSelect.isVisible().catch(() => false))) {
-      const numType = this.page
-        .locator('[data-test^="o2-format-field-type-num-"]')
-        .first();
-      await numType.waitFor({ state: "visible", timeout: 5000 });
-      await numType.click();
-    }
+  /**
+   * Click "Add field" and select the LAST available field in the dropdown — the
+   * y-axis value column in a single-y-field table panel (x-axis/_timestamp is always
+   * listed first). Use this when the column under test must be the numeric y-value.
+   */
+  async addLastOverrideField() {
+    await this.overrideAddFieldBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.overrideAddFieldBtn.click();
+    const fieldOptions = this.page.locator(
+      '[data-test^="dashboard-addpanel-config-add-field-"]'
+    );
+    await fieldOptions.first().waitFor({ state: "visible", timeout: 5000 });
+    await fieldOptions.last().click();
+  }
 
-    // Select the unit (OSelect forwards parent data-test to `*-option`)
+  /** Select a unit from the Value Formatting OSelect for the currently configured column. */
+  async selectFormatUnit(unitName) {
+    const unitSelect = this.getOverrideUnitSelect();
     await unitSelect.waitFor({ state: "visible", timeout: 5000 });
+    // OSelect's listbox virtualizes options regardless of list size (~19 unit
+    // options) — off-screen entries like "Custom" (the last one) aren't real DOM
+    // nodes until scrolled to. Type into the built-in search box instead, which
+    // narrows filteredOptions so the match renders immediately.
+    const parentDataTest = await unitSelect.getAttribute("data-test");
     await unitSelect.click();
-    const unitOption = this.page
-      .locator(`[data-test^="o2-format-unit-"][data-test$="-option"][data-test-label="${unitName}"]`)
-      .first();
+
+    const searchInput = this.page.locator(`[data-test="${parentDataTest}-search"]`);
+    await searchInput.waitFor({ state: "visible", timeout: 5000 });
+    await searchInput.fill(unitName);
+
+    const unitOption = this.page.locator(
+      `[data-test="${parentDataTest}-option"][data-test-label="${unitName}"]`
+    );
     await unitOption.waitFor({ state: "visible", timeout: 5000 });
     await unitOption.click();
-
-    await this.overrideSaveBtn.click();
-    await this.overrideDialog.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
   }
 
   /** Open the Column Formatting dialog and wait for it to be visible. */
@@ -435,6 +483,16 @@ export default class DashboardPanelConfigs {
     );
   }
 
+  /** "Add Rule" button for the currently configured column (Conditional Styling section). */
+  getAddConditionRuleBtn() {
+    return this.overrideDialog.locator('[data-test^="o2-format-add-rule-"]').first();
+  }
+
+  /** Custom unit input for the currently configured column (visible when unit = Custom). */
+  getCustomUnitInput() {
+    return this.overrideDialog.locator('[data-test^="o2-format-custom-unit-"]').first();
+  }
+
   /** Value-Formatting unit select of the selected field in the dialog. */
   getOverrideUnitSelect() {
     return this.overrideDialog.locator('[data-test^="o2-format-unit-"]').first();
@@ -444,6 +502,114 @@ export default class DashboardPanelConfigs {
   async closeOverrideConfig() {
     await this.overrideCancelBtn.click();
     await this.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
+  }
+
+  // ========== Column Formatting — field type / alignment / colors / conditional rules ==========
+  // All target the single field row added via configureOverrideWithUnit/openOverrideConfig
+  // + overrideAddFieldBtn, using attribute-prefix matches since the field alias is dynamic.
+
+  /** Select the field-type toggle (auto|num|text) for the currently configured column. */
+  async selectFieldType(type) {
+    const btn = this.overrideDialog
+      .locator(`[data-test^="o2-format-field-type-${type}-"]`)
+      .first();
+    await btn.waitFor({ state: "visible", timeout: 5000 });
+    await btn.click();
+  }
+
+  /** Fill the custom unit input (visible only when unit = Custom). */
+  async fillCustomUnit(value) {
+    const input = this.overrideDialog
+      .locator('[data-test^="o2-format-custom-unit-"]')
+      .first();
+    await input.waitFor({ state: "visible", timeout: 5000 });
+    await input.locator('[data-test$="-field"]').fill(value);
+  }
+
+  /**
+   * Set a color via the ColorSwatchPicker's native color input (the "custom" swatch),
+   * which accepts any hex value regardless of the curated swatch list.
+   * @param {"text"|"bg"} kind
+   * @param {string} hex
+   */
+  async setFormatColor(kind, hex) {
+    const wrapper = this.overrideDialog
+      .locator(`[data-test^="o2-format-${kind}-color-"]`)
+      .first();
+    await wrapper.waitFor({ state: "visible", timeout: 5000 });
+    const colorInput = wrapper.locator('input[type="color"]');
+    await colorInput.evaluate((el, value) => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value"
+      ).set;
+      setter.call(el, value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }, hex);
+  }
+
+  /** Toggle the auto/unique-value color checkbox for the currently configured column. */
+  async toggleAutoColor() {
+    const btn = this.overrideDialog
+      .locator('[data-test^="o2-format-unique-color-"]')
+      .first();
+    await btn.waitFor({ state: "visible", timeout: 5000 });
+    await btn.click();
+  }
+
+  /**
+   * Select alignment (auto|left|center|right). Alignment buttons have no data-test
+   * (verified against source); the second `.cf-seg` toggle group in the popup is
+   * Alignment (the first is Field Type).
+   */
+  async selectAlignment(label) {
+    const group = this.overrideDialog.locator(".cf-seg").nth(1);
+    await group.getByText(label, { exact: true }).click();
+  }
+
+  /** Click "Add Rule" to append a conditional styling rule for the current column. */
+  async addConditionalRule() {
+    const addBtn = this.overrideDialog
+      .locator('[data-test^="o2-format-add-rule-"]')
+      .first();
+    await addBtn.waitFor({ state: "visible", timeout: 5000 });
+    await addBtn.click();
+  }
+
+  /**
+   * Fill the threshold for the conditional rule at ruleIdx (default operator "<").
+   * The threshold OInput has no data-test; scoped via the rule row's `.w-28` container,
+   * located by walking up from the ruleIdx's text-color swatch (which does have a data-test).
+   */
+  async fillConditionThreshold(ruleIdx, threshold) {
+    const anchor = this.overrideDialog
+      .locator(`[data-test^="o2-format-cond-text-"][data-test$="-${ruleIdx}"]`)
+      .first();
+    const row = anchor.locator(
+      'xpath=ancestor::div[contains(@class,"rounded-md")][1]'
+    );
+    const thresholdInput = row.locator(".w-28 input").first();
+    await thresholdInput.waitFor({ state: "visible", timeout: 5000 });
+    await thresholdInput.fill(String(threshold));
+  }
+
+  /** Set the text/bg color for the conditional rule at ruleIdx (data-test driven). */
+  async setConditionRuleColor(ruleIdx, kind, hex) {
+    const wrapper = this.overrideDialog
+      .locator(`[data-test^="o2-format-cond-${kind}-"][data-test$="-${ruleIdx}"]`)
+      .first();
+    await wrapper.waitFor({ state: "visible", timeout: 5000 });
+    const colorInput = wrapper.locator('input[type="color"]');
+    await colorInput.evaluate((el, value) => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value"
+      ).set;
+      setter.call(el, value);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }, hex);
   }
 
   /**

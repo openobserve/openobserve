@@ -14,6 +14,8 @@ const props = defineProps<{
   selectionEnabled?: boolean;
   /** Render placeholder for the expand chevron column */
   expansionEnabled?: boolean;
+  /** Render placeholder for the drag-handle column */
+  enableRowReorder?: boolean;
 }>();
 
 const BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
@@ -74,16 +76,16 @@ const actionCountFor = (col: Column<any, any>): number => {
 
 const actionDimsFor = (col: Column<any, any>): string => {
   const s = (defOf(col).meta as any)?.actionSize;
-  if (s === "button") return "tw:h-7 tw:w-7 tw:rounded-md";
-  if (s === "pill") return "tw:h-5 tw:w-12 tw:rounded-md";
-  return "tw:h-[22px] tw:w-[22px] tw:rounded-md"; // icon (Vercel/GitHub style)
+  if (s === "button") return "h-7 w-7 rounded-md";
+  if (s === "pill") return "h-5 w-12 rounded-md";
+  return "h-[22px] w-[22px] rounded-md"; // icon (Vercel/GitHub style)
 };
 
 const alignClassFor = (col: Column<any, any>): string => {
   const a = (defOf(col).meta as any)?.align;
-  if (a === "center") return "tw:text-center";
-  if (a === "right") return "tw:text-right";
-  return "tw:text-left";
+  if (a === "center") return "text-center";
+  if (a === "right") return "text-right";
+  return "text-left";
 };
 </script>
 
@@ -97,7 +99,7 @@ const alignClassFor = (col: Column<any, any>): string => {
     <tr
       v-for="r in rowCount"
       :key="`o2-skel-${r}`"
-      class="o2-skel-row tw:opacity-0 tw:[animation:o2-skel-row-in_320ms_ease-out_forwards]"
+      class="o2-skel-row opacity-0 [animation:o2-skel-row-in_320ms_ease-out_forwards]"
       :style="{
         animationDelay: `${(r - 1) * 40}ms`,
         height: 'var(--o2-table-row-height)',
@@ -106,48 +108,54 @@ const alignClassFor = (col: Column<any, any>): string => {
       <!-- Expand chevron placeholder — matches OTableBodyRow exactly -->
       <td
         v-if="expansionEnabled"
-        class="tw:w-4 tw:min-w-4 tw:px-0 tw:text-center tw:align-middle"
+        class="w-4 min-w-4 px-0 text-center align-middle"
       />
 
       <!-- Selection checkbox placeholder — matches OTableBodyRow exactly -->
       <td
         v-if="selectionEnabled"
-        class="tw:text-left tw:align-middle"
+        class="text-left align-middle"
         :style="{ width: TABLE_CHECKBOX_COL_SIZE + 'px', minWidth: TABLE_CHECKBOX_COL_SIZE + 'px', maxWidth: TABLE_CHECKBOX_COL_SIZE + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
       >
         <span
-          class="tw:inline-block tw:h-3.5 tw:w-3.5 tw:rounded-[3px] tw:border tw:border-[var(--color-skeleton-base)]"
+          class="inline-block h-3.5 w-3.5 rounded-[3px] border border-[var(--color-skeleton-base)]"
           aria-hidden="true"
         />
       </td>
+
+      <!-- Drag handle placeholder -->
+      <td
+        v-if="enableRowReorder"
+        class="w-4 min-w-4 px-0 text-center align-middle"
+      />
 
       <!-- Data cells — class & style mirror OTableBodyCell exactly -->
       <td
         v-for="(col, c) in tableColumns"
         :key="col.id"
         :class="[
-          'tw:px-2 tw:align-middle',
+          'px-2 align-middle',
           alignClassFor(col),
-          isActionCol(col) ? 'tw:w-0 tw:whitespace-nowrap' : '',
+          isActionCol(col) ? 'w-0 whitespace-nowrap' : '',
         ]"
         :style="cellStyle(col)"
       >
         <!-- Action column → inline group of N icon-sized placeholders -->
         <span
           v-if="isActionCol(col)"
-          class="tw:inline-flex tw:items-center tw:gap-1 tw:align-middle"
+          class="inline-flex items-center gap-1 align-middle"
         >
           <span
             v-for="a in actionCountFor(col)"
             :key="`a-${r}-${c}-${a}`"
-            :class="['o2-skel-pill tw:inline-block tw:shrink-0 tw:[background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]', actionDimsFor(col)]"
+            :class="['o2-skel-pill inline-block shrink-0 [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]', actionDimsFor(col)]"
             aria-hidden="true"
           />
         </span>
         <!-- Data column → chunky rounded bar with shimmer; td text-align positions it -->
         <span
           v-else
-          class="o2-skel-pill tw:inline-block tw:h-3 tw:rounded-md tw:align-middle tw:[background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] tw:[background-size:200%_100%] tw:[animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
+          class="o2-skel-pill inline-block h-3 rounded-md align-middle [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
           :style="{ width: `${cellWidth(r - 1, c)}%` }"
           aria-hidden="true"
         />

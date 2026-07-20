@@ -20,18 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="modelValue"
         data-test="common-app-dialog-backdrop"
-        class="tw:fixed tw:inset-0 tw:bg-black/50 tw:flex tw:justify-center tw:items-center tw:z-9999"
+        class="fixed inset-0 bg-black/50 flex justify-center items-center z-9999"
         @click="handleBackdropClick"
       >
         <div
           data-test="common-app-dialog"
-          class="tw:bg-white tw:rounded-lg tw:shadow-[0_4px_20px_rgba(0,0,0,0.15)] tw:w-[90%] tw:max-w-150 tw:max-h-[90vh] tw:flex tw:flex-col tw:overflow-hidden"
+          class="bg-white rounded-lg shadow-[0_4px_20px_rgba(0,0,0,0.15)] w-[90%] max-w-150 max-h-[90vh] flex flex-col overflow-hidden"
           ref="dialogRef"
           @click.stop
           role="dialog"
           aria-modal="true"
         >
-          <div data-test="common-app-dialog-content" class="tw:overflow-y-auto tw:flex-1">
+          <div data-test="common-app-dialog-content" class="overflow-y-auto flex-1">
             <slot></slot>
           </div>
         </div>

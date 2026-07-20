@@ -1,27 +1,27 @@
 ﻿<template>
   <div
-    class="scd-scrim tw:fixed tw:inset-0 tw:bg-[rgba(0,0,0,0.32)] tw:z-[1010] tw:flex tw:justify-end tw:[animation:scd-fade_0.18s_ease-out]"
+    class="scd-scrim fixed inset-0 bg-[rgba(0,0,0,0.32)] z-[1010] flex justify-end [animation:scd-fade_0.18s_ease-out]"
     role="dialog"
     aria-modal="true"
     @click.self="$emit('close')"
   >
     <aside
-      class="scd tw:w-[560px] tw:max-w-[92vw] tw:h-full tw:bg-(--color-card-bg) tw:border-l tw:border-(--color-dialog-header-border) tw:flex tw:flex-col tw:[animation:scd-slide_0.22s_ease-out]"
+      class="scd w-[560px] max-w-[92vw] h-full bg-(--color-card-bg) border-l border-(--color-dialog-header-border) flex flex-col [animation:scd-slide_0.22s_ease-out]"
       @click.stop
       data-test="score-config-detail"
     >
       <!-- Header: eyebrow + title + status meta + close -->
-      <header class="tw:flex tw:items-start tw:gap-2.5 tw:px-5 tw:pt-4 tw:pb-3.5 tw:border-b tw:border-dialog-header-border tw:bg-card-bg tw:shrink-0">
-        <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-1">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap">
-            <span class="tw:font-semibold tw:text-[11px] tw:leading-[1.4] tw:tracking-[0.02em] tw:text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.eyebrow") }}</span>
+      <header class="flex items-start gap-2.5 px-5 pt-4 pb-3.5 border-b border-dialog-header-border bg-card-bg shrink-0">
+        <div class="flex-1 min-w-0 flex flex-col gap-1">
+          <div class="flex items-center gap-2 flex-nowrap">
+            <span class="font-semibold text-[11px] leading-[1.4] tracking-[0.02em] text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.eyebrow") }}</span>
             <span
               v-if="row.name"
               :class="[
-                'tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-block',
+                'font-semibold px-2 py-1 rounded-md inline-block',
                 store.state.theme === 'dark'
-                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                  : 'tw:text-blue-600 tw:bg-blue-50',
+                  ? 'text-blue-400 bg-blue-900/50'
+                  : 'text-blue-600 bg-blue-50',
               ]"
             >
               {{ row.name }}
@@ -35,7 +35,7 @@
         </div>
         <button
           type="button"
-          class="scd__close tw:shrink-0 tw:bg-transparent tw:border-0 tw:p-1 tw:rounded tw:cursor-pointer tw:text-(--color-text-secondary)"
+          class="scd__close shrink-0 bg-transparent border-0 p-1 rounded cursor-pointer text-(--color-text-secondary)"
           :aria-label="t('onlineEvals.scoreConfig.detail.close')"
           data-test="score-config-detail-close-btn"
           @click="$emit('close')"
@@ -56,7 +56,7 @@
       <OTabs
         :model-value="activeTab"
         bordered
-        class="tw:flex-shrink-0 tw:px-5"
+        class="flex-shrink-0 px-5"
         data-test="score-config-detail-tabs"
         @update:model-value="activeTab = $event as TabId"
       >
@@ -78,17 +78,17 @@
         </OTab>
       </OTabs>
 
-      <div class="tw:flex-1 tw:overflow-auto tw:px-5 tw:py-4.5 tw:flex tw:flex-col tw:gap-4.5 tw:min-h-0 tw:bg-card-bg">
+      <div class="flex-1 overflow-auto px-5 py-4.5 flex flex-col gap-4.5 min-h-0 bg-card-bg">
         <!-- ─────────── OVERVIEW TAB ─────────── -->
         <template v-if="activeTab === 'overview'">
-          <section v-if="row.description" class="tw:flex tw:flex-col tw:gap-2">
-            <h4 class="scd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-normal tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">{{ t("onlineEvals.scoreConfig.detail.descriptionSection") }}</h4>
-            <p class="tw:m-0 tw:text-[13px] tw:leading-[1.55] tw:text-(--color-text-primary)">{{ row.description }}</p>
+          <section v-if="row.description" class="flex flex-col gap-2">
+            <h4 class="scd-section__title m-0 font-semibold text-[13px] leading-normal text-(--color-text-primary) pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.descriptionSection") }}</h4>
+            <p class="m-0 text-[13px] leading-[1.55] text-(--color-text-primary)">{{ row.description }}</p>
           </section>
 
-          <section class="tw:flex tw:flex-col tw:gap-2">
-            <h4 class="scd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-normal tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">{{ t("onlineEvals.scoreConfig.detail.configurationSection") }}</h4>
-            <dl class="scd-kv tw:grid tw:gap-x-3.5 tw:gap-y-1.5 tw:m-0" style="grid-template-columns: 120px 1fr;">
+          <section class="flex flex-col gap-2">
+            <h4 class="scd-section__title m-0 font-semibold text-[13px] leading-normal text-(--color-text-primary) pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.configurationSection") }}</h4>
+            <dl class="scd-kv grid gap-x-3.5 gap-y-1.5 m-0" style="grid-template-columns: 120px 1fr;">
               <dt>{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
               <dd>
                 <OTag type="evalDataType" :value="dataType" />
@@ -96,7 +96,7 @@
 
               <template v-if="dataType === 'numeric' && numericRange">
                 <dt>{{ t("onlineEvals.scoreConfig.detail.rangeLabel") }}</dt>
-                <dd class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ numericRange.min }} – {{ numericRange.max }}</dd>
+                <dd class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ numericRange.min }} – {{ numericRange.max }}</dd>
               </template>
 
               <template v-if="dataType === 'categorical' && categories.length">
@@ -108,32 +108,32 @@
 
               <template v-if="dataType === 'boolean'">
                 <dt>{{ t("onlineEvals.scoreConfig.detail.valuesLabel") }}</dt>
-                <dd class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">true / false</dd>
+                <dd class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">true / false</dd>
               </template>
             </dl>
           </section>
 
-          <section class="tw:flex tw:flex-col tw:gap-2">
-            <h4 class="scd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-normal tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">
+          <section class="flex flex-col gap-2">
+            <h4 class="scd-section__title m-0 font-semibold text-[13px] leading-normal text-(--color-text-primary) pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">
               {{ t("onlineEvals.scoreConfig.detail.thresholdSection") }}
               <OTag v-if="!healthyLabel" type="thresholdFlag" value="notdeclared" />
             </h4>
             <div
               v-if="healthyLabel"
-              class="tw:flex tw:items-baseline tw:gap-2 tw:p-[12px_14px] tw:border tw:border-[color-mix(in_srgb,var(--o2-status-success-text,#2e7d32)_35%,transparent)] tw:bg-[color-mix(in_srgb,var(--o2-status-success-text,#2e7d32)_8%,transparent)] tw:rounded-md"
+              class="flex items-baseline gap-2 p-[12px_14px] border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] rounded-md"
             >
-              <span class="tw:text-lg tw:font-bold tw:text-(--o2-status-success-text)">{{ thresholdSign }}</span>
-              <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:font-bold tw:text-sm tw:text-(--color-text-primary)">{{ healthyLabel }}</span>
-              <span class="tw:ml-auto tw:text-[11px] tw:text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.detail.thresholdHint") }}</span>
+              <span class="text-lg font-bold text-(--color-status-success-text)">{{ thresholdSign }}</span>
+              <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] font-bold text-sm text-(--color-text-primary)">{{ healthyLabel }}</span>
+              <span class="ml-auto text-[11px] text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.detail.thresholdHint") }}</span>
             </div>
-            <p v-else class="tw:m-0 tw:text-[13px] tw:leading-[1.55] tw:text-(--color-text-secondary)">
+            <p v-else class="m-0 text-[13px] leading-[1.55] text-(--color-text-secondary)">
               {{ t("onlineEvals.scoreConfig.detail.noThresholdHint") }}
             </p>
           </section>
 
-          <section class="tw:flex tw:flex-col tw:gap-2">
-            <h4 class="scd-section__title tw:m-0 tw:font-semibold tw:text-[13px] tw:leading-normal tw:text-(--color-text-primary) tw:pb-1.5 tw:border-b tw:border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] tw:inline-flex tw:items-center tw:gap-1.5">{{ t("onlineEvals.scoreConfig.detail.metadataSection") }}</h4>
-            <dl class="scd-kv tw:grid tw:gap-x-3.5 tw:gap-y-1.5 tw:m-0" style="grid-template-columns: 120px 1fr;">
+          <section class="flex flex-col gap-2">
+            <h4 class="scd-section__title m-0 font-semibold text-[13px] leading-normal text-(--color-text-primary) pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.metadataSection") }}</h4>
+            <dl class="scd-kv grid gap-x-3.5 gap-y-1.5 m-0" style="grid-template-columns: 120px 1fr;">
               <dt>{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
               <dd>
                 <OTag type="booleanState" :value="isActive ? 'enabled' : 'disabled'">
@@ -143,29 +143,29 @@
                 </OTag>
               </dd>
               <dt>{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
-              <dd class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
+              <dd class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
               <dt v-if="createdAt">{{ t("onlineEvals.scoreConfig.detail.createdLabel") }}</dt>
-              <dd v-if="createdAt" class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ formatTimestamp(createdAt) }}</dd>
+              <dd v-if="createdAt" class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(createdAt) }}</dd>
               <dt v-if="updatedAt">{{ t("onlineEvals.scoreConfig.detail.updatedLabel") }}</dt>
-              <dd v-if="updatedAt" class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</dd>
+              <dd v-if="updatedAt" class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</dd>
             </dl>
           </section>
         </template>
 
         <!-- ─────────── VERSIONS TAB ─────────── -->
         <template v-else-if="activeTab === 'versions'">
-          <p class="tw:m-0 tw:text-xs tw:leading-normal tw:text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.detail.versionsIntro") }}</p>
-          <ul class="tw:list-none tw:m-0 tw:p-0 tw:flex tw:flex-col tw:gap-2">
+          <p class="m-0 text-xs leading-normal text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.detail.versionsIntro") }}</p>
+          <ul class="list-none m-0 p-0 flex flex-col gap-2">
             <li
-              class="tw:p-[12px_14px] tw:bg-(--color-card-bg) tw:border tw:border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] tw:bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! tw:rounded-md"
+              class="p-[12px_14px] bg-(--color-card-bg) border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! rounded-md"
             >
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:font-bold tw:text-[13px] tw:text-(--color-text-primary)">v{{ row.version }}</span>
+              <div class="flex items-center gap-2">
+                <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-[13px] text-(--color-text-primary)">v{{ row.version }}</span>
                 <OTag type="activeVersionFlag" value="active" />
               </div>
-              <div v-if="updatedAt" class="tw:mt-1.5 tw:text-[11.5px] tw:text-(--color-text-secondary)">
+              <div v-if="updatedAt" class="mt-1.5 text-[11.5px] text-(--color-text-secondary)">
                 {{ t("onlineEvals.scoreConfig.detail.lastUpdated") }}
-                <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</span>
+                <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</span>
               </div>
             </li>
           </ul>
@@ -173,30 +173,30 @@
 
         <!-- ─────────── USED BY TAB ─────────── -->
         <template v-else-if="activeTab === 'usedBy'">
-          <p class="tw:m-0 tw:text-xs tw:leading-normal tw:text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.detail.usedByIntro") }}</p>
+          <p class="m-0 text-xs leading-normal text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.detail.usedByIntro") }}</p>
           <div
             v-if="usedByScorers.length === 0"
-            class="tw:inline-flex tw:items-center tw:gap-1.5 tw:p-[8px_10px] tw:bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] tw:rounded-[5px] tw:text-xs tw:text-(--color-text-secondary)"
+            class="inline-flex items-center gap-1.5 p-[8px_10px] bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] rounded-[5px] text-xs text-(--color-text-secondary)"
           >
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scoreConfig.detail.usedByEmpty") }}</span>
           </div>
-          <ul v-else class="tw:list-none tw:m-0 tw:p-0 tw:flex tw:flex-col tw:gap-2">
+          <ul v-else class="list-none m-0 p-0 flex flex-col gap-2">
             <li v-for="scorer in usedByScorers" :key="scorer.id">
               <OButton
                 variant="ghost"
-                class="scd-used-card tw:w-full tw:bg-(--color-card-bg)! tw:border! tw:border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)]! tw:rounded-md! tw:transition-[border-color,background] tw:duration-150"
+                class="scd-used-card w-full bg-(--color-card-bg)! border! border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)]! rounded-md! transition-[border-color,background] duration-150"
                 :data-test="`score-config-detail-used-by-item-${scorer.name}`"
                 @click="emit('view-scorer', scorer)"
               >
-                <div class="tw:flex-1 tw:min-w-0">
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                    <span class="tw:font-[ui-monospace,SFMono-Regular,Menlo,monospace] tw:[font-variant-numeric:tabular-nums] tw:font-bold tw:text-[13px] tw:text-(--color-text-primary)">{{ scorer.name }}</span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] [font-variant-numeric:tabular-nums] font-bold text-[13px] text-(--color-text-primary)">{{ scorer.name }}</span>
                     <OTag type="scorerType" :value="scorerTypeOf(scorer)" />
-                    <span class="tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]">v{{ scorer.version }}</span>
+                    <span class="text-[11px] text-(--color-text-secondary) [font-variant-numeric:tabular-nums]">v{{ scorer.version }}</span>
                   </div>
                 </div>
-                <OIcon name="chevron-right" size="sm" class="scd-used-card__chevron tw:shrink-0 tw:text-(--color-text-secondary) tw:opacity-50" />
+                <OIcon name="chevron-right" size="sm" class="scd-used-card__chevron shrink-0 text-(--color-text-secondary) opacity-50" />
               </OButton>
             </li>
           </ul>

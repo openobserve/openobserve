@@ -23,41 +23,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-left>
         <!-- Left: back + title + stream info -->
-        <div class="tw:flex tw:items-center tw:gap-2.5">
+        <div class="flex items-center gap-2.5">
           <div
             data-test="add-alert-back-btn"
-            class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100 tw:transition-opacity tw:flex-shrink-0"
+            class="flex justify-center items-center cursor-pointer opacity-60 hover:opacity-100 transition-opacity flex-shrink-0"
             style="border: 1.5px solid currentColor; border-radius: 50%; width: 20px; height: 20px;"
             :title="t('common.goBack')"
             @click="closeDialog"
           >
             <OIcon name="arrow-back-ios-new" size="xs" />
           </div>
-          <span class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block">{{ t('alerts.addConditions') }}</span>
+          <span class="text-lg font-semibold text-dialog-header-text truncate block">{{ t('alerts.addConditions') }}</span>
 
           <!-- Separator -->
-          <div class="tw:w-px tw:h-4 tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:bg-gray-400' : 'tw:bg-gray-500'" />
+          <div class="w-px h-4 opacity-30" :class="store.state.theme === 'dark' ? 'bg-gray-400' : 'bg-gray-500'" />
 
           <!-- Stream Type + Stream Name -->
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div v-if="streamType" class="tw:inline-flex tw:flex-row tw:items-center tw:gap-[5px] tw:py-[3px] tw:px-[10px] tw:rounded-md" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(59,130,246,0.12)] tw:border tw:border-[rgba(59,130,246,0.3)]' : 'tw:bg-[rgba(59,130,246,0.08)] tw:border tw:border-[rgba(59,130,246,0.25)]'">
-              <span class="tw:text-[11px] tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#94a3b8]' : 'tw:text-[#64748b]'">Stream Type</span>
-              <span class="tw:text-[11px] tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:text-[#64748b]' : 'tw:text-[#94a3b8]'">:</span>
-              <span class="tw:text-xs tw:font-bold" :class="store.state.theme === 'dark' ? 'tw:text-[#60a5fa]' : 'tw:text-[#2563eb]'">{{ streamType }}</span>
+          <div class="flex items-center gap-2">
+            <div v-if="streamType" class="inline-flex flex-row items-center gap-[5px] py-[3px] px-[10px] rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(59,130,246,0.12)] border border-[rgba(59,130,246,0.3)]' : 'bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)]'">
+              <span class="text-[11px] font-semibold" :class="store.state.theme === 'dark' ? 'text-[#94a3b8]' : 'text-[#64748b]'">{{ t("alerts.streamType") }}</span>
+              <span class="text-[11px] opacity-30" :class="store.state.theme === 'dark' ? 'text-[#64748b]' : 'text-[#94a3b8]'">:</span>
+              <span class="text-xs font-bold" :class="store.state.theme === 'dark' ? 'text-[#60a5fa]' : 'text-[#2563eb]'">{{ streamType }}</span>
             </div>
-            <span v-if="streamType && streamName" class="tw:opacity-20 tw:select-none">|</span>
-            <div class="tw:inline-flex tw:flex-row tw:items-center tw:gap-[5px] tw:py-[3px] tw:px-[10px] tw:rounded-md" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(139,92,246,0.12)] tw:border tw:border-[rgba(139,92,246,0.3)]' : 'tw:bg-[rgba(139,92,246,0.08)] tw:border tw:border-[rgba(139,92,246,0.25)]'">
-              <span class="tw:text-[11px] tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#94a3b8]' : 'tw:text-[#64748b]'">Stream Name</span>
-              <span class="tw:text-[11px] tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:text-[#64748b]' : 'tw:text-[#94a3b8]'">:</span>
-              <span v-if="streamName" class="tw:text-xs tw:font-bold" :class="store.state.theme === 'dark' ? 'tw:text-[#a78bfa]' : 'tw:text-[#7c3aed]'">{{ streamName }}</span>
-              <span v-else class="tw:text-xs tw:font-bold tw:opacity-40 tw:italic" :class="store.state.theme === 'dark' ? 'tw:text-[#a78bfa]' : 'tw:text-[#7c3aed]'">none</span>
+            <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
+            <div class="inline-flex flex-row items-center gap-[5px] py-[3px] px-[10px] rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.3)]' : 'bg-[rgba(139,92,246,0.08)] border border-[rgba(139,92,246,0.25)]'">
+              <span class="text-[11px] font-semibold" :class="store.state.theme === 'dark' ? 'text-[#94a3b8]' : 'text-[#64748b]'">{{ t("alerts.stream_name") }}</span>
+              <span class="text-[11px] opacity-30" :class="store.state.theme === 'dark' ? 'text-[#64748b]' : 'text-[#94a3b8]'">:</span>
+              <span v-if="streamName" class="text-xs font-bold" :class="store.state.theme === 'dark' ? 'text-[#a78bfa]' : 'text-[#7c3aed]'">{{ streamName }}</span>
+              <span v-else class="text-xs font-bold opacity-40 italic" :class="store.state.theme === 'dark' ? 'text-[#a78bfa]' : 'text-[#7c3aed]'">{{ t("alerts.queryEditor.noStream") }}</span>
             </div>
           </div>
         </div>
       </template>
       <template #header-right>
         <!-- Right: AI -->
-        <div class="tw:flex tw:items-center tw:gap-3">
+        <div class="flex items-center gap-3">
 
           <!-- AI button -->
           <OButton
@@ -67,26 +67,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="menu-link-ai-item"
             variant="ghost"
             size="icon-toolbar"
-            class="tw:[background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! tw:transition-[background,box-shadow] tw:duration-300 tw:ease-[ease] tw:hover:[background:linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] tw:group"
+            class="[background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! transition-[background,box-shadow] duration-300 ease-[ease] hover:[background:linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] group"
             @mouseenter="isHovered = true"
             @mouseleave="isHovered = false"
           >
-            <img :src="getBtnLogo" class="tw:transition-transform tw:duration-[600ms] tw:ease-[ease] tw:group-hover:rotate-180" style="width: 18px; height: 18px;" />
+            <img :src="getBtnLogo" class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180" style="width: 18px; height: 18px;" />
           </OButton>
         </div>
       </template>
-    <div data-test="query-editor-dialog-card" class="tw:flex tw:h-[calc(100vh-3.5rem)] tw:overflow-hidden tw:bg-(--o2-card-bg)">
+    <div data-test="query-editor-dialog-card" class="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-(--o2-card-bg)">
       <div
-        class="tw:h-full tw:flex tw:overflow-hidden tw:flex-1"
+        class="h-full flex overflow-hidden flex-1"
       >
-        <div class="tw:h-full tw:w-full tw:flex tw:flex-col">
+        <div class="h-full w-full flex flex-col">
           <!-- Main Content Grid: field browser | editors | output -->
-          <div class="tw:grid tw:flex-1 tw:min-h-0 tw:w-full tw:grid-cols-[20fr_45fr_35fr] tw:gap-x-2 tw:px-2 tw:pr-2 tw:py-2 tw:overflow-hidden">
+          <div class="grid flex-1 min-h-0 w-full grid-cols-[20fr_45fr_35fr] gap-x-2 px-2 pr-2 py-2 overflow-hidden">
 
             <!-- Left Section (25%) — Field Browser -->
             <div
-              class="tw:h-full tw:rounded-lg tw:overflow-hidden tw:p-[10px]"
-              :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748] tw:bg-[#1a1a1a]' : 'tw:border tw:border-[#e5e7eb] tw:bg-white'"
+              class="h-full rounded-lg overflow-hidden p-[10px]"
+              :class="store.state.theme === 'dark' ? 'border border-[#2d3748] bg-[#1a1a1a]' : 'border border-[#e5e7eb] bg-white'"
             >
               <SearchFieldList
                 :fields="fieldListItems"
@@ -100,26 +100,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Input Section (40%) -->
-            <div class="tw:flex tw:w-full tw:h-full tw:min-h-0 tw:overflow-y-auto">
-              <div ref="editorsColumnRef" class="tw:flex tw:w-full tw:flex-col tw:min-h-full tw:gap-y-2">
+            <div class="flex w-full h-full min-h-0 overflow-y-auto">
+              <div ref="editorsColumnRef" class="flex w-full flex-col min-h-full gap-y-2">
                 <!-- SQL/PromQL Editor Pane + Status Bar wrapper -->
-                <div class="tw:flex-[3] tw:w-full tw:flex tw:flex-col tw:overflow-visible" style="min-height: 220px;">
+                <div class="flex-[3] w-full flex flex-col overflow-visible" style="min-height: 220px;">
                   <!-- Editor Pane (no overflow:hidden bottom clip issue for status bar) -->
                   <div
-                    class="tw:flex-1 tw:w-full tw:flex tw:flex-col tw:overflow-hidden tw:rounded-lg"
-                    :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748]' : 'tw:border tw:border-[#e5e7eb]'"
+                    class="flex-1 w-full flex flex-col overflow-hidden rounded-lg"
+                    :class="store.state.theme === 'dark' ? 'border border-[#2d3748]' : 'border border-[#e5e7eb]'"
                     style="border-bottom: none; border-bottom-left-radius: 0; border-bottom-right-radius: 0;"
                   >
                     <!-- Pane Header -->
                     <div
-                      class="tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:min-h-12 tw:shrink-0"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-white/[0.04] tw:border-b tw:border-[#2d3748]' : 'tw:bg-[#f3f4f6] tw:border-b tw:border-[#e5e7eb]'"
+                      class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0"
+                      :class="store.state.theme === 'dark' ? 'bg-white/[0.04] border-b border-[#2d3748]' : 'bg-[#f3f4f6] border-b border-[#e5e7eb]'"
                     >
-                      <div class="tw:flex tw:items-center tw:gap-2">
-                        <div class="tw:w-[3px] tw:h-[14px] tw:rounded-[2px] tw:shrink-0 tw:bg-(--q-primary)" />
-                        <span class="tw:text-xs tw:font-semibold">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
+                      <div class="flex items-center gap-2">
+                        <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-primary)" />
+                        <span class="text-xs font-semibold">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
                       </div>
-                      <div class="tw:flex tw:items-center tw:gap-2">
+                      <div class="flex items-center gap-2">
                         <OSwitch
                           v-if="localTab !== 'promql'"
                           :model-value="!sqlEditorMaximized"
@@ -127,23 +127,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                           @update:model-value="(val) => val ? restoreVrlEditor() : (sqlEditorMaximized = true)"
                         >
-                          <OTooltip :delay="400" :content="sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor'" />
+                          <OTooltip :delay="400" :content="sqlEditorMaximized ? t('alerts.queryEditor.showVrlEditor') : t('alerts.queryEditor.hideVrlEditor')" />
                         </OSwitch>
                         <OButton
                           data-test="alert-run-query-btn"
                           variant="primary"
                           size="sm"
-                          class="tw:h-[28px] tw:text-xs tw:rounded-md tw:px-3!"
+                          class="h-[28px] text-xs rounded-md px-3!"
                           :disabled="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
                           @click="localTab === 'sql' ? runSqlQuery() : runPromqlQuery()"
                         >
-                          <span class="tw:text-xs tw:font-semibold">{{ t('alerts.runQuery') }}</span>
+                          <span class="text-xs font-semibold">{{ t('alerts.runQuery') }}</span>
                         </OButton>
                       </div>
                     </div>
 
                     <!-- Unified Query Editor -->
-                    <div class="tw:flex-1 tw:min-h-0 tw:relative">
+                    <div class="flex-1 min-h-0 relative">
                       <UnifiedQueryEditor
                         ref="queryEditorRef"
                         :languages="availableLanguages"
@@ -164,47 +164,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div
                         v-if="(localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) && queryEditorPlaceholderFlag"
-                        class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:[padding:0.1875rem_0.5rem_0_2.15rem] tw:pointer-events-none tw:z-[1] tw:select-none"
+                        class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
                       >
-                        <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ fullEditorPlaceholder }}</span>
+                        <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] whitespace-nowrap overflow-hidden text-ellipsis">{{ fullEditorPlaceholder }}</span>
                       </div>
                     </div>
                   </div>
 
                   <!-- Status bar: outside overflow:hidden pane so border-bottom is never clipped -->
                   <div
-                    class="tw:relative tw:h-[22px] tw:shrink-0 tw:text-[13px] tw:font-medium tw:cursor-default"
+                    class="relative h-[22px] shrink-0 text-[13px] font-medium cursor-default"
                     :class="[
                       sqlStatusBarClasses,
                       store.state.theme === 'dark'
-                        ? 'tw:border-l tw:border-r tw:border-b tw:border-[#2d3748] tw:rounded-bl-lg tw:rounded-br-lg'
-                        : 'tw:border-l tw:border-r tw:border-b tw:border-[#e5e7eb] tw:rounded-bl-lg tw:rounded-br-lg'
+                        ? 'border-l border-r border-b border-[#2d3748] rounded-bl-lg rounded-br-lg'
+                        : 'border-l border-r border-b border-[#e5e7eb] rounded-bl-lg rounded-br-lg'
                     ]"
                   >
-                    <div class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:gap-[5px] tw:px-[10px] tw:overflow-hidden">
+                    <div class="absolute inset-0 flex items-center gap-[5px] px-[10px] overflow-hidden">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
                         <OIcon name="error-outline" size="xs" style="flex-shrink:0;" />
-                        <span class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:min-w-0 tw:flex-1">{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span>
+                        <span class="whitespace-nowrap overflow-hidden text-ellipsis min-w-0 flex-1">{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
-                        <OSpinner size="xs" class="tw:shrink-0" />
-                        <span>Fetching results...</span>
+                        <OSpinner size="xs" class="shrink-0" />
+                        <span>{{ t('alerts.queryEditor.fetchingResults') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
                         <OIcon name="edit" size="xs" style="flex-shrink:0;opacity:0.6;" />
-                        <span>Write a query to get started</span>
+                        <span>{{ t('alerts.queryEditor.writeQueryHint') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--idle'">
                         <OIcon name="play-arrow" size="xs" style="flex-shrink:0;opacity:0.7;" />
-                        <span>Press Run Query to see results</span>
+                        <span>{{ t('alerts.queryEditor.runQueryHint') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--empty'">
                         <OIcon name="search-off" size="xs" style="flex-shrink:0;" />
-                        <span>Query ran successfully — no matching events</span>
+                        <span>{{ t('alerts.queryEditor.noMatchingEvents') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--success'">
                         <OIcon name="check-circle" size="xs" style="flex-shrink:0;" />
-                        <span>{{ sqlResultCount }} event{{ sqlResultCount === 1 ? '' : 's' }} found</span>
+                        <span>{{ t('alerts.queryEditor.eventsFound', sqlResultCount) }}</span>
                       </template>
                     </div>
                     <OTooltip
@@ -220,23 +220,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- VRL Editor Pane -->
                 <div
                   v-if="localTab !== 'promql'"
-                  class="tw:w-full tw:flex tw:flex-col tw:overflow-hidden tw:rounded-lg"
+                  class="w-full flex flex-col overflow-hidden rounded-lg"
                   :class="[
-                    store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748]' : 'tw:border tw:border-[#e5e7eb]',
-                    sqlEditorMaximized ? 'tw:flex-none' : 'tw:flex-[2]'
+                    store.state.theme === 'dark' ? 'border border-[#2d3748]' : 'border border-[#e5e7eb]',
+                    sqlEditorMaximized ? 'flex-none' : 'flex-[2]'
                   ]"
                   :style="sqlEditorMaximized ? '' : 'min-height: 160px;'"
                 >
                   <!-- Pane Header -->
                   <div
-                    class="tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:min-h-12 tw:shrink-0"
-                    :class="store.state.theme === 'dark' ? 'tw:bg-white/[0.04] tw:border-b tw:border-[#2d3748]' : 'tw:bg-[#f3f4f6] tw:border-b tw:border-[#e5e7eb]'"
+                    class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0"
+                    :class="store.state.theme === 'dark' ? 'bg-white/[0.04] border-b border-[#2d3748]' : 'bg-[#f3f4f6] border-b border-[#e5e7eb]'"
                   >
-                    <div class="tw:flex tw:items-center tw:gap-2">
-                      <div class="tw:w-[3px] tw:h-[14px] tw:rounded-[2px] tw:shrink-0 tw:bg-(--q-secondary)" />
-                      <span class="tw:text-xs tw:font-semibold">VRL Editor</span>
+                    <div class="flex items-center gap-2">
+                      <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-secondary)" />
+                      <span class="text-xs font-semibold">{{ t('alerts.vrlEditor') }}</span>
                     </div>
-                    <div v-if="!sqlEditorMaximized" class="tw:flex tw:gap-2 tw:items-center">
+                    <div v-if="!sqlEditorMaximized" class="flex gap-2 items-center">
                       <!-- Saved functions -->
                       <OSelect
                         v-model="selectedFunction"
@@ -244,7 +244,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-saved-vrl-function-select"
                         labelKey="name"
                         valueKey="name"
-                        @filter="filterFunctionOptions"
                         @update:modelValue="onFunctionSelect"
                         class="mini-select alert-v3-select"
                         clearable
@@ -253,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :placeholder="t('alerts.placeholders.savedFunctions')"
                       >
                         <template #empty>
-                          <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                          <div class="px-3 py-2 text-muted-foreground">
                             {{ t("search.noResult") }}
                           </div>
                         </template>
@@ -263,17 +262,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-apply-vrl-btn"
                         variant="primary"
                         size="sm"
-                        class="tw:h-[28px] tw:text-xs tw:rounded-md tw:px-3!"
+                        class="h-[28px] text-xs rounded-md px-3!"
                         :disabled="vrlFunctionContent == ''"
                         @click="runTestFunction"
                       >
-                        <span class="tw:text-xs tw:font-semibold">{{ t('alerts.applyVRL') }}</span>
+                        <span class="text-xs font-semibold">{{ t('alerts.applyVRL') }}</span>
                       </OButton>
                     </div>
                   </div>
 
                   <!-- VRL Editor -->
-                  <div v-if="!sqlEditorMaximized && vrlContentMounted" class="tw:flex-1 tw:min-h-0 tw:relative">
+                  <div v-if="!sqlEditorMaximized && vrlContentMounted" class="flex-1 min-h-0 relative">
                     <unified-query-editor
                       data-test="scheduled-alert-vrl-function-editor"
                       data-test-prefix="alert-dialog-vrl"
@@ -288,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :debounce-time="300"
                       editor-height="100%"
-                      class="tw:w-full tw:h-full"
+                      class="w-full h-full"
                       :class="store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode'"
                       @update:query="updateVrlFunction"
                       @focus="functionEditorPlaceholderFlag = false"
@@ -300,9 +299,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
-                      class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:[padding:0.1875rem_0.5rem_0_2.15rem] tw:pointer-events-none tw:z-[1] tw:select-none"
+                      class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
                     >
-                      <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ vrlPlaceholder }}</span>
+                      <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
                     </div>
                   </div>
                 </div>
@@ -310,54 +309,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Output Section (35%) -->
-            <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:gap-y-2 tw:overflow-y-auto">
+            <div class="flex flex-col h-full min-h-0 gap-y-2 overflow-y-auto">
 
               <!-- Query Result Pane -->
               <div
-                class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:rounded-lg"
-                :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748]' : 'tw:border tw:border-[#e5e7eb]'"
+                class="flex-1 flex flex-col overflow-hidden rounded-lg"
+                :class="store.state.theme === 'dark' ? 'border border-[#2d3748]' : 'border border-[#e5e7eb]'"
                 style="min-height: 220px;"
               >
                 <!-- Pane Header -->
                 <div
-                  class="tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:min-h-12 tw:shrink-0"
-                  :class="store.state.theme === 'dark' ? 'tw:bg-white/[0.04] tw:border-b tw:border-[#2d3748]' : 'tw:bg-[#f3f4f6] tw:border-b tw:border-[#e5e7eb]'"
+                  class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0"
+                  :class="store.state.theme === 'dark' ? 'bg-white/[0.04] border-b border-[#2d3748]' : 'bg-[#f3f4f6] border-b border-[#e5e7eb]'"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                    <div class="tw:w-[3px] tw:h-[14px] tw:rounded-[2px] tw:shrink-0 tw:bg-(--q-primary)" />
-                    <span class="tw:text-xs tw:font-semibold">Query Result</span>
+                  <div class="flex items-center gap-2">
+                    <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-primary)" />
+                    <span class="text-xs font-semibold">{{ t('alerts.queryEditor.queryResult') }}</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
-                      class="tw:text-[10px] tw:font-bold tw:py-px tw:px-[7px] tw:rounded tw:tracking-[0.04em]"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-blue-500/[0.12] tw:border tw:border-blue-500/30 tw:text-[#60a5fa]' : 'tw:bg-blue-500/[0.08] tw:border tw:border-blue-500/25 tw:text-[#2563eb]'"
-                    >results across all time windows</span>
+                      class="text-[10px] font-bold py-px px-[7px] rounded tracking-[0.04em]"
+                      :class="store.state.theme === 'dark' ? 'bg-blue-500/[0.12] border border-blue-500/30 text-[#60a5fa]' : 'bg-blue-500/[0.08] border border-blue-500/25 text-[#2563eb]'"
+                    >{{ t('alerts.queryEditor.resultsAcrossWindows') }}</span>
                   </div>
                 </div>
 
                 <!-- Content -->
-                <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+                <div class="flex-1 min-h-0 overflow-hidden">
                   <!-- Idle: not yet run -->
-                  <div v-if="!tempRunQuery && outputEvents == ''" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full tw:bg-(--o2-card-bg)">
-                    <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
-                      <OIcon name="table-chart" class="tw:opacity-[0.18]" style="width: 48px; height: 48px;" />
-                      <span class="tw:text-xs tw:opacity-[0.45]">{{ t('alerts.runQueryForOutput') }}</span>
+                  <div v-if="!tempRunQuery && outputEvents == ''" class="flex flex-col justify-center items-center h-full w-full bg-(--o2-card-bg)">
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="table-chart" class="opacity-[0.18]" style="width: 48px; height: 48px;" />
+                      <span class="text-xs opacity-[0.45]">{{ t('alerts.runQueryForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results after run -->
-                  <div v-else-if="outputEvents == '' && !runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:bg-(--o2-card-bg)">
-                    <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
-                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
+                  <div v-else-if="outputEvents == '' && !runQueryLoading" class="flex flex-col justify-center items-center h-full bg-(--o2-card-bg)">
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="warning" size="xl" class="text-orange-400 opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
-                  <div v-else-if="runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:gap-2">
+                  <div v-else-if="runQueryLoading" class="flex flex-col justify-center items-center h-full gap-2">
                     <OSpinner size="md" />
-                    <span class="tw:text-sm tw:opacity-60">{{ t('search.fetchingResults') }}</span>
+                    <span class="text-sm opacity-60">{{ t('search.fetchingResults') }}</span>
                   </div>
                   <!-- Results -->
                   <QueryEditor
                     v-else
-                    class="tw:w-full tw:h-full tw:overflow-y-auto"
+                    class="w-full h-full overflow-y-auto"
                     data-test="sql-output-editor"
                     ref="outputEventsEditorRef"
                     editor-id="sql-output-editor"
@@ -371,54 +370,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Combined Output Pane (SQL + VRL only) -->
               <div
                 v-if="localTab !== 'promql'"
-                class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:rounded-lg"
-                :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748]' : 'tw:border tw:border-[#e5e7eb]'"
+                class="flex-1 flex flex-col overflow-hidden rounded-lg"
+                :class="store.state.theme === 'dark' ? 'border border-[#2d3748]' : 'border border-[#e5e7eb]'"
                 style="min-height: 200px;"
               >
                 <!-- Pane Header -->
                 <div
-                  class="tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:min-h-12 tw:shrink-0"
-                  :class="store.state.theme === 'dark' ? 'tw:bg-white/[0.04] tw:border-b tw:border-[#2d3748]' : 'tw:bg-[#f3f4f6] tw:border-b tw:border-[#e5e7eb]'"
+                  class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0"
+                  :class="store.state.theme === 'dark' ? 'bg-white/[0.04] border-b border-[#2d3748]' : 'bg-[#f3f4f6] border-b border-[#e5e7eb]'"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                    <div class="tw:w-[3px] tw:h-[14px] tw:rounded-[2px] tw:shrink-0 tw:bg-(--q-secondary)" />
-                    <span class="tw:text-xs tw:font-semibold">Combined Output</span>
+                  <div class="flex items-center gap-2">
+                    <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-secondary)" />
+                    <span class="text-xs font-semibold">{{ t('alerts.queryEditor.combinedOutput') }}</span>
                     <span
-                      class="tw:text-[10px] tw:font-bold tw:py-px tw:px-[7px] tw:rounded tw:tracking-[0.04em]"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-violet-500/[0.15] tw:border tw:border-violet-500/30 tw:text-[#a78bfa]' : 'tw:bg-violet-500/[0.10] tw:border tw:border-violet-500/25 tw:text-[#7c3aed]'"
+                      class="text-[10px] font-bold py-px px-[7px] rounded tracking-[0.04em]"
+                      :class="store.state.theme === 'dark' ? 'bg-violet-500/[0.15] border border-violet-500/30 text-[#a78bfa]' : 'bg-violet-500/[0.10] border border-violet-500/25 text-[#7c3aed]'"
                     >SQL + VRL</span>
                   </div>
                   <!-- Running indicator -->
-                  <div v-if="runFnQueryLoading" class="tw:flex tw:items-center tw:gap-1">
-                    <span class="tw:w-[6px] tw:h-[6px] tw:rounded-full tw:bg-emerald-500 tw:[animation:pulse_1.5s_ease-in-out_infinite]" />
-                    <span class="tw:text-[10px] tw:font-semibold tw:text-emerald-400">Running</span>
+                  <div v-if="runFnQueryLoading" class="flex items-center gap-1">
+                    <span class="w-[6px] h-[6px] rounded-full bg-emerald-500 [animation:pulse_1.5s_ease-in-out_infinite]" />
+                    <span class="text-[10px] font-semibold text-emerald-400">{{ t('alerts.queryEditor.running') }}</span>
                   </div>
                 </div>
 
                 <!-- Content -->
-                <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+                <div class="flex-1 min-h-0 overflow-hidden">
                   <!-- Idle -->
-                  <div v-if="!tempTestFunction && !runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full tw:bg-(--o2-card-bg)">
-                    <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
-                      <OIcon name="data-object" class="tw:opacity-[0.18]" style="width: 48px; height: 48px;" />
-                      <span class="tw:text-xs tw:opacity-[0.45]">{{ t('alerts.applyVRLForOutput') }}</span>
+                  <div v-if="!tempTestFunction && !runFnQueryLoading" class="flex flex-col justify-center items-center h-full w-full bg-(--o2-card-bg)">
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="data-object" class="opacity-[0.18]" style="width: 48px; height: 48px;" />
+                      <span class="text-xs opacity-[0.45]">{{ t('alerts.applyVRLForOutput') }}</span>
                     </div>
                   </div>
                   <!-- No results -->
-                  <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:bg-(--o2-card-bg)">
-                    <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
-                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
+                  <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="flex flex-col justify-center items-center h-full bg-(--o2-card-bg)">
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="warning" size="xl" class="text-orange-400 opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
-                  <div v-else-if="runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:gap-2">
+                  <div v-else-if="runFnQueryLoading" class="flex flex-col justify-center items-center h-full gap-2">
                     <OSpinner size="md" />
-                    <span class="tw:text-sm tw:opacity-60">{{ t('search.fetchingResults') }}</span>
+                    <span class="text-sm opacity-60">{{ t('search.fetchingResults') }}</span>
                   </div>
                   <!-- Results -->
                   <QueryEditor
                     v-else
-                    class="tw:w-full tw:h-full"
+                    class="w-full h-full"
                     data-test="vrl-function-test-events-output-editor"
                     ref="outputFnEventsEditorRef"
                     editor-id="test-function-events-output-editor"
@@ -435,15 +434,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- AI Chat Panel -->
       <div
-        class="tw:ml-2 tw:w-[24.5vw] tw:max-w-full tw:min-w-[75px]"
+        class="ml-2 w-[24.5vw] max-w-full min-w-[75px]"
         v-if="store.state.isAiChatEnabled"
-        :class="store.state.theme == 'dark' ? 'tw:bg-[#1f2937]' : 'tw:bg-white'"
+        :class="store.state.theme == 'dark' ? 'bg-[#1f2937]' : 'bg-white'"
       >
         <O2AIChat
           :header-height="48"
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
-          class="tw:h-[calc(100vh-3.5rem)]!"
+          class="h-[calc(100vh-3.5rem)]!"
         />
       </div>
     </div>
@@ -451,7 +450,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type PropType, onMounted } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  type PropType,
+  onMounted,
+  inject,
+  type Ref,
+} from "vue";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -565,14 +573,14 @@ const sqlStatusState = computed(() => {
 
 const sqlStatusBarClasses = computed(() => {
   const isDark = store.state.theme === 'dark';
-  const neutralBg = isDark ? 'tw:bg-white/[0.04] tw:text-[#9ca3af]' : 'tw:bg-[#f3f4f6] tw:text-[#6b7280]';
+  const neutralBg = isDark ? 'bg-white/[0.04] text-[#9ca3af]' : 'bg-[#f3f4f6] text-[#6b7280]';
   const map: Record<string, string> = {
     'sql-status-bar--hint':    neutralBg,
     'sql-status-bar--idle':    neutralBg,
-    'sql-status-bar--loading': 'tw:bg-[rgba(139,92,246,0.06)] tw:text-[#8b5cf6]',
-    'sql-status-bar--error':   'tw:bg-[rgba(239,68,68,0.08)] tw:text-[#ef4444] tw:cursor-pointer',
-    'sql-status-bar--empty':   'tw:bg-[rgba(245,158,11,0.06)] tw:text-[#f59e0b]',
-    'sql-status-bar--success': 'tw:bg-[rgba(16,185,129,0.06)] tw:text-[#10b981]',
+    'sql-status-bar--loading': 'bg-[rgba(139,92,246,0.06)] text-[#8b5cf6]',
+    'sql-status-bar--error':   'bg-[rgba(239,68,68,0.08)] text-[#ef4444] cursor-pointer',
+    'sql-status-bar--empty':   'bg-[rgba(245,158,11,0.06)] text-[#f59e0b]',
+    'sql-status-bar--success': 'bg-[rgba(16,185,129,0.06)] text-[#10b981]',
   };
   return map[sqlStatusState.value] ?? '';
 });
@@ -705,20 +713,6 @@ watch(() => props.savedFunctions, (newVal) => {
   functionOptions.value = [...newVal];
 });
 
-// Filter functions
-const filterFunctionOptions = (val: string, update: any) => {
-  update(() => {
-    if (val === "") {
-      functionOptions.value = [...props.savedFunctions];
-    } else {
-      const needle = val.toLowerCase();
-      functionOptions.value = props.savedFunctions.filter((v: any) =>
-        v.name.toLowerCase().indexOf(needle) > -1
-      );
-    }
-  });
-};
-
 // Update handlers
 const updateSqlQuery = (value: string) => {
   localSqlQuery.value = value;
@@ -778,11 +772,13 @@ const handleAlertFunctionEditorGenerationSuccess = (payload: {
   // Function code is already updated via @update:query handler
 };
 
-// Column and function selection
-const onFunctionSelect = (func: any) => {
-  if (func && func.function) {
-    vrlFunctionContent.value = func.function;
-    updateVrlFunction(func.function);
+// Column and function selection.
+// OSelect emits the resolved `valueKey` (the function name), not the option
+// object — look the function up before reading its body.
+const onFunctionSelect = (name: any) => {
+  const func = props.savedFunctions.find((f: any) => f.name === name);
+  if (func) {
+    updateVrlFunction(func.function || func.body || "");
   }
 };
 
@@ -1000,12 +996,19 @@ const runPromqlQuery = async () => {
 // Unified Query Editor ref
 const queryEditorRef = ref<any>(null);
 
+// Server SQL-validation squiggle ranges, provided by AddAlert.vue.
+const alertSqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
+  "alertSqlErrorRanges",
+  ref<SqlErrorRange[]>([]),
+);
+
 const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
   useSqlEditorDiagnostics({
     queryEditorRef,
     sqlMode: computed(() => localTab.value === 'sql'),
     query: computed(() => localSqlQuery.value ?? ""),
     streamName: computed(() => props.streamName),
+    externalErrors: alertSqlErrorRanges,
   });
 
 const onQueryEditorFocus = () => {

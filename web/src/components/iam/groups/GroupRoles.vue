@@ -15,24 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="iam-roles-selection-section" class="tw:flex tw:flex-col tw:h-full tw:p-0" >
+  <div data-test="iam-roles-selection-section" class="flex flex-col h-full p-0" >
     <div
-      class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:shrink-0"
-      :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
+      class="flex justify-start px-3 py-2 card-container shrink-0"
+      :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
     >
-      <div class="tw:mr-3">
+      <div class="mr-3">
         <div
           data-test="iam-roles-selection-show-toggle"
-          class="tw:flex tw:items-center"
+          class="flex items-center"
         >
           <span
             data-test="iam-roles-selection-show-text"
             style="font-size: 14px"
           >
-            Show
+            {{ t('iam.groupRoles.show') }}
           </span>
           <OToggleGroup
-            class="tw:ml-1"
+            class="ml-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -50,17 +50,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         data-test="iam-roles-selection-search-input"
-        class="tw:mr-3"
+        class="mr-3"
       >
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="tw:h-9 tw:w-50"
-          placeholder="Search Roles"
+          class="h-9 w-50"
+          :placeholder="t('iam.groupRoles.searchRoles')"
         />
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
+    <div data-test="iam-roles-selection-table" class="flex-1 min-h-0 card-container">
       <OTable
         :data="rows"
         :columns="columns"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             :data-test="`iam-roles-selection-table-body-row-${row.role_name}-checkbox`"
             :model-value="row.isInGroup"
-            class="filter-check-box tw:cursor-pointer"
+            class="filter-check-box cursor-pointer"
             @update:model-value="toggleUserSelection(row)"
           />
         </template>
@@ -154,18 +154,18 @@ const userSearchKey = ref("");
 
 const usersDisplay = ref("selected");
 
+const { t } = useI18n();
+
 const usersDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.groupRoles.all"),
     value: "all",
   },
   {
-    label: "Selected",
+    label: t("iam.groupRoles.selected"),
     value: "selected",
   },
 ];
-
-const { t } = useI18n();
 
 const hasFetchedOrgUsers = ref(false);
 

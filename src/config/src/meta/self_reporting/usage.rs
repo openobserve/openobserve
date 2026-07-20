@@ -30,6 +30,25 @@ pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
 
+/// The reserved self-reporting stream names. These are written only by internal
+/// self-reporting jobs (usage/stats/triggers/errors/data-retention). Users must
+/// not be able to create, ingest into, or delete them — doing so would corrupt
+/// billing/usage accounting.
+pub const RESERVED_SELF_REPORTING_STREAMS: [&str; 5] = [
+    USAGE_STREAM,
+    STATS_STREAM,
+    TRIGGERS_STREAM,
+    ERROR_STREAM,
+    DATA_RETENTION_USAGE_STREAM,
+];
+
+/// Returns true if `stream_name` is a reserved self-reporting stream that users
+/// are not allowed to create, ingest into, or delete. Internal self-reporting
+/// writes bypass this via the `IngestionRequest::Usage` channel.
+pub fn is_reserved_self_reporting_stream(stream_name: &str) -> bool {
+    RESERVED_SELF_REPORTING_STREAMS.contains(&stream_name)
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum TriggerDataStatus {
     #[serde(rename = "completed")]
@@ -58,6 +77,8 @@ pub enum TriggerDataType {
     AnomalyDetection,
     #[serde(rename = "anomaly_detection_training")]
     AnomalyDetectionTraining,
+    #[serde(rename = "synthetics")]
+    Synthetics,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -644,6 +665,25 @@ mod tests {
         assert_eq!(format!("{}", UsageEvent::Search), "Search");
         assert_eq!(format!("{}", UsageEvent::Functions), "Functions");
         assert_eq!(format!("{}", UsageEvent::Other), "Other");
+    }
+
+    #[test]
+    fn test_is_reserved_self_reporting_stream() {
+        // All self-reporting streams are reserved.
+        assert!(is_reserved_self_reporting_stream(USAGE_STREAM));
+        assert!(is_reserved_self_reporting_stream(STATS_STREAM));
+        assert!(is_reserved_self_reporting_stream(TRIGGERS_STREAM));
+        assert!(is_reserved_self_reporting_stream(ERROR_STREAM));
+        assert!(is_reserved_self_reporting_stream(
+            DATA_RETENTION_USAGE_STREAM
+        ));
+        assert!(is_reserved_self_reporting_stream("usage"));
+
+        // Ordinary user streams are not.
+        assert!(!is_reserved_self_reporting_stream("my_logs"));
+        assert!(!is_reserved_self_reporting_stream("usage_production"));
+        assert!(!is_reserved_self_reporting_stream("_usage"));
+        assert!(!is_reserved_self_reporting_stream(""));
     }
 
     #[test]

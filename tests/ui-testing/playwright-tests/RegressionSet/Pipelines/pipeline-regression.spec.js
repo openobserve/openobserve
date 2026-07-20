@@ -551,7 +551,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
     await expect(addBtn, 'Add destination button should be visible after cancel').toBeVisible({ timeout: 10000 });
 
     // Verify no error/spurious notification appeared during the add/cancel flow
-    // Use OToast component's explicit data-test attributes (not Quasar CSS classes)
+    // Use OToast component's explicit data-test attributes (not framework CSS classes)
     const errorToasts = pageManager.pipelinesPage.toastError;
     const errorToastCount = await errorToasts.count();
     testLogger.info(`Error toasts visible after cancel: ${errorToastCount}`);

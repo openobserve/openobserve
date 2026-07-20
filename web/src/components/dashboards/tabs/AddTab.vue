@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog data-test="dashboard-tab-settings-add-tab-dialog"
     :open="open"
     size="sm"
-    :title="editMode ? 'Edit Tab' : 'Add Tab'"
-    secondary-button-label="Cancel"
-    primary-button-label="Save"
+    :title="editMode ? t('dashboard.editTab') : t('dashboard.newTab')"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
     form-id="add-tab-form"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OForm id="add-tab-form" ref="addTabForm" :schema="addTabSchema" :default-values="addTabDefaults" @submit="onSubmit">
         <OFormInput
           name="name"
-          label="Name"
+          :label="t('dashboard.name')"
           required
           data-test="dashboard-add-tab-name"
         />
@@ -153,7 +153,7 @@ export default defineComponent({
             emit("refresh", updatedTab);
             emit("update:open", false);
 
-            showPositiveNotification("Tab updated successfully");
+            showPositiveNotification(t("dashboard.addTab.tabUpdatedSuccessfully"));
           }
           //else new tab
           else {
@@ -168,19 +168,23 @@ export default defineComponent({
             emit("refresh", newTab);
             emit("update:open", false);
 
-            showPositiveNotification("Tab added successfully");
+            showPositiveNotification(t("dashboard.addTab.tabAddedSuccessfully"));
           }
       } catch (error: any) {
           if (error?.response?.status === 409) {
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
+                (props.editMode
+                  ? t("dashboard.addTab.failedToUpdateTab")
+                  : t("dashboard.addTab.failedToAddTab")),
             );
           } else {
             showErrorNotification(
               error?.message ??
-                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
+                (props.editMode
+                  ? t("dashboard.addTab.failedToUpdateTab")
+                  : t("dashboard.addTab.failedToAddTab")),
               {
                 timeout: 2000,
               },

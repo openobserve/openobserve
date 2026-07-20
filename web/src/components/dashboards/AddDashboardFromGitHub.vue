@@ -19,9 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="show"
     side="right"
     size="lg"
-    title="Add Dashboard from Gallery"
-    secondary-button-label="Cancel"
-    :primary-button-label="`Next (${selectedDashboards.length})`"
+    :title="t('dashboard.addDashboardFromGitHub.title')"
+    :secondary-button-label="t('dashboard.addDashboardFromGitHub.cancel')"
+    :primary-button-label="t('dashboard.addDashboardFromGitHub.next', { count: selectedDashboards.length })"
     :primary-button-disabled="selectedDashboards.length === 0"
     @click:secondary="show = false"
     @click:primary="handleNext"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="tw:flex tw:flex-1 tw:items-center tw:justify-center"
+          class="flex flex-1 items-center justify-center"
         >
           <OSpinner size="lg" />
         </div>
@@ -37,64 +37,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error State -->
         <div
           v-else-if="error"
-          class="tw:flex tw:flex-1 tw:flex-col tw:items-center tw:justify-center tw:text-center"
+          class="flex flex-1 flex-col items-center justify-center text-center"
         >
           <OIcon
             name="error-outline"
-            class="tw:mb-2" style="width: 3em; height: 3em;" />
-          <div class="tw:text-red-500">{{ error }}</div>
+            class="mb-2" style="width: 3em; height: 3em;" />
+          <div class="text-red-500">{{ error }}</div>
           <OButton
             variant="primary"
             size="sm"
-            class="tw:mt-4"
+            class="mt-4"
             @click="loadDashboards"
-            >Retry</OButton
+            >{{ t('dashboard.addDashboardFromGitHub.retry') }}</OButton
           >
         </div>
 
         <!-- Dashboard List -->
-        <div v-else class="tw:flex tw:flex-col tw:mx-2 tw:my-2">
+        <div v-else class="flex flex-col mx-2 my-2">
           <OSearchInput
             v-model="searchQuery"
-            placeholder="Search dashboards..."
+            :placeholder="t('dashboard.addDashboardFromGitHub.searchPlaceholder')"
             clearable
-            class="tw:mb-3"
+            class="mb-3"
             data-test="add-dashboard-github-search"
           />
 
-          <div class="tw:text-xs tw:text-gray-500 tw:mb-2 tw:px-1">
-            {{ filteredDashboards.length }} dashboard(s) available
+          <div class="text-xs text-gray-500 mb-2 px-1">
+            {{ t('dashboard.addDashboardFromGitHub.dashboardsAvailable', { count: filteredDashboards.length }) }}
           </div>
 
           <ul
-            class="dashboard-list tw:flex tw:flex-col tw:rounded tw:list-none tw:p-0 tw:m-0 tw:max-h-[calc(100dvh-200px)] tw:overflow-y-auto"
-            :class="filteredDashboards.length > 0 ? 'tw:border tw:border-border' : ''"
+            class="dashboard-list flex flex-col rounded list-none p-0 m-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
+            :class="filteredDashboards.length > 0 ? 'border border-border' : ''"
           >
             <li
               v-for="dashboard in filteredDashboards"
               :key="dashboard.name"
               @click="toggleDashboard(dashboard)"
-              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:border-l-4"
+              class="flex items-center gap-2 px-3 py-1 cursor-pointer transition-colors duration-200 border-l-4"
               :class="[
                 isSelected(dashboard)
-                  ? 'selected-item tw:bg-(--o2-tab-bg)! tw:border-primary'
-                  : 'tw:border-transparent tw:hover:bg-gray-50',
+                  ? 'selected-item bg-(--o2-tab-bg)! border-primary'
+                  : 'border-transparent hover:bg-gray-50',
               ]"
               data-test="add-dashboard-github-item"
             >
-              <div class="tw:shrink-0 tw:pr-2">
+              <div class="shrink-0 pr-2">
                 <OCheckbox
                   :model-value="isSelected(dashboard)"
                   @update:model-value="toggleDashboard(dashboard)"
                 />
               </div>
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm tw:font-medium">
+              <div class="flex flex-col flex-1 min-w-0">
+                <span class="text-sm font-medium">
                   {{ dashboard.displayName }}
                 </span>
                 <span
                   v-if="dashboard.description"
-                  class="tw:block tw:text-xs tw:text-muted-foreground"
+                  class="block text-xs text-muted-foreground"
                 >
                   {{ dashboard.description }}
                 </span>
@@ -108,20 +108,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showFolderSelection"
       persistent
       size="sm"
-      title="Select Destination Folder"
-      secondary-button-label="Back"
-      primary-button-label="Add Dashboard"
+      :title="t('dashboard.addDashboardFromGitHub.selectFolderTitle')"
+      :secondary-button-label="t('dashboard.addDashboardFromGitHub.back')"
+      :primary-button-label="t('dashboard.addDashboardFromGitHub.addDashboard')"
       :primary-button-disabled="!selectedFolderObj"
       :primary-button-loading="importing"
       @click:secondary="showFolderSelection = false"
       @click:primary="confirmAdd"
     >
-      <div class="tw:flex tw:items-end tw:gap-2">
+      <div class="flex items-end gap-2">
         <OSelect
           v-model="selectedFolderObj"
           :options="folderOptions"
-          label="Folder"
-          class="tw:grow"
+          :label="t('dashboard.addDashboardFromGitHub.folder')"
+          class="grow"
           data-test="add-dashboard-github-folder-select"
         />
         <div style="width: 40px; margin-bottom: 2px">
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="add"
             @click="showAddFolderDialog = true"
             data-test="add-dashboard-github-add-folder"
-            title="Add New Folder"
+            :title="t('dashboard.addDashboardFromGitHub.addNewFolder')"
           />
         </div>
       </div>
@@ -141,9 +141,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="showAddFolderDialog"
       size="sm"
-      title="Add New Folder"
-      primary-button-label="Save"
-      secondary-button-label="Cancel"
+      :title="t('dashboard.addDashboardFromGitHub.addNewFolder')"
+      :primary-button-label="t('dashboard.addDashboardFromGitHub.save')"
+      :secondary-button-label="t('dashboard.addDashboardFromGitHub.cancel')"
       form-id="add-folder-dashboards-form"
       @click:secondary="showAddFolderDialog = false"
       data-test="add-dashboard-github-add-folder-dialog"
@@ -161,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import dashboardsService from "@/services/dashboards";
 import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -195,6 +196,7 @@ export default defineComponent({
   emits: ["update:modelValue", "added"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
 
     const show = computed({
       get: () => props.modelValue,
@@ -292,7 +294,7 @@ export default defineComponent({
           `${S3_BASE}/?list-type=2&prefix=${S3_PREFIX}&delimiter=/`,
         );
         if (!response.ok)
-          throw new Error("Failed to fetch dashboards from gallery");
+          throw new Error(t("dashboard.addDashboardFromGitHub.fetchDashboardsError"));
 
         const xmlText = await response.text();
         const folderNames = parseS3Folders(xmlText).filter(
@@ -314,7 +316,7 @@ export default defineComponent({
         error.value =
           err instanceof Error
             ? err.message
-            : "Failed to load dashboard gallery";
+            : t("dashboard.addDashboardFromGitHub.loadGalleryError");
       } finally {
         loading.value = false;
       }
@@ -440,7 +442,10 @@ export default defineComponent({
                 const response = await fetch(rawUrl);
                 if (!response.ok) {
                   throw new Error(
-                    `Failed to fetch ${jsonFile}: ${response.statusText}`,
+                    t("dashboard.addDashboardFromGitHub.fetchFileError", {
+                      file: jsonFile,
+                      status: response.statusText,
+                    }),
                   );
                 }
                 dashboardJson = await response.json();
@@ -494,7 +499,13 @@ export default defineComponent({
             } catch (err) {
               failCount++;
               errors.push(
-                `${jsonFile}: ${err instanceof Error ? err.message : "Unknown error"}`,
+                t("dashboard.addDashboardFromGitHub.fileError", {
+                  file: jsonFile,
+                  error:
+                    err instanceof Error
+                      ? err.message
+                      : t("dashboard.addDashboardFromGitHub.unknownError"),
+                }),
               );
               console.error(`Failed to import ${jsonFile}:`, err);
             }
@@ -505,18 +516,27 @@ export default defineComponent({
         if (successCount > 0 && failCount === 0) {
           toast({
             variant: "success",
-            message: `Successfully imported ${successCount} dashboard(s)!`,
+            message: t("dashboard.addDashboardFromGitHub.importSuccess", {
+              count: successCount,
+            }),
           });
         } else if (successCount > 0 && failCount > 0) {
           toast({
             variant: "warning",
-            message: `Imported ${successCount} dashboard(s), but ${failCount} failed. Check console for details.`,
+            message: t("dashboard.addDashboardFromGitHub.importPartial", {
+              count: successCount,
+              failCount,
+            }),
             timeout: 5000,
           });
         } else {
           toast({
             variant: "error",
-            message: `Failed to import dashboards: ${errors[0] || "Unknown error"}`,
+            message: t("dashboard.addDashboardFromGitHub.importFailed", {
+              error:
+                errors[0] ||
+                t("dashboard.addDashboardFromGitHub.unknownError"),
+            }),
             timeout: 5000,
           });
         }
@@ -527,7 +547,12 @@ export default defineComponent({
       } catch (err) {
         toast({
           variant: "error",
-          message: `Failed to add dashboards: ${err instanceof Error ? err.message : "Unknown error"}`,
+          message: t("dashboard.addDashboardFromGitHub.addFailed", {
+            error:
+              err instanceof Error
+                ? err.message
+                : t("dashboard.addDashboardFromGitHub.unknownError"),
+          }),
           timeout: 5000,
         });
       } finally {
@@ -548,6 +573,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       show,
       loading,
       store,

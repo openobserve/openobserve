@@ -18,6 +18,8 @@ flamegraph.html
 /tmp/
 /data*/
 /src/infra/data/
+/src/core/data/
+/src/search/data/
 /.idea/
 /.vscode
 /.env
@@ -76,4 +78,9 @@ tests/ui-testing/.env.old
 !/.opencode/agents/
 /.opencode/agents/*
 !/.opencode/agents/e2e_ci_council_of_agents/
-/tests/ux-audit/*
+/tests/ux-audit/*.worktrees/
+
+# Track the shared ui-architect skill; the rest of .claude stays ignored.
+!/.claude/skills/
+/.claude/skills/*
+!/.claude/skills/ui-architect/

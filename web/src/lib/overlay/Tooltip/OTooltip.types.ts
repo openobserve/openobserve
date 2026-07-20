@@ -24,6 +24,13 @@ export interface TooltipProps {
   maxWidth?: string;
   /** When true, the tooltip never opens */
   disabled?: boolean;
+  /**
+   * When true, the tooltip stays open while the pointer moves onto the bubble,
+   * so its content can be hovered/selected/copied (useful for long error text
+   * or paths). Default false keeps the standard non-interactive tooltip that
+   * closes as soon as the pointer leaves the trigger.
+   */
+  hoverable?: boolean;
   /** Controlled open state ΓÇö omit for uncontrolled */
   open?: boolean;
   /** Extra CSS class applied to the tooltip bubble element */

@@ -80,7 +80,7 @@ const richContent = computed(() =>
 </script>
 
 <template>
-  <div v-if="integration" class="tw:p-2">
+  <div v-if="integration" class="p-2">
     <AIRichSetupCard
       v-if="richContent"
       :key="integrationSlug"
@@ -94,9 +94,9 @@ const richContent = computed(() =>
       :content="cardContent"
       :doc-url="docURL"
     />
-    <div v-else class="tw:text-[16px]">
+    <div v-else class="text-[16px]">
       <CopyContent :content="aiContent" />
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">
+      <div class="font-bold pt-6 pb-2">
         Click
         <a
           :href="safeHttpUrl(docURL)"
@@ -110,7 +110,7 @@ const richContent = computed(() =>
       </div>
     </div>
   </div>
-  <div v-else class="tw:p-2">
+  <div v-else class="p-2">
     <p>Select an integration to view details.</p>
   </div>
 </template>

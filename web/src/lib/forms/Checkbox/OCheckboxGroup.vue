@@ -45,7 +45,7 @@ provide(CHECKBOX_GROUP_KEY, {
 </script>
 
 <template>
-  <div role="group" class="tw:flex tw:flex-col tw:gap-2">
+  <div role="group" class="flex flex-col gap-2">
     <slot />
   </div>
 </template>

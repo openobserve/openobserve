@@ -825,4 +825,162 @@ describe("FieldList", () => {
       expect(fieldARow.exists()).toBe(true);
     });
   });
+  // ── PromQL query on a stream change ──────────────────────────────────
+
+  describe("changing the stream in PromQL mode", () => {
+    const currentQuery = () => mockReturn.dashboardPanelData.data.queries[0];
+
+    const METRIC_STREAMS = [
+      {
+        name: "first_metric",
+        stream_type: "metrics",
+        metrics_meta: {
+          metric_type: "Counter",
+          metric_family_name: "first_metric",
+          help: "",
+          unit: "",
+        },
+        stats: { doc_num: 100 },
+      },
+      {
+        name: "second_metric",
+        stream_type: "metrics",
+        metrics_meta: {
+          metric_type: "Counter",
+          metric_family_name: "second_metric",
+          help: "",
+          unit: "",
+        },
+        stats: { doc_num: 100 },
+      },
+    ];
+
+    /**
+     * Set up BEFORE mounting: the component loads the stream list on mount and
+     * overwrites `meta.stream.streamResults` with whatever `getStreams` returns,
+     * so the metrics list has to come from the service mock rather than be
+     * written into the panel data by hand.
+     */
+    const asMetricsPromqlPanel = () => {
+      mockReturn.promqlMode = computed(() => true) as any;
+      mockGetStreams.mockResolvedValue({ list: METRIC_STREAMS });
+      currentQuery().fields.stream_type = "metrics";
+      currentQuery().customQuery = true;
+    };
+
+    it("does NOT destroy a query the user wrote", async () => {
+      // It used to reset the query to a bare `${stream}{}` on every stream
+      // change, so a moment's curiosity about another metric silently threw away
+      // a query that may have taken a while to get right. In Custom mode the
+      // query is what actually runs — the stream field only drives label
+      // suggestions — so leaving the two out of step is recoverable, and deleting
+      // the user's work is not.
+      //
+      // `parsePromQlQuery` is mocked to report no metric name, which is what a
+      // query we did not generate looks like from here.
+      asMetricsPromqlPanel();
+      wrapper = mountComponent({ pageKey: "metrics" });
+      await flushPromises();
+
+      const handWritten = 'sum(rate(first_metric{code="500"}[1h])) * 60';
+      currentQuery().query = handWritten;
+
+      // The first change only records the baseline for this query slot.
+      currentQuery().fields.stream = "first_metric";
+      await flushPromises();
+
+      currentQuery().fields.stream = "second_metric";
+      await flushPromises();
+
+      expect(currentQuery().query).toBe(handWritten);
+    });
+
+    it("still seeds an empty slot", async () => {
+      // Nothing to protect, so the rule set's default lands — `sum(rate(...))`
+      // for a counter, rather than the raw cumulative selector.
+      asMetricsPromqlPanel();
+      wrapper = mountComponent({ pageKey: "metrics" });
+      await flushPromises();
+
+      currentQuery().query = "";
+      currentQuery().fields.stream = "first_metric";
+      await flushPromises();
+
+      currentQuery().fields.stream = "second_metric";
+      await flushPromises();
+
+      // The rule set's default for a counter — not the raw cumulative selector.
+      expect(currentQuery().query).toContain("rate(second_metric{}");
+      expect(currentQuery().query).toContain("sum(");
+    });
+  });
+
+  /**
+   * In edit mode the stream list waits for a stream rather than fetching against
+   * a half-built query — the panel's own data arrives asynchronously.
+   *
+   * But a parent can seed the query in ITS `onMounted`, which runs BEFORE this
+   * component's watcher exists (the metrics Visualize workspace does exactly
+   * that, mounting PanelEditor with `edit-mode` and seeding the stream itself).
+   * A change-only watcher never fires for a value already present, so the Stream
+   * dropdown stayed empty forever: "No options found" under a stream that is
+   * plainly selected.
+   */
+  describe("edit mode loads the stream list for an ALREADY-set stream", () => {
+    const currentQuery = () => mockReturn.dashboardPanelData.data.queries[0];
+
+    it("fetches immediately in metrics edit mode even when stream is blank", async () => {
+      currentQuery().fields.stream = "";
+      currentQuery().fields.stream_type = "metrics";
+
+      wrapper = mountComponent({
+        pageKey: "metrics",
+        props: { editMode: true },
+      });
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
+    });
+
+    it("fetches when the stream is set before mount (the seeded-parent case)", async () => {
+      // The parent seeded this before the field list ever mounted.
+      currentQuery().fields.stream = "envoy_cluster_assignment_stale";
+      currentQuery().fields.stream_type = "metrics";
+
+      wrapper = mountComponent({ props: { editMode: true } });
+      await flushPromises();
+
+      // Without `immediate` this never ran, and the dropdown had no options.
+      expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResults).toEqual(
+        mockStreamResults,
+      );
+    });
+
+    it("still fetches when the stream arrives AFTER mount (the real edit case)", async () => {
+      currentQuery().fields.stream = "";
+      wrapper = mountComponent({ props: { editMode: true } });
+      await flushPromises();
+      expect(mockGetStreams).not.toHaveBeenCalled();
+
+      // The panel's data lands late — the original reason this path defers.
+      currentQuery().fields.stream = "some_stream";
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledTimes(1);
+    });
+
+    it("loads once, not once per stream change", async () => {
+      currentQuery().fields.stream = "first";
+      wrapper = mountComponent({ props: { editMode: true } });
+      await flushPromises();
+
+      // The watcher stops itself after the first hit; picking another stream
+      // must not refetch the whole list.
+      currentQuery().fields.stream = "second";
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:w-full index-menu tw:p-1.5! tw:bg-surface-panel!">
+  <div class="flex flex-col w-full index-menu p-1.5! bg-surface-panel!">
     <OSelect
       data-test="log-search-index-list-select-stream"
       :model-value="searchObj.data.stream.selectedStream?.value ?? null"
@@ -30,11 +30,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onStreamChange"
     >
         <template #empty>
-          <div class="tw:p-2">{{ t("search.noResult") }}</div>
+          <div class="p-2">{{ t("search.noResult") }}</div>
         </template>
     </OSelect>
     <div
-      class="index-table tw:h-[calc(100%-2rem)]! tw:w-full"
+      class="index-table h-[calc(100%-2rem)]! w-full"
       data-test="log-search-index-list-fields-table"
     >
       <GroupedFieldList
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-if="field.name === 'duration'" #body>
                   <div
                     v-if="durationPercentilesLoading"
-                    class="tw:flex tw:justify-center tw:py-[0.5rem]"
+                    class="flex justify-center py-[0.5rem]"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -95,37 +95,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="p in PERCENTILE_LABELS"
                       :key="p.key"
-                      class="tw:flex tw:items-center tw:justify-between tw:py-[0.15rem] tw:pl-[0.5rem]"
+                      class="flex items-center justify-between py-[0.15rem] pl-[0.5rem]"
                     >
-                      <span class="tw:text-[0.75rem] tw:w-[2rem] tw:shrink-0">{{ p.label }}</span>
-                      <span class="tw:text-[0.75rem] tw:flex-1 tw:text-right tw:pr-[0.25rem]">
+                      <span class="text-[0.75rem] w-[2rem] shrink-0">{{ p.label }}</span>
+                      <span class="text-[0.75rem] flex-1 text-right pr-[0.25rem]">
                         {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
                       </span>
-                      <div class="tw:flex tw:w-[3rem]">
+                      <div class="flex w-[3rem]">
                         <OButton
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
                           :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                           @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover tw:ml-[0.25rem]! tw:border! tw:border-[var(--o2-border-color)]!"
+                          class="o2-custom-button-hover ml-[0.25rem]! border! border-[var(--o2-border-color)]!"
                         >
-                          <OIcon name="arrow-forward-ios" size="sm" class="tw:h-[0.5rem]! tw:w-[0.5rem]!" />
+                          <OIcon name="arrow-forward-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
                         </OButton>
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
                           :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
                           @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover tw:mr-[0.625rem]! tw:border! tw:border-[var(--o2-border-color)]! tw:ml-auto!"
+                          class="o2-custom-button-hover mr-[0.625rem]! border! border-[var(--o2-border-color)]! ml-auto!"
                         >
-                          <OIcon name="arrow-back-ios" size="sm" class="tw:h-[0.5rem]! tw:w-[0.5rem]!" />
+                          <OIcon name="arrow-back-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
                         </OButton>
                       </div>
                     </div>
                   </template>
-                  <div v-else class="tw:pl-3 tw:py-1 tw:text-sm tw:font-medium">
-                    {{ durationPercentileErrMsg || "No values found" }}
+                  <div v-else class="pl-3 py-1 text-sm font-medium">
+                    {{ durationPercentileErrMsg || t('traces.indexList.noValuesFound') }}
                   </div>
                 </template>
               </FieldExpansion>
@@ -150,10 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #loading>
           <div
-            class="tw:flex tw:items-center tw:justify-center tw:w-full tw:pt-[2rem]"
+            class="flex items-center justify-center w-full pt-[2rem]"
           >
             <div
-              class="tw:text-sm tw:font-medium text-weight-bold tw:w-fit tw:mx-auto tw:my-0 tw:flex-col tw:justify-items-center"
+              class="text-sm font-medium text-weight-bold w-fit mx-auto my-0 flex-col justify-items-center"
             >
               <OSpinner size="sm" />
               {{ t("traces.loadingStream") }}
@@ -170,7 +170,7 @@ import { defineComponent, ref, computed, watch, defineAsyncComponent, onMounted 
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import useTraces, { DEFAULT_TRACE_COLUMNS } from "../../composables/useTraces";
+import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
 import { getImageURL, b64EncodeUnicode, b64DecodeUnicode, formatTimeWithSuffix } from "../../utils/zincutils";
 import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -180,7 +180,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles, { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
-import useParser from "@/composables/useParser";
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { removeFieldFromWhereAST, logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -225,7 +224,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const { searchObj } = useTraces();
+    const { searchObj, tracesParser } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
 
     const pagination = ref({
@@ -366,13 +365,6 @@ export default defineComponent({
       errMsg: durationPercentileErrMsg,
     } = useDurationPercentiles();
 
-    const sqlParser = ref<any>(null);
-
-    onMounted(async () => {
-      const { sqlParser: loadSqlParser } = useParser();
-      sqlParser.value = await loadSqlParser();
-    });
-
     const PERCENTILE_LABELS = [
       { key: "p25", label: "P25" },
       { key: "p50", label: "P50" },
@@ -413,7 +405,7 @@ export default defineComponent({
 
       const durationParseResult = parseDurationWhereClause(
         whereClause,
-        sqlParser.value,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
       if (typeof durationParseResult === "string") {
@@ -422,7 +414,7 @@ export default defineComponent({
 
       whereClause = parseSpanKindWhereClause(
         whereClause,
-        sqlParser.value,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
 

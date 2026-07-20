@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { mount } from "@vue/test-utils";
+import { mount, config } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import i18n from "@/locales";
 import CellActions from "./CellActions.vue";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // ── Mock Vuex ──────────────────────────────────────────────────────────────────
 const mockStore = {
@@ -86,13 +89,13 @@ describe("CellActions", () => {
     it("applies dark background class in dark theme", () => {
       mockStore.state.theme = "dark";
       const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("tw:bg-black");
+      expect(wrapper.find(".field_overlay").classes()).toContain("bg-black");
     });
 
     it("applies light background class in light theme", () => {
       mockStore.state.theme = "light";
       const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("tw:bg-white");
+      expect(wrapper.find(".field_overlay").classes()).toContain("bg-white");
     });
   });
 

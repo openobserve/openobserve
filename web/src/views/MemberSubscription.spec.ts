@@ -67,11 +67,6 @@ describe('MemberSubscription.vue', () => {
     // Push to the route
     router.push('/member-subscription' + routeHash);
 
-    const mockNotify = vi.fn();
-    const mockQuasar = {
-      notify: mockNotify,
-    };
-
     const wrapperInstance = mount(MemberSubscription, {
       global: {
         plugins: [
@@ -79,7 +74,6 @@ describe('MemberSubscription.vue', () => {
           router,
         ],
         mocks: {
-          $q: mockQuasar,
           $route: createMockRoute(routeHash),
           $router: {
             resolve: vi.fn().mockReturnValue({ href: '/organizations' }),
@@ -134,7 +128,7 @@ describe('MemberSubscription.vue', () => {
       wrapper = createWrapper('#token=test-token-123', true); // Prevent auto processing
       await wrapper.vm.$nextTick();
       
-      expect(wrapper.find('.tw\\:rounded-md').exists()).toBe(true);
+      expect(wrapper.find('.rounded-md').exists()).toBe(true);
       expect(wrapper.text()).toContain('Member Subscription');
     });
 

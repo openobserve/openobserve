@@ -1,6 +1,6 @@
 <template>
-  <div style="max-width: 400px; margin-top: 100px" class="tw:mx-auto tw:p-3">
-    <div class="tw:flex tw:justify-center" style="height: 150px">
+  <div style="max-width: 400px; margin-top: 100px" class="mx-auto p-3">
+    <div class="flex justify-center" style="height: 150px">
       <img
         class="appLogo"
         style="width: 250px; height: auto"
@@ -12,7 +12,7 @@
       />
     </div>
 
-    <div class="tw:flex tw:justify-center tw:mt-4">
+    <div class="flex justify-center mt-4">
       <OButton
         data-test="sso-login-btn"
         variant="primary"
@@ -21,29 +21,29 @@
       >
         <div
           data-test="sso-login-btn"
-          class="tw:flex tw:items-center tw:justify-center tw:w-full tw:text-center tw:relative"
+          class="flex items-center justify-center w-full text-center relative"
         >
           <img
-            class="tw:absolute"
+            class="absolute"
             style="width: 30px; left: 16px"
             :src="getImageURL('images/common/sso.svg')"
           />
-          <span class="tw:text-center"> Login with SSO</span>
+          <span class="text-center"> Login with SSO</span>
         </div>
       </OButton>
     </div>
 
-    <div class="tw:mb-3 tw:mt-4 tw:text-center">
+    <div class="mb-3 mt-4 text-center">
       <a
         data-test="sso-login-internal-link"
-        class="tw:cursor-pointer tw:hover:text-[#595959]"
+        class="cursor-pointer hover:text-[#595959]"
         style="text-decoration: underline"
         @click="showLoginInput = !showLoginInput"
         >Sign in with an internal user</a
       >
 
-      <div v-show="showLoginInput" class="o2-input tw:pt-4">
-        <div class="tw:gap-3">
+      <div v-show="showLoginInput" class="o2-input pt-4">
+        <div class="gap-3">
           <OInput
             v-model="name"
             data-cy="login-user-id"
@@ -62,7 +62,7 @@
             type="password"
           />
 
-          <div class="tw:mt-4 tw:mb-6">
+          <div class="mt-4 mb-6">
             <OButton
               data-cy="login-sign-in"
               variant="primary"

@@ -13,31 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   calculateWidthText,
   calculateOptimalFontSize,
   calculateDynamicNameGap,
+  calculateNiceTickValues,
   calculateRotatedLabelBottomSpace,
 } from "@/utils/dashboard/chartDimensionUtils";
 
-// Mock DOM APIs used by calculateWidthText
-const mockSpan = {
-  style: {} as any,
-  innerHTML: "",
-  clientWidth: 0,
-  remove: vi.fn(),
-};
-
+// calculateWidthText delegates to zrender's text measurement (the same one
+// ECharts uses for its own labels); in headless environments zrender uses a
+// deterministic character-width table, so real widths are asserted here.
 describe("chartDimensionUtils", () => {
-  beforeEach(() => {
-    mockSpan.clientWidth = 0;
-    mockSpan.remove.mockClear();
-
-    vi.spyOn(document, "createElement").mockReturnValue(mockSpan as any);
-    vi.spyOn(document.body, "appendChild").mockImplementation(() => mockSpan as any);
-  });
-
   describe("calculateWidthText", () => {
     it("returns 0 for empty string", () => {
       expect(calculateWidthText("")).toBe(0);
@@ -47,80 +35,94 @@ describe("chartDimensionUtils", () => {
       expect(calculateWidthText(null as any)).toBe(0);
     });
 
-    it("calls document.createElement with span", () => {
-      mockSpan.clientWidth = 50;
-      calculateWidthText("Hello");
-      expect(document.createElement).toHaveBeenCalledWith("span");
+    it("returns a positive integer width for non-empty text", () => {
+      const width = calculateWidthText("Hello");
+      expect(width).toBeGreaterThan(0);
+      expect(Number.isInteger(width)).toBe(true);
     });
 
-    it("appends span to body and removes it", () => {
-      mockSpan.clientWidth = 50;
-      calculateWidthText("Hello");
-      expect(document.body.appendChild).toHaveBeenCalled();
-      expect(mockSpan.remove).toHaveBeenCalled();
+    it("never shrinks when the font size grows", () => {
+      // in real browsers zrender measures via canvas and this scales
+      // linearly; jsdom's fallback estimate is font-size-independent, so
+      // only monotonicity can be asserted here
+      expect(calculateWidthText("Hello", "24px")).toBeGreaterThanOrEqual(
+        calculateWidthText("Hello", "12px"),
+      );
     });
 
-    it("returns Math.ceil of clientWidth", () => {
-      mockSpan.clientWidth = 49.3;
-      const result = calculateWidthText("Hello");
-      expect(result).toBe(50);
+    it("scales with the text length", () => {
+      expect(calculateWidthText("HelloHello")).toBeGreaterThan(
+        calculateWidthText("Hello"),
+      );
     });
 
-    it("uses default fontSize of 12px when not provided", () => {
-      mockSpan.clientWidth = 100;
-      calculateWidthText("Hello");
-      expect(mockSpan.style.fontSize).toBe("12px");
+    it("measures unit-formatted values realistically (wider string is wider)", () => {
+      // the motivating bug: "995.56GB" is a smaller value but a wider label
+      expect(calculateWidthText("995.56GB")).toBeGreaterThan(
+        calculateWidthText("1.34TB"),
+      );
+    });
+  });
+
+  describe("calculateNiceTickValues", () => {
+    // expected values verified against ECharts' own IntervalScale output
+    it("matches ECharts ticks for a byte-scale range", () => {
+      expect(calculateNiceTickValues(0, 1720e9)).toEqual([
+        0, 300e9, 600e9, 900e9, 1200e9, 1500e9, 1800e9,
+      ]);
     });
 
-    it("uses provided fontSize", () => {
-      mockSpan.clientWidth = 100;
-      calculateWidthText("Hello", "16px");
-      expect(mockSpan.style.fontSize).toBe("16px");
+    it("matches ECharts ticks for a sub-decimal range (CLS-style)", () => {
+      expect(calculateNiceTickValues(0, 0.012)).toEqual([
+        0, 0.002, 0.004, 0.006, 0.008, 0.01, 0.012,
+      ]);
     });
 
-    it("sets span innerHTML to text", () => {
-      mockSpan.clientWidth = 100;
-      calculateWidthText("TestText");
-      expect(mockSpan.innerHTML).toBe("TestText");
+    it("matches ECharts ticks for a plain numeric range", () => {
+      expect(calculateNiceTickValues(20000, 30000)).toEqual([
+        20000, 22000, 24000, 26000, 28000, 30000,
+      ]);
+    });
+
+    it("matches ECharts ticks for a range crossing zero", () => {
+      expect(calculateNiceTickValues(-50, 175)).toEqual([
+        -50, 0, 50, 100, 150, 200,
+      ]);
+    });
+
+    it("strips floating point noise from tick values", () => {
+      expect(calculateNiceTickValues(0, 1)).toEqual([0, 0.2, 0.4, 0.6, 0.8, 1]);
+    });
+
+    it("returns the single value for a zero-span extent", () => {
+      expect(calculateNiceTickValues(5, 5)).toEqual([5]);
     });
   });
 
   describe("calculateOptimalFontSize", () => {
-    it("finds the largest font size that fits canvas width", () => {
-      // Mock: smaller fonts have smaller widths
-      let callCount = 0;
-      vi.spyOn(document, "createElement").mockReturnValue({
-        ...mockSpan,
-        get clientWidth() {
-          // Simulate: width = fontSize * 5 (approximation)
-          callCount++;
-          return parseInt(mockSpan.style.fontSize || "12") * 5;
-        },
-      } as any);
-
+    it("finds the largest font size that fits the canvas width", () => {
       const result = calculateOptimalFontSize("Hello", 200);
-      // With width = fontSize * 5, max fontSize where fontSize * 5 <= 200 is 40
-      // But this depends on the binary search logic
       expect(result).toBeGreaterThan(0);
       expect(result).toBeLessThanOrEqual(90);
+      // the chosen size fits, the next size up would not (or is the 90 cap)
+      expect(calculateWidthText("Hello", `${result}px`)).toBeLessThanOrEqual(
+        200,
+      );
+      if (result < 90) {
+        expect(
+          calculateWidthText("Hello", `${result + 1}px`),
+        ).toBeGreaterThan(200);
+      }
     });
 
     it("returns a value between 1 and 90", () => {
-      mockSpan.clientWidth = 0; // Text always fits
       const result = calculateOptimalFontSize("Hi", 1000);
       expect(result).toBeGreaterThanOrEqual(1);
       expect(result).toBeLessThanOrEqual(90);
     });
 
     it("returns 1 when text never fits", () => {
-      // Mock: text always too wide
-      vi.spyOn(document, "createElement").mockReturnValue({
-        ...mockSpan,
-        clientWidth: 9999,
-        remove: vi.fn(),
-      } as any);
-
-      const result = calculateOptimalFontSize("VeryLongText", 10);
+      const result = calculateOptimalFontSize("VeryLongTextThatIsWide", 1);
       expect(result).toBe(1);
     });
   });

@@ -117,10 +117,10 @@ const benefits = computed(() => [
 // dark enough for a white person glyph). Full literal classes so Tailwind emits
 // them. These are placeholders — not real members.
 const avatarBgClasses = [
-  "tw:bg-primary-700",
-  "tw:bg-primary-600",
-  "tw:bg-primary-500",
-  "tw:bg-primary-400",
+  "bg-primary-700",
+  "bg-primary-600",
+  "bg-primary-500",
+  "bg-primary-400",
 ];
 
 // Every dismissal path (× / overlay / Escape, Maybe later, or Join Slack)
@@ -149,16 +149,16 @@ const joinSlack = () => {
     :show-close="false"
     @update:open="handleOpenChange"
   >
-    <div class="tw:flex tw:flex-col tw:gap-4 tw:p-2">
+    <div class="flex flex-col gap-4 p-2">
       <!-- Header: Slack badge, title to its right, close button on the far right -->
-      <div class="tw:flex tw:items-start tw:gap-3">
+      <div class="flex items-start gap-3">
         <div
-          class="tw:flex tw:h-12 tw:w-12 tw:shrink-0 tw:items-center tw:justify-center tw:rounded-xl tw:bg-primary-50"
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-50"
           aria-hidden="true"
         >
           <svg
             viewBox="0 0 122.8 122.8"
-            class="tw:h-6 tw:w-6"
+            class="h-6 w-6"
             xmlns="http://www.w3.org/2000/svg"
           >
             <path
@@ -182,7 +182,7 @@ const joinSlack = () => {
 
         <h2
           data-test="community-slack-invite-title"
-          class="tw:flex-1 tw:self-center"
+          class="flex-1 self-center"
         >
           {{ t("communitySlackInvite.title") }}
         </h2>
@@ -190,7 +190,7 @@ const joinSlack = () => {
         <OButton
           variant="ghost"
           size="icon-sm"
-          class="tw:-mr-1 tw:shrink-0"
+          class="-mr-1 shrink-0"
           aria-label="Close"
           data-test="community-slack-invite-close-btn"
           @click="dismiss"
@@ -201,18 +201,18 @@ const joinSlack = () => {
 
       <p
         data-test="community-slack-invite-description"
-        class="tw:text-[var(--o2-text-secondary)]"
+        class="text-[var(--o2-text-secondary)]"
       >
         {{ t("communitySlackInvite.description") }}
       </p>
 
       <!-- Benefits -->
-      <ul class="tw:flex tw:flex-col tw:gap-2.5">
+      <ul class="flex flex-col gap-2.5">
         <li
           v-for="(benefit, index) in benefits"
           :key="index"
           :data-test="`community-slack-invite-benefit-${index}`"
-          class="tw:flex tw:items-start tw:gap-2.5"
+          class="flex items-start gap-2.5"
         >
           <svg
             viewBox="0 0 24 24"
@@ -221,12 +221,12 @@ const joinSlack = () => {
             stroke-width="2.5"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="tw:mt-0.5 tw:h-4 tw:w-4 tw:shrink-0 tw:text-primary-600"
+            class="mt-0.5 h-4 w-4 shrink-0 text-primary-600"
             aria-hidden="true"
           >
             <path d="M20 6 9 17l-5-5" />
           </svg>
-          <span class="tw:text-[var(--o2-text-secondary)]">{{
+          <span class="text-[var(--o2-text-secondary)]">{{
             benefit
           }}</span>
         </li>
@@ -235,16 +235,16 @@ const joinSlack = () => {
       <!-- Social proof — generic avatar stack, no fabricated counts -->
       <div
         data-test="community-slack-invite-members"
-        class="tw:flex tw:items-center tw:gap-3 tw:rounded-lg tw:bg-surface-panel tw:px-3 tw:py-2.5"
+        class="flex items-center gap-3 rounded-lg bg-surface-panel px-3 py-2.5"
       >
-        <div class="tw:flex tw:items-center" aria-hidden="true">
+        <div class="flex items-center" aria-hidden="true">
           <span
             v-for="(bg, i) in avatarBgClasses"
             :key="i"
             :class="[
-              'tw:flex tw:h-7 tw:w-7 tw:items-center tw:justify-center tw:rounded-full tw:text-white tw:ring-2 tw:ring-surface-panel',
+              'flex h-7 w-7 items-center justify-center rounded-full text-white ring-2 ring-surface-panel',
               bg,
-              i > 0 ? 'tw:-ml-2' : '',
+              i > 0 ? '-ml-2' : '',
             ]"
           >
             <OIcon name="person" size="sm" />
@@ -256,15 +256,15 @@ const joinSlack = () => {
       </div>
 
       <!-- Actions -->
-      <div class="tw:flex tw:items-center tw:gap-3 tw:pt-1">
+      <div class="flex items-center gap-3 pt-1">
         <OButton
           data-test="community-slack-invite-join-btn"
           variant="primary"
-          class="tw:flex-1"
+          class="flex-1"
           @click="joinSlack"
         >
           <template #icon-left>
-            <SlackIcon class="tw:h-5 tw:w-5" />
+            <SlackIcon class="h-5 w-5" />
           </template>
           {{ t("communitySlackInvite.joinSlack") }}
         </OButton>

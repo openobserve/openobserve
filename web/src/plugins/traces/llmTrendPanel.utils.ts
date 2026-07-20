@@ -16,7 +16,7 @@
 /**
  * Pure helpers used by `LLMTrendPanel.vue` for axis label / cell
  * formatting and small math. Extracted so they can be unit-tested
- * without mounting the component (which depends on quasar + echarts).
+ * without mounting the component (which depends on echarts).
  *
  * No Vue / DOM imports.
  */

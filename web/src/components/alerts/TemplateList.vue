@@ -15,21 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
-    <div v-if="!showImportTemplate && !showTemplateEditor" class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex flex-col h-full p-0">
+    <PageLayout
+      v-if="!showImportTemplate && !showTemplateEditor"
+      :main-panel="false"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
+    >
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <template #header>
       <AppPageHeader
         :title="t('alert_templates.header')"
         icon="description"
         :subtitle="'Reusable alert message templates'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
       >
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
             @update:model-value="(v: any) => { activeTab = v; }"
             data-test="template-list-tabs"
-            class="tw:mr-2"
+            class="mr-2"
           >
             <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
               <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
@@ -60,7 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
       </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+      </template>
+      <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         data-test="alert-templates-list-table"
@@ -84,22 +89,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <OSearchInput
             v-model="filterQuery"
-            class="tw:flex-1"
+            class="flex-1"
             :placeholder="t('template.search')"
             data-test="template-list-search-input"
           />
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="template-list-refresh-btn"
+            @click="getTemplates"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertTemplatesRefresh" />
+          </OButton>
         </template>
         <template #empty>
           <OEmptyState
             size="hero"
             preset="no-alert-templates"
             :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+            :actions="[
+              { id: 'create', icon: 'add', titleKey: 'emptyState.noAlertTemplates.action', descriptionKey: 'emptyState.noAlertTemplates.actionDesc' },
+              { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noAlertTemplates.import', descriptionKey: 'emptyState.noAlertTemplates.importDesc' },
+            ]"
+            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importTemplate() : editTemplate(null)"
           />
         </template>
         <template #cell-name="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="flex items-center gap-2">
             <span>{{ row.name }}</span>
             <OTag
               v-if="row.isPrebuilt"
@@ -119,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <OButton
             title="Export Template"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             @click.stop="exportTemplate(row)"
@@ -130,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-update-template`"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')"
@@ -142,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-clone-template`"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             :title="t('alert_templates.clone')"
@@ -153,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             :data-test="`alert-template-list-${row.name}-delete-template`"
-            class="tw:ml-1"
+            class="ml-1"
             variant="ghost"
             size="icon-sm"
             :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')"
@@ -168,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedTemplates.length > 0"
           #bottom
         >
-          <span class="tw:text-xs tw:text-text-primary">
+          <span class="text-xs text-text-primary">
             {{ selectedTemplates.length }} selected
           </span>
           <OButton
@@ -183,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </PageLayout>
     <div v-else-if="!showImportTemplate && showTemplateEditor">
       <AddTemplate
         :template="editingTemplate"
@@ -192,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:templates="getTemplates"
       />
     </div>
-    <div v-else>
+    <div v-else class="flex-1 min-h-0">
       <ImportTemplate :templates="templates" @update:templates="getTemplates" />
     </div>
 
@@ -232,6 +252,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -239,6 +260,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";

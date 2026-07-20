@@ -20,23 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('iam.addGroup')"
     :primaryButtonLabel="t('alerts.save')"
     :secondaryButtonLabel="t('alerts.cancel')"
-    :primaryButtonDisabled="!name || !isValidGroupName"
-    @click:primary="saveGroup"
+    form-id="add-group-form"
     @click:secondary="emits('update:open', false)"
     @update:open="emits('update:open', $event)"
   >
     <div data-test="add-group-section">
-      <OInput
-        v-model.trim="name"
-        :label="t('common.name') + ' *'"
-        class="showLabelOnTop tw:mt-2"
-        maxlength="100"
-        data-test="add-group-groupname-input-btn"
-        :error="showNameError"
-        :error-message="nameErrorMessage"
-        :help-text="!showNameError ? t('iam.nameHelpText') : undefined"
-        @update:model-value="showNameError = !!name && !isValidGroupName"
-      />
+      <OForm
+        id="add-group-form"
+        :schema="addGroupSchema"
+        :default-values="addGroupDefaults"
+        @submit="saveGroup"
+      >
+        <OFormInput
+          name="name"
+          :label="t('common.name')"
+          required
+          class="showLabelOnTop mt-2"
+          maxlength="100"
+          data-test="add-group-groupname-input-btn"
+          :help-text="t('iam.nameHelpText')"
+        />
+      </OForm>
     </div>
   </ODialog>
 </template>
@@ -44,12 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { createGroup } from "@/services/iam";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import { ref, computed, watch } from "vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeAddGroupSchema, type AddGroupForm } from "./AddGroup.schema";
 
 const { t } = useI18n();
 const props = defineProps({
@@ -69,63 +75,50 @@ const props = defineProps({
 
 const emits = defineEmits(["update:open", "added:group"]);
 
-const name = ref(props.group?.name || "");
-
-
 const { track } = useReo();
 
 const store = useStore();
 
-const isValidGroupName = computed(() => {
-  // Keep in sync with the backend, which strips everything except
-  // [a-zA-Z0-9_] via format_role_name_only() (jwt.rs). Hyphens are NOT
-  // allowed: the backend would silently rewrite "my-group" → "my_group".
-  const roleNameRegex = /^[a-zA-Z0-9_]+$/;
-  return roleNameRegex.test(name.value);
-});
+const addGroupSchema = makeAddGroupSchema(t);
 
-const showNameError = ref(false);
+// The OForm owns `name`. The ODialog unmounts its body on close + remounts fresh
+// on open, so this typed computed re-seeds `:default-values` each open (the
+// optional `group` prop prefills it, otherwise blank). No local model / watch.
+const addGroupDefaults = computed((): AddGroupForm => ({
+  name: props.group?.name ?? "",
+}));
 
-watch(
-  () => props.open,
-  (isOpen) => {
-    if (isOpen) {
-      name.value = props.group?.name || "";
-      showNameError.value = false;
-    }
-  }
-);
-const nameErrorMessage = computed(() =>
-  !name.value
-    ? t("iam.group.name.required")
-    : t("iam.group.name.invalidChars")
-);
+// Plain async @submit handler — the validated `value` is the source of truth.
+// The schema validates the trimmed name (so surrounding whitespace doesn't trip
+// the regex, mirroring the old `v-model.trim`); trim again here so the saved
+// value matches. OForm awaits this, so the Save spinner spans the request.
+const saveGroup = async (value: AddGroupForm) => {
+  const name = value.name.trim();
+  try {
+    const res = await createGroup(
+      name,
+      store.state.selectedOrganization.identifier,
+    );
+    emits("added:group", { group_name: name, data: res.data });
+    emits("update:open", false);
 
-const saveGroup = () => {
-  if (!name.value || !isValidGroupName.value) return;
-  createGroup(name.value, store.state.selectedOrganization.identifier)
-    .then((res) => {
-      emits("added:group", { group_name: name.value, data: res.data });
-      emits("update:open", false);
-
+    toast({
+      message: t('iam.addGroupPage.createdSuccessfully', { name }),
+      variant: "success",
+    });
+  } catch (err: any) {
+    if (err.response?.status != 403) {
       toast({
-        message: `User Group "${name.value}" Created Successfully!`,
-        variant: "success",
-      });
-    })
-    .catch((err) => {
-      if(err.response.status != 403){
-        toast({
-        message: "Error while creating group",
+        message: t('iam.addGroupPage.errorCreating'),
         variant: "error",
       });
-      }
-      console.log(err);
-    });
-    track("Button Click", {
-      button: "Save Group",
-      page: "Add Group"
-    });
+    }
+    console.log(err);
+  }
+
+  track("Button Click", {
+    button: "Save Group",
+    page: "Add Group",
+  });
 };
 </script>
-

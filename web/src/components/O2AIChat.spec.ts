@@ -81,14 +81,6 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false" },
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
-  };
-});
-
 vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
     push: vi.fn(),

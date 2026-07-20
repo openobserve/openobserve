@@ -14,9 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import searchService from "@/services/search";
+import i18n from "@/locales";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // ---------------------------------------------------------------------------
 // vi.mock calls must sit at the top — Vitest hoists them before any imports
@@ -700,20 +703,20 @@ describe("TraceDAG", () => {
     });
 
     const nodeStyle = {
-      default: "tw:border-[#9e9e9e] tw:bg-[#fafafa] tw:dark:border-[#9e9e9e] tw:dark:bg-[#262626]",
-      generation: "tw:border-[#4caf50] tw:bg-[#e8f5e9] tw:dark:border-[#66bb6a] tw:dark:bg-[#1a2e1a]",
-      embedding: "tw:border-[#2196f3] tw:bg-[#e3f2fd] tw:dark:border-[#64b5f6] tw:dark:bg-[#1a2a3a]",
-      agent: "tw:border-[#9c27b0] tw:bg-[#f3e5f5] tw:dark:border-[#ce93d8] tw:dark:bg-[#2a1a2e]",
-      tool: "tw:border-[#ff9800] tw:bg-[#fff3e0] tw:dark:border-[#ffb74d] tw:dark:bg-[#2e2218]",
-      chain: "tw:border-[#3f51b5] tw:bg-[#e8eaf6] tw:dark:border-[#7986cb] tw:dark:bg-[#1a1a2e]",
-      retriever: "tw:border-[#00bcd4] tw:bg-[#e0f7fa] tw:dark:border-[#4dd0e1] tw:dark:bg-[#1a2a2e]",
-      task: "tw:border-[#009688] tw:bg-[#e0f2f1] tw:dark:border-[#4db6ac] tw:dark:bg-[#1a2e2a]",
-      evaluator: "tw:border-[#e91e63] tw:bg-[#fce4ec] tw:dark:border-[#f48fb1] tw:dark:bg-[#2e1a22]",
-      workflow: "tw:border-[#673ab7] tw:bg-[#ede7f6] tw:dark:border-[#b39ddb] tw:dark:bg-[#221a2e]",
-      rerank: "tw:border-[#03a9f4] tw:bg-[#e1f5fe] tw:dark:border-[#4fc3f7] tw:dark:bg-[#1a2a3a]",
-      guardrail: "tw:border-[#f44336] tw:bg-[#ffebee] tw:dark:border-[#ef5350] tw:dark:bg-[#2e1a1a]",
-      span: "tw:border-[#9e9e9e] tw:bg-[#f5f5f5] tw:dark:border-[#9e9e9e] tw:dark:bg-[#262626]",
-      event: "tw:border-[#ffc107] tw:bg-[#fff8e1] tw:dark:border-[#ffd54f] tw:dark:bg-[#2e2a18]",
+      default: "border-[#9e9e9e] bg-[#fafafa] dark:border-[#9e9e9e] dark:bg-[#262626]",
+      generation: "border-[#4caf50] bg-[#e8f5e9] dark:border-[#66bb6a] dark:bg-[#1a2e1a]",
+      embedding: "border-[#2196f3] bg-[#e3f2fd] dark:border-[#64b5f6] dark:bg-[#1a2a3a]",
+      agent: "border-[#9c27b0] bg-[#f3e5f5] dark:border-[#ce93d8] dark:bg-[#2a1a2e]",
+      tool: "border-[#ff9800] bg-[#fff3e0] dark:border-[#ffb74d] dark:bg-[#2e2218]",
+      chain: "border-[#3f51b5] bg-[#e8eaf6] dark:border-[#7986cb] dark:bg-[#1a1a2e]",
+      retriever: "border-[#00bcd4] bg-[#e0f7fa] dark:border-[#4dd0e1] dark:bg-[#1a2a2e]",
+      task: "border-[#009688] bg-[#e0f2f1] dark:border-[#4db6ac] dark:bg-[#1a2e2a]",
+      evaluator: "border-[#e91e63] bg-[#fce4ec] dark:border-[#f48fb1] dark:bg-[#2e1a22]",
+      workflow: "border-[#673ab7] bg-[#ede7f6] dark:border-[#b39ddb] dark:bg-[#221a2e]",
+      rerank: "border-[#03a9f4] bg-[#e1f5fe] dark:border-[#4fc3f7] dark:bg-[#1a2a3a]",
+      guardrail: "border-[#f44336] bg-[#ffebee] dark:border-[#ef5350] dark:bg-[#2e1a1a]",
+      span: "border-[#9e9e9e] bg-[#f5f5f5] dark:border-[#9e9e9e] dark:bg-[#262626]",
+      event: "border-[#ffc107] bg-[#fff8e1] dark:border-[#ffd54f] dark:bg-[#2e2a18]",
     };
 
     it("should return the default node style for an unknown observation type", () => {
@@ -826,27 +829,27 @@ describe("TraceDAG", () => {
 
     it("should return the default text style for an unknown observation type", () => {
       expect(wrapper.vm.getObservationTypeTextClass("unknown")).toBe(
-        "tw:text-[#757575] tw:dark:text-[#bdbdbd]",
+        "text-[#757575] dark:text-[#bdbdbd]",
       );
     });
 
     it.each([
-      ["chat", "tw:text-[#388e3c] tw:dark:text-[#81c784]"],
-      ["text_completion", "tw:text-[#388e3c] tw:dark:text-[#81c784]"],
-      ["generate_content", "tw:text-[#388e3c] tw:dark:text-[#81c784]"],
-      ["embeddings", "tw:text-[#1976d2] tw:dark:text-[#90caf9]"],
-      ["invoke_agent", "tw:text-[#7b1fa2] tw:dark:text-[#ce93d8]"],
-      ["create_agent", "tw:text-[#7b1fa2] tw:dark:text-[#ce93d8]"],
-      ["execute_tool", "tw:text-[#e65100] tw:dark:text-[#ffcc80]"],
-      ["invoke_workflow", "tw:text-[#4527a0] tw:dark:text-[#b39ddb]"],
-      ["retrieval", "tw:text-[#00838f] tw:dark:text-[#80deea]"],
-      ["chain", "tw:text-[#283593] tw:dark:text-[#9fa8da]"],
-      ["task", "tw:text-[#00796b] tw:dark:text-[#80cbc4]"],
-      ["evaluator", "tw:text-[#c2185b] tw:dark:text-[#f48fb1]"],
-      ["rerank", "tw:text-[#0277bd] tw:dark:text-[#81d4fa]"],
-      ["guardrail", "tw:text-[#c62828] tw:dark:text-[#ef9a9a]"],
-      ["span", "tw:text-[#616161] tw:dark:text-[#bdbdbd]"],
-      ["event", "tw:text-[#f57f17] tw:dark:text-[#ffe082]"],
+      ["chat", "text-[#388e3c] dark:text-[#81c784]"],
+      ["text_completion", "text-[#388e3c] dark:text-[#81c784]"],
+      ["generate_content", "text-[#388e3c] dark:text-[#81c784]"],
+      ["embeddings", "text-[#1976d2] dark:text-[#90caf9]"],
+      ["invoke_agent", "text-[#7b1fa2] dark:text-[#ce93d8]"],
+      ["create_agent", "text-[#7b1fa2] dark:text-[#ce93d8]"],
+      ["execute_tool", "text-[#e65100] dark:text-[#ffcc80]"],
+      ["invoke_workflow", "text-[#4527a0] dark:text-[#b39ddb]"],
+      ["retrieval", "text-[#00838f] dark:text-[#80deea]"],
+      ["chain", "text-[#283593] dark:text-[#9fa8da]"],
+      ["task", "text-[#00796b] dark:text-[#80cbc4]"],
+      ["evaluator", "text-[#c2185b] dark:text-[#f48fb1]"],
+      ["rerank", "text-[#0277bd] dark:text-[#81d4fa]"],
+      ["guardrail", "text-[#c62828] dark:text-[#ef9a9a]"],
+      ["span", "text-[#616161] dark:text-[#bdbdbd]"],
+      ["event", "text-[#f57f17] dark:text-[#ffe082]"],
     ])(
       "should map '%s' to '%s'",
       (input, expected) => {

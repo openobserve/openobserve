@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="action-scripts-list-page" class="tw:h-full">
-    <div v-if="!showAddActionScriptDialog" class="tw:h-full">
+  <div data-test="action-scripts-list-page" class="h-full">
+    <div v-if="!showAddActionScriptDialog" class="h-full">
       <PageLayout
-        :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+        :header-class="'shrink-0 px-4 border-b border-border-default'"
       >
         <!-- Row 1: standard header — title + actions only. Search moved into the
              table's own toolbar below. -->
@@ -53,15 +53,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
           :default-columns="false"
           :show-global-filter="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="actions-action-scripts-list"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="tw:w-64 no-border o2-search-input"
+              class="w-64 no-border o2-search-input"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
             />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="action-scripts-list-refresh-btn"
+              @click="getActionScripts"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="actionsRefresh" />
+            </OButton>
           </template>
             <template #empty>
               <NoData />
@@ -105,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="action-scripts-loading"
                 v-if="alertStateLoadingMap[row.uuid]"
                 style="display: inline-block; width: 33.14px; height: auto"
-                class="tw:flex tw:justify-center tw:items-center tw:ml-1"
+                class="flex justify-center items-center ml-1"
                 :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
               >
                 <OSpinner size="xs" />
@@ -132,11 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div
-                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+                class="flex items-center justify-between w-full h-[48px]"
               >
-                <div class="tw:flex tw:items-center tw:gap-2">
+                <div class="flex items-center gap-2">
                   <div
-                    class="o2-table-footer-title tw:flex tw:items-center tw:w-[80px] tw:mr-md"
+                    class="o2-table-footer-title flex items-center w-[80px] mr-md"
                   >
                     {{ resultTotal }} {{ t("actions.header") }}
                   </div>
@@ -146,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="secondary"
                     size="sm"
                     @click="openBulkDeleteDialog"
-                    ><OIcon name="delete" size="sm" /><span class="tw:ml-1.5"
+                    ><OIcon name="delete" size="sm" /><span class="ml-1.5"
                       >Delete</span
                     ></OButton
                   >
@@ -157,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </PageLayout>
     </div>
     <template v-else>
-      <div class="tw:w-full">
+      <div class="w-full">
         <EditScript
           :isUpdated="isUpdated"
           @update:list="refreshList"
@@ -196,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-left>
         <div
           data-test="add-action-back-btn"
-          class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer"
+          class="flex justify-center items-center cursor-pointer"
           style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
           title="Go Back"
           @click="showForm = false"
@@ -259,7 +274,7 @@ import {
   getImageURL,
   getUUID,
   verifyOrganizationStatus,
-  convertUnixToQuasarFormat,
+  convertUnixToDateFormat,
 } from "@/utils/zincutils";
 import type { Alert, AlertListItem } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -282,6 +297,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface ActionScriptList {
   "#": string | number;
@@ -382,6 +399,7 @@ export default defineComponent({
         header: t("alerts.name"),
         accessorKey: "name",
         sortable: true,
+        hideable: true,
         size: COL.name,
         meta: { align: "left", autoWidth: true },
       },
@@ -390,6 +408,7 @@ export default defineComponent({
         header: t("alerts.createdBy"),
         accessorKey: "created_by",
         sortable: true,
+        hideable: true,
         size: COL.owner,
         meta: { align: "left" },
       },
@@ -398,6 +417,7 @@ export default defineComponent({
         header: t("alerts.createdAt"),
         accessorKey: "created_at",
         sortable: true,
+        hideable: true,
         size: COL.createdAt,
         meta: { align: "left" },
       },
@@ -406,6 +426,7 @@ export default defineComponent({
         header: t("actions.type"),
         accessorKey: "execution_details_type",
         sortable: true,
+        hideable: true,
         size: COL.type,
         meta: { align: "left" },
       },
@@ -414,6 +435,7 @@ export default defineComponent({
         header: t("alerts.lastRunAt"),
         accessorKey: "last_run_at",
         sortable: true,
+        hideable: true,
         size: COL.dateAbsolute,
         meta: { align: "left" },
       },
@@ -422,6 +444,7 @@ export default defineComponent({
         header: t("alerts.lastSuccessfulAt"),
         accessorKey: "last_successful_at",
         sortable: true,
+        hideable: true,
         size: COL.dateAbsolute,
         meta: { align: "left" },
       },
@@ -430,6 +453,7 @@ export default defineComponent({
         header: t("alerts.status"),
         accessorKey: "status",
         sortable: true,
+        hideable: true,
         size: COL.status,
         meta: { align: "left" },
       },
@@ -495,15 +519,15 @@ export default defineComponent({
               created_by: data.created_by,
               created_at_raw: data.created_at || null,
               created_at: data.created_at
-                ? convertUnixToQuasarFormat(data.created_at)
+                ? convertUnixToDateFormat(data.created_at)
                 : "-",
               last_run_at_raw: data.last_run_at || null,
               last_run_at: data.last_run_at
-                ? convertUnixToQuasarFormat(data.last_run_at)
+                ? convertUnixToDateFormat(data.last_run_at)
                 : "-",
               last_successful_at_raw: data.last_successful_at || null,
               last_successful_at: data.last_successful_at
-                ? convertUnixToQuasarFormat(data.last_successful_at)
+                ? convertUnixToDateFormat(data.last_successful_at)
                 : "-",
               status: data.status,
               execution_details_type: data.execution_details_type,
@@ -814,6 +838,10 @@ export default defineComponent({
       },
       { immediate: true },
     );
+
+    useShortcuts([
+      { id: "actionsRefresh", handler: () => { if (!isInputFocused()) getActionScripts(); } },
+    ]);
 
     return {
       t,

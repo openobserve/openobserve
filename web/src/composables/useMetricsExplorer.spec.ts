@@ -19,14 +19,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockNotify } = vi.hoisted(() => ({
-  mockNotify: vi.fn(),
-}));
-
-vi.mock("quasar", () => ({
-  useQuasar: vi.fn(() => ({ notify: mockNotify })),
-}));
-
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({
     state: {

@@ -58,7 +58,7 @@ describe('email template', () => {
       const recipientsField = emailConfig.credentialFields.find(f => f.key === 'recipients');
       expect(recipientsField).toBeDefined();
       expect(recipientsField?.required).toBe(true);
-      expect(recipientsField?.label).toBeTruthy();
+      expect(recipientsField?.labelKey).toBeTruthy();
     });
 
     it('recipients field has validator', () => {

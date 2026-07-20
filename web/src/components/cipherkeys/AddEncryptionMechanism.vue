@@ -14,79 +14,69 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="cipher-keys-add-encryption-mechanism tw:flex tw:flex-col tw:gap-y-2">
-    <OSelect
+  <div class="cipher-keys-add-encryption-mechanism flex flex-col gap-y-2">
+    <!-- Both selects are OForm* controls connected to the parent OForm (in
+         AddCipherKey.vue) by `name`; their rules live in AddCipherKey.schema.ts.
+         No manual error/touched refs, no validate() — the parent schema gates. -->
+    <OFormSelect
       data-test="add-cipher-key-auth-method-input"
-      v-model="frmData.key.mechanism.type"
-      :label="t('cipherKey.providerType') + ' *'"
-      class="tw:w-full"
+      name="key.mechanism.type"
+      :label="t('cipherKey.providerType')"
+      required
+      class="w-full"
       :options="providerTypeOptions"
       labelKey="label"
       valueKey="value"
-      :error="providerTypeTouched && !frmData.key.mechanism.type"
-      :error-message="t('cipherKey.providerTypeRequired') || 'Provider type is required'"
-      @update:model-value="providerTypeTouched = true"
+      tabindex="0"
     />
 
-    <OSelect
-      v-if="frmData.key.mechanism.type === 'simple'"
+    <OFormSelect
+      v-if="mechanismType === 'simple'"
       data-test="add-cipher-algorithm-input"
-      v-model="frmData.key.mechanism.simple_algorithm"
-      :label="t('cipherKey.algorithm') + ' *'"
-      class="tw:w-full"
+      name="key.mechanism.simple_algorithm"
+      :label="t('cipherKey.algorithm')"
+      required
+      class="w-full"
       :options="plainAlgorithmOptions"
       labelKey="label"
       valueKey="value"
-      :error="algorithmTouched && !frmData.key.mechanism.simple_algorithm"
-      :error-message="t('cipherKey.algorithmRequired') || 'Algorithm is required'"
-      @update:model-value="algorithmTouched = true"
+      tabindex="0"
     />
-
   </div>
 </template>
 
 <script lang="ts">
-import { ref, defineComponent } from "vue";
+import { computed, defineComponent, inject } from "vue";
 import { useI18n } from "vue-i18n";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 
 export default defineComponent({
   name: "PageAddEncryptionMechanism",
-  components: { OSelect },
-  props: {
-    formData: Object,
-  },
-  setup(props: any) {
+  components: { OFormSelect },
+  setup() {
     const { t } = useI18n();
-    const frmData = ref(props.formData || {});
-    const providerTypeTouched = ref(false);
-    const algorithmTouched = ref(false);
 
-    const providerTypeOptions = ref([
+    // Read the (form-owned) mechanism type reactively from the parent OForm so
+    // the conditional algorithm select shows/hides as it changes. `useStore`
+    // (NOT a snapshot of form.state.values) keeps the computed reactive.
+    const form = inject(FORM_CONTEXT_KEY, null);
+    const mechanismType = form
+      ? form.useStore((s: any) => s?.values?.key?.mechanism?.type)
+      : computed(() => "simple");
+
+    const providerTypeOptions = [
       { value: "simple", label: "Simple" },
       { value: "tink_keyset", label: "Tink KeySet" },
-    ]);
+    ];
 
-    const plainAlgorithmOptions = ref([
-      { value: "aes-256-siv", label: "AES 256 SIV" },
-    ]);
+    const plainAlgorithmOptions = [{ value: "aes-256-siv", label: "AES 256 SIV" }];
 
     return {
       t,
-      frmData,
-      providerTypeTouched,
-      algorithmTouched,
+      mechanismType,
       providerTypeOptions,
       plainAlgorithmOptions,
-      validate: () => {
-        providerTypeTouched.value = true;
-        algorithmTouched.value = true;
-        const providerValid = !!frmData.value.key.mechanism.type;
-        const algorithmValid =
-          frmData.value.key.mechanism.type !== 'simple' ||
-          !!frmData.value.key.mechanism.simple_algorithm;
-        return providerValid && algorithmValid;
-      },
     };
   },
 });

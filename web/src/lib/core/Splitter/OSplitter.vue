@@ -6,16 +6,16 @@
     :class="[
       'o-splitter',
       horizontal ? 'o-splitter--horizontal' : 'o-splitter--vertical',
-      'tw:flex tw:relative',
-      horizontal ? 'tw:flex-col' : 'tw:flex-row'
+      'flex relative',
+      horizontal ? 'flex-col' : 'flex-row'
     ]"
   >
     <!-- Before slot -->
     <div
       :class="[
         'o-splitter__before',
-        'tw:overflow-hidden tw:shrink-0 tw:relative',
-        horizontal ? 'tw:w-full' : 'tw:h-full',
+        'overflow-hidden shrink-0 relative',
+        horizontal ? 'w-full' : 'h-full',
         beforeClass
       ]"
       :style="beforeStyle"
@@ -28,14 +28,12 @@
       v-if="separator !== false"
       :class="[
         horizontal ? 'o-splitter__separator--horizontal' : 'o-splitter__separator--vertical',
-        'tw:select-none',
-        'tw:transition-colors',
-        'hover:tw:bg-[var(--o2-border-input)]',
-        'tw:relative',
-        'tw:z-10',
-        'tw:focus:outline-2 tw:focus:outline-(--o2-primary-color) tw:focus:-outline-offset-2',
-        disable ? 'tw:cursor-default! tw:opacity-50' : '',
-        horizontal ? 'tw:h-px tw:w-full tw:cursor-row-resize' : 'tw:h-full tw:cursor-col-resize',
+        'select-none',
+        'relative',
+        'z-10',
+        'focus:outline-2 focus:outline-(--o2-primary-color) focus:-outline-offset-2',
+        disable ? 'cursor-default! opacity-50' : '',
+        horizontal ? 'h-px w-full cursor-row-resize' : 'h-full cursor-col-resize',
         separatorClass
       ]"
       :style="[separatorStyle]"
@@ -56,8 +54,8 @@
     <div
       :class="[
         'o-splitter__after',
-        'tw:overflow-hidden tw:flex-1 tw:relative tw:z-0 tw:shrink-0',
-        horizontal ? 'tw:w-full' : 'tw:h-full'
+        'overflow-hidden flex-1 relative z-0 shrink-0',
+        horizontal ? 'w-full' : 'h-full'
       ]"
     >
       <slot name="after" />

@@ -38,7 +38,7 @@ export default class DashboardLegendsCopy {
    * @returns {import('@playwright/test').Locator}
    */
   getShowLegendsButton() {
-    // The button renders icon "format_list_bulleted" as text content via Quasar's OIcon
+    // The button renders icon "format_list_bulleted" as text content via OIcon
     return this.showLegendsBtn.first();
   }
 

@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   global, *unlayered* h1/h2 rules (styles/app.scss) that otherwise beat
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
-  Props: title | subtitle | icon | breadcrumb | breadcrumbMaxInline | back | tabsBelow
+  Props: title | titleDataTest | subtitle | icon | breadcrumb | breadcrumbMaxInline | back | tabsBelow
   Slots: title-prefix | title | subtitle | actions | tabs | back
 -->
 <template>
@@ -51,14 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        action button. Title overflow is handled by truncate + min-w-0 on the
        title block instead. h-14 gives the header a touch more breathing room. -->
   <header
-    class="app-page-header tw:shrink-0"
+    class="app-page-header shrink-0"
     :class="[
       tabsBelow
-        ? 'tw:flex tw:flex-col'
-        : 'tw:h-15 tw:flex tw:items-center tw:justify-between tw:gap-4',
+        ? 'flex flex-col'
+        : 'h-15 flex items-center justify-between gap-4',
       // The header owns its bottom divider whenever it carries tabs, so the tab
       // underline always lands on it — consumers never hand-draw a border-b.
-      { 'tw:border-b tw:border-border-default': hasTabs && tabsBelow },
+      { 'border-b border-border-default': hasTabs && tabsBelow },
     ]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
@@ -67,11 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       :class="
         tabsBelow
-          ? 'tw:h-15 tw:flex tw:items-center tw:justify-between tw:gap-4'
-          : 'tw:contents'
+          ? 'h-15 flex items-center justify-between gap-4'
+          : 'contents'
       "
     >
-    <div class="tw:flex tw:items-center tw:gap-3.25 tw:min-w-0 tw:h-full tw:flex-1">
+    <div class="flex items-center gap-3.25 min-w-0 h-full flex-1">
       <slot name="title-prefix" />
 
       <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="back">
           <button
             type="button"
-            class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-9.5 tw:h-9.5 tw:rounded-[0.625rem] tw:text-text-secondary tw:transition-colors tw:hover:bg-surface-subtle tw:hover:text-text-primary tw:outline-none tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+            class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-[0.625rem] bg-surface-subtle text-text-primary transition-colors hover:bg-button-ghost-hover-bg outline-none focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
             :title="backLabel"
             :aria-label="backLabel"
             :data-test="props.back?.dataTest ?? 'app-page-header-back'"
@@ -94,16 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Listing/index page: the module icon tile. -->
       <span
         v-else-if="icon"
-        class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-9.5 tw:h-9.5 tw:rounded-[0.625rem] tw:bg-tabs-active-bg tw:text-tabs-active-text"
+        class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-[0.625rem] bg-tabs-active-bg text-tabs-active-text"
         aria-hidden="true"
       >
         <OIcon :name="icon" size="md" />
       </span>
 
-      <div class="tw:flex tw:flex-col tw:justify-center tw:min-w-0 tw:shrink-0">
+      <div class="flex flex-col justify-center min-w-0 shrink-0">
         <h1
-          class="tw:text-[1.0625rem]! tw:font-semibold! tw:leading-[1.45]! tw:tracking-[-0.02em]! tw:text-text-primary tw:truncate tw:min-h-6"
+          class="text-[1.0625rem]! font-semibold! leading-[1.45]! tracking-[-0.02em]! text-text-primary truncate min-h-6"
           :title="title"
+          :data-test="titleDataTest"
         >
           <slot name="title">{{ title }}</slot>
         </h1>
@@ -115,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="hasSubtitle"
           variant="meta"
           as="div"
-          class="tw:flex tw:items-center tw:h-5 tw:min-w-0"
+          class="flex items-center h-5 min-w-0"
         >
           <slot name="subtitle">
             <AppBreadcrumb
@@ -126,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- leading-normal (not the meta variant's leading-none): truncate
                  sets overflow:hidden, and a 1em line box clips descenders
                  (g/y/p). The h-5 band + items-center leaves room for it. -->
-            <span v-else class="tw:truncate tw:min-w-0 tw:leading-normal">{{ subtitle }}</span>
+            <span v-else class="truncate min-w-0 leading-normal">{{ subtitle }}</span>
           </slot>
         </OText>
       </div>
@@ -139,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Two-row mode renders them as a full-width strip below instead. -->
       <div
         v-if="hasTabs && !tabsBelow"
-        class="tw:flex tw:items-center tw:min-w-0 tw:flex-1 tw:h-full"
+        class="flex items-center min-w-0 flex-1 h-full"
       >
         <slot name="tabs" />
       </div>
@@ -147,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="hasActions"
-      class="tw:flex tw:items-center tw:gap-2 tw:shrink-0"
+      class="flex items-center gap-2 shrink-0"
     >
       <slot name="actions" />
     </div>
@@ -159,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom edge — so the underline lands exactly on that divider with no
          margin hacks and no consumer-drawn border. The -mt-2 pulls the tab row up
          into the title row's slack so the overall header height stays compact. -->
-    <div v-if="hasTabs && tabsBelow" class="tw:-mt-2">
+    <div v-if="hasTabs && tabsBelow" class="-mt-2">
       <slot name="tabs" />
     </div>
   </header>
@@ -185,6 +186,9 @@ interface BackTarget {
 const props = withDefaults(
   defineProps<{
     title?: string;
+    /** Optional data-test attribute rendered on the <h1>, so consumers can
+     *  drop the #title slot (whose only purpose was attaching a test hook). */
+    titleDataTest?: string;
     subtitle?: string;
     icon?: IconName;
     /** Level-3+ ancestor path; renders an AppBreadcrumb into the subtitle band. */

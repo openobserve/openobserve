@@ -52,13 +52,13 @@ describe("ORadioGroup", () => {
 
   it("renders vertical layout by default", () => {
     wrapper = mount(ORadioGroup);
-    expect(wrapper.find("div[role]").classes()).toContain("tw:flex-col");
+    expect(wrapper.find("div[role]").classes()).toContain("flex-col");
   });
 
   it("renders horizontal layout when orientation is horizontal", () => {
     wrapper = mount(ORadioGroup, {
       props: { orientation: "horizontal" },
     });
-    expect(wrapper.find("div[role]").classes()).toContain("tw:flex-row");
+    expect(wrapper.find("div[role]").classes()).toContain("flex-row");
   });
 });

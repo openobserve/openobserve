@@ -613,7 +613,7 @@ describe("RenderDashboardCharts", () => {
     it("does not render the legacy q-dialog / q-card markup after migration", async () => {
       wrapper = createWrapper();
       await nextTick();
-      // The migrated markup must not include the old Quasar dialog selectors
+      // The migrated markup must not include the old dialog selectors
       expect(wrapper.find('[data-test="q-dialog-stub"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="q-card-stub"]').exists()).toBe(false);
     });

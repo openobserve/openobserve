@@ -60,7 +60,7 @@ describe("LoadingProgress", () => {
       },
     });
 
-    expect(wrapper.html()).toContain("tw:w-full");
+    expect(wrapper.html()).toContain("w-full");
   });
 
   it("should set minimum width of 5% for very small percentages", () => {
@@ -168,8 +168,8 @@ describe("LoadingProgress", () => {
       },
     });
 
-    const container = wrapper.find(".tw\\:absolute");
-    expect(container.classes()).toContain("tw:opacity-0");
+    const container = wrapper.find(".absolute");
+    expect(container.classes()).toContain("opacity-0");
   });
 
   it("should apply opacity-100 class when loading", () => {
@@ -183,8 +183,8 @@ describe("LoadingProgress", () => {
       },
     });
 
-    const container = wrapper.find(".tw\\:absolute");
-    expect(container.classes()).toContain("tw:opacity-100");
+    const container = wrapper.find(".absolute");
+    expect(container.classes()).toContain("opacity-100");
   });
 
   it("should use dark theme colors when theme is dark", () => {
@@ -204,7 +204,7 @@ describe("LoadingProgress", () => {
       },
     });
 
-    expect(wrapper.html()).toContain("tw:bg-gray-700");
+    expect(wrapper.html()).toContain("bg-gray-700");
   });
 
   it("should use light theme colors when theme is light", () => {
@@ -218,7 +218,7 @@ describe("LoadingProgress", () => {
       },
     });
 
-    expect(wrapper.html()).toContain("tw:bg-gray-200");
+    expect(wrapper.html()).toContain("bg-gray-200");
   });
 
   it("should show shimmer animation during loading", () => {
@@ -263,8 +263,8 @@ describe("LoadingProgress", () => {
       },
     });
 
-    expect(wrapper.html()).toContain("tw:absolute tw:top-0");
-    expect(wrapper.html()).toContain("tw:rounded-full");
+    expect(wrapper.html()).toContain("absolute top-0");
+    expect(wrapper.html()).toContain("rounded-full");
   });
 
   it("should have smooth transition animation", () => {
@@ -292,8 +292,8 @@ describe("LoadingProgress", () => {
       },
     });
 
-    const container = wrapper.find(".tw\\:absolute");
-    expect(container.classes()).toContain("tw:top-0");
-    expect(container.classes()).toContain("tw:z-[999]");
+    const container = wrapper.find(".absolute");
+    expect(container.classes()).toContain("top-0");
+    expect(container.classes()).toContain("z-[999]");
   });
 });

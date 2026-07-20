@@ -30,25 +30,13 @@ vi.mock("@/services/backfill", () => ({
 vi.mock("@/components/DateTime.vue", () => ({
   default: {
     template: '<div data-test="time-range-picker" />',
-    props: ["autoApply", "defaultType", "disableRelative", "minDate"],
+    props: ["defaultType", "defaultAbsoluteTime", "defaultRelativeTime", "disableRelative", "minDate"],
     emits: ["on:date-change"],
     methods: {
       setCustomDate: vi.fn(),
     },
   },
 }));
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-      dialog: vi.fn(() => ({ onOk: vi.fn((cb: () => void) => { cb(); return { onCancel: vi.fn() }; }) })),
-      dark: { isActive: false },
-    }),
-  };
-});
 
 import backfillService from "@/services/backfill";
 import type { BackfillJob } from "@/services/backfill";
@@ -80,6 +68,7 @@ const ODialogStub = {
     "width",
     "title",
     "subTitle",
+    "formId",
     "primaryButtonLabel",
     "primaryButtonLoading",
     "primaryButtonDisabled",
@@ -129,6 +118,23 @@ function createWrapper(props: Record<string, unknown> = {}) {
     },
   });
 }
+
+// Form helpers — everything (timerange/chunk/delay/deleteBeforeBackfill) is
+// form-owned now. The footer Save submits via form-id; tests drive the form's
+// own handleSubmit() so the validate → @submit → save chain is awaited.
+const setField = (w: any, name: string, val: unknown) =>
+  (w.vm as any).form.setFieldValue(name, val);
+const formVals = (w: any) => (w.vm as any).form.state.values;
+const setRange = (w: any, range: unknown) => setField(w, "timerange", range);
+const validRange = () => ({
+  type: "absolute",
+  from: mockJob.start_time,
+  to: mockJob.end_time,
+});
+const submitForm = async (w: any) => {
+  await (w.vm as any).form.handleSubmit();
+  await flushPromises();
+};
 
 describe("EditBackfillJobDialog", () => {
   beforeEach(() => {
@@ -204,31 +210,29 @@ describe("EditBackfillJobDialog", () => {
     });
   });
 
-  describe("formData initialization", () => {
-    it("initializes formData from job prop when dialog opens", async () => {
+  describe("form initialization", () => {
+    it("initializes form + time range from job prop when dialog opens", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
-      const vm = wrapper.vm as any;
-      expect(vm.formData.startTimeMicros).toBe(mockJob.start_time);
-      expect(vm.formData.endTimeMicros).toBe(mockJob.end_time);
-      expect(vm.formData.chunkPeriodMinutes).toBe(mockJob.chunk_period_minutes);
-      expect(vm.formData.delayBetweenChunks).toBe(
+      expect(formVals(wrapper).timerange.from).toBe(mockJob.start_time);
+      expect(formVals(wrapper).timerange.to).toBe(mockJob.end_time);
+      expect(formVals(wrapper).chunkPeriodMinutes).toBe(mockJob.chunk_period_minutes);
+      expect(formVals(wrapper).delayBetweenChunks).toBe(
         mockJob.delay_between_chunks_secs,
       );
-      expect(vm.formData.deleteBeforeBackfill).toBe(
+      expect(formVals(wrapper).deleteBeforeBackfill).toBe(
         mockJob.delete_before_backfill,
       );
     });
 
-    it("does not populate formData when job is null", async () => {
+    it("does not populate form time range when job is null", async () => {
       const wrapper = createWrapper({ modelValue: true, job: null });
       await flushPromises();
-      const vm = wrapper.vm as any;
-      expect(vm.formData.startTimeMicros).toBe(0);
-      expect(vm.formData.endTimeMicros).toBe(0);
+      expect(formVals(wrapper).timerange.from).toBeUndefined();
+      expect(formVals(wrapper).timerange.to).toBeUndefined();
     });
 
-    it("re-initializes formData when job prop changes", async () => {
+    it("re-initializes form + time range when job prop changes", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
@@ -241,44 +245,33 @@ describe("EditBackfillJobDialog", () => {
       await wrapper.setProps({ job: updatedJob });
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      expect(vm.formData.startTimeMicros).toBe(1800000000000000);
-      expect(vm.formData.endTimeMicros).toBe(1800003600000000);
-      expect(vm.formData.chunkPeriodMinutes).toBe(30);
+      expect(formVals(wrapper).timerange.from).toBe(1800000000000000);
+      expect(formVals(wrapper).timerange.to).toBe(1800003600000000);
+      expect(formVals(wrapper).chunkPeriodMinutes).toBe(30);
     });
   });
 
-  describe("updateDateTime", () => {
-    it("sets startTimeMicros and endTimeMicros from DateTime event value", async () => {
+  describe("timerange field", () => {
+    it("setFieldValue('timerange', ...) updates the form value", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      const vm = wrapper.vm as any;
 
-      vm.updateDateTime({
-        startTime: 1700000000000000,
-        endTime: 1700007200000000,
-      });
+      setRange(wrapper, { type: "absolute", from: 1700000000000000, to: 1700007200000000 });
       await nextTick();
 
-      expect(vm.formData.startTimeMicros).toBe(1700000000000000);
-      expect(vm.formData.endTimeMicros).toBe(1700007200000000);
+      expect(formVals(wrapper).timerange.from).toBe(1700000000000000);
+      expect(formVals(wrapper).timerange.to).toBe(1700007200000000);
     });
   });
 
-  describe("onSubmit (via ODrawer click:primary)", () => {
+  describe("onSubmit (via real OForm submit)", () => {
     it("calls backfillService.updateBackfillJob with correct parameters on submit", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
+      // timerange + chunk/delay/deleteBeforeBackfill are seeded into the form
+      // from the job (start/end / 60 / 5 / false) by the open-watch.
 
-      const vm = wrapper.vm as any;
-      vm.formData.startTimeMicros = 1700000000000000;
-      vm.formData.endTimeMicros = 1700003600000000;
-      vm.formData.chunkPeriodMinutes = 60;
-      vm.formData.delayBetweenChunks = 5;
-      vm.formData.deleteBeforeBackfill = false;
-
-      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
-      await flushPromises();
+      await submitForm(wrapper);
 
       expect(backfillService.updateBackfillJob).toHaveBeenCalledWith({
         org_id: store.state.selectedOrganization.identifier,
@@ -298,13 +291,7 @@ describe("EditBackfillJobDialog", () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.formData.startTimeMicros = 1700000000000000;
-      vm.formData.endTimeMicros = 1700003600000000;
-      vm.formData.deleteBeforeBackfill = false;
-
-      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
-      await flushPromises();
+      await submitForm(wrapper);
 
       expect(wrapper.emitted("job-updated")).toBeTruthy();
       expect(wrapper.emitted("job-updated")!.length).toBe(1);
@@ -314,18 +301,24 @@ describe("EditBackfillJobDialog", () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.formData.startTimeMicros = 1700000000000000;
-      vm.formData.endTimeMicros = 1700003600000000;
-      vm.formData.deleteBeforeBackfill = false;
-
-      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
-      await flushPromises();
+      await submitForm(wrapper);
 
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeTruthy();
       const lastEmit = emitted![emitted!.length - 1];
       expect(lastEmit[0]).toBe(false);
+    });
+
+    it("blocks submit when chunkPeriodMinutes is out of range", async () => {
+      const wrapper = createWrapper({ modelValue: true, job: mockJob });
+      await flushPromises();
+
+      setField(wrapper, "chunkPeriodMinutes", 5000);
+
+      await submitForm(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(backfillService.updateBackfillJob).not.toHaveBeenCalled();
     });
 
     it("sets errorMessage on service failure", async () => {
@@ -336,15 +329,9 @@ describe("EditBackfillJobDialog", () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.formData.startTimeMicros = 1700000000000000;
-      vm.formData.endTimeMicros = 1700003600000000;
-      vm.formData.deleteBeforeBackfill = false;
+      await submitForm(wrapper);
 
-      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
-      await flushPromises();
-
-      expect(vm.errorMessage).toBe("Network Error");
+      expect((wrapper.vm as any).errorMessage).toBe("Network Error");
     });
 
     it("sets errorMessage from response data on API error", async () => {
@@ -359,51 +346,51 @@ describe("EditBackfillJobDialog", () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.formData.startTimeMicros = 1700000000000000;
-      vm.formData.endTimeMicros = 1700003600000000;
-      vm.formData.deleteBeforeBackfill = false;
+      await submitForm(wrapper);
 
-      await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
-      await flushPromises();
-
-      expect(vm.errorMessage).toBe("Job not found");
+      expect((wrapper.vm as any).errorMessage).toBe("Job not found");
     });
 
     it("sets errorMessage when job prop is null on submit", async () => {
       const wrapper = createWrapper({ modelValue: true, job: null });
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      await vm.onSubmit();
+      // job is null → the form's default timerange is empty; supply a valid
+      // range so the schema passes and the @submit handler runs the null guard.
+      setRange(wrapper, { type: "absolute", from: 1700000000000000, to: 1700003600000000 });
+      await submitForm(wrapper);
 
-      expect(vm.errorMessage).toBe("No job selected");
+      expect((wrapper.vm as any).errorMessage).toBe("No job selected");
+      expect(backfillService.updateBackfillJob).not.toHaveBeenCalled();
     });
 
-    it("sets errorMessage when time range is invalid (both zero)", async () => {
+    it("blocks submit + renders error when time range is invalid (both zero)", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.formData.startTimeMicros = 0;
-      vm.formData.endTimeMicros = 0;
+      setRange(wrapper, { type: "absolute", from: 0, to: 0 });
+      await submitForm(wrapper);
 
-      await vm.onSubmit();
-
-      expect(vm.errorMessage).toBe("Please select a valid time range");
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect((wrapper.vm as any).timerangeError).toBe(
+        "Please select a valid time range",
+      );
+      expect(wrapper.text()).toContain("Please select a valid time range");
+      expect(backfillService.updateBackfillJob).not.toHaveBeenCalled();
     });
 
-    it("sets errorMessage when start time >= end time", async () => {
+    it("blocks submit + renders error when start time >= end time", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.formData.startTimeMicros = 1700003600000000;
-      vm.formData.endTimeMicros = 1700000000000000;
+      setRange(wrapper, { type: "absolute", from: 1700003600000000, to: 1700000000000000 });
+      await submitForm(wrapper);
 
-      await vm.onSubmit();
-
-      expect(vm.errorMessage).toBe("End time must be after start time");
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect((wrapper.vm as any).timerangeError).toBe(
+        "Start time must be before end time",
+      );
+      expect(backfillService.updateBackfillJob).not.toHaveBeenCalled();
     });
   });
 
@@ -421,22 +408,22 @@ describe("EditBackfillJobDialog", () => {
       expect(lastEmit[0]).toBe(false);
     });
 
-    it("resets formData on cancel", async () => {
+    it("resets form + time range on cancel", async () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.formData.chunkPeriodMinutes = 999;
+      setField(wrapper, "chunkPeriodMinutes", 999);
       vm.errorMessage = "some error";
 
       await wrapper.findComponent(ODialogStub).vm.$emit("click:secondary");
       await nextTick();
 
-      expect(vm.formData.startTimeMicros).toBe(0);
-      expect(vm.formData.endTimeMicros).toBe(0);
-      expect(vm.formData.chunkPeriodMinutes).toBeNull();
-      expect(vm.formData.delayBetweenChunks).toBeNull();
-      expect(vm.formData.deleteBeforeBackfill).toBe(false);
+      expect(formVals(wrapper).timerange.from).toBeUndefined();
+      expect(formVals(wrapper).timerange.to).toBeUndefined();
+      expect(formVals(wrapper).chunkPeriodMinutes).toBeNull();
+      expect(formVals(wrapper).delayBetweenChunks).toBeNull();
+      expect(formVals(wrapper).deleteBeforeBackfill).toBe(false);
       expect(vm.errorMessage).toBe("");
     });
 
@@ -492,61 +479,59 @@ describe("EditBackfillJobDialog", () => {
     });
   });
 
-  describe("validation rules", () => {
-    it("chunk period rule: returns true for empty/null value (optional field)", () => {
-      const rule = (val: number | null) =>
-        !val || (val >= 1 && val <= 1440) || "Must be between 1 and 1440";
-      expect(rule(null)).toBe(true);
-      expect(rule(0)).toBe(true);
+  // These drive the REAL shared Zod schema (backfillJob.schema.ts) through the
+  // form submit — not a hand-rolled copy of the rule. They lock in the main
+  // baseline: only null/undefined are optional and PASS; 0 and empty ("") coerce
+  // into the range check and BLOCK (main did `Number(v) < min`); an in-range
+  // value passes; an out-of-range value blocks the save.
+  describe("numeric-range validation (real schema)", () => {
+    // Set one numeric field, submit through the real OForm, and report whether
+    // the save actually fired (job + valid range are seeded from mockJob).
+    const savesWith = async (field: string, value: unknown) => {
+      const wrapper = createWrapper({ modelValue: true, job: mockJob });
+      await flushPromises();
+      setField(wrapper, field, value);
+      await submitForm(wrapper);
+      const called =
+        vi.mocked(backfillService.updateBackfillJob).mock.calls.length > 0;
+      wrapper.unmount();
+      return called;
+    };
+
+    it("chunkPeriodMinutes: 0 blocks the save (0 < min)", async () => {
+      expect(await savesWith("chunkPeriodMinutes", 0)).toBe(false);
     });
 
-    it("chunk period rule: returns true for value 1 (lower bound)", () => {
-      const rule = (val: number | null) =>
-        !val || (val >= 1 && val <= 1440) || "Must be between 1 and 1440";
-      expect(rule(1)).toBe(true);
+    it("chunkPeriodMinutes: '' (cleared) blocks the save", async () => {
+      expect(await savesWith("chunkPeriodMinutes", "")).toBe(false);
     });
 
-    it("chunk period rule: returns true for value 1440 (upper bound)", () => {
-      const rule = (val: number | null) =>
-        !val || (val >= 1 && val <= 1440) || "Must be between 1 and 1440";
-      expect(rule(1440)).toBe(true);
+    it("chunkPeriodMinutes: null (unset) passes — save is called", async () => {
+      expect(await savesWith("chunkPeriodMinutes", null)).toBe(true);
     });
 
-    it("chunk period rule: returns error for value exceeding 1440", () => {
-      const rule = (val: number | null) =>
-        !val || (val >= 1 && val <= 1440) || "Must be between 1 and 1440";
-      expect(rule(1441)).toBe("Must be between 1 and 1440");
+    it("chunkPeriodMinutes: 1 (lower bound) passes", async () => {
+      expect(await savesWith("chunkPeriodMinutes", 1)).toBe(true);
     });
 
-    it("chunk period rule: returns error for value 2000 (well above max)", () => {
-      const rule = (val: number | null) =>
-        !val || (val >= 1 && val <= 1440) || "Must be between 1 and 1440";
-      expect(rule(2000)).toBe("Must be between 1 and 1440");
+    it("chunkPeriodMinutes: 1440 (upper bound) passes", async () => {
+      expect(await savesWith("chunkPeriodMinutes", 1440)).toBe(true);
     });
 
-    it("delay rule: returns true for empty/null value (optional field)", () => {
-      const rule = (val: number | null) =>
-        !val || (val >= 1 && val <= 3600) || "Must be between 1 and 3600";
-      expect(rule(null)).toBe(true);
-      expect(rule(0)).toBe(true);
+    it("chunkPeriodMinutes: 1441 (over max) blocks the save", async () => {
+      expect(await savesWith("chunkPeriodMinutes", 1441)).toBe(false);
     });
 
-    it("delay rule: returns true for value 1 (lower bound)", () => {
-      const rule = (val: number | null) =>
-        !val || (val >= 1 && val <= 3600) || "Must be between 1 and 3600";
-      expect(rule(1)).toBe(true);
+    it("delayBetweenChunks: 0 blocks the save (0 < min)", async () => {
+      expect(await savesWith("delayBetweenChunks", 0)).toBe(false);
     });
 
-    it("delay rule: returns true for value 3600 (upper bound)", () => {
-      const rule = (val: number | null) =>
-        !val || (val >= 1 && val <= 3600) || "Must be between 1 and 3600";
-      expect(rule(3600)).toBe(true);
+    it("delayBetweenChunks: 3600 (upper bound) passes", async () => {
+      expect(await savesWith("delayBetweenChunks", 3600)).toBe(true);
     });
 
-    it("delay rule: returns error for value exceeding 3600", () => {
-      const rule = (val: number | null) =>
-        !val || (val >= 1 && val <= 3600) || "Must be between 1 and 3600";
-      expect(rule(3601)).toBe("Must be between 1 and 3600");
+    it("delayBetweenChunks: 3601 (over max) blocks the save", async () => {
+      expect(await savesWith("delayBetweenChunks", 3601)).toBe(false);
     });
   });
 
@@ -556,48 +541,59 @@ describe("EditBackfillJobDialog", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      vm.formData.chunkPeriodMinutes = 120;
-      vm.formData.delayBetweenChunks = 10;
-      vm.formData.deleteBeforeBackfill = true;
+      setField(wrapper, "chunkPeriodMinutes", 120);
+      setField(wrapper, "delayBetweenChunks", 10);
+      setField(wrapper, "deleteBeforeBackfill", true);
       vm.showAdvanced = true;
       vm.errorMessage = "Some error";
 
       vm.resetForm();
       await nextTick();
 
-      expect(vm.formData.startTimeMicros).toBe(0);
-      expect(vm.formData.endTimeMicros).toBe(0);
-      expect(vm.formData.chunkPeriodMinutes).toBeNull();
-      expect(vm.formData.delayBetweenChunks).toBeNull();
-      expect(vm.formData.deleteBeforeBackfill).toBe(false);
+      expect(formVals(wrapper).timerange.from).toBeUndefined();
+      expect(formVals(wrapper).timerange.to).toBeUndefined();
+      expect(formVals(wrapper).chunkPeriodMinutes).toBeNull();
+      expect(formVals(wrapper).delayBetweenChunks).toBeNull();
+      expect(formVals(wrapper).deleteBeforeBackfill).toBe(false);
       expect(vm.showAdvanced).toBe(false);
       expect(vm.errorMessage).toBe("");
     });
   });
 
-  describe("loading state", () => {
-    it("loading starts as false", () => {
+  describe("loading state (form-driven)", () => {
+    it("form is not submitting initially", () => {
       const wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.loading).toBe(false);
+      expect((wrapper.vm as any).form.state.isSubmitting).toBe(false);
     });
 
-    it("passes loading=false to ODrawer initially via primaryButtonLoading", () => {
+    it("passes primary-loading=false to ODrawer initially", () => {
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
       expect(drawer.attributes("data-primary-loading")).toBe("false");
     });
 
-    it("ODrawer receives primaryButtonLoading=true when loading is true", async () => {
+    it("form.isSubmitting is true while the (awaited) save is in flight", async () => {
+      let resolveFn: (val: any) => void = () => {};
+      vi.mocked(backfillService.updateBackfillJob).mockImplementationOnce(
+        () => new Promise((res) => { resolveFn = res; }),
+      );
+
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
-      const vm = wrapper.vm as any;
 
-      vm.loading = true;
-      await nextTick();
+      // The awaited onSubmit keeps the form's isSubmitting (which the form-id
+      // bridge mirrors onto the ODialog footer spinner) true for the whole save.
+      (wrapper.vm as any).form.handleSubmit();
+      // The schema validates asynchronously — wait for the save to actually fire.
+      await vi.waitFor(() =>
+        expect(backfillService.updateBackfillJob).toHaveBeenCalled(),
+      );
+      expect((wrapper.vm as any).form.state.isSubmitting).toBe(true);
 
-      const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-loading")).toBe("true");
+      resolveFn({ message: "updated" });
+      await vi.waitFor(() =>
+        expect((wrapper.vm as any).form.state.isSubmitting).toBe(false),
+      );
     });
   });
 });

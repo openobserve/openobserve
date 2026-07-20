@@ -21,11 +21,6 @@ import {
   applySeriesColorMappings,
   getContrastColor,
 } from "./chartColorUtils";
-import {
-  calculateOptimalFontSize,
-  calculateDynamicNameGap,
-  calculateRotatedLabelBottomSpace,
-} from "./chartDimensionUtils";
 import { formatDate } from "./dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
@@ -42,7 +37,7 @@ import {
   calculateRightLegendWidth,
 } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
-import { METRIC_COPY_BTN_RESERVE_PX } from "./sql/charts/convertSQLMetricChart";
+import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
 import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 
@@ -545,6 +540,9 @@ export const convertPromQLData = async (
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       axisLabel: {
+        // hide colliding tick labels instead of drawing them on top of each
+        // other (short panels fit fewer labels than ECharts offers)
+        hideOverlap: true,
         formatter: function (name: any) {
           return formatUnitValue(
             getUnitValue(
@@ -1011,21 +1009,22 @@ export const convertPromQLData = async (
                 _metricText: metricText,
                 renderItem: function (params: any) {
                   const backgroundColor =
-                    panelSchema.config?.background?.value?.color;
-                  const isDarkTheme = store.state.theme === "dark";
+                    panelSchema?.config?.background?.value?.color;
+                  const isDarkTheme = store?.state?.theme === "dark";
                   return {
                     type: "text",
                     style: {
                       text: metricText,
-                      fontSize: calculateOptimalFontSize(
+                      fontSize: calculateMetricFontSize(
                         metricText,
-                        params.coordSys.cx * 2 - METRIC_COPY_BTN_RESERVE_PX,
+                        params?.coordSys?.cx * 2,
+                        params?.coordSys?.cy * 2,
                       ), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",
                       verticalAlign: "middle",
-                      x: params.coordSys.cx,
-                      y: params.coordSys.cy,
+                      x: params?.coordSys?.cx,
+                      y: params?.coordSys?.cy,
                       fill: getContrastColor(backgroundColor, isDarkTheme),
                     },
                   };
@@ -1036,8 +1035,8 @@ export const convertPromQLData = async (
             // Rect for the per-value copy icon overlay (single metric fills the area).
             const panelEl = chartPanelRef?.value;
             if (panelEl) {
-              const w = panelEl.offsetWidth;
-              const h = panelEl.offsetHeight;
+              const w = panelEl?.offsetWidth;
+              const h = panelEl?.offsetHeight;
               series[0]._metricLayout = {
                 left: 0,
                 top: 0,
@@ -1045,10 +1044,7 @@ export const convertPromQLData = async (
                 height: h,
                 cx: w / 2,
                 cy: h / 2,
-                fontSize: calculateOptimalFontSize(
-                  metricText,
-                  w - METRIC_COPY_BTN_RESERVE_PX,
-                ),
+                fontSize: calculateMetricFontSize(metricText, w, h),
               };
             }
 

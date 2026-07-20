@@ -130,6 +130,9 @@ describe('Prebuilt Templates Index', () => {
 
       const teamsUrl2 = 'https://webhook.office.com/webhookb2/abc';
       expect(detectPrebuiltTypeFromUrl(teamsUrl2)).toBe('msteams');
+
+      const teamsWorkflowUrl = 'https://prod-10.westus.logic.azure.com/workflows/abc/triggerS/manual/paths/invoke?api-version=2016-06-01&sig=xyz';
+      expect(detectPrebuiltTypeFromUrl(teamsWorkflowUrl)).toBe('msteams');
     });
 
     it('should detect PagerDuty URLs', () => {
@@ -375,12 +378,12 @@ describe('Prebuilt Templates Index', () => {
       Object.values(PREBUILT_CONFIGS).forEach(config => {
         config.credentialFields.forEach(field => {
           expect(field).toHaveProperty('key');
-          expect(field).toHaveProperty('label');
+          expect(field).toHaveProperty('labelKey');
           expect(field).toHaveProperty('type');
           expect(field).toHaveProperty('required');
 
           expect(typeof field.key).toBe('string');
-          expect(typeof field.label).toBe('string');
+          expect(typeof field.labelKey).toBe('string');
           expect(['text', 'password', 'email', 'select', 'toggle']).toContain(field.type);
           expect(typeof field.required).toBe('boolean');
         });

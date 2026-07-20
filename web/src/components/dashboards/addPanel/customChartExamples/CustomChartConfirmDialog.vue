@@ -25,20 +25,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div data-test="dialog-box">
-      <div class="para tw:text-center">{{ message }}</div>
-      <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4">
+      <div class="para text-center">{{ message }}</div>
+      <div v-if="warningMessage && warningMessage.length > 0" class="mt-4">
         <OBanner variant="warning" icon="warning" :content="warningMessage" />
       </div>
-      <div v-if="hasQuery" class="tw:mt-4">
+      <div v-if="hasQuery" class="mt-4">
         <OCheckbox
           v-model="replaceQuery"
-          label="Also replace query with example query"
+          :label="t('dashboard.customChartConfirmDialog.alsoReplaceQuery')"
           data-test="replace-query-checkbox"
         />
         <div
-          class="tw:text-xs tw:mt-1 tw:ml-7 tw:text-gray-500 tw:dark:text-gray-400"
+          class="text-xs mt-1 ml-7 text-gray-500 dark:text-gray-400"
         >
-          The example query will be inserted into the query editor
+          {{ t('dashboard.customChartConfirmDialog.exampleQueryInserted') }}
         </div>
       </div>
     </div>

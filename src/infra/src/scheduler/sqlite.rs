@@ -387,6 +387,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         concurrency: i64,
         alert_timeout: i64,
         report_timeout: i64,
+        module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
@@ -402,7 +403,28 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
-        let query = r#"UPDATE scheduled_jobs
+        // Sqlite holds the single global CLIENT_RW write lock here, so there is no per-module
+        // advisory lock — all writes are already serialized (single-node/dev backend). The
+        // `module` filter still scopes which rows a per-module puller claims; see postgres.rs for
+        // the C3 lock rationale. Legacy `None` string is byte-identical (LIMIT $10).
+        let query = if module.is_some() {
+            r#"UPDATE scheduled_jobs
+SET status = $1, start_time = $2,
+    end_time = CASE
+        WHEN module = $3 THEN $4
+        ELSE $5
+    END
+WHERE id IN (
+    SELECT id
+    FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
+      AND module = $10
+    ORDER BY next_run_at
+    LIMIT $11
+)
+RETURNING *;"#
+        } else {
+            r#"UPDATE scheduled_jobs
 SET status = $1, start_time = $2,
     end_time = CASE
         WHEN module = $3 THEN $4
@@ -415,9 +437,10 @@ WHERE id IN (
     ORDER BY next_run_at
     LIMIT $10
 )
-RETURNING *;"#;
+RETURNING *;"#
+        };
 
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
+        let mut q = sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)
             .bind(TriggerModule::Report)
@@ -426,10 +449,12 @@ RETURNING *;"#;
             .bind(TriggerStatus::Waiting)
             .bind(now)
             .bind(true)
-            .bind(false)
-            .bind(concurrency)
-            .fetch_all(&*client)
-            .await?;
+            .bind(false);
+        if let Some(m) = module {
+            q = q.bind(m);
+        }
+        q = q.bind(concurrency);
+        let jobs: Vec<Trigger> = q.fetch_all(&*client).await?;
         Ok(jobs)
     }
 

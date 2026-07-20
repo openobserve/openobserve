@@ -1,14 +1,14 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:w-full" data-test="o-field-list">
+  <div class="flex flex-col h-full min-h-0 w-full" data-test="o-field-list">
     <!-- before-list slot (stream selectors, etc.) -->
-    <div v-if="$slots['before-list']" class="tw:shrink-0">
+    <div v-if="$slots['before-list']" class="shrink-0">
       <slot name="before-list" />
     </div>
 
     <!-- Search input -->
-    <div v-if="showSearch" class="tw:shrink-0 tw:py-1.5">
+    <div v-if="showSearch" class="shrink-0 py-1.5">
       <OInput
         :model-value="searchModel"
         data-test="o-field-list-search"
@@ -23,11 +23,11 @@
     </div>
 
     <!-- Scrollable field list body -->
-    <div ref="scrollContainerRef" class="tw:flex-1 tw:overflow-y-auto tw:overflow-x-hidden tw:min-h-0" @scroll="onScroll">
+    <div ref="scrollContainerRef" class="flex-1 overflow-y-auto overflow-x-hidden min-h-0" @scroll="onScroll">
       <!-- Loading state -->
       <div
         v-if="loading"
-        class="tw:w-full"
+        class="w-full"
       >
         <slot name="loading" />
       </div>
@@ -35,7 +35,7 @@
       <!-- Empty state -->
       <div
         v-else-if="paginatedFields.length === 0"
-        class="tw:flex tw:items-center tw:justify-center tw:p-4 tw:text-field-list-empty-text tw:text-xs"
+        class="flex items-center justify-center p-4 text-field-list-empty-text text-xs"
       >
         <slot name="empty" />
       </div>
@@ -49,7 +49,7 @@
         <!-- Group header -->
         <div
           v-if="row.isGroup"
-          class="o-field-list__group-header tw:h-7 tw:flex tw:items-center tw:justify-between tw:text-[0.6875rem] tw:font-semibold tw:text-(--color-field-list-group-text) tw:cursor-default tw:select-none tw:tracking-[0.01em] tw:sticky tw:top-0 tw:z-[2] tw:bg-transparent"
+          class="o-field-list__group-header h-7 flex items-center justify-between text-[0.6875rem] font-semibold text-(--color-field-list-group-text) cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
           :data-test="`o-field-list-group-${row.groupName}`"
         >
           <slot name="group-header" :row="row" :group-name="row.groupName">
@@ -62,7 +62,7 @@
         <!-- Field row -->
         <div
           v-else
-          class="o-field-list__row tw:mt-[0.25rem] tw:flex tw:items-center tw:w-full tw:min-h-[24px] tw:p-0 tw:relative tw:cursor-pointer tw:rounded-[0.1875rem] tw:text-xs tw:leading-[0.8rem]"
+          class="o-field-list__row mt-[0.25rem] flex items-center w-full min-h-[24px] p-0 relative cursor-pointer rounded-[0.1875rem] text-xs leading-[0.8rem]"
           :class="{ 'o-field-list__row--draggable': draggable }"
           :data-test="`o-field-list-row-${row.name}`"
           :draggable="draggable && isDragEnabled(row, row._index ?? 0)"
@@ -72,7 +72,7 @@
           @dragend="(e: DragEvent) => onDragEnd(row, e)"
           @dragover.prevent
         >
-          <div class="tw:flex tw:items-center tw:gap-1 tw:min-w-0 tw:flex-1">
+          <div class="flex items-center gap-1 min-w-0 flex-1">
             <slot
               name="field-row"
               :row="row"
@@ -86,10 +86,10 @@
                   name="drag-indicator"
                   size="sm"
                   :class="[
-                    'tw:shrink-0 tw:inline-flex tw:items-center tw:justify-center tw:w-4 tw:text-[var(--color-field-list-drag-icon)]',
+                    'shrink-0 inline-flex items-center justify-center w-4 text-[var(--color-field-list-drag-icon)]',
                     isDragEnabled(row, row._index ?? 0)
-                      ? 'tw:cursor-grab'
-                      : 'tw:cursor-not-allowed tw:opacity-40',
+                      ? 'cursor-grab'
+                      : 'cursor-not-allowed opacity-40',
                   ]"
                   data-test="o-field-list-drag-indicator"
                 />
@@ -97,7 +97,7 @@
               </OFieldRow>
             </slot>
           </div>
-          <div v-if="$slots['field-actions']" class="o-field-list__actions tw:flex tw:items-stretch tw:shrink-0 tw:invisible tw:opacity-0 tw:transition-[opacity,visibility] tw:duration-[120ms] tw:ease-[ease] tw:absolute tw:right-1 tw:top-1/2 tw:-translate-y-1/2 tw:border tw:border-(--color-field-list-actions-border) tw:rounded-[0.1875rem] tw:overflow-hidden tw:bg-(--color-field-list-actions-bg)">
+          <div v-if="$slots['field-actions']" class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-(--color-field-list-actions-border) rounded-[0.1875rem] overflow-hidden bg-(--color-field-list-actions-bg)">
             <slot name="field-actions" :row="row" :index="row._index" />
           </div>
         </div>
@@ -105,7 +105,7 @@
         <!-- Expanded content -->
         <div
           v-if="isExpanded(row) && $slots.expansion"
-          class="tw:w-full tw:pt-1 tw:pb-[0.375rem] tw:border tw:border-[var(--color-field-list-expansion-border)] tw:border-t-0 tw:rounded-b-[0.1875rem] tw:mb-[0.375rem] tw:relative tw:z-[1] tw:box-border"
+          class="w-full pt-1 pb-[0.375rem] border border-[var(--color-field-list-expansion-border)] border-t-0 rounded-b-[0.1875rem] mb-[0.375rem] relative z-[1] box-border"
         >
           <slot name="expansion" :row="row" />
         </div>
@@ -114,7 +114,7 @@
     </div>
 
     <!-- After-list slot (pagination, toggles, etc.) -->
-    <div v-if="$slots['after-list']" class="tw:shrink-0">
+    <div v-if="$slots['after-list']" class="shrink-0">
       <slot name="after-list" v-bind="paginationSlotProps" />
     </div>
   </div>
@@ -213,6 +213,13 @@ const filteredFields = computed(() => {
   } else {
     result = props.fields.filter((row) => {
       if (row.isGroup) {
+        // A grouped consumer (GroupedFieldList) that hides collapsed field rows
+        // stamps the header with `matchesSearch` so a collapsed-but-matching
+        // group keeps its header and stays re-expandable. Fall back to scanning
+        // the visible child rows when the flag is absent.
+        if (typeof (row as any).matchesSearch === "boolean") {
+          return (row as any).matchesSearch;
+        }
         return props.fields.some(
           (f) =>
             !f.isGroup &&
@@ -402,7 +409,7 @@ defineExpose({ scrollToTop });
 /* Make each chip flush (no individual border, no rounded corners),
    and put a vertical separator between adjacent chips.
    `!important` overrides Tailwind utility classes on the OButton root
-   (`tw:border-0`, `tw:rounded`, etc.) which otherwise win on specificity. */
+   (`border-0`, `rounded`, etc.) which otherwise win on specificity. */
 .o-field-list__actions > * {
   border: 0 !important;
   border-radius: 0 !important;

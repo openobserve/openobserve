@@ -87,6 +87,12 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-patterns": {
+    illustration: "wave-bars",
+    variant: "no-results",
+    titleKey: "emptyState.noPatterns.title",
+    descriptionKey: "emptyState.noPatterns.description",
+  },
   "no-stream-selected": {
     illustration: "query",
     variant: "neutral",
@@ -98,6 +104,14 @@ export const emptyStatePresets = {
     variant: "neutral",
     titleKey: "emptyState.noQueryApplied.title",
     descriptionKey: "emptyState.noQueryApplied.description",
+    actions: [
+      {
+        id: "run",
+        icon: "play-arrow",
+        titleKey: "emptyState.noQueryApplied.action",
+        descriptionKey: "emptyState.noQueryApplied.actionDesc",
+      },
+    ],
   },
 
   // --- first-run "create your first X" -------------------------------------
@@ -164,7 +178,7 @@ export const emptyStatePresets = {
 
   // --- no ingestion / no data flowing in -----------------------------------
   "no-streams": {
-    illustration: "hourglass",
+    illustration: "connect",
     variant: "create",
     titleKey: "emptyState.noStreams.title",
     descriptionKey: "emptyState.noStreams.description",
@@ -174,6 +188,46 @@ export const emptyStatePresets = {
         icon: "cloud-upload",
         titleKey: "emptyState.noStreams.action",
         descriptionKey: "emptyState.noStreams.actionDesc",
+      },
+    ],
+  },
+
+  // --- no synthetic monitors -------------------------------------------------
+  "no-synthetic-monitors": {
+    illustration: "browser-check",
+    variant: "create",
+    titleKey: "emptyState.noMonitors.title",
+    descriptionKey: "emptyState.noMonitors.description",
+    actions: [
+      {
+        id: "create-browser",
+        icon: "open-in-browser",
+        titleKey: "synthetics.newCheck.browser",
+        descriptionKey: "synthetics.newCheck.browserDesc",
+      },
+      {
+        id: "create-http",
+        icon: "network-check",
+        titleKey: "synthetics.newCheck.http",
+        descriptionKey: "synthetics.newCheck.httpDesc",
+      },
+      {
+        id: "create-tcp",
+        icon: "bolt",
+        titleKey: "synthetics.newCheck.tcp",
+        descriptionKey: "synthetics.newCheck.tcpDesc",
+      },
+      {
+        id: "create-tls",
+        icon: "shield",
+        titleKey: "synthetics.newCheck.tls",
+        descriptionKey: "synthetics.newCheck.tlsDesc",
+      },
+      {
+        id: "create-ssh",
+        icon: "keyboard",
+        titleKey: "synthetics.newCheck.ssh",
+        descriptionKey: "synthetics.newCheck.sshDesc",
       },
     ],
   },
@@ -553,6 +607,54 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noBackfillJobs.title",
     descriptionKey: "emptyState.noBackfillJobs.description",
   },
+  "no-regex-patterns": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noRegexPatterns.title",
+    descriptionKey: "emptyState.noRegexPatterns.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noRegexPatterns.action",
+        descriptionKey: "emptyState.noRegexPatterns.actionDesc",
+      },
+      {
+        id: "import",
+        icon: "upload-file",
+        titleKey: "emptyState.noRegexPatterns.import",
+        descriptionKey: "emptyState.noRegexPatterns.importDesc",
+      },
+    ],
+  },
+  "no-storage-config": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noStorageConfig.title",
+    descriptionKey: "emptyState.noStorageConfig.description",
+    actions: [
+      {
+        id: "configure",
+        icon: "cloud-upload",
+        titleKey: "emptyState.noStorageConfig.action",
+        descriptionKey: "emptyState.noStorageConfig.actionDesc",
+      },
+    ],
+  },
+  "no-model-pricing": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noModelPricing.title",
+    descriptionKey: "emptyState.noModelPricing.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noModelPricing.action",
+        descriptionKey: "emptyState.noModelPricing.actionDesc",
+      },
+    ],
+  },
 
   // LLM Insights dashboard — single empty-state shape (used for all three
   // "no data" cases: no LLM streams in the org, the active stream has no
@@ -651,6 +753,7 @@ export type EmptyStatePresetName = keyof typeof emptyStatePresets;
 // preset. Presets not listed fall back to a generic "results".
 export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-logs": "emptyState.nouns.logs",
+  "no-patterns": "emptyState.nouns.patterns",
   "no-dashboards": "emptyState.nouns.dashboards",
   "no-pipelines": "emptyState.nouns.pipelines",
   "no-functions": "emptyState.nouns.functions",
@@ -683,8 +786,11 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-llm-providers": "emptyState.nouns.llmProviders",
   "no-source-maps": "emptyState.nouns.sourceMaps",
   "no-backfill-jobs": "emptyState.nouns.backfillJobs",
+  "no-regex-patterns": "emptyState.nouns.regexPatterns",
   "no-scorers": "emptyState.nouns.scorers",
   "no-eval-jobs": "emptyState.nouns.evalJobs",
   "no-score-configs": "emptyState.nouns.scoreConfigs",
   "no-pipeline-history": "emptyState.nouns.pipelineHistory",
+  "no-synthetic-monitors": "emptyState.nouns.monitors",
+  "no-model-pricing": "emptyState.nouns.modelPricing",
 };

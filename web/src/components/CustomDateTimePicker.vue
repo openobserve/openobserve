@@ -8,8 +8,8 @@
         }"
         data-test="date-time-btn"
         variant="outline"
-        class="tw:h-full tw:rounded-[3px] tw:py-0 tw:px-[5px] tw:text-xs tw:min-w-auto tw:bg-[rgba(89,96,178,0.2)]!"
-        :class="changeStyle ? computedClass : 'tw:h-8!'"
+        class="h-full rounded-[3px] py-0 px-[5px] text-xs min-w-auto bg-[rgba(89,96,178,0.2)]!"
+        :class="changeStyle ? computedClass : 'h-8!'"
         :disabled="isFirstEntry"
       >
         <template v-if="!changeStyle" #icon-left>
@@ -18,22 +18,22 @@
         {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
         <template #icon-right>
           <OIcon name="arrow-drop-down" size="sm"
-            class="tw:transition-transform tw:duration-[250ms] tw:ease-in-out"
-            :class="picker.showMenu ? 'tw:rotate-180' : ''" />
+            class="transition-transform duration-[250ms] ease-in-out"
+            :class="picker.showMenu ? 'rotate-180' : ''" />
         </template>
       </OButton>
     </template>
-    <div class="date-time-dialog tw:w-[341px] tw:z-[10001] tw:max-h-[600px]">
-      <div class="tw:flex tw:justify-between">
+    <div class="date-time-dialog w-[341px] z-[10001] max-h-[600px]">
+      <div class="flex justify-between">
         <OTabPanels v-model="picker.activeTab">
           <OTabPanel name="relative">
-            <div class="date-time-table tw:relative tw:flex tw:flex-col">
+            <div class="date-time-table relative flex flex-col">
               <div
-                class="relative-row tw:px-3 tw:py-2 tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border)]"
+                class="relative-row px-3 py-2 flex items-center border-b border-[var(--o2-border)]"
                 v-for="(period, periodIndex) in relativePeriods"
                 :key="'date_' + periodIndex"
               >
-                <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">{{ period.label }}</div>
+                <div class="text-sm font-semibold min-w-18.75">{{ period.label }}</div>
                 <div
                   v-for="(item, itemIndex) in relativeDates[period.value]"
                   :key="item"
@@ -51,17 +51,17 @@
                   >
                 </div>
               </div>
-              <div class="relative-row tw:px-3 tw:py-2 tw:flex tw:items-center tw:border-b tw:border-[var(--o2-border)]">
-                <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">Custom</div>
-                <div class="tw:flex tw:gap-2">
-                  <div class="tw:flex tw:flex-col tw:w-20">
+              <div class="relative-row px-3 py-2 flex items-center border-b border-[var(--o2-border)]">
+                <div class="text-sm font-semibold min-w-18.75">Custom</div>
+                <div class="flex gap-2">
+                  <div class="flex flex-col w-20">
                     <OInput
                       v-model.number="picker.data.selectedDate.relative.value"
                       type="number"
                       :min="1"
                     />
                   </div>
-                  <div class="tw:flex tw:flex-col">
+                  <div class="flex flex-col">
                     <OSelect
                       v-model="picker.data.selectedDate.relative.period"
                       :options="relativePeriodsSelect"
@@ -229,8 +229,8 @@ const getPeriodLabel = () => {
 const computedClass = computed(() => {
   return props.changeStyle
     ? store.state.theme === "dark"
-      ? "tw:bg-[#2a2828]! tw:text-white!"
-      : "tw:bg-white!"
+      ? "bg-[#2a2828]! text-white!"
+      : "bg-white!"
     : "";
 });
 </script>

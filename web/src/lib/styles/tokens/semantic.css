@@ -11,10 +11,10 @@
 
 /* ── Light-mode defaults ─────────────────────────────────── */
 :root {
-  /* Text — grey-based semantic hierarchy (Datadog/Grafana pattern) */
+  /* Text — grey-based semantic hierarchy */
   --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles */
   --color-text-primary:     var(--color-grey-900);  /* alias for heading — backward compat */
-  --color-text-body:        var(--color-grey-800);  /* paragraphs, default body */
+  --color-text-body:        var(--color-grey-700);  /* paragraphs, default body */
   --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions */
   --color-text-caption:     var(--color-grey-500);  /* captions, footnotes, timestamps */
   --color-text-label:       var(--color-grey-400);  /* form labels, metadata, badges */
@@ -52,6 +52,24 @@
 
   /* Overlay scrim — semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
+
+  /* Status (semantic text+bg pairs) — the --color-* home for what used to be
+     --o2-status-*. Theme-paired via dark.css. Use these for status TEXT and
+     tinted status BACKGROUNDS (badges, callouts, required-field marks, etc.). */
+  --color-status-success-text: #208A3C;
+  --color-status-success-bg:   #F2FCF3;
+  --color-status-info-text:    #588CF3;
+  --color-status-info-bg:      #EDF3FF;
+  --color-status-warning-text: #E56D17;
+  --color-status-warning-bg:   #FFF4EB;
+  --color-status-error-text:   #CC3645;
+  --color-status-error-bg:     #FFF7F7;
+
+  /* Favorite (filled heart) — a rose/pink-leaning red, deliberately warmer
+     than the destructive error red so "loved" and "danger" never read as the
+     same hue on a row that carries both. Only the FILLED heart uses this;
+     unfavorited outlines stay neutral. */
+  --color-favorite: #F43F5E;
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
@@ -87,6 +105,21 @@
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);
+
+  /* Status (self-references so `text-status-error-text` etc. utilities exist
+     and dark.css overrides apply) */
+  --color-status-success-text: var(--color-status-success-text);
+  --color-status-success-bg:   var(--color-status-success-bg);
+  --color-status-info-text:    var(--color-status-info-text);
+  --color-status-info-bg:      var(--color-status-info-bg);
+  --color-status-warning-text: var(--color-status-warning-text);
+  --color-status-warning-bg:   var(--color-status-warning-bg);
+  --color-status-error-text:   var(--color-status-error-text);
+  --color-status-error-bg:     var(--color-status-error-bg);
+
+  /* Favorite (self-reference so `text-favorite` utility exists + dark override
+     applies) */
+  --color-favorite: var(--color-favorite);
 
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50:  var(--color-primary-50);
@@ -136,7 +169,7 @@
   --o2-muted-background: #E8ECF0;
   --o2-text-heading:     #19191E;
   --o2-text-primary:     var(--o2-text-heading);
-  --o2-text-body:        #383A42;
+  --o2-text-body:        #404040;
   --o2-text-secondary:   #5A5D6B;
   --o2-text-caption:     #6C707E;
   --o2-text-label:       #818594;
@@ -192,12 +225,14 @@
   --o2-sticky-col-header-bg: #E0E0E0;
   --o2-pivot-header-border: rgba(0, 0, 0, 0.15);
   --o2-table-actions-bg: white;
-  --o2-log-table-row-bg: #ffffff;
-  --o2-log-table-row-alt-bg: #f7f8fa;
-  --o2-log-table-row-hover: #eff1fd;
-  --o2-log-table-row-border: #e4e6ec;
+  /* Legacy log-table row tokens now ALIAS the OTable row standard, so the
+     TenstackTable (logs/traces/etc.) rows match every OTable across the app.
+     Theme-paired automatically via the --color-table-row-* tokens. */
+  --o2-log-table-row-bg: var(--color-surface-base);
+  --o2-log-table-row-alt-bg: var(--color-table-row-striped-bg);
+  --o2-log-table-row-hover: var(--color-table-row-hover-bg);
+  --o2-log-table-row-border: var(--color-table-row-divider);
   --o2-log-table-header-bg: #f1f3f7;
-  --o2-log-table-text: #27282e;
   --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
   --o2-tab-text-color: #19191E;
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, white);

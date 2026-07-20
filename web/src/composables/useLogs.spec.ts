@@ -2653,11 +2653,6 @@ describe("Use Logs Composable", () => {
         expect(router).toBeDefined();
       });
 
-      it.skip("should expose $q property", () => {
-        // $q is no longer used — replaced by toast from @/lib/feedback/Toast/useToast
-        expect(true).toBe(true);
-      });
-
       it("should expose initialQueryPayload property", () => {
         const { initialQueryPayload } = wrapper.vm;
         expect(initialQueryPayload).toBeDefined();

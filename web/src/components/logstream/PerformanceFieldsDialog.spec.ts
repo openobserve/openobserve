@@ -346,8 +346,8 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
       // light theme applies the light surface/border classes
-      expect(wrapper.html()).toContain("tw:bg-[#f5f5f5]");
-      expect(wrapper.html()).not.toContain("tw:bg-[#1e1e1e]");
+      expect(wrapper.html()).toContain("bg-[#f5f5f5]");
+      expect(wrapper.html()).not.toContain("bg-[#1e1e1e]");
     });
 
     it("should render correctly in dark theme", async () => {
@@ -360,8 +360,8 @@ describe("PerformanceFieldsDialog", () => {
 
       mountDialog([mockFtsFiled], true, darkStore);
       await flushPromises();
-      expect(wrapper.html()).toContain("tw:bg-[#1e1e1e]");
-      expect(wrapper.html()).not.toContain("tw:bg-[#f5f5f5]");
+      expect(wrapper.html()).toContain("bg-[#1e1e1e]");
+      expect(wrapper.html()).not.toContain("bg-[#f5f5f5]");
     });
   });
 });

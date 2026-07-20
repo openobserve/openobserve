@@ -95,13 +95,13 @@ watch(
     <!-- Trigger -->
     <CollapsibleTrigger
       :class="[
-        'tw:w-full tw:flex tw:items-center tw:gap-2 tw:text-start tw:cursor-pointer tw:select-none',
-        'tw:transition-colors tw:duration-150 tw:outline-none',
-        'tw:hover:bg-collapsible-trigger-hover-bg tw:active:bg-collapsible-trigger-active-bg',
-        'tw:focus-visible:ring-2 tw:focus-visible:ring-collapsible-trigger-focus-ring tw:focus-visible:ring-offset-1',
+        'w-full flex items-center gap-2 text-start cursor-pointer select-none',
+        'transition-colors duration-150 outline-none',
+        'hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg',
+        'focus-visible:ring-2 focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-offset-1',
         variant === 'sidebar'
-          ? 'tw:px-3 tw:py-0 tw:min-h-[36px] tw:rounded-none'
-          : 'tw:px-2 tw:py-2 tw:rounded-md',
+          ? 'px-3 py-0 min-h-[36px] rounded-none'
+          : 'px-2 py-2 rounded-md',
         triggerClass,
       ]"
     >
@@ -110,8 +110,8 @@ watch(
         v-if="variant === 'sidebar'"
         name="chevron-right"
         size="md"
-        class="tw:text-collapsible-icon tw:transition-transform tw:duration-200"
-        :class="isOpen ? 'tw:rotate-90' : 'tw:rotate-0'"
+        class="text-collapsible-icon transition-transform duration-200"
+        :class="isOpen ? 'rotate-90' : 'rotate-0'"
       />
 
       <!-- Custom trigger slot - renders after sidebar chevron if present -->
@@ -126,27 +126,27 @@ watch(
           v-if="icon && isOIcon"
           :name="(icon as any)"
           size="md"
-          class="tw:text-collapsible-icon tw:shrink-0"
+          class="text-collapsible-icon shrink-0"
         />
         <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
           v-else-if="icon"
-          class="material-icons-outlined tw:text-icon-md tw:text-collapsible-icon tw:shrink-0"
+          class="material-icons-outlined text-icon-md text-collapsible-icon shrink-0"
           aria-hidden="true"
           >{{ icon }}</span
         >
 
-        <span class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+        <span class="flex flex-col flex-1 min-w-0">
           <span
             :class="[
-              'tw:font-medium tw:text-collapsible-label tw:truncate',
-              variant === 'sidebar' ? 'tw:text-[13px]' : 'tw:text-sm',
+              'font-medium text-collapsible-label truncate',
+              variant === 'sidebar' ? 'text-[13px]' : 'text-sm',
             ]"
             >{{ label }}</span
           >
           <span
             v-if="caption"
-            class="tw:text-xs tw:text-collapsible-caption tw:truncate"
+            class="text-xs text-collapsible-caption truncate"
             >{{ caption }}</span
           >
         </span>
@@ -156,14 +156,14 @@ watch(
           v-if="variant === 'default'"
           name="expand-more"
           size="md"
-          class="tw:text-collapsible-icon tw:transition-transform tw:duration-200"
-          :class="isOpen ? 'tw:rotate-180' : 'tw:rotate-0'"
+          class="text-collapsible-icon transition-transform duration-200"
+          :class="isOpen ? 'rotate-180' : 'rotate-0'"
         />
       </template>
     </CollapsibleTrigger>
 
     <!-- Animated content -->
-    <CollapsibleContent class="o-collapsible-content tw:overflow-hidden">
+    <CollapsibleContent class="o-collapsible-content overflow-hidden">
       <slot />
     </CollapsibleContent>
   </CollapsibleRoot>

@@ -26,7 +26,6 @@ import {
   durationFormatter,
   maskText,
   convertToCamelCase,
-  convertUnixToQuasarFormat,
 } from "./formatters";
 
 // Buffer-based btoa/atob for jsdom
@@ -78,7 +77,6 @@ describe("b64EncodeUnicode", () => {
   });
 
   it("returns null and logs on encoding error", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     // Pass an object that causes encodeURIComponent to fail indirectly
     // by monkey-patching encodeURIComponent temporarily
     const original = global.encodeURIComponent;
@@ -90,8 +88,6 @@ describe("b64EncodeUnicode", () => {
 
     global.encodeURIComponent = original;
     expect(result).toBeNull();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -112,13 +108,10 @@ describe("b64DecodeUnicode", () => {
   });
 
   it("returns undefined and logs on invalid base64", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = b64DecodeUnicode("!!!invalid!!!");
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -141,12 +134,10 @@ describe("b64DecodeUnicodeSafe", () => {
   });
 
   it("returns fallback when decoding fails", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = b64DecodeUnicodeSafe("!!!invalid!!!", "default-fallback");
 
     expect(result).toBe("default-fallback");
-    logSpy.mockRestore();
   });
 });
 
@@ -169,9 +160,7 @@ describe("smartDecodeVrlFunction", () => {
 
   it("returns the original for plain text that is not base64", () => {
     // Plain text with spaces can't be base64, decode will fail → returns input
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const result = smartDecodeVrlFunction("plain text with spaces");
-    logSpy.mockRestore();
     // Either returns the original or the decoded; for non-base64, decoding fails
     // The function returns vrlFunction on decode failure
     expect(typeof result).toBe("string");
@@ -217,7 +206,6 @@ describe("b64EncodeStandard", () => {
   });
 
   it("returns undefined and logs on error", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     const original = global.encodeURIComponent;
     global.encodeURIComponent = () => {
       throw new Error("encode error");
@@ -227,7 +215,6 @@ describe("b64EncodeStandard", () => {
 
     global.encodeURIComponent = original;
     expect(result).toBeUndefined();
-    logSpy.mockRestore();
   });
 });
 
@@ -238,13 +225,10 @@ describe("b64DecodeStandard", () => {
   });
 
   it("returns undefined and logs on invalid base64", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = b64DecodeStandard("!!!not-base64!!!");
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -514,42 +498,5 @@ describe("convertToCamelCase", () => {
 });
 
 // ---------------------------------------------------------------------------
-// convertUnixToQuasarFormat
 // ---------------------------------------------------------------------------
 
-describe("convertUnixToQuasarFormat", () => {
-  beforeEach(() => {
-    vi.mocked(mockFormatDate).mockImplementation(
-      (value: any, _fmt: string) => String(value),
-    );
-  });
-
-  it("returns empty string for 0", () => {
-    expect(convertUnixToQuasarFormat(0)).toBe("");
-  });
-
-  it("returns empty string for null", () => {
-    expect(convertUnixToQuasarFormat(null)).toBe("");
-  });
-
-  it("returns empty string for undefined", () => {
-    expect(convertUnixToQuasarFormat(undefined)).toBe("");
-  });
-
-  it("returns a non-empty string for valid microsecond timestamp", () => {
-    // 1_700_000_000_000_000 microseconds
-    const result = convertUnixToQuasarFormat(1_700_000_000_000_000);
-
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
-  });
-
-  it("calls formatDate with YYYY-MM-DDTHH:mm:ssZ format", () => {
-    convertUnixToQuasarFormat(1_700_000_000_000_000);
-
-    expect(mockFormatDate).toHaveBeenCalledWith(
-      expect.any(String),
-      "YYYY-MM-DDTHH:mm:ssZ",
-    );
-  });
-});

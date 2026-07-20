@@ -217,6 +217,39 @@ class LanguagePage {
     return this.page.locator(`[data-test="${tabDataTest}"]`).first();
   }
 
+  /**
+   * A closed page/context (or a Playwright "Target ... has been closed" error) is
+   * fatal and non-recoverable — it means the worker's browser process crashed
+   * (typically OOM under high parallelism). Such errors must NEVER be swallowed by
+   * best-effort try/catch blocks: doing so lets the test limp through the rest of
+   * the crawl and report a bogus coverage percentage instead of failing honestly.
+   * @param {Error} error
+   * @returns {boolean}
+   */
+  _isFatalClosedError(error) {
+    return this.page.isClosed()
+      || /has been closed|Target (page|frame)?.*closed|Target closed/i.test((error && error.message) || '');
+  }
+
+  /**
+   * Navigate to a page for text scraping with a BOUNDED settle.
+   *
+   * Translation strings are static i18n rendered on component mount, so we do not
+   * need a fully loaded/idle page — waiting for `networkidle` on chart/monaco/
+   * websocket-heavy views (Metrics/Traces/RUM/Dashboards) never settles, wasting
+   * up to 10–30s per page AND holding that heavy page live at peak renderer memory
+   * the whole time. Under `--workers=5` that prolonged, overlapping memory spike is
+   * what OOM-kills a worker. Using `domcontentloaded` + a short bounded settle caps
+   * each heavy page's live-at-peak dwell to ~a few seconds (lower OOM probability)
+   * and makes the crawl ~3–4× faster (fits the shard timeout).
+   * @param {string} url
+   * @param {number} settleMs bounded max settle after DOMContentLoaded
+   */
+  async _navigateForScrape(url, settleMs = 2500) {
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    await this.page.waitForLoadState('networkidle', { timeout: settleMs }).catch(() => {});
+  }
+
   // ============================================================================
   // PUBLIC ACTIONS
   // ============================================================================
@@ -329,8 +362,7 @@ class LanguagePage {
    */
   async navigateToHome() {
     const homeUrl = `/web/?org_identifier=${process.env["ORGNAME"]}`;
-    await this.page.goto(homeUrl);
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await this._navigateForScrape(homeUrl, 5000);
   }
 
   /**
@@ -339,7 +371,7 @@ class LanguagePage {
    */
   async resetToEnglish(pm) {
     await this.navigateToHome();
-    await pm.homePage.changeLanguage('en-gb');
+    await pm.homePage.changeLanguage('en-us');
   }
 
   /**
@@ -558,8 +590,7 @@ class LanguagePage {
    */
   async _testSinglePage(pageConfig, langCode) {
     const pageUrl = `/web${pageConfig.path}?org_identifier=${process.env["ORGNAME"]}`;
-    await this.page.goto(pageUrl);
-    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await this._navigateForScrape(pageUrl);
 
     const allTexts = await this._extractAllVisibleText();
     return this._analyzeTranslation(allTexts, langCode);
@@ -608,8 +639,7 @@ class LanguagePage {
         } else if (subPage.path) {
           // Navigate to sub-page URL
           const subPageUrl = `/web${subPage.path}?org_identifier=${process.env["ORGNAME"]}`;
-          await this.page.goto(subPageUrl);
-          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+          await this._navigateForScrape(subPageUrl);
           const texts = await this._extractAllVisibleText();
           results.push({
             name: subPage.name,
@@ -630,6 +660,8 @@ class LanguagePage {
           }
         }
       } catch (e) {
+        // Rethrow fatal browser-crash errors — never mask a dead page/context.
+        if (this._isFatalClosedError(e)) throw e;
         testLogger.warn(`Could not test sub-page ${subPage.name}: ${e.message}`);
       }
     }
@@ -664,7 +696,10 @@ class LanguagePage {
         results.totalTranslated += analysis.translatedCount;
         testLogger.info(`    Modal (Add Dashboard): ${analysis.percentage}%`);
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      // Rethrow fatal browser-crash errors; only best-effort modal issues are ignored.
+      if (this._isFatalClosedError(e)) throw e;
+    }
   }
 }
 

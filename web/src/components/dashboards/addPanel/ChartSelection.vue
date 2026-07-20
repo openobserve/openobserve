@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="height: 100%">
-    <div class="tw:p-0" style="width: 100px">
-      <ul class="tw:flex tw:flex-wrap tw:list-none tw:p-0 tw:m-0">
+    <div class="p-0" style="width: 100px">
+      <ul class="flex flex-wrap list-none p-0 m-0">
         <li
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
             'dashboard-chart-border',
-            'tw:transition-colors tw:duration-150 tw:ease-in-out tw:hover:bg-surface-subtle',
-            selectedChartType === item.id ? 'tw:bg-label-chip-url-bg' : '',
+            'transition-colors duration-150 ease-in-out hover:bg-surface-subtle',
+            selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
             isChartDisabled(item)
-              ? 'tw:opacity-50 tw:cursor-not-allowed'
-              : 'tw:cursor-pointer',
+              ? 'opacity-50 cursor-not-allowed'
+              : 'cursor-pointer',
           ]"
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
           style="width: 50px"
@@ -37,12 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             :data-test="`selected-chart-${item.id}-item`"
             :data-selected="selectedChartType === item.id ? 'true' : 'false'"
-            class="tw:flex tw:flex-col tw:items-center tw:relative"
+            class="flex flex-col items-center relative"
           >
             <img
               :src="item.image.replace('img:', '')"
               :alt="item.title"
-              class="tw:mx-auto tw:my-2"
+              class="mx-auto my-2"
               style="width: 24px; height: 24px;"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
@@ -155,27 +155,27 @@ export default defineComponent({
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
-        title: "Gauge",
+        title: t("dashboard.chartSelection.gauge"),
         id: "gauge",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
-        title: "HTML",
+        title: t("dashboard.chartSelection.html"),
         id: "html",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Markdown.svg"),
-        title: "Markdown",
+        title: t("dashboard.chartSelection.markdown"),
         id: "markdown",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/sankey.svg"),
-        title: "Sankey",
+        title: t("dashboard.chartSelection.sankey"),
         id: "sankey",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/chart.png"),
-        title: "Custom Chart",
+        title: t("dashboard.chartSelection.customChart"),
         id: "custom_chart",
       },
     ]);

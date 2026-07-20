@@ -21,20 +21,32 @@ const randomPipelineName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
   let pageManager;
+  // Worker-specific stream suffix (set per test in beforeEach). Used by the toggle
+  // test to isolate its persisted pipeline's source/destination across parallel workers.
+  let streamSuffix;
 
   function removeUTFCharacters(text) {
     // Remove UTF characters using regular expression
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     // Auth is handled via storageState - no login needed
     pageManager = new PageManager(page);
+    // Worker-specific suffix (0..workers-1). Only the toggle test persists a pipeline,
+    // and it uses this suffix so concurrent workers never share its source/dest stream.
+    streamSuffix = `_w${testInfo.parallelIndex}`;
 
-    // Ingest data using page object method
-    const streamNames = ["e2e_automate", "e2e_automate1", "e2e_automate2", "e2e_automate3"];
+    // Ingest data using page object method. The unsuffixed streams feed the validation
+    // tests (which only select a stream, never persist a pipeline); the worker-suffixed
+    // e2e_automate feeds the toggle test's persisted pipeline.
+    const streamNames = ["e2e_automate", "e2e_automate1", "e2e_automate2", "e2e_automate3", `e2e_automate${streamSuffix}`];
     await pageManager.pipelinesPage.bulkIngestToStreams(streamNames, logsdata);
-    await pageManager.apiCleanup.cleanupPipelines(streamNames).catch(() => {});
+    // NOTE: no pool-wide pipeline cleanup here. Deleting pipelines across all four shared
+    // source streams on every test setup races with sibling tests (in this file and in
+    // pipeline-core / pipeline-dynamic, which share these stream names) and deletes their
+    // in-flight pipelines. Only the toggle test below persists a pipeline; it frees just
+    // its own source stream at its start.
 
     // Navigate to logs page and select stream
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
@@ -470,6 +482,13 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     const pipelinePage = pageManager.pipelinesPage;
     testLogger.info('Test: Pipeline enable/disable toggle');
 
+    const sourceStream = `e2e_automate${streamSuffix}`;
+    const destFill = `toggle-test-dest${streamSuffix}`;   // hyphen normalizes to "_" on create
+    const destStream = `toggle_test_dest${streamSuffix}`;  // resulting stream name to explore
+    // Free only this test's own source stream (see note in beforeEach) so its
+    // persisted pipeline can't be deleted by a sibling test's setup.
+    await pageManager.apiCleanup.cleanupPipelines([sourceStream]).catch(() => {});
+
     // First create a pipeline to test toggle
     await pipelinePage.openPipelineMenu();
     await pipelinePage.addPipeline();
@@ -477,14 +496,14 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton);
     await pipelinePage.selectLogs();
 
-    await pipelinePage.enterStreamName("e2e_automate");
-    await pipelinePage.selectStreamOptionByName("e2e_automate");
+    await pipelinePage.enterStreamName(sourceStream);
+    await pipelinePage.selectStreamOptionByName(sourceStream);
     await pipelinePage.saveInputNodeStream();
 
     // Delete auto-created output and add new destination
     await pipelinePage.deleteOutputStreamNode();
     await pipelinePage.selectAndDragSecondStream();
-    await pipelinePage.fillDestinationStreamName("toggle-test-dest");
+    await pipelinePage.fillDestinationStreamName(destFill);
     await pipelinePage.clickInputNodeStreamSave();
 
     // Connect nodes
@@ -497,7 +516,7 @@ test.describe("Pipeline testcases", { tag: ['@all', '@pipelines'] }, () => {
     await pipelinePage.waitForPipelineSaved();
 
     // Navigate to pipeline list
-    await pipelinePage.exploreStreamAndNavigateToPipeline('toggle_test_dest');
+    await pipelinePage.exploreStreamAndNavigateToPipeline(destStream);
 
     // Search for our pipeline
     await pipelinePage.searchPipeline(pipelineName);

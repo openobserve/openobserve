@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="query-plan-tree tw:font-mono tw:text-[13px] tw:leading-[1.8] tw:p-4 tw:bg-[rgba(0,0,0,0.02)] tw:dark:bg-[rgba(255,255,255,0.03)] tw:rounded tw:overflow-x-auto">
+  <div class="query-plan-tree font-mono text-[13px] leading-[1.8] p-4 bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.03)] rounded overflow-x-auto">
     <div
       v-for="(node, index) in tree.children"
       :key="index"
-      class="tree-node tw:m-0"
+      class="tree-node m-0"
       data-test="query-plan-tree-node"
     >
       <QueryPlanNode

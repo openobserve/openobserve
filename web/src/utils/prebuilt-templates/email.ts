@@ -105,7 +105,7 @@ export const emailConfig: PrebuiltConfig = {
   credentialFields: [
     {
       key: 'recipients',
-      label: 'Recipient Email Addresses',
+      labelKey: 'alerts.prebuiltDestinations.emailRecipients',
       type: 'email',
       required: true,
       hint: 'Comma-separated email addresses',
@@ -113,7 +113,10 @@ export const emailConfig: PrebuiltConfig = {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const emailList = emails.split(',').map(e => e.trim());
         const invalidEmails = emailList.filter(email => !emailRegex.test(email));
-        return invalidEmails.length === 0 || `Invalid email addresses: ${invalidEmails.join(', ')}`;
+        return invalidEmails.length === 0 || {
+          key: 'alerts.prebuiltDestinations.invalidEmailAddresses',
+          params: { emails: invalidEmails.join(', ') }
+        };
       }
     }
     // CC and Subject fields removed - not supported by backend Email struct

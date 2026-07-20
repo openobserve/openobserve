@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex flex-col h-full">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
     <OForm ref="formRef" :schema="generalSettingsSchema" :default-values="generalSettingsDefaults()" @submit="onSubmit" v-slot="{ isSubmitting }">
-    <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3 tw:py-3">
+    <div class="flex flex-col gap-3 px-3 py-3">
         <OFormInput
           name="name"
           :label="t('dashboard.name')"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="tw:h-7.5 tw:my-2"
+            class="h-7.5 my-2"
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-general-setting-dynamic-filter"
           size="lg"
         />
-        <div class="tw:flex tw:justify-center tw:gap-2">
+        <div class="flex justify-center gap-2">
           <OButton
             @click="$emit('close')"
             variant="outline"
@@ -197,7 +197,7 @@ export default defineComponent({
           route?.query?.folder ?? "default",
         );
 
-        showPositiveNotification("Dashboard updated successfully.");
+        showPositiveNotification(t("dashboard.generalSettingsPage.updatedSuccessfully"));
 
         emit("save");
       } catch (error: any) {
@@ -205,10 +205,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Dashboard updation failed",
+              t("dashboard.generalSettingsPage.updationFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Dashboard updation failed", {
+          showErrorNotification(error?.message ?? t("dashboard.generalSettingsPage.updationFailed"), {
             timeout: 2000,
           });
         }

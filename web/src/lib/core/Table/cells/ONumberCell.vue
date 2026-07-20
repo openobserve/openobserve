@@ -77,12 +77,12 @@ const formatted = computed<string | null>(() => {
 <template>
   <span
     v-if="formatted === null"
-    class="tw:text-text-primary tw:text-xs tw:tabular-nums"
+    class="text-text-primary text-xs tabular-nums"
   >{{ emptyLabel }}</span>
-  <span v-else class="tw:tabular-nums tw:whitespace-nowrap">
+  <span v-else class="tabular-nums whitespace-nowrap">
     {{ formatted }}<span
       v-if="suffix"
-      class="tw:text-text-primary tw:ml-0.5"
+      class="text-text-primary ml-0.5"
     >{{ suffix }}</span>
   </span>
 </template>

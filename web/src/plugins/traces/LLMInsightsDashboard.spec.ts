@@ -145,7 +145,7 @@ function mountDashboard(
           template: "<button @click=\"$emit('click')\"><slot /></button>",
           emits: ["click"],
         },
-        // Quasar primitives the dashboard renders.
+        // Primitives the dashboard renders.
         QSelect: {
           template: "<div data-test=\"q-select\" />",
           props: ["modelValue", "options", "disable"],

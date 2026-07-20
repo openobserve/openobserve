@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
+  <div class="p-0" style="min-height: inherit">
     <!-- Header -->
     <AppPageHeader
       :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
@@ -23,324 +23,332 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: () => $emit('cancel:hideform'),
         dataTest: 'ai-toolset-back-btn',
       }"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     />
 
-    <div
-      style="height: calc(100vh - 120px); overflow: auto"
+    <!-- Inline page form. The form is created in setup() via useOForm (headless)
+         so this owner can read `kind`/arrays/skill content reactively to drive
+         the v-if/v-for below; it's handed to <OForm :form="form">. The Save
+         button lives inside <OForm> as type="submit", so Enter + click both
+         submit natively (no form-id). -->
+    <OForm
+      id="add-ai-toolset-form"
+      :form="form"
+      v-slot="{ isSubmitting }"
     >
-      <div class="tw:max-w-2xl tw:mx-4 tw:mt-4">
-        <!-- Name -->
-        <div class="o2-input tw:mb-4">
-          <OInput
-            data-test="ai-toolset-name-input"
-            v-model="form.name"
-            :label="t('aiToolset.name') + ' *'"
-            class="showLabelOnTop tw:w-full"
-            :readonly="isEditing"
-            :disabled="isEditing"
-            :error="!!nameError"
-            :error-message="nameError"
-            @update:model-value="nameError = ''"
-          />
-        </div>
-
-        <!-- Kind -->
-        <div class="o2-input tw:mb-4">
-          <OSelect
-            data-test="ai-toolset-kind-select"
-            v-model="form.kind"
-            :label="t('aiToolset.kind') + ' *'"
-            :options="kindOptions"
-            labelKey="label"
-            valueKey="value"
-            class="showLabelOnTop tw:w-full"
-            :disabled="isEditing"
-            :error="!!kindError"
-            :error-message="kindError"
-            @update:model-value="kindError = ''"
-          />
-        </div>
-
-        <!-- Description -->
-        <div class="o2-input tw:mb-4">
-          <OTextarea
-            data-test="ai-toolset-description-input"
-            v-model="form.description"
-            :label="t('aiToolset.description')"
-            class="showLabelOnTop tw:w-full"
-          />
-        </div>
-
-        <!-- MCP fields -->
-        <template v-if="form.kind === 'mcp'">
-          <div class="tw:text-base tw:font-medium tw:font-semibold tw:mb-3">
-            {{ t("aiToolset.mcpConfig") }}
-          </div>
-          <div class="o2-input tw:mb-4">
-            <OInput
-              data-test="ai-toolset-mcp-url"
-              v-model="mcpData.url"
-              :label="t('aiToolset.mcpUrl') + ' *'"
-              class="showLabelOnTop tw:w-full"
-              placeholder="https://api.example.com/mcp/"
-              :error="!!mcpUrlError"
-              :error-message="mcpUrlError"
-              @update:model-value="mcpUrlError = ''"
+      <div style="height: calc(100vh - 120px); overflow: auto">
+        <div class="max-w-2xl mx-4 mt-4">
+          <!-- Name -->
+          <div class="o2-input mb-4">
+            <OFormInput
+              data-test="ai-toolset-name-input"
+              name="name"
+              :label="t('aiToolset.name')"
+              required
+              class="showLabelOnTop w-full"
+              :readonly="isEditing"
+              :disabled="isEditing"
             />
           </div>
-          <div class="o2-input tw:mb-4">
-            <OInput
-              data-test="ai-toolset-mcp-timeout"
-              v-model.number="mcpData.timeout_seconds"
-              :label="t('aiToolset.timeoutSeconds')"
-              class="showLabelOnTop tw:w-full"
-              type="number"
-              min="1"
-            />
-          </div>
-          <!-- Headers -->
-          <div class="tw:mb-2 tw:text-sm tw:font-medium">{{ t("aiToolset.headers") }}</div>
-          <div
-            v-for="(header, idx) in mcpHeaders"
-            :key="idx"
-            class="tw:flex tw:items-end tw:gap-2 tw:mb-2"
-          >
-            <OInput
-              v-model="header.key"
-              :label="t('aiToolset.headerKey')"
-              class="o2-input tw:flex-1"
-            />
-            <OInput
-              v-model="header.value"
-              :label="t('aiToolset.headerValue')"
-              class="o2-input tw:flex-1"
-              :type="header.visible ? 'text' : 'password'"
-            >
-              <template #icon-right>
-                <OIcon
-                  :name="header.visible ? 'visibility-off' : 'visibility'" size="sm"
-                  class="tw:cursor-pointer"
-                  @click="header.visible = !header.visible"
-                />
-              </template>
-            </OInput>
-            <OButton
-              variant="ghost-destructive"
-              size="icon-xs-sq"
-              @click="removeHeader(idx)"
-            >
-              <OIcon name="delete" size="xs" />
-            </OButton>
-          </div>
-          <OButton variant="outline" size="sm" class="tw:mb-4" @click="addHeader" icon-left="add">
-            {{ t("aiToolset.addHeader") }}
-          </OButton>
-        </template>
 
-        <!-- CLI fields -->
-        <template v-if="form.kind === 'cli'">
-          <div class="tw:flex tw:items-center tw:gap-3 tw:mb-4">
-            <div class="tw:text-base tw:font-medium tw:font-semibold">
-              {{ t("aiToolset.cliConfig") }}
+          <!-- Kind -->
+          <div class="o2-input mb-4">
+            <OFormSelect
+              data-test="ai-toolset-kind-select"
+              name="kind"
+              :label="t('aiToolset.kind')"
+              required
+              :options="kindOptions"
+              labelKey="label"
+              valueKey="value"
+              class="showLabelOnTop w-full"
+              :disabled="isEditing"
+            />
+          </div>
+
+          <!-- Description -->
+          <div class="o2-input mb-4">
+            <OFormTextarea
+              data-test="ai-toolset-description-input"
+              name="description"
+              :label="t('aiToolset.description')"
+              class="showLabelOnTop w-full"
+            />
+          </div>
+
+          <!-- MCP fields -->
+          <template v-if="selectedKind === 'mcp'">
+            <div class="text-base font-medium font-semibold mb-3">
+              {{ t("aiToolset.mcpConfig") }}
             </div>
-            <div class="tw:flex tw:items-center tw:gap-1">
-              <span class="tw:text-xs tw:text-gray-400"
-                >{{ t("aiToolset.presets") }}:</span
-              >
-              <OTag
-                v-for="preset in CLI_PRESETS"
-                :key="preset.id"
-                type="cliPreset"
-                :value="preset.id"
-                clickable
-                class="tw:cursor-pointer"
-                :data-test="`cli-preset-${preset.id}`"
-                @click="applyPreset(preset)"
-              >
-                {{ preset.label }}
-              </OTag>
+            <div class="o2-input mb-4">
+              <OFormInput
+                data-test="ai-toolset-mcp-url"
+                name="mcp.url"
+                :label="t('aiToolset.mcpUrl')"
+                required
+                class="showLabelOnTop w-full"
+                placeholder="https://api.example.com/mcp/"
+              />
             </div>
-          </div>
-          <div class="o2-input tw:mb-4">
-            <OInput
-              data-test="ai-toolset-cli-command"
-              v-model="cliData.command"
-              :label="t('aiToolset.cliCommand') + ' *'"
-              class="showLabelOnTop tw:w-full"
-              placeholder="kubectl"
-              :error="!!cliCommandError"
-              :error-message="cliCommandError"
-              @update:model-value="cliCommandError = ''"
-            />
-          </div>
-          <div class="o2-input tw:mb-4">
-            <OInput
-              v-model="cliData.allowed_subcommands_raw"
-              :label="t('aiToolset.allowedSubcommands')"
-              :helpText="t('aiToolset.subcommandsHint')"
-              class="showLabelOnTop tw:w-full"
-              placeholder="get, describe, logs"
-            />
-          </div>
-          <div class="tw:flex tw:gap-4 tw:mb-4">
-            <div class="o2-input tw:flex-1">
-              <OInput
-                v-model.number="cliData.timeout_seconds"
+            <div class="o2-input mb-4">
+              <OFormInput
+                data-test="ai-toolset-mcp-timeout"
+                name="mcp.timeout_seconds"
                 :label="t('aiToolset.timeoutSeconds')"
-                class="showLabelOnTop tw:w-full"
+                class="showLabelOnTop w-full"
                 type="number"
                 min="1"
               />
             </div>
-            <div class="o2-input tw:flex-1">
-              <OInput
-                v-model.number="cliData.max_output_bytes"
-                :label="t('aiToolset.maxOutputBytes')"
-                class="showLabelOnTop tw:w-full"
-                type="number"
-                min="1"
-              />
-            </div>
-          </div>
-          <div class="tw:mb-4">
-            <OSwitch
-              v-model="cliData.requires_confirmation"
-              :label="t('aiToolset.requiresConfirmation')"
-            />
-          </div>
-          <!-- Env vars -->
-          <div class="tw:mb-2 tw:text-sm tw:font-medium">{{ t("aiToolset.envVars") }}</div>
-          <div
-            v-for="(env, idx) in cliEnvVars"
-            :key="'env-' + idx"
-            class="tw:flex tw:items-end tw:gap-2 tw:mb-2"
-          >
-            <OInput
-              v-model="env.key"
-              :label="t('aiToolset.envKey')"
-              class="o2-input tw:flex-1"
-            />
-            <OInput
-              v-model="env.value"
-              :label="t('aiToolset.envValue')"
-              class="o2-input tw:flex-1"
-              :type="env.visible ? 'text' : 'password'"
+            <!-- Headers — form-owned dynamic array-field (mcp.headers[i].*) -->
+            <div class="mb-2 text-sm font-medium">{{ t("aiToolset.headers") }}</div>
+            <div
+              v-for="(header, idx) in mcpHeaders"
+              :key="idx"
+              class="flex items-end gap-2 mb-2"
             >
-              <template #icon-right>
-                <OIcon
-                  :name="env.visible ? 'visibility-off' : 'visibility'" size="sm"
-                  class="tw:cursor-pointer"
-                  @click="env.visible = !env.visible"
-                />
-              </template>
-            </OInput>
-            <OButton
-              variant="ghost-destructive"
-              size="icon-xs-sq"
-              @click="removeEnvVar(idx)"
-            >
-              <OIcon name="delete" size="xs" />
-            </OButton>
-          </div>
-          <OButton variant="outline" size="sm" class="tw:mb-4" @click="addEnvVar" icon-left="add">
-            {{ t("aiToolset.addEnvVar") }}
-          </OButton>
-
-          <!-- Credential files -->
-          <div class="tw:mb-2 tw:text-sm tw:font-medium">
-            {{ t("aiToolset.credentialFiles") }}
-          </div>
-          <div
-            v-for="(cred, idx) in cliCredFiles"
-            :key="'cred-' + idx"
-            class="tw:mb-4"
-          >
-            <div class="tw:flex tw:items-center tw:gap-2 tw:mb-1">
-              <OInput
-                v-model="cred.key"
-                :label="t('aiToolset.credEnvVar')"
-                helpText="e.g. KUBECONFIG"
-                class="o2-input tw:w-48"
+              <OFormInput
+                :name="`mcp.headers[${idx}].key`"
+                :label="t('aiToolset.headerKey')"
+                class="o2-input flex-1"
               />
+              <OFormInput
+                :name="`mcp.headers[${idx}].value`"
+                :label="t('aiToolset.headerValue')"
+                class="o2-input flex-1"
+                :type="header.visible ? 'text' : 'password'"
+              >
+                <template #icon-right>
+                  <OIcon
+                    :name="header.visible ? 'visibility-off' : 'visibility'" size="sm"
+                    class="cursor-pointer"
+                    @click="toggleHeaderVisible(idx)"
+                  />
+                </template>
+              </OFormInput>
               <OButton
                 variant="ghost-destructive"
                 size="icon-xs-sq"
-                :title="t('common.delete')"
-                @click="removeCredFile(idx)"
+                @click="removeHeader(idx)"
               >
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mb-1">
-              {{ t("aiToolset.credContentHint") }}
+            <OButton variant="outline" size="sm" class="mb-4" @click="addHeader" icon-left="add">
+              {{ t("aiToolset.addHeader") }}
+            </OButton>
+          </template>
+
+          <!-- CLI fields -->
+          <template v-if="selectedKind === 'cli'">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="text-base font-medium font-semibold">
+                {{ t("aiToolset.cliConfig") }}
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="text-xs text-gray-400"
+                  >{{ t("aiToolset.presets") }}:</span
+                >
+                <OTag
+                  v-for="preset in CLI_PRESETS"
+                  :key="preset.id"
+                  type="cliPreset"
+                  :value="preset.id"
+                  clickable
+                  class="cursor-pointer"
+                  :data-test="`cli-preset-${preset.id}`"
+                  @click="applyPreset(preset)"
+                >
+                  {{ preset.label }}
+                </OTag>
+              </div>
+            </div>
+            <div class="o2-input mb-4">
+              <OFormInput
+                data-test="ai-toolset-cli-command"
+                name="cli.command"
+                :label="t('aiToolset.cliCommand')"
+                required
+                class="showLabelOnTop w-full"
+                placeholder="kubectl"
+              />
+            </div>
+            <div class="o2-input mb-4">
+              <OFormInput
+                name="cli.allowed_subcommands_raw"
+                :label="t('aiToolset.allowedSubcommands')"
+                :helpText="t('aiToolset.subcommandsHint')"
+                class="showLabelOnTop w-full"
+                placeholder="get, describe, logs"
+              />
+            </div>
+            <div class="flex gap-4 mb-4">
+              <div class="o2-input flex-1">
+                <OFormInput
+                  name="cli.timeout_seconds"
+                  :label="t('aiToolset.timeoutSeconds')"
+                  class="showLabelOnTop w-full"
+                  type="number"
+                  min="1"
+                />
+              </div>
+              <div class="o2-input flex-1">
+                <OFormInput
+                  name="cli.max_output_bytes"
+                  :label="t('aiToolset.maxOutputBytes')"
+                  class="showLabelOnTop w-full"
+                  type="number"
+                  min="1"
+                />
+              </div>
+            </div>
+            <div class="mb-4">
+              <OFormSwitch
+                name="cli.requires_confirmation"
+                :label="t('aiToolset.requiresConfirmation')"
+              />
+            </div>
+            <!-- Env vars — form-owned dynamic array-field (cli.env[i].*) -->
+            <div class="mb-2 text-sm font-medium">{{ t("aiToolset.envVars") }}</div>
+            <div
+              v-for="(env, idx) in cliEnvVars"
+              :key="'env-' + idx"
+              class="flex items-end gap-2 mb-2"
+            >
+              <OFormInput
+                :name="`cli.env[${idx}].key`"
+                :label="t('aiToolset.envKey')"
+                class="o2-input flex-1"
+              />
+              <OFormInput
+                :name="`cli.env[${idx}].value`"
+                :label="t('aiToolset.envValue')"
+                class="o2-input flex-1"
+                :type="env.visible ? 'text' : 'password'"
+              >
+                <template #icon-right>
+                  <OIcon
+                    :name="env.visible ? 'visibility-off' : 'visibility'" size="sm"
+                    class="cursor-pointer"
+                    @click="toggleEnvVisible(idx)"
+                  />
+                </template>
+              </OFormInput>
+              <OButton
+                variant="ghost-destructive"
+                size="icon-xs-sq"
+                @click="removeEnvVar(idx)"
+              >
+                <OIcon name="delete" size="xs" />
+              </OButton>
+            </div>
+            <OButton variant="outline" size="sm" class="mb-4" @click="addEnvVar" icon-left="add">
+              {{ t("aiToolset.addEnvVar") }}
+            </OButton>
+
+            <!-- Credential files — form-owned array-field. `key` is an OFormInput
+                 (cli.credFiles[i].key); `value` is a Monaco editor (no OForm*
+                 equivalent) bridged into the form via setCredValue. -->
+            <div class="mb-2 text-sm font-medium">
+              {{ t("aiToolset.credentialFiles") }}
+            </div>
+            <div
+              v-for="(cred, idx) in cliCredFiles"
+              :key="'cred-' + idx"
+              class="mb-4"
+            >
+              <div class="flex items-center gap-2 mb-1">
+                <OFormInput
+                  :name="`cli.credFiles[${idx}].key`"
+                  :label="t('aiToolset.credEnvVar')"
+                  helpText="e.g. KUBECONFIG"
+                  class="o2-input w-48"
+                />
+                <OButton
+                  variant="ghost-destructive"
+                  size="icon-xs-sq"
+                  :title="t('common.delete')"
+                  @click="removeCredFile(idx)"
+                >
+                  <OIcon name="delete" size="xs" />
+                </OButton>
+              </div>
+              <div class="text-xs text-gray-500 mb-1">
+                {{ t("aiToolset.credContentHint") }}
+              </div>
+              <query-editor
+                :editor-id="`cred-file-editor-${idx}`"
+                class="w-full min-h-50! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto"
+                language="yaml"
+                :query="cred.value"
+                @update:query="(v: string) => setCredValue(idx, v)"
+              />
+            </div>
+            <OButton
+              variant="outline"
+              size="sm"
+              class="mb-4"
+              @click="addCredFile"
+              icon-left="add"
+            >
+              {{ t("aiToolset.addCredFile") }}
+            </OButton>
+          </template>
+
+          <!-- Skill fields — the Monaco editor (no OForm* equivalent) is bridged
+               into the form (skill.content); its required rule lives in the
+               schema and the error shows after the first submit (R3). -->
+          <template v-if="selectedKind === 'skill'">
+            <div class="text-base font-medium font-semibold mb-2">
+              {{ t("aiToolset.skillConfig") }}
+            </div>
+            <div class="mb-1 text-xs text-gray-400">
+              {{ t("aiToolset.skillContent") }} *
             </div>
             <query-editor
-              :editor-id="`cred-file-editor-${idx}`"
-              class="tw:w-full tw:min-h-50! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto"
-              language="yaml"
-              v-model:query="cred.value"
+              data-test="ai-toolset-skill-content"
+              editor-id="skill-content-editor"
+              class="w-full min-h-100! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto mb-3"
+              language="markdown"
+              :query="skillContent"
+              @update:query="(v: string) => setSkillContent(v)"
             />
-          </div>
+            <div
+              v-if="skillContentError"
+              class="text-red-500 text-xs mt-[-12px] mb-4"
+            >
+              {{ t("aiToolset.skillContentRequired") }}
+            </div>
+          </template>
+        </div>
+
+        <!-- Footer -->
+        <div
+          class="flex items-center gap-2 px-4 py-3 border-t border-border-default sticky bottom-0"
+          :class="store.state.theme === 'dark' ? 'bg-(--o2-primary-background)' : 'bg-white'"
+        >
           <OButton
-            variant="outline"
-            size="sm"
-            class="tw:mb-4"
-            @click="addCredFile"
-            icon-left="add"
+            data-test="ai-toolset-save-btn"
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            :loading="isSubmitting"
           >
-            {{ t("aiToolset.addCredFile") }}
+            {{ isEditing ? t("common.update") : t("common.save") }}
           </OButton>
-        </template>
-
-        <!-- Skill fields -->
-        <template v-if="form.kind === 'skill'">
-          <div class="tw:text-base tw:font-medium tw:font-semibold tw:mb-2">
-            {{ t("aiToolset.skillConfig") }}
-          </div>
-          <div class="tw:mb-1 tw:text-xs tw:text-gray-400">
-            {{ t("aiToolset.skillContent") }} *
-          </div>
-          <query-editor
-            data-test="ai-toolset-skill-content"
-            editor-id="skill-content-editor"
-            class="tw:w-full tw:min-h-100! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto tw:mb-3"
-            language="markdown"
-            v-model:query="skillData.content"
-          />
-          <div
-            v-if="skillContentError"
-            class="tw:text-red-500 tw:text-xs tw:mt-[-12px] tw:mb-4"
+          <OButton
+            data-test="ai-toolset-cancel-btn"
+            variant="outline"
+            size="sm-action"
+            :disabled="isSubmitting"
+            @click="$emit('cancel:hideform')"
           >
-            {{ t("aiToolset.skillContentRequired") }}
-          </div>
-        </template>
+            {{ t("common.cancel") }}
+          </OButton>
+        </div>
       </div>
-
-      <!-- Footer -->
-      <div
-        class="tw:flex tw:items-center tw:gap-2 tw:px-4 tw:py-3 tw:border-t tw:border-border-default tw:sticky tw:bottom-0"
-        :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-primary-background)' : 'tw:bg-white'"
-      >
-        <OButton
-          data-test="ai-toolset-save-btn"
-          variant="primary"
-          size="sm-action"
-          @click="onSubmit"
-          :loading="saving"
-        >
-          {{ isEditing ? t("common.update") : t("common.save") }}
-        </OButton>
-        <OButton
-          data-test="ai-toolset-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="$emit('cancel:hideform')"
-        >
-          {{ t("common.cancel") }}
-        </OButton>
-      </div>
-    </div>
+    </OForm>
   </div>
 </template>
 
@@ -349,7 +357,7 @@ import {
   defineAsyncComponent,
   defineComponent,
   ref,
-  watch,
+  computed,
   onMounted,
 } from "vue";
 import { useStore } from "vuex";
@@ -359,13 +367,20 @@ import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeAddAiToolsetSchema,
+  addAiToolsetDefaults,
+  type AddAiToolsetForm,
+} from "./AddAiToolset.schema";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -373,36 +388,159 @@ const QueryEditor = defineAsyncComponent(
 
 export default defineComponent({
   name: "AddAiToolset",
-  components: { AppPageHeader, OTag, OButton, OIcon, OInput, OSelect, OSwitch, OTextarea, QueryEditor },
+  components: {
+    AppPageHeader,
+    OTag,
+    OButton,
+    OIcon,
+    OForm,
+    OFormInput,
+    OFormTextarea,
+    OFormSelect,
+    OFormSwitch,
+    QueryEditor,
+  },
   emits: ["cancel:hideform"],
   setup(_, { emit }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const formRef = ref<any>(null);
-    const saving = ref(false);
-    const nameError = ref('');
-    const kindError = ref('');
-    const mcpUrlError = ref('');
-    const cliCommandError = ref('');
+
+    // Co-located Zod schema (factory keeps the messages i18n-driven).
+    const addAiToolsetSchema = makeAddAiToolsetSchema(t);
 
     const editingId = ref<string | null>(null);
     const isEditing = ref(false);
-
-    // -----------------------------------------------------------------------
-    // Form model
-    // -----------------------------------------------------------------------
-    const form = ref({
-      name: "",
-      kind: "mcp" as ToolsetKind,
-      description: "",
-    });
 
     const kindOptions = [
       { label: "MCP Server", value: "mcp" },
       { label: "CLI Tool", value: "cli" },
       { label: "Skill", value: "skill" },
     ];
+
+    // -----------------------------------------------------------------------
+    // Build the API payload from the validated submit value (single source of
+    // truth — incl. the form-owned arrays and the bridged Monaco values).
+    // -----------------------------------------------------------------------
+    const buildData = (value: AddAiToolsetForm) => {
+      const kind = value.kind;
+      if (kind === "mcp") {
+        const headers: Record<string, string> = {};
+        (value.mcp.headers ?? [])
+          .filter((h) => (h.key ?? "").trim())
+          .forEach((h) => {
+            headers[(h.key ?? "").trim()] = h.value ?? "";
+          });
+        return {
+          url: value.mcp.url ?? "",
+          headers,
+          timeout_seconds: Number(value.mcp.timeout_seconds),
+        };
+      }
+      if (kind === "cli") {
+        const allowed = (value.cli.allowed_subcommands_raw ?? "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const env: Record<string, string> = {};
+        (value.cli.env ?? [])
+          .filter((e) => (e.key ?? "").trim())
+          .forEach((e) => {
+            env[(e.key ?? "").trim()] = e.value ?? "";
+          });
+        const credential_files: Record<string, string> = {};
+        (value.cli.credFiles ?? [])
+          .filter((c) => (c.key ?? "").trim())
+          .forEach((c) => {
+            credential_files[(c.key ?? "").trim()] = c.value ?? "";
+          });
+        return {
+          command: value.cli.command ?? "",
+          ...(allowed.length ? { allowed_subcommands: allowed } : {}),
+          timeout_seconds: Number(value.cli.timeout_seconds),
+          max_output_bytes: Number(value.cli.max_output_bytes),
+          requires_confirmation: value.cli.requires_confirmation ?? false,
+          env,
+          credential_files,
+        };
+      }
+      if (kind === "skill") {
+        return { content: value.skill.content ?? "" };
+      }
+      return {};
+    };
+
+    // Awaited save handler — baked into useOForm below, so OForm only calls it
+    // once the whole schema passes (no manual gate). OForm awaits it → auto Save
+    // spinner. `value` is the validated payload and the single source of truth.
+    const saveToolset = async (value: AddAiToolsetForm) => {
+      const org = store.state.selectedOrganization.identifier;
+      const data = buildData(value);
+
+      try {
+        if (isEditing.value && editingId.value) {
+          await aiToolsetsService.update(org, editingId.value, {
+            description: value.description || undefined,
+            data,
+          });
+          toast({
+            variant: "success",
+            message: t("aiToolset.updatedSuccessfully"),
+          });
+        } else {
+          await aiToolsetsService.create(org, {
+            name: value.name,
+            kind: value.kind as ToolsetKind,
+            description: value.description || undefined,
+            data,
+          });
+          toast({
+            variant: "success",
+            message: t("aiToolset.createdSuccessfully"),
+          });
+        }
+        emit("cancel:hideform");
+      } catch (err: any) {
+        const msg =
+          err?.response?.data?.message ||
+          (isEditing.value
+            ? t("aiToolset.updateFailed")
+            : t("aiToolset.createFailed"));
+        toast({ variant: "error", message: msg });
+      }
+    };
+
+    // ── Headless form (Rule ③ fix) ────────────────────────────────────────────
+    // The form is created HERE in the owner's setup (not inside <OForm>), so it
+    // exists synchronously and this component can read it reactively with
+    // `form.useStore` to drive the v-if/v-for below — no template ref, no store
+    // subscription, no mirror. It is handed to <OForm :form="form">.
+    const form = useOForm<AddAiToolsetForm>({
+      defaultValues: addAiToolsetDefaults(),
+      schema: addAiToolsetSchema,
+      onSubmit: saveToolset,
+    });
+
+    // ── Reactive reads (REPLACE the old mirror) ───────────────────────────────
+    // `form.useStore(selector)` returns a reactive Ref that re-tracks on every
+    // form change — used for the section toggle, the array v-for rows, the
+    // Monaco editor value, and the submit-attempt-driven skill error.
+    const selectedKind = form.useStore((s: any) => s.values.kind);
+    const mcpHeaders = form.useStore((s: any) => s.values.mcp?.headers ?? []);
+    const cliEnvVars = form.useStore((s: any) => s.values.cli?.env ?? []);
+    const cliCredFiles = form.useStore((s: any) => s.values.cli?.credFiles ?? []);
+    const skillContent = form.useStore((s: any) => s.values.skill?.content ?? "");
+    const submitted = form.useStore((s: any) => (s.submissionAttempts ?? 0) > 0);
+
+    // Mirror the schema's skill.content required rule for display: shown only
+    // after the first submit (R3 timing), cleared live as content is typed.
+    // (Monaco isn't an OForm* field that auto-renders its error.)
+    const skillContentError = computed(
+      () =>
+        submitted.value &&
+        selectedKind.value === "skill" &&
+        !(skillContent.value ?? "").trim(),
+    );
 
     // -----------------------------------------------------------------------
     // Built-in CLI presets
@@ -427,86 +565,118 @@ export default defineComponent({
     ];
 
     const applyPreset = (preset: (typeof CLI_PRESETS)[number]) => {
-      cliData.value.command = preset.command;
-      cliData.value.allowed_subcommands_raw = preset.allowed_subcommands;
-      // Replace env and cred arrays — keep empty placeholders so the user
-      // can see exactly which fields to fill in.
-      cliEnvVars.value = preset.env.map((e) => ({ ...e }));
-      cliCredFiles.value = preset.credential_files.map((c) => ({ ...c }));
+      // Cross-field edits driven by a user action → setFieldValue (sanctioned).
+      form.setFieldValue("cli.command", preset.command);
+      form.setFieldValue("cli.allowed_subcommands_raw", preset.allowed_subcommands);
+      // Replace the form-owned env and cred arrays — keep empty placeholders so
+      // the user can see exactly which fields to fill in.
+      form.setFieldValue(
+        "cli.env",
+        preset.env.map((e) => ({ ...e })),
+      );
+      form.setFieldValue(
+        "cli.credFiles",
+        preset.credential_files.map((c) => ({ key: c.key, value: c.value })),
+      );
     };
 
-    // MCP
-    const mcpData = ref({ url: "", timeout_seconds: 30 });
-    const mcpHeaders = ref<
-      Array<{ key: string; value: string; visible: boolean }>
-    >([]);
+    // -----------------------------------------------------------------------
+    // Dynamic array-fields — FORM-OWNED (mcp.headers / cli.env / cli.credFiles).
+    // The form is the single source of truth; add/remove/toggle mutate it via
+    // the form API directly, and the `form.useStore` reads above re-render the
+    // v-for rows (playbook §2).
+    // -----------------------------------------------------------------------
+    // MCP headers
     const addHeader = () =>
-      mcpHeaders.value.push({ key: "", value: "", visible: false });
-    const removeHeader = (i: number) => mcpHeaders.value.splice(i, 1);
+      form.pushFieldValue("mcp.headers", { key: "", value: "", visible: false });
+    const removeHeader = (i: number) => form.removeFieldValue("mcp.headers", i);
+    const toggleHeaderVisible = (i: number) => {
+      const cur = !!(form.state.values as AddAiToolsetForm).mcp?.headers?.[i]
+        ?.visible;
+      form.setFieldValue(`mcp.headers[${i}].visible`, !cur, {
+        dontUpdateMeta: true,
+      });
+    };
 
-    // CLI
-    const cliData = ref({
-      command: "",
-      allowed_subcommands_raw: "",
-      timeout_seconds: 30,
-      max_output_bytes: 100000,
-      requires_confirmation: false,
-    });
-    const cliEnvVars = ref<
-      Array<{ key: string; value: string; visible: boolean }>
-    >([]);
-    const cliCredFiles = ref<Array<{ key: string; value: string }>>([]);
+    // CLI env vars
     const addEnvVar = () =>
-      cliEnvVars.value.push({ key: "", value: "", visible: false });
-    const removeEnvVar = (i: number) => cliEnvVars.value.splice(i, 1);
-    const addCredFile = () => cliCredFiles.value.push({ key: "", value: "" });
-    const removeCredFile = (i: number) => cliCredFiles.value.splice(i, 1);
+      form.pushFieldValue("cli.env", { key: "", value: "", visible: false });
+    const removeEnvVar = (i: number) => form.removeFieldValue("cli.env", i);
+    const toggleEnvVisible = (i: number) => {
+      const cur = !!(form.state.values as AddAiToolsetForm).cli?.env?.[i]
+        ?.visible;
+      form.setFieldValue(`cli.env[${i}].visible`, !cur, {
+        dontUpdateMeta: true,
+      });
+    };
 
-    // Skill
-    const skillData = ref({ content: "" });
-    const skillContentError = ref(false);
+    // CLI credential files — `key` is an OFormInput; `value` is a Monaco editor
+    // bridged into the form (no OForm* equivalent).
+    const addCredFile = () =>
+      form.pushFieldValue("cli.credFiles", { key: "", value: "" });
+    const removeCredFile = (i: number) =>
+      form.removeFieldValue("cli.credFiles", i);
+    const setCredValue = (i: number, value: string) =>
+      form.setFieldValue(`cli.credFiles[${i}].value`, value, {
+        dontUpdateMeta: true,
+      });
+
+    // Skill content (Monaco editor — no OForm* equivalent) bridged into the form.
+    const setSkillContent = (value: string) =>
+      form.setFieldValue("skill.content", value, { dontUpdateMeta: true });
 
     // -----------------------------------------------------------------------
-    // Load existing toolset when editing
+    // Load existing toolset when editing — seed via form.reset (the record
+    // arrives async; `:default-values` was read once at creation).
     // -----------------------------------------------------------------------
     const loadForEdit = async (id: string) => {
       const org = store.state.selectedOrganization.identifier;
       try {
         const res = await aiToolsetsService.get(org, id);
-        const t = res.data;
-        form.value.name = t.name;
-        form.value.kind = t.kind;
-        form.value.description = t.description || "";
-        editingId.value = t.id;
+        const toolset = res.data;
+        editingId.value = toolset.id;
         isEditing.value = true;
 
-        const data = t.data || {};
-        if (t.kind === "mcp") {
-          mcpData.value.url = data.url || "";
-          mcpData.value.timeout_seconds = data.timeout_seconds ?? 30;
-          mcpHeaders.value = Object.entries(data.headers || {}).map(
-            ([k, v]) => ({ key: k, value: v as string, visible: false }),
-          );
-        } else if (t.kind === "cli") {
-          cliData.value.command = data.command || "";
-          cliData.value.allowed_subcommands_raw = (
-            data.allowed_subcommands || []
-          ).join(", ");
-          cliData.value.timeout_seconds = data.timeout_seconds ?? 30;
-          cliData.value.max_output_bytes = data.max_output_bytes ?? 100000;
-          cliData.value.requires_confirmation =
-            data.requires_confirmation ?? false;
-          cliEnvVars.value = Object.entries(data.env || {}).map(([k, v]) => ({
-            key: k,
-            value: v as string,
-            visible: false,
-          }));
-          cliCredFiles.value = Object.entries(data.credential_files || {}).map(
-            ([k, v]) => ({ key: k, value: v as string }),
-          );
-        } else if (t.kind === "skill") {
-          skillData.value.content = data.content || "";
+        const data = toolset.data || {};
+        const record: AddAiToolsetForm = {
+          ...addAiToolsetDefaults(),
+          name: toolset.name,
+          kind: toolset.kind,
+          description: toolset.description || "",
+        };
+        if (toolset.kind === "mcp") {
+          record.mcp = {
+            url: data.url || "",
+            timeout_seconds: data.timeout_seconds ?? 30,
+            headers: Object.entries(data.headers || {}).map(([k, v]) => ({
+              key: k,
+              value: v as string,
+              visible: false,
+            })),
+          };
+        } else if (toolset.kind === "cli") {
+          record.cli = {
+            command: data.command || "",
+            allowed_subcommands_raw: (data.allowed_subcommands || []).join(", "),
+            timeout_seconds: data.timeout_seconds ?? 30,
+            max_output_bytes: data.max_output_bytes ?? 100000,
+            requires_confirmation: data.requires_confirmation ?? false,
+            env: Object.entries(data.env || {}).map(([k, v]) => ({
+              key: k,
+              value: v as string,
+              visible: false,
+            })),
+            credFiles: Object.entries(data.credential_files || {}).map(
+              ([k, v]) => ({ key: k, value: v as string }),
+            ),
+          };
+        } else if (toolset.kind === "skill") {
+          record.skill = { content: data.content || "" };
         }
+
+        // Async-loaded record → form.reset (NOT per-field setFieldValue). The
+        // `form.useStore` reads above re-render automatically.
+        form.reset(record);
       } catch {
         toast({ variant: "error", message: "Failed to load toolset" });
       }
@@ -519,148 +689,36 @@ export default defineComponent({
       }
     });
 
-    // -----------------------------------------------------------------------
-    // Build data payload
-    // -----------------------------------------------------------------------
-    const buildData = () => {
-      const kind = form.value.kind;
-      if (kind === "mcp") {
-        const headers: Record<string, string> = {};
-        mcpHeaders.value
-          .filter((h) => h.key.trim())
-          .forEach((h) => {
-            headers[h.key.trim()] = h.value;
-          });
-        return {
-          url: mcpData.value.url,
-          headers,
-          timeout_seconds: mcpData.value.timeout_seconds,
-        };
-      }
-      if (kind === "cli") {
-        const allowed = cliData.value.allowed_subcommands_raw
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        const env: Record<string, string> = {};
-        cliEnvVars.value
-          .filter((e) => e.key.trim())
-          .forEach((e) => {
-            env[e.key.trim()] = e.value;
-          });
-        const credential_files: Record<string, string> = {};
-        cliCredFiles.value
-          .filter((c) => c.key.trim())
-          .forEach((c) => {
-            credential_files[c.key.trim()] = c.value;
-          });
-        return {
-          command: cliData.value.command,
-          ...(allowed.length ? { allowed_subcommands: allowed } : {}),
-          timeout_seconds: cliData.value.timeout_seconds,
-          max_output_bytes: cliData.value.max_output_bytes,
-          requires_confirmation: cliData.value.requires_confirmation,
-          env,
-          credential_files,
-        };
-      }
-      if (kind === "skill") {
-        return { content: skillData.value.content };
-      }
-      return {};
-    };
-
-    // -----------------------------------------------------------------------
-    // Submit
-    // -----------------------------------------------------------------------
-    const onSubmit = async () => {
-      // Validate manually
-      nameError.value = !form.value.name
-        ? t('aiToolset.nameRequired')
-        : !/^[a-zA-Z0-9_-]+$/.test(form.value.name)
-        ? t('aiToolset.nameInvalid')
-        : form.value.name.length > 256
-        ? t('aiToolset.nameTooLong')
-        : '';
-      kindError.value = !form.value.kind ? t('aiToolset.kindRequired') : '';
-      mcpUrlError.value = form.value.kind === 'mcp' && !mcpData.value.url ? t('aiToolset.mcpUrlRequired') : '';
-      cliCommandError.value = form.value.kind === 'cli' && !cliData.value.command ? t('aiToolset.cliCommandRequired') : '';
-      // Monaco editor is outside form validation — check skill content manually.
-      if (form.value.kind === "skill") {
-        skillContentError.value = !skillData.value.content.trim();
-      }
-      if (nameError.value || kindError.value || mcpUrlError.value || cliCommandError.value || skillContentError.value) return;
-
-      saving.value = true;
-      const org = store.state.selectedOrganization.identifier;
-      const data = buildData();
-
-      try {
-        if (isEditing.value && editingId.value) {
-          await aiToolsetsService.update(org, editingId.value, {
-            description: form.value.description || undefined,
-            data,
-          });
-          toast({
-            variant: "success",
-            message: t("aiToolset.updatedSuccessfully"),
-          });
-        } else {
-          await aiToolsetsService.create(org, {
-            name: form.value.name,
-            kind: form.value.kind,
-            description: form.value.description || undefined,
-            data,
-          });
-          toast({
-            variant: "success",
-            message: t("aiToolset.createdSuccessfully"),
-          });
-        }
-        emit("cancel:hideform");
-      } catch (err: any) {
-        const msg =
-          err?.response?.data?.message ||
-          (isEditing.value
-            ? t("aiToolset.updateFailed")
-            : t("aiToolset.createFailed"));
-        toast({ variant: "error", message: msg });
-      } finally {
-        saving.value = false;
-      }
-    };
-
     return {
       t,
+      // Exposed for the theme-aware footer background (`store.state.theme`).
       store,
-      formRef,
+      // 🔑 Options-API: the form MUST be returned so `:form` resolves in the
+      // template (else <OForm> gets no form and validation silently no-ops).
       form,
       isEditing,
-      saving,
-      nameError,
-      kindError,
-      mcpUrlError,
-      cliCommandError,
+      selectedKind,
       kindOptions,
-      // MCP
-      mcpData,
+      // MCP headers (form-owned array-field)
       mcpHeaders,
       addHeader,
       removeHeader,
-      // CLI
-      cliData,
+      toggleHeaderVisible,
+      // CLI env vars + credential files (form-owned array-fields)
       cliEnvVars,
       cliCredFiles,
       addEnvVar,
       removeEnvVar,
+      toggleEnvVisible,
       addCredFile,
       removeCredFile,
+      setCredValue,
       CLI_PRESETS,
       applyPreset,
-      // Skill
-      skillData,
+      // Skill (Monaco content bridged into the form)
+      skillContent,
+      setSkillContent,
       skillContentError,
-      onSubmit,
     };
   },
 });

@@ -237,13 +237,17 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
+      up: { variant: "success-soft" },
+      passed: { variant: "success-soft" },
       healthy: { variant: "success-soft" },
       online: { variant: "success-soft" },
       degraded: { variant: "warning-soft" },
       warning: { variant: "amber-soft" },
       critical: { variant: "error-soft" },
       offline: { variant: "error-soft" },
+      failed: { variant: "error-soft" },
       down: { variant: "error-soft" },
+      unknown: { variant: "default-soft" },
     },
   },
 
@@ -404,7 +408,7 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     size: "md",
-    class: "tw:px-2 tw:py-3",
+    class: "px-2 py-3",
     values: {
       discount: { variant: "primary-soft", labelKey: "billing.discountTag" },
       subscribed: { variant: "primary-soft", labelKey: "billing.subscribed" },
@@ -496,6 +500,25 @@ export const BADGE_GROUPS = {
     fallback: { variant: "primary" },
   },
 
+  // Prometheus metric TYPE — the classifying badge on the Metrics Explorer's
+  // cards, the ⚙ function dialog and anywhere else a metric's kind is shown.
+  // One hue per kind, matching the explorer's palette (metricPalette.ts):
+  // Counter blue, Gauge green, Histogram purple, Summary orange, Other grey.
+  metricType: {
+    mode: "plain",
+    shape: "rounded",
+    // xs: this badge lives in dense card footers and dialog headers.
+    size: "xs",
+    values: {
+      counter: { variant: "blue-soft", label: "Counter" },
+      gauge: { variant: "success-soft", label: "Gauge" },
+      histogram: { variant: "purple-soft", label: "Histogram" },
+      summary: { variant: "orange-soft", label: "Summary" },
+      other: { variant: "default-soft", label: "Other" },
+    },
+    fallback: { variant: "default-soft", label: "Other" },
+  },
+
   // Metric/info chip — trace & thread toolbar chips (Service/Duration/Cost/Steps…)
   // that carry icon + label + value in the slot and get their accent from scoped
   // CSS (.toolbar-chip/.thread-chip/.llm-chip). Uniform neutral base; pill + sm.
@@ -561,7 +584,7 @@ export const BADGE_GROUPS = {
   // component needs no slot (was dimensionKey/fieldTag + hardcoded t() slots).
   templateOrigin: {
     mode: "plain",
-    shape: "rounded",
+    shape: "pill",
     size: "sm",
     values: {
       prebuilt: { variant: "blue-soft", labelKey: "alert_templates.prebuiltBadge" },
@@ -659,7 +682,7 @@ export const BADGE_GROUPS = {
 
   // Field-name chips (ImportSemanticGroups dialogs) — decorative chips listing
   // field names. `highlight` = a group's member fields (primary), `muted` = the
-  // "current/old" side of a compare (light grey). Replaces dead Quasar
+  // "current/old" side of a compare (light grey). Replaces dead
   // `color="primary"/text-color/color="grey-4"` props that OTag silently ignored
   // (so these had been rendering default). pill + sm.
   fieldNameChip: {
@@ -721,7 +744,7 @@ export const BADGE_GROUPS = {
 
   // "Default" template marker (AlertsDestinationList) — fixed neutral flag.
   // Named-colour group (R5). SOLID `default` + pill + md to match the old manual
-  // chip (no size prop → md; its `tw:text-xs` class was redundant since md is
+  // chip (no size prop → md; its `text-xs` class was redundant since md is
   // already text-xs). Label stays an i18n slot at the call site.
   templateDefaultFlag: {
     mode: "plain",
@@ -780,7 +803,7 @@ export const BADGE_GROUPS = {
   destinationKind: {
     mode: "plain",
     shape: "pill",
-    class: "tw:text-xs",
+    class: "text-xs",
     values: {
       prebuilt: { variant: "primary" },
       custom: { variant: "default" },
@@ -924,12 +947,12 @@ export const BADGE_GROUPS = {
   },
 
   // Threshold-declaration flag (Score Config detail → Healthy threshold section).
-  // Muted, extra-small, rounded — its own group so the xs/rounded sizing stays
-  // scoped here and never leaks into the shared `fieldTag` chips.
+  // Muted, its own group so the label mapping stays scoped and never leaks into
+  // the shared `fieldTag` chips. Uses the default sm/pill sizing so it reads as a
+  // normal status chip, consistent with the sibling `evalDataType`/`evalStatus`.
   thresholdFlag: {
     mode: "plain",
-    shape: "rounded",
-    size: "xs",
+    shape: "pill",
     values: {
       notdeclared: { variant: "default-soft", labelKey: "onlineEvals.scoreConfig.detail.noThreshold" },
     },
@@ -1221,7 +1244,7 @@ export const BADGE_GROUPS = {
   qualityStatus: {
     mode: "dot",
     shape: "pill",
-    class: "tw:!bg-transparent tw:!p-0 tw:!ring-0",
+    class: "!bg-transparent !p-0 !ring-0",
     values: {
       healthy: { variant: "success-soft" },
       warn: { variant: "warning-soft" },
@@ -1286,6 +1309,21 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
+  // Synthetic monitor type — plain, PILL.
+  syntheticType: {
+    mode: "plain",
+    shape: "pill",
+    size: "sm",
+    values: {
+      http:    { variant: "blue-soft",    label: "HTTP" },
+      browser: { variant: "purple-soft",  label: "Browser" },
+      api:     { variant: "success-soft", label: "API" },
+      tcp:     { variant: "orange-soft",  label: "TCP" },
+      ping:    { variant: "default-soft", label: "Ping" },
+      dns:     { variant: "amber-soft",   label: "DNS" },
+    },
+  },
+
   // Billing AI usage mode — PILL. i18n labels.
   aiMode: {
     mode: "plain",
@@ -1313,7 +1351,7 @@ export const BADGE_GROUPS = {
   billingManagement: {
     mode: "plain",
     shape: "pill",
-    class: "tw:px-3 tw:py-2",
+    class: "px-3 py-2",
     values: {
       aws: { variant: "success-soft", label: "AWS Marketplace" },
       azure: { variant: "success-soft", label: "Azure Marketplace" },

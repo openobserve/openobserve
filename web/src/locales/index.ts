@@ -17,58 +17,37 @@ import { createI18n } from "vue-i18n"; // import from runtime only
 import { getLanguage } from "../utils/cookies";
 import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
 
-// User defined lang
-import zhLocale from "./languages/zh.json";
-import enLocale from "./languages/en.json";
-import trLocale from "./languages/tr.json";
-import deLocale from "./languages/de.json";
-import esLocale from "./languages/es.json";
-import frLocale from "./languages/fr.json";
-import itLocale from "./languages/it.json";
-import jaLocale from "./languages/ja.json";
-import koLocale from "./languages/ko.json";
-import nlLocale from "./languages/nl.json";
-import ptLocale from "./languages/pt.json";
-import zhTWLocale from "./languages/zh_TW.json";
+// Only the fallback locale (en-us) is bundled into the main chunk. Every other
+// language is code-split and loaded on demand via loadLocaleMessages() so we
+// don't ship all 15 locale files (~5MB raw) to every user on first load.
+import enLocale from "./languages/en-US.json";
 
-const messages = {
-  "en-gb": {
-    ...enLocale,
-  },
-  "zh-cn": {
-    ...zhLocale,
-  },
-  "tr-turk": {
-    ...trLocale,
-  },
-  de: {
-    ...deLocale,
-  },
-  es: {
-    ...esLocale,
-  },
-  fr: {
-    ...frLocale,
-  },
-  it: {
-    ...itLocale,
-  },
-  ja: {
-    ...jaLocale,
-  },
-  ko: {
-    ...koLocale,
-  },
-  nl: {
-    ...nlLocale,
-  },
-  pt: {
-    ...ptLocale,
-  },
-  "zh-tw": {
-    ...zhTWLocale,
-  },
+// Maps an i18n locale code to its source file name (without extension).
+// Exported so tests can assert it stays in sync with the files on disk — an
+// unmapped file ships as a chunk nothing can load, and a mapping with no file
+// silently falls back to en-us.
+export const localeFileMap: Record<string, string> = {
+  "en-us": "en-US",
+  "zh-cn": "zh-CN",
+  "tr-turk": "tr-TR",
+  de: "de-DE",
+  es: "es-ES",
+  fr: "fr-FR",
+  it: "it-IT",
+  ja: "ja-JP",
+  ko: "ko-KR",
+  nl: "nl-NL",
+  pt: "pt-PT",
+  "zh-tw": "zh-TW",
+  ru: "ru-RU",
+  pl: "pl-PL",
+  vi: "vi-VN",
 };
+
+// Lazy importers — each locale json becomes its own cacheable chunk.
+const localeLoaders = import.meta.glob<{ default: Record<string, unknown> }>(
+  "./languages/*.json",
+);
 
 export const getLocale = () => {
   const cookieLanguage = getLanguage();
@@ -76,7 +55,7 @@ export const getLocale = () => {
     return cookieLanguage;
   }
   const language = navigator.language.toLowerCase();
-  const locales = Object.keys(messages);
+  const locales = Object.keys(localeFileMap);
   for (const locale of locales) {
     if (language.indexOf(locale) > -1) {
       return locale;
@@ -84,17 +63,39 @@ export const getLocale = () => {
   }
 
   // Default language is English
-  return "en-gb";
+  return "en-us";
 };
 
 const i18n = createI18n({
   locale: getLocale(),
-  fallbackLocale: "en-gb",
-  messages: messages,
+  fallbackLocale: "en-us",
+  messages: {
+    "en-us": {
+      ...enLocale,
+    },
+  },
 });
 
 // Wire the badge registry's i18n resolver (OTag labelKey → translated text)
 // without coupling the low-level OTag component to this module graph.
 setBadgeTranslator((key: string) => i18n.global.t(key as never));
+
+/**
+ * Loads and registers the messages for a locale on demand. No-op when the
+ * locale is already loaded (e.g. the statically bundled en-us fallback) or
+ * unknown (the fallback locale then handles missing keys).
+ */
+export const loadLocaleMessages = async (locale: string): Promise<void> => {
+  if (i18n.global.availableLocales.includes(locale)) {
+    return;
+  }
+  const file = localeFileMap[locale];
+  const loader = file && localeLoaders[`./languages/${file}.json`];
+  if (!loader) {
+    return;
+  }
+  const messages = await loader();
+  i18n.global.setLocaleMessage(locale, messages.default);
+};
 
 export default i18n;

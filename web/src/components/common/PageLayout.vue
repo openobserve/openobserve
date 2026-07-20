@@ -32,17 +32,17 @@
                       Use for settings sections, single forms, org params, hubs, etc.
     contentSize     — reading-column width when constrained ('sm'|'md'|'lg'|'xl'; default 'lg')
     headerClass     — override the default header wrapper class
-                      (default: 'tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default')
+                      (default: 'shrink-0 px-3 border-b border-border-default')
 
   v-model:sidebarWidth — bidirectional bind for the sidebar width when resizable=true,
                          so the page can react to resize/collapse (e.g. compact mode).
 -->
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex flex-col h-full">
     <!-- ── Optional header ──────────────────────────────────────── -->
     <div
       v-if="$slots.header"
-      :class="headerClass ?? 'tw:shrink-0 tw:px-3 tw:border-b tw:border-border-default'"
+      :class="headerClass ?? 'shrink-0 px-3 border-b border-border-default'"
     >
       <slot name="header" />
     </div>
@@ -54,12 +54,12 @@
       unit="px"
       :limits="splitterLimits"
       :horizontal="false"
-      class="tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+      class="flex-1 min-h-0 overflow-hidden"
     >
       <template #before>
         <div
           v-if="sidebarVisible"
-          class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-border-subtle"
+          class="w-full h-full flex flex-col overflow-hidden border-r border-border-subtle"
         >
           <slot name="sidebar" />
         </div>
@@ -71,7 +71,7 @@
         </slot>
       </template>
       <template #after>
-        <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
+        <div class="w-full h-full flex flex-col overflow-hidden">
           <slot />
         </div>
       </template>
@@ -80,16 +80,16 @@
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
     <div
       v-else-if="$slots.sidebar"
-      class="tw:flex-1 tw:flex tw:min-h-0"
+      class="flex-1 flex min-h-0"
     >
       <aside
-        class="tw:shrink-0 tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:border-r tw:border-border-subtle"
+        class="shrink-0 h-full flex flex-col overflow-hidden border-r border-border-subtle"
         :style="{ width: (sidebarWidth ?? 200) + 'px' }"
       >
         <slot name="sidebar" />
       </aside>
       <section
-        class="tw:flex-1 tw:min-w-0 tw:h-full tw:overflow-hidden"
+        class="flex-1 min-w-0 h-full overflow-hidden"
       >
         <slot />
       </section>
@@ -99,7 +99,7 @@
     <ConstrainedPage
       v-else-if="constrained"
       :size="contentSize"
-      class="tw:flex-1 tw:min-h-0"
+      class="flex-1 min-h-0"
     >
       <slot />
     </ConstrainedPage>
@@ -109,7 +109,7 @@
          single bordered "content card", so inner panels would just nest borders.
          Sections inside separate with border-soft dividers, not boxed cards. -->
     <template v-else>
-      <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-hidden">
+      <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
         <slot />
       </div>
     </template>

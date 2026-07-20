@@ -282,19 +282,19 @@ onBeforeUnmount(() => {
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[
-          // Layout + stacking (must be above Quasar header/drawer: 2000/3000)
-          'tw:min-w-40 tw:p-1 tw:z-[6000]',
+          // Layout + stacking (must be above the app header/drawer: 2000/3000)
+          'min-w-40 p-1 z-[6000]',
           // Surface
-          'tw:bg-dropdown-bg tw:border tw:border-dropdown-border tw:rounded-lg tw:shadow-md',
+          'bg-dropdown-bg border border-dropdown-border rounded-lg shadow-md',
           // Typography
-          'tw:text-sm tw:text-dropdown-item-text',
+          'text-sm text-dropdown-item-text',
           // Animation — clip-path reveal: the menu is unveiled at full size from
           // its trigger edge (no scale/squish). Wipes down by default; top-placed
           // menus wipe up. Soft ease-out-expo in (200ms), quick wipe out (140ms).
-          'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-          'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+          'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+          'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           props.contentClass,
         ]"
       >

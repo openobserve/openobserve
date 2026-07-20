@@ -86,7 +86,7 @@ const OTableStub = {
 
 // Stub WildcardValuePopover — the real reka-ui Popover copies the trigger's
 // class tokens via classList.add(), which throws InvalidCharacterError on
-// Tailwind arbitrary-value classes (e.g. "tw:text-[0.8125rem]") under jsdom.
+// Tailwind arbitrary-value classes (e.g. "text-[0.8125rem]") under jsdom.
 // The stub keeps the component name so findComponent / $emit assertions work.
 const WildcardValuePopoverStub = {
   name: "WildcardValuePopover",

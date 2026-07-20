@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:mb-3" :data-test="dataTest">
-    <div class="tw:font-bold tw:mb-1 tw:text-sm">{{ title }}</div>
+  <div class="mb-3" :data-test="dataTest">
+    <div class="font-bold mb-1 text-sm">{{ title }}</div>
     <div>
       <KeyValueRow
         v-for="(field, index) in visibleFields"

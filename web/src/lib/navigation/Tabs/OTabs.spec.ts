@@ -172,31 +172,31 @@ describe('OTabs', () => {
 
   it('does not apply the bottom-border class on the outer wrapper by default (horizontal)', () => {
     const wrapper = mountTabs()
-    const outer = wrapper.find('.tw\\:flex.tw\\:flex-row.tw\\:items-stretch')
+    const outer = wrapper.find('.flex.flex-row.items-stretch')
     expect(outer.exists()).toBe(true)
-    expect(outer.classes()).not.toContain('tw:border-b')
+    expect(outer.classes()).not.toContain('border-b')
   })
 
   it('applies the bottom-border class on the outer wrapper when bordered is true (horizontal)', () => {
     const wrapper = mountTabs({ bordered: true })
     // The horizontal layout adds the border to the outer flex-row wrapper
-    const outer = wrapper.find('.tw\\:flex.tw\\:flex-row.tw\\:items-stretch')
+    const outer = wrapper.find('.flex.flex-row.items-stretch')
     expect(outer.exists()).toBe(true)
-    expect(outer.classes()).toContain('tw:border-b')
-    expect(outer.classes()).toContain('tw:border-solid')
+    expect(outer.classes()).toContain('border-b')
+    expect(outer.classes()).toContain('border-solid')
   })
 
   it('applies the bottom-border class on the tablist when bordered is true (vertical)', () => {
     const wrapper = mountTabs({ orientation: 'vertical', bordered: true })
     const tablist = wrapper.find('.o-tabs')
-    expect(tablist.classes()).toContain('tw:border-b')
-    expect(tablist.classes()).toContain('tw:border-solid')
+    expect(tablist.classes()).toContain('border-b')
+    expect(tablist.classes()).toContain('border-solid')
   })
 
   it('does not apply the bottom-border class on the tablist when bordered is false (vertical)', () => {
     const wrapper = mountTabs({ orientation: 'vertical', bordered: false })
     const tablist = wrapper.find('.o-tabs')
-    expect(tablist.classes()).not.toContain('tw:border-b')
+    expect(tablist.classes()).not.toContain('border-b')
   })
 
   // --- Horizontal scroll arrows ---
@@ -235,22 +235,22 @@ describe('OTabs', () => {
 
   it('applies left alignment class by default', () => {
     const wrapper = mountTabs()
-    expect(wrapper.find('.o-tabs').classes()).toContain('tw:justify-start')
+    expect(wrapper.find('.o-tabs').classes()).toContain('justify-start')
   })
 
   it('applies center alignment class when align=center', () => {
     const wrapper = mountTabs({ align: 'center' })
-    expect(wrapper.find('.o-tabs').classes()).toContain('tw:justify-center')
+    expect(wrapper.find('.o-tabs').classes()).toContain('justify-center')
   })
 
   it('applies right alignment class when align=right', () => {
     const wrapper = mountTabs({ align: 'right' })
-    expect(wrapper.find('.o-tabs').classes()).toContain('tw:justify-end')
+    expect(wrapper.find('.o-tabs').classes()).toContain('justify-end')
   })
 
   it('applies justify alignment class when align=justify', () => {
     const wrapper = mountTabs({ align: 'justify' })
-    expect(wrapper.find('.o-tabs').classes()).toContain('tw:justify-stretch')
+    expect(wrapper.find('.o-tabs').classes()).toContain('justify-stretch')
   })
 
   // --- Inner padding for focus-ring spacing (horizontal) ---
@@ -260,13 +260,13 @@ describe('OTabs', () => {
     // Top-only padding keeps focus-ring spacing above the tabs while letting the
     // active underline sit flush at the bottom edge — so it lands exactly on any
     // border-b divider placed directly under the tabs (no -mb hacks needed).
-    expect(wrapper.html()).toContain('tw:pt-0.75')
-    expect(wrapper.html()).not.toContain('tw:py-[3px]')
+    expect(wrapper.html()).toContain('pt-0.75')
+    expect(wrapper.html()).not.toContain('py-[3px]')
   })
 
   it('applies horizontal tablist horizontal padding for focus spacing', () => {
     const wrapper = mountTabs()
-    expect(wrapper.find('.o-tabs').classes()).toContain('tw:px-[3px]')
+    expect(wrapper.find('.o-tabs').classes()).toContain('px-[3px]')
   })
 
   // --- Numeric modelValue ---

@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div icon="info" class="tw:justify-between date-time-container">
+  <div icon="info" class="justify-between date-time-container">
     <OPopover
       v-model:open="menuOpen"
       side="bottom"
       :align="menuAlign"
       :z-index="10001"
-      content-class="tw:p-1"
+      content-class="p-1"
       @update:open="onMenuOpenChange"
     >
       <template #trigger>
@@ -35,33 +35,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            'tw:min-w-[286px]': !disableRelative && selectedType === 'absolute',
-            'tw:w-fit': disableRelative,
+            'min-w-[286px]': !disableRelative && selectedType === 'absolute',
+            'w-fit': disableRelative,
           }"
           :disabled="disable"
           icon-left="schedule"
         >
-          <span class="date-time-label tw:font-semibold tw:flex-1 tw:text-left">{{ getDisplayValue }}</span>
+          <span class="date-time-label font-semibold flex-1 text-left">{{ triggerLabel }}</span>
           <template #icon-right
-            ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow tw:transition-transform tw:duration-250 tw:ml-auto tw:text-[18px]!"
+            ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow transition-transform duration-250 ml-auto text-[18px]!"
           /></template>
         </OButton>
       </template>
-      <div id="date-time-menu" class="date-time-dialog tw:w-81.25 tw:z-10001 tw:max-h-(--reka-popper-available-height,600px) tw:overflow-y-auto" @keydown.capture="onPickerKeydown">
-        <div v-if="!disableRelative" class="tw:flex tw:justify-evenly tw:py-2">
+      <div id="date-time-menu" class="date-time-dialog w-81.25 z-10001 max-h-(--reka-popper-available-height,600px) overflow-y-auto" @keydown.capture="onPickerKeydown">
+        <div v-if="!disableRelative" class="flex justify-evenly py-2">
           <OButton
             data-test="date-time-relative-tab"
-            class="tw:w-38.5"
+            class="w-38.5"
             :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
             size="sm"
             @click="setDateType('relative')"
           >
             {{ t("common.relative") }}
           </OButton>
-          <OSeparator vertical class="tw:my-2" />
+          <OSeparator vertical class="my-2" />
           <OButton
             data-test="date-time-absolute-tab"
-            class="tw:w-38.5"
+            class="w-38.5"
             :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
             size="sm"
             @click="setDateType('absolute')"
@@ -70,16 +70,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <OSeparator />
-        <div class="tw:overflow-y-visible">
+        <div class="overflow-y-visible">
         <OTabPanels v-model="selectedType" animated>
-          <OTabPanel v-if="!disableRelative" name="relative" class="tw:p-0">
-            <div class="date-time-table tw:relative tw:flex tw:flex-col">
+          <OTabPanel v-if="!disableRelative" name="relative">
+            <div class="date-time-table relative flex flex-col">
               <div
-                class="relative-row tw:flex tw:items-center tw:border-b tw:border-(--o2-border) tw:pl-3 tw:py-2"
+                class="relative-row flex items-center border-b border-(--o2-border) pl-3 py-2"
                 v-for="(period, index) in relativePeriods"
                 :key="'date_' + index"
               >
-                <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">
+                <div class="text-sm font-semibold min-w-18.75">
                   {{ period.label }}
                 </div>
                 <div
@@ -121,8 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <div class="relative-row tw:flex tw:items-center tw:border-b tw:border-(--o2-border) tw:px-3 tw:py-2">
-                <div class="tw:text-sm tw:font-semibold tw:min-w-18.75">{{ t("common.custom") }}</div>
+              <div class="relative-row flex items-center border-b border-(--o2-border) px-3 py-2">
+                <div class="text-sm font-semibold min-w-18.75">{{ t("common.custom") }}</div>
                 <OTooltip
                   side="right"
                   align="center"
@@ -131,8 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="queryRangeRestrictionMsg"
                 />
 
-                <div class="tw:flex tw:gap-2 tw:flex-1 tw:min-w-0">
-                  <div class="tw:flex tw:flex-col tw:w-20">
+                <div class="flex gap-2 flex-1 min-w-0">
+                  <div class="flex flex-col w-20">
                     <OInput
                       v-model.number="relativeValue"
                       type="number"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="onCustomPeriodSelect"
                     />
                   </div>
-                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                  <div class="flex flex-col flex-1 min-w-0">
                     <OSelect
                       v-model="relativePeriod"
                       :options="relativePeriodsSelect"
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OTabPanel>
           <OTabPanel name="absolute">
-            <div class="date-time-table tw:flex tw:flex-col">
+            <div class="date-time-table flex flex-col">
               <OTooltip
                 side="right"
                 align="center"
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="queryRangeRestrictionInHour > 0"
                 :content="queryRangeRestrictionMsg"
               />
-              <div class="tw:flex tw:justify-center tw:px-3 tw:py-2">
+              <div class="flex justify-center px-3 py-2">
                 <ODateRangeCalendar
                   :start-date="selectedDate.from"
                   :end-date="selectedDate.to"
@@ -180,19 +180,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:end-date="selectedDate.to = $event"
                 />
               </div>
-              <div class="tw:pr-6 tw:pl-6 tw:text-[0.625rem]">{{ t("common.datetimeMessage") }}</div>
-              <OSeparator v-if="!disableRelative" class="tw:my-2" />
+              <div class="pr-6 pl-6 text-[0.625rem]">{{ t("common.datetimeMessage") }}</div>
+              <OSeparator v-if="!disableRelative" class="my-2" />
 
-              <table v-if="!hideRelativeTime" class="tw:px-3 tw:w-[calc(100%-0.8rem)] tw:mx-[0.4rem] tw:mt-2 tw:mb-[0.3rem] startEndTime">
+              <table v-if="!hideRelativeTime" class="px-3 w-[calc(100%-0.8rem)] mx-[0.4rem] mt-2 mb-[0.3rem] startEndTime">
                 <tbody>
                   <tr>
-                    <td class="label o-input-label tw:pr-1.5 tw:text-xs tw:font-semibold tw:w-1/2">Start time</td>
-                    <td class="label o-input-label tw:pl-1.5 tw:text-xs tw:font-semibold tw:w-1/2">End time</td>
+                    <td class="label o-input-label pr-1.5 text-xs font-semibold w-1/2">Start time</td>
+                    <td class="label o-input-label pl-1.5 text-xs font-semibold w-1/2">End time</td>
                   </tr>
                   <tr>
-                    <td class="tw:pr-1.5 tw:w-1/2">
+                    <td class="pr-1.5 w-1/2">
                       <OTime
-                        class="tw:w-full"
+                        class="w-full"
                         v-model="selectedTime.startTime"
                         with-seconds
                         data-test="datetime-start-time"
@@ -204,9 +204,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       />
                     </td>
-                    <td class="tw:pl-1.5 tw:w-1/2">
+                    <td class="pl-1.5 w-1/2">
                       <OTime
-                        class="tw:w-full"
+                        class="w-full"
                         v-model="selectedTime.endTime"
                         :with-seconds="true"
                         data-test="datetime-end-time"
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTabPanel>
         </OTabPanels>
         </div>
-        <div v-if="!hideRelativeTimezone" class="tw:pr-3">
+        <div v-if="!hideRelativeTimezone" class="pr-3">
           <OSelect
             data-test="datetime-timezone-select"
             v-model="timezone"
@@ -235,10 +235,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="onTimezoneChange"
             @open="isTimezoneSelectOpen = true"
             @close="isTimezoneSelectOpen = false"
-            class="tw:my-2 tw:mx-[0.4rem]"
+            class="my-2 mx-[0.4rem]"
           />
         </div>
-        <div v-if="!autoApply" class="tw:flex tw:justify-end tw:py-2 tw:px-3">
+        <div v-if="!autoApply" class="flex justify-end py-2 px-3">
           <OButton
             data-test="date-time-apply-btn"
             variant="primary"
@@ -488,6 +488,22 @@ export default defineComponent({
 
     const displayValue = ref("");
 
+    /**
+     * The label as of the last APPLY, which is what the trigger button shows.
+     *
+     * `getDisplayValue` reads the picker's *pending* selection — the refs that
+     * clicking "Past 6 Hours" mutates on the spot. With `autoApply` that is also
+     * the applied range, so the two never disagree. WITHOUT it (dashboards, the
+     * metrics explorer) a selection only takes effect when the user presses
+     * Apply, so binding the trigger to the pending label made the button
+     * advertise a window that nothing was querying yet: pick "Past 6 Hours",
+     * don't apply, and the button reads 6h while the panels are still on 15m.
+     *
+     * So the trigger renders this instead: the range that is actually in force.
+     * Every path that genuinely applies a range stamps it via `markApplied`.
+     */
+    const appliedDisplayValue = ref("");
+
     const datePayload = ref({});
 
     const dateLocale = {
@@ -696,8 +712,21 @@ export default defineComponent({
       });
     };
 
+    /**
+     * Promote the pending selection to the applied one, so the trigger button
+     * starts advertising it. Called from every path that actually puts a range
+     * into force — Apply, `refresh()`, mount, and the parent-invoked setters.
+     * Deliberately NOT called from `setRelativeDate` / `onCustomPeriodSelect` /
+     * the popup's absolute inputs when `autoApply` is off: those are pending
+     * until the user presses Apply, and that is exactly the gap the trigger was
+     * lying about.
+     */
+    const markApplied = () => {
+      appliedDisplayValue.value = getDisplayValue.value;
+    };
+
     const saveDate = (dateType) => {
-      // displayValue.value = getDisplayValue();
+      markApplied();
       const date = getConsumableDateTime();
       // if (isNaN(date.endTime) || isNaN(date.startTime)) {
       //   // return false;
@@ -740,6 +769,9 @@ export default defineComponent({
 
       selectedType.value = dateType;
       markProgrammaticDateChange();
+      // A parent-invoked range (chart brush-zoom, saved view) is applied by the
+      // act of setting it — not left pending on an Apply the user never sees.
+      markApplied();
     };
 
     const onBeforeShow = () => {
@@ -772,7 +804,7 @@ export default defineComponent({
         let period = getPeriodLabel.value.toLowerCase();
         let periodValue = relativeValue.value;
 
-        // quasar does not support arithmetic on weeks. convert to days.
+        // arithmetic on weeks is not supported; convert to days.
         if (relativePeriod.value === "w") {
           period = "days";
           periodValue = periodValue * 7;
@@ -897,8 +929,21 @@ export default defineComponent({
         }
       }
 
-      // displayValue.value = getDisplayValue();
+      markApplied();
     };
+
+    /**
+     * What the trigger button renders.
+     *
+     * With `autoApply` the pending selection IS the applied one, so show it live.
+     * Without it, show the range that is in force; see `appliedDisplayValue`.
+     * The `||` fallback covers the first paint, before the mount-time apply.
+     */
+    const triggerLabel = computed(() =>
+      props.autoApply
+        ? getDisplayValue.value
+        : appliedDisplayValue.value || getDisplayValue.value,
+    );
 
     const getDisplayValue = computed(() => {
       if (props.disableRelative) {
@@ -1199,6 +1244,7 @@ export default defineComponent({
       relativeValue,
       getPeriodLabel,
       displayValue,
+      triggerLabel,
       refresh,
       dateLocale,
       resetTime,

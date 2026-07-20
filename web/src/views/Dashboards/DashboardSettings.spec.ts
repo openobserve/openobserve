@@ -197,7 +197,7 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("tw:bg-white");
+      expect(mainContainer.classes()).toContain("bg-white");
       expect(mainContainer.classes()).not.toContain("dark-mode");
     });
 
@@ -208,7 +208,7 @@ describe("DashboardSettings.vue", () => {
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
       expect(mainContainer.classes()).toContain("dark-mode");
-      expect(mainContainer.classes()).not.toContain("tw:bg-white");
+      expect(mainContainer.classes()).not.toContain("bg-white");
     });
 
     it("should pass the title 'Dashboard Settings' to ODrawer", () => {
@@ -478,7 +478,7 @@ describe("DashboardSettings.vue", () => {
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
       // Should default to light theme behavior when theme is undefined
-      expect(mainContainer.classes()).toContain("tw:bg-white");
+      expect(mainContainer.classes()).toContain("bg-white");
     });
 
     it("should handle null theme state", () => {
@@ -491,7 +491,7 @@ describe("DashboardSettings.vue", () => {
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
       // Should default to light theme behavior when theme is null
-      expect(mainContainer.classes()).toContain("tw:bg-white");
+      expect(mainContainer.classes()).toContain("bg-white");
     });
 
     it("should handle empty templates array", () => {

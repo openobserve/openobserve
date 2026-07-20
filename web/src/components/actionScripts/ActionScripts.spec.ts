@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import * as quasar from "quasar";
 import ActionScripts from "@/components/actionScripts/ActionScripts.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -997,7 +996,7 @@ describe("ActionScripts", () => {
   describe("Clone ODialog migration", () => {
     const findODialog = () => wrapper.findComponent({ name: "ODialog" });
 
-    it("should mount the ODialog component (Quasar q-dialog migration)", () => {
+    it("should mount the ODialog component", () => {
       const dialog = findODialog();
       expect(dialog.exists()).toBe(true);
       // The stub renders regardless of `open` so we can verify slot wiring.

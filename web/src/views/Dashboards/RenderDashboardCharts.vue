@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="tw:bg-surface-base"
+    class="bg-surface-base"
     :class="[
-      frame ? 'tw:border tw:border-border-default tw:rounded-xl' : '',
-      store.state.printMode ? '' : 'tw:h-full tw:overflow-y-auto',
+      frame ? 'border border-border-default rounded-xl' : '',
+      store.state.printMode ? '' : 'h-full overflow-y-auto',
     ]"
   >
-    <div class="tw:px-[0.625rem] render-dashboard-charts-container">
+    <div class="px-[0.625rem] render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span
         v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tab List -->
       <TabList
         v-if="showTabs && selectedTabId !== null"
-        class="tw:mt-2"
+        class="mt-2"
         :dashboardData="dashboardData"
         :viewOnly="viewOnly"
         @refresh="refreshDashboard"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <slot name="before_panels" />
-      <div class="displayDiv tw:clear-both tw:min-h-0 tw:h-auto">
+      <div class="displayDiv clear-both min-h-0 h-auto">
         <div
           v-if="
             store.state.printMode &&
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-else-if="panels.length > 0"
           ref="gridStackContainer"
-          class="grid-stack tw:bg-transparent tw:m-0.5"
+          class="grid-stack bg-transparent m-0.5"
         >
           <div
             v-for="item in panels"
@@ -155,12 +155,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-h="getPanelLayout(item, 'h')"
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
-            class="grid-stack-item gridBackground tw:bg-transparent! tw:rounded-lg tw:border-border-default!"
-            :class="store.state.theme == 'dark' ? 'dark tw:border-border-default!' : ''"
+            class="grid-stack-item gridBackground bg-transparent! rounded-lg border-border-default!"
+            :class="store.state.theme == 'dark' ? 'dark border-border-default!' : ''"
           >
             <div class="grid-stack-item-content">
               <!-- Panel with Panel-Level Variables -->
-              <div class="panel-with-variables tw:h-full tw:flex tw:flex-col">
+              <div class="panel-with-variables h-full flex flex-col">
                 <!-- Original Panel Container -->
 
                 <PanelContainer
@@ -209,13 +209,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
                     <div
-                      class="panel-variables-container tw:px-1"
+                      class="panel-variables-container px-1"
                       :data-test="`dashboard-panel-${item.id}-variables`"
                     >
                       <!-- Panel Time Picker (NEW) -->
                       <div
                         v-if="hasPanelTime(item) && panelTimeValues[item.id]"
-                        class="panel-time-picker-wrapper tw:mb-2"
+                        class="panel-time-picker-wrapper mb-2"
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {}
                         "
                         :initialVariableValues="initialVariableValues"
-                        class="panel-variables-margin tw:mb-2"
+                        class="panel-variables-margin mb-2"
                         data-test="panel-variables-selector"
                       />
                     </div>
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Explicit height wrapper: fills the dialog body's available space
              (90vh − body padding) so ViewPanel can use height:100% and
              flex:1 works all the way down without causing a body scrollbar. -->
-        <div class="view-panel-height-wrapper tw:h-[calc(90vh-var(--spacing-dialog-content-py)*2)] tw:-my-(--spacing-dialog-content-py) tw:-mx-(--spacing-dialog-content-px) tw:flex tw:flex-col tw:overflow-hidden">
+        <div class="view-panel-height-wrapper h-[calc(90vh-var(--spacing-dialog-content-py)*2)] -my-(--spacing-dialog-content-py) -mx-(--spacing-dialog-content-px) flex flex-col overflow-hidden">
           <ViewPanel
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"
@@ -753,18 +753,24 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        showPositiveNotification("Dashboard updated successfully");
+        showPositiveNotification(
+          t("dashboard.renderDashboardCharts.dashboardUpdatedSuccessfully"),
+        );
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Dashboard update failed",
+              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Dashboard update failed", {
-            timeout: 2000,
-          });
+          showErrorNotification(
+            error?.message ??
+              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
+            {
+              timeout: 2000,
+            },
+          );
         }
 
         // refresh dashboard
@@ -1175,7 +1181,7 @@ export default defineComponent({
           // Mark new tab as visible - variables will load if ready
           variablesManager.setTabVisibility(newTabId, true);
 
-          // Mark old tab as tw:hidden (optional - for cleanup)
+          // Mark old tab as hidden (optional - for cleanup)
           if (oldTabId && oldTabId !== newTabId) {
             variablesManager.setTabVisibility(oldTabId, false);
           }
@@ -1696,11 +1702,11 @@ export default defineComponent({
   Plain GLOBAL (unscoped) style block.
   Only rules that target third-party / dynamically-created DOM that this
   template does NOT render directly are kept here (GridStack-injected classes,
-  Quasar internals, print/page setup). All component-own element styles are
-  expressed as inline tw: utilities in the template above.
+  legacy component internals, print/page setup). All component-own element styles are
+  expressed as inline  utilities in the template above.
 -->
 <style>
-/* Quasar table top toolbar (dynamic Quasar DOM — cannot be inlined) */
+/* Table top toolbar (dynamic DOM — cannot be inlined) */
 .q-table__top {
   border-bottom: 1px solid var(--color-border-default);
   justify-content: flex-end;
@@ -1792,7 +1798,7 @@ export default defineComponent({
     overflow: visible !important;
   }
 
-  /* Quasar virtual-scroll inserts padding divs above/below the rendered
+  /* Virtual-scroll inserts padding divs above/below the rendered
    * rows to simulate the full scroll height. In print mode these become
    * empty white space. Hide them so no blank gaps appear in table panels. */
   .q-virtual-scroll__padding {

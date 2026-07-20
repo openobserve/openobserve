@@ -15,23 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="hasValidContent" class="llm-content-renderer tw:w-full tw:h-full">
+  <div v-if="hasValidContent" class="llm-content-renderer w-full h-full">
     <!-- Tool-specific rendering -->
-    <div v-if="isToolObservation && toolContent !== null" class="tool-content tw:flex tw:flex-col tw:h-full">
-      <div v-if="toolMetadata" class="tw:flex tw:items-center tw:flex-wrap tw:gap-2 tw:mb-2">
+    <div v-if="isToolObservation && toolContent !== null" class="tool-content flex flex-col h-full">
+      <div v-if="toolMetadata" class="flex items-center flex-wrap gap-2 mb-2">
         <OTag
           v-if="toolMetadata.name"
           type="toolMeta"
           value="tool"
-          class="tw:mr-2"
-        >{{ `Tool: ${toolMetadata.name}` }}</OTag>
+          class="mr-2"
+        >{{ t('traces.lLMContentRenderer.tool', { name: toolMetadata.name }) }}</OTag>
         <OTag
           v-if="toolMetadata.callId"
           type="toolMeta"
           value="callid"
-        >{{ `Call ID: ${toolMetadata.callId}` }}</OTag>
+        >{{ t('traces.lLMContentRenderer.callId', { callId: toolMetadata.callId }) }}</OTag>
       </div>
-      <div class="tool-data tw:flex-1">
+      <div class="tool-data flex-1">
         <CodeQueryEditor
           :editor-id="`${editorIdPrefix}tool-json-viewer-${span?.llm_tool_call_id || 'unknown'}`"
           :query="toolContentJson"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-auto-complete="false"
           :show-line-numbers="false"
           :sticky-scroll="false"
-          class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+          class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
         />
       </div>
     </div>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         props.viewMode === 'formatted' &&
         !shouldRenderAsMessages &&
         !isPlainText &&
-        'tw:h-full'
+        'h-full'
       "
     >
       <!-- Truncated view -->
@@ -63,37 +63,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           props.viewMode === 'formatted' &&
           !shouldRenderAsMessages &&
           !isPlainText &&
-          'tw:h-full'
+          'h-full'
         "
       >
         <!-- Formatted mode -->
         <div
           v-if="props.viewMode === 'formatted'"
-          :class="!shouldRenderAsMessages && !isPlainText && 'tw:h-full'"
+          :class="!shouldRenderAsMessages && !isPlainText && 'h-full'"
         >
           <div v-if="shouldRenderAsMessages" class="messages-view">
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
-              class="message-item tw:mb-2 tw:h-full"
+              class="message-item mb-2 h-full"
               :style="{
-                border: '1px solid var(--o2-border)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
               }"
             >
               <div
-                class="message-role tw:text-xs tw:font-bold tw:p-2 tw:capitalize"
+                class="message-role text-xs font-bold p-2 capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--o2-border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
                 {{ roleLabel(msg.role) }}
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json tw:p-2 tw:h-full tw:text-[13px]"
-                style="background-color: var(--o2-code-bg)"
+                class="message-content-json p-2 h-full text-[13px]"
+                style="background-color: var(--color-code-bg)"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-${idx}`"
@@ -103,19 +103,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+                  class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
                 />
               </div>
               <div
                 v-else
-                class="message-content markdown-body tw:p-2 tw:overflow-x-auto"
-                style="background-color: var(--o2-code-bg)"
+                class="message-content markdown-body p-2 overflow-x-auto"
+                style="background-color: var(--color-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content tw:m-0 tw:p-2 tw:whitespace-pre-wrap tw:wrap-break-word tw:font-mono tw:text-[13px] tw:leading-normal tw:bg-(--o2-code-bg) tw:rounded tw:overflow-x-auto">{{ contentStats.previewText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--color-code-bg) rounded overflow-x-auto">{{ contentStats.previewText }}</pre>
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
@@ -126,13 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+              class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
             />
           </div>
         </div>
 
         <!-- JSON mode -->
-        <div v-else class="json-content tw:h-full!">
+        <div v-else class="json-content h-full!">
           <CodeQueryEditor
             :editor-id="`truncated-json-mode-viewer-${editorIdPrefix}`"
             :query="parsedContentJson"
@@ -141,18 +141,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+            class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
           />
         </div>
 
-        <div class="tw:text-center tw:mt-2">
+        <div class="text-center mt-2">
           <OButton
             variant="ghost-primary"
             size="sm"
             data-test="traces-llm-content-renderer-expand-btn"
             @click="isExpanded = true"
           >
-            ...expand ({{ contentStats.remainingChars }} more characters)
+            {{ t('traces.lLMContentRenderer.expandMore', { count: contentStats.remainingChars }) }}
           </OButton>
         </div>
       </div>
@@ -164,37 +164,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           props.viewMode === 'formatted' &&
           !shouldRenderAsMessages &&
           !isPlainText &&
-          'tw:h-full'
+          'h-full'
         "
       >
         <!-- Formatted mode -->
         <div
           v-if="props.viewMode === 'formatted'"
-          :class="!shouldRenderAsMessages && !isPlainText && 'tw:h-full'"
+          :class="!shouldRenderAsMessages && !isPlainText && 'h-full'"
         >
           <div v-if="shouldRenderAsMessages" class="messages-view">
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
-              class="message-item tw:mb-2 tw:h-full"
+              class="message-item mb-2 h-full"
               :style="{
-                border: '1px solid var(--o2-border)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
               }"
             >
               <div
-                class="message-role tw:text-xs tw:font-bold tw:p-2 tw:capitalize"
+                class="message-role text-xs font-bold p-2 capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--o2-border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
                 {{ roleLabel(msg.role) }}
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json tw:p-2 tw:h-full tw:text-[13px]"
-                style="background-color: var(--o2-code-bg)"
+                class="message-content-json p-2 h-full text-[13px]"
+                style="background-color: var(--color-code-bg)"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-full-${idx}`"
@@ -204,21 +204,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+                  class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full!"
                 />
               </div>
               <div
                 v-else
-                class="message-content markdown-body tw:p-2 tw:overflow-x-auto"
-                style="background-color: var(--o2-code-bg)"
+                class="message-content markdown-body p-2 overflow-x-auto"
+                style="background-color: var(--color-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content tw:m-0 tw:p-2 tw:whitespace-pre-wrap tw:wrap-break-word tw:font-mono tw:text-[13px] tw:leading-normal tw:bg-(--o2-code-bg) tw:rounded tw:overflow-x-auto">{{ fullText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--color-code-bg) rounded overflow-x-auto">{{ fullText }}</pre>
           </div>
-          <div v-else class="json-content tw:h-full">
+          <div v-else class="json-content h-full">
             <CodeQueryEditor
               :editor-id="`full-formatted-json-viewer-${editorIdPrefix}`"
               :query="parsedContentJson"
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full"
+              class="min-h-25 w-full rounded overflow-hidden max-h-full! h-full"
             />
           </div>
         </div>
@@ -242,17 +242,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="tw:h-full tw:max-h-full tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden"
+            class="h-full max-h-full min-h-25 w-full rounded overflow-hidden"
           />
         </div>
 
-        <div v-if="contentStats.shouldTruncate" class="tw:text-center tw:mt-2">
+        <div v-if="contentStats.shouldTruncate" class="text-center mt-2">
           <OButton
             variant="ghost-primary"
             size="sm"
             @click="isExpanded = false"
           >
-            Collapse
+            {{ t('traces.lLMContentRenderer.collapse') }}
           </OButton>
         </div>
       </div>
@@ -262,8 +262,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+
+const { t } = useI18n();
 
 const CodeQueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -657,10 +660,10 @@ const roleColor = (role: string) => {
 
 const roleLabel = (role: string) => {
   const labels: Record<string, string> = {
-    user: "User",
-    assistant: "Assistant",
-    system: "System",
-    tool: "Tool",
+    user: t("traces.lLMContentRenderer.roleUser"),
+    assistant: t("traces.lLMContentRenderer.roleAssistant"),
+    system: t("traces.lLMContentRenderer.roleSystem"),
+    tool: t("traces.lLMContentRenderer.roleTool"),
   };
   return labels[role] || role;
 };
@@ -752,10 +755,10 @@ const renderMarkdown = (content: string): string => {
 }
 
 .messages-view .message-item .message-content blockquote {
-  border-left: 3px solid var(--o2-border-color);
+  border-left: 3px solid var(--color-border-default);
   margin: 8px 0;
   padding-left: 12px;
-  color: var(--o2-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .messages-view .message-item .message-content table {
@@ -766,7 +769,7 @@ const renderMarkdown = (content: string): string => {
 
 .messages-view .message-item .message-content table th,
 .messages-view .message-item .message-content table td {
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-border-default);
   padding: 6px 8px;
   text-align: left;
 }

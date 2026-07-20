@@ -17,18 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
     <!-- latitude container -->
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="tw:whitespace-nowrap tw:min-w-[130px] tw:flex tw:items-center">
+    <div style="display: flex; flex-direction: row" class="pl-3">
+      <div class="whitespace-nowrap min-w-[130px] flex items-center">
         {{ t("panel.latitude") }}
-        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+        <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="tw:flex tw:items-center tw:mx-[2px]">:</span>
+      <span class="flex items-center mx-[2px]">:</span>
       <div
-        class="axis-container droppable tw:flex-1 tw:w-full tw:flex tw:flex-wrap tw:border-2 tw:border-dashed tw:border-transparent"
+        class="axis-container droppable flex-1 w-full flex flex-wrap border-2 border-dashed border-transparent"
         :class="{
-          'tw:bg-[rgba(0,0,0,0.042)] tw:border-white tw:border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+          'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
+          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'latitude',
         }"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-latitude-layout"
       >
         <OButtonGroup
-          class="axis-field tw:overflow-hidden tw:mr-2 tw:my-1"
+          class="axis-field overflow-hidden mr-2 my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
               :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
             >
               <div
@@ -125,31 +125,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+          class="text-xs text-weight-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.latitude == null
           "
         >
-          <div class="tw:mt-1">{{ Hint }}</div>
+          <div class="mt-1">{{ Hint }}</div>
         </div>
       </div>
     </div>
     <OSeparator />
     <!-- longitude container -->
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="tw:whitespace-nowrap tw:min-w-[130px] tw:flex tw:items-center">
+    <div style="display: flex; flex-direction: row" class="pl-3">
+      <div class="whitespace-nowrap min-w-[130px] flex items-center">
         {{ t("panel.longitude") }}
-        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+        <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="tw:flex tw:items-center tw:mx-[2px]">:</span>
+      <span class="flex items-center mx-[2px]">:</span>
       <div
-        class="axis-container droppable tw:flex-1 tw:w-full tw:flex tw:flex-wrap tw:border-2 tw:border-dashed tw:border-transparent"
+        class="axis-container droppable flex-1 w-full flex flex-wrap border-2 border-dashed border-transparent"
         :class="{
-          'tw:bg-[rgba(0,0,0,0.042)] tw:border-white tw:border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+          'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
+          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'longitude',
         }"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-longitude-layout"
       >
         <OButtonGroup
-          class="axis-field tw:overflow-hidden tw:mr-2 tw:my-1"
+          class="axis-field overflow-hidden mr-2 my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
               :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
             >
               <div
@@ -246,31 +246,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+          class="text-xs text-weight-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.longitude == null
           "
         >
-          <div class="tw:mt-1">{{ Hint }}</div>
+          <div class="mt-1">{{ Hint }}</div>
         </div>
       </div>
     </div>
     <OSeparator />
     <!-- weight container -->
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="tw:whitespace-nowrap tw:min-w-[130px] tw:flex tw:items-center">
+    <div style="display: flex; flex-direction: row" class="pl-3">
+      <div class="whitespace-nowrap min-w-[130px] flex items-center">
         {{ t("panel.weight") }}
-        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
+        <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="WeightHint" />
       </div>
-      <span class="tw:flex tw:items-center tw:mx-[2px]">:</span>
+      <span class="flex items-center mx-[2px]">:</span>
       <div
-        class="axis-container droppable tw:flex-1 tw:w-full tw:flex tw:flex-wrap tw:border-2 tw:border-dashed tw:border-transparent"
+        class="axis-container droppable flex-1 w-full flex flex-wrap border-2 border-dashed border-transparent"
         :class="{
-          'tw:bg-[rgba(0,0,0,0.042)] tw:border-white tw:border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+          'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
+          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'weight',
         }"
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-weight-layout"
       >
         <OButtonGroup
-          class="axis-field tw:overflow-hidden tw:mr-2 tw:my-1"
+          class="axis-field overflow-hidden mr-2 my-1"
           radius="sm"
           v-if="
             dashboardPanelData.data.queries[
@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
               :data-test="`dashboard-weight-item-${weightLabel}-menu`"
             >
               <div
@@ -367,14 +367,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+          class="text-xs text-weight-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.weight == null
           "
         >
-          <div class="tw:mt-1">{{ WeightHint }}</div>
+          <div class="mt-1">{{ WeightHint }}</div>
         </div>
       </div>
     </div>
@@ -526,7 +526,13 @@ export default defineComponent({
           ) {
             const maxAllowedAxisFields = 1;
 
-            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+            const errorMessage = t(
+              "dashboard.dashboardGeoMapsQueryBuilder.maxFieldAllowed",
+              {
+                count: maxAllowedAxisFields,
+                axis: targetAxis.toUpperCase(),
+              },
+            );
 
             showErrorNotification(errorMessage);
             cleanupDraggingFields();
@@ -553,7 +559,9 @@ export default defineComponent({
         )?.value;
 
         if (!firstFieldTypeArg) {
-          showErrorNotification("Without field, not able to drag");
+          showErrorNotification(
+            t("dashboard.dashboardGeoMapsQueryBuilder.withoutFieldDrag"),
+          );
           cleanupDraggingFields();
           return;
         }

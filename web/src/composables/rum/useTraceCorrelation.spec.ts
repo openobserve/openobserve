@@ -652,4 +652,182 @@ describe("useTraceCorrelation", () => {
       expect(endTime - startTime).toBeGreaterThanOrEqual(3600000000);
     });
   });
+
+  // ==========================================================================
+  // Optional timeRange argument
+  // ==========================================================================
+
+  describe("optional timeRange argument", () => {
+    describe("when timeRange is provided", () => {
+      it("uses the provided startTime in the RUM query", async () => {
+        // Arrange
+        const traceId = ref("trace-with-range");
+        const timeRange = ref({
+          startTime: 1_700_000_000_000_000,
+          endTime: 1_700_003_600_000_000,
+        });
+
+        vi.mocked(searchService.search)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
+
+        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+
+        // Act
+        await fetchCorrelation();
+
+        // Assert — first call is the RUM query
+        const rumCall = vi.mocked(searchService.search).mock.calls[0][0];
+        expect(rumCall.query.query.start_time).toBe(1_700_000_000_000_000);
+      });
+
+      it("uses the provided endTime in the RUM query", async () => {
+        // Arrange
+        const traceId = ref("trace-with-range");
+        const timeRange = ref({
+          startTime: 1_700_000_000_000_000,
+          endTime: 1_700_003_600_000_000,
+        });
+
+        vi.mocked(searchService.search)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
+
+        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+
+        // Act
+        await fetchCorrelation();
+
+        // Assert
+        const rumCall = vi.mocked(searchService.search).mock.calls[0][0];
+        expect(rumCall.query.query.end_time).toBe(1_700_003_600_000_000);
+      });
+
+      it("uses the provided startTime in the APM (traces) query", async () => {
+        // Arrange
+        const traceId = ref("trace-apm-range");
+        const timeRange = ref({
+          startTime: 1_700_000_000_000_000,
+          endTime: 1_700_003_600_000_000,
+        });
+
+        vi.mocked(searchService.search)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
+
+        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+
+        // Act
+        await fetchCorrelation();
+
+        // Assert — second call is the APM query
+        const apmCall = vi.mocked(searchService.search).mock.calls[1][0];
+        expect(apmCall.query.query.start_time).toBe(1_700_000_000_000_000);
+        expect(apmCall.query.query.end_time).toBe(1_700_003_600_000_000);
+      });
+
+      it("picks up a reactive timeRange update on the next fetchCorrelation call", async () => {
+        // Arrange
+        const traceId = ref("trace-reactive");
+        const timeRange = ref({
+          startTime: 1_700_000_000_000_000,
+          endTime: 1_700_003_600_000_000,
+        });
+
+        vi.mocked(searchService.search)
+          .mockResolvedValue({ data: { hits: [], total: 0 } } as any);
+
+        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+        await fetchCorrelation();
+
+        // Update the reactive ref
+        timeRange.value = {
+          startTime: 1_800_000_000_000_000,
+          endTime: 1_800_003_600_000_000,
+        };
+        vi.clearAllMocks();
+        vi.mocked(searchService.search)
+          .mockResolvedValue({ data: { hits: [], total: 0 } } as any);
+
+        // Act
+        await fetchCorrelation();
+
+        // Assert — now uses updated values
+        const rumCall = vi.mocked(searchService.search).mock.calls[0][0];
+        expect(rumCall.query.query.start_time).toBe(1_800_000_000_000_000);
+        expect(rumCall.query.query.end_time).toBe(1_800_003_600_000_000);
+      });
+    });
+
+    describe("when timeRange is omitted", () => {
+      it("falls back to a trailing-hour range with start_time < end_time", async () => {
+        // Arrange
+        const traceId = ref("trace-no-range");
+
+        vi.mocked(searchService.search)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
+
+        const { fetchCorrelation } = useTraceCorrelation(traceId);
+
+        // Act
+        await fetchCorrelation();
+
+        // Assert
+        const rumCall = vi.mocked(searchService.search).mock.calls[0][0];
+        const { start_time, end_time } = rumCall.query.query;
+        expect(start_time).toBeLessThan(end_time);
+      });
+
+      it("falls back to a range spanning approximately 1 hour (in µs)", async () => {
+        // Arrange
+        const traceId = ref("trace-no-range-span");
+
+        vi.mocked(searchService.search)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
+
+        const { fetchCorrelation } = useTraceCorrelation(traceId);
+
+        const beforeCall = Date.now() * 1000;
+        // Act
+        await fetchCorrelation();
+        const afterCall = Date.now() * 1000;
+
+        // Assert
+        const rumCall = vi.mocked(searchService.search).mock.calls[0][0];
+        const { start_time, end_time } = rumCall.query.query;
+
+        // end_time should be close to Date.now() * 1000 (within a few ms either side)
+        expect(end_time).toBeGreaterThanOrEqual(beforeCall - 5_000);
+        expect(end_time).toBeLessThanOrEqual(afterCall + 5_000);
+
+        // Span is 1 hour in µs
+        expect(end_time - start_time).toBeGreaterThanOrEqual(3_600_000_000);
+        expect(end_time - start_time).toBeLessThanOrEqual(3_600_000_000 + 10_000);
+      });
+    });
+
+    describe("when timeRange is provided as null ref", () => {
+      it("falls back to the trailing-hour default when timeRange.value is null", async () => {
+        // Arrange
+        const traceId = ref("trace-null-range");
+        const timeRange = ref<{ startTime: number; endTime: number } | null>(null);
+
+        vi.mocked(searchService.search)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any)
+          .mockResolvedValueOnce({ data: { hits: [], total: 0 } } as any);
+
+        const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
+
+        // Act
+        await fetchCorrelation();
+
+        // Assert — trailing-hour span
+        const rumCall = vi.mocked(searchService.search).mock.calls[0][0];
+        const { start_time, end_time } = rumCall.query.query;
+        expect(end_time - start_time).toBeGreaterThanOrEqual(3_600_000_000);
+      });
+    });
+  });
 });

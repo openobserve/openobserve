@@ -20,30 +20,24 @@
     :title="isEditMode ? t('dashboard.editDrilldown') : t('dashboard.createDrilldown')"
     :primary-button-label="isEditMode ? t('dashboard.update') : t('common.add')"
     :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-disabled="isFormValid"
     size="md"
+    form-id="drilldown-popup-form"
     data-test="dashboard-drilldown-popup"
     @update:open="(v) => { if (!v) $emit('close') }"
-    @click:primary="saveDrilldown"
     @click:secondary="$emit('close')"
   >
     <template #header-right>
       <DrilldownUserGuide />
     </template>
-    <OInput
-      v-model="drilldownData.name"
-      :label="t('dashboard.nameOfVariable') + ' * ' + ' : '"
-      :error-message="nameError"
-      :error="!!nameError"
-      @update:model-value="nameError = ''"
+    <OForm id="drilldown-popup-form" :form="form">
+    <OFormInput
+      name="name"
+      :label="t('dashboard.nameOfVariable')"
+      required
       data-test="dashboard-config-panel-drilldown-name"
     />
     <div style="margin-top: 0.75rem">
-      <OToggleGroup
-        :model-value="drilldownData.type"
-        :label="t('dashboard.goTo')"
-        @update:model-value="(v) => v && changeTypeOfDrilldown(String(v))"
-      >
+      <OFormToggleGroup name="type" :label="t('dashboard.goTo')">
         <OToggleGroupItem
           value="byDashboard"
           size="sm"
@@ -68,81 +62,90 @@
         >
           {{ t("common.logs") }}
         </OToggleGroupItem>
-      </OToggleGroup>
+      </OFormToggleGroup>
     </div>
 
     <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
       <div>
-        <OToggleGroup
+        <OFormToggleGroup
+          name="data.logsMode"
           :label="t('dashboard.selectLogsMode')"
-          :model-value="drilldownData.data.logsMode"
-          @update:model-value="drilldownData.data.logsMode = $event"
         >
           <OToggleGroupItem value="auto" size="sm">{{ t("common.auto") }}</OToggleGroupItem>
           <OToggleGroupItem value="custom" size="sm">{{ t("common.custom") }}</OToggleGroupItem>
-        </OToggleGroup>
+        </OFormToggleGroup>
       </div>
-      <div
+      <component
+        :is="form.Field"
+        name="data.logsQuery"
         v-if="drilldownData.data.logsMode === 'custom'"
-        style="margin-top: 10px"
       >
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
-        <query-editor
-          data-test="scheduled-alert-sql-editor"
-          ref="queryEditorRef"
-          editor-id="alerts-query-editor"
-          style="height: 80px"
-          :debounceTime="300"
-          v-model:query="drilldownData.data.logsQuery"
-          @update:query="updateQueryValue"
-        />
-      </div>
+        <template #default="{ field }">
+          <div style="margin-top: 10px">
+            <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
+            <query-editor
+              data-test="scheduled-alert-sql-editor"
+              ref="queryEditorRef"
+              editor-id="alerts-query-editor"
+              style="height: 80px"
+              :debounceTime="300"
+              :query="drilldownData.data.logsQuery"
+              @update:query="updateQueryValue"
+            />
+            <span
+              v-if="field.state.meta.errors.length > 0"
+              class="text-xs text-input-error-text leading-none mt-1 block"
+              role="alert"
+              data-test="dashboard-drilldown-logs-query-error"
+            >
+              {{ firstFieldError(field.state.meta.errors) }}
+            </span>
+          </div>
+        </template>
+      </component>
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
       <div style="margin-top: 10px; display: flex; flex-direction: column">
-        <label class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.enterUrl") }}</label>
-        <OTextarea
-          v-model="drilldownData.data.url"
+        <OFormTextarea
+          name="data.url"
+          :label="t('dashboard.enterUrl')"
+          required
           data-test="dashboard-drilldown-url-textarea"
         />
-        <div
-          style="color: red; font-size: 12px"
-          v-if="!isFormURLValid && drilldownData.data.url.trim()"
-          data-test="dashboard-drilldown-url-error-message"
-        >
-          {{ t("dashboard.invalidUrl") }}
-        </div>
       </div>
     </div>
 
     <div v-if="drilldownData.type == 'byDashboard'">
       <div style="margin-top: 10px">
-        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full">
-          <OSelect
-            v-model="drilldownData.data.folder"
+        <div class="flex items-center my-[10px] w-full">
+          <OFormSelect
+            name="data.folder"
             :options="folderList"
             :label="t('dashboard.selectFolderDrilldown')"
-            class="tw:w-full"
+            required
+            class="w-full"
             :disabled="getFoldersListLoading.isLoading.value"
             data-test="dashboard-drilldown-folder-select"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full" v-if="drilldownData.data.folder">
-          <OSelect
-            v-model="drilldownData.data.dashboard"
+        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.folder">
+          <OFormSelect
+            name="data.dashboard"
             :options="dashboardList"
             :label="t('dashboard.selectDashboardDrilldown')"
-            class="tw:w-full"
+            required
+            class="w-full"
             :disabled="getDashboardListLoading.isLoading.value"
             data-test="dashboard-drilldown-dashboard-select"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:my-[10px] tw:w-full" v-if="drilldownData.data.dashboard">
-          <OSelect
-            v-model="drilldownData.data.tab"
+        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.dashboard">
+          <OFormSelect
+            name="data.tab"
             :options="tabList"
             :label="t('dashboard.selectTabDrilldown')"
-            class="tw:w-full"
+            required
+            class="w-full"
             :disabled="getTabListLoading.isLoading.value"
             data-test="dashboard-drilldown-tab-select"
           />
@@ -158,17 +161,11 @@
               align-items: center;
             "
           >
-            <span class="o-input-label tw:text-sm tw:font-semibold tw:leading-tight">{{ t("dashboard.variables") }}</span>
+            <span class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.variables") }}</span>
             <OButton
               variant="primary"
               size="sm"
-              @click="
-                () =>
-                  drilldownData.data.variables.push({
-                    name: '',
-                    value: '',
-                  })
-              "
+              @click="addVariableRow"
               data-test="dashboard-drilldown-add-variable"
               icon-left="add"
             >
@@ -183,16 +180,16 @@
               style="display: flex; gap: 0.625rem; margin-bottom: 0.625rem; align-items: center"
               :key="JSON.stringify(variableNamesFn ?? {})"
             >
-              <OCombobox
+              <OFormCombobox
+                :name="`data.variables[${index}].name`"
                 :placeholder="t('dashboard.name')"
-                v-model="variable.name"
                 search-regex="(.*)"
                 :items="variableNamesFn"
               />
-              <OCombobox
+              <OFormCombobox
+                :name="`data.variables[${index}].value`"
                 :placeholder="t('panel.value')"
                 search-regex="(.*)"
-                v-model="variable.value"
                 :items="options.selectedValue"
               />
 
@@ -200,7 +197,7 @@
                 size="sm"
                 name="close"
                 style="cursor: pointer; flex-shrink: 0"
-                @click="() => drilldownData.data.variables.splice(index, 1)"
+                @click="() => removeVariableRow(index)"
                 :data-test="`dashboard-drilldown-variable-remove-${index}`"
               />
             </div>
@@ -209,10 +206,10 @@
       </div>
       <!-- radio button for new tab -->
       <div style="margin-top: 10px">
-        <OSwitch
+        <OFormSwitch
+          name="data.passAllVariables"
           :label="t('dashboard.passAllCurrentVariables')"
           labelPosition="left"
-          v-model="drilldownData.data.passAllVariables"
           data-test="dashboard-drilldown-pass-all-variables"
           size="lg"
         />
@@ -221,21 +218,22 @@
 
     <!-- radio button for new tab -->
     <div style="margin-top: 10px">
-      <OSwitch
+      <OFormSwitch
+        name="targetBlank"
         :label="t('dashboard.openInNewTab')"
         labelPosition="left"
-        v-model="drilldownData.targetBlank"
         data-test="dashboard-drilldown-open-in-new-tab"
         size="lg"
       />
     </div>
+    </OForm>
 
   </ODialog>
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, inject, reactive, ref } from "vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import { defineAsyncComponent, inject, nextTick, reactive, ref } from "vue";
+import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
@@ -251,15 +249,22 @@ import {
 import { onMounted, onUnmounted } from "vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
-import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
+import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { useLoading } from "@/composables/useLoading";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import {
+  makeDrilldownPopUpSchema,
+  type DrilldownPopUpForm,
+} from "./DrilldownPopUp.schema";
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
@@ -268,17 +273,18 @@ export default defineComponent({
   name: "DrilldownPopUp",
   components: {
     ODialog,
-    OToggleGroup,
+    OForm,
+    OFormInput,
+    OFormTextarea,
+    OFormSelect,
+    OFormSwitch,
+    OFormToggleGroup,
     OToggleGroupItem,
     DrilldownUserGuide,
-    OCombobox,
+    OFormCombobox,
     QueryEditor,
     OButton,
-    OInput,
-    OSelect,
-    OSwitch,
     OIcon,
-    OTextarea,
   },
   props: {
     open: {
@@ -340,9 +346,11 @@ export default defineComponent({
         ],
       },
     });
-    const nameError = ref("");
 
-    const drilldownData = ref(
+    // Source of the form's seed values: the record in edit mode, blank defaults
+    // otherwise. Used both for the working mirror (drilldownData) and the OForm
+    // `:default-values`, so they always start in sync.
+    const getRecordData = () =>
       props?.isEditMode
         ? JSON.parse(
             JSON.stringify(
@@ -351,8 +359,38 @@ export default defineComponent({
               ],
             ),
           )
-        : getDefaultDrilldownData(),
-    );
+        : getDefaultDrilldownData();
+
+    // ── OForm wiring (rule ②/③: form is the SOLE source, no mirror) ───────────
+    // Every scalar control is `name=`-only (no v-model). `data.variables[]` is a
+    // FORM-OWNED field-array (indexed OFormCombobox names). `type`/`logsMode` are
+    // OFormToggleGroup (name=-owned); only `logsQuery` (Monaco) is a non-OForm*
+    // widget bridged into the schema via setFieldValue. This component OWNS
+    // <OForm>, so it creates the form with useOForm and reads it reactively via
+    // form.useStore to drive the v-if (type/logsMode/folder/dashboard), the
+    // cascades, and the async loaders — ONE source of truth, no mirror (rule ③).
+    const drilldownPopUpSchema = makeDrilldownPopUpSchema(t);
+    const form = useOForm<DrilldownPopUpForm>({
+      defaultValues: getRecordData(),
+      schema: drilldownPopUpSchema,
+      // forward to the onSubmit defined below (avoids a TDZ ref at setup time)
+      onSubmit: (value) => onSubmit(value),
+    });
+
+    // Bridge the Monaco logsQuery + cascade resets + array-row mutations into the
+    // single form.
+    const setFormField = (name: string, val: unknown) => {
+      form.setFieldValue(name, val);
+    };
+    const addVariableRow = () =>
+      form.pushFieldValue("data.variables", { name: "", value: "" });
+    const removeVariableRow = (index: number) =>
+      form.removeFieldValue("data.variables", index);
+
+    // Reactive READ of the form values (rule ③: form.useStore, NOT a local copy)
+    // — drives the v-if (type/logsMode/folder/dashboard), the cascades, and the
+    // async loaders.
+    const drilldownData = form.useStore((s: any) => s.values);
     const dashboardList: any = ref([]);
     const tabList: any = ref([]);
 
@@ -388,28 +426,27 @@ export default defineComponent({
       await getvariableNames();
     });
 
-    // on folder change, reset dashboard and tab values
+    // on folder change, reset dashboard and tab values (cross-field setFieldValue)
     watch(
-      () => drilldownData.value.data.folder,
+      () => drilldownData.value?.data?.folder,
       async (newVal, oldVal) => {
         await getDashboardListLoading.execute();
         if (newVal !== oldVal) {
           // take first value from new options list
-          drilldownData.value.data.dashboard =
-            dashboardList?.value[0]?.value ?? "";
-          drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
+          setFormField("data.dashboard", dashboardList?.value[0]?.value ?? "");
+          setFormField("data.tab", tabList?.value[0]?.value ?? "");
         }
       },
     );
 
-    // on dashboard change, reset tab value
+    // on dashboard change, reset tab value (cross-field setFieldValue)
     watch(
-      () => drilldownData.value.data.dashboard,
+      () => drilldownData.value?.data?.dashboard,
       async (newVal, oldVal) => {
         await getTabListLoading.execute();
         if (newVal !== oldVal) {
           // take first value from new options list
-          drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
+          setFormField("data.tab", tabList?.value[0]?.value ?? "");
         }
       },
     );
@@ -514,67 +551,21 @@ export default defineComponent({
         }) ?? [];
     };
 
-    const isFormURLValid = computed(() => {
-      // check if url is valid with protocol only(will check only protocol)
-      const urlRegex = /^(http|https|ftp|file|mailto|telnet|data|ws|wss):\/\//;
-      return urlRegex.test(drilldownData.value.data.url.trim());
-    });
-
-    const isFormValid = computed(() => {
-      // if name is empty
-      if (!drilldownData.value.name.trim()) {
-        return true;
-      }
-
-      // if action is not selected
-      if (!drilldownData.value.type) {
-        return true;
-      }
-
-      // if action is by url
-      if (drilldownData.value.type == "byUrl") {
-        if (drilldownData.value.data.url.trim()) {
-          // check if url is valid with protocol
-          return !isFormURLValid.value;
-        }
-      } else if (drilldownData.value.type == "logs") {
-        if (drilldownData.value.data.logsMode === "custom") {
-          return !drilldownData.value.data.logsQuery.trim();
-        } else if (drilldownData.value.data.logsMode === "auto") {
-          return false;
-        }
-      } else {
-        if (
-          drilldownData.value.data.folder &&
-          drilldownData.value.data.dashboard &&
-          drilldownData.value.data.tab
-        ) {
-          return false;
-        }
-      }
-      return true;
-    });
-
-    const saveDrilldown = () => {
-      if (!drilldownData.value.name.trim()) {
-        nameError.value = t("common.required");
-        return;
-      }
-      nameError.value = "";
+    // @submit fires only after the Zod schema passes (name required +
+    // type-conditional url/logsQuery/folder/dashboard/tab rules). The validated
+    // `value` is the sole source of truth (rule ②) — it carries every field,
+    // including the form-owned `data.variables[]` rows.
+    const onSubmit = async (value: DrilldownPopUpForm) => {
+      const record = JSON.parse(JSON.stringify(value));
       // if editmode then made changes
       // else add new drilldown
       if (props?.isEditMode) {
         dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex] =
-          drilldownData.value;
+          record;
       } else {
-        dashboardPanelData.data.config.drilldown.push(drilldownData.value);
+        dashboardPanelData.data.config.drilldown.push(record);
       }
       emit("close");
-    };
-
-    // change type of drilldown
-    const changeTypeOfDrilldown = (type: string) => {
-      drilldownData.value.type = type;
     };
 
     const options: any = reactive({
@@ -737,27 +728,55 @@ export default defineComponent({
       }
     }, { deep: true });
 
+    watch(
+      () => props.open,
+      async (isOpen) => {
+        if (!isOpen) {
+          // This component is NOT v-if'd (parent only toggles `:open`), so the
+          // useOForm form is created once and PERSISTS across opens. Reset it on
+          // CLOSE to clear submit-state + errors — otherwise a failed submit's
+          // errors linger when the dialog is reopened (the on-open reset alone
+          // races with the dialog body remounting and doesn't refresh the
+          // already-rendered errors). Resetting on close has no remount race.
+          form.reset(getRecordData());
+          return;
+        }
+
+        // Re-baseline the OForm to the freshly-seeded record on each open.
+        // `:default-values` is read once at mount; the overlay may keep the body
+        // mounted, so reset here (clears submit-state → no post-open "required"
+        // flash). The read-only projection picks the values back up.
+        await nextTick();
+        form.reset(getRecordData());
+
+        // NOTE: dependent lists are loaded in onMounted + refreshed by the
+        // folder / dashboard / drilldownData watches — do NOT re-fetch them here.
+        // Refreshing on every open reset the selected org when navigating away
+        // (#12932), so that on-open refresh was removed.
+      },
+    );
+
+    // bare Monaco editor → bridge into the form for superRefine
     const updateQueryValue = (value: string) => {
-      drilldownData.value.data.logsQuery = value;
+      setFormField("data.logsQuery", value);
     };
 
     return {
       t,
+      form,
+      firstFieldError,
       dashboardPanelData,
       drilldownData,
-      nameError,
       "delete": "delete",
       store,
       folderList,
       dashboardList,
       tabList,
-      isFormValid,
-      saveDrilldown,
-      isFormURLValid,
-      changeTypeOfDrilldown,
       options,
       variableNamesFn,
       updateQueryValue,
+      addVariableRow,
+      removeVariableRow,
       getFoldersListLoading,
       getDashboardListLoading,
       getTabListLoading,

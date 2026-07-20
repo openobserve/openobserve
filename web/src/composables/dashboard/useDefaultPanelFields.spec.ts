@@ -107,6 +107,50 @@ describe("useDefaultPanelFields", () => {
       expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
     });
 
+    it("does not re-seed a slot the user has built in", async () => {
+      // The Builder toggle comes back through here on a panel the user has been
+      // building in; seeding it again replaced their filters and operations.
+      setPanel({
+        queryType: "promql",
+        stream: "mystream",
+        query: 'rate(mystream{env="dev"}[5m])',
+        customQuery: true,
+      });
+      currentQuery().fields.promql_labels = [
+        { label: "env", op: "=", value: "dev" },
+      ];
+      currentQuery().fields.promql_operations = [{ id: "rate" }];
+
+      const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
+      await applyDefaultPanelFields();
+
+      expect(currentQuery().query).toBe('rate(mystream{env="dev"}[5m])');
+      expect(currentQuery().fields.promql_labels).toEqual([
+        { label: "env", op: "=", value: "dev" },
+      ]);
+      expect(currentQuery().fields.promql_operations).toEqual([{ id: "rate" }]);
+      // The toggle still lands them in Builder mode.
+      expect(currentQuery().customQuery).toBe(false);
+    });
+
+    it("keeps a label row the user added but has not filled in", async () => {
+      // It renders to nothing, so the query text alone still looks auto-seeded.
+      setPanel({
+        queryType: "promql",
+        stream: "mystream",
+        query: "mystream{}",
+        customQuery: true,
+      });
+      currentQuery().fields.promql_labels = [{ label: "", op: "=", value: "" }];
+
+      const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
+      await applyDefaultPanelFields();
+
+      expect(currentQuery().fields.promql_labels).toEqual([
+        { label: "", op: "=", value: "" },
+      ]);
+    });
+
     it("leaves the query empty when no stream is selected", async () => {
       setPanel({ queryType: "promql", stream: "" });
       const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");

@@ -500,7 +500,7 @@ describe("gridBuilder", () => {
         false,
       );
 
-      expect(result.radius).toBe("70%");
+      expect(result.radius).toBe("58%");
       expect(result.center).toEqual(["50%", "50%"]);
     });
 
@@ -515,7 +515,7 @@ describe("gridBuilder", () => {
         true,
       );
 
-      expect(result.radius).toEqual(["40%", "70%"]);
+      expect(result.radius).toEqual(["40%", "58%"]);
       expect(result.center).toEqual(["50%", "50%"]);
     });
 
@@ -534,7 +534,7 @@ describe("gridBuilder", () => {
         true,
       );
 
-      expect(result.radius).toEqual(["40%", "50%"]);
+      expect(result.radius).toEqual(["40%", "45%"]);
     });
 
     it("should use custom center position when configured", async () => {
@@ -649,7 +649,7 @@ describe("gridBuilder", () => {
         false,
       );
 
-      expect(result.radius).toBe("70%");
+      expect(result.radius).toBe("58%");
       expect(result.center).toEqual(["50%", "50%"]);
     });
 
@@ -668,7 +668,7 @@ describe("gridBuilder", () => {
         false,
       );
 
-      expect(result.radius).toBe("70%");
+      expect(result.radius).toBe("58%");
       expect(result.center).toEqual(["50%", "50%"]);
     });
 
@@ -686,7 +686,7 @@ describe("gridBuilder", () => {
         seriesData,
       );
 
-      expect(result.radius).toBe("70%");
+      expect(result.radius).toBe("58%");
     });
   });
 });

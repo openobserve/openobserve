@@ -1663,13 +1663,13 @@ test.describe("Logs Regression Bug Fixes", () => {
 
       testLogger.info('✓ PASSED: Decimal value rejected in datetime picker');
     } else {
-      // Time input not in absolute tab — check if the time is entered via Quasar time picker buttons instead
-      // Uses class-based selector as fallback (Quasar QTime component has no data-test attr)
-      const timePickerVisible = await pm.logsPage.getQuasarTimePicker()
+      // Time input not in absolute tab — check if the time is entered via time picker buttons instead
+      // Uses class-based selector as fallback (the QTime component has no data-test attr)
+      const timePickerVisible = await pm.logsPage.getTimePicker()
         .isVisible({ timeout: 2000 }).catch(() => false);
 
       if (timePickerVisible) {
-        testLogger.info('Quasar time picker component found — decimal entry not possible via button UI');
+        testLogger.info('Time picker component found — decimal entry not possible via button UI');
         testLogger.info('✓ PASSED: Time picker uses button UI — decimal entry is naturally prevented');
       } else {
         testLogger.warn('Time input not found — skipping');

@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   EmptyPanel — a calm, modern empty-state illustration for a dashboard with no
   panels: an empty chart frame whose bars rise from a dashed baseline on a slow
-  loop, with a small "+" badge hinting that a panel can be added. Pure SMIL
+  loop. No "+" badge — the actual "Add panel" action lives in the CTA below the
+  illustration, and a decorative "+" here read as a clickable button. Pure SMIL
   animation (no CSS/SCSS); token colors keep it correct in light and dark.
 -->
 <template>
@@ -57,15 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <animate attributeName="height" values="0;22;22;0" keyTimes="0;0.35;0.85;1" dur="3.4s" repeatCount="indefinite" begin="0.5s" />
         <animate attributeName="y" values="108;86;86;108" keyTimes="0;0.35;0.85;1" dur="3.4s" repeatCount="indefinite" begin="0.5s" />
       </rect>
-    </g>
-
-    <!-- "add panel" badge -->
-    <g>
-      <circle cx="150" cy="44" r="13" fill="var(--color-primary-600)">
-        <animate attributeName="r" values="13;14;13" dur="2.8s" repeatCount="indefinite" />
-      </circle>
-      <line x1="150" y1="39" x2="150" y2="49" stroke="var(--color-white)" stroke-width="2.5" stroke-linecap="round" />
-      <line x1="145" y1="44" x2="155" y2="44" stroke="var(--color-white)" stroke-width="2.5" stroke-linecap="round" />
     </g>
   </svg>
 </template>

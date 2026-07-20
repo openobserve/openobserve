@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-show-legends-dialog"
   >
     <template #header-right>
-      <div class="tw:flex tw:items-center">
-        <span class="legend-count tw:mr-3" style="font-size: 14px" data-test="dashboard-show-legends-count">
+      <div class="flex items-center">
+        <span class="legend-count mr-3" style="font-size: 14px" data-test="dashboard-show-legends-count">
           {{ t("dashboard.totalLegends", { count: legends.length }) }}
         </span>
         <OButton
@@ -45,29 +45,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="dashboard-show-legends-popup"
     >
-      <div class="scroll tw:max-h-[400px] tw:overflow-y-auto tw:py-[3px]">
-        <div v-if="legends.length === 0" class="tw:p-3 tw:text-center tw:min-h-[100px] tw:flex tw:items-center tw:justify-center">
+      <div class="scroll max-h-[400px] overflow-y-auto py-[3px]">
+        <div v-if="legends.length === 0" class="p-3 text-center min-h-[100px] flex items-center justify-center">
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
-        <div v-else class="tw:flex tw:flex-col">
+        <div v-else class="flex flex-col">
           <div
             v-for="(legend, index) in legends"
             :key="index"
-            class="legend-item tw:px-2 tw:py-1 tw:last:border-b-0"
+            class="legend-item px-2 py-1 last:border-b-0"
             :data-test="`dashboard-legend-item-${index}`"
           >
-            <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full">
+            <div class="flex items-center flex-nowrap w-full">
               <div
-                class="tw:w-5 tw:h-3 tw:rounded-sm tw:mr-[10px] tw:shrink-0"
+                class="w-5 h-3 rounded-sm mr-[10px] shrink-0"
                 :style="{ backgroundColor: legend.color || '#5960b2' }"
               ></div>
-              <div class="tw:break-all tw:overflow-wrap-anywhere tw:whitespace-normal tw:leading-[1.4] tw:text-xs" data-test="dashboard-legend-item-text">
+              <div class="break-all overflow-wrap-anywhere whitespace-normal leading-[1.4] text-xs" data-test="dashboard-legend-item-text">
                 {{ legend.name }}
               </div>
               <OButton
                 variant="ghost"
                 size="icon"
-                class="tw:ml-1"
+                class="ml-1"
                 data-test="dashboard-legend-copy-btn"
                 :data-copied="isLegendCopied(index) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, index)"

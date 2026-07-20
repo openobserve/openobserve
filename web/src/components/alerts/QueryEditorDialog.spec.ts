@@ -224,40 +224,45 @@ describe("QueryEditorDialog - updateVrlFunction", () => {
   });
 });
 
-describe("QueryEditorDialog - filterFunctionOptions", () => {
-  it("resets to all functions when val is empty", async () => {
-    const w = await mountComp({ savedFunctions: [{ name: "fn1" }, { name: "fn2" }] });
-    (w.vm as any).functionOptions = [];
-    (w.vm as any).filterFunctionOptions("", (fn: any) => fn());
-    expect((w.vm as any).functionOptions).toHaveLength(2);
-  });
-
-  it("filters functions case-insensitively", async () => {
-    const w = await mountComp({ savedFunctions: [{ name: "myFunc" }, { name: "otherFn" }] });
-    (w.vm as any).filterFunctionOptions("MY", (fn: any) => fn());
-    expect((w.vm as any).functionOptions).toHaveLength(1);
-    expect((w.vm as any).functionOptions[0].name).toBe("myFunc");
-  });
-
-  it("returns empty array when no match", async () => {
-    const w = await mountComp({ savedFunctions: [{ name: "fn1" }] });
-    (w.vm as any).filterFunctionOptions("xyz_not_exist", (fn: any) => fn());
-    expect((w.vm as any).functionOptions).toHaveLength(0);
-  });
-});
-
-
+// The saved-functions OSelect is configured with valueKey="name", so it emits
+// the function NAME, never the option object. These tests must pass a name —
+// passing an object here is what let the "select does nothing" bug through.
 describe("QueryEditorDialog - onFunctionSelect", () => {
-  it("sets vrlFunctionContent from function.function", async () => {
-    const w = await mountComp();
-    (w.vm as any).onFunctionSelect({ name: "myFn", function: ".level = upcase(.level)" });
+  const FUNCS = [
+    { name: "myFn", function: ".level = upcase(.level)" },
+    { name: "otherFn", function: ".a = 1" },
+  ];
+
+  it("sets vrlFunctionContent from the selected function's body", async () => {
+    const w = await mountComp({ savedFunctions: FUNCS });
+    (w.vm as any).onFunctionSelect("myFn");
     expect((w.vm as any).vrlFunctionContent).toBe(".level = upcase(.level)");
   });
 
-  it("does nothing when func has no function property", async () => {
-    const w = await mountComp({ vrlFunction: "existing" });
-    (w.vm as any).onFunctionSelect({ name: "myFn" });
-    // vrlFunctionContent should remain unchanged
+  it("emits update:vrlFunction so the parent form keeps the selection", async () => {
+    const w = await mountComp({ savedFunctions: FUNCS });
+    (w.vm as any).onFunctionSelect("myFn");
+    expect(w.emitted("update:vrlFunction")?.at(-1)).toEqual([
+      ".level = upcase(.level)",
+    ]);
+  });
+
+  it("replaces the body when switching to a different function", async () => {
+    const w = await mountComp({ savedFunctions: FUNCS });
+    (w.vm as any).onFunctionSelect("myFn");
+    (w.vm as any).onFunctionSelect("otherFn");
+    expect((w.vm as any).vrlFunctionContent).toBe(".a = 1");
+  });
+
+  it("falls back to `body` when the function has no `function` field", async () => {
+    const w = await mountComp({ savedFunctions: [{ name: "bodyFn", body: ".b = 2" }] });
+    (w.vm as any).onFunctionSelect("bodyFn");
+    expect((w.vm as any).vrlFunctionContent).toBe(".b = 2");
+  });
+
+  it("does nothing when the name matches no saved function", async () => {
+    const w = await mountComp({ vrlFunction: "existing", savedFunctions: FUNCS });
+    (w.vm as any).onFunctionSelect("nope");
     expect((w.vm as any).vrlFunctionContent).toBe("existing");
   });
 });

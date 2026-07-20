@@ -43,169 +43,169 @@ const hasTrailing = computed(() => {
 const tag = computed(() => (props.clickable ? "button" : "span"));
 
 // ── Variant class map ─────────────────────────────────────────────────────
-// Each entry is a complete token-based class string. No tw:inline colours.
+// Each entry is a complete token-based class string. No inline colours.
 const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
   // Solid
   default:
-    "tw:bg-badge-default-soft-bg tw:text-badge-default-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-default-ol-border/30",
+    "bg-badge-default-soft-bg text-badge-default-soft-text ring-1 ring-inset ring-badge-default-ol-border/30",
   primary:
-    "tw:bg-badge-primary-soft-bg tw:text-badge-primary-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-primary-ol-border/30",
+    "bg-badge-primary-soft-bg text-badge-primary-soft-text ring-1 ring-inset ring-badge-primary-ol-border/30",
   success:
-    "tw:bg-badge-success-soft-bg tw:text-badge-success-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-success-ol-border/30",
+    "bg-badge-success-soft-bg text-badge-success-soft-text ring-1 ring-inset ring-badge-success-ol-border/30",
   warning:
-    "tw:bg-badge-warning-soft-bg tw:text-badge-warning-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-warning-ol-border/30",
+    "bg-badge-warning-soft-bg text-badge-warning-soft-text ring-1 ring-inset ring-badge-warning-ol-border/30",
   error:
-    "tw:bg-badge-error-soft-bg tw:text-badge-error-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-error-ol-border/30",
+    "bg-badge-error-soft-bg text-badge-error-soft-text ring-1 ring-inset ring-badge-error-ol-border/30",
   // Outline (transparent bg + inset ring)
   "default-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-default-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-default-ol-border",
+    "bg-transparent",
+    "text-badge-default-ol-text",
+    "ring-1 ring-inset ring-badge-default-ol-border",
   ].join(" "),
   "primary-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-primary-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-primary-ol-border",
+    "bg-transparent",
+    "text-badge-primary-ol-text",
+    "ring-1 ring-inset ring-badge-primary-ol-border",
   ].join(" "),
   "success-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-success-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-success-ol-border",
+    "bg-transparent",
+    "text-badge-success-ol-text",
+    "ring-1 ring-inset ring-badge-success-ol-border",
   ].join(" "),
   "warning-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-warning-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-warning-ol-border",
+    "bg-transparent",
+    "text-badge-warning-ol-text",
+    "ring-1 ring-inset ring-badge-warning-ol-border",
   ].join(" "),
   "error-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-error-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-error-ol-border",
+    "bg-transparent",
+    "text-badge-error-ol-text",
+    "ring-1 ring-inset ring-badge-error-ol-border",
   ].join(" "),
   "info-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-info-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-info-ol-border",
+    "bg-transparent",
+    "text-badge-info-ol-text",
+    "ring-1 ring-inset ring-badge-info-ol-border",
   ].join(" "),
   "purple-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-purple-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-purple-ol-border",
+    "bg-transparent",
+    "text-badge-purple-ol-text",
+    "ring-1 ring-inset ring-badge-purple-ol-border",
   ].join(" "),
   // Soft (light tinted bg, dark text, subtle matching inset border)
   "default-soft":
-    "tw:bg-badge-default-soft-bg tw:text-badge-default-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-default-ol-border/30",
+    "bg-badge-default-soft-bg text-badge-default-soft-text ring-1 ring-inset ring-badge-default-ol-border/30",
   "primary-soft":
-    "tw:bg-badge-primary-soft-bg tw:text-badge-primary-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-primary-ol-border/30",
+    "bg-badge-primary-soft-bg text-badge-primary-soft-text ring-1 ring-inset ring-badge-primary-ol-border/30",
   "success-soft":
-    "tw:bg-badge-success-soft-bg tw:text-badge-success-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-success-ol-border/30",
+    "bg-badge-success-soft-bg text-badge-success-soft-text ring-1 ring-inset ring-badge-success-ol-border/30",
   "warning-soft":
-    "tw:bg-badge-warning-soft-bg tw:text-badge-warning-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-warning-ol-border/30",
+    "bg-badge-warning-soft-bg text-badge-warning-soft-text ring-1 ring-inset ring-badge-warning-ol-border/30",
   "error-soft":
-    "tw:bg-badge-error-soft-bg tw:text-badge-error-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-error-ol-border/30",
+    "bg-badge-error-soft-bg text-badge-error-soft-text ring-1 ring-inset ring-badge-error-ol-border/30",
 
   // NEW: Extended color families for correlation dimensions
   // Teal
   teal:
-    "tw:bg-badge-teal-soft-bg tw:text-badge-teal-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-teal-ol-border/30",
+    "bg-badge-teal-soft-bg text-badge-teal-soft-text ring-1 ring-inset ring-badge-teal-ol-border/30",
   "teal-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-teal-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-teal-ol-border",
+    "bg-transparent",
+    "text-badge-teal-ol-text",
+    "ring-1 ring-inset ring-badge-teal-ol-border",
   ].join(" "),
   "teal-soft":
-    "tw:bg-badge-teal-soft-bg tw:text-badge-teal-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-teal-ol-border/30",
+    "bg-badge-teal-soft-bg text-badge-teal-soft-text ring-1 ring-inset ring-badge-teal-ol-border/30",
 
   // Orange
   orange:
-    "tw:bg-badge-orange-soft-bg tw:text-badge-orange-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-orange-ol-border/30",
+    "bg-badge-orange-soft-bg text-badge-orange-soft-text ring-1 ring-inset ring-badge-orange-ol-border/30",
   "orange-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-orange-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-orange-ol-border",
+    "bg-transparent",
+    "text-badge-orange-ol-text",
+    "ring-1 ring-inset ring-badge-orange-ol-border",
   ].join(" "),
   "orange-soft":
-    "tw:bg-badge-orange-soft-bg tw:text-badge-orange-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-orange-ol-border/30",
+    "bg-badge-orange-soft-bg text-badge-orange-soft-text ring-1 ring-inset ring-badge-orange-ol-border/30",
 
   // Lime
   lime:
-    "tw:bg-badge-lime-soft-bg tw:text-badge-lime-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-lime-ol-border/30",
+    "bg-badge-lime-soft-bg text-badge-lime-soft-text ring-1 ring-inset ring-badge-lime-ol-border/30",
   "lime-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-lime-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-lime-ol-border",
+    "bg-transparent",
+    "text-badge-lime-ol-text",
+    "ring-1 ring-inset ring-badge-lime-ol-border",
   ].join(" "),
   "lime-soft":
-    "tw:bg-badge-lime-soft-bg tw:text-badge-lime-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-lime-ol-border/30",
+    "bg-badge-lime-soft-bg text-badge-lime-soft-text ring-1 ring-inset ring-badge-lime-ol-border/30",
 
   // Amber
   amber:
-    "tw:bg-badge-amber-soft-bg tw:text-badge-amber-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-amber-ol-border/30",
+    "bg-badge-amber-soft-bg text-badge-amber-soft-text ring-1 ring-inset ring-badge-amber-ol-border/30",
   "amber-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-amber-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-amber-ol-border",
+    "bg-transparent",
+    "text-badge-amber-ol-text",
+    "ring-1 ring-inset ring-badge-amber-ol-border",
   ].join(" "),
   "amber-soft":
-    "tw:bg-badge-amber-soft-bg tw:text-badge-amber-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-amber-ol-border/30",
+    "bg-badge-amber-soft-bg text-badge-amber-soft-text ring-1 ring-inset ring-badge-amber-ol-border/30",
 
   // Cyan
   cyan:
-    "tw:bg-badge-cyan-soft-bg tw:text-badge-cyan-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-cyan-ol-border/30",
+    "bg-badge-cyan-soft-bg text-badge-cyan-soft-text ring-1 ring-inset ring-badge-cyan-ol-border/30",
   "cyan-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-cyan-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-cyan-ol-border",
+    "bg-transparent",
+    "text-badge-cyan-ol-text",
+    "ring-1 ring-inset ring-badge-cyan-ol-border",
   ].join(" "),
   "cyan-soft":
-    "tw:bg-badge-cyan-soft-bg tw:text-badge-cyan-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-cyan-ol-border/30",
+    "bg-badge-cyan-soft-bg text-badge-cyan-soft-text ring-1 ring-inset ring-badge-cyan-ol-border/30",
 
   // Blue
   blue:
-    "tw:bg-badge-blue-soft-bg tw:text-badge-blue-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-blue-ol-border/30",
+    "bg-badge-blue-soft-bg text-badge-blue-soft-text ring-1 ring-inset ring-badge-blue-ol-border/30",
   "blue-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-blue-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-blue-ol-border",
+    "bg-transparent",
+    "text-badge-blue-ol-text",
+    "ring-1 ring-inset ring-badge-blue-ol-border",
   ].join(" "),
   "blue-soft":
-    "tw:bg-badge-blue-soft-bg tw:text-badge-blue-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-blue-ol-border/30",
+    "bg-badge-blue-soft-bg text-badge-blue-soft-text ring-1 ring-inset ring-badge-blue-ol-border/30",
 
   // Purple (solid/soft variants for correlation)
   purple:
-    "tw:bg-badge-purple-soft-bg tw:text-badge-purple-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-purple-ol-border/30",
+    "bg-badge-purple-soft-bg text-badge-purple-soft-text ring-1 ring-inset ring-badge-purple-ol-border/30",
   "purple-soft":
-    "tw:bg-badge-purple-soft-bg tw:text-badge-purple-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-purple-ol-border/30",
+    "bg-badge-purple-soft-bg text-badge-purple-soft-text ring-1 ring-inset ring-badge-purple-ol-border/30",
 
   // Indigo
   indigo:
-    "tw:bg-badge-indigo-soft-bg tw:text-badge-indigo-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-indigo-ol-border/30",
+    "bg-badge-indigo-soft-bg text-badge-indigo-soft-text ring-1 ring-inset ring-badge-indigo-ol-border/30",
   "indigo-outline": [
-    "tw:bg-transparent",
-    "tw:text-badge-indigo-ol-text",
-    "tw:ring-1 tw:ring-inset tw:ring-badge-indigo-ol-border",
+    "bg-transparent",
+    "text-badge-indigo-ol-text",
+    "ring-1 ring-inset ring-badge-indigo-ol-border",
   ].join(" "),
   "indigo-soft":
-    "tw:bg-badge-indigo-soft-bg tw:text-badge-indigo-soft-text tw:ring-1 tw:ring-inset tw:ring-badge-indigo-ol-border/30",
+    "bg-badge-indigo-soft-bg text-badge-indigo-soft-text ring-1 ring-inset ring-badge-indigo-ol-border/30",
 };
 
 // ── Size class map ────────────────────────────────────────────────────────
 const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
-  xs: "tw:px-1.5 tw:py-0.5 tw:text-[10px] tw:gap-0.5",
-  sm: "tw:px-2.5 tw:py-1.5 tw:text-[11px] tw:gap-1",
-  md: "tw:px-2.5 tw:py-2 tw:text-xs tw:gap-1.5",
+  xs: "px-1.5 py-0.5 text-[10px] gap-0.5",
+  sm: "px-2.5 py-1.5 text-[11px] gap-1",
+  md: "px-2.5 py-2 text-xs gap-1.5",
 };
 
 // ── Shape (corner radius) class map ───────────────────────────────────────
 const shapeClasses: Record<NonNullable<BadgeProps["shape"]>, string> = {
-  pill: "tw:rounded-full",
-  rounded: "tw:rounded-md",
-  square: "tw:rounded-none",
+  pill: "rounded-full",
+  rounded: "rounded-md",
+  square: "rounded-none",
 };
 
 // ── Trailing segment padding per size ────────────────────────────────────
 const trailingSizeClasses = computed(() =>
-  props.size === "md" ? "tw:ps-1.5 tw:ms-1" : "tw:ps-1 tw:ms-0.5",
+  props.size === "md" ? "ps-1.5 ms-1" : "ps-1 ms-0.5",
 );
 
 // ── Root element classes ──────────────────────────────────────────────────
@@ -213,24 +213,24 @@ const classes = computed(() => [
   // Base — layout + typography + shape.
   // Weight 600 per the design-system weight scale (HANDOFF §2.2: badges = 600).
   // Pill shape (rounded-full) per HANDOFF §11 + this component's own contract.
-  "tw:inline-flex tw:items-center tw:whitespace-nowrap",
-  "tw:font-medium tw:leading-none",
-  "tw:transition-colors tw:duration-150",
+  "inline-flex items-center whitespace-nowrap",
+  "font-medium leading-none",
+  "transition-colors duration-150",
   // Variant + size + shape
   variantClasses[props.variant],
   sizeClasses[props.size],
   shapeClasses[props.shape],
   // Clickable — interaction states (button element handles :disabled natively)
   props.clickable && [
-    "tw:cursor-pointer",
-    "tw:enabled:hover:opacity-80",
-    "tw:focus-visible:outline-none",
-    "tw:focus-visible:ring-2",
-    "tw:focus-visible:ring-badge-focus-ring",
-    "tw:focus-visible:ring-offset-1",
+    "cursor-pointer",
+    "enabled:hover:opacity-80",
+    "focus-visible:outline-none",
+    "focus-visible:ring-2",
+    "focus-visible:ring-badge-focus-ring",
+    "focus-visible:ring-offset-1",
   ].join(" "),
   // Disabled — always mutes regardless of clickable
-  props.disabled && "tw:opacity-40 tw:pointer-events-none",
+  props.disabled && "opacity-40 pointer-events-none",
 ]);
 
 // ── Event handlers ────────────────────────────────────────────────────────
@@ -264,8 +264,8 @@ function handleKeydown(e: KeyboardEvent): void {
     <span
       v-if="dot"
       :class="[
-        'tw:inline-block tw:shrink-0 tw:rounded-full tw:size-1.75 tw:bg-current',
-        size === 'sm' ? 'tw:me-0' : 'tw:me-0',
+        'inline-block shrink-0 rounded-full size-1.75 bg-current',
+        size === 'sm' ? 'me-0' : 'me-0',
       ]"
       aria-hidden="true"
     />
@@ -281,12 +281,12 @@ function handleKeydown(e: KeyboardEvent): void {
           v-if="icon && isOIcon"
           :name="(icon as any)"
           size="xs"
-          class="tw:shrink-0"
+          class="shrink-0"
         />
         <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
           v-else
-          class="material-icons-outlined tw:text-[1em] tw:leading-none tw:shrink-0"
+          class="material-icons-outlined text-[1em] leading-none shrink-0"
           aria-hidden="true"
         >{{ icon }}</span>
       </slot>
@@ -302,7 +302,7 @@ function handleKeydown(e: KeyboardEvent): void {
     <span
       v-if="hasTrailing"
       :class="[
-        'tw:border-s tw:border-current/25 tw:opacity-75 tw:leading-none tw:shrink-0',
+        'border-s border-current/25 opacity-75 leading-none shrink-0',
         trailingSizeClasses,
       ]"
     >

@@ -31,12 +31,6 @@ vi.mock("vuex", () => ({
   }),
 }));
 
-vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  "add": "add",
-  "visibility": "visibility",
-  "visibility-off": "visibility_off",
-}));
-
 const componentStubs = {
   OButton: {
     name: "OButton",

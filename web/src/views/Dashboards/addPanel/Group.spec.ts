@@ -297,7 +297,7 @@ describe("Group.vue", () => {
       
       const addConditionItem = wrapper.find('[data-test="dashboard-add-group-add-condition"]');
       
-      // If not found due to Quasar menu rendering, check the menu state instead
+      // If not found due to menu rendering, check the menu state instead
       if (!addConditionItem.exists()) {
         expect(wrapper.vm.showAddMenu).toBe(true);
       } else {
@@ -316,7 +316,7 @@ describe("Group.vue", () => {
       
       const addGroupItem = wrapper.find('[data-test="dashboard-add-group-add-group"]');
       
-      // If not found due to Quasar menu rendering, check the menu state instead
+      // If not found due to menu rendering, check the menu state instead
       if (!addGroupItem.exists()) {
         expect(wrapper.vm.showAddMenu).toBe(true);
       } else {

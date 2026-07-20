@@ -23,31 +23,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:ps-3 tw:pe-3.5 tw:py-2.5 tw:rounded-xl tw:border tw:border-border-default tw:bg-surface-base tw:shadow-sm tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow,transform] tw:duration-150 tw:outline-none tw:hover:shadow-md tw:hover:border-primary-400 tw:hover:bg-tabs-hover-bg tw:focus-visible:ring-[0.125rem] tw:focus-visible:ring-primary-500/40"
+    class="group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 ps-3 pe-3.5 py-2.5 rounded-xl border border-border-default bg-surface-base shadow-sm text-left cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg focus-visible:ring-[0.125rem] focus-visible:ring-primary-500/40"
   >
     <span
-      class="tw:relative tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:bg-tabs-active-bg tw:text-tabs-active-text tw:transition-colors tw:group-hover:bg-primary-600 tw:group-hover:text-white"
+      class="relative inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-tabs-active-bg text-tabs-active-text transition-colors group-hover:bg-primary-600 group-hover:text-white"
     >
       <OIcon :name="icon" size="md" />
     </span>
 
-    <span class="tw:relative tw:flex-1 tw:min-w-0">
+    <span class="relative flex-1 min-w-0">
       <span
         :title="label"
-        class="tw:block tw:text-sm tw:font-medium tw:text-text-primary tw:wrap-break-word"
+        class="block text-sm font-medium text-text-primary wrap-break-word"
         >{{ label }}</span
       >
       <span
         v-if="sublabel"
-        class="tw:block tw:text-xs tw:text-text-secondary tw:leading-snug"
+        class="block text-xs text-text-secondary leading-snug"
         >{{ sublabel }}</span
       >
     </span>
 
     <OIcon
+      v-if="!hideChevron"
       name="chevron-right"
       size="sm"
-      class="tw:relative tw:shrink-0 tw:text-text-disabled tw:transition-transform tw:group-hover:translate-x-0.5 tw:group-hover:text-primary-600"
+      class="relative shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-primary-600"
     />
   </button>
 </template>
@@ -60,5 +61,6 @@ defineProps<{
   icon: IconName;
   label: string;
   sublabel?: string;
+  hideChevron?: boolean;
 }>();
 </script>

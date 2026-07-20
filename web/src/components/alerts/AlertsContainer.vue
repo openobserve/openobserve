@@ -1,10 +1,10 @@
 <template>
     <div data-test="alerts-container">
-      <div data-test="alerts-container-header" class="tw:flex tw:justify-between tw:cursor-pointer" @click="expanded = !expanded">
-        <div class="tw:flex tw:items-start tw:justify-between tw:w-full ">
+      <div data-test="alerts-container-header" class="flex justify-between cursor-pointer" @click="expanded = !expanded">
+        <div class="flex items-start justify-between w-full ">
 
           <div
-            class="tw:text-[16px] tw:flex tw:items-start"
+            class="text-[16px] flex items-start"
 
           >
           <OIcon
@@ -12,11 +12,11 @@
             data-test="container-icon"
             :name="icon"
             size="sm"
-            class="tw:mr-2   tw:rounded-full tw:px-1 tw:py-1  "
+            class="mr-2   rounded-full px-1 py-1  "
             :class="[
               store.state.theme === 'dark'
-                ? 'tw:text-gray-100 tw:bg-gray-600'
-                : 'tw:bg-[#f2f1f1] tw:text-[#555555]',
+                ? 'text-gray-100 bg-gray-600'
+                : 'bg-[#f2f1f1] text-[#555555]',
                 iconClass
             ]"
           />
@@ -24,21 +24,21 @@
             v-else
             data-test="container-image"
             :src="image"
-            class="tw:mr-2 tw:rounded-full tw:px-1 tw:py-1"
+            class="mr-2 rounded-full px-1 py-1"
             :class="[
               store.state.theme === 'dark'
-                ? 'tw:text-gray-100 tw:bg-gray-600'
-                : 'tw:bg-[#f2f1f1] tw:text-[#555555]',
+                ? 'text-gray-100 bg-gray-600'
+                : 'bg-[#f2f1f1] text-[#555555]',
                 iconClass
             ]"
           />
-          <div data-test="container-label-wrapper" class="tw:flex tw:flex-col tw:items-start tw:justify-start">
+          <div data-test="container-label-wrapper" class="flex flex-col items-start justify-start">
            <span data-test="container-label"> {{ label }}</span>
-            <div data-test="container-sublabel" class="tw:text-[13px] tw:h-[20px]"
+            <div data-test="container-sublabel" class="text-[13px] h-[20px]"
             :class="[
               store.state.theme === 'dark'
-                ? 'tw:text-[#c6c6c6]'
-                : 'tw:text-gray-900',
+                ? 'text-[#c6c6c6]'
+                : 'text-gray-900',
             ]"
             >
                 {{ subLabel }}
@@ -49,12 +49,12 @@
           <OIcon
             data-test="expand-toggle-icon"
             :name="expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
-            class="tw:rounded-full tw:p-1 tw:mt-2"
+            class="rounded-full p-1 mt-2"
 
             :class="[
               store.state.theme === 'dark'
-                ? 'tw:text-gray-100  tw:bg-gray-600'
-                : 'tw:text-gray-900 tw:bg-gray-300',
+                ? 'text-gray-100  bg-gray-600'
+                : 'text-gray-900 bg-gray-300',
             ]"
             size="sm"
           />

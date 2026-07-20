@@ -50,7 +50,22 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((dashboard) => dashboard),
 }));
 
-// Mock DOM methods to prevent Quasar errors
+// Settings v2 KV backend for the home pin + per-user favorites — mocked so
+// mount-time loads and favorite toggles never hit the network.
+vi.mock("@/services/settings", () => ({
+  default: {
+    getSetting: vi.fn().mockResolvedValue({ data: null }),
+    setOrgSetting: vi.fn().mockResolvedValue({}),
+    setUserSetting: vi.fn().mockResolvedValue({}),
+    deleteOrgSetting: vi.fn().mockResolvedValue({}),
+    deleteUserSetting: vi.fn().mockResolvedValue({}),
+  },
+}));
+
+import settingsService from "@/services/settings";
+import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
+
+// Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, 'removeAttribute', {
   writable: true,
   value: vi.fn(),
@@ -189,12 +204,10 @@ const createMockI18n = () => {
 };
 
 // Shared stub configuration used across the suite.
-// q-dialog is removed in favor of the migrated overlay primitives ODrawer/ODialog.
 const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any = { folder: "default" }) => ({
   plugins: [store, router, i18n],
   mocks: {
     $route: { query: routeQuery },
-    $q: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() },
   },
   provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
   stubs: {
@@ -454,6 +467,243 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.resultTotal).toBe(3);
+    });
+  });
+
+  describe("Favorite dashboards", () => {
+    const storeWithTwo = () => {
+      const testStore = createMockStore();
+      testStore.state.organizationData.allDashboardList = {
+        default: [
+          { dashboardId: "dash1", title: "Dashboard 1", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
+          { dashboardId: "dash2", title: "Dashboard 2", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
+        ],
+      };
+      return testStore;
+    };
+
+    beforeEach(() => {
+      useFavoriteDashboards().favorites.value = [];
+    });
+
+    afterEach(() => {
+      // Module-level shared ref — never leak favorites into later mounts,
+      // which would flip their favorites-first landing.
+      useFavoriteDashboards().favorites.value = [];
+    });
+
+    it("shows the selected folder normally, and only favorites in the Favorites view", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash2", folderId: "default", label: "Dashboard 2" },
+      ];
+      expect(wrapper.vm.dashboards).toHaveLength(2);
+
+      wrapper.vm.updateActiveFolderId("__favorites__");
+      await nextTick();
+
+      expect(wrapper.vm.showFavoritesOnly).toBe(true);
+      expect(wrapper.vm.dashboards).toHaveLength(1);
+      expect(wrapper.vm.dashboards[0].id).toBe("dash2");
+      expect(wrapper.vm.dashboards[0]["#"]).toBe("01");
+      expect(wrapper.vm.resultTotal).toBe(1);
+
+      wrapper.vm.updateActiveFolderId("default");
+      await nextTick();
+      expect(wrapper.vm.showFavoritesOnly).toBe(false);
+      expect(wrapper.vm.dashboards).toHaveLength(2);
+    });
+
+    it("lists favorites from OTHER folders too — favorites are folder-independent", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      // This favorite lives in folder1 (whose dashboard list is not cached),
+      // so the row must come from the stored favorite entry itself.
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "remote1", folderId: "folder1", label: "Remote Dash" },
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      wrapper.vm.updateActiveFolderId("__favorites__");
+      await nextTick();
+
+      expect(wrapper.vm.dashboards).toHaveLength(2);
+      const remote = wrapper.vm.dashboards.find((r: any) => r.id === "remote1");
+      expect(remote).toBeDefined();
+      expect(remote.folder_id).toBe("folder1");
+      expect(remote.folder).toBe("Folder 1"); // resolved from the folders list
+      expect(remote.name).toBe("Remote Dash"); // stored label, folder not cached
+      // The cached default-folder favorite is enriched from the store list.
+      const local = wrapper.vm.dashboards.find((r: any) => r.id === "dash1");
+      expect(local.name).toBe("Dashboard 1");
+
+      // The favorites view shows the folder column, like cross-folder search.
+      const columnIds = wrapper.vm.columns.map((c: any) => c.id);
+      expect(columnIds).toContain("folder");
+    });
+
+    it("selecting a folder exits the favorites view and shows that folder", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      wrapper.vm.updateActiveFolderId("__favorites__");
+      await nextTick();
+      expect(wrapper.vm.dashboards).toHaveLength(1);
+
+      // A folder click while favorites is on must drop the user into the
+      // normal folder view — the view is just another rail location now.
+      wrapper.vm.updateActiveFolderId("folder1");
+      await nextTick();
+
+      expect(wrapper.vm.showFavoritesOnly).toBe(false);
+      expect(wrapper.vm.activeFolderId).toBe("folder1");
+    });
+
+    // The component reads the query via useRoute(), so the deep-link tests
+    // drive the REAL mock router rather than the $route mock.
+    const settle = async () => {
+      await nextTick();
+      await nextTick();
+      await nextTick();
+    };
+
+    it("lands on Favorites when the user has favorites and no deep link", async () => {
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+      expect(wrapper.vm.showFavoritesOnly).toBe(true);
+    });
+
+    it("lands on the default folder when there are no favorites", async () => {
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("default");
+    });
+
+    it("a folder deep link beats the favorites-first landing", async () => {
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      await router.push({ path: "/dashboards", query: { folder: "folder1" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("folder1");
+      expect(wrapper.vm.showFavoritesOnly).toBe(false);
+    });
+
+    it("an app-stamped ?folder=default does NOT beat the favorites landing", async () => {
+      // The folder watcher writes ?folder=default into the URL on every
+      // ordinary visit, so a reload always carries it — it is not an explicit
+      // deep link and must not suppress favorites-first.
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      await router.push({ path: "/dashboards", query: { folder: "default" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+    });
+
+    it("ignores folder emissions that arrive before the landing decision", async () => {
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      // FolderList's async init emits "default" before onMounted decides —
+      // simulate that immediate emission.
+      wrapper.vm.updateActiveFolderId("default");
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+    });
+
+    it("a Favorites deep link is honored even with zero favorites", async () => {
+      await router.push({
+        path: "/dashboards",
+        query: { folder: "__favorites__" },
+      });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+    });
+
+    it("toggleFavorite persists the per-user setting resolved to the active folder", async () => {
+      const testStore = storeWithTwo();
+      (testStore.state.userInfo as any).email = "me@example.com";
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(testStore, router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      await wrapper.vm.toggleFavorite({ id: "dash1", name: "Dashboard 1" });
+
+      expect(settingsService.setUserSetting).toHaveBeenCalledWith(
+        "test-org",
+        "me@example.com",
+        "favorite_dashboards",
+        [{ dashboardId: "dash1", folderId: "default", label: "Dashboard 1" }],
+        "ui",
+      );
+      expect(wrapper.vm.isFavorite("dash1")).toBe(true);
+    });
+
+    it("toggleFavorite on an existing favorite removes it", async () => {
+      const testStore = storeWithTwo();
+      (testStore.state.userInfo as any).email = "me@example.com";
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(testStore, router, i18n),
+      });
+      await nextTick();
+      await nextTick();
+
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      await wrapper.vm.toggleFavorite({ id: "dash1", name: "Dashboard 1" });
+
+      expect(wrapper.vm.isFavorite("dash1")).toBe(false);
+      expect(settingsService.setUserSetting).toHaveBeenCalledWith(
+        "test-org",
+        "me@example.com",
+        "favorite_dashboards",
+        [],
+        "ui",
+      );
     });
   });
 

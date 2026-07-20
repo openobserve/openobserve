@@ -18,11 +18,6 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRoute,
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return { ...actual, useQuasar: () => ({ notify: vi.fn() }) };
-});
-
 // The placement manifest is fetched at build time (absent in tests), so stub it.
 // codex (no existing home) → real "ai-codex" entry pinned to top of Frameworks.
 // openai → matches openai-python, so it MOVES to the top of Model Providers

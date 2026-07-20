@@ -67,7 +67,7 @@ describe("ODropdownItem", () => {
       {},
       { default: () => h("span", "Action") },
     );
-    const item = wrapper.find(".tw\\:text-dropdown-item-text");
+    const item = wrapper.find(".text-dropdown-item-text");
     expect(item.exists()).toBe(true);
   });
 
@@ -76,7 +76,7 @@ describe("ODropdownItem", () => {
       {},
       { default: () => h("span", "Action") },
     );
-    expect(wrapper.html()).toContain("tw:text-dropdown-item-text");
+    expect(wrapper.html()).toContain("text-dropdown-item-text");
   });
 
   it('applies destructive variant classes when variant="destructive"', () => {
@@ -84,9 +84,9 @@ describe("ODropdownItem", () => {
       { variant: "destructive" },
       { default: () => h("span", "Delete") },
     );
-    expect(wrapper.html()).toContain("tw:text-dropdown-item-destructive-text");
+    expect(wrapper.html()).toContain("text-dropdown-item-destructive-text");
     expect(wrapper.html()).toContain(
-      "tw:data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
+      "data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
     );
   });
 });

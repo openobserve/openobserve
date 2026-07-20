@@ -3,17 +3,17 @@
        skeleton must not add one (otherwise a top/outer border flashes only while
        loading and disappears once data arrives). -->
   <div
-    class="home-view-skeleton tw:w-full tw:px-[0.625rem] tw:py-[0.625rem]"
+    class="home-view-skeleton w-full px-[0.625rem] py-[0.625rem]"
     style="display: flex; flex-direction: column; height: calc(100vh - 52px)"
   >
     <!-- 1st section - Streams container -->
     <div
       data-test="home-view-skeleton-streams-container"
-      class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--o2-border-color) tw:rounded-lg tw:p-4"
+      class="feature-card bg-(--tile-bg) border-[0.0625rem] border-(--o2-border-color) rounded-lg p-4"
     >
       <!-- Header -->
-      <div data-test="home-view-skeleton-streams-header" class="tw:flex tw:justify-between tw:items-center tw:mb-4">
-        <div class="tw:flex tw:items-center tw:gap-2">
+      <div data-test="home-view-skeleton-streams-header" class="flex justify-between items-center mb-4">
+        <div class="flex items-center gap-2">
           <SkeletonBox variant="avatar" width="40px" height="40px" />
           <SkeletonBox variant="title" width="100px" />
         </div>
@@ -21,27 +21,27 @@
       </div>
 
       <!-- Tiles using same grid as HomeView -->
-      <div class="tiles-grid tw:grid tw:gap-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
-        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="tw:rounded-[0.325rem] tw:border-[0.0625rem] tw:border-(--o2-border-color)">
+      <div class="tiles-grid grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
+        <div v-for="n in 5" :key="n" data-test="home-view-skeleton-tile" class="rounded-[0.325rem] border-[0.0625rem] border-(--o2-border-color)">
           <div
-            class="tile-content tw:h-full tw:p-4 tw:rounded-lg tw:gap-2 tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:text-(--text-primary)"
+            class="tile-content h-full p-4 rounded-lg gap-2 rounded text-center flex flex-col justify-between bg-(--tile-bg) border border-(--tile-border) text-(--text-primary)"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444] tw:[--text-primary:#cccfd1]'
-                : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133]'
+                ? '[--tile-bg:#2b2c2d] [--tile-border:#444444] [--text-primary:#cccfd1]'
+                : '[--tile-bg:#ffffff] [--tile-border:#e7eaee] [--text-primary:#2e3133]'
             "
           >
             <!-- Top Section (60%) -->
-            <div class="tw:flex tw:flex-col tw:justify-between">
+            <div class="flex flex-col justify-between">
               <!-- Title row -->
-              <div class="tw:flex tw:justify-between">
+              <div class="flex justify-between">
                 <SkeletonBox variant="text" width="100px" height="20px" />
                 <SkeletonBox variant="avatar" width="40px" height="40px" />
               </div>
             </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="data-to-display tw:flex tw:items-end tw:text-[28px] tw:font-semibold tw:leading-8">
+            <div class="data-to-display flex items-end text-[28px] font-semibold leading-8">
               <SkeletonBox variant="title" width="80px" height="32px" />
             </div>
           </div>
@@ -50,54 +50,54 @@
     </div>
 
     <!-- 2nd section - functions and dashboards tiles + 2 charts -->
-    <div class="charts-main-container tw:grid tw:gap-4 tw:mt-4 tw:items-stretch" style="grid-template-columns: minmax(min-content, max-content) 1fr 2fr">
+    <div class="charts-main-container grid gap-4 mt-4 items-stretch" style="grid-template-columns: minmax(min-content, max-content) 1fr 2fr">
       <!-- Functions and Dashboards column -->
-      <div class="functions-dashboards-column tw:flex tw:flex-col tw:gap-4 tw:w-full">
+      <div class="functions-dashboards-column flex flex-col gap-4 w-full">
         <!-- Functions tile -->
-        <div class="tile-wrapper tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
+        <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:text-(--text-primary)"
+            class="feature-card bg-(--tile-bg) border-[0.0625rem] border-(--tile-border) rounded-lg p-4 w-full rounded text-center flex flex-col justify-between text-(--text-primary)"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444] tw:[--text-primary:#cccfd1]'
-                : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133]'
+                ? '[--tile-bg:#2b2c2d] [--tile-border:#444444] [--text-primary:#cccfd1]'
+                : '[--tile-bg:#ffffff] [--tile-border:#e7eaee] [--text-primary:#2e3133]'
             "
           >
-            <div class="tw:flex tw:flex-col tw:justify-between">
+            <div class="flex flex-col justify-between">
               <div
-                class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
+                class="flex items-center gap-2 flex-nowrap w-full"
               >
                 <SkeletonBox variant="avatar" width="40px" height="40px" />
                 <SkeletonBox variant="text" width="100px" height="20px" />
                 <SkeletonBox variant="button" width="40px" height="40px" />
               </div>
             </div>
-            <div class="data-to-display tw:flex tw:items-end tw:text-[28px] tw:font-semibold tw:leading-8">
+            <div class="data-to-display flex items-end text-[28px] font-semibold leading-8">
               <SkeletonBox variant="title" width="60px" height="32px" />
             </div>
           </div>
         </div>
 
         <!-- Dashboards tile -->
-        <div class="tile-wrapper tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
+        <div class="tile-wrapper flex-1 flex min-w-0 w-full">
           <div
-            class="feature-card tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:p-4 tw:w-full tw:rounded tw:text-center tw:flex tw:flex-col tw:justify-between tw:text-(--text-primary)"
+            class="feature-card bg-(--tile-bg) border-[0.0625rem] border-(--tile-border) rounded-lg p-4 w-full rounded text-center flex flex-col justify-between text-(--text-primary)"
             :class="
               store.state.theme === 'dark'
-                ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444] tw:[--text-primary:#cccfd1]'
-                : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee] tw:[--text-primary:#2e3133]'
+                ? '[--tile-bg:#2b2c2d] [--tile-border:#444444] [--text-primary:#cccfd1]'
+                : '[--tile-bg:#ffffff] [--tile-border:#e7eaee] [--text-primary:#2e3133]'
             "
           >
-            <div class="tw:flex tw:flex-col tw:justify-between">
+            <div class="flex flex-col justify-between">
               <div
-                class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
+                class="flex items-center gap-2 flex-nowrap w-full"
               >
                 <SkeletonBox variant="avatar" width="40px" height="40px" />
                 <SkeletonBox variant="text" width="100px" height="20px" />
                 <SkeletonBox variant="button" width="40px" height="40px" />
               </div>
             </div>
-            <div class="data-to-display tw:flex tw:items-end tw:text-[28px] tw:font-semibold tw:leading-8">
+            <div class="data-to-display flex items-end text-[28px] font-semibold leading-8">
               <SkeletonBox variant="title" width="60px" height="32px" />
             </div>
           </div>
@@ -106,40 +106,40 @@
 
       <!-- Alerts Chart -->
       <div
-        class="feature-card first-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:rounded tw:p-4"
+        class="feature-card first-chart-container bg-(--tile-bg) border-[0.0625rem] border-(--tile-border) rounded-lg rounded p-4"
         :class="
           store.state.theme === 'dark'
-            ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444]'
-            : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee]'
+            ? '[--tile-bg:#2b2c2d] [--tile-border:#444444]'
+            : '[--tile-bg:#ffffff] [--tile-border:#e7eaee]'
         "
       >
-        <div class="details-container tw:flex tw:flex-col tw:gap-3 tw:mb-4">
+        <div class="details-container flex flex-col gap-3 mb-4">
           <!-- Header -->
-          <div class="tw:flex tw:justify-between tw:items-center">
-            <span class="text-title tw:flex tw:items-center tw:gap-2 tw:text-lg tw:font-medium tw:leading-5">
+          <div class="flex justify-between items-center">
+            <span class="text-title flex items-center gap-2 text-lg font-medium leading-5">
               <SkeletonBox variant="avatar" width="40px" height="40px" />
               <SkeletonBox variant="text" width="120px" height="20px" />
             </span>
             <SkeletonBox variant="button" width="40px" height="40px" />
           </div>
           <!-- Stats row -->
-          <div class="tw:flex tw:pt-2" style="gap: 16px">
-            <div class="tw:flex tw:flex-col">
+          <div class="flex pt-2" style="gap: 16px">
+            <div class="flex flex-col">
               <SkeletonBox
                 variant="text"
                 width="100px"
                 height="14px"
-                class="tw:mb-1"
+                class="mb-1"
               />
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>
             <OSeparator vertical />
-            <div class="tw:flex tw:flex-col">
+            <div class="flex flex-col">
               <SkeletonBox
                 variant="text"
                 width="80px"
                 height="14px"
-                class="tw:mb-1"
+                class="mb-1"
               />
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>
@@ -147,10 +147,10 @@
         </div>
         <!-- Chart area -->
         <div
-          class="custom-first-chart tw:my-auto tw:xl:min-h-[200px] tw:h-[calc(100vh-500px)] tw:md:h-[calc(100vh-500px)] tw:lg:h-[calc(100vh-550px)] tw:xl:h-[calc(100vh-645px)] tw:w-full"
+          class="custom-first-chart my-auto xl:min-h-[200px] h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)] w-full"
         >
           <div
-            class="skeleton-box tw:bg-[var(--color-skeleton-base,#f5f5f5)] tw:relative tw:overflow-hidden tw:rounded-lg"
+            class="skeleton-box bg-[var(--color-skeleton-base,#f5f5f5)] relative overflow-hidden rounded-lg"
             style="width: 100%; height: 100%"
           ></div>
         </div>
@@ -158,40 +158,40 @@
 
       <!-- Pipelines Chart -->
       <div
-        class="feature-card second-chart-container tw:bg-(--tile-bg) tw:border-[0.0625rem] tw:border-(--tile-border) tw:rounded-lg tw:rounded tw:p-4"
+        class="feature-card second-chart-container bg-(--tile-bg) border-[0.0625rem] border-(--tile-border) rounded-lg rounded p-4"
         :class="
           store.state.theme === 'dark'
-            ? 'tw:[--tile-bg:#2b2c2d] tw:[--tile-border:#444444]'
-            : 'tw:[--tile-bg:#ffffff] tw:[--tile-border:#e7eaee]'
+            ? '[--tile-bg:#2b2c2d] [--tile-border:#444444]'
+            : '[--tile-bg:#ffffff] [--tile-border:#e7eaee]'
         "
       >
-        <div class="details-container tw:flex tw:flex-col tw:gap-3 tw:mb-4">
+        <div class="details-container flex flex-col gap-3 mb-4">
           <!-- Header -->
-          <div class="tw:flex tw:justify-between tw:items-center">
-            <span class="text-title tw:flex tw:items-center tw:gap-2 tw:text-lg tw:font-medium tw:leading-5">
+          <div class="flex justify-between items-center">
+            <span class="text-title flex items-center gap-2 text-lg font-medium leading-5">
               <SkeletonBox variant="avatar" width="40px" height="40px" />
               <SkeletonBox variant="text" width="140px" height="20px" />
             </span>
             <SkeletonBox variant="button" width="40px" height="40px" />
           </div>
           <!-- Stats row -->
-          <div class="tw:flex tw:pt-2" style="gap: 16px">
-            <div class="tw:flex tw:flex-col">
+          <div class="flex pt-2" style="gap: 16px">
+            <div class="flex flex-col">
               <SkeletonBox
                 variant="text"
                 width="120px"
                 height="14px"
-                class="tw:mb-1"
+                class="mb-1"
               />
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>
             <OSeparator vertical />
-            <div class="tw:flex tw:flex-col">
+            <div class="flex flex-col">
               <SkeletonBox
                 variant="text"
                 width="100px"
                 height="14px"
-                class="tw:mb-1"
+                class="mb-1"
               />
               <SkeletonBox variant="text" width="40px" height="20px" />
             </div>
@@ -199,10 +199,10 @@
         </div>
         <!-- Chart area -->
         <div
-          class="custom-second-chart tw:my-auto tw:xl:min-h-[200px] tw:h-[calc(100vh-500px)] tw:md:h-[calc(100vh-500px)] tw:lg:h-[calc(100vh-550px)] tw:xl:h-[calc(100vh-645px)]"
+          class="custom-second-chart my-auto xl:min-h-[200px] h-[calc(100vh-500px)] md:h-[calc(100vh-500px)] lg:h-[calc(100vh-550px)] xl:h-[calc(100vh-645px)]"
         >
           <div
-            class="skeleton-box tw:bg-[var(--color-skeleton-base,#f5f5f5)] tw:relative tw:overflow-hidden tw:rounded-lg"
+            class="skeleton-box bg-[var(--color-skeleton-base,#f5f5f5)] relative overflow-hidden rounded-lg"
             style="width: 100%; height: 100%"
           ></div>
         </div>

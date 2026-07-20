@@ -32,7 +32,7 @@ Usage:
 - <ChunkedContent :data="value" :field-key="'field_name'" :query-string="highlightQuery" />
 -->
 <template>
-  <div data-test="logs-chunked-content-container" class="tw:inline-block tw:w-full">
+  <div data-test="logs-chunked-content-container" class="inline-block w-full">
     <!-- Display the visible content with highlighting -->
     <LogsHighLighting
       :data="visibleContent"
@@ -44,7 +44,7 @@ Usage:
     <!-- Load more button and info -->
     <div
       v-if="shouldShowLoadMore"
-      class="tw:pt-2 tw:[border-top:1px_solid_var(--o2-border-color)] tw:mt-2 tw:flex tw:items-center tw:gap-3"
+      class="pt-2 [border-top:1px_solid_var(--o2-border-color)] mt-2 flex items-center gap-3"
     >
       <OButton
         :data-test="`load-more-btn-${fieldKey}`"
@@ -52,11 +52,11 @@ Usage:
         size="sm-action"
         @click="handleLoadMore"
       >
-        <OIcon name="expand-more" size="xs" class="tw:mr-1" />
-        Load more ({{ chunkInfo.loadedSizeKB }}KB / {{ chunkInfo.totalSizeKB }}KB)
+        <OIcon name="expand-more" size="xs" class="mr-1" />
+        {{ t('logs.chunkedContent.loadMore', { loaded: chunkInfo.loadedSizeKB, total: chunkInfo.totalSizeKB }) }}
       </OButton>
-      <span class="tw:text-sm tw:font-medium tw:text-(--q-primary)">
-        Showing chunk {{ chunkInfo.currentChunk }} of {{ chunkInfo.totalChunks }}
+      <span class="text-sm font-medium text-(--q-primary)">
+        {{ t('logs.chunkedContent.showingChunk', { current: chunkInfo.currentChunk, total: chunkInfo.totalChunks }) }}
       </span>
     </div>
   </div>
@@ -64,6 +64,7 @@ Usage:
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useChunkedContent } from "@/composables/useChunkedContent";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -76,6 +77,8 @@ export interface ChunkedContentProps {
   simpleMode?: boolean;
   chunkSizeKB?: number; // Optional: override default chunk size
 }
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<ChunkedContentProps>(), {
   queryString: "",

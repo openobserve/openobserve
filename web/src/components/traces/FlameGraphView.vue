@@ -4,24 +4,24 @@
 -->
 <template>
   <div
-    class="flame-graph-view tw:flex tw:flex-col tw:h-full tw:bg-white tw:w-full tw:bg-[var(--o2-card-bg)]!"
+    class="flame-graph-view flex flex-col h-full bg-white w-full bg-[var(--o2-card-bg)]!"
     style="min-height: 400px; height: 100%"
   >
     <!-- Upper area: controls + ruler + chart -->
-    <div class="tw:flex tw:flex-col tw:flex-1" style="min-height: 0">
+    <div class="flex flex-col flex-1" style="min-height: 0">
       <!-- Controls Bar -->
       <div
-        class="tw:px-6 tw:py-3 tw:border-b tw:border-[var(--o2-border)] tw:flex tw:items-center tw:justify-between tw:bg-[var(--o2-card-bg)]!"
+        class="px-6 py-3 border-b border-[var(--o2-border)] flex items-center justify-between bg-[var(--o2-card-bg)]!"
       >
-        <div class="tw:flex tw:items-center tw:space-x-4">
+        <div class="flex items-center space-x-4">
           <div
-            class="tw:text-xs tw:font-bold tw:text-[var(--o2-text-secondary)]"
+            class="text-xs font-bold text-[var(--o2-text-secondary)]"
           >
-            <span class="tw:text-[var(--o2-text-primary)]">{{ totalSpans }}</span>
-            spans
-            <span class="tw:mx-2">•</span>
-            <span class="tw:text-[var(--o2-text-primary)]">{{ maxDepth }}</span>
-            depth
+            <span class="text-[var(--o2-text-primary)]">{{ totalSpans }}</span>
+            {{ t('traces.flameGraphView.spans') }}
+            <span class="mx-2">•</span>
+            <span class="text-[var(--o2-text-primary)]">{{ maxDepth }}</span>
+            {{ t('traces.flameGraphView.depth') }}
           </div>
         </div>
       </div>
@@ -29,21 +29,21 @@
       <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
       <div
         data-test="flame-graph-view-chart-wrapper"
-        class="tw:flex tw:flex-col tw:flex-1"
+        class="flex flex-col flex-1"
         style="min-height: 0"
         @mousemove="handleChartMouseMove"
         @mouseleave="cursorVisible = false"
       >
         <!-- Timeline Ruler — stays fixed above the scrollable chart -->
         <div
-          class="tw:relative tw:bg-[var(--o2-card-bg)] tw:select-none tw:flex-shrink-0"
+          class="relative bg-[var(--o2-card-bg)] select-none flex-shrink-0"
           style="height: 1.5rem"
         >
           <!-- Static tick labels -->
           <span
             v-for="(tick, index) in timelineTicks"
             :key="'lbl-' + index"
-            class="tw:absolute tw:text-[10px] tw:text-[var(--o2-text-secondary)] tw:leading-none tw:whitespace-nowrap"
+            class="absolute text-[10px] text-[var(--o2-text-secondary)] leading-none whitespace-nowrap"
             style="top: 50%; padding-left: 3px"
             :style="{ left: tick.left, transform: tick.transform }"
             >{{ tick.label }}</span
@@ -56,7 +56,7 @@
           >
             <div
               v-if="index > 0 && index < timelineTicks.length - 1"
-              class="tw:absolute tw:w-px"
+              class="absolute w-px"
               style="bottom: 0; height: 100%; background: #aaa"
               :style="{ left: tick.left, transform: 'translateX(-50%)' }"
             ></div>
@@ -65,12 +65,12 @@
           <!-- Cursor time badge with downward arrow -->
           <div
             v-if="cursorVisible"
-            class="tw:absolute tw:pointer-events-none tw:flex tw:flex-col tw:items-center"
+            class="absolute pointer-events-none flex flex-col items-center"
             style="top: 2px; z-index: 20; transform: translateX(-50%)"
             :style="{ left: cursorX + 'px' }"
           >
             <div
-              class="tw:text-[10px] tw:text-white tw:px-[6px] tw:py-[2px] tw:rounded tw:whitespace-nowrap tw:font-medium"
+              class="text-[10px] text-white px-[6px] py-[2px] rounded whitespace-nowrap font-medium"
               style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
             >
               {{ cursorTimeLabel }}
@@ -91,7 +91,7 @@
         <!-- Scrollable chart area: grows to fit all rows, scrolls vertically -->
         <div
           ref="chartScrollRef"
-          class="tw:flex-1 tw:overflow-y-auto tw:relative"
+          class="flex-1 overflow-y-auto relative"
           style="min-height: 0"
         >
           <div
@@ -111,7 +111,7 @@
             <!-- Vertical cursor line -->
             <div
               v-if="cursorVisible"
-              class="tw:absolute tw:top-0 tw:bottom-0 tw:pointer-events-none"
+              class="absolute top-0 bottom-0 pointer-events-none"
               style="
                 width: 1px;
                 background: rgba(80, 80, 80, 0.6);
@@ -126,11 +126,11 @@
       <!-- Empty State -->
       <div
         v-if="!hasData"
-        class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:justify-center tw:bg-white"
+        class="absolute inset-0 flex items-center justify-center bg-white"
         style="top: 60px"
       >
-        <div class="tw:text-center tw:text-[var(--o2-text-secondary)]">
-          <div class="tw:text-sm">No spans to display</div>
+        <div class="text-center text-[var(--o2-text-secondary)]">
+          <div class="text-sm">{{ t('traces.flameGraphView.noSpansToDisplay') }}</div>
         </div>
       </div>
     </div>
@@ -138,7 +138,7 @@
     <!-- Resize handle -->
     <div
       v-if="sidebarVisible"
-      class="tw:h-1 tw:cursor-row-resize tw:bg-[var(--o2-border)] tw:hover:bg-[var(--o2-primary-color)] tw:flex-shrink-0 tw:transition-colors"
+      class="h-1 cursor-row-resize bg-[var(--o2-border)] hover:bg-[var(--o2-primary-color)] flex-shrink-0 transition-colors"
       style="min-height: 4px"
       data-test="flame-graph-resizer"
       @mousedown="startResize"
@@ -148,7 +148,7 @@
     <div
       v-if="sidebarVisible"
       data-test="trace-details-flame-graph-sidebar"
-      class="tw:border-t tw:border-t-solid tw:border-t-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)]! tw:flex-shrink-0 tw:overflow-hidden"
+      class="border-t border-t-solid border-t-[var(--o2-border-color)] bg-[var(--o2-card-bg)]! flex-shrink-0 overflow-hidden"
       :style="{ height: bottomPanelHeight + 'px' }"
     >
       <TraceDetailsSidebar
@@ -173,6 +173,7 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import useResizer from "@/composables/useResizer";
 import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
@@ -223,6 +224,7 @@ const emit = defineEmits<{
 }>();
 
 // Composables
+const { t } = useI18n();
 
 // State
 const cursorVisible = ref(false);
@@ -425,18 +427,18 @@ const chartOptions = computed(() => {
             <div style="font-weight: bold; margin-bottom: 6px;">${escapeHtml(span.operationName)}</div>
             <div style="font-size: 11px; line-height: 1.6;">
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: #cbd5e1;">Service:</span>
+                <span style="color: #cbd5e1;">${t('traces.flameGraphView.service')}</span>
                 <span>${escapeHtml(span.serviceName)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: #cbd5e1;">Duration:</span>
+                <span style="color: #cbd5e1;">${t('traces.flameGraphView.duration')}</span>
                 <span>${formatDuration(span.durationMs)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; gap: 16px;">
-                <span style="color: #cbd5e1;">% of trace:</span>
+                <span style="color: #cbd5e1;">${t('traces.flameGraphView.percentOfTrace')}</span>
                 <span>${percentage}%</span>
               </div>
-              ${span.hasError ? '<div style="color: #f87171; margin-top: 4px;">⚠ Has errors</div>' : ""}
+              ${span.hasError ? `<div style="color: #f87171; margin-top: 4px;">${t('traces.flameGraphView.hasErrors')}</div>` : ""}
             </div>
           </div>
         `;

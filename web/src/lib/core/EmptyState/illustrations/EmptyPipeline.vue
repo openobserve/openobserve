@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- transform node (center) -->
     <rect x="104" y="56" width="32" height="28" rx="7" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" />
     <path d="M114 64 l-6 6 6 6 M126 64 l6 6 -6 6" stroke="var(--color-primary-500)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
-    <!-- destination node (dashed / empty) -->
-    <g class="es-slot">
+    <!-- destination node (dashed / empty, static — a pulsing plus here read as a clickable button) -->
+    <g opacity="0.85">
       <rect x="164" y="56" width="32" height="28" rx="7" fill="none" stroke="var(--color-primary-400)" stroke-width="1.75" stroke-dasharray="5 5" />
       <line x1="180" y1="64" x2="180" y2="76" stroke="var(--color-primary-500)" stroke-width="2.25" stroke-linecap="round" />
       <line x1="174" y1="70" x2="186" y2="70" stroke="var(--color-primary-500)" stroke-width="2.25" stroke-linecap="round" />
@@ -71,23 +71,9 @@ withDefaults(
 </script>
 
 <style>
-.es-slot {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: es-slot 2.6s ease-in-out infinite;
-}
 .es-packet {
   transform-box: view-box;
   animation: es-travel 3s ease-in-out infinite;
-}
-@keyframes es-slot {
-  0%,
-  100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
-  }
 }
 @keyframes es-travel {
   0% {
@@ -109,11 +95,11 @@ withDefaults(
     opacity: 0;
   }
 }
-.es-static :where(.es-slot, .es-packet) {
+.es-static :where(.es-packet) {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(.es-slot, .es-packet) {
+  :where(.es-packet) {
     animation: none;
   }
 }

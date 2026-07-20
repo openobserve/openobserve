@@ -57,7 +57,7 @@ test.describe("Theme Management Tests", () => {
       await page.reload();
       await page.waitForLoadState('domcontentloaded');
 
-      // Wait for theme to be restored from storage (Vue/Quasar needs time to apply it)
+      // Wait for theme to be restored from storage (Vue needs time to apply it)
       await page.waitForFunction(
         (darkClass) => document.body.classList.contains(darkClass),
         'body--dark',

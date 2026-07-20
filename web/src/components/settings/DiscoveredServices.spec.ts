@@ -28,15 +28,6 @@ vi.mock("@/services/service_streams", () => ({
   },
 }));
 
-const notifyMock = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual<any>("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: notifyMock }),
-  };
-});
-
 vi.mock("@/components/common/GroupHeader.vue", () => ({
   default: {
     name: "GroupHeader",

@@ -203,7 +203,8 @@ describe("SummaryList.vue", () => {
       "filter:queries",
       "update:selectedRows",
       "delete:queries",
-      "clear:filters"
+      "clear:filters",
+      "refresh"
     ];
     expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
   });

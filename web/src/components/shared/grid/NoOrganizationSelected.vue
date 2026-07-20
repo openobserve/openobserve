@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="tw:w-full tw:flex tw:flex-col flex-center tw:gap-2"
+      class="w-full flex flex-col flex-center gap-2"
       style="font-size: 1.5rem"
     >
       <img
@@ -25,8 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="width: 200px; height: 200px; margin-top: 20vh"
         alt=""
       />
-      <div data-test="no-organization-selected-title" class="tw:m-0 tw:text-[18px] tw:font-semibold">{{ t("ticket.noOrganizationSelected") }}</div>
-      <div data-test="no-organization-selected-message" class="tw:m-0 tw:text-sm tw:font-normal tw:leading-5 tw:text-[#7F7777]">{{ t("ticket.selectOrganizationForQuota") }}</div>
+      <div data-test="no-organization-selected-title" class="m-0 text-[18px] font-semibold">{{ t("ticket.noOrganizationSelected") }}</div>
+      <div data-test="no-organization-selected-message" class="m-0 text-sm font-normal leading-5 text-[#7F7777]">{{ t("ticket.selectOrganizationForQuota") }}</div>
     </div>
   </template>
   

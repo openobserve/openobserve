@@ -28,28 +28,28 @@
         <div>
         <div
           v-if="loadingState"
-          class="tw:flex tw:items-center tw:justify-center tw:h-full tw:w-full tw:py-10"
+          class="flex items-center justify-center h-full w-full py-10"
         >
           <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
         </div>
-        <div v-else class="indexDetailsContainer tw:p-5 tw:w-full" style="height: 100vh">
+        <div v-else class="indexDetailsContainer p-5 w-full" style="height: 100vh">
           <div
-            class="titleContainer tw:flex tw:flex-col tw:items-flex-start tw:gap-5 tw:bg-[#00000005] tw:border tw:border-[var(--o2-border-input)] tw:rounded-[5px] tw:p-4"
+            class="titleContainer flex flex-col items-flex-start gap-5 bg-[#00000005] border border-[var(--o2-border-input)] rounded-[5px] p-4"
           >
             <div
               data-test="stream-details-container"
-              class="stream_details_container tw:flex tw:justify-between tw:gap-5 tw:flex-wrap"
+              class="stream_details_container flex justify-between gap-5 flex-wrap"
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
-                <span class="title tw:pl-1 tw:mb-4 tw:font-bold" > {{ schemaData.name }}</span>
+                <span class="title pl-1 mb-4 font-bold" > {{ schemaData.name }}</span>
               </div>
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 data-test="schema-stream-title-text"
               >
                 {{ t("logStream.docsCount") }}
-                <span class="title tw:pl-1 tw:mb-4 tw:font-bold">
+                <span class="title pl-1 mb-4 font-bold">
                   {{
                     parseInt(schemaData.stats.doc_num).toLocaleString("en-US")
                   }}
@@ -57,7 +57,7 @@
               </div>
               <div data-test="schema-stream-title-text">
                 {{ t("logStream.storageSize") }}
-                <span class="title tw:pl-1 tw:mb-4 tw:font-bold">
+                <span class="title pl-1 mb-4 font-bold">
                   {{ formatSizeFromMB(schemaData.stats.storage_size) }}</span
                 >
               </div>
@@ -66,16 +66,16 @@
                 data-test="schema-stream-title-text"
               >
                 {{ t("logStream.compressedSize") }}
-                <span class="title tw:pl-1 tw:mb-4 tw:font-bold">
+                <span class="title pl-1 mb-4 font-bold">
                   {{ formatSizeFromMB(schemaData.stats.compressed_size) }}</span
                 >
               </div>
             </div>
           </div>
-          <div class="tw:flex tw:items-center tw:justify-between tw:gap-4 tw:mt-4">
+          <div class="flex items-center justify-between gap-4 mt-4">
             <div
               data-test="enrichment-schema-total-fields"
-              class="tw:text-sm tw:w-28.75 tw:h-7.5 tw:rounded-sm tw:flex tw:items-center tw:justify-center tw:bg-(--o2-theme-color) tw:text-white"
+              class="text-sm w-28.75 h-7.5 rounded-sm flex items-center justify-center bg-(--o2-theme-color) text-white"
             >
                 All Fields ({{ schemaData.schema.length }})
             </div>
@@ -96,7 +96,7 @@
                   : 'light-theme-table'
               "
               style="margin-bottom: 30px"
-              class="tw:mt-4"
+              class="mt-4"
             >
               <OTable
                 data-test="schema-log-stream-field-mapping-table"
@@ -138,7 +138,6 @@
     import ConfirmDialog from "@/components/ConfirmDialog.vue";
     import useStreams from "@/composables/useStreams";
     import { useRouter } from "vue-router";
-    import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
     import AppTabs from "@/components/common/AppTabs.vue";
 
     import OTable from "@/lib/core/Table/OTable.vue";
@@ -174,7 +173,6 @@
     },
     components: {
         ConfirmDialog,
-        StreamFieldsInputs,
         AppTabs,
         OTable,
         ODrawer,

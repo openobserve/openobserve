@@ -145,10 +145,13 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=8192"
           GIT_HASH_OVERRIDE: ${{ github.sha }}
         run: |
-          bash -c "cd web && npm run build && cp -r ./dist /tmp/dist" &
-          sed -i 's|folder = "web/dist/"|folder = "/tmp/dist/"|' src/handler/http/router/ui.rs
+          mkdir -p /tmp/dist
+          bash -c "cd web && npm run build && cp -r ./dist/. /tmp/dist/" &
+          NPM_PID=$!
+          sed -i 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs && grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
           cargo build --profile release-ci --target x86_64-unknown-linux-gnu
-          wait
+          wait $NPM_PID
+          test -f /tmp/dist/index.html
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
@@ -309,6 +312,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Rerun-detection strategy:
+          #  1. On a rerun, query the GitHub Jobs API for this run.
+          #  2. Compare non-completed jobs in the current attempt against total unique
+          #     matrix jobs: all present -> rerun ALL tests; a subset -> rerun FAILED only.
+          #  3. If the API returns an unexpected payload (rate-limit / error body with no
+          #     .jobs key), default to "all tests". Safe (everything runs), just not
+          #     cost-optimized — and it never crashes the step (see guard below).
           echo "::notice::GitHub run attempt: ${{ github.run_attempt }}"
           if [ "${{ github.run_attempt }}" -gt "1" ]; then
             echo "is_rerun=true" >> $GITHUB_OUTPUT
@@ -318,11 +328,19 @@ jobs:
             ALL_JOBS_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?filter=all&per_page=100")
-            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.status != \"completed\")] | length")
-            TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[.jobs[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length")
+            CURRENT_ATTEMPT_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[(.jobs // [])[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == $CURRENT_ATTEMPT) | select(.status != \"completed\")] | length" 2>/dev/null || echo "0")
+            TOTAL_MATRIX_JOBS=$(echo "$ALL_JOBS_RESPONSE" | jq -r "[(.jobs // [])[] | select(.name | startswith(\"e2e /\")) | select(.run_attempt == 1) | .name] | unique | length" 2>/dev/null || echo "0")
             echo "::notice::Total unique matrix job names: $TOTAL_MATRIX_JOBS"
             echo "::notice::Jobs running in current attempt $CURRENT_ATTEMPT: $CURRENT_ATTEMPT_JOBS"
-            if [ "$CURRENT_ATTEMPT_JOBS" -eq "$TOTAL_MATRIX_JOBS" ]; then
+            # If the jobs API returned an unexpected payload (a rate-limit/error body has no
+            # .jobs key, or curl failed) the counts above fall back to 0 via `.jobs // []`.
+            # Never let that crash the step: previously raw `.jobs[]` hit jq "Cannot iterate
+            # over null", exited 5 under `bash -e`, and skipped the entire test run. On any
+            # ambiguity, default to re-running ALL tests (safe, just not cost-optimized).
+            if ! [[ "$CURRENT_ATTEMPT_JOBS" =~ ^[0-9]+$ ]] || ! [[ "$TOTAL_MATRIX_JOBS" =~ ^[0-9]+$ ]] || [ "$TOTAL_MATRIX_JOBS" -eq 0 ]; then
+              echo "::warning::Could not determine rerun type from jobs API; defaulting to rerun_type=all (all tests)."
+              echo "rerun_type=all" >> $GITHUB_OUTPUT
+            elif [ "$CURRENT_ATTEMPT_JOBS" -eq "$TOTAL_MATRIX_JOBS" ]; then
               echo "::notice::✅ DETECTED: Re-run ALL jobs (all $TOTAL_MATRIX_JOBS matrix jobs running)"
               echo "rerun_type=all" >> $GITHUB_OUTPUT
             else

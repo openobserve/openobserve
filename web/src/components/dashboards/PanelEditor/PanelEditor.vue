@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex-1 tw:flex tw:min-h-0 tw:h-full tw:w-full" data-test="panel-editor-container">
-    <div class="tw:flex" :style="rowStyle">
+  <div class="flex-1 flex min-h-0 h-full w-full" data-test="panel-editor-container">
+    <div class="flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div>
         <div
-          class="tw:flex tw:flex-col scroll card-container tw:bg-surface-panel! tw:border-r tw:border-border-default"
+          class="flex flex-col scroll card-container bg-surface-panel! border-r border-border-default"
           style="
             overflow-y: auto;
             overflow-x: hidden;
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="tw:cursor-pointer tw:overflow-y-auto tw:flex tw:flex-col tw:items-center tw:justify-start card-container tw:bg-surface-panel!"
+          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start card-container bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -58,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="expand-all"
             size="sm"
-            class="tw:mt-2.5 tw:text-xl rotate-90"
+            class="mt-2.5 text-xl rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-base">
+          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-base">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -79,10 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="tw:flex tw:flex-col card-container tw:bg-surface-panel!"
+                class="flex flex-col card-container bg-surface-panel!"
                 :style="fieldListContainerStyle"
               >
-                <div class="tw:flex tw:flex-col" :style="fieldListInnerStyle">
+                <div class="flex flex-col" :style="fieldListInnerStyle">
                   <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
                 </div>
               </div>
@@ -98,19 +98,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @scroll.passive="onBuilderScroll"
               >
                 <div
-                  class="layout-panel-container tw:flex tw:flex-col tw:w-full tw:h-full"
+                  class="layout-panel-container flex flex-col w-full h-full"
                   :style="layoutPanelContainerStyle"
                 >
-                  <!-- Mode selection (left) + Add To Dashboard (right) row -->
+                  <!-- Mode selection + Add To Dashboard row. Skip when empty (e.g.
+                       dashboard mode) so its `my-2` margin isn't dead space. -->
                   <div
-                    class="tw:flex tw:justify-between tw:items-center tw:my-2 tw:mx-2"
+                    v-if="pageType === 'build' || resolvedConfig.showAddToDashboardButton"
+                    class="flex justify-between items-center my-2 mx-2"
                   >
                     <QueryTypeSelector
                       v-if="pageType === 'build'"
                       :showQueryType="false"
                     />
                     <div v-else />
-                    <div class="tw:flex tw:items-center tw:gap-2">
+                    <div class="flex items-center gap-2">
                       <OButton
                         v-if="resolvedConfig.showAddToDashboardButton"
                         data-test="panel-editor-add-to-dashboard-btn"
@@ -162,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Outdated Warning -->
                   <div
                     v-if="resolvedConfig.showOutdatedWarning && isOutDated"
-                    class="tw:p-2"
+                    class="p-2"
                   >
                     <div
                       :style="{
@@ -188,11 +190,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Warning icons and last refreshed time -->
                   <div
-                    class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2"
+                    class="flex justify-end mr-2 items-center gap-2"
                   >
-                    <!-- Show Legends button -->
+                    <!-- Show Legends button (hidden when the chart has no data) -->
                     <OButton
                       v-if="
+                        !panelSchemaRendererRef?.noData &&
                         ![
                           'table', 'heatmap', 'metric', 'gauge',
                           'geomap', 'maps',
@@ -266,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Chart Area -->
                   <div
                     v-if="!resolvedConfig.hideChartPreview"
-                    class="tw:flex tw:flex-col tw:relative tw:overflow-hidden tw:h-full"
+                    class="flex flex-col relative overflow-hidden h-full"
                   >
                     <div :class="chartAreaClass" :style="chartAreaStyle">
                       <PanelSchemaRenderer
@@ -325,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="tw:flex tw:flex-col"
+                  class="flex flex-col"
                   :style="{
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
@@ -364,10 +367,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- HTML Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'html'"
-        class="tw:flex tw:flex-col column"
+        class="flex flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
-        <div class="card-container tw:h-full tw:flex tw:flex-col">
+        <div class="card-container h-full flex flex-col">
           <!-- Variables Selector for HTML (dashboard mode only) -->
           <VariablesValueSelector
             v-if="resolvedConfig.showVariablesSelector"
@@ -376,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:shrink-0 tw:mb-2"
+            class="shrink-0 mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -391,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <DashboardErrorsComponent
             :errors="errorData"
-            class="tw:shrink-0"
+            class="shrink-0"
           />
         </div>
       </div>
@@ -399,10 +402,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Markdown Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'markdown'"
-        class="tw:flex tw:flex-col column"
+        class="flex flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
-        <div class="card-container tw:h-full tw:flex tw:flex-col">
+        <div class="card-container h-full flex flex-col">
           <!-- Variables Selector for Markdown (dashboard mode only) -->
           <VariablesValueSelector
             v-if="resolvedConfig.showVariablesSelector"
@@ -411,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="tw:shrink-0 tw:mb-2"
+            class="shrink-0 mb-2"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
@@ -426,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <DashboardErrorsComponent
             :errors="errorData"
-            class="tw:shrink-0"
+            class="shrink-0"
           />
         </div>
       </div>
@@ -434,13 +437,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Custom Chart Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'custom_chart'"
-        class="tw:flex"
+        class="flex"
         :style="{ height: contentHeight, flex: 1, overflow: 'hidden' }"
       >
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="tw:cursor-pointer tw:overflow-y-auto tw:flex tw:flex-col tw:items-center tw:justify-start card-container tw:bg-surface-panel!"
+          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start card-container bg-surface-panel!"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
           style="width: 50px; height: 100%; flex-shrink: 0"
@@ -448,10 +451,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="expand-all"
             size="sm"
-            class="tw:mt-2.5 tw:text-xl rotate-90"
+            class="mt-2.5 text-xl rotate-90"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-base">
+          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-base">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -471,9 +474,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Field List for custom chart -->
           <template #before>
-            <div class="tw:w-full tw:h-full">
+            <div class="w-full h-full">
               <div
-                class="tw:flex tw:flex-col scroll card-container"
+                class="flex flex-col scroll card-container"
                 :style="{ height: contentHeight, overflowY: 'auto' }"
               >
                 <div
@@ -481,7 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="column"
                   style="height: 100%"
                 >
-                  <div class="tw:flex tw:flex-col" style="width: 100%">
+                  <div class="flex flex-col" style="width: 100%">
                     <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
                   </div>
                 </div>
@@ -492,11 +495,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Custom chart content area -->
           <template #after>
             <div
-              class="tw:flex card-container"
+              class="flex card-container"
               :style="{ height: contentHeight, overflow: 'hidden' }"
             >
               <div
-                class="tw:flex tw:flex-col scroll tw:flex-1 tw:min-w-0 tw:h-full"
+                class="flex flex-col scroll flex-1 min-w-0 h-full"
               >
                 <!-- Editor/Preview splitter -->
                 <div style="height: 500px; flex-shrink: 0; overflow: hidden">
@@ -553,13 +556,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Splitter separator -->
                     <template #separator>
-                      <div class="tw:w-1 tw:h-full tw:bg-transparent tw:transition-colors tw:duration-300 tw:hover:bg-orange-500"></div>
+                      <div class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-orange-500"></div>
                     </template>
 
                     <!-- Chart Preview -->
                     <template #after>
-                      <div class="tw:flex tw:flex-col tw:h-full">
-                        <div class="tw:flex tw:justify-end tw:mr-2 tw:mt-1 tw:items-center tw:gap-2">
+                      <div class="flex flex-col h-full">
+                        <div class="flex justify-end mr-2 mt-1 items-center gap-2">
                           <PanelErrorButtons
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"
@@ -627,7 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Query Editor for custom chart -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
-                  class="tw:flex tw:flex-col"
+                  class="flex flex-col"
                   :style="{
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
@@ -914,9 +917,9 @@ const contentHeight = computed(() => {
 // Chart area class based on page type
 const chartAreaClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "tw:h-[calc(100%-36px)] tw:min-h-[140px]";
+    return "h-[calc(100%-36px)] min-h-[140px]";
   }
-  return "tw:min-h-[140px] tw:mt-[40px]";
+  return "min-h-[140px] mt-[40px]";
 });
 
 // Chart area style based on page type (uses CSS var for dynamic navbar height)
@@ -933,9 +936,9 @@ const chartAreaStyle = computed(() => {
 // Main content area class - logs needs flat background without card styling
 const mainContentAreaClass = computed(() => {
   if (props.pageType === "logs") {
-    return "tw:flex card-container";
+    return "flex card-container";
   }
-  return "tw:flex card-container tw:h-full tw:overflow-y-hidden";
+  return "flex card-container h-full overflow-y-hidden";
 });
 
 // Row style - logs/build needs height: 100%, others need overflow-y: auto
@@ -949,9 +952,9 @@ const rowStyle = computed(() => {
 // Main content container class - logs/build uses vertical flex, others use horizontal
 const mainContentContainerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "tw:flex tw:flex-row tw:flex-1";
+    return "flex flex-row flex-1";
   }
-  return "tw:flex tw:flex-row tw:flex-1";
+  return "flex flex-row flex-1";
 });
 
 // Main content container style
@@ -1000,12 +1003,12 @@ const afterSlotStyle = computed(() => {
   return {};
 });
 
-// After slot inner div class - logs/build uses "tw:flex tw:flex-col", others use "tw:flex tw:flex-col scroll"
+// After slot inner div class - logs/build uses "flex flex-col", others use "flex flex-col scroll"
 const afterSlotInnerClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "tw:flex tw:flex-col tw:flex-1 tw:min-w-0";
+    return "flex flex-col flex-1 min-w-0";
   }
-  return "scroll tw:flex-1 tw:min-w-0";
+  return "scroll flex-1 min-w-0";
 });
 
 // After slot inner div style
@@ -1021,9 +1024,9 @@ const layoutPanelContainerStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%" };
   }
-  // height: auto overrides the tw:h-full class so the container sizes to its
+  // height: auto overrides the h-full class so the container sizes to its
   // content instead of filling afterSlotInner. This also makes the chart area
-  // wrapper's tw:h-full resolve to auto, matching the inner chart div's
+  // wrapper's h-full resolve to auto, matching the inner chart div's
   // explicit height and eliminating the empty space below the legends.
   return { height: "auto" };
 });
@@ -1031,9 +1034,9 @@ const layoutPanelContainerStyle = computed(() => {
 // Field list wrapper class - logs/build doesn't need padding-bottom
 const fieldListWrapperClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "tw:w-full tw:h-full";
+    return "w-full h-full";
   }
-  return "tw:w-full tw:h-full";
+  return "w-full h-full";
 });
 
 // Field list container style

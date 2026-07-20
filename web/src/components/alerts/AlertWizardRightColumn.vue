@@ -16,40 +16,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Right Column: Preview & Summary (calc to account for gap) -->
-  <div class="tw:flex-[0_0_calc(32%-0.625rem)] tw:flex tw:flex-col tw:gap-2 tw:overflow-y-auto tw:overflow-x-clip" style="height: calc(100vh - 302px); position: sticky; top: 0;">
+  <div class="flex-[0_0_calc(32%-0.625rem)] flex flex-col gap-2 overflow-y-auto overflow-x-clip" style="height: calc(100vh - 302px); position: sticky; top: 0;">
     <!-- Preview Section -->
     <div
-      class="collapsible-section card-container preview-section tw:flex tw:flex-col tw:transition-all tw:duration-300 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:border tw:border-(--o2-border-color)"
+      class="collapsible-section card-container preview-section flex flex-col transition-all duration-300 bg-(--o2-card-bg) rounded-md shadow-[0_0_5px_1px_var(--o2-hover-shadow)] border border-(--o2-border-color)"
       :style="previewSectionStyle"
     >
       <div
-        class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))] tw:transition-all tw:duration-200 tw:rounded-t-md tw:select-none tw:hover:bg-black/4 tw:active:bg-black/[0.06]"
+        class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[var(--o2-border-color,rgba(0,0,0,0.08))] transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
         @click="togglePreview"
       >
-        <div class="tw:flex tw:items-center tw:gap-2">
-          <span class="tw:text-sm tw:font-semibold">{{ t('alerts.preview') }}</span>
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold">{{ t('alerts.preview') }}</span>
           <!-- Status Indicator -->
           <div
             v-if="evaluationStatus && !isRealTime"
-            class="alert-status-indicator tw:group tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded tw:border-l-[0.1875rem] tw:border-l-solid tw:bg-[rgba(76,175,80,0.08)] tw:border-l-[#4caf50]"
+            class="alert-status-indicator group flex items-center gap-1.5 px-2 py-1 rounded border-l-[0.1875rem] border-l-solid bg-[rgba(76,175,80,0.08)] border-l-[#4caf50]"
             :class="{
               'status-indicator-light': store.state.theme !== 'dark',
-              'tw:bg-[rgba(158,158,158,0.08)] tw:border-l-[#9e9e9e]': !evaluationStatus.wouldTrigger,
-              'tw:bg-[rgba(76,175,80,0.04)]': store.state.theme !== 'dark' && evaluationStatus.wouldTrigger,
-              'tw:bg-[rgba(158,158,158,0.04)]': store.state.theme !== 'dark' && !evaluationStatus.wouldTrigger,
+              'bg-[rgba(158,158,158,0.08)] border-l-[#9e9e9e]': !evaluationStatus.wouldTrigger,
+              'bg-[rgba(76,175,80,0.04)]': store.state.theme !== 'dark' && evaluationStatus.wouldTrigger,
+              'bg-[rgba(158,158,158,0.04)]': store.state.theme !== 'dark' && !evaluationStatus.wouldTrigger,
             }"
             data-test="alert-status-indicator"
           >
             <OIcon
               :name="evaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" size="sm"
-              class="tw:text-xs tw:flex-shrink-0"
-              :class="evaluationStatus.wouldTrigger ? 'tw:text-green-500' : 'tw:text-gray-400'"
+              class="text-xs flex-shrink-0"
+              :class="evaluationStatus.wouldTrigger ? 'text-green-500' : 'text-gray-400'"
             />
-            <span class="tw:text-xs tw:font-semibold tw:tracking-wide tw:uppercase tw:flex-shrink-0 tw:whitespace-nowrap">
+            <span class="text-xs font-semibold tracking-wide uppercase flex-shrink-0 whitespace-nowrap">
               {{ evaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
             </span>
-            <span class="tw:text-xs tw:flex-shrink-0 tw:text-[rgba(255,255,255,0.3)] tw:group-[.status-indicator-light]:text-[rgba(0,0,0,0.3)]">•</span>
-            <span class="tw:text-xs tw:text-[rgba(255,255,255,0.65)] tw:group-[.status-indicator-light]:text-[rgba(0,0,0,0.6)]">
+            <span class="text-xs flex-shrink-0 text-[rgba(255,255,255,0.3)] group-[.status-indicator-light]:text-[rgba(0,0,0,0.3)]">•</span>
+            <span class="text-xs text-[rgba(255,255,255,0.65)] group-[.status-indicator-light]:text-[rgba(0,0,0,0.6)]">
               {{ evaluationStatus.reason }}
             </span>
           </div>
@@ -58,12 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click.stop="togglePreview"
-          class="expand-toggle-btn tw:opacity-50 tw:transition-all tw:duration-200 tw:hover:opacity-100"
+          class="expand-toggle-btn opacity-50 transition-all duration-200 hover:opacity-100"
         >
           <OIcon :name="expandState.preview ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
       </div>
-      <div v-show="expandState.preview" class="section-content tw:flex-1 tw:flex tw:flex-col">
+      <div v-show="expandState.preview" class="section-content flex-1 flex flex-col">
         <keep-alive>
           <preview-alert
             style="height: 100%;"
@@ -81,24 +81,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Summary Section -->
     <div
-      class="collapsible-section card-container tw:flex tw:flex-col tw:transition-all tw:duration-300 tw:bg-(--o2-card-bg) tw:rounded-md tw:shadow-[0_0_5px_1px_var(--o2-hover-shadow)] tw:border tw:border-(--o2-border-color)"
+      class="collapsible-section card-container flex flex-col transition-all duration-300 bg-(--o2-card-bg) rounded-md shadow-[0_0_5px_1px_var(--o2-hover-shadow)] border border-(--o2-border-color)"
       :style="summarySectionStyle"
     >
       <div
-        class="tw:flex tw:items-center tw:justify-between tw:px-4 tw:py-3 tw:cursor-pointer tw:shrink-0 tw:border-b tw:border-[var(--o2-border-color,rgba(0,0,0,0.08))] tw:transition-all tw:duration-200 tw:rounded-t-md tw:select-none tw:hover:bg-black/4 tw:active:bg-black/[0.06]"
+        class="flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[var(--o2-border-color,rgba(0,0,0,0.08))] transition-all duration-200 rounded-t-md select-none hover:bg-black/4 active:bg-black/[0.06]"
         @click="toggleSummary"
       >
-        <span class="tw:text-sm tw:font-semibold">{{ t('alerts.summary.title') }}</span>
+        <span class="text-sm font-semibold">{{ t('alerts.summary.title') }}</span>
         <OButton
           variant="ghost"
           size="icon-circle-sm"
           @click.stop="toggleSummary"
-          class="expand-toggle-btn tw:opacity-50 tw:transition-all tw:duration-200 tw:hover:opacity-100"
+          class="expand-toggle-btn opacity-50 transition-all duration-200 hover:opacity-100"
         >
           <OIcon :name="expandState.summary ? 'expand-less' : 'expand-more'" size="sm" />
         </OButton>
       </div>
-      <div v-show="expandState.summary" class="summary-section-content tw:flex-1 tw:overflow-hidden tw:flex tw:flex-col">
+      <div v-show="expandState.summary" class="summary-section-content flex-1 overflow-hidden flex flex-col">
         <alert-summary
           style="height: 100%; overflow: auto;"
           :formData="formData"

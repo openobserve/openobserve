@@ -67,11 +67,31 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((d: any) => d),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({
-    t: (key: string) => key,
-  })),
-}));
+vi.mock("vue-i18n", async () => {
+  // Resolve keys against the real English locale so migrated t("...") calls
+  // render the actual translated text (badges, caller column, "No operations
+  // found", etc.), instead of the raw key paths the old identity mock returned.
+  const enLocaleFull = (await import("@/locales/languages/en-US.json")).default;
+  // A few tests assert on the raw i18n key (locale-independent), matching the
+  // original identity-mock behavior. Keep those keys mapping to themselves so
+  // those assertions still hold.
+  const identityKeys = new Set<string>(["traces.noLogsAvailableForService"]);
+  const resolve = (key: string): string => {
+    if (identityKeys.has(key)) return key;
+    const val = key
+      .split(".")
+      .reduce<any>(
+        (acc, part) => (acc == null ? undefined : acc[part]),
+        enLocaleFull,
+      );
+    return typeof val === "string" ? val : key;
+  };
+  return {
+    useI18n: vi.fn(() => ({
+      t: (key: string) => resolve(key),
+    })),
+  };
+});
 
 vi.mock("vue-router", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -89,13 +109,6 @@ vi.mock("vue-router", async (importOriginal) => {
     }),
   };
 });
-
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    notify: notifyMock,
-    dialog: vi.fn(),
-  }),
-}));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: toastMock,
@@ -606,6 +619,59 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No operations found");
     });
+
+    // A tool node's caller is its OWNING AGENT, which sits on an ancestor span —
+    // the operations query must climb the parent chain (COALESCE + chained LEFT
+    // JOINs) exactly like the graph edge, so the panel and the graph agree. The
+    // bug: it used raw service_name, showing the host app as the caller while the
+    // graph correctly showed the agent.
+    it("climbs the parent chain for a TOOL node's caller (matches the graph)", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [] },
+      } as any);
+      wrapper = mountPanel({
+        streamFilter: "sre_agent_v2",
+        selectedNode: { ...baseNode, name: "load_skill", service_type: "tool" },
+      });
+      await flushPromises();
+      const sql =
+        vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      // Nearest-ancestor-agent caller, not raw service_name.
+      expect(sql).toContain(
+        "COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name",
+      );
+      expect(sql).toContain("c.service_name)");
+      // Chained ancestor joins, one per level, keyed on parent span + trace.
+      expect(sql).toContain(
+        'LEFT JOIN "sre_agent_v2" AS p1 ON c.reference_parent_span_id = p1.span_id',
+      );
+      expect(sql).toContain(
+        "p1.reference_parent_span_id = p2.span_id",
+      );
+      expect((sql.match(/LEFT JOIN/g) || []).length).toBe(4);
+      // Filters the tool's own spans (child-qualified identity field).
+      expect(sql).toContain("c.gen_ai_tool_name = 'load_skill'");
+      // NOT the old raw-service_name caller.
+      expect(sql).not.toContain("service_name as caller_service");
+    });
+
+    it("keeps raw service_name as caller for an INFERRED dependency node", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [] },
+      } as any);
+      wrapper = mountPanel({
+        streamFilter: "default",
+        selectedNode: { ...baseNode, name: "postgres", service_type: "database" },
+      });
+      await flushPromises();
+      const sql =
+        vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      // Inferred deps genuinely have the caller on service_name — no agent climb.
+      expect(sql).toContain("service_name as caller_service");
+      expect(sql).not.toContain("LEFT JOIN");
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1035,6 +1101,79 @@ describe("ServiceGraphNodeSidePanel", () => {
         });
         expect(wrapper.vm.isInferred).toBe(true);
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // serviceNameField — column the panel filters on, per node family
+  // ---------------------------------------------------------------------------
+
+  describe("serviceNameField", () => {
+    it("uses service_name for an instrumented service (no service_type)", () => {
+      wrapper = mountPanel({ selectedNode: baseNode });
+      expect(wrapper.vm.serviceNameField).toBe("service_name");
+    });
+
+    it("uses infer_service_name for inferred dependency kinds", () => {
+      for (const st of ["database", "queue", "rpc", "external"]) {
+        wrapper = mountPanel({
+          selectedNode: { ...baseNode, service_type: st },
+        });
+        expect(wrapper.vm.serviceNameField).toBe("infer_service_name");
+      }
+    });
+
+    it("uses the gen_ai_* column for agent and tool kinds (not infer_service_name)", () => {
+      for (const [st, col] of Object.entries({
+        agent: "gen_ai_agent_name",
+        tool: "gen_ai_tool_name",
+      })) {
+        wrapper = mountPanel({
+          selectedNode: { ...baseNode, service_type: st },
+        });
+        // regression: previously returned "infer_service_name" → "field not found"
+        expect(wrapper.vm.serviceNameField).toBe(col);
+      }
+    });
+
+    it("model defaults to gen_ai_request_model before schema resolves", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "model" },
+      });
+      // streamFieldSet is empty until the schema fetch settles
+      expect(wrapper.vm.serviceNameField).toBe("gen_ai_request_model");
+    });
+
+    it("model COALESCEs request/response when the schema has both", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [
+          { name: "gen_ai_request_model", type: "keyword" },
+          { name: "gen_ai_response_model", type: "keyword" },
+        ],
+      });
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "model" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+      expect(wrapper.vm.serviceNameField).toBe(
+        "COALESCE(gen_ai_request_model, gen_ai_response_model)",
+      );
+    });
+
+    it("model falls back to response_model when the schema has only that (Langfuse/OpenInference)", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [{ name: "gen_ai_response_model", type: "keyword" }],
+      });
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "model" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+      // regression: response-only vendors would otherwise hit "field not found"
+      expect(wrapper.vm.serviceNameField).toBe("gen_ai_response_model");
     });
   });
 

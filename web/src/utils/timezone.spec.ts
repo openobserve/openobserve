@@ -144,7 +144,6 @@ describe("getLocalTime", () => {
   });
 
   it("logs and returns undefined when an exception is thrown by Date()", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     // Pass a non-null value that causes Date constructor to throw when called as new Date(invalid.toString())
     // We can patch Date globally to throw for this test
     const OriginalDate = global.Date;
@@ -162,9 +161,7 @@ describe("getLocalTime", () => {
     const result = getLocalTime("2023-11-14T10:30:00.000Z");
 
     global.Date = OriginalDate;
-    expect(logSpy).toHaveBeenCalled();
     expect(result).toBeUndefined();
-    logSpy.mockRestore();
   });
 });
 

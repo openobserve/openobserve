@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -93,6 +93,9 @@ function makePipelineObj(overrides: any = {}) {
   };
 }
 
+// ScheduledPipeline is stubbed for these owner-level tests — Query OWNS the real
+// <OForm>, so the schema still runs on the form's values. The stub no longer
+// needs a validateInputs() method (the gate moved into the schema).
 function createWrapper(props: any = {}, pipelineObjOverrides: any = {}) {
   mockPipelineObj = makePipelineObj(pipelineObjOverrides);
 
@@ -118,7 +121,6 @@ function createWrapper(props: any = {}, pipelineObjOverrides: any = {}) {
             "validate-sql", "submit:form", "cancel:form", "delete:node",
             "update:fullscreen", "update:stream_type", "expandLog", "update:delay",
           ],
-          methods: { validateInputs: vi.fn().mockReturnValue(true) },
         },
         ConfirmDialog: true,
       },
@@ -131,6 +133,13 @@ function createWrapper(props: any = {}, pipelineObjOverrides: any = {}) {
       ...props,
     },
   });
+}
+
+// Drive submit through the OWNED form (the schema gates the save). Mirrors the
+// Condition.spec real-OForm pattern.
+async function submit(wrapper: any) {
+  await wrapper.vm.form.handleSubmit();
+  await flushPromises();
 }
 
 // ---------------------------------------------------------------------------
@@ -278,6 +287,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.updateStreamType("metrics");
+      await nextTick();
       expect(wrapper.vm.streamRoute.stream_type).toBe("metrics");
     });
 
@@ -285,6 +295,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.updateStreamType("traces");
+      await nextTick();
       expect(wrapper.vm.streamRoute.stream_type).toBe("traces");
     });
 
@@ -292,6 +303,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.updateStreamType("");
+      await nextTick();
       expect(wrapper.vm.streamRoute.stream_type).toBe("");
     });
   });
@@ -301,8 +313,9 @@ describe("Query Component", () => {
     it("updateQueryType sets type to promql and clears sql", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.streamRoute.query_condition.sql = "SELECT 1";
+      wrapper.vm.form.setFieldValue("query_condition.sql", "SELECT 1");
       wrapper.vm.updateQueryType("promql");
+      await nextTick();
       expect(wrapper.vm.streamRoute.query_condition.type).toBe("promql");
       expect(wrapper.vm.streamRoute.query_condition.sql).toBe("");
     });
@@ -310,14 +323,17 @@ describe("Query Component", () => {
     it("updateQueryType sets type to sql without clearing sql", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.streamRoute.query_condition.sql = "SELECT 1";
+      wrapper.vm.form.setFieldValue("query_condition.sql", "SELECT 1");
       wrapper.vm.updateQueryType("sql");
+      await nextTick();
       expect(wrapper.vm.streamRoute.query_condition.type).toBe("sql");
       expect(wrapper.vm.streamRoute.query_condition.sql).toBe("SELECT 1");
     });
   });
 
   // -------------------------------------------------------------------------
+  // isValidStreamName remains an exposed computed (never an actual submit gate,
+  // and not a schema field — the live drawer doesn't edit streamRoute.name).
   describe("Stream Name Validation (isValidStreamName)", () => {
     const cases = [
       { name: "valid123",        expected: true  },
@@ -337,7 +353,8 @@ describe("Query Component", () => {
       it(`isValidStreamName for "${name}" is ${expected}`, async () => {
         const wrapper = createWrapper();
         await flushPromises();
-        wrapper.vm.streamRoute.name = name;
+        wrapper.vm.form.setFieldValue("name", name);
+        await nextTick();
         expect(wrapper.vm.isValidStreamName).toBe(expected);
       });
     });
@@ -349,6 +366,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.updateDelay("30");
+      await nextTick();
       expect(wrapper.vm.streamRoute.delay).toBe(30);
     });
 
@@ -356,6 +374,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.updateDelay("15.9");
+      await nextTick();
       expect(wrapper.vm.streamRoute.delay).toBe(15);
     });
 
@@ -363,6 +382,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.updateDelay("0");
+      await nextTick();
       expect(wrapper.vm.streamRoute.delay).toBe(0);
     });
 
@@ -370,6 +390,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.updateDelay("-5");
+      await nextTick();
       expect(wrapper.vm.streamRoute.delay).toBe(-5);
     });
 
@@ -377,6 +398,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.updateDelay("abc");
+      await nextTick();
       expect(wrapper.vm.streamRoute.delay).toBeNaN();
     });
   });
@@ -393,7 +415,7 @@ describe("Query Component", () => {
     it("updateFullscreenMode sets isFullscreenMode to false", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.isFullscreenMode = true;
+      wrapper.vm.updateFullscreenMode(true);
       wrapper.vm.updateFullscreenMode(false);
       expect(wrapper.vm.isFullscreenMode).toBe(false);
     });
@@ -425,17 +447,20 @@ describe("Query Component", () => {
       await flushPromises();
       const initial = wrapper.vm.streamRoute.context_attributes.length;
       wrapper.vm.addVariable();
+      await nextTick();
       expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(initial + 1);
     });
 
     it("removeVariable removes entry by id", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.streamRoute.context_attributes = [
+      wrapper.vm.form.setFieldValue("context_attributes", [
         { key: "k1", value: "v1", id: "id1" },
         { key: "k2", value: "v2", id: "id2" },
-      ];
+      ]);
+      await nextTick();
       wrapper.vm.removeVariable({ id: "id1" });
+      await nextTick();
       expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(1);
       expect(wrapper.vm.streamRoute.context_attributes[0].id).toBe("id2");
     });
@@ -443,8 +468,12 @@ describe("Query Component", () => {
     it("removeVariable with unknown id leaves array unchanged", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.streamRoute.context_attributes = [{ key: "k", value: "v", id: "id1" }];
+      wrapper.vm.form.setFieldValue("context_attributes", [
+        { key: "k", value: "v", id: "id1" },
+      ]);
+      await nextTick();
       wrapper.vm.removeVariable({ id: "does-not-exist" });
+      await nextTick();
       expect(wrapper.vm.streamRoute.context_attributes).toHaveLength(1);
     });
   });
@@ -468,7 +497,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.streamRoute.query_condition.type = "sql";
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
       wrapper.vm.validateSqlQuery(); // don't await
       expect(wrapper.vm.validatingSqlQuery).toBe(true);
     });
@@ -477,7 +506,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.streamRoute.query_condition.type = "sql";
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(wrapper.vm.isValidSqlQuery).toBe(true);
@@ -493,7 +522,7 @@ describe("Query Component", () => {
       (searchService.search as any).mockRejectedValueOnce({
         response: { data: { message: errMsg } },
       });
-      wrapper.vm.streamRoute.query_condition.type = "sql";
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
@@ -513,7 +542,7 @@ describe("Query Component", () => {
       (searchService.search as any).mockRejectedValueOnce({
         response: { data: {} },
       });
-      wrapper.vm.streamRoute.query_condition.type = "sql";
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
@@ -525,7 +554,7 @@ describe("Query Component", () => {
     it("skips search call entirely for promql query type", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.streamRoute.query_condition.type = "promql";
+      wrapper.vm.form.setFieldValue("query_condition.type", "promql");
       await wrapper.vm.validateSqlQuery();
       expect(searchService.search).not.toHaveBeenCalled();
       expect(wrapper.vm.isValidSqlQuery).toBe(true);
@@ -536,8 +565,8 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.streamRoute.query_condition.type = "sql";
-      wrapper.vm.streamRoute.stream_type = "metrics";
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
+      wrapper.vm.form.setFieldValue("stream_type", "metrics");
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(searchService.search).toHaveBeenCalledWith(
@@ -549,8 +578,8 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.streamRoute.query_condition.type = "sql";
-      wrapper.vm.streamRoute.stream_type = "traces";
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
+      wrapper.vm.form.setFieldValue("stream_type", "traces");
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(searchService.search).not.toHaveBeenCalledWith(
@@ -562,7 +591,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.streamRoute.query_condition.type = "sql";
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
       await wrapper.vm.validateSqlQuery();
       await flushPromises();
       expect(searchService.search).toHaveBeenCalledWith(
@@ -622,7 +651,8 @@ describe("Query Component", () => {
     it("openCancelDialog shows dialog when streamRoute was changed", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.streamRoute.name = "changed-name";
+      wrapper.vm.form.setFieldValue("name", "changed-name");
+      await nextTick();
       wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
@@ -643,7 +673,8 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const originalName = wrapper.vm.streamRoute.name;
-      wrapper.vm.streamRoute.name = "changed";
+      wrapper.vm.form.setFieldValue("name", "changed");
+      await nextTick();
       wrapper.vm.openCancelDialog();
       wrapper.vm.dialog.okCallback();
       await nextTick();
@@ -691,23 +722,50 @@ describe("Query Component", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("saveQueryData", () => {
-    it("returns false when scheduledPipelineRef.validateInputs() fails", async () => {
+  // Submission is now schema-gated through the OWNED form (validateInputs() gone).
+  describe("saveQueryData (schema-gated submit)", () => {
+    it("blocks submit and does NOT call addNode when period < 1 (schema invalid)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.scheduledPipelineRef = { validateInputs: vi.fn().mockReturnValue(false) };
-      const result = await wrapper.vm.saveQueryData();
-      expect(result).toBe(false);
+      wrapper.vm.form.setFieldValue("trigger_condition.period", 0);
+      await nextTick();
+      await submit(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
-    it("calls addNode and emits cancel:hideform on successful save (sql)", async () => {
+    it("blocks submit when an empty cron is set with frequency_type=cron", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("trigger_condition.frequency_type", "cron");
+      wrapper.vm.form.setFieldValue("trigger_condition.cron", "");
+      await nextTick();
+      await submit(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockAddNode).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit when an aggregation group_by row is empty", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("query_condition.aggregation", {
+        group_by: ["col_a", ""],
+        function: "count",
+        having: { column: "", operator: "=", value: "" },
+      });
+      await nextTick();
+      await submit(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockAddNode).not.toHaveBeenCalled();
+    });
+
+    it("calls addNode and emits cancel:hideform on a valid submit (sql)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.scheduledPipelineRef = { validateInputs: vi.fn().mockReturnValue(true) };
-      wrapper.vm.streamRoute.query_condition.type = "sql";
-      await wrapper.vm.saveQueryData();
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
+      await submit(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(true);
       expect(mockAddNode).toHaveBeenCalled();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
@@ -716,8 +774,7 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.scheduledPipelineRef = { validateInputs: vi.fn().mockReturnValue(true) };
-      await wrapper.vm.saveQueryData();
+      await submit(wrapper);
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ node_type: "query" })
       );
@@ -727,18 +784,29 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.scheduledPipelineRef = { validateInputs: vi.fn().mockReturnValue(true) };
-      wrapper.vm.streamRoute.trigger_condition.period = "30" as any;
-      await wrapper.vm.saveQueryData();
-      expect(wrapper.vm.streamRoute.trigger_condition.period).toBe(30);
+      wrapper.vm.form.setFieldValue("trigger_condition.period", "30");
+      await submit(wrapper);
+      const payload = mockAddNode.mock.calls[0][0];
+      expect(payload.trigger_condition.period).toBe(30);
+    });
+
+    it("converts delay string to integer in payload", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      (searchService.search as any).mockResolvedValueOnce({ hits: [] });
+      // OFormInput (type="number") writes a string; the payload must send i32.
+      wrapper.vm.form.setFieldValue("delay", "-1");
+      await submit(wrapper);
+      const payload = mockAddNode.mock.calls[0][0];
+      expect(payload.delay).toBe(-1);
+      expect(typeof payload.delay).toBe("number");
     });
 
     it("sets promql_condition for promql query type", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.scheduledPipelineRef = { validateInputs: vi.fn().mockReturnValue(true) };
-      wrapper.vm.streamRoute.query_condition.type = "promql";
-      await wrapper.vm.saveQueryData();
+      wrapper.vm.form.setFieldValue("query_condition.type", "promql");
+      await submit(wrapper);
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
           query_condition: expect.objectContaining({
@@ -753,11 +821,14 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.scheduledPipelineRef = { validateInputs: vi.fn().mockReturnValue(true) };
-      wrapper.vm.streamRoute.trigger_condition.frequency_type = "cron";
-      wrapper.vm.streamRoute.trigger_condition.timezone = "America/New_York";
-      wrapper.vm.streamRoute.query_condition.type = "sql";
-      await wrapper.vm.saveQueryData();
+      // a 30-minute cron interval comfortably exceeds the 900s min, so the
+      // frequency/cron superRefine passes.
+      wrapper.vm.form.setFieldValue("trigger_condition.frequency_type", "cron");
+      wrapper.vm.form.setFieldValue("trigger_condition.cron", "0 */30 * * * *");
+      wrapper.vm.form.setFieldValue("trigger_condition.timezone", "America/New_York");
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
+      await submit(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(true);
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ tz_offset: -300 })
       );
@@ -767,23 +838,20 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.scheduledPipelineRef = { validateInputs: vi.fn().mockReturnValue(true) };
-      wrapper.vm.streamRoute.trigger_condition.frequency_type = "minutes";
-      await wrapper.vm.saveQueryData();
+      wrapper.vm.form.setFieldValue("trigger_condition.frequency_type", "minutes");
+      await submit(wrapper);
       const payload = mockAddNode.mock.calls[0][0];
       expect(payload.tz_offset).toBeUndefined();
     });
 
-    it("returns false when SQL validation fails", async () => {
+    it("does NOT call addNode when SQL validation fails (pre-submit guard)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockRejectedValueOnce({
         response: { data: { message: "bad sql" } },
       });
-      wrapper.vm.scheduledPipelineRef = { validateInputs: vi.fn().mockReturnValue(true) };
-      wrapper.vm.streamRoute.query_condition.type = "sql";
-      const result = await wrapper.vm.saveQueryData();
-      expect(result).toBe(false);
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
+      await submit(wrapper);
       expect(mockAddNode).not.toHaveBeenCalled();
     });
   });
@@ -844,14 +912,8 @@ describe("Query Component", () => {
     });
 
     it("uses zoConfig.min_auto_refresh_interval for frequency if set", async () => {
-      // Mount against a store that has min_auto_refresh_interval = 1800 (30 min)
-      // The default store has no min_auto_refresh_interval so we manipulate the vm store
       const wrapper = createWrapper();
       await flushPromises();
-      // patch the store state seen by the component
-      (wrapper.vm as any).$store?.state?.zoConfig
-        ? ((wrapper.vm as any).$store.state.zoConfig.min_auto_refresh_interval = 1800)
-        : undefined;
       const result = wrapper.vm.getDefaultStreamRoute();
       // frequency defaults to 15 if zoConfig is absent; with 1800 it becomes 30
       expect([15, 30]).toContain(result.trigger_condition.frequency);
@@ -887,11 +949,13 @@ describe("Query Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       (searchService.search as any).mockResolvedValueOnce({ hits: [] });
-      wrapper.vm.scheduledPipelineRef = { validateInputs: vi.fn().mockReturnValue(true) };
-      wrapper.vm.streamRoute.name = "integration-test";
-      wrapper.vm.streamRoute.query_condition.sql = "SELECT * FROM logs WHERE level='error'";
-      wrapper.vm.streamRoute.query_condition.type = "sql";
-      await wrapper.vm.saveQueryData();
+      wrapper.vm.form.setFieldValue("name", "integration-test");
+      wrapper.vm.form.setFieldValue(
+        "query_condition.sql",
+        "SELECT * FROM logs WHERE level='error'",
+      );
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
+      await submit(wrapper);
       expect(mockAddNode).toHaveBeenCalled();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
@@ -909,7 +973,8 @@ describe("Query Component", () => {
     it("completes cancel workflow via dialog with changes", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.streamRoute.name = "dirty-state";
+      wrapper.vm.form.setFieldValue("name", "dirty-state");
+      await nextTick();
       wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       wrapper.vm.dialog.okCallback();

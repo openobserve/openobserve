@@ -9,40 +9,40 @@ describe("OSkeleton", () => {
   });
 
   describe("type prop", () => {
-    it("applies tw:rounded-md and tw:w-full for type=rect (default)", () => {
+    it("applies rounded-md and w-full for type=rect (default)", () => {
       const wrapper = mount(OSkeleton);
-      expect(wrapper.find("span").classes()).toContain("tw:rounded-md");
-      expect(wrapper.find("span").classes()).toContain("tw:w-full");
+      expect(wrapper.find("span").classes()).toContain("rounded-md");
+      expect(wrapper.find("span").classes()).toContain("w-full");
     });
 
-    it("applies tw:rounded-full and tw:aspect-square for type=circle", () => {
+    it("applies rounded-full and aspect-square for type=circle", () => {
       const wrapper = mount(OSkeleton, { props: { type: "circle" } });
-      expect(wrapper.find("span").classes()).toContain("tw:rounded-full");
-      expect(wrapper.find("span").classes()).toContain("tw:aspect-square");
+      expect(wrapper.find("span").classes()).toContain("rounded-full");
+      expect(wrapper.find("span").classes()).toContain("aspect-square");
     });
 
-    it("applies tw:rounded and tw:h-4 for type=text", () => {
+    it("applies rounded and h-4 for type=text", () => {
       const wrapper = mount(OSkeleton, { props: { type: "text" } });
-      expect(wrapper.find("span").classes()).toContain("tw:rounded");
-      expect(wrapper.find("span").classes()).toContain("tw:h-4");
+      expect(wrapper.find("span").classes()).toContain("rounded");
+      expect(wrapper.find("span").classes()).toContain("h-4");
     });
   });
 
   describe("animation prop", () => {
-    it("applies tw:animate-pulse for animation=pulse", () => {
+    it("applies animate-pulse for animation=pulse", () => {
       const wrapper = mount(OSkeleton, { props: { animation: "pulse" } });
-      expect(wrapper.find("span").classes()).toContain("tw:animate-pulse");
+      expect(wrapper.find("span").classes()).toContain("animate-pulse");
     });
 
-    it("applies tw:skeleton-wave for animation=wave (default)", () => {
+    it("applies skeleton-wave for animation=wave (default)", () => {
       const wrapper = mount(OSkeleton);
-      expect(wrapper.find("span").classes()).toContain("tw:skeleton-wave");
+      expect(wrapper.find("span").classes()).toContain("skeleton-wave");
     });
 
     it("applies no animation class for animation=none", () => {
       const wrapper = mount(OSkeleton, { props: { animation: "none" } });
-      expect(wrapper.find("span").classes()).not.toContain("tw:animate-pulse");
-      expect(wrapper.find("span").classes()).not.toContain("tw:skeleton-wave");
+      expect(wrapper.find("span").classes()).not.toContain("animate-pulse");
+      expect(wrapper.find("span").classes()).not.toContain("skeleton-wave");
     });
   });
 

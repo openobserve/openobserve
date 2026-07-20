@@ -151,118 +151,118 @@ describe("tokenizeTemplate", () => {
 describe("wildcardChipColor", () => {
   it('returns pattern chip color for generic wildcard <*>', () => {
     const cls = wildcardChipColor("<*>");
-    expect(cls).toContain("tw:bg-label-chip-pattern-bg");
-    expect(cls).toContain("tw:text-label-chip-pattern-text");
+    expect(cls).toContain("bg-label-chip-pattern-bg");
+    expect(cls).toContain("text-label-chip-pattern-text");
   });
 
   it('returns ip chip color for IP wildcard <:IP>', () => {
     const cls = wildcardChipColor("<:IP>");
-    expect(cls).toContain("tw:bg-label-chip-ip-bg");
+    expect(cls).toContain("bg-label-chip-ip-bg");
   });
 
   it('returns ip chip color for <:IPV4>', () => {
-    expect(wildcardChipColor("<:IPV4>")).toContain("tw:bg-label-chip-ip-bg");
+    expect(wildcardChipColor("<:IPV4>")).toContain("bg-label-chip-ip-bg");
   });
 
   it('returns num chip color for numeric wildcard <:NUM>', () => {
-    expect(wildcardChipColor("<:NUM>")).toContain("tw:bg-label-chip-num-bg");
+    expect(wildcardChipColor("<:NUM>")).toContain("bg-label-chip-num-bg");
   });
 
   it('returns num chip color for <:INT>', () => {
-    expect(wildcardChipColor("<:INT>")).toContain("tw:bg-label-chip-num-bg");
+    expect(wildcardChipColor("<:INT>")).toContain("bg-label-chip-num-bg");
   });
 
   it('returns num chip color for <:FLOAT>', () => {
-    expect(wildcardChipColor("<:FLOAT>")).toContain("tw:bg-label-chip-num-bg");
+    expect(wildcardChipColor("<:FLOAT>")).toContain("bg-label-chip-num-bg");
   });
 
   it('returns num chip color for <:HEX>', () => {
-    expect(wildcardChipColor("<:HEX>")).toContain("tw:bg-label-chip-num-bg");
+    expect(wildcardChipColor("<:HEX>")).toContain("bg-label-chip-num-bg");
   });
 
   it('returns ts chip color for timestamp wildcard <:TIMESTAMP>', () => {
-    expect(wildcardChipColor("<:TIMESTAMP>")).toContain("tw:bg-label-chip-ts-bg");
+    expect(wildcardChipColor("<:TIMESTAMP>")).toContain("bg-label-chip-ts-bg");
   });
 
   it('returns ts chip color for <:DATE>', () => {
-    expect(wildcardChipColor("<:DATE>")).toContain("tw:bg-label-chip-ts-bg");
+    expect(wildcardChipColor("<:DATE>")).toContain("bg-label-chip-ts-bg");
   });
 
   it('returns ts chip color for <:TIME>', () => {
-    expect(wildcardChipColor("<:TIME>")).toContain("tw:bg-label-chip-ts-bg");
+    expect(wildcardChipColor("<:TIME>")).toContain("bg-label-chip-ts-bg");
   });
 
   it("returns default chip color for unknown wildcard type", () => {
-    expect(wildcardChipColor("<:UUID>")).toContain("tw:bg-label-chip-default-bg");
+    expect(wildcardChipColor("<:UUID>")).toContain("bg-label-chip-default-bg");
   });
 
   it("returns default chip color for <:URL>", () => {
-    expect(wildcardChipColor("<:URL>")).toContain("tw:bg-label-chip-default-bg");
+    expect(wildcardChipColor("<:URL>")).toContain("bg-label-chip-default-bg");
   });
 
   it("returns inferred ip chip color for <*> with IP sampleValues", () => {
     const cls = wildcardChipColor("<*>", ["192.168.1.1", "10.0.0.1"]);
-    expect(cls).toContain("tw:bg-label-chip-ip-bg");
+    expect(cls).toContain("bg-label-chip-ip-bg");
   });
 
   it("returns pattern chip color for <*> without sampleValues", () => {
     const cls = wildcardChipColor("<*>");
-    expect(cls).toContain("tw:bg-label-chip-pattern-bg");
+    expect(cls).toContain("bg-label-chip-pattern-bg");
   });
 
   it("returns inferred method chip color for <*> with HTTP method values", () => {
     const cls = wildcardChipColor("<*>", ["GET", "POST", "DELETE"]);
-    expect(cls).toContain("tw:bg-label-chip-method-bg");
+    expect(cls).toContain("bg-label-chip-method-bg");
   });
 });
 
 describe("chipColorForLabel", () => {
   it("returns ip chip color for ip", () => {
-    expect(chipColorForLabel("ip")).toContain("tw:bg-label-chip-ip-bg");
+    expect(chipColorForLabel("ip")).toContain("bg-label-chip-ip-bg");
   });
 
   it("returns method chip color for method", () => {
-    expect(chipColorForLabel("method")).toContain("tw:bg-label-chip-method-bg");
+    expect(chipColorForLabel("method")).toContain("bg-label-chip-method-bg");
   });
 
   it("returns url chip color for url", () => {
-    expect(chipColorForLabel("url")).toContain("tw:bg-label-chip-url-bg");
+    expect(chipColorForLabel("url")).toContain("bg-label-chip-url-bg");
   });
 
   it("returns num chip color for num", () => {
-    expect(chipColorForLabel("num")).toContain("tw:bg-label-chip-num-bg");
+    expect(chipColorForLabel("num")).toContain("bg-label-chip-num-bg");
   });
 
   it("returns float chip color for float", () => {
-    expect(chipColorForLabel("float")).toContain("tw:bg-label-chip-float-bg");
+    expect(chipColorForLabel("float")).toContain("bg-label-chip-float-bg");
   });
 
   it("returns hex chip color for hex", () => {
-    expect(chipColorForLabel("hex")).toContain("tw:bg-label-chip-hex-bg");
+    expect(chipColorForLabel("hex")).toContain("bg-label-chip-hex-bg");
   });
 
   it("returns ts chip color for ts", () => {
-    expect(chipColorForLabel("ts")).toContain("tw:bg-label-chip-ts-bg");
+    expect(chipColorForLabel("ts")).toContain("bg-label-chip-ts-bg");
   });
 
   it("returns id chip color for id", () => {
-    expect(chipColorForLabel("id")).toContain("tw:bg-label-chip-id-bg");
+    expect(chipColorForLabel("id")).toContain("bg-label-chip-id-bg");
   });
 
   it("returns email chip color for email", () => {
-    expect(chipColorForLabel("email")).toContain("tw:bg-label-chip-email-bg");
+    expect(chipColorForLabel("email")).toContain("bg-label-chip-email-bg");
   });
 
   it("returns str chip color for str", () => {
-    expect(chipColorForLabel("str")).toContain("tw:bg-label-chip-str-bg");
+    expect(chipColorForLabel("str")).toContain("bg-label-chip-str-bg");
   });
 
   it("returns pattern chip color for pattern", () => {
-    expect(chipColorForLabel("pattern")).toContain("tw:bg-label-chip-pattern-bg");
+    expect(chipColorForLabel("pattern")).toContain("bg-label-chip-pattern-bg");
   });
 
   it("returns default chip color for unknown label", () => {
-    expect(chipColorForLabel("unknownxyz")).toContain("tw:bg-label-chip-default-bg");
+    expect(chipColorForLabel("unknownxyz")).toContain("bg-label-chip-default-bg");
   });
 });
 

@@ -91,8 +91,8 @@ describe('Ansible.vue Comprehensive Coverage', () => {
     it('should apply correct styling to documentation link', () => {
       wrapper = createWrapper();
       const docLink = wrapper.find('a');
-      expect(docLink.classes()).toContain('tw:text-text-link');
-      expect(docLink.classes()).toContain('tw:underline');
+      expect(docLink.classes()).toContain('text-text-link');
+      expect(docLink.classes()).toContain('underline');
     });
 
     it('should render documentation text correctly', () => {

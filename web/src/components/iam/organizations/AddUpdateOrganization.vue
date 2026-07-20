@@ -21,63 +21,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')"
     :primaryButtonLabel="t('organization.save')"
     :secondaryButtonLabel="t('organization.cancel')"
-    :primaryButtonDisabled="(!organizationData.name || !isValidOrgName) && !proPlanRequired"
-    @click:primary="onSubmit"
+    form-id="add-update-organization-form"
     @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
   >
     <div>
-      <div>
-          <OInput
-            v-if="beingUpdated"
-            v-model="organizationData.id"
-            :readonly="beingUpdated"
-            :disabled="beingUpdated"
-            :label="t('organization.id')"
-            class="showLabelOnTop tw:mt-2"
-          />
+      <OForm
+        id="add-update-organization-form"
+        :schema="addUpdateOrganizationSchema"
+        :default-values="addUpdateOrganizationDefaults"
+        @submit="onSubmit"
+      >
+        <OFormInput
+          v-if="beingUpdated"
+          name="id"
+          readonly
+          disabled
+          :label="t('organization.id')"
+          class="showLabelOnTop mt-2"
+        />
 
-          <OInput
-            v-model.trim="organizationData.name"
-            :label="t('organization.name') + '*'"
-            class="showLabelOnTop tw:mt-2"
-            :error="showNameError"
-            :error-message="nameErrorMessage"
-            :help-text="!showNameError ? t('organization.nameHelpText') : undefined"
-            @update:model-value="showNameError = !!organizationData.name && !isValidOrgName"
-            data-test="org-name"
-            maxlength="100"
-          />
+        <OFormInput
+          name="name"
+          :label="t('organization.name')"
+          required
+          class="showLabelOnTop mt-2"
+          :help-text="t('organization.nameHelpText')"
+          data-test="org-name"
+          maxlength="100"
+        />
 
-          <OCheckbox
-            v-if="!beingUpdated && config.isCloud == 'true' && canMakeBilledMember"
-            v-model="makeBilledMember"
-            :label="t('organization.makeBilledMember', { org: currentOrgName })"
-            class="tw:mt-4"
-            data-test="org-make-billed-member"
-          />
+        <OFormCheckbox
+          v-if="!beingUpdated && config.isCloud == 'true' && canMakeBilledMember"
+          name="makeBilledMember"
+          :label="t('organization.makeBilledMember', { org: currentOrgName })"
+          class="mt-4"
+          data-test="org-make-billed-member"
+        />
 
-          <div class="tw:flex tw:justify-center tw:mt-4" v-if="proPlanRequired">
-            <OButton
-              variant="secondary"
-              size="md"
-              class="tw:mb-4 tw:ml-4"
-              @click="completeSubscriptionProcess"
-            >
-              {{ t('organization.proceed_subscription') }}
-            </OButton>
-          </div>
+        <div class="flex justify-center mt-4" v-if="proPlanRequired">
+          <OButton
+            variant="secondary"
+            size="md"
+            class="mb-4 ml-4"
+            @click="completeSubscriptionProcess"
+          >
+            {{ t('organization.proceed_subscription') }}
+          </OButton>
         </div>
+      </OForm>
     </div>
   </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import organizationService from "@/services/organizations";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -85,6 +88,10 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeAddUpdateOrganizationSchema,
+  type AddUpdateOrganizationForm,
+} from "./AddUpdateOrganization.schema";
 
 const defaultValue = () => {
   return {
@@ -93,11 +100,9 @@ const defaultValue = () => {
   };
 };
 
-let callOrganization: Promise<{ data: any }>;
-
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { OButton, OCheckbox, ODialog, OInput },
+  components: { OButton, OFormCheckbox, ODialog, OForm, OFormInput },
   props: {
     open: {
       type: Boolean,
@@ -110,7 +115,6 @@ export default defineComponent({
   },
   data() {
     return {
-      showNameError: false as boolean,
       proPlanRequired: false,
       proPlanMsg: "",
       newOrgIdentifier: "",
@@ -120,50 +124,31 @@ export default defineComponent({
   setup(props) {
     const store: any = useStore();
     const router: any = useRouter();
-    const beingUpdated: any = ref(false);
-    const addOrganizationForm: any = ref(null);
-    const disableColor: any = ref("");
-    const organizationData: any = ref(defaultValue());
-    const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const { track } = useReo();
 
-    const isValidOrgName = computed(() => {
-      const orgNameRegex = /^[a-zA-Z0-9_ ]+$/;
-      return orgNameRegex.test(organizationData.value.name);
-    });
+    const addUpdateOrganizationSchema = makeAddUpdateOrganizationSchema(t);
 
-    const nameErrorMessage = computed(() =>
-      !organizationData.value.name
-        ? t('organization.nameRequired')
-        : t('organization.nameHelpText')
+    // Update mode is derived from the externally-provided modelValue (it carries
+    // an `id` only for an existing organization).
+    const beingUpdated = computed(() => !!props.modelValue?.id);
+
+    // The OForm owns id/name/makeBilledMember. This typed computed seeds them each
+    // time the dialog body mounts (edit → id + name from modelValue, create →
+    // blank); makeBilledMember always starts unchecked.
+    const addUpdateOrganizationDefaults = computed(
+      (): AddUpdateOrganizationForm => ({
+        id: props.modelValue?.id ?? "",
+        name: props.modelValue?.name ?? "",
+        makeBilledMember: false,
+      }),
     );
 
-    watch(
-      () => props.modelValue,
-      (newVal) => {
-        if (newVal && newVal.id) {
-          beingUpdated.value = true;
-          disableColor.value = "grey-5";
-          organizationData.value = {
-            id: newVal.id,
-            name: newVal.name,
-          };
-        } else {
-          beingUpdated.value = false;
-          disableColor.value = "";
-          organizationData.value = defaultValue();
-        }
-      },
-      { deep: true, immediate: true },
-    );
-
-    const makeBilledMember = ref(false);
     const currentOrgName = computed(
       () =>
         store.state.selectedOrganization?.name ||
         store.state.selectedOrganization?.identifier ||
-        ""
+        "",
     );
 
     // Only orgs listed in billing_group_allowed_orgs (comma-separated, from
@@ -176,121 +161,87 @@ export default defineComponent({
       return allowed.includes(store.state.selectedOrganization?.identifier);
     });
 
+    // Options-API: the schema (and the defaults computed) MUST be returned from
+    // setup() — a bare module import is out of the template's scope, so :schema
+    // would resolve to undefined and validation would silently no-op.
     return {
       t,
       router,
-      disableColor,
-      isPwd: ref(true),
       beingUpdated,
-      organizationData,
-      addOrganizationForm,
+      addUpdateOrganizationSchema,
+      addUpdateOrganizationDefaults,
       store,
-      isValidIdentifier,
       track,
-      isValidOrgName,
-      nameErrorMessage,
       config,
-      makeBilledMember,
       currentOrgName,
       canMakeBilledMember,
     };
   },
 
   methods: {
-    onRejected(rejectedEntries: string | any[]) {
-      toast({
-        variant: "error",
-        message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
-      });
-    },
     completeSubscriptionProcess() {
-      // this.store.state.dispatch("setSelectedOrganization",)
       this.router.push(
-        `/billings/plans?org_identifier=${this.newOrgIdentifier}`
+        `/billings/plans?org_identifier=${this.newOrgIdentifier}`,
       );
     },
-    onSubmit() {
-      this.organizationData.name = this.organizationData.name.trim();
-      if (!this.organizationData.name || !this.isValidOrgName) {
-        this.showNameError = true;
-        return;
+    // Plain async @submit handler — fires only after the schema passes (name
+    // required + regex). Awaited by OForm, so the footer Save spinner spans the
+    // request automatically.
+    async onSubmit(value: AddUpdateOrganizationForm) {
+      const name = value.name.trim();
+      const organizationId = value.id;
+      // here we will check if organizationId is there or not because we only get
+      // org id when we are updating the organization: no id → create, else rename.
+      let callOrganization: Promise<{ data: any; status?: number }>;
+      if (!organizationId) {
+        const payload: any = { name };
+        if (value.makeBilledMember && config.isCloud == "true") {
+          payload.make_billed_member_of =
+            this.store.state.selectedOrganization.identifier;
+        }
+        callOrganization = organizationService.create(payload);
+      } else {
+        callOrganization = organizationService.rename_organization(
+          organizationId,
+          name,
+        );
       }
-      this.showNameError = false;
-      const dismiss = toast({
-        variant: "loading",
-        message: "Please wait...",
-              timeout: 0,
-});
-      const organizationId = this.organizationData.id;
-        //here we will check if organizationId is there or not because we only get org id when we are updating the organization
-        //if organizationId is not there we will create a new organization else we will update the existing organization
-        if (!organizationId) {
-          delete this.organizationData.id;
-          const payload: any = { name: this.organizationData.name };
-          if (this.makeBilledMember && config.isCloud == "true") {
-            payload.make_billed_member_of =
-              this.store.state.selectedOrganization.identifier;
-          }
-          callOrganization = organizationService.create(payload);
-        }
-        else {
-          callOrganization = organizationService.rename_organization(
-            organizationId,
-            this.organizationData.name,
-          );
-        }
 
-        callOrganization
-          .then((res: any) => {
-            const data = res.data;
-            if (res?.status == 200) {
-              this.organizationData = {
-                id: "",
-                name: "",
-              };
+      try {
+        const res: any = await callOrganization;
+        const data = res.data;
+        if (res?.status == 200) {
+          this.$emit("updated");
+          this.$emit("update:open", false);
+        } else {
+          this.proPlanRequired = true;
+          this.proPlanMsg = res.data.message;
+          this.newOrgIdentifier = res.data.identifier;
+          this.router.push({
+            name: "organizations",
+            query: {
+              org_identifier: data.data.identifier,
+              action: "subscribe",
+              update_org: Date.now(),
+            },
+          });
+        }
+      } catch (err: any) {
+        toast({
+          variant: "error",
+          message: JSON.stringify(
+            err?.response?.data["message"] ||
+              (organizationId
+                ? this.t("iam.addUpdateOrganization.updateFailed")
+                : this.t("iam.addUpdateOrganization.createFailed")),
+          ),
+        });
+      }
 
-              // this.$emit("update:modelValue", data);
-              this.$emit("updated");
-              this.$emit("update:open", false);
-              dismiss();
-            } else {
-              this.proPlanRequired = true;
-              this.proPlanMsg = res.data.message;
-              this.newOrgIdentifier = res.data.identifier;
-              // this.store.state.dispatch("setSelectedOrganization", {
-              //   identifier: data.identifier,
-              //   name: data.name,
-              //   id: data.id,
-              //   ingest_threshold: data.ingest_threshold,
-              //   search_threshold: data.search_threshold,
-              //   label: data.name,
-              //   user_email: this.store.state.userInfo.email,
-              //   subscription_type: "Free-Plan-USD-Monthly",
-              // });
-              // window.location.href = `/organizations?org_identifier=${data.data.identifier}&action=subscribe`;
-              this.router.push({
-                name: "organizations",
-                query: {
-                  org_identifier: data.data.identifier,
-                  action: "subscribe",
-                  update_org: Date.now(),
-                },
-              });
-            }
-          })
-          .catch((err: any) => {
-            toast({
-              variant: "error",
-              message: JSON.stringify(
-                err?.response?.data["message"] || ( organizationId ? "Organization Update failed." : "Organization creation failed.")
-              ),
-            });
-            dismiss();
-          });
-          this.track("Button Click", {
-            button: "Save Organization",
-            page: "Add Organization"
-          });
+      this.track("Button Click", {
+        button: "Save Organization",
+        page: "Add Organization",
+      });
     },
   },
 });

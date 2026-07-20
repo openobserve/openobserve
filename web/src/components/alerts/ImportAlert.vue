@@ -19,20 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="baseImportRef"
     title="Import Alert"
     test-prefix="alert"
+    class="flex-1 min-h-0"
     :is-importing="isAlertImporting"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 110px)',
-      errorReport: 'calc(100vh - 192px)',
-    }"
     @back="router.back()"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
-      <div class="tw:flex tw:items-end tw:gap-2 tw:my-[0.725rem]">
+      <div class="flex items-end gap-2 my-[0.725rem]">
         <div style="width: calc(69%)">
           <OInput
             data-test="alert-import-url-input"
@@ -55,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div class="tw:mb-1 tw:flex tw:items-start tw:gap-2" style="width: calc(100% - 10px)">
+      <div class="mb-1 flex items-start gap-2" style="width: calc(100% - 10px)">
         <div style="width: calc(69%)">
           <OFile
             data-test="alert-import-json-file-input"
@@ -81,18 +76,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
       <div
         v-if="alertErrorsToDisplay.length > 0"
-        class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+        class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
       >
         Error Validations
       </div>
-      <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-      <OSeparator class="tw:mr-4 tw:mt-4" />
-      <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
+      <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+      <OSeparator class="mt-1 shrink-0" />
+      <div class="error-report-container flex-1 min-h-0">
         <!-- Alert Errors Section -->
-        <div class="tw:p-2.5 tw:mb-2.5" v-if="alertErrorsToDisplay.length > 0">
+        <div class="p-2.5 mb-2.5" v-if="alertErrorsToDisplay.length > 0">
           <div class="error-list">
             <!-- Iterate through the outer array -->
             <div
@@ -104,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(errorMessage, errorIndex) in errorGroup"
                 :key="errorIndex"
-                class="tw:py-1.25 tw:px-0 tw:text-sm"
+                class="py-1.25 px-0 text-sm"
                 :data-test="`alert-import-error-${index}-${errorIndex}`"
               >
                 <span
@@ -262,9 +257,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:p-2.5 tw:mb-2.5" v-if="alertCreators.length > 0">
+        <div class="p-2.5 mb-2.5" v-if="alertCreators.length > 0">
           <div
-            class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
+            class="text-base mb-2.5 uppercase text-primary"
             data-test="alert-import-creation-title"
           >
             Alert Creation
@@ -277,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div
               :class="{
-                'tw:py-1.25 tw:px-0 tw:text-sm tw:font-bold': true,
+                'py-1.25 px-0 text-sm font-bold': true,
                 'text-green ': val.success,
                 'text-red': !val.success,
               }"
@@ -423,7 +418,7 @@ export default defineComponent({
 
     // Keep filteredDestinations in sync with the destinations prop so the
     // dropdown is pre-populated on first open (OSelect @search only fires
-    // on user input, not on initial open like Quasar's @filter).
+    // on user input, not on initial open).
     watch(
       () => props.destinations,
       () => {

@@ -198,7 +198,7 @@ describe("PatternList", () => {
         "Try increasing the time range or selecting a different stream",
       );
       expect(emptyText).toContain(
-        "Pattern extraction works best with at least 1000+ logs",
+        "Pattern extraction works best with at least 1,000 logs",
       );
     });
 
@@ -272,7 +272,7 @@ describe("PatternList", () => {
     it("should render the Pattern column header", () => {
       const text = wrapper.text();
       // i18n key search.patternColumnHeader is rendered
-      expect(wrapper.find(".tw\\:flex.tw\\:items-center.tw\\:border-b").exists() ||
+      expect(wrapper.find(".flex.items-center.border-b").exists() ||
         wrapper.text().length > 0).toBe(true);
     });
 

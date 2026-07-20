@@ -21,7 +21,7 @@ import { createI18n } from "vue-i18n";
 import shortURLService from "@/services/short_url";
 
 
-// Mock copyToClipboard — migrated from quasar to @/utils/clipboard
+// Mock copyToClipboard
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn(() => Promise.resolve(true)),
 }));

@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:py-2 tw:px-4 tw:shrink-0 tw:bg-[var(--o2-bg-gray)] tw:text-sm"
+    class="py-2 px-4 shrink-0 bg-[var(--o2-bg-gray)] text-sm"
     data-test="pattern-statistics"
-    :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+    :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
   >
     {{ summaryText }}
   </div>
@@ -27,6 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   statistics: any;
@@ -46,6 +49,11 @@ const summaryText = computed(() => {
   const patternMs = props.statistics?.extraction_time_ms || 0;
   const totalTimeMs = histogramMs + patternMs;
 
-  return `Showing 1 to 50 out of ${totalEvents} events & ${patternsFound} patterns found in ${logsAnalyzed} events in ${totalTimeMs} ms.`;
+  return t("logs.patternStatistics.summary", {
+    totalEvents,
+    patternsFound,
+    logsAnalyzed,
+    totalTimeMs,
+  });
 });
 </script>

@@ -193,13 +193,16 @@ test.describe('CrossLink dialog form validation', () => {
         await pm.crossLinkPage.clickAddCrossLink();
         await pm.crossLinkPage.waitForDialog();
 
-        // Primary button is disabled when name or url is empty
-        // (primaryButtonDisabled="!form.name || !form.url")
-        await expect(
-            pm.crossLinkPage.getCrossLinkSaveBtnLocator()
-        ).toBeDisabled();
+        // After the OForm+zod migration the Save button stays ENABLED and
+        // validation runs on submit — clicking it with an empty form reveals the
+        // per-field required errors (submit-then-change timing), it no longer
+        // gates via a disabled button.
+        await pm.crossLinkPage.clickSave();
 
-        testLogger.info('Primary button correctly disabled when fields are empty');
+        await pm.crossLinkPage.expectNameRequiredError();
+        await pm.crossLinkPage.expectUrlRequiredError();
+
+        testLogger.info('Name and URL required errors correctly shown on empty submit');
     });
 
     test('should show URL error when only name is filled and dialog is submitted', {
@@ -212,12 +215,14 @@ test.describe('CrossLink dialog form validation', () => {
 
         await pm.crossLinkPage.fillCrossLinkName('test_cross_link_fv');
 
-        // Primary button remains disabled until URL is also filled
-        await expect(
-            pm.crossLinkPage.getCrossLinkSaveBtnLocator()
-        ).toBeDisabled();
+        // Save stays enabled; submitting with only the name filled reveals the
+        // URL required error while the filled name shows none.
+        await pm.crossLinkPage.clickSave();
 
-        testLogger.info('Primary button correctly disabled when URL is missing');
+        await pm.crossLinkPage.expectUrlRequiredError();
+        await pm.crossLinkPage.expectNoNameError();
+
+        testLogger.info('URL required error correctly shown when only name is filled');
     });
 
     test('should show name error when only URL is filled and dialog is submitted', {
@@ -228,14 +233,16 @@ test.describe('CrossLink dialog form validation', () => {
         await pm.crossLinkPage.clickAddCrossLink();
         await pm.crossLinkPage.waitForDialog();
 
-        await pm.crossLinkPage.fillCrossLinkUrl('https://grafana.example.com/explore?query={{field_value}}');
+        await pm.crossLinkPage.fillCrossLinkUrl('https://openobserve.example.com/web/logs?query={{field_value}}');
 
-        // Primary button remains disabled until name is also filled
-        await expect(
-            pm.crossLinkPage.getCrossLinkSaveBtnLocator()
-        ).toBeDisabled();
+        // Save stays enabled; submitting with only the URL filled reveals the
+        // name required error while the filled URL shows none.
+        await pm.crossLinkPage.clickSave();
 
-        testLogger.info('Primary button correctly disabled when name is missing');
+        await pm.crossLinkPage.expectNameRequiredError();
+        await pm.crossLinkPage.expectNoUrlError();
+
+        testLogger.info('Name required error correctly shown when only URL is filled');
     });
 
     test('should enable save button when both name and URL are filled', {
@@ -247,7 +254,7 @@ test.describe('CrossLink dialog form validation', () => {
         await pm.crossLinkPage.waitForDialog();
 
         await pm.crossLinkPage.fillCrossLinkName('test_cross_link_fv_enabled');
-        await pm.crossLinkPage.fillCrossLinkUrl('https://grafana.example.com/explore?query={{field_value}}');
+        await pm.crossLinkPage.fillCrossLinkUrl('https://openobserve.example.com/web/logs?query={{field_value}}');
 
         await expect(
             pm.crossLinkPage.getCrossLinkSaveBtnLocator()
@@ -262,7 +269,7 @@ test.describe('CrossLink dialog form validation', () => {
         testLogger.info('Testing successful cross-link creation');
 
         const linkName = 'fv_cross_link_001';
-        const linkUrl  = 'https://grafana.example.com/explore?query={{field_value}}';
+        const linkUrl  = 'https://openobserve.example.com/web/logs?query={{field_value}}';
         const field    = 'log_level';
 
         await pm.crossLinkPage.clickAddCrossLink();

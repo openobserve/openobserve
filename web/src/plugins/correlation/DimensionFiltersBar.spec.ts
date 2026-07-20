@@ -168,8 +168,8 @@ describe("DimensionFiltersBar.vue", () => {
       const html = wrapper.html();
 
       // Check if opacity classes are applied
-      expect(html).toContain("tw:opacity-60");
-      expect(html).toContain("tw:opacity-100");
+      expect(html).toContain("opacity-60");
+      expect(html).toContain("opacity-100");
     });
 
     it("should show tooltip for unstable dimensions", () => {
@@ -194,7 +194,7 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should disable apply button when no pending changes", () => {
       wrapper = createWrapper({ hasPendingChanges: false });
-      // OButton uses native HTML disabled attribute (not Quasar's disable prop)
+      // OButton uses the native HTML disabled attribute (not a disable prop)
       const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
       expect(applyBtn.exists()).toBe(true);
       expect(applyBtn.attributes("disabled")).toBeDefined();
@@ -300,19 +300,19 @@ describe("DimensionFiltersBar.vue", () => {
   describe("Styling and Layout", () => {
     it("should have correct container classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find(".tw\\:py-2");
+      const container = wrapper.find(".py-2");
       expect(container.exists()).toBe(true);
     });
 
     it("should use flex layout for dimensions", () => {
       wrapper = createWrapper();
-      const flexContainer = wrapper.find(".tw\\:flex");
+      const flexContainer = wrapper.find(".flex");
       expect(flexContainer.exists()).toBe(true);
     });
 
     it("should have proper spacing between elements", () => {
       wrapper = createWrapper();
-      const gapContainer = wrapper.find(".tw\\:gap-3");
+      const gapContainer = wrapper.find(".gap-3");
       expect(gapContainer.exists()).toBe(true);
     });
   });

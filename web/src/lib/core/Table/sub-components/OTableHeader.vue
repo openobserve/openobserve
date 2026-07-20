@@ -18,6 +18,7 @@ const props = defineProps<{
   isAllSelected?: boolean;
   isIndeterminate?: boolean;
   expansionEnabled?: boolean;
+  enableRowReorder?: boolean;
   enableColumnReorder?: boolean;
   enableColumnResize?: boolean;
   isResizing?: boolean;
@@ -81,15 +82,15 @@ function isAutoWidthColumn(header: any): boolean {
 
 function headerAlignClass(header: any): string {
   const align = (header.column.columnDef.meta as any)?.align;
-  if (align === 'center') return 'tw:text-center tw:justify-center';
-  if (align === 'right') return 'tw:text-right tw:justify-end';
+  if (align === 'center') return 'text-center justify-center';
+  if (align === 'right') return 'text-right justify-end';
   return '';
 }
 
 function headerPaddingClass(header: any): string {
   const m = header.column.columnDef.meta as any;
-  if (m?.spacer) return 'tw:px-0'; // the invisible spacer must be able to reach 0 width
-  return m?.compactPadding ? 'tw:px-1' : 'tw:px-2';
+  if (m?.spacer) return 'px-0'; // the invisible spacer must be able to reach 0 width
+  return m?.compactPadding ? 'px-1' : 'px-2';
 }
 
 function headerSizeVar(header: any): string {
@@ -135,13 +136,13 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
   <!-- ── Pivot multi-level headers (dashboard only) ───────────── -->
   <thead
     v-if="pivotHeaderLevels && pivotHeaderLevels.length > 0"
-    class="tw:sticky tw:top-0 tw:z-10"
+    class="sticky top-0 z-10"
     data-test="o2-table-pivot-header"
   >
     <tr
       v-for="(level, levelIdx) in pivotHeaderLevels"
       :key="'pivot-hl-' + levelIdx"
-      class="tw:h-7"
+      class="h-7"
     >
       <!-- Row-field column headers: first row only, rowspan all levels -->
       <th
@@ -150,11 +151,11 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="'pivot-rh-' + col.id"
         :rowspan="pivotHeaderLevels.length"
         :data-test="`o2-table-pivot-th-${col.id}`"
-        class="tw:px-2 tw:text-left tw:cursor-pointer tw:font-medium tw:text-secondary tw:text-xs"
+        class="px-2 text-left cursor-pointer font-medium text-secondary text-xs"
         :style="getPivotRowColStyle(col.id)"
         @click="handleSort(col.id)"
       >
-        <div class="tw:flex tw:items-center tw:gap-1">
+        <div class="flex items-center gap-1">
           <FlexRender
             v-if="col.header"
             :render="col.header"
@@ -165,19 +166,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             v-if="getSortIcon?.(col.id) === 'asc'"
             name="arrow-upward"
             size="sm"
-            class="tw:text-[var(--color-table-sort-icon-active)]"
+            class="text-[var(--color-table-sort-icon-active)]"
           />
           <OIcon
             v-else-if="getSortIcon?.(col.id) === 'desc'"
             name="arrow-downward"
             size="sm"
-            class="tw:text-[var(--color-table-sort-icon-active)]"
+            class="text-[var(--color-table-sort-icon-active)]"
           />
           <OIcon
             v-else
             name="unfold-more"
             size="sm"
-            class="tw:opacity-40"
+            class="opacity-40"
           />
         </div>
       </th>
@@ -189,17 +190,17 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :colspan="cell.colspan"
         :rowspan="cell.rowspan || 1"
         :data-test="`o2-table-pivot-th-${levelIdx}-${cellIdx}`"
-        class="tw:px-2"
+        class="px-2"
         :class="[
           level.isLeaf
-            ? 'pivot-value-header tw:text-secondary tw:text-xs tw:font-medium'
-            : 'pivot-group-header tw:text-center tw:font-medium tw:text-secondary tw:text-xs',
+            ? 'pivot-value-header text-secondary text-xs font-medium'
+            : 'pivot-group-header text-center font-medium text-secondary text-xs',
           {
-            'tw:border-l tw:border-border-default':
+            'border-l border-border-default':
               cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
           },
           {
-            'tw:cursor-pointer': cell._sortColumn,
+            'cursor-pointer': cell._sortColumn,
           },
         ]"
         :style="
@@ -214,19 +215,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
           name="arrow-upward"
           size="sm"
-          class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
+          class="text-[var(--color-table-sort-icon-active)] ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'"
           name="arrow-downward"
           size="sm"
-          class="tw:text-[var(--color-table-sort-icon-active)] tw:ml-1"
+          class="text-[var(--color-table-sort-icon-active)] ml-1"
         />
         <OIcon
           v-else-if="level.isLeaf && cell._sortColumn"
           name="unfold-more"
           size="sm"
-          class="tw:opacity-40 tw:ml-1"
+          class="opacity-40 ml-1"
         />
       </th>
     </tr>
@@ -238,9 +239,9 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     v-for="headerGroup in headerGroups"
     :key="headerGroup.id"
     :class="[
-      'tw:bg-[var(--color-table-header-bg)]',
-      'tw:border-b tw:border-[var(--color-table-header-border)]',
-      stickyHeader ? 'tw:sticky tw:top-0 tw:z-10' : '',
+      'bg-[var(--color-table-header-bg)]',
+      'border-b border-[var(--color-table-header-border)]',
+      stickyHeader ? 'sticky top-0 z-10' : '',
     ]"
     data-test="o2-table-header"
   >
@@ -254,8 +255,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       handle=".table-head"
       tag="tr"
       :class="[
-        'tw:bg-[var(--color-table-header-bg)]',
-        columnOrder.length > 1 ? 'tw:cursor-move' : '',
+        'bg-[var(--color-table-header-bg)]',
+        columnOrder.length > 1 ? 'cursor-move' : '',
       ]"
       :style="{
         minWidth: '100%',
@@ -267,14 +268,14 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       <!-- Expand placeholder -->
       <th
         v-if="expansionEnabled"
-        class="tw:w-4 tw:min-w-4 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
         data-test="o2-table-th-expand"
       />
 
       <!-- Selection checkbox header -->
       <th
         v-if="selectionMultiple"
-        class="tw:text-left tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="text-left border-b border-[var(--color-table-header-border)]"
         :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
         data-test="o2-table-th-select"
       >
@@ -286,6 +287,14 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         />
       </th>
 
+      <!-- Drag handle placeholder column -->
+      <th
+        v-if="enableRowReorder"
+        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
+        data-test="o2-table-th-drag"
+        aria-hidden="true"
+      />
+
       <!-- Column headers -->
       <th
         v-for="header in headerGroup.headers"
@@ -294,12 +303,12 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :rowspan="header.rowSpan"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-medium tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
+          `${headerPaddingClass(header)} text-left font-medium text-table-header-text text-xs select-none relative`,
           'table-head',
-          dense ? 'tw:h-8' : 'tw:h-9',
-          'tw:border-b tw:border-[var(--color-table-header-border)]',
-          'tw:group',
-          header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
+          dense ? 'h-8' : 'h-9',
+          'border-b border-[var(--color-table-header-border)]',
+          'group',
+          header.column.getIsPinned?.() ? 'bg-[var(--color-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -326,15 +335,15 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             : {}),
         }"
       >
-        <div :class="['tw:flex tw:items-center tw:gap-1 tw:h-full tw:overflow-hidden tw:min-w-0', headerAlignClass(header)]">
+        <div :class="['flex items-center gap-1 h-full overflow-hidden min-w-0', headerAlignClass(header)]">
           <!-- Sortable header -->
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
-            :class="['tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:min-w-0', headerAlignClass(header)]"
+            :class="['flex items-center gap-1 cursor-pointer flex-1 min-w-0', headerAlignClass(header)]"
             data-test="o2-table-th-sort-trigger"
             @click="(e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)"
           >
-            <span class="tw:truncate tw:min-w-0">
+            <span class="truncate min-w-0">
               <FlexRender
                 v-if="!header.isPlaceholder"
                 :render="header.column.columnDef.header"
@@ -345,34 +354,37 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                  header title truncates. -->
             <span
               v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable"
-              class="tw:flex tw:items-center tw:shrink-0"
+              class="flex items-center shrink-0"
             >
               <OIcon
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow-upward"
                 size="sm"
-                class="tw:text-[var(--color-table-sort-icon-active)]"
+                class="text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
+                data-test-sort-direction="asc"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
                 name="arrow-downward"
                 size="sm"
-                class="tw:text-[var(--color-table-sort-icon-active)]"
+                class="text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
+                data-test-sort-direction="desc"
               />
               <OIcon
                 v-else
                 name="unfold-more"
                 size="sm"
-                class="tw:opacity-40"
+                class="opacity-40"
                 data-test="o2-table-sort-icon-inactive"
+                data-test-sort-direction="none"
               />
             </span>
           </div>
 
           <!-- Non-sortable header -->
-          <div v-else :class="['tw:flex-1 tw:min-w-0 tw:truncate', headerAlignClass(header)]">
+          <div v-else :class="['flex-1 min-w-0 truncate', headerAlignClass(header)]">
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"
@@ -385,7 +397,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         <!-- Column resize handle -->
         <div
           v-if="header.column.getCanResize()"
-          class="resizer tw:absolute tw:right-0 tw:top-0 tw:h-full tw:w-2 tw:flex tw:items-center tw:justify-end tw:cursor-col-resize tw:select-none tw:touch-none tw:z-10 tw:group/resizer"
+          class="resizer absolute right-0 top-0 h-full w-2 flex items-center justify-end cursor-col-resize select-none touch-none z-10 group/resizer"
           :title="'Drag to resize · double-click to reset'"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="startResize(header, $event)"
@@ -395,10 +407,10 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                default, the accent (full-height) while hovering it or resizing. -->
           <div
             :class="[
-              'tw:rounded-full tw:transition-all tw:duration-150',
+              'rounded-full transition-all duration-150',
               header.column.getIsResizing()
-                ? 'tw:w-0.5 tw:h-full tw:bg-[var(--color-table-resize-handle)]'
-                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] tw:group-hover/resizer:w-0.5 tw:group-hover/resizer:h-full tw:group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
+                : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
             ]"
           />
         </div>
@@ -412,16 +424,11 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
          while the toolbar <div> stays white. -->
     <tr
       v-if="!enableColumnReorder"
-      class="tw:bg-[var(--color-table-header-bg)]"
+      class="bg-[var(--color-table-header-bg)]"
     >
       <th
-        v-if="expansionEnabled"
-        class="tw:w-4 tw:min-w-4 tw:px-0 tw:border-b tw:border-[var(--color-table-header-border)]"
-        data-test="o2-table-th-expand"
-      />
-      <th
         v-if="selectionMultiple"
-        class="tw:text-left tw:border-b tw:border-[var(--color-table-header-border)]"
+        class="text-left border-b border-[var(--color-table-header-border)]"
         :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
         data-test="o2-table-th-select"
       >
@@ -432,15 +439,28 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
           @update:model-value="emit('toggle-all-rows')"
         />
       </th>
+
+      <th
+        v-if="enableRowReorder"
+        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
+        data-test="o2-table-th-drag"
+        aria-hidden="true"
+      />
+
+      <th
+        v-if="expansionEnabled"
+        class="w-4 min-w-4 px-0 border-b border-[var(--color-table-header-border)]"
+        data-test="o2-table-th-expand"
+      />
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"
         :data-test="`o2-table-th-${header.id}`"
         :class="[
-          `${headerPaddingClass(header)} tw:text-left tw:font-medium tw:text-table-header-text tw:text-xs tw:select-none tw:relative`,
-          dense ? 'tw:h-8 tw:group' : 'tw:h-9 tw:group',
-          'tw:border-b tw:border-[var(--color-table-header-border)]',
-          header.column.getIsPinned?.() ? 'tw:bg-[var(--color-table-header-bg)]' : '',
+          `${headerPaddingClass(header)} text-left font-medium text-table-header-text text-xs select-none relative`,
+          dense ? 'h-8 group' : 'h-9 group',
+          'border-b border-[var(--color-table-header-border)]',
+          header.column.getIsPinned?.() ? 'bg-[var(--color-table-header-bg)]' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
         ]"
         :style="{
@@ -467,14 +487,14 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             : {}),
         }"
       >
-        <div :class="['tw:flex tw:items-center tw:gap-1 tw:h-full tw:overflow-hidden tw:min-w-0', headerAlignClass(header)]">
+        <div :class="['flex items-center gap-1 h-full overflow-hidden min-w-0', headerAlignClass(header)]">
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
-            :class="['tw:flex tw:items-center tw:gap-1 tw:cursor-pointer tw:flex-1 tw:overflow-hidden tw:whitespace-nowrap', headerAlignClass(header)]"
+            :class="['flex items-center gap-1 cursor-pointer flex-1 overflow-hidden whitespace-nowrap', headerAlignClass(header)]"
             data-test="o2-table-th-sort-trigger"
             @click="(e: MouseEvent) => handleSort(header.id, header.column.getToggleSortingHandler(), e)"
           >
-            <span class="tw:truncate tw:min-w-0">
+            <span class="truncate min-w-0">
               <FlexRender
                 v-if="!header.isPlaceholder"
                 :render="header.column.columnDef.header"
@@ -486,26 +506,29 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 v-if="getSortIcon(header.id) === 'asc'"
                 name="arrow-upward"
                 size="sm"
-                class="tw:shrink-0 tw:text-[var(--color-table-sort-icon-active)]"
+                class="shrink-0 text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
+                data-test-sort-direction="asc"
               />
               <OIcon
                 v-else-if="getSortIcon(header.id) === 'desc'"
                 name="arrow-downward"
                 size="sm"
-                class="tw:shrink-0 tw:text-[var(--color-table-sort-icon-active)]"
+                class="shrink-0 text-[var(--color-table-sort-icon-active)]"
                 data-test="o2-table-sort-icon-active"
+                data-test-sort-direction="desc"
               />
               <OIcon
                 v-else
                 name="unfold-more"
                 size="sm"
-                class="tw:shrink-0 tw:opacity-40"
+                class="shrink-0 opacity-40"
                 data-test="o2-table-sort-icon-inactive"
+                data-test-sort-direction="none"
               />
             </template>
           </div>
-          <div v-else :class="['tw:flex-1 tw:min-w-0 tw:truncate', headerAlignClass(header)]">
+          <div v-else :class="['flex-1 min-w-0 truncate', headerAlignClass(header)]">
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"
@@ -515,7 +538,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         </div>
         <div
           v-if="header.column.getCanResize()"
-          class="resizer tw:absolute tw:right-0 tw:top-0 tw:h-full tw:w-2 tw:flex tw:items-center tw:justify-end tw:cursor-col-resize tw:select-none tw:touch-none tw:z-10 tw:group/resizer"
+          class="resizer absolute right-0 top-0 h-full w-2 flex items-center justify-end cursor-col-resize select-none touch-none z-10 group/resizer"
           :title="'Drag to resize · double-click to reset'"
           @dblclick="header.column.resetSize()"
           @mousedown.prevent.stop="startResize(header, $event)"
@@ -525,10 +548,10 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                default, the accent (full-height) while hovering it or resizing. -->
           <div
             :class="[
-              'tw:rounded-full tw:transition-all tw:duration-150',
+              'rounded-full transition-all duration-150',
               header.column.getIsResizing()
-                ? 'tw:w-0.5 tw:h-full tw:bg-[var(--color-table-resize-handle)]'
-                : 'tw:w-px tw:h-4 tw:bg-[var(--color-border-default)] tw:group-hover/resizer:w-0.5 tw:group-hover/resizer:h-full tw:group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
+                : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
             ]"
           />
         </div>

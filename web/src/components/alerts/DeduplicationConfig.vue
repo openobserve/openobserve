@@ -15,32 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="alerts-deduplication-config" class="tw:w-full tw:p-0 tw:m-0">
-    <div class="tw:w-full">
-      <div class="tw:w-full">
+  <div data-test="alerts-deduplication-config" class="w-full p-0 m-0">
+    <div class="w-full">
+      <div class="w-full">
         <AlertsContainer
           :name="t('alerts.deduplication.title')"
           v-model:is-expanded="isExpanded"
           :label="t('alerts.deduplication.title')"
           :subLabel="t('alerts.deduplication.subtitle')"
           icon="filter-alt"
-          class="tw:w-full tw:w-full tw:pl-4 tw:pr-2 tw:py-2"
-          :iconClass="'tw:mt-[2px]'"
+          class="w-full w-full pl-4 pr-2 py-2"
+          :iconClass="'mt-[2px]'"
         />
       </div>
 
-      <div v-if="isExpanded" class="tw:w-full tw:flex tw:px-4">
-        <OSeparator class="tw:my-2"/>
-        <div class="tw:mt-2 tw:w-full tw:pl-3">
+      <div v-if="isExpanded" class="w-full flex px-4">
+        <OSeparator class="my-2"/>
+        <div class="mt-2 w-full pl-3">
             <!-- Fingerprint Fields -->
-            <div class="tw:mb-4">
-              <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+            <div class="mb-4">
+              <div class="font-semibold pb-2 flex items-center">
                 {{ t("alerts.deduplication.fingerprintFields") }}
                 <OIcon
                   name="info"
                   size="sm"
-                  class="tw:ml-1 tw:cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+                  class="ml-1 cursor-pointer"
+                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
                  />
                   <OTooltip
                     side="right"
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                   />
               </div>
-              <div class="tw:text-sm tw:text-gray-600 tw:dark:text-gray-400 tw:mb-2">
+              <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 {{ t("alerts.deduplication.fingerprintFieldsHint") }}
               </div>
               <OSelect
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="emitUpdate"
               >
                 <template v-slot:hint>
-                  <div class="tw:text-xs">
+                  <div class="text-xs">
                     💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)
                   </div>
                 </template>
@@ -71,14 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Time Window -->
-            <div class="tw:mb-4">
-              <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
+            <div class="mb-4">
+              <div class="font-semibold pb-2 flex items-center">
                 {{ t("alerts.deduplication.timeWindow") }}
                 <OIcon
                   name="info"
                   size="sm"
-                  class="tw:ml-1 tw:cursor-pointer"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+                  class="ml-1 cursor-pointer"
+                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
                  />
                   <OTooltip
                     side="right"
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="t('alerts.deduplication.timeWindowTooltip')"
                   />
               </div>
-              <div class="tw:text-sm tw:text-gray-600 tw:dark:text-gray-400 tw:mb-2">
+              <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 {{ t("alerts.deduplication.timeWindowHint") }}
               </div>
               <OInput

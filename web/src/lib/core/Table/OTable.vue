@@ -40,6 +40,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   enableColumnResize: false,
   enableColumnReorder: false,
   enableColumnPin: false,
+  enableRowReorder: false,
   persistColumns: false,
   loading: false,
   streaming: false,
@@ -305,7 +306,7 @@ const selection = useTableSelection(table, {
 const expansion = useTableExpansion<TData>(
   {
     expansion: props.expansion,
-    expandedIds: props.expandedIds,
+    expandedIds: () => props.expandedIds,
     rowKey: props.rowKey,
     getSubRows: props.getSubRows,
   },
@@ -438,7 +439,7 @@ onMounted(scheduleMeasureActions);
 //     invisible trailing spacer absorbs any slack so the pinned actions column
 //     stays flush-right and the table grows + scrolls only as needed.
 // `containerWidth` tracks the scroll container's live inner width.
-const EXPANSION_COL_WIDTH = 16; // tw:w-4
+const EXPANSION_COL_WIDTH = 16; // w-4
 const containerWidth = ref(0);
 let containerRO: ResizeObserver | null = null;
 
@@ -795,20 +796,20 @@ defineExpose({
 <template>
   <div
     data-test="o2-table-root"
-    :class="['tw:flex tw:flex-col tw:overflow-hidden', props.fillHeight ? 'tw:h-full' : 'tw:h-auto']"
+    :class="['flex flex-col overflow-hidden', props.fillHeight ? 'h-full' : 'h-auto']"
   >
     <!-- ── Top slot (search bar, title, actions) ─────────────── -->
     <slot name="top" />
 
     <!-- ── Bordered wrapper: search + loading + top pagination + table area ── -->
     <div
-      class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0"
-      :class="props.frame ? 'tw:border tw:border-border-default' : ''"
+      class="flex-1 flex flex-col min-h-0"
+      :class="props.frame ? 'border border-border-default' : ''"
     >
     <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
     <div
       v-if="slots.toolbar || slots['toolbar-trailing']"
-      class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:gap-2 tw:border-b tw:border-[var(--color-table-row-divider)]"
+      class="flex items-center px-3 py-2 gap-2 border-b border-[var(--color-table-row-divider)]"
       data-test="o2-table-toolbar"
     >
       <slot name="toolbar" />
@@ -817,7 +818,7 @@ defineExpose({
         :columns="props.columns"
         :column-visibility="internalColumnVisibility"
         :has-resized-columns="props.enableColumnResize && hasResizedColumns"
-        class="tw:shrink-0"
+        class="shrink-0"
         data-test="o2-table-column-toggle"
         @update:column-visibility="handleColumnVisibilityChange"
         @reset:column-sizes="handleResetColumnSizes"
@@ -827,20 +828,20 @@ defineExpose({
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
       v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
-      class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:border-b tw:border-[var(--color-table-row-divider)] tw:bg-[var(--color-table-header-bg)]"
+      class="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-table-row-divider)] bg-[var(--color-table-header-bg)]"
       data-test="o2-table-global-filter"
     >
-      <div class="tw:relative tw:max-w-xs tw:flex-1">
+      <div class="relative max-w-xs flex-1">
         <OIcon
           name="search"
           size="sm"
-          class="tw:absolute tw:left-2 tw:top-1/2 tw:-translate-y-1/2 tw:text-secondary"
+          class="absolute left-2 top-1/2 -translate-y-1/2 text-secondary"
         />
         <input
           :value="globalFilterLocal"
           type="text"
           :placeholder="props.globalFilterPlaceholder"
-          class="tw:pl-7 tw:pr-2 tw:py-1 tw:text-sm tw:bg-transparent tw:border-none tw:text-primary tw:placeholder-text-disabled tw:outline-none tw:w-full"
+          class="pl-7 pr-2 py-1 text-sm bg-transparent border-none text-primary placeholder-text-disabled outline-none w-full"
           data-test="o2-table-global-filter-input"
           @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
         />
@@ -877,7 +878,7 @@ defineExpose({
     <!-- ── Scrollable table area ────────────────────────────── -->
     <div
       ref="scrollContainerRef"
-      :class="['tw:flex tw:flex-col tw:overflow-y-auto tw:min-h-0 tw:relative', allowHorizontalScroll ? 'tw:overflow-x-auto' : 'tw:overflow-x-hidden', props.fillHeight ? 'tw:flex-1' : '']"
+      :class="['flex flex-col overflow-y-auto min-h-0 relative', allowHorizontalScroll ? 'overflow-x-auto' : 'overflow-x-hidden', props.fillHeight ? 'flex-1' : '']"
       :style="{
         maxHeight: props.maxHeight
           ? typeof props.maxHeight === 'number'
@@ -890,9 +891,12 @@ defineExpose({
     >
       <table
         :class="[
-          props.horizontalScroll ? 'tw:min-w-max' : ((useComputedWidth && frozen) ? '' : 'tw:w-full'),
-          props.horizontalScroll || props.defaultColumns ? 'tw:table-auto' : 'tw:table-fixed',
-          (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'tw:border-separate tw:border-spacing-0',
+          props.horizontalScroll ? 'min-w-max' : ((useComputedWidth && frozen) ? '' : 'w-full'),
+          props.horizontalScroll || props.defaultColumns ? 'table-auto' : 'table-fixed',
+          (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'border-separate border-spacing-0',
+          // Without a leading selection/expansion gutter the first column would
+          // hug the table's left edge; inset it so it aligns like gutter tables.
+          (!selection.isEnabled.value && !expansion.isEnabled.value) ? 'o2-table--inset-first' : '',
         ]"
         :style="{
           ...columnSizeVars,
@@ -916,6 +920,7 @@ defineExpose({
           :is-all-selected="selection.isAllSelected()"
           :is-indeterminate="selection.isIndeterminate()"
           :expansion-enabled="expansion.isEnabled.value"
+          :enable-row-reorder="props.enableRowReorder"
           :enable-column-reorder="props.enableColumnReorder"
           :enable-column-resize="props.enableColumnResize"
           :is-resizing="columnMgmt.isResizing.value"
@@ -945,6 +950,7 @@ defineExpose({
           :table-columns="table.getVisibleLeafColumns()"
           :selection-enabled="selection.isEnabled.value"
           :expansion-enabled="expansion.isEnabled.value"
+          :enable-row-reorder="props.enableRowReorder"
         />
 
         <!-- ── Body ─────────────────────────────────────────── -->
@@ -973,6 +979,10 @@ defineExpose({
           :enable-cell-copy="props.enableCellCopy"
           :loading="props.loading"
           :get-cell-style="(props.getCellStyle as any)"
+          :enable-row-reorder="props.enableRowReorder"
+          :disable-row-reorder="props.disableRowReorder"
+          :global-filter-active="!!globalFilterLocal"
+          :row-key="props.rowKey"
           :virtual-rows="isVirtual ? virtualRows : undefined"
           :total-size="isVirtual ? totalSize : undefined"
           :base-offset="isVirtual ? baseOffset : undefined"
@@ -986,6 +996,7 @@ defineExpose({
             if (canExpand) expansion.toggleRow(row);
             emit('row-click', row, evt);
           }"
+          @row-reorder="(data: TData[]) => emit('row-reorder', data)"
           @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
           @row-mouseenter="(row: TData, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
           @row-mouseleave="(row: TData) => emit('row-mouseleave', row)"
@@ -1020,22 +1031,27 @@ defineExpose({
         <tfoot
           v-if="table.getFooterGroups().some(fg => fg.headers.some(h => h.column.columnDef.footer))"
           data-test="o2-table-footer"
-          class="tw:sticky tw:bottom-0 tw:z-10"
+          class="sticky bottom-0 z-10"
         >
           <tr
             v-for="footerGroup in table.getFooterGroups()"
             :key="footerGroup.id"
-            class="tw:bg-[var(--color-table-header-bg)]"
+            class="bg-[var(--color-table-header-bg)]"
           >
             <!-- Expand placeholder -->
             <th
               v-if="expansion.isEnabled.value"
-              class="tw:w-0 tw:px-0"
+              class="w-0 px-0"
             />
             <!-- Selection placeholder -->
             <th
               v-if="selection.isMultiple.value"
-              class="tw:w-0"
+              class="w-0"
+            />
+            <!-- Drag handle placeholder -->
+            <th
+              v-if="props.enableRowReorder"
+              class="w-0 px-0"
             />
             <th
               v-for="header in footerGroup.headers"
@@ -1043,10 +1059,10 @@ defineExpose({
               :colspan="header.colSpan"
               :data-test="`o2-table-footer-cell-${header.id}`"
               :class="[
-                'tw:px-2 tw:py-1 tw:text-left tw:text-text-primary tw:text-xs',
-                'tw:border-t tw:border-[var(--color-table-header-border)]',
-                (header.column.columnDef.meta as any)?.align === 'center' ? 'tw:text-center' : '',
-                (header.column.columnDef.meta as any)?.align === 'right' ? 'tw:text-right' : '',
+                'px-2 py-1 text-left text-text-primary text-xs',
+                'border-t border-[var(--color-table-header-border)]',
+                (header.column.columnDef.meta as any)?.align === 'center' ? 'text-center' : '',
+                (header.column.columnDef.meta as any)?.align === 'right' ? 'text-right' : '',
               ]"
               :style="{
                 width: `var(--header-${header.id.replace(/[^a-zA-Z0-9]/g, '-')}-size)`,
@@ -1083,7 +1099,7 @@ defineExpose({
       <!-- ── Custom loading slot (overlay) ───────────────────── -->
       <div
         v-if="showLoadingOverlay && slots.loading"
-        class="tw:absolute tw:inset-0 tw:z-10 tw:bg-surface-base/70 tw:flex tw:items-center tw:justify-center"
+        class="absolute inset-0 z-10 bg-surface-base/70 flex items-center justify-center"
         data-test="o2-table-loading-slot"
       >
         <slot name="loading" />
@@ -1112,7 +1128,7 @@ defineExpose({
       <div
         v-if="showStreaming"
         data-test="o2-table-streaming-bar"
-        class="tw:sticky tw:bottom-0 tw:h-1 tw:w-full tw:bg-[var(--color-table-streaming-bar)] tw:animate-pulse tw:z-10"
+        class="sticky bottom-0 h-1 w-full bg-[var(--color-table-streaming-bar)] animate-pulse z-10"
         aria-label="Data streaming in progress"
       />
     </div>
@@ -1163,3 +1179,16 @@ defineExpose({
     </div> <!-- /bordered wrapper -->
   </div>
 </template>
+
+<style scoped>
+/* When the table has no leading selection/expansion gutter, the first data
+   column would otherwise sit flush against the left edge with only the default
+   cell padding (0.5rem). Inset the first header + body cell so these tables read
+   with the same comfortable left margin as tables that do have a checkbox
+   gutter. Targeted by data-test prefix so full-width colspan rows (expanded /
+   tree-warning) are left untouched. */
+.o2-table--inset-first :deep(th[data-test^="o2-table-th-"]:first-child),
+.o2-table--inset-first :deep(td[data-test^="o2-table-cell-"]:first-child) {
+  padding-left: 1rem;
+}
+</style>

@@ -45,19 +45,21 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-// ODrawer stub — renders slot content so inner elements are accessible in tests.
+// ODrawer stub — renders slot content (so the REAL <OForm> mounts inside it and
+// the schema runs) plus the footer buttons. The footer Save is wired via
+// form-id; tests drive the form's own handleSubmit().
 const ODrawerStub = {
   name: "ODrawer",
   props: [
-    "open", "size", "showClose", "title", "width", "persistent",
+    "open", "size", "showClose", "title", "width", "persistent", "formId",
     "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:secondary", "click:neutral"],
   template: `<div class="o-drawer-stub">
     <slot />
     <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
     <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" type="submit" form="associate-function-form">{{ primaryButtonLabel }}</button>
   </div>`,
 };
 
@@ -107,12 +109,21 @@ function createWrapper(props = {}, pipelineObjOverrides = {}) {
       },
     },
     props: {
+      open: true,
       functions: ["alpha", "beta", "gamma"],
       associatedFunctions: ["delta"],
       ...props,
     },
   });
 }
+
+// Form helpers — selectedFunction/afterFlattening are form-owned now.
+const setField = (w, name, val) => w.vm.form.setFieldValue(name, val);
+const formVals = (w) => w.vm.form.state.values;
+const submitForm = async (w) => {
+  await w.vm.form.handleSubmit();
+  await flushPromises();
+};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -144,10 +155,10 @@ describe("AssociateFunction Component", () => {
       expect(wrapper.vm.createNewFunction).toBe(false);
     });
 
-    it("initializes afterFlattening as true by default", async () => {
+    it("seeds form afterFlattening as true by default", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.vm.afterFlattening).toBe(true);
+      expect(formVals(wrapper).afterFlattening).toBe(true);
     });
 
     it("initializes loading as false", async () => {
@@ -156,16 +167,10 @@ describe("AssociateFunction Component", () => {
       expect(wrapper.vm.loading).toBe(false);
     });
 
-    it("initializes selectedFunction as empty string when no node data", async () => {
+    it("seeds form selectedFunction as empty string when no node data", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.vm.selectedFunction).toBe("");
-    });
-
-    it("initializes functionExists as false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.functionExists).toBe(false);
+      expect(formVals(wrapper).selectedFunction).toBe("");
     });
 
     it("populates filteredFunctions from the functions prop and sorts alphabetically", async () => {
@@ -183,7 +188,7 @@ describe("AssociateFunction Component", () => {
 
   // -------------------------------------------------------------------------
   describe("Edit Mode Initialization", () => {
-    it("reads selectedFunction from currentSelectedNodeData in edit mode", async () => {
+    it("seeds form selectedFunction from currentSelectedNodeData in edit mode", async () => {
       const wrapper = createWrapper({}, {
         isEditNode: true,
         currentSelectedNodeData: {
@@ -192,10 +197,10 @@ describe("AssociateFunction Component", () => {
         },
       });
       await flushPromises();
-      expect(wrapper.vm.selectedFunction).toBe("alpha");
+      expect(formVals(wrapper).selectedFunction).toBe("alpha");
     });
 
-    it("reads afterFlattening as false when node data has after_flatten: false", async () => {
+    it("seeds form afterFlattening as false when node data has after_flatten: false", async () => {
       const wrapper = createWrapper({}, {
         isEditNode: true,
         currentSelectedNodeData: {
@@ -203,16 +208,16 @@ describe("AssociateFunction Component", () => {
         },
       });
       await flushPromises();
-      expect(wrapper.vm.afterFlattening).toBe(false);
+      expect(formVals(wrapper).afterFlattening).toBe(false);
     });
 
-    it("defaults afterFlattening to true when after_flatten is undefined", async () => {
+    it("defaults form afterFlattening to true when after_flatten is undefined", async () => {
       const wrapper = createWrapper({}, {
         isEditNode: true,
         currentSelectedNodeData: { data: { name: "gamma" } },
       });
       await flushPromises();
-      expect(wrapper.vm.afterFlattening).toBe(true);
+      expect(formVals(wrapper).afterFlattening).toBe(true);
     });
 
     it("shows delete button when isEditNode is true", async () => {
@@ -381,13 +386,23 @@ describe("AssociateFunction Component", () => {
   });
 
   // -------------------------------------------------------------------------
+  // saveFunction via the real OForm (schema-gated: required + uniqueness).
   describe("saveFunction – existing function", () => {
+    it("blocks submit and does NOT call addNode when no function is selected (restored required rule)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      setField(wrapper, "selectedFunction", "");
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockAddNode).not.toHaveBeenCalled();
+    });
+
     it("calls addNode with name and after_flatten when function is valid", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      wrapper.vm.afterFlattening = true;
-      await wrapper.vm.saveFunction();
+      setField(wrapper, "selectedFunction", "alpha");
+      setField(wrapper, "afterFlattening", true);
+      await submitForm(wrapper);
       expect(mockAddNode).toHaveBeenCalledWith({
         name: "alpha",
         after_flatten: true,
@@ -397,104 +412,67 @@ describe("AssociateFunction Component", () => {
     it("emits cancel:hideform after successful save", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.selectedFunction = "beta";
-      await wrapper.vm.saveFunction();
+      setField(wrapper, "selectedFunction", "beta");
+      await submitForm(wrapper);
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
-    it("sets functionExists and does NOT call addNode when function is already associated", async () => {
+    it("blocks submit and does NOT call addNode when function is already associated (uniqueness)", async () => {
       const wrapper = createWrapper({ associatedFunctions: ["alpha"] });
       await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      await wrapper.vm.saveFunction();
-      expect(wrapper.vm.functionExists).toBe(true);
+      setField(wrapper, "selectedFunction", "alpha");
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
-    it("resets functionExists to false at the start of each save", async () => {
+    it("allows a not-yet-associated function even when others are associated", async () => {
       const wrapper = createWrapper({ associatedFunctions: ["alpha"] });
       await flushPromises();
-      wrapper.vm.functionExists = true;
-      wrapper.vm.selectedFunction = "beta";
-      await wrapper.vm.saveFunction();
-      // beta is not already associated so save succeeds and functionExists stays false
-      expect(wrapper.vm.functionExists).toBe(false);
+      setField(wrapper, "selectedFunction", "beta");
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(true);
+      expect(mockAddNode).toHaveBeenCalled();
     });
 
     it("saves with afterFlattening false correctly", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.selectedFunction = "gamma";
-      wrapper.vm.afterFlattening = false;
-      await wrapper.vm.saveFunction();
+      setField(wrapper, "selectedFunction", "gamma");
+      setField(wrapper, "afterFlattening", false);
+      await submitForm(wrapper);
       expect(mockAddNode).toHaveBeenCalledWith({
         name: "gamma",
         after_flatten: false,
       });
     });
 
-    it("skips duplicate-check when isUpdating is true (edit mode)", async () => {
+    it("skips the uniqueness check when isUpdating is true (edit mode)", async () => {
       const wrapper = createWrapper({ associatedFunctions: ["alpha"] }, {
         isEditNode: true,
         currentSelectedNodeData: { data: { name: "alpha" } },
       });
       await flushPromises();
       wrapper.vm.isUpdating = true;
-      wrapper.vm.selectedFunction = "alpha";
-      await wrapper.vm.saveFunction();
-      // In updating mode duplicate check is bypassed
-      expect(wrapper.vm.functionExists).toBe(false);
+      await nextTick();
+      setField(wrapper, "selectedFunction", "alpha");
+      await submitForm(wrapper);
+      // In updating mode the uniqueness check is bypassed → save succeeds.
+      expect(wrapper.vm.form.state.isValid).toBe(true);
       expect(mockAddNode).toHaveBeenCalled();
     });
   });
 
   // -------------------------------------------------------------------------
-  describe("saveFunction – create new function mode", () => {
-    it("shows notify when createNewFunction is true but function name is empty", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      // Provide a fake addFunctionRef with empty name
-      wrapper.vm.addFunctionRef = {
-        formData: { name: "", function: "" },
-      };
-      const { toast } = await import("@/lib/feedback/Toast/useToast");
-      vi.mocked(toast).mockClear();
-      await wrapper.vm.saveFunction();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "Function Name is required",
-        })
-      );
-      expect(mockAddNode).not.toHaveBeenCalled();
-    });
-
-    it("does NOT show notify when createNewFunction is true and function name is set", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      wrapper.vm.addFunctionRef = {
-        formData: { name: "newFunc", function: "def newFunc(r): return r" },
-      };
-      const { toast } = await import("@/lib/feedback/Toast/useToast");
-      vi.mocked(toast).mockClear();
-      await wrapper.vm.saveFunction();
-      expect(toast).not.toHaveBeenCalled();
-    });
-  });
-
-  // -------------------------------------------------------------------------
   describe("onFunctionCreation callback", () => {
-    it("sets selectedFunction to the newly created function name", async () => {
+    it("selects the newly created function in the form", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.createNewFunction = true;
       await nextTick();
       await wrapper.vm.onFunctionCreation({ name: "newFunc" });
       await flushPromises();
-      expect(wrapper.vm.selectedFunction).toBe("newFunc");
+      expect(formVals(wrapper).selectedFunction).toBe("newFunc");
     });
 
     it("sets createNewFunction back to false after function creation", async () => {
@@ -531,7 +509,6 @@ describe("AssociateFunction Component", () => {
     it("shows the confirm dialog with correct title and message", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
       await wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
@@ -543,7 +520,6 @@ describe("AssociateFunction Component", () => {
     it("dialog okCallback emits cancel:hideform", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
       await wrapper.vm.openCancelDialog();
       wrapper.vm.dialog.okCallback();
       await nextTick();
@@ -555,7 +531,6 @@ describe("AssociateFunction Component", () => {
       await flushPromises();
       mockPipelineObj.userClickedNode = { id: "x" };
       mockPipelineObj.userSelectedNode = { id: "y" };
-      wrapper.vm.selectedFunction = "alpha";
       await wrapper.vm.openCancelDialog();
       expect(mockPipelineObj.userClickedNode).toEqual({});
       expect(mockPipelineObj.userSelectedNode).toEqual({});
@@ -602,22 +577,20 @@ describe("AssociateFunction Component", () => {
 
   // -------------------------------------------------------------------------
   describe("After Flattening Toggle", () => {
-    it("toggling the after-flattening toggle changes afterFlattening state", async () => {
+    it("afterFlattening value reflects what's set on the form", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.vm.afterFlattening).toBe(true);
-      await wrapper
-        .find('[data-test="associate-function-after-flattening-toggle"]')
-        .trigger("click");
-      expect(wrapper.vm.afterFlattening).toBe(false);
+      expect(formVals(wrapper).afterFlattening).toBe(true);
+      setField(wrapper, "afterFlattening", false);
+      expect(formVals(wrapper).afterFlattening).toBe(false);
     });
 
     it("afterFlattening value is included in addNode payload", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      wrapper.vm.afterFlattening = false;
-      await wrapper.vm.saveFunction();
+      setField(wrapper, "selectedFunction", "alpha");
+      setField(wrapper, "afterFlattening", false);
+      await submitForm(wrapper);
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({ after_flatten: false })
       );
@@ -633,9 +606,11 @@ describe("AssociateFunction Component", () => {
         },
       });
       await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
-      await nextTick();
-      expect(wrapper.find('[data-test="associate-function-definition-section"]').exists()).toBe(true);
+      setField(wrapper, "selectedFunction", "alpha");
+      await flushPromises();
+      expect(
+        wrapper.find('[data-test="associate-function-definition-section"]').exists(),
+      ).toBe(true);
     });
 
     it("does NOT show function definition card when no function is selected", async () => {
@@ -651,7 +626,7 @@ describe("AssociateFunction Component", () => {
         },
       });
       await flushPromises();
-      wrapper.vm.selectedFunction = "alpha";
+      setField(wrapper, "selectedFunction", "alpha");
       wrapper.vm.createNewFunction = true;
       await nextTick();
       expect(wrapper.find('[data-test="associate-function-definition-section"]').exists()).toBe(false);

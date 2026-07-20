@@ -17,61 +17,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div :key="store.state.selectedOrganization.identifier">
-    <div class="tw:pb-2.5">
-      <div class="card-container">
-        <div class="tw:flex tw:justify-between tw:items-center tw:py-2 tw:px-3">
-          <div data-test="rum-performance-title" class="tw:text-2xl">
-            {{ t("rum.performanceSummaryLabel") }}
-          </div>
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <DateTimePickerDashboard
-              class="rum-date-time-picker"
-              ref="dateTimePicker"
-              v-model="selectedDate"
-              menu-align="end"
-            />
-            <AutoRefreshInterval
-              v-model="refreshInterval"
-              :min-refresh-interval="
-                store.state?.zoConfig?.min_auto_refresh_interval || 5
-              "
-              trigger
-              class="app-performance-auto-refresh-interval"
-              @trigger="refreshData"
-            />
-            <OButton
-              icon-left="refresh"
-              :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
-              size="icon-toolbar"
-              data-test="rum-performance-refresh"
-              @click="refreshData"
-            >
-              <OTooltip :content="isVariablesChanged ? t('dashboard.refreshToApplyVariableChanges') : t('dashboard.refresh')" />
-            </OButton>
-          </div>
-        </div>
-        <OTabs
-          class="tw:px-3"
-          v-model="activePerformanceTab"
-          align="left"
-          dense
+  <div
+    :key="store.state.selectedOrganization.identifier"
+    data-test="rum-performance-page"
+    class="w-full h-full flex flex-col min-h-0"
+  >
+    <AppPageHeader
+      :title="t('rum.performanceSummaryLabel')"
+      title-data-test="rum-performance-title"
+      icon="speed"
+      class="shrink-0 px-4 border-b border-border-default"
+    >
+      <template #actions>
+        <DateTimePickerDashboard
+          class="rum-date-time-picker"
+          ref="dateTimePicker"
+          v-model="selectedDate"
+          menu-align="end"
+        />
+        <AutoRefreshInterval
+          v-model="refreshInterval"
+          :min-refresh-interval="
+            store.state?.zoConfig?.min_auto_refresh_interval || 5
+          "
+          trigger
+          class="app-performance-auto-refresh-interval"
+          @trigger="refreshData"
+        />
+        <OButton
+          icon-left="refresh"
+          :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
+          size="icon-toolbar"
+          data-test="rum-performance-refresh"
+          @click="refreshData"
         >
-          <OTab
-            v-for="tab in tabs"
-            :key="tab.value"
-            :name="tab.value"
-            :label="tab.label"
-          />
-        </OTabs>
-      </div>
-    </div>
+          <OTooltip :content="isVariablesChanged ? t('dashboard.refreshToApplyVariableChanges') : t('dashboard.refresh')" />
+        </OButton>
+      </template>
+    </AppPageHeader>
+
+    <OTabs
+      class="shrink-0 px-3 border-b border-border-default"
+      v-model="activePerformanceTab"
+      align="left"
+      dense
+    >
+      <OTab
+        v-for="tab in tabs"
+        :key="tab.value"
+        :name="tab.value"
+        :label="tab.label"
+      />
+    </OTabs>
 
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <div class="tw:flex-1 tw:min-h-0">
+        <div class="flex-1 min-h-0">
           <div
-            class="card-container tw:h-full tw:overflow-hidden"
+            class="card-container h-full overflow-hidden"
           >
             <component
               :is="Component"
@@ -115,6 +118,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -125,6 +129,7 @@ export default defineComponent({
     DateTimePickerDashboard,
     OButton,
     OTooltip,
+    AppPageHeader,
   },
   setup() {
     const { t } = useI18n();

@@ -17,40 +17,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row-latency-bar"
-    class="tw:flex tw:flex-nowrap tw:h-[0.85rem] tw:rounded tw:overflow-hidden tw:w-full tw:bg-[var(--o2-border-color)]"
+    class="flex flex-nowrap h-[0.85rem] rounded overflow-hidden w-full bg-[var(--o2-border-color)]"
   >
     <div
       v-for="[service, svc] in serviceEntries"
       :key="service"
       data-test="trace-row-latency-segment"
-      class="tw:h-full tw:min-w-[0.125rem]"
+      class="h-full min-w-[0.125rem]"
       :style="segmentStyle(service, svc as any)"
     >
       <OTooltip side="left" align="center">
         <template #content>
           <div
-            class="tw:font-semibold tw:mb-[0.35rem] tw:tracking-[0.03rem] tw:opacity-100 tw:text-[0.75rem]"
+            class="font-semibold mb-[0.35rem] tracking-[0.03rem] opacity-100 text-[0.75rem]"
           >
-            {{ item.spans }} spans across {{ serviceEntries.length }} services
+            {{ t('traces.traceLatencyCell.spansAcrossServices', { spans: item.spans, services: serviceEntries.length }) }}
           </div>
           <div
             v-for="[s, sv] in serviceEntries"
             :key="s"
-            class="tw:grid tw:items-center tw:gap-x-[0.5rem] tw:py-[0.1rem]"
+            class="grid items-center gap-x-[0.5rem] py-[0.1rem]"
             :class="
-              s === service ? 'tw:font-bold' : 'tw:font-normal tw:opacity-75'
+              s === service ? 'font-bold' : 'font-normal opacity-75'
             "
             style="grid-template-columns: 0.5rem 1fr auto auto"
           >
             <span
-              class="tw:inline-block tw:w-[0.5rem] tw:h-[0.5rem] tw:rounded-full tw:shrink-0"
+              class="inline-block w-[0.5rem] h-[0.5rem] rounded-full shrink-0"
               :style="{ backgroundColor: serviceColors[s] || '#9e9e9e' }"
             />
-            <span class="tw:truncate">{{ s }}</span>
-            <span class="tw:text-right">{{
+            <span class="truncate">{{ s }}</span>
+            <span class="text-right">{{
               formatTimeWithSuffix((sv as any).duration)
             }}</span>
-            <span class="tw:text-right"
+            <span class="text-right"
               >{{ segmentPercent(sv as any).toFixed(1) }}%</span
             >
           </div>
@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
@@ -70,6 +71,7 @@ const props = defineProps<{
   item: Record<string, any>;
 }>();
 
+const { t } = useI18n();
 const { searchObj } = useTraces();
 const serviceColors = computed(() => searchObj.meta.serviceColors ?? {});
 

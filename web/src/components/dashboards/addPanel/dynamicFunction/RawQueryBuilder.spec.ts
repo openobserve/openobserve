@@ -168,14 +168,14 @@ describe("RawQueryBuilder", () => {
       wrapper = createWrapper();
       // OTextarea renders the native <textarea> with Tailwind resize and sizing classes
       const textareaField = wrapper.find(TEXTAREA_FIELD);
-      expect(textareaField.classes()).toContain("tw:resize-y");
-      expect(textareaField.classes()).toContain("tw:flex-1");
+      expect(textareaField.classes()).toContain("resize-y");
+      expect(textareaField.classes()).toContain("flex-1");
     });
 
     it("should be resizable vertically", () => {
       wrapper = createWrapper();
       const textareaField = wrapper.find(TEXTAREA_FIELD);
-      expect(textareaField.classes()).toContain("tw:resize-y");
+      expect(textareaField.classes()).toContain("resize-y");
     });
   });
 
@@ -386,9 +386,9 @@ WHERE level = 'error'`;
       // OTextarea renders border/rounded on its inner wrapper div and resize on the textarea
       const innerWrapper = wrapper.find(`${TEXTAREA_WRAPPER} > div`);
       const textareaField = wrapper.find(TEXTAREA_FIELD);
-      expect(innerWrapper.classes()).toContain("tw:rounded-md");
-      expect(innerWrapper.classes()).toContain("tw:border");
-      expect(textareaField.classes()).toContain("tw:resize-y");
+      expect(innerWrapper.classes()).toContain("rounded-md");
+      expect(innerWrapper.classes()).toContain("border");
+      expect(textareaField.classes()).toContain("resize-y");
     });
   });
 
@@ -526,22 +526,22 @@ WHERE level = 'error'`;
 
     it("should have proper margins on textarea", () => {
       wrapper = createWrapper();
-      // OTextarea's root wrapper div receives class="tw:mt-0.5" from parent via $attrs
+      // OTextarea's root wrapper div receives class="mt-0.5" from parent via $attrs
       const textarea = wrapper.find(TEXTAREA_WRAPPER);
-      expect(textarea.classes()).toContain("tw:mt-0.5");
+      expect(textarea.classes()).toContain("mt-0.5");
     });
 
     it("should have border styling", () => {
       wrapper = createWrapper();
       // OTextarea renders border on its inner wrapper div
       const innerWrapper = wrapper.find(`${TEXTAREA_WRAPPER} > div`);
-      expect(innerWrapper.classes()).toContain("tw:border");
+      expect(innerWrapper.classes()).toContain("border");
     });
 
     it("should have rounded corners", () => {
       wrapper = createWrapper();
       const innerWrapper = wrapper.find(`${TEXTAREA_WRAPPER} > div`);
-      expect(innerWrapper.classes()).toContain("tw:rounded-md");
+      expect(innerWrapper.classes()).toContain("rounded-md");
     });
   });
 

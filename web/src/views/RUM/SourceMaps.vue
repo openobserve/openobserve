@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="source-maps-container card-container tw:flex tw:flex-col tw:h-full tw:overflow-hidden"
+    class="source-maps-container card-container flex flex-col h-full overflow-hidden"
   >
     <!-- Filters Section -->
-    <div class="tw:p-3 tw:bg-(--q-background)">
-      <div class="tw:flex tw:justify-between tw:items-end">
-      <div class="tw:flex tw:gap-4 tw:items-end">
+    <div class="p-3 bg-(--q-background)">
+      <div class="flex justify-between items-end">
+      <div class="flex gap-4 items-end">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
@@ -68,24 +68,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </div>
 
-        <!-- Upload Button -->
-
+        <!-- Columns + Refresh + Upload Buttons -->
+        <div class="flex gap-2 items-center">
+          <OTableColumnToggle
+            :columns="columns"
+            :column-visibility="columnVisibility"
+            @update:column-visibility="setColumnVisibility"
+          />
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="isLoading"
+            data-test="source-maps-refresh-btn"
+            @click="fetchSourceMaps"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="sourceMapsRefresh" />
+          </OButton>
           <OButton
             variant="outline"
             size="sm-action"
             @click="navigateToUpload"
           >{{ t('rum.uploadSourceMaps') }}</OButton>
+        </div>
       </div>
     </div>
 
     <OSeparator />
 
     <!-- Source Maps List -->
-    <div class="source-maps-list tw:flex-1 tw:min-h-0">
+    <div class="source-maps-list flex-1 min-h-0">
       <!-- Source Maps Table (OTable handles loading skeleton) -->
         <OTable
           :data="groupedSourceMaps"
           :columns="columns"
+          :column-visibility="columnVisibility"
           row-key="id"
           :loading="isLoading"
           pagination="client"
@@ -96,30 +113,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expansion="single"
           expand-on-row-click
           v-model:expanded-ids="expandedIds"
-          class="tw:w-full"
+          class="w-full"
         >
           <template #expansion="{ row }">
-            <div class="tw:p-3 tw:bg-(--q-background) tw:border-t tw:border-(--q-border-color,var(--o2-border))">
-              <div class="tw:text-sm tw:font-medium tw:mb-2">
+            <div class="p-3 bg-(--q-background) border-t border-(--q-border-color,var(--o2-border))">
+              <div class="text-sm font-medium mb-2">
                 Source Map Files ({{ row.files.length }})
               </div>
               <ul
-                class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md"
+                class="flex flex-col divide-y divide-border border rounded-md"
                 style="max-height: 400px; overflow-y: auto;"
               >
                 <li
                   v-for="(file, index) in row.files"
                   :key="index"
                   data-test="source-maps-file-item"
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                  class="flex items-center gap-2 px-3 py-2"
                 >
-                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                    <span class="tw:block tw:text-xs tw:text-muted-foreground">Source File</span>
-                    <span class="tw:font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] tw:break-all tw:text-sm">{{ file.source_file_name }}</span>
+                  <div class="flex flex-col flex-1 min-w-0">
+                    <span class="block text-xs text-muted-foreground">Source File</span>
+                    <span class="font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] break-all text-sm">{{ file.source_file_name }}</span>
                   </div>
-                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                    <span class="tw:block tw:text-xs tw:text-muted-foreground">Source Map File</span>
-                    <span class="tw:font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] tw:break-all tw:text-sm">{{ file.source_map_file_name }}</span>
+                  <div class="flex flex-col flex-1 min-w-0">
+                    <span class="block text-xs text-muted-foreground">Source Map File</span>
+                    <span class="font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] break-all text-sm">{{ file.source_map_file_name }}</span>
                   </div>
                 </li>
               </ul>
@@ -127,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-uploaded_at="{ row }">
-            <div class="tw:cursor-pointer tw:hover:bg-black/3 tw:dark:hover:bg-white/5">{{ formatTimestamp(row.uploaded_at) }}</div>
+            <div class="cursor-pointer hover:bg-black/3 dark:hover:bg-white/5">{{ formatTimestamp(row.uploaded_at) }}</div>
           </template>
 
           <template #cell-actions="{ row }">
@@ -147,7 +164,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-source-maps"
               :filtered="!!(filters.version || filters.service || filters.environment)"
-              :hide-action="!(filters.version || filters.service || filters.environment)"
               @action="(id) => id === 'upload' && navigateToUpload()"
             />
           </template>
@@ -178,9 +194,14 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -310,12 +331,17 @@ const groupedSourceMaps = ref<any[]>([]);
 const expandedIds = ref<string[]>([]);
 
 // Table columns
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+  "rum-source-maps-list",
+);
+
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "service",
     header: t("rum.service"),
     accessorKey: "service",
     sortable: true,
+    hideable: true,
     meta: { align: "left" },
   },
   {
@@ -323,6 +349,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("common.version"),
     accessorKey: "version",
     sortable: true,
+    hideable: true,
     meta: { align: "left" },
   },
   {
@@ -330,6 +357,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("rum.environment"),
     accessorKey: "env",
     sortable: true,
+    hideable: true,
     meta: { align: "left" },
   },
   {
@@ -337,6 +365,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("rum.files"),
     accessorKey: "fileCount",
     sortable: true,
+    hideable: true,
     meta: { align: "right" },
   },
   {
@@ -344,6 +373,7 @@ const columns = computed<OTableColumnDef[]>(() => [
     header: t("rum.uploadedAt"),
     accessorKey: "uploaded_at",
     sortable: true,
+    hideable: true,
     meta: {
       align: "left",
       format: (_v: any, row: any) => formatTimestamp(row.uploaded_at),
@@ -500,4 +530,8 @@ onMounted(async () => {
   await fetchFilterValues();
   fetchSourceMaps();
 });
+
+useShortcuts([
+  { id: "sourceMapsRefresh", handler: () => { if (!isInputFocused()) fetchSourceMaps(); } },
+]);
 </script>

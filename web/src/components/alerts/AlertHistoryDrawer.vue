@@ -18,42 +18,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer data-test="alert-history-drawer"
     :open="open"
     :width="65"
-    :title="t('alert_list.alert_history')"
+    :title="alertDetails?.name"
+    :title-data-test="'alert-history-name-badge'"
+    :sub-title="t('alert_list.alert_history')"
     @update:open="emit('update:open', $event)"
   >
-    <!-- #header override required: header contains alert name/type badges,
-         tab toggle, and datetime picker — too complex for title + sub-slots -->
+    <!-- The alert name is the drawer title and "History" its subtitle (matching
+         the other detail headers); the type badge + History/Condition toggle
+         trail in header-left, the datetime picker sits in header-right. -->
     <template #header-left>
           <div
-            class="tw:flex tw:items-center tw:gap-2 tw:flex-1 tw:min-w-0"
+            class="flex items-center gap-2 flex-1 min-w-0"
             data-test="alert-details-title"
           >
-            <!-- Alert Name Badge — truncates so a long name can never push the
-                 tab toggle into the datetime picker; full name stays in tooltip -->
-            <span
-              v-if="alertDetails"
-              :class="[
-                'tw:font-semibold tw:text-[18px] tw:mr-2 tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:min-w-0 tw:truncate',
-                store.state.theme === 'dark'
-                  ? 'tw:text-blue-400 tw:bg-blue-900/50'
-                  : 'tw:text-blue-600 tw:bg-blue-50',
-              ]"
-              data-test="alert-history-name-badge"
-            >
-              {{ alertDetails.name }}
-              <OTooltip
-                v-if="alertDetails.name"
-                :content="alertDetails.name"
-              />
-            </span>
             <!-- Alert Type Badge -->
             <div
               v-if="alertDetails"
               :class="[
-                'tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:rounded-md tw:border tw:shrink-0',
+                'flex items-center gap-1 px-2 py-1 rounded-md border shrink-0',
                 store.state.theme === 'dark'
-                  ? 'tw:bg-gray-800/50 tw:border-gray-600'
-                  : 'tw:bg-gray-50 tw:border-gray-200',
+                  ? 'bg-gray-800/50 border-gray-600'
+                  : 'bg-gray-50 border-gray-200',
               ]"
             >
               <OIcon
@@ -65,14 +50,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : 'schedule'
                 "
                 size="sm"
-                class="tw:opacity-70"
+                class="opacity-70"
               />
               <span
                 :class="[
-                  'tw:text-xs tw:font-semibold',
+                  'text-xs font-semibold',
                   store.state.theme === 'dark'
-                    ? 'tw:text-gray-200'
-                    : 'tw:text-gray-800',
+                    ? 'text-gray-200'
+                    : 'text-gray-800',
                 ]"
               >
                 {{
@@ -86,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Tab toggle -->
             <OToggleGroup
-              class="tw:shrink-0"
+              class="shrink-0"
               :model-value="activeTab"
               @update:model-value="activeTab = $event as string"
             >
@@ -114,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
     </template>
     <template #header-right>
-      <div class="col-auto tw:flex tw:items-center tw:gap-1">
+      <div class="col-auto flex items-center gap-1">
         <DateTime
           :style="activeTab !== 'history' ? 'visibility: hidden' : ''"
           ref="dateTimeRef"
@@ -132,12 +117,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content -->
-    <div class="tw:flex tw:flex-col tw:h-[calc(100vh-4rem)]" v-if="alertDetails">
+    <div class="flex flex-col h-[calc(100vh-4rem)]" v-if="alertDetails">
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
         animated
-        class="tw:flex-1 tw:overflow-hidden tw:bg-transparent"
+        class="flex-1 overflow-hidden bg-transparent"
         style="display: flex; flex-direction: column"
       >
         <!-- History Panel -->
@@ -145,56 +130,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="history"
           layout="flex-col"
           stretch
-          class="tw:flex-1"
+          class="flex-1"
         >
           <div
-            class="tw:flex tw:h-full tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
+            class="flex h-full flex-col flex-1 overflow-hidden px-2 py-2"
           >
             <!-- Empty state -->
-            <div
+            <OEmptyState
               v-if="!isLoadingHistory && alertHistory.length === 0"
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:gap-2"
-            >
-              <div
-                class="tw:w-14 tw:h-14 tw:rounded-full tw:flex tw:items-center tw:justify-center tw:mb-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:bg-gray-800'
-                    : 'tw:bg-gray-100'
-                "
-              >
-                <OIcon
-                  name="history-toggle-off"
-                  size="lg"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
-                />
-              </div>
-              <div
-                class="tw:text-sm tw:font-medium"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:text-gray-400'
-                    : 'tw:text-gray-600'
-                "
-              >
-                {{ t("alerts.alertDetails.noHistoryAvailable") }}
-              </div>
-              <div
-                class="tw:text-xs"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'tw:text-gray-600'
-                    : 'tw:text-gray-400'
-                "
-              >
-                Try expanding the time range
-              </div>
-            </div>
+              size="block"
+              illustration="history"
+              :title="t('alerts.alertDetails.noHistoryAvailable')"
+              :description="t('alerts.alertDetails.tryExpandingTimeRange')"
+              :hide-action="true"
+              class="flex-1"
+            />
 
             <!-- History Table -->
             <div
               v-else
-              class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:gap-2"
+              class="flex flex-col flex-1 overflow-hidden gap-2"
             >
               <!-- Firing frequency timeline -->
               <AlertHistoryTimeline
@@ -203,11 +158,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <div
-                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
+                class="rounded-lg overflow-hidden border flex flex-col flex-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:border-[#374151]'
-                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
+                    ? 'border-[#374151]'
+                    : 'border-[#e5e7eb] bg-[#f9fafb]'
                 "
               >
                 <OTable
@@ -222,14 +177,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :row-class="getRowClass"
                   :default-columns="false"
                   :show-global-filter="false"
-                  class="history-table tw:flex-1 tw:overflow-hidden tw:!border-0 tw:!shadow-none"
+                  class="history-table flex-1 overflow-hidden !border-0 !shadow-none"
                   data-test="alert-details-history-table"
                   @pagination-change="onPaginationChange"
                 >
                   <template #[`cell-#`]="{ row }">
                     <span
-                      class="tw:text-[13px] tw:tabular-nums"
-                      :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
+                      class="text-[13px] tabular-nums"
+                      :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'"
                     >
                       {{ row._displayIndex ?? '—' }}
                     </span>
@@ -237,20 +192,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <template #cell-status="{ row }">
                     <!-- Flapping group row -->
-                    <div v-if="row._flappingGroup" class="tw:flex tw:items-center tw:gap-1.5">
+                    <div v-if="row._flappingGroup" class="flex items-center gap-1.5">
                       <OIcon
                         :name="expandedGroups.has(row.timestamp) ? 'expand-less' : 'expand-more'"
                         size="sm"
-                        class="tw:cursor-pointer tw:opacity-50 tw:shrink-0"
+                        class="cursor-pointer opacity-50 shrink-0"
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
-                      <OTag type="alertState" value="flapping" class="tw:cursor-pointer tw:shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
-                      <span class="tw:text-[11px] tw:truncate" style="color: var(--color-text-secondary)">
+                      <OTag type="alertState" value="flapping" class="cursor-pointer shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
+                      <span class="text-[11px] truncate" style="color: var(--color-text-secondary)">
                         {{ row._children.length }} rows · {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
-                    <span v-else class="tw:inline-flex tw:cursor-default">
+                    <span v-else class="inline-flex cursor-default">
                       <OTag
                         type="alertState"
                         :value="row.status"
@@ -261,39 +216,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template #cell-timestamp="{ row }">
-                    <span class="tw:text-[13px] tw:tabular-nums tw:whitespace-nowrap" :class="row._child ? 'tw:pl-5 tw:opacity-70' : ''">
+                    <span class="text-[13px] tabular-nums whitespace-nowrap" :class="row._child ? 'pl-5 opacity-70' : ''">
                       {{ formatTimestampFull(row.timestamp) }}
                     </span>
                   </template>
 
                   <template #cell-evaluation_time="{ row }">
-                    <span class="tw:text-[13px] tw:tabular-nums">
+                    <span class="text-[13px] tabular-nums">
                       {{ row.evaluation_took_in_secs ? row.evaluation_took_in_secs.toFixed(3) + "s" : "—" }}
                     </span>
                   </template>
 
                   <template #cell-query_time="{ row }">
-                    <span class="tw:text-[13px] tw:tabular-nums">
+                    <span class="text-[13px] tabular-nums">
                       {{ row.query_took ? row.query_took + "ms" : "—" }}
                     </span>
                   </template>
 
                   <template #cell-anomaly_count="{ row }">
                     <span
-                      class="tw:text-[13px] tw:tabular-nums"
-                      :class="row.anomaly_count > 0 ? 'tw:text-red-500 tw:font-medium' : ''"
+                      class="text-[13px] tabular-nums"
+                      :class="row.anomaly_count > 0 ? 'text-red-500 font-medium' : ''"
                     >
                       {{ row.anomaly_count != null ? row.anomaly_count : "—" }}
                     </span>
                   </template>
 
                   <template #cell-error="{ row }">
-                    <span class="tw:text-[13px]">{{ row.error || "—" }}</span>
+                    <span class="text-[13px]">{{ row.error || "—" }}</span>
                   </template>
 
                   <template #bottom>
-                    <div class="tw:flex tw:items-center tw:w-full tw:h-[48px]">
-                      <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[220px]">
+                    <div class="flex items-center w-full h-[48px]">
+                      <div class="o2-table-footer-title flex items-center w-[220px]">
                         {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
                       </div>
                     </div>
@@ -309,36 +264,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="condition"
           layout="flex-col"
           stretch
-          class="tw:flex-1"
+          class="flex-1"
         >
           <div
-            class="tw:flex tw:flex-col tw:flex-1 tw:overflow-hidden tw:px-2 tw:py-2"
+            class="flex flex-col flex-1 overflow-hidden px-2 py-2"
           >
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
               <div
-                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
+                class="rounded-lg overflow-hidden border flex flex-col flex-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:border-[#374151]'
-                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
+                    ? 'border-[#374151]'
+                    : 'border-[#e5e7eb] bg-[#f9fafb]'
                 "
               >
                 <div
-                  class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2.5 tw:border-b tw:shrink-0"
+                  class="flex items-center justify-between py-1.5 px-2.5 border-b shrink-0"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:border-[#374151]'
-                      : 'tw:bg-[#f3f4f6] tw:border-[#e5e7eb]'
+                      ? 'border-[#374151]'
+                      : 'bg-[#f3f4f6] border-[#e5e7eb]'
                   "
                 >
-                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                  <div class="flex items-center gap-1.5">
                     <span
-                      class="tw:text-[11px] tw:font-medium"
+                      class="text-[11px] font-medium"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-gray-400'
-                          : 'tw:text-gray-500'
+                          ? 'text-gray-400'
+                          : 'text-gray-500'
                       "
                     >
                       SQL
@@ -356,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <pre
-                  class="tw:p-[10px_14px] tw:font-mono tw:whitespace-pre-wrap tw:overflow-x-auto tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-[13px] m-0 leading-relaxed flex-1 overflow-y-auto"
                   >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
                 >
               </div>
@@ -365,29 +320,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Regular alert condition view -->
             <template v-else>
               <div
-                class="tw:rounded-lg tw:overflow-hidden tw:border tw:flex tw:flex-col tw:flex-1"
+                class="rounded-lg overflow-hidden border flex flex-col flex-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:border-[#374151]'
-                    : 'tw:border-[#e5e7eb] tw:bg-[#f9fafb]'
+                    ? 'border-[#374151]'
+                    : 'border-[#e5e7eb] bg-[#f9fafb]'
                 "
               >
                 <!-- Code block header bar — stays fixed -->
                 <div
-                  class="tw:flex tw:items-center tw:justify-between tw:py-1.5 tw:px-2.5 tw:border-b tw:shrink-0"
+                  class="flex items-center justify-between py-1.5 px-2.5 border-b shrink-0"
                   :class="
                     store.state.theme === 'dark'
-                      ? 'tw:border-[#374151]'
-                      : 'tw:bg-[#f3f4f6] tw:border-[#e5e7eb]'
+                      ? 'border-[#374151]'
+                      : 'bg-[#f3f4f6] border-[#e5e7eb]'
                   "
                 >
-                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                  <div class="flex items-center gap-1.5">
                     <span
-                      class="tw:text-[11px] tw:font-medium"
+                      class="text-[11px] font-medium"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-gray-400'
-                          : 'tw:text-gray-500'
+                          ? 'text-gray-400'
+                          : 'text-gray-500'
                       "
                     >
                       {{
@@ -427,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
-                  class="tw:p-[10px_14px] tw:font-mono tw:whitespace-pre-wrap tw:overflow-x-auto tw:text-[13px] tw:m-0 tw:leading-relaxed tw:flex-1 tw:overflow-y-auto"
+                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-[13px] m-0 leading-relaxed flex-1 overflow-y-auto"
                   >{{
                     alertDetails.conditions !== "" &&
                     alertDetails.conditions !== "--"
@@ -444,24 +399,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Description (only show if exists) -->
-            <div v-if="alertDetails.description" class="tw:mt-3 tw:shrink-0">
+            <div v-if="alertDetails.description" class="mt-3 shrink-0">
               <div
-                class="tw:flex tw:items-center tw:gap-1.5 tw:text-[12px] tw:font-semibold tw:uppercase tw:tracking-wider tw:mb-1"
+                class="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider mb-1"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:text-gray-400'
-                    : 'tw:text-gray-500'
+                    ? 'text-gray-400'
+                    : 'text-gray-500'
                 "
               >
                 <OIcon name="info-outline" size="xs" />
                 {{ t("common.description") }}
               </div>
               <div
-                class="tw:text-[13px] tw:px-3 tw:py-2 tw:rounded tw:leading-relaxed"
+                class="text-[13px] px-3 py-2 rounded leading-relaxed"
                 :class="
                   store.state.theme === 'dark'
-                    ? 'tw:bg-gray-800 tw:text-gray-300'
-                    : 'tw:bg-gray-50 tw:text-gray-700'
+                    ? 'bg-gray-800 text-gray-300'
+                    : 'bg-gray-50 text-gray-700'
                 "
               >
                 {{ alertDetails.description }}
@@ -486,6 +441,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -821,15 +777,15 @@ const historyTableColumns = computed(() =>
 
 const getRowClass = (row: any) => {
   if (row?._flappingGroup) {
-    return store.state.theme === "dark" ? "tw:!bg-[#1e1a2e]" : "tw:!bg-[#f5f3ff]";
+    return store.state.theme === "dark" ? "!bg-[#1e1a2e]" : "!bg-[#f5f3ff]";
   }
   if (row?._child) {
-    return store.state.theme === "dark" ? "tw:!bg-[#1a1a1a]" : "tw:!bg-[#fafafa]";
+    return store.state.theme === "dark" ? "!bg-[#1a1a1a]" : "!bg-[#fafafa]";
   }
   const status = row?.status?.toLowerCase();
   const isFiringStatus = status === "firing" || status === "error" || status === "anomaly" || status === "completed";
   if (isFiringStatus) {
-    return store.state.theme === "dark" ? "tw:!bg-[#2d1b1b]" : "tw:!bg-[#fff5f5]";
+    return store.state.theme === "dark" ? "!bg-[#2d1b1b]" : "!bg-[#fff5f5]";
   }
   return "";
 };

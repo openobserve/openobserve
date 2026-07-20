@@ -14,9 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, config } from "@vue/test-utils";
 import { nextTick } from "vue";
+import i18n from "@/locales";
 import VariableAdHocValueSelector from "./VariableAdHocValueSelector.vue";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Mock vuex store
 const mockStore = {

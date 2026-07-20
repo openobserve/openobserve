@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
     type="spanStatus"
     :value="status || 'unset'"
     :label="status || 'UNSET'"
-    class="tw:uppercase"
+    class="uppercase"
   />
 </template>
 

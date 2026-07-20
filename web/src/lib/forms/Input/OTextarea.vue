@@ -77,15 +77,15 @@ watch(
 const fieldWidthClass = computed(() => {
   switch (props.width) {
     case "xs":
-      return "tw:w-[var(--spacing-field-width-xs)]";
+      return "w-[var(--spacing-field-width-xs)]";
     case "sm":
-      return "tw:w-[var(--spacing-field-width-sm)]";
+      return "w-[var(--spacing-field-width-sm)]";
     case "md":
-      return "tw:w-[var(--spacing-field-width-md)]";
+      return "w-[var(--spacing-field-width-md)]";
     case "lg":
-      return "tw:w-[var(--spacing-field-width-lg)]";
+      return "w-[var(--spacing-field-width-lg)]";
     default:
-      return "tw:w-full";
+      return "w-full";
   }
 });
 
@@ -95,18 +95,18 @@ const charCount = computed(() => {
 });
 
 const wrapperClasses = computed(() => [
-  "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
-  "tw:ring-offset-1 tw:ring-offset-surface-base",
-  "tw:bg-input-bg",
+  "flex items-stretch w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "ring-offset-1 ring-offset-surface-base",
+  "bg-input-bg",
   /* Keep the red error border on focus (don't let the focus color override it);
      focus border color applies only when there's no error. See OInput.vue. */
   hasError.value
-    ? "tw:border-input-border-error"
-    : "tw:border-input-border tw:hover:border-input-border-hover tw:focus-within:border-input-border-focus",
+    ? "border-input-border-error"
+    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus",
   /* Same opacity+dashed treatment as OInput so disabled textareas are
      visually obvious vs enabled ones. */
   props.disabled
-    ? "tw:bg-input-disabled-bg tw:border-input-disabled-border tw:cursor-not-allowed tw:border-dashed"
+    ? "bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed"
     : "",
 ]);
 </script>
@@ -115,9 +115,9 @@ const wrapperClasses = computed(() => [
   <div
     v-bind="wrapperAttrs"
     :class="[
-      'tw:flex tw:flex-col tw:gap-1',
+      'flex flex-col gap-1',
       fieldWidthClass,
-      fill && 'tw:h-full tw:min-h-0',
+      fill && 'h-full min-h-0',
     ]"
   >
     <!-- Label -->
@@ -125,22 +125,22 @@ const wrapperClasses = computed(() => [
       v-if="label || $slots.tooltip"
       :for="textareaId"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1',
+        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
         props.disabled && 'o-input-label--disabled',
       ]"
     >
-      {{ label }}<span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+      {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help"
+        class="cursor-help"
       ><slot name="tooltip" /></OIcon>
     </label>
 
     <!-- Textarea wrapper -->
-    <div :class="[wrapperClasses, fill && 'tw:flex-1 tw:min-h-0']">
+    <div :class="[wrapperClasses, fill && 'flex-1 min-h-0']">
       <textarea
         :id="textareaId"
         ref="textareaRef"
@@ -157,12 +157,12 @@ const wrapperClasses = computed(() => [
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
-          'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none',
-          'tw:text-input-text tw:placeholder:text-input-placeholder',
-          'tw:disabled:cursor-not-allowed',
-          'tw:py-2 tw:px-3 tw:text-sm',
-          fill ? 'tw:h-full tw:min-h-0 tw:resize-none' : 'tw:min-h-[80px]',
-          !fill && (autogrow ? 'tw:resize-none' : 'tw:resize-y'),
+          'flex-1 min-w-0 bg-transparent outline-none',
+          'text-input-text placeholder:text-input-placeholder',
+          'disabled:cursor-not-allowed',
+          'py-2 px-3 text-sm',
+          fill ? 'h-full min-h-0 resize-none' : 'min-h-[80px]',
+          !fill && (autogrow ? 'resize-none' : 'resize-y'),
         ]"
         @input="
           emit(
@@ -179,31 +179,31 @@ const wrapperClasses = computed(() => [
     <!-- Bottom row: helpText / error / counter -->
     <div
       v-if="effectiveError || helpText || maxlength"
-      class="tw:flex tw:items-center tw:justify-between tw:gap-2"
+      class="flex items-center justify-between gap-2"
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-        class="tw:text-xs tw:text-input-error-text tw:leading-none"
+        class="text-xs text-input-error-text leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
       <span
         v-else-if="helpText"
-        class="tw:text-xs tw:text-input-hint tw:leading-none"
+        class="text-xs text-input-hint leading-none"
       >
         {{ helpText }}
       </span>
-      <span v-else class="tw:flex-1" />
+      <span v-else class="flex-1" />
 
       <span
         v-if="maxlength"
         :class="[
-          'tw:text-xs tw:leading-none tw:tabular-nums tw:shrink-0',
+          'text-xs leading-none tabular-nums shrink-0',
           charCount > maxlength
-            ? 'tw:text-input-error-text'
-            : 'tw:text-input-hint',
+            ? 'text-input-error-text'
+            : 'text-input-hint',
         ]"
       >
         {{ charCount }}/{{ maxlength }}

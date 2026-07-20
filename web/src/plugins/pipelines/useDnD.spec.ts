@@ -42,25 +42,12 @@ vi.mock("@vue-flow/core", () => ({
   },
 }));
 
-vi.mock("quasar", () => ({
-  Notify: {
-    create: vi.fn(),
-  },
-  useQuasar: () => ({
-    notify: vi.fn(),
-  }),
-}));
-
 describe("useDragAndDrop", () => {
   let useDnD: any;
-  let mockQuasar: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     useDnD = useDragAndDrop();
-    mockQuasar = {
-      notify: vi.fn(),
-    };
     // Mock the global document
     Object.defineProperty(global, 'document', {
       value: {

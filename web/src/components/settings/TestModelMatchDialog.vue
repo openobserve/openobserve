@@ -15,33 +15,33 @@
   >
 
     <!-- Two-column body -->
-    <div class="tw:flex tw:flex-1 tw:overflow-hidden tw:min-h-0" style="height: 100%">
+    <div class="flex flex-1 overflow-hidden min-h-0" style="height: 100%">
         <!-- ── Left: Inputs ── -->
-        <div class="tw:w-[340px] tw:shrink-0 tw:overflow-y-auto tw:py-5 tw:pr-5 tw:pl-6 tw:flex tw:flex-col tw:gap-5">
+        <div class="w-[340px] shrink-0 overflow-y-auto py-5 pr-5 pl-6 flex flex-col gap-5">
           <!-- Model Name -->
-          <div class="tw:flex tw:flex-col tw:gap-[6px]">
-            <label class="tw:text-[13px] tw:font-semibold tw:text-(--color-text-primary)"
+          <div class="flex flex-col gap-[6px]">
+            <label class="text-[13px] font-semibold text-(--color-text-primary)"
               >{{ t("modelPricing.modelNameInput") }}
-              <span class="tw:text-[#ef4444]">*</span></label
+              <span class="text-[#ef4444]">*</span></label
             >
-            <div class="tw:text-xs tw:opacity-50 tw:leading-normal tw:mb-0.5">
+            <div class="text-xs opacity-50 leading-normal mb-0.5">
               {{ t("modelPricing.modelNameHint") }}
             </div>
             <OInput
               ref="modelInputRef"
               v-model="testModelName"
-              placeholder="e.g. gpt-4-turbo"
+              :placeholder="t('settings.testModelMatchDialog.modelNamePlaceholder')"
               data-test="test-match-model-input"
             >
               <template #icon-left>
-                <OIcon name="smart-toy" size="sm" class="tw:opacity-[0.35] tw:shrink-0" />
+                <OIcon name="smart-toy" size="sm" class="opacity-[0.35] shrink-0" />
               </template>
               <template #icon-right>
                 <OButton
                   v-if="testModelName"
                   variant="ghost"
                   size="icon"
-                  class="tw:opacity-[0.35] tw:hover:opacity-70"
+                  class="opacity-[0.35] hover:opacity-70"
                   @click="clearAndFocus"
                   data-test="test-match-clear-btn"
                 >
@@ -53,20 +53,20 @@
         </div>
 
         <!-- ── Vertical divider ── -->
-        <div class="tw:w-px tw:bg-(--o2-border-color) tw:shrink-0"></div>
+        <div class="w-px bg-(--o2-border-color) shrink-0"></div>
 
         <!-- ── Right: Live Results ── -->
-        <div class="tw:flex-1 tw:overflow-y-auto tw:py-5 tw:pl-5 tw:pr-6">
+        <div class="flex-1 overflow-y-auto py-5 pl-5 pr-6">
           <transition name="tmm-fade" mode="out-in">
             <!-- Empty state -->
             <div
               v-if="!testModelName"
               key="empty"
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:min-h-[200px] tw:gap-[10px]"
+              class="flex flex-col items-center justify-center h-full min-h-[200px] gap-[10px]"
               data-test="test-match-empty"
             >
-              <OIcon name="manage-search" size="xl" class="tw:opacity-[0.12]" />
-              <div class="tw:text-[13px] tw:opacity-[0.35] tw:text-center">
+              <OIcon name="manage-search" size="xl" class="opacity-[0.12]" />
+              <div class="text-[13px] opacity-[0.35] text-center">
                 {{ t("modelPricing.enterModelName") }}
               </div>
             </div>
@@ -75,11 +75,11 @@
             <div
               v-else-if="testResult === null"
               key="waiting"
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:min-h-[200px] tw:gap-[10px]"
+              class="flex flex-col items-center justify-center h-full min-h-[200px] gap-[10px]"
               data-test="test-match-waiting"
             >
-              <OIcon name="ads-click" size="xl" class="tw:opacity-[0.12]" />
-              <div class="tw:text-[13px] tw:opacity-[0.35] tw:text-center">
+              <OIcon name="ads-click" size="xl" class="opacity-[0.12]" />
+              <div class="text-[13px] opacity-[0.35] text-center">
                 {{ t("modelPricing.clickToTest") }}
               </div>
             </div>
@@ -88,18 +88,18 @@
             <div
               v-else-if="!testResult?.matched"
               key="no-match"
-              class="tw:flex tw:flex-col tw:gap-3"
+              class="flex flex-col gap-3"
               data-test="test-match-no-result"
             >
-              <div class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-[14px] tw:rounded-lg tw:border tw:bg-[rgba(239,68,68,0.04)] tw:border-[rgba(239,68,68,0.15)] tw:dark:bg-[rgba(239,68,68,0.08)] tw:dark:border-[rgba(239,68,68,0.2)]">
-                <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[rgba(239,68,68,0.1)] tw:text-[#dc2626]">
+              <div class="flex items-center gap-3 py-3 px-[14px] rounded-lg border bg-[rgba(239,68,68,0.04)] border-[rgba(239,68,68,0.15)] dark:bg-[rgba(239,68,68,0.08)] dark:border-[rgba(239,68,68,0.2)]">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[rgba(239,68,68,0.1)] text-[#dc2626]">
                   <OIcon name="error-outline" size="md" />
                 </div>
                 <div>
-                  <div class="tw:text-[13px] tw:font-bold tw:text-[#b91c1c] tw:dark:text-[#fca5a5]">
+                  <div class="text-[13px] font-bold text-[#b91c1c] dark:text-[#fca5a5]">
                     {{ t("modelPricing.noMatchFound") }}
                   </div>
-                  <div class="tw:text-xs tw:mt-0.5 tw:opacity-70">
+                  <div class="text-xs mt-0.5 opacity-70">
                     {{
                       t("modelPricing.noMatchDesc", {
                         modelName: testModelName,
@@ -108,11 +108,11 @@
                   </div>
                 </div>
               </div>
-              <div class="tw:py-3 tw:px-[14px] tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:dark:bg-[rgba(255,255,255,0.02)] tw:border tw:border-(--o2-border-color)">
-                <div class="tw:text-[11px] tw:font-semibold tw:opacity-55 tw:mb-[6px]">
+              <div class="py-3 px-[14px] rounded-lg bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] border border-(--o2-border-color)">
+                <div class="text-[11px] font-semibold opacity-55 mb-[6px]">
                   {{ t("modelPricing.troubleshootingTitle") }}
                 </div>
-                <ul class="tw:m-0 tw:pl-4 tw:text-xs tw:leading-[1.9] tw:opacity-60">
+                <ul class="m-0 pl-4 text-xs leading-[1.9] opacity-60">
                   <li>{{ t("modelPricing.tip1") }}</li>
                   <li>{{ t("modelPricing.tip2") }}</li>
                   <li>{{ t("modelPricing.tip3") }}</li>
@@ -124,20 +124,20 @@
             <div
               v-else
               key="match"
-              class="tw:flex tw:flex-col tw:gap-3"
+              class="flex flex-col gap-3"
               data-test="test-match-result"
             >
               <!-- Match status -->
-              <div class="tw:flex tw:items-center tw:gap-3 tw:py-3 tw:px-[14px] tw:rounded-lg tw:border tw:bg-[rgba(22,163,74,0.05)] tw:border-[rgba(22,163,74,0.2)] tw:dark:bg-[rgba(22,163,74,0.08)] tw:dark:border-[rgba(22,163,74,0.25)]">
-                <div class="tw:w-8 tw:h-8 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:bg-[rgba(22,163,74,0.12)] tw:text-[#16a34a]">
+              <div class="flex items-center gap-3 py-3 px-[14px] rounded-lg border bg-[rgba(22,163,74,0.05)] border-[rgba(22,163,74,0.2)] dark:bg-[rgba(22,163,74,0.08)] dark:border-[rgba(22,163,74,0.25)]">
+                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[rgba(22,163,74,0.12)] text-[#16a34a]">
                   <OIcon name="check-circle" size="md" />
                 </div>
-                <div class="tw:flex-1 tw:min-w-0">
-                  <div class="tw:text-[13px] tw:font-bold tw:text-[#15803d] tw:dark:text-[#4ade80]">
+                <div class="flex-1 min-w-0">
+                  <div class="text-[13px] font-bold text-[#15803d] dark:text-[#4ade80]">
                     {{ t("modelPricing.matchFound") }}
                   </div>
-                  <div class="tw:text-xs tw:mt-0.5 tw:opacity-70 tw:truncate">
-                    <code class="tw:inline tw:py-px tw:px-[6px] tw:rounded tw:text-xs tw:font-semibold tw:font-[SF_Mono,JetBrains_Mono,monospace] tw:bg-[rgba(22,163,74,0.08)] tw:border tw:border-[rgba(22,163,74,0.2)] tw:text-inherit">{{
+                  <div class="text-xs mt-0.5 opacity-70 truncate">
+                    <code class="inline py-px px-[6px] rounded text-xs font-semibold font-[SF_Mono,JetBrains_Mono,monospace] bg-[rgba(22,163,74,0.08)] border border-[rgba(22,163,74,0.2)] text-inherit">{{
                       testResult.matched.name
                     }}</code>
                   </div>
@@ -145,43 +145,43 @@
                 <OTag
                   type="modelSource"
                   :value="testResult.matched.source || 'org'"
-                  class="tw:shrink-0 tw:text-[11px] tw:font-semibold tw:ml-auto"
+                  class="shrink-0 text-[11px] font-semibold ml-auto"
                 >
                   {{ sourceLabel(testResult.matched) }}
                 </OTag>
               </div>
 
               <!-- Priority flow -->
-              <div class="tw:py-3 tw:px-[14px] tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:bg-[rgba(0,0,0,0.015)] tw:dark:bg-[rgba(255,255,255,0.02)]">
-                <div class="tw:text-[10px] tw:font-semibold tw:opacity-40 tw:mb-2">
+              <div class="py-3 px-[14px] border border-(--o2-border-color) rounded-lg bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)]">
+                <div class="text-[10px] font-semibold opacity-40 mb-2">
                   {{ t("modelPricing.matchPriority") }}
                 </div>
-                <div class="tw:flex tw:items-center tw:gap-[6px] tw:flex-wrap">
+                <div class="flex items-center gap-[6px] flex-wrap">
                   <template
                     v-for="(step, sIdx) in matchFlowSteps"
                     :key="step.key"
                   >
-                    <div class="tw:opacity-30" v-if="sIdx > 0">
+                    <div class="opacity-30" v-if="sIdx > 0">
                       <OIcon name="arrow-forward" size="xs" />
                     </div>
                     <div
-                      class="tw:flex tw:items-center tw:gap-[5px] tw:py-[5px] tw:px-[10px] tw:rounded-md tw:border tw:border-(--o2-border-color) tw:text-[11px] tw:font-medium tw:bg-transparent"
+                      class="flex items-center gap-[5px] py-[5px] px-[10px] rounded-md border border-(--o2-border-color) text-[11px] font-medium bg-transparent"
                       :class="{
-                        'tw:border-[#16a34a] tw:bg-[rgba(22,163,74,0.06)] tw:font-bold tw:dark:bg-[rgba(22,163,74,0.1)]': step.key === winnerSource,
-                        'tw:opacity-40': step.key !== winnerSource,
+                        'border-[#16a34a] bg-[rgba(22,163,74,0.06)] font-bold dark:bg-[rgba(22,163,74,0.1)]': step.key === winnerSource,
+                        'opacity-40': step.key !== winnerSource,
                       }"
                     >
                       <OIcon
                         :name="step.icon"
                         size="sm"
-                        class="tw:opacity-60"
+                        class="opacity-60"
                       />
                       <span>{{ step.label }}</span>
                       <OIcon
                         v-if="step.key === winnerSource"
                         name="check-circle"
                         size="xs"
-                        class="tw:text-[#16a34a]"
+                        class="text-[#16a34a]"
                       />
                     </div>
                   </template>
@@ -189,48 +189,48 @@
               </div>
 
               <!-- Tier + cost card -->
-              <div class="tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
-                <div class="tw:py-3 tw:px-[14px] tw:bg-[rgba(0,0,0,0.02)] tw:dark:bg-[rgba(255,255,255,0.03)] tw:border-b tw:border-(--o2-border-color)">
+              <div class="border border-(--o2-border-color) rounded-lg overflow-hidden">
+                <div class="py-3 px-[14px] bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.03)] border-b border-(--o2-border-color)">
                   <div>
-                    <div class="tw:text-[13px] tw:font-bold">
-                      {{ testResult.tier || "Default" }}
+                    <div class="text-[13px] font-bold">
+                      {{ testResult.tier || t("settings.testModelMatchDialog.defaultTier") }}
                     </div>
                     <div
-                      class="tw:text-[11px] tw:opacity-50 tw:mt-0.5"
+                      class="text-[11px] opacity-50 mt-0.5"
                       v-if="matchedTierDef?.condition"
                     >
-                      Condition:
-                      <code class="tmm-cost-tier-desc-code tw:py-px tw:px-1 tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.05)] tw:dark:bg-[rgba(255,255,255,0.08)] tw:text-[11px]"
+                      {{ t("settings.testModelMatchDialog.condition") }}
+                      <code class="tmm-cost-tier-desc-code py-px px-1 rounded-[3px] bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.08)] text-[11px]"
                         >{{ matchedTierDef.condition.usage_key }}
                         {{ operatorSymbol(matchedTierDef.condition.operator) }}
                         {{ matchedTierDef.condition.value }}</code
                       >
                     </div>
-                    <div class="tw:text-[11px] tw:opacity-50 tw:mt-0.5" v-else>
+                    <div class="text-[11px] opacity-50 mt-0.5" v-else>
                       {{ t("modelPricing.defaultPricingTier") }}
                     </div>
                   </div>
                 </div>
 
-                <div class="tw:text-xs" v-if="pricingRows.length > 0">
-                  <div class="tw:grid tw:gap-2 tw:py-[7px] tw:px-[14px] tw:border-b tw:border-(--o2-border-color) tw:bg-[rgba(0,0,0,0.015)] tw:dark:bg-[rgba(255,255,255,0.02)] tw:[grid-template-columns:1.5fr_1fr]">
-                    <span class="tw:text-[10px] tw:font-semibold tw:opacity-40">{{ t("modelPricing.usageType") }}</span>
-                    <span class="tw:text-[10px] tw:font-semibold tw:opacity-40 tw:text-right">{{
+                <div class="text-xs" v-if="pricingRows.length > 0">
+                  <div class="grid gap-2 py-[7px] px-[14px] border-b border-(--o2-border-color) bg-[rgba(0,0,0,0.015)] dark:bg-[rgba(255,255,255,0.02)] [grid-template-columns:1.5fr_1fr]">
+                    <span class="text-[10px] font-semibold opacity-40">{{ t("modelPricing.usageType") }}</span>
+                    <span class="text-[10px] font-semibold opacity-40 text-right">{{
                       t("modelPricing.pricePerMTokens")
                     }}</span>
                   </div>
                   <div
                     v-for="row in pricingRows"
                     :key="row.key"
-                    class="tmm-cost-table-row tw:grid tw:gap-2 tw:py-2 tw:px-[14px] tw:text-xs tw:border-b tw:border-[rgba(0,0,0,0.04)] tw:dark:border-[rgba(255,255,255,0.04)] tw:hover:bg-[rgba(0,0,0,0.015)] tw:dark:hover:bg-[rgba(255,255,255,0.02)] tw:[grid-template-columns:1.5fr_1fr]"
+                    class="tmm-cost-table-row grid gap-2 py-2 px-[14px] text-xs border-b border-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.04)] hover:bg-[rgba(0,0,0,0.015)] dark:hover:bg-[rgba(255,255,255,0.02)] [grid-template-columns:1.5fr_1fr]"
                   >
-                    <span class="tw:font-semibold tw:font-[SF_Mono,JetBrains_Mono,monospace] tw:text-[11px]">{{ row.key }}</span>
-                    <span class="tw:font-semibold tw:[font-variant-numeric:tabular-nums] tw:text-right"
+                    <span class="font-semibold font-[SF_Mono,JetBrains_Mono,monospace] text-[11px]">{{ row.key }}</span>
+                    <span class="font-semibold [font-variant-numeric:tabular-nums] text-right"
                       >${{ formatRate(row.rate) }}</span
                     >
                   </div>
                 </div>
-                <div v-else class="tw:flex tw:items-center tw:gap-[7px] tw:p-[14px] tw:text-xs tw:opacity-40 tw:italic">
+                <div v-else class="flex items-center gap-[7px] p-[14px] text-xs opacity-40 italic">
                   <OIcon name="info-outline" size="sm" />
                   {{ t("modelPricing.noPricingForTier") }}
                 </div>
@@ -341,11 +341,11 @@ function sortedPriceEntries(
 
 const winnerSource = computed(() => testResult.value?.matched?.source || null);
 
-const matchFlowSteps = [
-  { key: "org", label: "your org", icon: "person" },
-  { key: "meta_org", label: "global", icon: "corporate-fare" },
-  { key: "built_in", label: "built-in", icon: "auto-awesome" },
-];
+const matchFlowSteps = computed(() => [
+  { key: "org", label: t("settings.testModelMatchDialog.stepYourOrg"), icon: "person" },
+  { key: "meta_org", label: t("settings.testModelMatchDialog.stepGlobal"), icon: "corporate-fare" },
+  { key: "built_in", label: t("settings.testModelMatchDialog.stepBuiltIn"), icon: "auto-awesome" },
+]);
 
 const matchedTierDef = computed(() => {
   const result = testResult.value;
@@ -380,9 +380,11 @@ function operatorSymbol(op: string) {
 }
 
 function sourceLabel(model: any) {
-  if (!model.source || model.source === "org") return "Your Org";
-  if (model.source === "meta_org") return "Global";
-  return "Built-in";
+  if (!model.source || model.source === "org")
+    return t("settings.testModelMatchDialog.sourceYourOrg");
+  if (model.source === "meta_org")
+    return t("settings.testModelMatchDialog.sourceGlobal");
+  return t("settings.testModelMatchDialog.sourceBuiltIn");
 }
 
 function formatRate(rate: number) {

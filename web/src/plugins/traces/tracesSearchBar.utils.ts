@@ -16,7 +16,7 @@
 /**
  * Pure helpers for the traces SearchBar. Extracted so the change-
  * detection logic (mount-replay filter) can be unit-tested without
- * mounting the full SFC, which pulls in monaco / quasar / vuex.
+ * mounting the full SFC, which pulls in monaco / vuex.
  */
 
 /** Subset of `searchObj.data.datetime` that the comparison cares about. */

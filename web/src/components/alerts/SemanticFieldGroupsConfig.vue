@@ -15,19 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full">
-    <div class="tw:border-b tw:border-separator tw:pb-3 tw:mb-3">
-      <div class="tw:text-xl tw:font-semibold">
+  <div class="w-full">
+    <div class="border-b border-separator pb-3 mb-3">
+      <div class="text-xl font-semibold">
         {{ t("settings.correlation.semanticFieldGroupsTitle") }}
       </div>
-      <div class="tw:text-xs tw:text-gray-400">
+      <div class="text-xs text-gray-400">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
     </div>
 
     <!-- Category Filter -->
-    <div class="tw:flex tw:gap-3 tw:mb-3">
-      <div class="tw:w-full col-md-4">
+    <div class="flex gap-3 mb-3">
+      <div class="w-full col-md-4">
         <OSelect
           data-test="semantic-group-category-select"
           v-model="selectedCategory"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="max-width: 100%"
         />
       </div>
-      <div class="tw:w-full col-md-8 tw:flex tw:items-center tw:justify-end tw:gap-2">
+      <div class="w-full col-md-8 flex items-center justify-end gap-2">
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
           variant="outline"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Filtered Semantic Groups List -->
-    <div v-if="filteredGroups.length > 0" class="tw:w-full tw:overflow-x-hidden tw:mb-3">
+    <div v-if="filteredGroups.length > 0" class="w-full overflow-x-hidden mb-3">
       <SemanticGroupItem
         v-for="(group, index) in filteredGroups"
         :key="`${group.id}-${index}`"
@@ -76,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete="removeGroupByFilter(index)"
       />
     </div>
-    <div v-else class="tw:text-center tw:p-4 tw:text-gray-400">
-      <OIcon name="info" size="md" class="tw:mb-2" />
+    <div v-else class="text-center p-4 text-gray-400">
+      <OIcon name="info" size="md" class="mb-2" />
       <div>
         {{
           t("correlation.noSemanticGroupsInCategory", {
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Total groups indicator -->
-    <div v-if="localGroups.length > 0" class="tw:text-xs tw:text-gray-400 tw:mt-2">
+    <div v-if="localGroups.length > 0" class="text-xs text-gray-400 mt-2">
       {{
         t("correlation.showingGroups", {
           filterGroupLength: filteredGroups.length,
@@ -100,16 +100,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
     <div
       v-if="localGroups.length > 0 && showFingerprintFields"
-      class="tw:border-t tw:border-separator tw:pt-4 tw:mt-4"
+      class="border-t border-separator pt-4 mt-4"
     >
-      <div class="tw:text-base tw:font-medium tw:mb-2">
+      <div class="text-base font-medium mb-2">
         {{ t("correlation.deduplicateFields") }} *
         <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>
-      <div class="tw:text-xs tw:text-gray-400 tw:mb-3">
+      <div class="text-xs text-gray-400 mb-3">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
-      <div class="tw:flex tw:flex-wrap tw:gap-3">
+      <div class="flex flex-wrap gap-3">
         <OCheckbox
           :data-test="`fingerprint-field-checkbox-${group.id}`"
           v-for="group in localGroups"
@@ -117,13 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="localFingerprintFields"
           :value="group.id"
           :label="group.display"
-          class="tw:min-w-50"
+          class="min-w-50"
           @update:model-value="emitUpdate"
         />
       </div>
       <div
         v-if="localFingerprintFields.length === 0"
-        class="tw:text-red-500 tw:text-xs tw:mt-2"
+        class="text-red-500 text-xs mt-2"
       >
         {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>
@@ -390,7 +390,7 @@ onMounted(async () => {
       // Scroll within the nearest scrollable parent to avoid pushing
       // ancestor containers (main page layout) out of view
       const scrollParent = el.closest(
-        ".tw\\:overflow-y-auto",
+        ".overflow-y-auto",
       ) as HTMLElement | null;
       if (scrollParent) {
         const parentRect = scrollParent.getBoundingClientRect();

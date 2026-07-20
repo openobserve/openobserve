@@ -14,8 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, config } from "@vue/test-utils";
+import i18n from "@/locales";
 import QueryBuilder from "./QueryBuilder.vue";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 
 // Mock the child components
@@ -48,7 +51,7 @@ vi.mock("@/components/promql/components/OperationsList.vue", () => ({
 
 // Mock the query modeller
 vi.mock("@/components/promql/operations/queryModeller", () => ({
-  promQueryModeller: {
+  promqlRenderer: {
     renderQuery: vi.fn((query) => {
       if (!query.metric) return "";
       let result = query.metric;

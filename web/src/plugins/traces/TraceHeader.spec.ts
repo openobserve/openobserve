@@ -118,13 +118,13 @@ describe("TraceHeader", () => {
 
     it("should have correct default height", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:h-7.5");
+      expect(headerContainer.classes()).toContain("h-7.5");
     });
 
     it("should have sticky positioning", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:sticky");
-      expect(headerContainer.classes()).toContain("tw:top-0");
+      expect(headerContainer.classes()).toContain("sticky");
+      expect(headerContainer.classes()).toContain("top-0");
     });
   });
 
@@ -166,8 +166,8 @@ describe("TraceHeader", () => {
 
     it("should have correct avatar properties", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      expect(resizeBtn.classes()).toContain("tw:bg-(--o2-primary)");
-      expect(resizeBtn.classes()).toContain("tw:rounded-full");
+      expect(resizeBtn.classes()).toContain("bg-(--o2-primary)");
+      expect(resizeBtn.classes()).toContain("rounded-full");
     });
   });
 
@@ -226,8 +226,8 @@ describe("TraceHeader", () => {
 
     it("should have correct z-index for first tic", () => {
       const firstTic = wrapper.find('[data-test="trace-header-tic-line-0"]');
-      expect(firstTic.classes()).toContain("tw:z-5");
-      expect(firstTic.classes()).toContain("tw:hidden");
+      expect(firstTic.classes()).toContain("z-5");
+      expect(firstTic.classes()).toContain("hidden");
     });
 
     it("should have correct z-index for other tics", () => {
@@ -244,12 +244,12 @@ describe("TraceHeader", () => {
     it("should apply light theme by default", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
       expect(headerContainer.classes()).toContain(
-        "tw:bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
+        "bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
       );
       const ticLines = wrapper.findAll('[data-test^="trace-header-tic-line-"]');
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("tw:bg-[#cacaca]");
-        expect(tic.classes()).not.toContain("tw:bg-[#3c3c3c]");
+        expect(tic.classes()).toContain("bg-[#cacaca]");
+        expect(tic.classes()).not.toContain("bg-[#3c3c3c]");
       });
     });
 
@@ -288,7 +288,7 @@ describe("TraceHeader", () => {
         '[data-test^="trace-header-tic-line-"]',
       );
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("tw:bg-[#3c3c3c]");
+        expect(tic.classes()).toContain("bg-[#3c3c3c]");
       });
 
       darkWrapper.unmount();
@@ -329,7 +329,7 @@ describe("TraceHeader", () => {
         '[data-test^="trace-header-tic-line-"]',
       );
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("tw:bg-[#3c3c3c]");
+        expect(tic.classes()).toContain("bg-[#3c3c3c]");
       });
 
       darkWrapper.unmount();
@@ -363,7 +363,7 @@ describe("TraceHeader", () => {
 
     it("should have correct cursor style for resize button", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      expect(resizeBtn.classes()).toContain("tw:cursor-col-resize");
+      expect(resizeBtn.classes()).toContain("cursor-col-resize");
     });
   });
 
@@ -455,15 +455,15 @@ describe("TraceHeader", () => {
   describe("CSS classes and styling", () => {
     it("should have correct flex classes", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:flex");
-      expect(headerContainer.classes()).toContain("tw:justify-start");
-      expect(headerContainer.classes()).toContain("tw:items-center");
+      expect(headerContainer.classes()).toContain("flex");
+      expect(headerContainer.classes()).toContain("justify-start");
+      expect(headerContainer.classes()).toContain("items-center");
     });
 
     it("should have correct header background class", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
       expect(headerContainer.classes()).toContain(
-        "tw:bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
+        "bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
       );
     });
 
@@ -471,29 +471,29 @@ describe("TraceHeader", () => {
       const operationNameSection = wrapper.find(
         '[data-test="trace-header-operation-name"]',
       );
-      expect(operationNameSection.classes()).toContain("tw:relative");
-      expect(operationNameSection.classes()).toContain("tw:flex");
-      expect(operationNameSection.classes()).toContain("tw:justify-start");
-      expect(operationNameSection.classes()).toContain("tw:items-center");
-      expect(operationNameSection.classes()).toContain("tw:flex-nowrap");
-      expect(operationNameSection.classes()).toContain("tw:px-2");
+      expect(operationNameSection.classes()).toContain("relative");
+      expect(operationNameSection.classes()).toContain("flex");
+      expect(operationNameSection.classes()).toContain("justify-start");
+      expect(operationNameSection.classes()).toContain("items-center");
+      expect(operationNameSection.classes()).toContain("flex-nowrap");
+      expect(operationNameSection.classes()).toContain("px-2");
     });
 
     it("should have correct tics section classes", () => {
       const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
-      expect(ticsSection.classes()).toContain("tw:flex");
-      expect(ticsSection.classes()).toContain("tw:justify-start");
-      expect(ticsSection.classes()).toContain("tw:items-center");
-      expect(ticsSection.classes()).toContain("tw:flex-nowrap");
-      // Component was migrated from Quasar's `relative-position` to Tailwind `tw:relative`.
-      expect(ticsSection.classes()).toContain("tw:relative");
+      expect(ticsSection.classes()).toContain("flex");
+      expect(ticsSection.classes()).toContain("justify-start");
+      expect(ticsSection.classes()).toContain("items-center");
+      expect(ticsSection.classes()).toContain("flex-nowrap");
+      // Uses the Tailwind `relative` class for positioning.
+      expect(ticsSection.classes()).toContain("relative");
     });
 
     it("should have correct tic label classes", () => {
       const tic0 = wrapper.find('[data-test="trace-header-tic-label-0"]');
-      expect(tic0.classes()).toContain("tw:w-1/4");
-      expect(tic0.classes()).toContain("tw:text-xs");
-      expect(tic0.classes()).toContain("tw:pl-3");
+      expect(tic0.classes()).toContain("w-1/4");
+      expect(tic0.classes()).toContain("text-xs");
+      expect(tic0.classes()).toContain("pl-3");
     });
 
     it("should have correct tic line classes", () => {
@@ -621,7 +621,7 @@ describe("TraceHeader", () => {
     it("should expose the resize button as an interactive element", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
       expect(resizeBtn.exists()).toBe(true);
-      expect(resizeBtn.classes()).toContain("tw:cursor-col-resize");
+      expect(resizeBtn.classes()).toContain("cursor-col-resize");
     });
   });
 

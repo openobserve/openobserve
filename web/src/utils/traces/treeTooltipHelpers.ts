@@ -188,19 +188,19 @@ export const generatePatternNodeTooltipContent = (metadata: any): string => {
   } = metadata;
 
   return `
-    <div class="tw:flex tw:flex-col tw:gap-0.5">
-      <div class="tw:font-semibold tw:pb-1 tw:text-left">${escapeHtml(serviceName || pathSignature)}</div>
-      <div class="tw:flex tw:justify-between tw:gap-3">
-        <span class="tw:w-12 tw:text-left">Spans:</span>
-        <span class="tw:font-mono tw:text-left tw:flex-1">${count}</span>
+    <div class="flex flex-col gap-0.5">
+      <div class="font-semibold pb-1 text-left">${escapeHtml(serviceName || pathSignature)}</div>
+      <div class="flex justify-between gap-3">
+        <span class="w-12 text-left">Spans:</span>
+        <span class="font-mono text-left flex-1">${count}</span>
       </div>
-      <div class="tw:flex tw:justify-between tw:gap-3">
-        <span class="tw:w-12 tw:text-left">Average:</span>
-        <span class="tw:font-mono tw:text-left tw:flex-1">${avg.toFixed(2)}ms (${traceTimePercent.toFixed(1)}% of trace)</span>
+      <div class="flex justify-between gap-3">
+        <span class="w-12 text-left">Average:</span>
+        <span class="font-mono text-left flex-1">${avg.toFixed(2)}ms (${traceTimePercent.toFixed(1)}% of trace)</span>
       </div>
-      <div class="tw:flex tw:justify-between tw:gap-3">
-        <span class="tw:w-12 tw:text-left">Errors:</span>
-        <span class="tw:font-mono tw:text-left tw:flex-1">${metadata.errorCount || 0}</span>
+      <div class="flex justify-between gap-3">
+        <span class="w-12 text-left">Errors:</span>
+        <span class="font-mono text-left flex-1">${metadata.errorCount || 0}</span>
       </div>
     </div>
   `;

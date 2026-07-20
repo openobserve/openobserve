@@ -25,24 +25,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="timeline" size="md" />
       <!-- Time Range Display: Inline chips -->
       <div
-        class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:ml-2"
+        class="flex items-center gap-2 flex-wrap ml-2"
       >
         <!-- Baseline Chip -->
         <div
-          class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-[0.375rem] rounded text-[0.85rem]"
           :style="{ '--chip-color': chipColors.baseline }"
         >
-          <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
-            >Baseline:</span
+          <span class="uppercase tracking-wide opacity-70"
+            >{{ t('traces.tracesAnalysisDashboard.baseline') }}</span
           >
-          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+          <span class="whitespace-nowrap text-[0.7rem]">{{
             formatSmartTimestamp(
               baselineTimeRange.startTime,
               baselineTimeRange.endTime,
             ).start
           }}</span>
-          <span class="tw:opacity-60 tw:text-[0.65rem]">→</span>
-          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+          <span class="opacity-60 text-[0.65rem]">→</span>
+          <span class="whitespace-nowrap text-[0.7rem]">{{
             formatSmartTimestamp(
               baselineTimeRange.startTime,
               baselineTimeRange.endTime,
@@ -53,20 +53,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Selected Chip -->
         <div
           v-if="hasSelectedTimeRange"
-          class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-[0.375rem] rounded text-[0.85rem]"
           :style="{ '--chip-color': chipColors.selected }"
         >
-          <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
-            >Selected:</span
+          <span class="uppercase tracking-wide opacity-70"
+            >{{ t('traces.tracesAnalysisDashboard.selected') }}</span
           >
-          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+          <span class="whitespace-nowrap text-[0.7rem]">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay.startTime,
               selectedTimeRangeDisplay.endTime,
             ).start
           }}</span>
-          <span class="tw:opacity-70 tw:text-[0.65rem]">→</span>
-          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+          <span class="opacity-70 text-[0.65rem]">→</span>
+          <span class="whitespace-nowrap text-[0.7rem]">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay.startTime,
               selectedTimeRangeDisplay.endTime,
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Additional filter info -->
         <span
           v-if="filterMetadata"
-          class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1"
+          class="opacity-60 text-[0.65rem] ml-1"
         >
           {{ filterMetadata }}
         </span>
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showTabs"
         v-model="activeAnalysisType"
         dense
-        class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-1)]! insights-dashboard-tabs"
+        class="border-b border-solid border-[var(--o2-border-color)] text-[var(--o2-text-1)]! insights-dashboard-tabs"
         align="left"
       >
         <OTab
@@ -111,78 +111,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="tab.label"
           :icon="tab.icon"
           :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
-          class="tw:min-h-[3rem]"
+          class="min-h-[3rem]"
         />
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden tw:flex tw:min-h-0 tw:bg-[#f5f5f5]">
+      <div class="analysis-content flex-1 pt-2 overflow-hidden flex min-h-0 bg-[#f5f5f5]">
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
         <div
           v-if="!showDimensionSelector"
-          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel! tw:shrink-0 tw:cursor-pointer tw:flex tw:flex-col tw:items-center tw:justify-start tw:pt-2 tw:gap-1.5"
+          class="field-list-sidebar-header-collapsed card-container bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5"
           style="width: 50px; height: 100%"
           data-test="dimension-selector-collapsed-bar"
           @click="toggleDimensionSelector"
         >
-          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90 tw:mt-2.5 tw:text-[20px]" />
-          <div class="field-list-collapsed-title tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-xs">Dimensions</div>
+          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90 mt-2.5 text-[20px]" />
+          <div class="field-list-collapsed-title [writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">{{ t('traces.tracesAnalysisDashboard.dimensions') }}</div>
         </div>
 
         <OSplitter
           v-model="splitterModel"
           :limits="splitterLimits"
           :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 50px)', height: '100%' }"
-          class="analysis-splitter-smooth tw:[transition:all_0.3s_ease]"
+          class="analysis-splitter-smooth [transition:all_0.3s_ease]"
           @update:model-value="onSplitterUpdate"
         >
           <!-- LEFT: Dimension Selector Sidebar -->
           <template #before>
-            <div class="relative-position tw:h-full">
+            <div class="relative-position h-full">
               <div
                 v-if="showDimensionSelector"
-                class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col tw:bg-white"
+                class="dimension-sidebar card-container h-full flex flex-col bg-white"
                 data-test="dimension-selector-sidebar"
               >
                 <!-- Sidebar Header with collapse button -->
                 <div
-                  class="tw:px-3 tw:py-2 tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="px-3 py-2 flex items-center justify-between shrink-0 border-b border-solid border-[var(--o2-border-color)]"
                 >
-                  <span class="tw:font-semibold tw:text-sm">Dimensions</span>
+                  <span class="font-semibold text-sm">{{ t('traces.tracesAnalysisDashboard.dimensions') }}</span>
                   <OButton
                     variant="outline"
                     size="icon-xs-sq"
-                    class="tw:rotate-90"
+                    class="rotate-90"
                     icon-left="unfold-less"
-                    title="Collapse Dimensions"
+                    :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
                     data-test="dimension-selector-collapse-btn"
                     @click="toggleDimensionSelector"
                   />
                 </div>
                 <!-- Search Input -->
                 <div
-                  class="tw:p-[0.625rem] tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="p-[0.625rem] border-solid border-[var(--o2-border-color)]"
                 >
                   <OSearchInput
                     v-model="dimensionSearchText"
                     :placeholder="t('search.searchDimension')"
                     clearable
-                    class="tw:w-full"
+                    class="w-full"
                     data-test="dimension-search-input"
                   />
                 </div>
 
                 <!-- Dimension List -->
                 <div
-                  class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]"
+                  class="dimension-list-container flex-1 overflow-y-auto px-[0.325rem]"
                 >
-                  <ul v-if="filteredDimensions.length > 0" class="tw:flex tw:flex-col">
+                  <ul v-if="filteredDimensions.length > 0" class="flex flex-col">
                     <li
                       v-for="dimension in filteredDimensions"
                       :key="dimension.value"
-                      class="dimension-list-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:border-none!"
+                      class="dimension-list-item flex items-center gap-2 px-3 py-1 border-none!"
                     >
-                      <div class="tw:flex tw:items-center tw:shrink-0">
+                      <div class="flex items-center shrink-0">
                         <OCheckbox
                           :model-value="
                             selectedDimensions.includes(dimension.value)
@@ -192,9 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :data-test="`dimension-checkbox-${dimension.value}`"
                         />
                       </div>
-                      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                      <div class="flex flex-col flex-1 min-w-0">
                         <span
-                          class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm tw:[line-height:1.25rem]"
+                          class="dimension-label truncate cursor-pointer text-[var(--o2-text-2)]! text-sm [line-height:1.25rem]"
                         >
                           {{ dimension.label }}
                           <OTooltip
@@ -211,14 +211,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ul>
 
                   <!-- No results message -->
-                  <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
+                  <div v-else class="p-4 text-center text-gray-500">
                     {{ t("search.noResult") }}
                   </div>
                 </div>
 
                 <!-- Selected Count Footer -->
                 <div
-                  class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title tw:text-[var(--o2-text-4)]!"
+                  class="p-3 border-t border-solid border-[var(--o2-border-color)] o2-table-footer-title"
                 >
                   {{ selectedDimensions.length }}
                   {{ t("latencyInsights.dimensionsSelected") }}
@@ -233,24 +233,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- RIGHT: Dashboard Charts -->
           <template #after>
-            <div class="tw:h-full">
+            <div class="h-full">
               <div
-                class="tw:h-full tw:w-full relative-position tw:overflow-auto"
+                class="h-full w-full relative-position overflow-auto"
               >
                 <!-- Loading State -->
                 <div
                   v-if="loading"
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                  class="flex flex-col items-center justify-center h-full py-20"
                 >
                   <OSpinner
                     size="xl"
-                    class="tw:mb-4"
+                    class="mb-4"
                     data-test="traces-analysis-dashboard-loading-indicator"
                   />
-                  <div class="tw:text-base">
+                  <div class="text-base">
                     {{ t("latencyInsights.analyzingDimensions") }}
                   </div>
-                  <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+                  <div class="text-xs text-gray-500 mt-2">
                     {{
                       t("latencyInsights.computingDistributions", {
                         count: selectedDimensions.length,
@@ -263,19 +263,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-else-if="error"
                   data-test="traces-analysis-dashboard-error"
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                  class="flex flex-col items-center justify-center h-full py-20"
                 >
                   <OIcon
                     name="error-outline"
-                    class="tw:mb-4" style="width: 3.75rem; height: 3.75rem;" />
-                  <div class="tw:text-base tw:mb-2">
+                    class="mb-4" style="width: 3.75rem; height: 3.75rem;" />
+                  <div class="text-base mb-2">
                     {{ t("latencyInsights.failedToLoad") }}
                   </div>
-                  <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
+                  <div class="text-sm text-gray-500">{{ error }}</div>
                   <OButton
                     variant="outline"
                     size="sm-action"
-                    class="tw:mt-4"
+                    class="mt-4"
                     data-test="traces-analysis-dashboard-retry-btn"
                     @click="loadAnalysis"
                   >
@@ -296,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
                   @variablesManagerReady="onVariablesManagerReady"
                   @onDeletePanel="handlePanelDelete"
-                  class="tw:p-[0.4rem] trace-analysis-dashboards"
+                  class="p-[0.4rem] trace-analysis-dashboards"
                 />
               </div>
             </div>
@@ -687,7 +687,7 @@ const filterMetadata = computed(() => {
     props.rateFilter &&
     !props.rateFilter.timeStart
   ) {
-    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} traces/interval`;
+    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} ${t('traces.tracesAnalysisDashboard.tracesPerInterval')}`;
   } else if (
     props.analysisType === "error" &&
     props.errorFilter &&

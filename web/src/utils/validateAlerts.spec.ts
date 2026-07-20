@@ -14,7 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
+import i18n from "@/locales";
 import { validateAlert, ValidationResult } from "./alerts/alertValidation";
+
+// validateAlert's messages are i18n-driven now — the pure util has no Vue
+// context, so callers inject `t` through the validation context. Resolve through
+// the REAL locale (same convention as the alerts *.schema.spec.ts files) so the
+// assertions below keep verifying the exact English AND prove the keys exist.
+const t = (key: string, named?: Record<string, unknown>): string =>
+  (i18n.global.t as any)(key, named);
 
 describe("Alert Validation", () => {
   const validAlert = {
@@ -57,7 +65,8 @@ describe("Alert Validation", () => {
   const validContext = {
     streamList: ["test_stream", "other_stream"],
     destinationsList: ["webhook1", "email1"],
-    selectedOrgId: "org123"
+    selectedOrgId: "org123",
+    t
   };
 
   describe("Valid alert validation", () => {

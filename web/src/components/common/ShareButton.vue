@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="handleShareClick"
     icon-left="share"
   >
-    <span v-if="showLabel" class="tw:ml-1">{{ t("search.shareLink") }}</span>
+    <span v-if="showLabel" class="ml-1">{{ t("search.shareLink") }}</span>
     <OTooltip v-if="isWebUrlNotConfigured">
-      <template #content><OIcon name="warning" size="sm" class="tw:mr-1" />{{ t("search.webUrlNotConfigured") }}</template>
+      <template #content><OIcon name="warning" size="sm" class="mr-1" />{{ t("search.webUrlNotConfigured") }}</template>
     </OTooltip>
     <OTooltip
       v-else-if="tooltip || !showLabel"

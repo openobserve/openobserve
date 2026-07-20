@@ -63,10 +63,25 @@ describe('msteams template', () => {
       expect(msteamsConfig.urlValidator('https://webhook.office.com/webhookb2/xxx')).toBe(true);
     });
 
+    it('URL validator accepts Power Automate workflow URLs', () => {
+      expect(
+        msteamsConfig.urlValidator(
+          'https://prod-10.westus.logic.azure.com/workflows/abc/triggers/manual/paths/invoke?api-version=2016-06-01&sig=xyz'
+        )
+      ).toBe(true);
+      expect(
+        msteamsConfig.urlValidator(
+          'https://default-123.environment.api.powerplatform.com/powerautomate/automations/direct/workflows/abc/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=xyz'
+        )
+      ).toBe(true);
+    });
+
     it('URL validator rejects invalid URLs', () => {
       expect(msteamsConfig.urlValidator('https://example.com/webhook')).toBe(false);
       expect(msteamsConfig.urlValidator('http://outlook.office.com/webhook/xxx')).toBe(false);
+      expect(msteamsConfig.urlValidator('http://prod-10.westus.logic.azure.com/workflows/abc/triggers/manual/paths/invoke')).toBe(false);
       expect(msteamsConfig.urlValidator('https://evil.com?outlook.office.com=fake')).toBe(false);
+      expect(msteamsConfig.urlValidator('https://prod-10.westus.logic.azure.com/not-a-workflow')).toBe(false);
       expect(msteamsConfig.urlValidator('invalid-url')).toBe(false);
     });
 
@@ -79,6 +94,7 @@ describe('msteams template', () => {
         // Valid URLs
         expect(validator('https://outlook.office.com/webhook/xxx')).toBe(true);
         expect(validator('https://webhook.office.com/webhookb2/xxx')).toBe(true);
+        expect(validator('https://prod-10.westus.logic.azure.com/workflows/abc/triggers/manual/paths/invoke?api-version=2016-06-01&sig=xyz')).toBe(true);
 
         // Invalid URLs
         expect(validator('https://example.com')).not.toBe(true);

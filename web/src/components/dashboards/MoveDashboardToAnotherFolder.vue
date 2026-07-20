@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog data-test="move-dashboard-to-another-folder-dialog"
     :open="open"
     size="md"
-    title="Move Dashboard"
+    :title="t('dashboard.moveDashboardToAnotherFolder.moveDashboard')"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
     :primary-button-loading="onSubmit.isLoading.value"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onSubmit.execute()"
   >
   <div data-test="dashboard-folder-move-body">
-      <div class="tw:flex tw:flex-col tw:gap-3">
+      <div class="flex flex-col gap-3">
         <OInput
           :model-value="
             store.state.organizationData.folders.find(
@@ -126,7 +126,7 @@ export default defineComponent({
           selectedFolder.value.value,
         );
 
-        showPositiveNotification("Dashboard Moved successfully", {
+        showPositiveNotification(t('dashboard.moveDashboardToAnotherFolder.movedSuccessfully'), {
           timeout: 2000,
         });
 
@@ -134,7 +134,7 @@ export default defineComponent({
       } catch (err: any) {
         //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
         if (err.status !== 403) {
-          showErrorNotification(err?.message ?? "Dashboard move failed.", {
+          showErrorNotification(err?.message ?? t('dashboard.moveDashboardToAnotherFolder.moveFailed'), {
             timeout: 2000,
           });
         }

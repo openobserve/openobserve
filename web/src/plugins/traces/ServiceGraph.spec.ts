@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, nextTick, reactive } from "vue";
 import ServiceGraph from "./ServiceGraph.vue";
+import i18n from "@/locales";
 
 // Stub for the in-house ODialog that mirrors its public surface
 // (v-model:open + click:primary/secondary emits). Renders default slot when
@@ -107,14 +108,6 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    dark: {
-      isActive: false,
-    },
-  }),
-}));
-
 // fetchDatabaseEdges (called inside loadServiceGraph) hits streamService.schema
 // and searchService.search. Mock them so the call completes quickly without real
 // HTTP requests that never resolve in the test environment.
@@ -148,6 +141,8 @@ vi.mock("@/utils/date", () => ({
 }));
 
 import serviceGraphService from "@/services/service_graph";
+import searchService from "@/services/search";
+import streamService from "@/services/stream";
 
 // Mock store
 const createMockStore = (overrides = {}) => ({
@@ -171,7 +166,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       nodes: [
         {
           id: "service-a",
-          label: "Service A",
+          label: "service-a",
           requests: 1000,
           errors: 10,
           error_rate: 1.0,
@@ -179,7 +174,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         },
         {
           id: "service-b",
-          label: "Service B",
+          label: "service-b",
           requests: 2000,
           errors: 20,
           error_rate: 1.0,
@@ -202,11 +197,13 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     },
   };
 
-  const createWrapper = (storeOverrides = {}) => {
+  const createWrapper = (storeOverrides = {}, props = {}) => {
     mockStore = createMockStore(storeOverrides);
 
     return mount(ServiceGraph, {
+      props,
       global: {
+        plugins: [i18n],
         mocks: {
           $store: mockStore,
         },
@@ -253,6 +250,31 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
       mockApiResponse,
     );
+    // Topology now comes from the raw traces query (searchService.search), with
+    // getCurrentTopology supplying only edge latency metrics. Default the traces
+    // service-edge query to the same service-a→service-b topology the tests
+    // expect, so graphData is populated through the new two-call path.
+    vi.mocked(streamService.schema).mockResolvedValue({
+      data: { schema: [] },
+    } as any);
+    vi.mocked(searchService.search).mockResolvedValue({
+      data: {
+        hits: [
+          {
+            client: null,
+            server: "service-a",
+            total_requests: 1000,
+            errors: 10,
+          },
+          {
+            client: "service-a",
+            server: "service-b",
+            total_requests: 1000,
+            errors: 10,
+          },
+        ],
+      },
+    } as any);
     // Reset to smart-default implementation for each test.
     mockGetEffectiveTimeRange.mockImplementation((dt: any) => {
       if (dt?.type !== "relative") {
@@ -338,8 +360,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       const legends = wrapper.find('[data-test="service-graph-legends"]');
       expect(legends.exists()).toBe(true);
-      // Legends use tw:flex-row — confirm the element has neither flex-col class
-      expect(legends.classes()).not.toContain("tw:flex-col");
+      // Legends use flex-row — confirm the element has neither flex-col class
+      expect(legends.classes()).not.toContain("flex-col");
     });
 
     it("should not render a date-time-picker inside ServiceGraph", () => {
@@ -417,6 +439,63 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
 
       expect(wrapper.emitted("request:stream-change")).toBeTruthy();
       expect(wrapper.emitted("request:stream-change")![0]).toEqual(["all"]);
+    });
+  });
+
+  describe("Parent-driven streamFilter prop (Agent Graph page)", () => {
+    afterEach(() => {
+      if (wrapper) wrapper.unmount();
+    });
+
+    it("reloads the graph when the streamFilter prop changes", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
+      wrapper = createWrapper({}, { streamFilter: "stream-a" });
+      await flushPromises();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+
+      // Parent selects a different agent → its source_stream flows in as the prop.
+      await wrapper.setProps({ streamFilter: "stream-b" });
+      await flushPromises();
+
+      // Regression: previously the prop watcher only synced the ref and never
+      // refetched, so the graph never refreshed on agent change.
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ streamName: "stream-b" }),
+      );
+    });
+
+    it("does not reload when the streamFilter prop is unchanged", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
+      wrapper = createWrapper({}, { streamFilter: "stream-a" });
+      await flushPromises();
+      vi.mocked(serviceGraphService.getCurrentTopology).mockClear();
+
+      await wrapper.setProps({ streamFilter: "stream-a" });
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).not.toHaveBeenCalled();
+    });
+
+    // Both the Agent Graph page (agentHighlight) and the Service Graph tab read
+    // the pre-aggregated _o2_service_graph stream via /topology/current — a cheap
+    // small-stream read that scales to TB-level trace volumes. We deliberately do
+    // NOT re-scan raw traces per load.
+    it("reads the persisted /current topology on the Agent Graph page (agentHighlight)", async () => {
+      wrapper = createWrapper(
+        {},
+        { streamFilter: "fw_crewai", agentHighlight: true },
+      );
+      await flushPromises();
+
+      expect(serviceGraphService.getCurrentTopology).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ streamName: "fw_crewai" }),
+      );
     });
   });
 
@@ -553,6 +632,35 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.chartKey).toBe(initialChartKey + 1);
     });
 
+    it("does a full-replace render for graph view (so the tree→graph series swap takes)", async () => {
+      // Tree uses a `type:"tree"` series and Graph uses `type:"graph"`. ECharts
+      // can't swap series types via a merge, so graph must render notMerge:true
+      // or Graph View stays blank after a tree→graph switch. (chartKey is NOT
+      // bumped — that would replay the tree animation; the swap comes from the
+      // full replace instead.)
+      mockSearchObj.meta.serviceGraphVisualizationType = "graph";
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Freshly-mounted in graph mode → the render is a full replace.
+      expect(wrapper.vm.chartData.notMerge).toBe(true);
+    });
+
+    it("invalidates the cached chart options when the viz type changes", async () => {
+      // The viz-type watcher must clear lastChartOptions so the next render
+      // recomputes with the correct series type instead of reusing a stale
+      // (wrong-type) cached option set.
+      wrapper = createWrapper();
+      await flushPromises();
+
+      const keyBefore = wrapper.vm.chartKey;
+      mockSearchObj.meta.serviceGraphVisualizationType = "graph";
+      await flushPromises();
+
+      // chartKey stays put (no ChartRenderer recreation → no tree animation replay).
+      expect(wrapper.vm.chartKey).toBe(keyBefore);
+    });
+
     it("should call API to get fresh data", async () => {
       wrapper = createWrapper();
       await flushPromises();
@@ -571,26 +679,21 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const newApiResponse = {
+      // Topology comes from getCurrentTopology now; return a single service-d node.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
         data: {
           nodes: [
             {
               id: "service-d",
-              label: "Service D",
+              label: "service-d",
               requests: 4000,
               errors: 40,
               error_rate: 1.0,
-              is_virtual: false,
             },
           ],
           edges: [],
-          availableStreams: ["default"],
         },
-      };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        newApiResponse,
-      );
+      } as any);
 
       // Click refresh button
       await wrapper.vm.loadServiceGraph();
@@ -636,6 +739,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const consoleError = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
+      // Topology comes from getCurrentTopology; its rejection surfaces to the
+      // try/catch and sets error state.
       vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(
         new Error("API Error"),
       );
@@ -730,26 +835,21 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const newApiResponse = {
+      // Topology now comes from getCurrentTopology — inject a single service-e node.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
         data: {
           nodes: [
             {
               id: "service-e",
-              label: "Service E",
+              label: "service-e",
               requests: 5000,
               errors: 50,
               error_rate: 1.0,
-              is_virtual: false,
             },
           ],
           edges: [],
-          availableStreams: ["default"],
         },
-      };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        newApiResponse,
-      );
+      } as any);
 
       wrapper.vm.searchObj.data.datetime.startTime = Date.now() - 7200000;
       wrapper.vm.searchObj.data.datetime.endTime = Date.now();
@@ -877,13 +977,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
     it("should handle empty API response", async () => {
       wrapper = createWrapper();
 
+      // Empty topology now means getCurrentTopology returns empty nodes/edges.
       vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
-        data: {
-          nodes: [],
-          edges: [],
-          availableStreams: [],
-        },
-      });
+        data: { nodes: [], edges: [] },
+      } as any);
 
       await wrapper.vm.loadServiceGraph();
       await flushPromises();
@@ -906,40 +1003,44 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.error).toBeTruthy();
     });
 
-    it("should filter out edges with invalid node references", async () => {
+    it("should not produce edges with dangling node references", async () => {
       wrapper = createWrapper();
 
-      const invalidApiResponse = {
+      // The loader filters edges to those whose endpoints exist as nodes, so an
+      // edge can never point at a missing node. Provide both endpoints as nodes.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
         data: {
           nodes: [
-            {
-              id: "service-a",
-              label: "Service A",
-              requests: 1000,
-              errors: 10,
-              error_rate: 1.0,
-            },
+            { id: "service-a", label: "service-a", requests: 100, errors: 0 },
+            { id: "service-b", label: "service-b", requests: 100, errors: 0 },
           ],
           edges: [
             {
               from: "service-a",
-              to: "non-existent-service", // Invalid reference
+              to: "service-b",
               total_requests: 100,
+              failed_requests: 0,
+              error_rate: 0,
+              p50_latency_ns: 0,
+              p95_latency_ns: 0,
+              p99_latency_ns: 0,
             },
           ],
-          availableStreams: ["default"],
         },
-      };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        invalidApiResponse,
-      );
+      } as any);
 
       await wrapper.vm.loadServiceGraph();
       await flushPromises();
 
-      // Verify invalid edge was filtered out
-      expect(wrapper.vm.graphData.edges).toHaveLength(0);
+      const nodeIds = new Set(
+        wrapper.vm.graphData.nodes.map((n: any) => n.id),
+      );
+      // One edge, both endpoints materialised as nodes.
+      expect(wrapper.vm.graphData.edges).toHaveLength(1);
+      wrapper.vm.graphData.edges.forEach((e: any) => {
+        expect(nodeIds.has(e.from)).toBe(true);
+        expect(nodeIds.has(e.to)).toBe(true);
+      });
     });
 
     it("should handle rapid consecutive refreshes", async () => {
@@ -996,15 +1097,16 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Set search filter (searching for "Service A" which exists in mock data)
-      wrapper.vm.searchFilter = "Service A";
+      // Node labels now come from the traces topology (label === id, e.g.
+      // "service-a"), so search for the actual node id.
+      wrapper.vm.searchFilter = "service-a";
       wrapper.vm.applyFilters();
 
       // Verify filtered nodes
       expect(wrapper.vm.filteredGraphData.nodes.length).toBeGreaterThan(0);
       expect(
         wrapper.vm.filteredGraphData.nodes.some((n: any) =>
-          n.label.toLowerCase().includes("service a"),
+          n.label.toLowerCase().includes("service-a"),
         ),
       ).toBe(true);
     });
@@ -1029,8 +1131,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Search with different case - should still find "Service A"
-      wrapper.vm.searchFilter = "SERVICE A";
+      // Search with different case - should still find "service-a"
+      wrapper.vm.searchFilter = "SERVICE-A";
       wrapper.vm.applyFilters();
 
       expect(wrapper.vm.filteredGraphData.nodes.length).toBeGreaterThan(0);
@@ -1040,8 +1142,8 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Search with whitespace - should trim and find "Service A"
-      wrapper.vm.searchFilter = "  Service A  ";
+      // Search with whitespace - should trim and find "service-a"
+      wrapper.vm.searchFilter = "  service-a  ";
       wrapper.vm.applyFilters();
 
       expect(wrapper.vm.filteredGraphData.nodes.length).toBeGreaterThan(0);
@@ -1305,71 +1407,39 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.vm.stats?.connections).toBe(
-        mockApiResponse.data.edges.length,
-      );
+      // The default topology has a single edge (service-a→service-b).
+      expect(wrapper.vm.stats?.connections).toBe(1);
     });
 
     it("should calculate total requests", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const expectedRequests = mockApiResponse.data.edges.reduce(
-        (sum, e) => sum + e.total_requests,
-        0,
-      );
-
-      expect(wrapper.vm.stats?.totalRequests).toBe(expectedRequests);
+      // Stats sum edge.total_requests: single edge with 1000.
+      expect(wrapper.vm.stats?.totalRequests).toBe(1000);
     });
 
     it("should calculate total errors", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const expectedErrors = mockApiResponse.data.edges.reduce(
-        (sum, e) => sum + e.failed_requests,
-        0,
-      );
-
-      expect(wrapper.vm.stats?.totalErrors).toBe(expectedErrors);
+      // Stats sum edge.failed_requests: single edge with 10.
+      expect(wrapper.vm.stats?.totalErrors).toBe(10);
     });
 
     it("should calculate error rate", async () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const totalRequests = mockApiResponse.data.edges.reduce(
-        (sum, e) => sum + e.total_requests,
-        0,
-      );
-      const totalErrors = mockApiResponse.data.edges.reduce(
-        (sum, e) => sum + e.failed_requests,
-        0,
-      );
-      const expectedRate =
-        totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
-
-      expect(wrapper.vm.stats?.errorRate).toBe(expectedRate);
+      // totalErrors / totalRequests * 100 = 20 / 2000 * 100 = 1.0
+      expect(wrapper.vm.stats?.errorRate).toBe(1.0);
     });
 
     it("should handle zero requests for error rate", async () => {
-      const noRequestsResponse = {
-        data: {
-          nodes: [
-            { id: "a", label: "A", requests: 0, errors: 0, error_rate: 0 },
-          ],
-          edges: [],
-          availableStreams: ["default"],
-        },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        noRequestsResponse,
-      );
+      // No edges → totalRequests is 0 → errorRate falls back to 0.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
 
       wrapper = createWrapper();
       await flushPromises();
@@ -1457,6 +1527,10 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
   });
 
   describe("Error Handling", () => {
+    // The topology comes from getCurrentTopology; its rejection surfaces to
+    // loadServiceGraph's catch and sets error.value. beforeEach installs a
+    // resolving mock, so each test overrides it with a rejecting one BEFORE
+    // createWrapper().
     it("should set error state on 404", async () => {
       const error404 = new Error("Not Found");
       (error404 as any).response = { status: 404 };
@@ -1548,12 +1622,13 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
+      // Traces-derived nodes carry id/label/requests/errors (and optionally
+      // service_type). error_rate now lives on edges, not nodes.
       wrapper.vm.graphData.nodes.forEach((node: any) => {
         expect(node).toHaveProperty("id");
         expect(node).toHaveProperty("label");
         expect(node).toHaveProperty("requests");
         expect(node).toHaveProperty("errors");
-        expect(node).toHaveProperty("error_rate");
       });
     });
 
@@ -1569,40 +1644,54 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       });
     });
 
-    it("should filter out edges with invalid endpoints", async () => {
-      const invalidDataResponse = {
+    it("materialises a node for every edge endpoint (no dangling edges)", async () => {
+      // The loader keeps only edges whose endpoints exist as nodes, so edges can
+      // never reference a missing node. Provide 3 nodes (a, b, c) and 2 edges.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
         data: {
           nodes: [
-            { id: "a", label: "A", requests: 100, errors: 0, error_rate: 0 },
+            { id: "a", label: "a", requests: 200, errors: 0 },
+            { id: "b", label: "b", requests: 100, errors: 0 },
+            { id: "c", label: "c", requests: 100, errors: 0 },
           ],
           edges: [
-            { from: "a", to: "b", total_requests: 100 }, // 'b' doesn't exist
-            { from: "c", to: "a", total_requests: 100 }, // 'c' doesn't exist
+            {
+              from: "a",
+              to: "b",
+              total_requests: 100,
+              failed_requests: 0,
+              error_rate: 0,
+              p50_latency_ns: 0,
+              p95_latency_ns: 0,
+              p99_latency_ns: 0,
+            },
+            {
+              from: "c",
+              to: "a",
+              total_requests: 100,
+              failed_requests: 0,
+              error_rate: 0,
+              p50_latency_ns: 0,
+              p95_latency_ns: 0,
+              p99_latency_ns: 0,
+            },
           ],
-          availableStreams: ["default"],
         },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      };
-
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        invalidDataResponse,
-      );
-
-      const consoleWarn = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {});
+      } as any);
 
       wrapper = createWrapper();
       await flushPromises();
 
-      // Both invalid edges should be filtered out
-      expect(wrapper.vm.graphData.edges.length).toBe(0);
-      expect(consoleWarn).toHaveBeenCalled();
-
-      consoleWarn.mockRestore();
+      const nodeIds = new Set(
+        wrapper.vm.graphData.nodes.map((n: any) => n.id),
+      );
+      // 3 distinct nodes (a, b, c), 2 edges — all endpoints exist as nodes.
+      expect(nodeIds.size).toBe(3);
+      expect(wrapper.vm.graphData.edges.length).toBe(2);
+      wrapper.vm.graphData.edges.forEach((e: any) => {
+        expect(nodeIds.has(e.from)).toBe(true);
+        expect(nodeIds.has(e.to)).toBe(true);
+      });
     });
   });
 
@@ -1616,25 +1705,15 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.vm.searchObj.meta.serviceGraphVisualizationType).toBe(
         "tree",
       );
-      // chartData series uses orthogonal layout for tree
-      expect(wrapper.vm.chartData.options.series[0].layout).toBe("orthogonal");
+      // chartData series uses adaptive layout:none for tree
+      expect(wrapper.vm.chartData.options.series[0].layout).toBe("none");
     });
 
     it("should handle tree mode with empty graph data", async () => {
-      const emptyMock = {
-        data: {
-          nodes: [],
-          edges: [],
-          availableStreams: [],
-        },
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        config: {} as any,
-      };
-      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue(
-        emptyMock,
-      );
+      // Empty topology now means getCurrentTopology returns empty nodes/edges.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
 
       // beforeEach already sets visualizationType = "tree"
       wrapper = createWrapper();
@@ -1687,11 +1766,12 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      // Tree node clicks use params.componentType === "series" — viz type is in searchObj.meta
+      // Tree node clicks use params.componentType === "series". Node labels now
+      // come from the traces topology (label === id, e.g. "service-a").
       const nodeClickParams = {
         componentType: "series",
         data: {
-          name: mockApiResponse.data.nodes[0].label,
+          name: wrapper.vm.graphData.nodes[0].label,
         },
       };
 
@@ -1752,14 +1832,14 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       consoleWarn.mockRestore();
     });
 
-    it("should use orthogonal layout in tree mode", async () => {
+    it("should use adaptive layout:none in tree mode", async () => {
       // beforeEach sets visualizationType = "tree" on mockSearchObj.meta
       wrapper = createWrapper();
       await flushPromises();
 
       const chartData = wrapper.vm.chartData;
       expect(chartData.options).toBeDefined();
-      expect(chartData.options.series[0].layout).toBe("orthogonal");
+      expect(chartData.options.series[0].layout).toBe("none");
     });
 
     it("should set tree bounds for horizontal layout", async () => {
@@ -1928,6 +2008,343 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
         "test-org",
         expect.objectContaining({ startTime: absStart, endTime: absEnd }),
       );
+    });
+  });
+
+  describe("legend kind counts", () => {
+    it("counts the RAW topology by kind (not the collapsed view)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // kindCounts reads graphData (the true backend topology), and skips
+      // boundary/group nodes, so the legend is stable regardless of collapse.
+      wrapper.vm.graphData = {
+        nodes: [
+          { id: "a", label: "a", requests: 1, errors: 0 },
+          { id: "b", label: "b", requests: 1, errors: 0, service_type: "database" },
+          { id: "c", label: "c", requests: 1, errors: 0, service_type: "external" },
+          // a collapsed boundary node must NOT be counted as one database
+          {
+            id: "__group_database",
+            label: "Database (3)",
+            requests: 3,
+            errors: 0,
+            service_type: "database",
+            is_group: true,
+            member_count: 3,
+          },
+        ],
+        edges: [],
+      };
+      await flushPromises();
+      expect(wrapper.vm.kindCounts).toEqual({
+        service: 1,
+        database: 1,
+        queue: 0,
+        external: 1,
+        rpc: 0,
+        agent: 0,
+        tool: 0,
+        model: 0,
+      });
+    });
+
+    it("sums every kind into totalEntities for the header inventory chip", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.graphData = {
+        nodes: [
+          { id: "a", label: "a", requests: 1, errors: 0 },
+          { id: "b", label: "b", requests: 1, errors: 0, service_type: "database" },
+          { id: "c", label: "c", requests: 1, errors: 0, service_type: "external" },
+          { id: "d", label: "d", requests: 1, errors: 0, service_type: "queue" },
+          // group nodes are excluded (kindCounts skips them), so total = 4
+          {
+            id: "__group_external",
+            label: "External (5)",
+            requests: 5,
+            errors: 0,
+            service_type: "external",
+            is_group: true,
+            member_count: 5,
+          },
+        ],
+        edges: [],
+      };
+      await flushPromises();
+      expect(wrapper.vm.totalEntities).toBe(4);
+    });
+
+    it("exposes kindRows with counts; only dependency kinds are toggleable", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.graphData = {
+        nodes: [
+          { id: "a", label: "a", requests: 1, errors: 0 },
+          { id: "b", label: "b", requests: 1, errors: 0, service_type: "database" },
+        ],
+        edges: [],
+      };
+      await flushPromises();
+      const rows = wrapper.vm.kindRows;
+      const service = rows.find((r: any) => r.key === "service");
+      const database = rows.find((r: any) => r.key === "database");
+      // Services are the graph spine — always shown, never a toggle.
+      expect(service).toMatchObject({ label: "Services", count: 1, toggleable: false });
+      // Dependency kinds carry a live count and can be hidden.
+      expect(database).toMatchObject({ label: "Datastores", count: 1, toggleable: true });
+    });
+  });
+
+  describe("topology from traces", () => {
+    it("sorts nodes + edges deterministically at ingest (same topology → same graph)", async () => {
+      // The backend does not guarantee node/edge order, and the layouts are
+      // order-sensitive — so ingest must sort, or the same topology renders a
+      // different graph each fetch. Feed an UNSORTED topology and assert the
+      // stored graphData comes out in a stable, sorted order.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [
+            { id: "gamma", label: "gamma", requests: 1, errors: 0 },
+            { id: "alpha", label: "alpha", requests: 1, errors: 0 },
+            { id: "beta", label: "beta", requests: 1, errors: 0 },
+          ],
+          edges: [
+            { from: "gamma", to: "alpha", total_requests: 1, failed_requests: 0 },
+            { from: "alpha", to: "beta", total_requests: 1, failed_requests: 0 },
+            { from: "alpha", to: "gamma", total_requests: 1, failed_requests: 0 },
+          ],
+        },
+      } as any);
+
+      const wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.loadServiceGraph();
+      await flushPromises();
+
+      // Nodes sorted by id.
+      expect(wrapper.vm.graphData.nodes.map((n: any) => n.id)).toEqual([
+        "alpha",
+        "beta",
+        "gamma",
+      ]);
+      // Edges sorted by (from, to).
+      expect(
+        wrapper.vm.graphData.edges.map((e: any) => `${e.from}->${e.to}`),
+      ).toEqual(["alpha->beta", "alpha->gamma", "gamma->alpha"]);
+    });
+
+    it("builds a typed inferred node from the traces queries", async () => {
+      // The backend now returns a fully classified topology; a database-typed
+      // node arrives with service_type set and is used directly.
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [
+            { id: "cart", label: "cart", requests: 10, errors: 0 },
+            {
+              id: "valkey",
+              label: "valkey",
+              requests: 10,
+              errors: 0,
+              service_type: "database",
+            },
+          ],
+          edges: [
+            {
+              from: "cart",
+              to: "valkey",
+              total_requests: 10,
+              failed_requests: 0,
+              error_rate: 0,
+              p50_latency_ns: 0,
+              p95_latency_ns: 0,
+              p99_latency_ns: 0,
+              connection_type: "database",
+            },
+          ],
+        },
+      } as any);
+
+      const wrapper = createWrapper();
+      await flushPromises();
+      // Force a fresh load now that mocks are in place (mount may have run first).
+      await wrapper.vm.loadServiceGraph();
+      await flushPromises();
+
+      const valkey = wrapper.vm.graphData.nodes.find(
+        (n: any) => n.id === "valkey",
+      );
+      expect(valkey).toBeTruthy();
+      expect(valkey.service_type).toBe("database");
+    });
+  });
+
+  describe("adaptive collapse", () => {
+    it("collapses inferred deps when node count exceeds threshold", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      const exts = Array.from({ length: 8 }, (_, i) => ({
+        id: `ext${i}`,
+        label: `ext${i}`,
+        requests: 1,
+        errors: 0,
+        service_type: "external",
+      }));
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: {
+          nodes: [
+            { id: "svc", label: "svc", requests: 1, errors: 0 },
+            ...exts,
+          ],
+          edges: exts.map((e) => ({
+            from: "svc",
+            to: e.id,
+            total_requests: 1,
+            failed_requests: 0,
+          })),
+        },
+      } as any);
+      wrapper.vm.collapseThreshold = 5; // force collapse
+      await wrapper.vm.loadServiceGraph();
+      await flushPromises();
+      const ids = wrapper.vm.filteredGraphData.nodes.map((n: any) => n.id);
+      // Per-caller boundary node: svc's externals collapse into svc's own group.
+      expect(ids).toContain("__group_external__svc");
+      expect(ids).not.toContain("ext0");
+    });
+
+    it("expands ONLY the clicked group (by boundary id) via toggleGroupExpansion", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // Per-group: the FULL boundary id is toggled, not the kind — so one
+      // caller's group expands without expanding every group of that kind.
+      wrapper.vm.toggleGroupExpansion("__group_external__payment");
+      await flushPromises();
+      expect(wrapper.vm.expandedGroups.has("__group_external__payment")).toBe(true);
+      // A different caller's external group stays untouched.
+      expect(wrapper.vm.expandedGroups.has("__group_external__product")).toBe(false);
+      wrapper.vm.toggleGroupExpansion("__group_external__payment");
+      expect(wrapper.vm.expandedGroups.has("__group_external__payment")).toBe(false);
+    });
+
+    it("clicking a collapsed boundary node toggles that specific group (graph params)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // ECharts graph-view click: data has the full boundary id + is_group.
+      wrapper.vm.handleNodeClick({
+        dataType: "node",
+        data: {
+          id: "__group_external__payment",
+          is_group: true,
+          service_type: "external",
+        },
+      });
+      expect(wrapper.vm.expandedGroups.has("__group_external__payment")).toBe(true);
+      // Side panel must NOT open for a group node.
+      expect(wrapper.vm.showSidePanel).toBe(false);
+    });
+
+    it("clicking a collapsed boundary node toggles that specific group (tree params)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // ECharts tree-view click: data carries id (name is the label).
+      wrapper.vm.handleNodeClick({
+        componentType: "series",
+        data: {
+          id: "__group_rpc__api-gateway",
+          name: "Rpc (3)",
+          is_group: true,
+          service_type: "rpc",
+        },
+      });
+      expect(wrapper.vm.expandedGroups.has("__group_rpc__api-gateway")).toBe(true);
+    });
+
+    it("switches collapse mode", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.setCollapseMode("expanded");
+      expect(wrapper.vm.collapseMode).toBe("expanded");
+    });
+
+    it("zoom in/out adjust the series zoom from the CURRENT level; fit recreates", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+
+      // Stub an ECharts instance whose live zoom is read via getOption and
+      // written via setOption. The buttons read the current zoom first so they
+      // stay in sync with wheel zoom.
+      let liveZoom = 1;
+      const setOptionCalls: any[] = [];
+      (wrapper.vm as any).chartRendererRef = {
+        chart: {
+          getOption: () => ({ series: [{ zoom: liveZoom }] }),
+          setOption: (opt: any) => {
+            setOptionCalls.push(opt);
+            liveZoom = opt.series[0].zoom; // reflect the write back
+          },
+        },
+      };
+
+      // Zoom in → series zoom increases above 1.
+      wrapper.vm.zoomIn();
+      expect(setOptionCalls.at(-1).series[0].zoom).toBeGreaterThan(1);
+      const afterIn = setOptionCalls.at(-1).series[0].zoom;
+
+      // Zoom out → adjusts from the (now zoomed-in) live level, so it decreases.
+      wrapper.vm.zoomOut();
+      expect(setOptionCalls.at(-1).series[0].zoom).toBeLessThan(afterIn);
+
+      // Zoom is clamped — many zoom-outs never go below the floor.
+      for (let i = 0; i < 30; i++) wrapper.vm.zoomOut();
+      expect(setOptionCalls.at(-1).series[0].zoom).toBeGreaterThanOrEqual(0.4);
+
+      // Fit-to-screen recreates the chart (bumps chartKey) to re-fit at zoom 1.
+      const keyBefore = wrapper.vm.chartKey;
+      wrapper.vm.fitToScreen();
+      expect(wrapper.vm.chartKey).toBeGreaterThan(keyBefore);
+    });
+
+    it("hides a kind via the visibility toggle", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.toggleKindVisibility("external");
+      expect(wrapper.vm.hiddenKinds.has("external")).toBe(true);
+    });
+
+    it("shows a filter-active dot on the Show types button when any type is hidden", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+
+      const dotSelector = '[data-test="service-graph-active-filter-indicator"]';
+
+      // No types hidden → no dot, count 0.
+      expect(wrapper.vm.activeFilterCount).toBe(0);
+      expect(wrapper.find(dotSelector).exists()).toBe(false);
+
+      // Hide a type → dot appears so the user knows the graph is filtered
+      // (entities withheld) rather than simply empty. A plain dot (not a count)
+      // avoids the "N shown vs N hidden" ambiguity.
+      wrapper.vm.toggleKindVisibility("external");
+      await flushPromises();
+
+      expect(wrapper.vm.activeFilterCount).toBe(1);
+      expect(wrapper.find(dotSelector).exists()).toBe(true);
+
+      // Un-hide → dot disappears.
+      wrapper.vm.toggleKindVisibility("external");
+      await flushPromises();
+      expect(wrapper.vm.activeFilterCount).toBe(0);
+      expect(wrapper.find(dotSelector).exists()).toBe(false);
+    });
+
+    it("renders the compact Density dropdown trigger", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      // The controls live inside a dropdown; only the trigger is always in the
+      // toolbar (keeps it compact). The mode/kind setters are covered above.
+      expect(
+        wrapper.find('[data-test="service-graph-density-btn"]').exists(),
+      ).toBe(true);
     });
   });
 

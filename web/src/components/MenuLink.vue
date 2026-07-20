@@ -24,23 +24,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="rootClass"
     @click="onRootClick"
   >
-    <div class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
+    <div class="nav-menu-item-avatar flex flex-col items-center gap-0.5 w-full">
       <div
-        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
+        class="icon-wrapper relative inline-flex items-center justify-center rounded-lg p-0.5 transition-colors duration-250"
         :class="isActive
           ? activeIconClass
-          : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
+          : 'text-tabs-inactive-text group-hover:text-primary-600'"
       >
         <!-- Rail icons are a hair smaller than the md (24px) default. -->
-        <OIcon v-if="icon" :name="icon" size="md" class="tw:size-5.5!" />
+        <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
         <component
           v-else-if="hasIconComponent"
           :is="iconComponent"
-          class="o-icon tw:size-5.5"
+          class="o-icon size-5.5"
         />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge tw:absolute tw:-top-1 tw:-right-2 tw:min-w-4 tw:h-4 tw:px-1 tw:bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] tw:border-2 tw:border-[#0f172a] tw:rounded-full tw:text-[9px] tw:font-bold tw:text-white tw:flex tw:items-center tw:justify-center tw:leading-none tw:shadow-[0_4px_8px_rgba(239,68,68,0.5)] tw:animate-pulse tw:z-1"
+          class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] border-2 border-[#0f172a] rounded-full text-[9px] font-bold text-white flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
@@ -48,10 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[0.71875rem] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight tw:line-clamp-2 tw:wrap-normal tw:break-normal tw:[hyphens:none]"
+        class="nav-menu-item-label text-[0.71875rem] tracking-[0.01em] transition-colors duration-250 w-full text-center leading-tight line-clamp-2 wrap-normal break-normal [hyphens:none]"
         :class="isActive
           ? activeLabelClass
-          : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
+          : 'font-medium text-tabs-inactive-text group-hover:text-primary-600'"
       >{{ title }}</div>
     </div>
 
@@ -60,10 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          hover, or stays lit while the flyout is open / the section is active. -->
     <span
       v-if="asTrigger || submenu"
-      class="tw:absolute tw:right-1 tw:top-3 tw:transition-opacity tw:duration-150"
+      class="absolute right-1 top-3 transition-opacity duration-150"
       :class="isActive || expanded
-        ? 'tw:opacity-100 tw:text-primary-600'
-        : 'tw:opacity-70 tw:group-hover:opacity-100 tw:text-tabs-inactive-text'"
+        ? 'opacity-100 text-primary-600'
+        : 'opacity-70 group-hover:opacity-100 text-tabs-inactive-text'"
       aria-hidden="true"
     >
       <OIcon name="chevron-right" size="xs" />
@@ -183,16 +183,16 @@ export default defineComponent({
     const isDark = computed(() => store.state.theme === "dark");
     const activePillClass = computed(() =>
       isDark.value
-        ? "tw:text-tabs-active-text tw:bg-tabs-active-bg tw:shadow-sm tw:border-l-2 tw:border-primary-400"
-        : "tw:text-primary-700 tw:bg-surface-base tw:shadow-sm tw:border-l-2 tw:border-primary-600",
+        ? "text-tabs-active-text bg-tabs-active-bg shadow-sm border-l-2 border-primary-400"
+        : "text-primary-700 bg-surface-base shadow-sm border-l-2 border-primary-600",
     );
     const activeIconClass = computed(() =>
-      isDark.value ? "tw:text-tabs-active-text!" : "tw:text-primary-700!",
+      isDark.value ? "text-tabs-active-text!" : "text-primary-700!",
     );
     const activeLabelClass = computed(() =>
       isDark.value
-        ? "tw:font-semibold tw:text-tabs-active-text!"
-        : "tw:font-semibold tw:text-primary-600!",
+        ? "font-semibold text-tabs-active-text!"
+        : "font-semibold text-primary-600!",
     );
 
     // Phase 5: Accessibility - compute ARIA label with fallback
@@ -255,10 +255,10 @@ export default defineComponent({
 
     const rootClass = computed(() => [
       "nav-menu-item",
-      "tw:group tw:relative tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:px-0 tw:py-1 tw:min-h-0 tw:rounded-lg tw:transition-colors tw:duration-150 tw:ease-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1",
+      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-lg transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1",
       isActive.value
         ? activePillClass.value
-        : "tw:text-tabs-inactive-text tw:border-l-2 tw:border-transparent tw:bg-transparent tw:hover:bg-tabs-hover-bg",
+        : "text-tabs-inactive-text border-l-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
       isActive.value ? "nav-menu-item--active" : "",
       props.title === "Functions" ? "menu-link-function" : "",
       // Reset native <button> chrome so the trigger looks EXACTLY like a link.
@@ -267,7 +267,7 @@ export default defineComponent({
       // `bg-transparent` here would override the active pill and break the
       // selected-state highlight. `font:inherit` keeps the label font identical.
       props.asTrigger
-        ? "tw:w-full tw:appearance-none tw:border-0 tw:cursor-pointer tw:text-left tw:[font-family:inherit] tw:[font-size:inherit] tw:[line-height:inherit] tw:[letter-spacing:inherit]"
+        ? "w-full appearance-none border-0 cursor-pointer text-left [font-family:inherit] [font-size:inherit] [line-height:inherit] [letter-spacing:inherit]"
         : "",
     ]);
 

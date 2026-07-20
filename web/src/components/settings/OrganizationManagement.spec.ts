@@ -26,17 +26,19 @@ import {
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
+import { extendTrialSchema } from "./OrganizationManagement.schema";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
+import enLocaleFull from "@/locales/languages/en-US.json";
 import { nextTick } from "vue";
 
-// ── Mock toast (replaces deprecated $q.notify) ──
+// ── Mock toast ──
 const mockToastFn = vi.fn().mockReturnValue(vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToastFn(...args),
 }));
 
-// ── Mock confirm dialog (replaces deprecated $q.dialog) ──
+// ── Mock confirm dialog ──
 const mockConfirmFn = vi.fn().mockResolvedValue(true);
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: vi.fn(() => ({
@@ -107,25 +109,7 @@ const i18n = createI18n({
   fallbackLocale: "en",
   legacy: false,
   globalInjection: true,
-  messages: {
-    en: {
-      settings: {
-        organizationManagement: "Organization Management",
-        searchOrgs: "Search Organizations",
-        paginationOrganizationLabel: "Organizations",
-        org_name: "Name",
-        org_identifier: "Identifier",
-        subscription_status: "Subscription Status",
-        created_on: "Created On",
-        trial_expiry: "Trial Expiry",
-        actions: "Actions",
-        extendTrial: "Extend Trial",
-      },
-      common: {
-        cancel: "Cancel",
-      },
-    },
-  },
+  messages: { en: enLocaleFull },
 });
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so
@@ -342,7 +326,8 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.contractPrompt).toBe(false);
       expect(wrapper.vm.contractMode).toBe("create");
-      expect(wrapper.vm.contractEndDate).toBe("");
+      // contractEndDate is now form-owned (OFormInput) — the schema default is "".
+      expect(wrapper.vm.contractDefaults()).toEqual({ contractEndDate: "" });
     });
   });
 
@@ -1180,22 +1165,16 @@ describe("OrganizationManagement.vue", () => {
       expect(wrapper.vm.extendTrialPrompt).toBe(false);
     });
 
-    it("should call updateTrialPeriod when primary is clicked on the extend-trial dialog", async () => {
+    it("should call updateTrialPeriod when the extend-trial form is submitted (real OForm)", async () => {
       mockExtendTrialPeriod.mockResolvedValue({ data: true });
       wrapper = createWrapper();
-      wrapper.vm.extendTrialPrompt = true;
-      wrapper.vm.extendTrialDataRow = { name: "Acme", identifier: "acme-id" };
+      wrapper.vm.toggleExtendTrialDialog({ name: "Acme", identifier: "acme-id" });
       wrapper.vm.extendedTrial = 3;
       await nextTick();
 
-      const dialog = wrapper
-        .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) =>
-          (d.attributes("data-title") || "").startsWith("Extend Trial"),
-        );
-      expect(dialog?.exists()).toBe(true);
-
-      await dialog!.find('[data-test="o-dialog-stub-primary"]').trigger("click");
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.exists()).toBe(true);
+      await (form.vm as any).form.handleSubmit();
       await flushPromises();
 
       expect(mockExtendTrialPeriod).toHaveBeenCalledWith(
@@ -1266,24 +1245,23 @@ describe("OrganizationManagement.vue", () => {
       expect(wrapper.vm.contractPrompt).toBe(false);
     });
 
-    it("should invoke submitContract when primary is clicked", async () => {
+    it("should call create_external_contract when the contract form is submitted with a valid date (real OForm)", async () => {
       mockCreateExternalContract?.mockResolvedValue?.({ data: true });
       wrapper = createWrapper();
       wrapper.vm.toggleContractDialog(
         { name: "Acme", identifier: "acme" },
         "create",
       );
-      wrapper.vm.contractEndDate = "2030-12-31";
       await nextTick();
 
-      const dialog = wrapper
-        .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) =>
-          (d.attributes("data-title") || "").includes("External Contract"),
-        );
-      expect(dialog?.exists()).toBe(true);
+      // Fill the form-owned date field, then submit through the real OForm.
+      await wrapper
+        .find('[data-test="contract-end-date-input"]')
+        .setValue("2030-12-31");
 
-      await dialog!.find('[data-test="o-dialog-stub-primary"]').trigger("click");
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.exists()).toBe(true);
+      await (form.vm as any).form.handleSubmit();
       await flushPromises();
 
       expect(mockCreateExternalContract).toHaveBeenCalledWith(
@@ -1294,9 +1272,8 @@ describe("OrganizationManagement.vue", () => {
   });
 
   describe("toggleContractDialog Function", () => {
-    it("should open the contract dialog in create mode and reset the end date", () => {
+    it("should open the contract dialog in create mode", () => {
       wrapper = createWrapper();
-      wrapper.vm.contractEndDate = "2025-01-01";
       wrapper.vm.toggleContractDialog(
         { name: "Acme", identifier: "acme" },
         "create",
@@ -1308,7 +1285,8 @@ describe("OrganizationManagement.vue", () => {
         name: "Acme",
         identifier: "acme",
       });
-      expect(wrapper.vm.contractEndDate).toBe("");
+      // The end date is no longer a component ref — the form re-seeds it to ""
+      // on each open (dialog body remounts), proven by the real-OForm gate tests.
     });
 
     it("should open the contract dialog in extend mode", () => {
@@ -1333,43 +1311,40 @@ describe("OrganizationManagement.vue", () => {
       store.state.zoConfig.meta_org = "different_org";
     });
 
-    it("should warn and return when create mode has no end date", async () => {
+    // Validation is now schema-driven: an empty end date blocks the submit
+    // (the old toast required-guards are gone). Mount the REAL <OForm> and prove
+    // the schema gates the submit and the service is NOT called.
+    it("blocks the create submit and does not call the service when the end date is empty (real OForm)", async () => {
       wrapper = createWrapper();
       wrapper.vm.toggleContractDialog(
         { name: "Acme", identifier: "acme" },
         "create",
       );
-      wrapper.vm.contractEndDate = "";
+      await nextTick();
 
-      await wrapper.vm.submitContract();
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.exists()).toBe(true);
+      await (form.vm as any).form.handleSubmit();
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-          message: "End date is required.",
-        }),
-      );
+      expect((form.vm as any).form.state.isValid).toBe(false);
       expect(mockCreateExternalContract).not.toHaveBeenCalled();
     });
 
-    it("should warn and return when extend mode has no end date", async () => {
+    it("blocks the extend submit and does not call the service when the end date is empty (real OForm)", async () => {
       wrapper = createWrapper();
       wrapper.vm.toggleContractDialog(
         { name: "Acme", identifier: "acme" },
         "extend",
       );
-      wrapper.vm.contractEndDate = "";
+      await nextTick();
 
-      await wrapper.vm.submitContract();
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.exists()).toBe(true);
+      await (form.vm as any).form.handleSubmit();
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-          message: "New end date is required.",
-        }),
-      );
+      expect((form.vm as any).form.state.isValid).toBe(false);
       expect(mockExtendExternalContract).not.toHaveBeenCalled();
     });
 
@@ -1380,9 +1355,8 @@ describe("OrganizationManagement.vue", () => {
         { name: "Acme", identifier: "acme" },
         "create",
       );
-      wrapper.vm.contractEndDate = "2030-12-31";
 
-      await wrapper.vm.submitContract();
+      await wrapper.vm.submitContract({ contractEndDate: "2030-12-31" });
       await flushPromises();
 
       expect(mockCreateExternalContract).toHaveBeenCalledTimes(1);
@@ -1404,8 +1378,7 @@ describe("OrganizationManagement.vue", () => {
         { name: "Acme", identifier: "acme" },
         "create",
       );
-      wrapper.vm.contractEndDate = "2030-12-31";
-      await wrapper.vm.submitContract();
+      await wrapper.vm.submitContract({ contractEndDate: "2030-12-31" });
       await flushPromises();
 
       expect(wrapper.vm.contractPrompt).toBe(false);
@@ -1421,9 +1394,8 @@ describe("OrganizationManagement.vue", () => {
         { name: "Acme", identifier: "acme" },
         "create",
       );
-      wrapper.vm.contractEndDate = "2030-12-31";
 
-      await wrapper.vm.submitContract();
+      await wrapper.vm.submitContract({ contractEndDate: "2030-12-31" });
       await flushPromises();
 
       expect(mockToastFn).toHaveBeenCalledWith(
@@ -1443,9 +1415,8 @@ describe("OrganizationManagement.vue", () => {
         { name: "Acme", identifier: "acme" },
         "create",
       );
-      wrapper.vm.contractEndDate = "2030-12-31";
 
-      await wrapper.vm.submitContract();
+      await wrapper.vm.submitContract({ contractEndDate: "2030-12-31" });
       await flushPromises();
 
       expect(mockToastFn).toHaveBeenCalledWith(
@@ -1463,9 +1434,8 @@ describe("OrganizationManagement.vue", () => {
         { name: "Beta", identifier: "beta" },
         "extend",
       );
-      wrapper.vm.contractEndDate = "2030-12-31";
 
-      await wrapper.vm.submitContract();
+      await wrapper.vm.submitContract({ contractEndDate: "2030-12-31" });
       await flushPromises();
 
       expect(mockExtendExternalContract).toHaveBeenCalledTimes(1);
@@ -1484,9 +1454,8 @@ describe("OrganizationManagement.vue", () => {
         { name: "Beta", identifier: "beta" },
         "extend",
       );
-      wrapper.vm.contractEndDate = "2030-12-31";
 
-      await wrapper.vm.submitContract();
+      await wrapper.vm.submitContract({ contractEndDate: "2030-12-31" });
       await flushPromises();
 
       expect(mockToastFn).toHaveBeenCalledWith(
@@ -1915,5 +1884,31 @@ describe("OrganizationManagement.vue", () => {
       expect(filtered).toHaveLength(1);
       expect(filtered[0].name).toBe("Alpha Corp");
     });
+  });
+});
+
+describe("extendTrialSchema", () => {
+  it("rejects a week count below 1 (the .min(1) rule)", () => {
+    expect(extendTrialSchema.safeParse({ extendedTrial: 0 }).success).toBe(
+      false,
+    );
+  });
+
+  it("coerces a numeric string and still enforces the minimum", () => {
+    // The pill value is bridged in and can arrive as a string.
+    expect(extendTrialSchema.safeParse({ extendedTrial: "0" }).success).toBe(
+      false,
+    );
+    const res = extendTrialSchema.safeParse({ extendedTrial: "2" });
+    expect(res.success).toBe(true);
+    if (res.success) expect(res.data.extendedTrial).toBe(2);
+  });
+
+  it("accepts the in-range pill values 1..4", () => {
+    for (const v of [1, 2, 3, 4]) {
+      expect(extendTrialSchema.safeParse({ extendedTrial: v }).success).toBe(
+        true,
+      );
+    }
   });
 });

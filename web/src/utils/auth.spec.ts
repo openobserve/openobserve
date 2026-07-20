@@ -38,7 +38,11 @@ vi.mock("@/utils/storage", () => ({
 
 vi.mock("@/utils/uuid", () => ({
   getUUID: vi.fn(() => "aaaabbbb-cccc-dddd-0000-111122223333"),
-  getUUIDv7: vi.fn(() => "01234567-89ab-7def-8123-456789abcdef"),
+  getUUIDv7: vi.fn((compact?: boolean) =>
+    compact
+      ? "0123456789ab7def8123456789abcdef"
+      : "01234567-89ab-7def-8123-456789abcdef",
+  ),
 }));
 
 // Imports AFTER mocks
@@ -170,13 +174,10 @@ describe("getUserInfo", () => {
   });
 
   it("logs and returns undefined when the whole function throws", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     // Pass something that causes substring to throw
     const result = getUserInfo(null as any);
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -222,13 +223,10 @@ describe("getDecodedAccessToken", () => {
     vi.mocked(b64DecodeStandard).mockImplementation(() => {
       throw new Error("decode error");
     });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = getDecodedAccessToken("bad.token");
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalledWith("error decoding token");
-    logSpy.mockRestore();
   });
 });
 
@@ -264,13 +262,10 @@ describe("getDecodedUserInfo", () => {
     vi.mocked(useLocalUserInfo).mockImplementation(() => {
       throw new Error("storage error");
     });
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const result = getDecodedUserInfo();
 
     expect(result).toBeUndefined();
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
   });
 });
 
@@ -509,6 +504,61 @@ describe("routeGuard", () => {
 
       expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledTimes(1);
+    });
+
+    const buildEmptyDataStore = () =>
+      buildMockStore({
+        state: {
+          organizationData: {
+            organizationSettings: { free_trial_expiry: "" },
+            isDataIngested: false,
+          },
+          selectedOrganization: { identifier: "default" },
+          zoConfig: { restricted_routes_on_empty_data: true },
+        },
+      });
+
+    // /settings/general hosts the Danger Zone, and an org with nothing ingested is
+    // the one an admin is most likely to delete — bouncing to /ingestion would
+    // leave no way to. "/settings" is the nav's landing path before it redirects
+    // to general, so it has to survive the guard too.
+    it.each([
+      ["settings landing", "settings", "/settings"],
+      ["general settings", "general", "/settings/general"],
+      ["general settings, trailing slash", "general", "/settings/general/"],
+    ])("calls next() directly for %s", async (_label, name, path) => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue(
+        { data: { streams: { num_streams: 0 } } },
+      );
+      mockStore = buildEmptyDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name, path }, {}, mockNext);
+
+      expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledTimes(1);
+      expect(mockNext).not.toHaveBeenCalledWith({ path: "/ingestion" });
+    });
+
+    // The exemption is deliberately only the two paths above — the rest of the
+    // Settings tree shows no ingested data either, but it is not needed to escape
+    // an empty org, so it stays behind the ingestion redirect.
+    it.each([
+      ["organizationSettings", "/settings/organization"],
+      ["license", "/settings/license"],
+      ["cipherKeys", "/settings/cipher_keys"],
+    ])("still redirects %s to /ingestion", async (name, path) => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue(
+        { data: { streams: { num_streams: 0 } } },
+      );
+      mockStore = buildEmptyDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name, path }, {}, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
     });
   });
 });

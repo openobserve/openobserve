@@ -249,10 +249,6 @@ vi.mock("@/composables/useTraces", () => ({
 import SearchBar from "@/plugins/traces/SearchBar.vue";
 
 // ---------------------------------------------------------------------------
-// Quasar setup
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // DOM anchor node required by attachTo
 // ---------------------------------------------------------------------------
 const appNode = document.createElement("div");
@@ -1396,27 +1392,16 @@ describe("SearchBar", () => {
       ).toBe(true);
     });
 
-    it("should render services-catalog-refresh-btn when searchMode is services-catalog", async () => {
+    // The services-catalog refresh button was intentionally moved out of the
+    // SearchBar header and into ServicesCatalog.vue (see commit "fix: take
+    // refresh icon below not in header"). SearchBar no longer renders it.
+    it("should not render services-catalog-refresh-btn in the header", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
 
       expect(
         wrapper.find('[data-test="services-catalog-refresh-btn"]').exists(),
-      ).toBe(true);
-    });
-
-    it("should emit services-catalog-refresh when refresh btn is clicked", async () => {
-      wrapper = mountSearchBar();
-      await flushPromises();
-
-      const refreshBtn = wrapper.find(
-        '[data-test="services-catalog-refresh-btn"]',
-      );
-      expect(refreshBtn.exists()).toBe(true);
-      await refreshBtn.trigger("click");
-
-      expect(wrapper.emitted("services-catalog-refresh")).toBeTruthy();
-      expect(wrapper.emitted("services-catalog-refresh")).toHaveLength(1);
+      ).toBe(false);
     });
 
     it("should hide services-catalog toolbar when searchMode is not services-catalog", async () => {

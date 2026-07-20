@@ -99,42 +99,42 @@ describe("OButton", () => {
 
   it("applies primary variant classes by default", () => {
     const wrapper = mount(OButton);
-    expect(wrapper.classes().join(" ")).toContain("tw:bg-button-primary");
+    expect(wrapper.classes().join(" ")).toContain("bg-button-primary");
   });
 
   it("applies secondary variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "secondary" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:bg-button-secondary");
+    expect(wrapper.classes().join(" ")).toContain("bg-button-secondary");
   });
 
   it("applies outline variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "outline" } });
     expect(wrapper.classes().join(" ")).toContain(
-      "tw:text-button-outline-text",
+      "text-button-outline-text",
     );
   });
 
   it("applies ghost variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "ghost" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:text-button-ghost-text");
+    expect(wrapper.classes().join(" ")).toContain("text-button-ghost-text");
   });
 
   it("applies destructive variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "destructive" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:bg-button-destructive");
+    expect(wrapper.classes().join(" ")).toContain("bg-button-destructive");
   });
 
   it("applies ghost-primary variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "ghost-primary" } });
     expect(wrapper.classes().join(" ")).toContain(
-      "tw:text-button-ghost-primary-text",
+      "text-button-ghost-primary-text",
     );
   });
 
   it("applies ghost-destructive variant classes", () => {
     const wrapper = mount(OButton, { props: { variant: "ghost-destructive" } });
     expect(wrapper.classes().join(" ")).toContain(
-      "tw:text-button-ghost-destructive-text",
+      "text-button-ghost-destructive-text",
     );
   });
 
@@ -142,51 +142,51 @@ describe("OButton", () => {
 
   it("applies md size classes by default", () => {
     const wrapper = mount(OButton);
-    expect(wrapper.classes().join(" ")).toContain("tw:h-10");
+    expect(wrapper.classes().join(" ")).toContain("h-10");
   });
 
   it("applies sm size classes", () => {
     const wrapper = mount(OButton, { props: { size: "sm" } });
     // 34px control height per the design system (HANDOFF §11).
-    expect(wrapper.classes().join(" ")).toContain("tw:h-[2.125rem]");
+    expect(wrapper.classes().join(" ")).toContain("h-[2.125rem]");
   });
 
   it("applies lg size classes", () => {
     const wrapper = mount(OButton, { props: { size: "lg" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:h-12");
+    expect(wrapper.classes().join(" ")).toContain("h-12");
   });
 
   it("applies icon size classes", () => {
     const wrapper = mount(OButton, { props: { size: "icon" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:size-6");
+    expect(wrapper.classes().join(" ")).toContain("size-6");
   });
 
   it("applies icon-circle size classes with rounded-full", () => {
     const wrapper = mount(OButton, { props: { size: "icon-circle" } });
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:size-8");
-    expect(classes).toContain("tw:rounded-full");
+    expect(classes).toContain("size-8");
+    expect(classes).toContain("rounded-full");
   });
 
   it("applies icon-sm size classes (h-8 w-8)", () => {
     const wrapper = mount(OButton, { props: { size: "icon-sm" } });
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:h-8");
-    expect(classes).toContain("tw:w-8");
+    expect(classes).toContain("h-8");
+    expect(classes).toContain("w-8");
   });
 
   it("applies icon-md size classes (h-10 w-10)", () => {
     const wrapper = mount(OButton, { props: { size: "icon-md" } });
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:h-10");
-    expect(classes).toContain("tw:w-10");
+    expect(classes).toContain("h-10");
+    expect(classes).toContain("w-10");
   });
 
   it("applies icon-lg size classes (h-12 w-12)", () => {
     const wrapper = mount(OButton, { props: { size: "icon-lg" } });
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:h-12");
-    expect(classes).toContain("tw:w-12");
+    expect(classes).toContain("h-12");
+    expect(classes).toContain("w-12");
   });
 
   // --- Keyboard ---
@@ -252,48 +252,48 @@ describe("OButton", () => {
     const wrapper = mount(OButton);
     const classes = wrapper.classes().join(" ");
     expect(classes).toContain(
-      "tw:transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow]",
+      "transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow]",
     );
-    expect(classes).toContain("tw:duration-150");
+    expect(classes).toContain("duration-150");
   });
 
   it("does not apply the old transition-colors-only utility", () => {
     const wrapper = mount(OButton);
-    // The migration replaced `tw:transition-colors` with an explicit property list.
+    // The migration replaced `transition-colors` with an explicit property list.
     // Ensure we don't regress back to the colors-only utility.
-    expect(wrapper.classes()).not.toContain("tw:transition-colors");
+    expect(wrapper.classes()).not.toContain("transition-colors");
   });
 
   it("applies unified focus glow (ring-[0.125rem]! ring-primary-500/25!) as base", () => {
     const wrapper = mount(OButton);
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:focus-visible:ring-[0.125rem]!");
-    expect(classes).toContain("tw:focus-visible:ring-primary-500/25!");
+    expect(classes).toContain("focus-visible:ring-[0.125rem]!");
+    expect(classes).toContain("focus-visible:ring-primary-500/25!");
   });
 
   it("retains outline-none as part of base classes", () => {
     const wrapper = mount(OButton);
     const classes = wrapper.classes().join(" ");
-    expect(classes).toContain("tw:outline-none");
+    expect(classes).toContain("outline-none");
   });
 
   it("applies a focus-visible ring on the default primary variant", () => {
     const wrapper = mount(OButton);
     expect(wrapper.classes().join(" ")).toContain(
-      "tw:focus-visible:ring-button-primary-hover",
+      "focus-visible:ring-button-primary-hover",
     );
   });
 
   it("applies a focus-visible ring on the secondary variant", () => {
     const wrapper = mount(OButton, { props: { variant: "secondary" } });
     expect(wrapper.classes().join(" ")).toContain(
-      "tw:focus-visible:ring-button-secondary-focus-ring",
+      "focus-visible:ring-button-secondary-focus-ring",
     );
   });
 
-  it("applies tw:focus-visible:ring-[3px] on every styled variant", () => {
+  it("applies focus-visible:ring-[3px] on every styled variant", () => {
     const wrapper = mount(OButton, { props: { variant: "destructive" } });
-    expect(wrapper.classes().join(" ")).toContain("tw:focus-visible:ring-[3px]");
+    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-[3px]");
   });
 
   // --- data attributes ---

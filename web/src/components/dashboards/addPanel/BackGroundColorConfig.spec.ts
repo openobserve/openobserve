@@ -648,8 +648,8 @@ describe("BackGroundColorConfig", () => {
 
       const colorWrapper = wrapper.find('[data-test="dashboard-config-color-input-wrapper"]');
       expect(colorWrapper.exists()).toBeTruthy();
-      expect(colorWrapper.classes()).toContain("tw:rounded-full");
-      expect(colorWrapper.classes()).toContain("tw:overflow-hidden");
+      expect(colorWrapper.classes()).toContain("rounded-full");
+      expect(colorWrapper.classes()).toContain("overflow-hidden");
     });
 
     it("should have color input styles applied", () => {

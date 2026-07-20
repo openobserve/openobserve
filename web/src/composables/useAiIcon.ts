@@ -24,7 +24,7 @@
  *
  * Usage:
  *   const { aiIconSrc } = useAiIcon()
- *   <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" />
+ *   <img :src="aiIconSrc" class="w-4 h-4 shrink-0" />
  */
 
 import { computed } from "vue";

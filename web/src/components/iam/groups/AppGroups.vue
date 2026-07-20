@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. Search moved into the
          table's own toolbar (built-in global filter). -->
     <AppPageHeader
       :title="t('iam.groups')"
       icon="group"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #subtitle>
         <span data-test="iam-groups-subtitle">
@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+    <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="card-container h-full">
         <OTable
           :frame="false"
           data-test="iam-groups-table-section"
@@ -62,17 +62,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex items-center gap-2 w-full">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('iam.searchGroup')"
-                class="tw:flex-1"
+                class="flex-1"
                 data-test="iam-groups-search-input"
               />
             </div>
           </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="iam-groups-refresh-btn"
+              @click="setupGroups"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamGroupsRefresh" />
+            </OButton>
+          </template>
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center tw:justify-center">
+            <div class="flex items-center justify-center">
               <OButton
                 :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
                 data-row-action="edit"
@@ -104,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title tw:text-text-primary">{{ rows.length }} {{ t('iam.groups') }}</span>
+            <span class="o2-table-footer-title">{{ rows.length }} {{ t('iam.groups') }}</span>
             <OButton
               v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"
@@ -125,16 +137,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @added:group="onGroupAdded"
     />
     <ConfirmDialog
-      title="Delete Group"
-      :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"
+      :title="t('iam.appGroups.deleteGroupTitle')"
+      :message="t('iam.appGroups.deleteGroupConfirm', { name: deleteConformDialog?.data?.group_name })"
       :warning-message="deleteImpactMessage"
       @update:ok="_deleteGroup"
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
     />
     <ConfirmDialog
-      title="Bulk Delete Groups"
-      :message="`Are you sure you want to delete ${selectedGroups.length} group(s)?`"
+      :title="t('iam.appGroups.bulkDeleteGroupsTitle')"
+      :message="t('iam.appGroups.bulkDeleteGroupsConfirm', { count: selectedGroups.length })"
       :warning-message="bulkDeleteImpactMessage"
       @update:ok="bulkDeleteUserGroups"
       @update:cancel="confirmBulkDelete = false"
@@ -147,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -314,7 +327,7 @@ const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
     .then(() => {
       toast({
-        message: "Group deleted successfully!",
+        message: t("iam.appGroups.groupDeletedSuccess"),
         variant: "success",
       });
       setupGroups();
@@ -322,7 +335,7 @@ const deleteUserGroup = (group: any) => {
     .catch((error: any) => {
       if (error.response.status != 403) {
         toast({
-          message: "Error while deleting group!",
+          message: t("iam.appGroups.errorDeletingGroup"),
           variant: "error",
         });
       }
@@ -404,17 +417,20 @@ const bulkDeleteUserGroups = async () => {
 
     if (successful.length > 0 && unsuccessful.length === 0) {
       toast({
-        message: `Successfully deleted ${successful.length} group(s)`,
+        message: t("iam.appGroups.bulkDeleteSuccess", { count: successful.length }),
         variant: "success",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
-        message: `Deleted ${successful.length} group(s). Failed to delete ${unsuccessful.length} group(s)`,
+        message: t("iam.appGroups.bulkDeletePartial", {
+          successCount: successful.length,
+          failCount: unsuccessful.length,
+        }),
         variant: "warning",
       });
     } else if (unsuccessful.length > 0) {
       toast({
-        message: `Failed to delete ${unsuccessful.length} group(s)`,
+        message: t("iam.appGroups.bulkDeleteFailed", { count: unsuccessful.length }),
         variant: "error",
       });
     }
@@ -425,7 +441,7 @@ const bulkDeleteUserGroups = async () => {
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
-        message: error.response?.data?.message || error?.message || "Error while deleting groups",
+        message: error.response?.data?.message || error?.message || t("iam.appGroups.errorDeletingGroups"),
         variant: "error",
       });
     }

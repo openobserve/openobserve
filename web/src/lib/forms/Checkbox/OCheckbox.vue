@@ -127,23 +127,23 @@ function toggle() {
 
 // ── Style ──────────────────────────────────────────────────────────────────
 const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
-  xs: "tw:size-3",
-  sm: "tw:size-3.5",
-  md: "tw:size-4",
+  xs: "size-3",
+  sm: "size-3.5",
+  md: "size-4",
 };
 
 const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
-  xs: "tw:text-xs",
-  sm: "tw:text-xs",
-  md: "tw:text-sm",
+  xs: "text-xs",
+  sm: "text-xs",
+  md: "text-sm",
 };
 </script>
 
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-2',
-      isDisabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
+      'inline-flex items-center gap-2',
+      isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
     ]"
     @click.stop
   >
@@ -157,37 +157,37 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       :data-state="dataState"
       :disabled="isDisabled"
       :class="[
-        'tw:shrink-0 tw:rounded-sm tw:border tw:cursor-[inherit]',
+        'shrink-0 rounded-sm border cursor-[inherit]',
         boxSizeClasses[size ?? 'md'],
         // Base / unchecked
-        'tw:bg-checkbox-bg tw:border-checkbox-border',
+        'bg-checkbox-bg border-checkbox-border',
         // Hover
-        'tw:enabled:hover:border-checkbox-hover-border',
+        'enabled:hover:border-checkbox-hover-border',
         // Checked
-        color === 'primary' && 'tw:data-[state=checked]:bg-checkbox-checked-bg',
-        color === 'primary' && 'tw:data-[state=checked]:border-checkbox-checked-border',
-        color === 'negative' && 'tw:data-[state=checked]:bg-error-600',
-        color === 'negative' && 'tw:data-[state=checked]:border-error-600',
+        color === 'primary' && 'data-[state=checked]:bg-checkbox-checked-bg',
+        color === 'primary' && 'data-[state=checked]:border-checkbox-checked-border',
+        color === 'negative' && 'data-[state=checked]:bg-error-600',
+        color === 'negative' && 'data-[state=checked]:border-error-600',
         // Indeterminate
-        color === 'primary' && 'tw:data-[state=indeterminate]:bg-checkbox-checked-bg',
-        color === 'primary' && 'tw:data-[state=indeterminate]:border-checkbox-checked-border',
-        color === 'negative' && 'tw:data-[state=indeterminate]:bg-error-600',
-        color === 'negative' && 'tw:data-[state=indeterminate]:border-error-600',
+        color === 'primary' && 'data-[state=indeterminate]:bg-checkbox-checked-bg',
+        color === 'primary' && 'data-[state=indeterminate]:border-checkbox-checked-border',
+        color === 'negative' && 'data-[state=indeterminate]:bg-error-600',
+        color === 'negative' && 'data-[state=indeterminate]:border-error-600',
         // Disabled
-        'tw:disabled:bg-checkbox-disabled-bg',
-        'tw:disabled:border-checkbox-disabled-border',
+        'disabled:bg-checkbox-disabled-bg',
+        'disabled:border-checkbox-disabled-border',
         // Focus
-        'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-checkbox-focus-ring',
+        'outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-checkbox-focus-ring',
         // Transition
-        'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
+        'transition-[color,background-color,border-color,box-shadow] duration-150',
         // Centering for indicator
-        'tw:flex tw:items-center tw:justify-center',
+        'flex items-center justify-center',
       ]"
       @click="toggle"
     >
       <span
         v-if="checked === true"
-        class="tw:flex tw:items-center tw:justify-center tw:text-checkbox-checked-fg tw:size-full"
+        class="flex items-center justify-center text-checkbox-checked-fg size-full"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -197,7 +197,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          class="tw:size-full tw:p-0.5"
+          class="size-full p-0.5"
           aria-hidden="true"
         >
           <polyline points="2,6 5,9 10,3" />
@@ -205,7 +205,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       </span>
       <span
         v-else-if="checked === 'indeterminate'"
-        class="tw:flex tw:items-center tw:justify-center tw:text-checkbox-checked-fg tw:size-full"
+        class="flex items-center justify-center text-checkbox-checked-fg size-full"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -214,7 +214,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
           stroke="currentColor"
           stroke-width="2.5"
           stroke-linecap="round"
-          class="tw:size-full tw:p-0.5"
+          class="size-full p-0.5"
           aria-hidden="true"
         >
           <line x1="2" y1="6" x2="10" y2="6" />
@@ -225,7 +225,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     <span
       v-if="$slots.label || label"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:select-none tw:leading-tight',
+        'o-input-label text-sm font-semibold select-none leading-tight',
         isDisabled && 'o-input-label--disabled',
       ]"
     >

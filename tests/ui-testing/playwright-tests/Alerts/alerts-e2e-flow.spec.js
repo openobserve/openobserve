@@ -118,7 +118,8 @@ test.describe("Alerts E2E Flow", () => {
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
-    const slackUrl = "DEMO";
+    // "DEMO" is not a valid URL — the backend SSRF guard rejects it at create time on cloud.
+    const slackUrl = "https://httpbin.org/post";
     await pm.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
 
     await pm.commonActions.navigateToAlerts();
@@ -171,7 +172,8 @@ test.describe("Alerts E2E Flow", () => {
     createdTemplateName = 'auto_playwright_template_' + sharedRandomValue;
     await pm.alertTemplatesPage.ensureTemplateExists(createdTemplateName);
     createdDestinationName = 'auto_playwright_destination_' + sharedRandomValue;
-    const slackUrl = "DEMO";
+    // "DEMO" is not a valid URL — the backend SSRF guard rejects it at create time on cloud.
+    const slackUrl = "https://httpbin.org/post";
     await pm.alertDestinationsPage.ensureDestinationExists(createdDestinationName, slackUrl, createdTemplateName);
 
     await pm.commonActions.navigateToAlerts();

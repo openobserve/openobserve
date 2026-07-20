@@ -1,9 +1,9 @@
 <template>
-  <div v-if="show" class="tw:flex tw:flex-col tw:h-full tw:bg-(--q-background) tw:border-l tw:border-(--q-border-color)">
-    <div class="correlation-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-(--q-border-color) tw:bg-(--q-header-bg)">
-      <div class="header-content tw:flex tw:items-center tw:gap-2">
+  <div v-if="show" class="flex flex-col h-full bg-(--q-background) border-l border-(--q-border-color)">
+    <div class="correlation-header flex items-center justify-between py-3 px-4 border-b border-(--q-border-color) bg-(--q-header-bg)">
+      <div class="header-content flex items-center gap-2">
         <OIcon name="link" size="sm" />
-        <span class="header-title tw:font-semibold tw:text-sm">Related Telemetry</span>
+        <span class="header-title font-semibold text-sm">Related Telemetry</span>
       </div>
       <OButton
         variant="ghost"
@@ -13,30 +13,30 @@
       />
     </div>
 
-    <div class="correlation-body tw:flex-1 tw:overflow-y-auto tw:p-4">
+    <div class="correlation-body flex-1 overflow-y-auto p-4">
       <!-- Loading State -->
-      <div v-if="loading" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:py-8 tw:px-4 tw:text-center">
+      <div v-if="loading" class="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
         <OSpinner size="sm" />
-        <span class="tw:text-[13px] tw:text-(--q-text-secondary)">Finding related data...</span>
+        <span class="text-[13px] text-(--q-text-secondary)">Finding related data...</span>
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:py-8 tw:px-4 tw:text-center">
+      <div v-else-if="error" class="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
         <OIcon name="error-outline" size="md" />
-        <span class="tw:text-[13px] tw:text-(--q-negative)">{{ error }}</span>
+        <span class="text-[13px] text-(--q-negative)">{{ error }}</span>
       </div>
 
       <!-- No Correlation Available -->
-      <div v-else-if="!correlationResult" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:py-8 tw:px-4 tw:text-center">
+      <div v-else-if="!correlationResult" class="flex flex-col items-center justify-center gap-3 py-8 px-4 text-center">
         <OIcon name="info-outline" size="md" />
-        <span class="tw:text-[13px] tw:text-(--q-text-secondary)">No related telemetry found</span>
+        <span class="text-[13px] text-(--q-text-secondary)">No related telemetry found</span>
       </div>
 
       <!-- Correlation Results -->
-      <div v-else class="correlation-results tw:flex tw:flex-col tw:gap-4">
+      <div v-else class="correlation-results flex flex-col gap-4">
         <!-- Service Info -->
-        <div class="service-info tw:flex tw:flex-col tw:gap-3">
-          <div class="service-name tw:flex tw:items-center tw:gap-[6px] tw:font-semibold tw:text-sm">
+        <div class="service-info flex flex-col gap-3">
+          <div class="service-name flex items-center gap-[6px] font-semibold text-sm">
             <OIcon name="cloud" size="xs" />
             {{ correlationResult.service.service_name }}
           </div>
@@ -45,14 +45,14 @@
           <div
             v-if="correlationResult.correlationData?.matched_dimensions &&
                   Object.keys(correlationResult.correlationData.matched_dimensions).length > 0"
-            class="dimension-section tw:flex tw:flex-col tw:gap-[6px]"
+            class="dimension-section flex flex-col gap-[6px]"
           >
-            <div class="dimension-section-header tw:flex tw:items-center tw:gap-[6px] tw:text-[11px] tw:font-semibold tw:uppercase tw:text-[var(--q-text-secondary)] tw:[letter-spacing:0.5px]">
+            <div class="dimension-section-header flex items-center gap-[6px] text-[11px] font-semibold uppercase text-[var(--q-text-secondary)] [letter-spacing:0.5px]">
               <OIcon name="link" size="xs" />
-              <span class="dimension-section-title tw:cursor-help">Matched Dimensions</span>
+              <span class="dimension-section-title cursor-help">Matched Dimensions</span>
               <OTooltip content="These stable dimensions were used to find related telemetry" />
             </div>
-            <div class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]">
+            <div class="service-dimensions flex flex-wrap gap-[6px]">
               <ODimensionChip
                 v-for="(value, key) in correlationResult.correlationData.matched_dimensions"
                 :key="`matched-${key}`"
@@ -66,14 +66,14 @@
           <div
             v-if="correlationResult.correlationData?.additional_dimensions &&
                   Object.keys(correlationResult.correlationData.additional_dimensions).length > 0"
-            class="dimension-section tw:flex tw:flex-col tw:gap-[6px]"
+            class="dimension-section flex flex-col gap-[6px]"
           >
-            <div class="dimension-section-header tw:flex tw:items-center tw:gap-[6px] tw:text-[11px] tw:font-semibold tw:uppercase tw:text-[var(--q-text-secondary)] tw:[letter-spacing:0.5px]">
+            <div class="dimension-section-header flex items-center gap-[6px] text-[11px] font-semibold uppercase text-[var(--q-text-secondary)] [letter-spacing:0.5px]">
               <OIcon name="tune" size="xs" />
-              <span class="dimension-section-title tw:cursor-help">Additional Filters Available</span>
+              <span class="dimension-section-title cursor-help">Additional Filters Available</span>
               <OTooltip content="These additional dimensions can be used for more specific filtering" />
             </div>
-            <div class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]">
+            <div class="service-dimensions flex flex-wrap gap-[6px]">
               <ODimensionChip
                 v-for="(value, key) in correlationResult.correlationData.additional_dimensions"
                 :key="`additional-${key}`"
@@ -86,7 +86,7 @@
           <!-- Fallback: show all dimensions if correlationData not available -->
           <div
             v-if="!correlationResult.correlationData"
-            class="service-dimensions tw:flex tw:flex-wrap tw:gap-[6px]"
+            class="service-dimensions flex flex-wrap gap-[6px]"
           >
             <ODimensionChip
                 v-for="(value, key) in correlationResult.service.dimensions"
@@ -100,23 +100,23 @@
         <OSeparator />
 
         <!-- Correlation Queries -->
-        <div class="correlation-queries tw:flex tw:flex-col tw:gap-4">
+        <div class="correlation-queries flex flex-col gap-4">
           <!-- Traces -->
           <div
             v-if="traceQueries.length > 0"
-            class="query-section tw:flex tw:flex-col tw:gap-2"
+            class="query-section flex flex-col gap-2"
           >
-            <div class="section-header tw:flex tw:items-center tw:gap-[6px] tw:font-semibold tw:text-[13px]">
+            <div class="section-header flex items-center gap-[6px] font-semibold text-[13px]">
               <OIcon name="timeline" size="sm" />
               <span class="section-title">Traces ({{ traceQueries.length }})</span>
             </div>
-            <div class="query-items tw:flex tw:flex-col tw:gap-[6px] tw:pl-6">
+            <div class="query-items flex flex-col gap-[6px] pl-6">
               <div
                 v-for="(query, idx) in traceQueries"
                 :key="`trace-${idx}`"
-                class="query-item tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:bg-[var(--q-item-bg)] tw:rounded tw:border tw:border-[var(--q-border-color)]"
+                class="query-item flex items-center justify-between py-2 px-3 bg-[var(--q-item-bg)] rounded border border-[var(--q-border-color)]"
               >
-                <div class="query-stream tw:text-xs tw:[font-family:monospace] tw:text-[var(--q-text-secondary)]">{{ query.stream }}</div>
+                <div class="query-stream text-xs [font-family:monospace] text-[var(--q-text-secondary)]">{{ query.stream }}</div>
                 <OButton
                   variant="outline"
                   size="sm"
@@ -129,19 +129,19 @@
           <!-- Metrics -->
           <div
             v-if="metricQueries.length > 0"
-            class="query-section tw:flex tw:flex-col tw:gap-2"
+            class="query-section flex flex-col gap-2"
           >
-            <div class="section-header tw:flex tw:items-center tw:gap-[6px] tw:font-semibold tw:text-[13px]">
+            <div class="section-header flex items-center gap-[6px] font-semibold text-[13px]">
               <OIcon name="show-chart" size="sm" />
               <span class="section-title">Metrics ({{ metricQueries.length }})</span>
             </div>
-            <div class="query-items tw:flex tw:flex-col tw:gap-[6px] tw:pl-6">
+            <div class="query-items flex flex-col gap-[6px] pl-6">
               <div
                 v-for="(query, idx) in metricQueries"
                 :key="`metric-${idx}`"
-                class="query-item tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:bg-[var(--q-item-bg)] tw:rounded tw:border tw:border-[var(--q-border-color)]"
+                class="query-item flex items-center justify-between py-2 px-3 bg-[var(--q-item-bg)] rounded border border-[var(--q-border-color)]"
               >
-                <div class="query-stream tw:text-xs tw:[font-family:monospace] tw:text-[var(--q-text-secondary)]">{{ query.stream }}</div>
+                <div class="query-stream text-xs [font-family:monospace] text-[var(--q-text-secondary)]">{{ query.stream }}</div>
                 <OButton
                   variant="outline"
                   size="sm"
@@ -154,19 +154,19 @@
           <!-- Logs -->
           <div
             v-if="logQueries.length > 0"
-            class="query-section tw:flex tw:flex-col tw:gap-2"
+            class="query-section flex flex-col gap-2"
           >
-            <div class="section-header tw:flex tw:items-center tw:gap-[6px] tw:font-semibold tw:text-[13px]">
+            <div class="section-header flex items-center gap-[6px] font-semibold text-[13px]">
               <OIcon name="article" size="sm" />
               <span class="section-title">Logs ({{ logQueries.length }})</span>
             </div>
-            <div class="query-items tw:flex tw:flex-col tw:gap-[6px] tw:pl-6">
+            <div class="query-items flex flex-col gap-[6px] pl-6">
               <div
                 v-for="(query, idx) in logQueries"
                 :key="`log-${idx}`"
-                class="query-item tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:bg-[var(--q-item-bg)] tw:rounded tw:border tw:border-[var(--q-border-color)]"
+                class="query-item flex items-center justify-between py-2 px-3 bg-[var(--q-item-bg)] rounded border border-[var(--q-border-color)]"
               >
-                <div class="query-stream tw:text-xs tw:[font-family:monospace] tw:text-[var(--q-text-secondary)]">{{ query.stream }}</div>
+                <div class="query-stream text-xs [font-family:monospace] text-[var(--q-text-secondary)]">{{ query.stream }}</div>
                 <OButton
                   variant="outline"
                   size="sm"

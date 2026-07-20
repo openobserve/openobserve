@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { mount, shallowMount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import ImportDashboard from "./ImportDashboard.vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
-// Install Quasar
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock external dependencies
 vi.mock("@/utils/commons", () => ({
@@ -119,20 +119,7 @@ const createMockRouter = () => {
 const createMockI18n = () => {
   return createI18n({
     locale: "en",
-    messages: {
-      en: {
-        dashboard: {
-          importDashboard: "Import Dashboard",
-          communityDashboard: "Community Dashboard",
-          import: "Import",
-          addURL: "Add URL",
-          dropFileMsg: "Drop file here",
-        },
-        function: {
-          cancel: "Cancel",
-        },
-      },
-    },
+    messages: { en: enLocaleFull },
   });
 };
 
@@ -221,15 +208,20 @@ describe("ImportDashboard.vue", () => {
 
   it("should reset form data when switching tabs", async () => {
     wrapper = mountComponent();
-    await nextTick();
+    await flushPromises();
 
-    // Set some initial values
+    // url/jsonFiles are now form-owned (rule ②); set them via the form so the
+    // read-only projection refs stay coherent.
     wrapper.vm.jsonStr = '{"test": "data"}';
-    wrapper.vm.jsonFiles = [{ name: "test.json" }];
-    wrapper.vm.url = "http://example.com";
+    wrapper.vm.form.setFieldValue("jsonFiles", [
+      { name: "test.json" },
+    ]);
+    wrapper.vm.form.setFieldValue("url", "http://example.com");
+    await flushPromises();
 
     // Call updateActiveTab
     wrapper.vm.updateActiveTab();
+    await flushPromises();
 
     // Verify all fields are reset
     expect(wrapper.vm.jsonStr).toBe("");
@@ -274,22 +266,21 @@ describe("ImportDashboard.vue", () => {
 
   it("should test jsonStr watcher - empty string resets other fields", async () => {
     wrapper = mountComponent();
-    await nextTick();
+    await flushPromises();
 
-    // Set some values first 
-    wrapper.vm.url = "http://example.com";
-    wrapper.vm.jsonFiles = null; // Set to a valid initial state
+    // url is form-owned (rule ②) — set via the form.
+    wrapper.vm.form.setFieldValue("url", "http://example.com");
+    await flushPromises();
 
     // The jsonStr watcher only resets when newVal == "" (exactly empty string)
-    // Let's first set it to something, then to empty string
     wrapper.vm.jsonStr = '{"test": "data"}';
     await nextTick();
-    
+
     // Now set to empty string to trigger the reset logic
     wrapper.vm.jsonStr = "";
-    await nextTick();
+    await flushPromises();
 
-    // Should reset url field according to line 456 in the watcher
+    // The watcher clears the form-owned url/jsonFiles → projected to the refs
     expect(wrapper.vm.url).toBe("");
     expect(wrapper.vm.jsonFiles).toBe(null);
   });
@@ -472,7 +463,7 @@ describe("ImportDashboard.vue", () => {
     const dashboard = { title: "Test Dashboard", panels: [] };
     wrapper.vm.jsonStr = JSON.stringify(dashboard);
     wrapper.vm.activeTab = "import_json_file";
-    wrapper.vm.jsonFiles = undefined;
+    wrapper.vm.form.setFieldValue("jsonFiles", undefined);
     
     // Call importDashboard - should call importFromJsonStr
     wrapper.vm.importDashboard();
@@ -491,7 +482,7 @@ describe("ImportDashboard.vue", () => {
     const dashboard = { title: "Test Dashboard", panels: [] };
     wrapper.vm.jsonStr = JSON.stringify([dashboard]);
     wrapper.vm.activeTab = "import_json_file";
-    wrapper.vm.jsonFiles = [mockFile];
+    wrapper.vm.form.setFieldValue("jsonFiles", [mockFile]);
     
     // Call importDashboard - should call importFiles
     wrapper.vm.importDashboard();
@@ -702,7 +693,7 @@ describe("ImportDashboard.vue", () => {
     })) as any;
 
     // Trigger the watcher
-    wrapper.vm.jsonFiles = [mockFile];
+    wrapper.vm.form.setFieldValue("jsonFiles", [mockFile]);
     
     // Wait for async processing
     await new Promise(resolve => setTimeout(resolve, 50));
@@ -732,7 +723,7 @@ describe("ImportDashboard.vue", () => {
     })) as any;
 
     // Trigger the watcher - should handle JSON parse errors gracefully
-    wrapper.vm.jsonFiles = [mockFile];
+    wrapper.vm.form.setFieldValue("jsonFiles", [mockFile]);
     
     await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -795,7 +786,7 @@ describe("ImportDashboard.vue", () => {
     await nextTick();
 
     // Set a valid HTTPS URL to trigger the URL watcher
-    wrapper.vm.url = "https://example.com/dashboard.json";
+    wrapper.vm.form.setFieldValue("url", "https://example.com/dashboard.json");
     
     // Wait for the async operation
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -836,5 +827,56 @@ describe("ImportDashboard.vue", () => {
     wrapper.vm.activeTab = "import_json_file";
     await nextTick();
     expect(wrapper.vm.activeTab).toBe("import_json_file");
+  });
+
+  // Real-OForm validation wiring (playbook §5): the OForm covers only the
+  // url/jsonFiles input collection. The URL-format rule is the one field check
+  // (non-required, so the paste-JSON flow is preserved).
+  describe("Import OForm (real form)", () => {
+    const submitForm = async (w: any) => {
+      await w.vm.form.handleSubmit();
+      await nextTick();
+    };
+
+    it("rejects a URL without an http(s) protocol", async () => {
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.form.setFieldValue("url", "ftp://example.com");
+      await submitForm(wrapper);
+
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+    });
+
+    it("accepts a valid http(s) URL", async () => {
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.form.setFieldValue(
+        "url",
+        "https://example.com/dash.json",
+      );
+      await submitForm(wrapper);
+
+      expect(wrapper.vm.form.state.isValid).toBe(true);
+    });
+
+    it("treats an empty URL as valid (URL is non-required; JSON paste allowed)", async () => {
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.form.setFieldValue("url", "");
+      await submitForm(wrapper);
+
+      expect(wrapper.vm.form.state.isValid).toBe(true);
+    });
+
+    it("keeps the Import button enabled and wired to the form (R3/R4)", async () => {
+      wrapper = mountComponent();
+      await nextTick();
+      const importBtn = wrapper.find(
+        '[data-test="dashboard-import-submit-btn"]',
+      );
+      expect(importBtn.exists()).toBe(true);
+      expect(importBtn.attributes("form")).toBe("import-dashboard-form");
+      expect(wrapper.find("#import-dashboard-form").exists()).toBe(true);
+    });
   });
 });

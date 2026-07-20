@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="splitterModel"
     unit="px"
     :horizontal="false"
-    class="tw:h-full"
+    class="h-full"
   >
     <template v-slot:before>
       <OTabs

@@ -1,26 +1,8 @@
 ﻿<template>
   <EvalListShell
     data-test="scorer"
-    :show-empty="showNoProvidersState"
+    :show-empty="false"
   >
-    <!-- Special-case empty: the org has no LLM providers yet. LLM Judge
-         scorers (the most common type) can't be created without one, so we
-         surface a dedicated provider-onboarding card outside the OTable
-         flow. Reuses the shared `no-llm-providers` preset (same illustration
-         + "Add provider" action) but overrides the copy with scorer-specific
-         context, so it matches the empty-state language used elsewhere in
-         the app instead of the bespoke EvalEmptyState card. -->
-    <template #empty>
-      <OEmptyState
-        size="hero"
-        preset="no-llm-providers"
-        :title="t('onlineEvals.scorer.noProviders.title')"
-        :description="t('onlineEvals.scorer.noProviders.description')"
-        data-test="scorer-no-providers-state"
-        @action="(id) => id === 'create' && $emit('add-provider')"
-      />
-    </template>
-
     <template #table>
       <OTable
         v-model:selected-ids="selectedIds"
@@ -40,13 +22,13 @@
         :persist-columns="true"
         table-id="scorer-list"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
             data-test="scorer-list-search-input"
             clearable
@@ -58,17 +40,51 @@
             :placeholder="t('onlineEvals.scorer.allTypes')"
             size="md"
             width="sm"
-            class="tw:shrink-0"
+            class="shrink-0"
             data-test="scorer-list-type-filter"
           />
         </template>
 
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="scorer-list-refresh-btn"
+            @click="emit('refresh')"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="scorersRefresh" />
+          </OButton>
+        </template>
+
         <template #empty>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+          <div class="flex items-center justify-center py-8">
+            <!-- Special-case empty: the org has no LLM providers yet. LLM Judge
+                 scorers (the most common type) can't be created without one, so
+                 we surface a dedicated provider-onboarding card. Rendered inside
+                 the table's #empty slot (not EvalListShell's) so the search bar
+                 and column header stay visible — consistent with the no-scorers
+                 state and the Eval Jobs / Score Configs list pages. Reuses the
+                 shared `no-llm-providers` preset with scorer-specific copy. -->
             <OEmptyState
+              v-if="showNoProvidersState"
+              size="hero"
+              preset="no-llm-providers"
+              :title="t('onlineEvals.scorer.noProviders.title')"
+              :description="t('onlineEvals.scorer.noProviders.description')"
+              data-test="scorer-no-providers-state"
+              @action="(id) => id === 'create' && $emit('add-provider')"
+            />
+            <OEmptyState
+              v-else
               size="hero"
               preset="no-scorers"
               :filtered="hasFilters"
+              :actions="[
+                { id: 'create', icon: 'add', titleKey: 'emptyState.noScorers.action', descriptionKey: 'emptyState.noScorers.actionDesc' },
+                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noScorers.import', descriptionKey: 'emptyState.noScorers.importDesc' },
+              ]"
               data-test="scorer-empty-state"
               @action="onEmptyAction"
             />
@@ -76,14 +92,14 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title tw:text-primary">
+          <span class="o2-table-footer-title">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
           </span>
           <OButton
             v-if="selectedIds.length > 0"
             variant="outline"
             size="sm"
-            class="tw:ml-3"
+            class="ml-3"
             icon-left="download"
             data-test="scorer-bulk-export-btn"
             @click="handleBulkExport"
@@ -100,19 +116,19 @@
         </template>
 
         <template #cell-produces="{ row }">
-          <span class="tw:font-mono tw:text-xs">{{ producesLabel(row) || "—" }}</span>
+          <span class="font-mono text-xs">{{ producesLabel(row) || "—" }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="tw:font-mono tw:text-xs">v{{ row.version }}</span>
+          <span class="font-mono text-xs">v{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="tw:font-mono tw:text-xs">{{ usedByText(row) }}</span>
+          <span class="font-mono text-xs">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               :data-test="`scorer-list-${row.name}-edit-btn`"
               data-row-action="edit"
@@ -150,6 +166,9 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -189,6 +208,7 @@ const emit = defineEmits<{
   (e: "export", row: Scorer): void;
   (e: "export-bulk", ids: string[]): void;
   (e: "add-provider"): void;
+  (e: "refresh"): void;
 }>();
 
 const { t } = useI18n();
@@ -284,8 +304,9 @@ const numberedRows = useNumberedRows(filteredRows);
 // When the org has no providers AND no scorers yet, surface a dedicated
 // provider-onboarding screen instead of the standard empty state. LLM Judge
 // scorers (the most common type) can't be created without a provider, so
-// nudging the user there first avoids a dead-end. This case routes through
-// EvalListShell's #empty slot (full card) so the OTable doesn't render.
+// nudging the user there first avoids a dead-end. This renders inside the
+// OTable's #empty slot (not EvalListShell's) so the search bar + column
+// header stay visible, matching the other eval list pages.
 const showNoProvidersState = computed(
   () =>
     !props.loading &&
@@ -305,6 +326,7 @@ const hasFilters = computed(
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
+  else if (id === "import") emit("import-custom");
   else if (id === "clear-filters") {
     emit("update:search", "");
     typeFilter.value = null;
@@ -334,4 +356,8 @@ function usedByText(row: Scorer) {
   if (count === 1) return t("onlineEvals.scorer.usedByJob", { count });
   return t("onlineEvals.scorer.usedByJobs", { count });
 }
+
+useShortcuts([
+  { id: "scorersRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+]);
 </script>

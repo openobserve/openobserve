@@ -16,34 +16,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div class="flex flex-col h-full overflow-hidden">
     <!-- Standard page header on top (full-width). The filter panel (left) + table
          (right) sit below in the splitter — the standard header + left + right model. -->
     <AppPageHeader
       :title="t('nodes.header')"
       icon="hub"
-      :subtitle="'Cluster nodes and their health'"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      :subtitle="t('settings.nodesPage.subtitle')"
+      class="shrink-0 px-4 border-b border-border-default"
     >
-      <template #actions>
-        <OButton variant="outline" size="sm-action" @click="getData(true)">
-          {{ t("common.refresh") }}
-        </OButton>
-      </template>
     </AppPageHeader>
     <OSplitter
       :model-value="splitterModel"
       @update:model-value="(v: number) => splitterModel = v"
       :limits="[0, 250]"
       unit="px"
-      class="tw:flex-1 tw:min-h-0"
+      class="flex-1 min-h-0"
       style="overflow: hidden"
     >
       <template #before>
-        <div class="tw:flex tw:flex-col tw:border-r4 tw:border-r tw:border-border-default " style="height: 100%">
-          <div class="tw:sticky tw:top-0 tw:px-2 tw:shrink-0">
-            <div class="tw:flex tw:items-center tw:justify-between tw:p-2 " style="font-size: 18px">
-              <span class="tw:flex tw:items-center tw:gap-1">
+        <div class="flex flex-col border-r4 border-r border-border-default " style="height: 100%">
+          <div class="sticky top-0 px-2 shrink-0">
+            <div class="flex items-center justify-between p-2 " style="font-size: 18px">
+              <span class="flex items-center gap-1">
                 {{ t("nodes.filter_header") }}
                 <OIcon name="filter-list" size="sm" />
               </span>
@@ -56,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class=" tw:min-h-0 tw:overflow-y-auto">
-            <div class="tw:flex tw:flex-col tw:pb-2 tw:px-2">
+          <div class=" min-h-0 overflow-y-auto">
+            <div class="flex flex-col pb-2 px-2">
               <OCollapsible
                 v-if="
                   regionRows.length > 0 &&
@@ -68,14 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="(v) => (sectionOpen.region = v)"
                 :label="t('nodes.region')"
               >
-                <div class="tw:p-0">
+                <div class="p-0">
                   <OSearchInput
                     data-test="nodes-region-filter-search-input"
                     v-model="filterRegionQuery"
                     clearable
                     :debounce="1"
                     :placeholder="t('nodes.searchRegion')"
-                    class="tw:w-full filter-input"
+                    class="w-full filter-input"
                   />
                   <OTable
                       data-test="nodes-region-table"
@@ -95,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTable>
                   </div>
                 </OCollapsible>
-                <OSeparator v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.region" class="tw:my-2" />
+                <OSeparator v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.region" class="my-2" />
 
                 <OCollapsible
                   v-if="
@@ -107,14 +102,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => (sectionOpen.cluster = v)"
                   :label="t('nodes.cluster')"
                 >
-                  <div class="tw:p-0">
+                  <div class="p-0">
                     <OSearchInput
                       data-test="nodes-cluster-filter-search-input"
                       v-model="filterClusterQuery"
                       clearable
                       :debounce="1"
                       :placeholder="t('nodes.searchCluster')"
-                      class="tw:w-full filter-input"
+                      class="w-full filter-input"
                     />
                     <OTable
                       data-test="nodes-cluster-table"
@@ -134,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTable>
                   </div>
                 </OCollapsible>
-                <OSeparator v-if="clusterRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.cluster" class="tw:my-2" />
+                <OSeparator v-if="clusterRows.length > 0 && store.state.zoConfig.super_cluster_enabled && sectionOpen.cluster" class="my-2" />
 
                 <OCollapsible
                   v-if="nodetypeRows.length > 0"
@@ -143,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => (sectionOpen.nodetype = v)"
                   :label="t('nodes.nodetype')"
                 >
-                  <div class="tw:px-1">
+                  <div class="px-1">
                     <OTable
                       data-test="nodes-nodetype-table"
                       :data="nodetypeRows"
@@ -166,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => (sectionOpen.status = v)"
                   :label="t('nodes.status')"
                 >
-                  <div class="tw:px-1">
+                  <div class="px-1">
                     <OTable
                       data-test="nodes-status-table"
                       :data="statusesRows"
@@ -182,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #cell-name="{ row }">
                         <span
                           :class="`status-${row.name.toLowerCase()}`"
-                          class="tw:self-stretch tw:mr-1"
+                          class="self-stretch mr-1"
                         ></span
                         >{{ row.name }}
                       </template>
@@ -196,21 +191,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => (sectionOpen.cpu = v)"
                   :label="t('nodes.cpuusage')"
                 >
-                  <div class="tw:px-1 tw:pb-2">
-                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                  <div class="px-1 pb-2">
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
                       <OInput
                         data-test="nodes-filter-cpuusage-min"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         max="100"
                         v-model="cpuUsage.min"
                       />
-                      <span class="tw:px-1 tw:text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         data-test="nodes-filter-cpuusage-max"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         max="100"
                         v-model="cpuUsage.max"
@@ -226,11 +221,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxCPUUsage"
-                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
+                      class="w-[85%] mt-3 ml-3"
                     />
                   </div>
                 </OCollapsible>
-                <OSeparator v-if="sectionOpen.cpu" class="tw:my-2" />
+                <OSeparator v-if="sectionOpen.cpu" class="my-2" />
 
                 <OCollapsible
                   variant="sidebar"
@@ -238,21 +233,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => (sectionOpen.memory = v)"
                   :label="t('nodes.memoryusage')"
                 >
-                  <div class="tw:px-1 tw:pb-2">
-                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                  <div class="px-1 pb-2">
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
                       <OInput
                         data-test="nodes-filter-memoryusage-min"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         max="100"
                         v-model="memoryUsage.min"
                       />
-                      <span class="tw:px-1 tw:text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         data-test="nodes-filter-memoryusage-max"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         max="100"
                         v-model="memoryUsage.max"
@@ -268,11 +263,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxMemoryUsage"
-                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
+                      class="w-[85%] mt-3 ml-3"
                     />
                   </div>
                 </OCollapsible>
-                <OSeparator v-if="sectionOpen.memory" class="tw:my-2" />
+                <OSeparator v-if="sectionOpen.memory" class="my-2" />
 
                 <OCollapsible
                   variant="sidebar"
@@ -280,28 +275,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="(v) => (sectionOpen.tcp = v)"
                   :label="t('nodes.tcpusage')"
                 >
-                  <div class="tw:px-1 tw:pb-2">
+                  <div class="px-1 pb-2">
                     <OCheckbox
                       type="checkbox"
                       v-model="establishedToggle"
                       :label="t('nodes.establishedLabel')"
                     />
-                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
                       <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-min"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         :max="maxEstablished"
                         v-model="establishedUsage.min"
                       />
-                      <span class="tw:px-1 tw:text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         :disable="!establishedToggle"
                         data-test="nodes-filter-established-max"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         :max="maxEstablished"
                         v-model="establishedUsage.max"
@@ -318,31 +313,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxEstablished"
-                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
+                      class="w-[85%] mt-3 ml-3"
                     />
 
                     <OCheckbox
                       type="checkbox"
-                      class="tw:mt-6"
+                      class="mt-6"
                       v-model="closewaitToggle"
                       :label="t('nodes.closewaitLabel')"
                     />
-                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
                       <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-min"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         :max="maxClosewait"
                         v-model="closewaitUsage.min"
                       />
-                      <span class="tw:px-1 tw:text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         :disable="!closewaitToggle"
                         data-test="nodes-filter-closewait-max"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         :max="maxClosewait"
                         v-model="closewaitUsage.max"
@@ -359,31 +354,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxClosewait"
-                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
+                      class="w-[85%] mt-3 ml-3"
                     />
 
                     <OCheckbox
                       type="checkbox"
-                      class="tw:mt-6"
+                      class="mt-6"
                       v-model="waittimeToggle"
                       :label="t('nodes.waittimeLabel')"
                     />
-                    <div class="tw:grid tw:grid-cols-[1fr_auto_1fr] tw:items-center tw:gap-1 tw:pr-2 tw:ml-1">
+                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
                       <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-min"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         :max="maxWaittime"
                         v-model="waittimeUsage.min"
                       />
-                      <span class="tw:px-1 tw:text-center">to</span>
+                      <span class="px-1 text-center">{{ t('settings.nodesPage.to') }}</span>
                       <OInput
                         :disable="!waittimeToggle"
                         data-test="nodes-filter-waittime-max"
                         type="number"
-                        class="tw:w-full tw:min-w-0"
+                        class="w-full min-w-0"
                         min="0"
                         :max="maxWaittime"
                         v-model="waittimeUsage.max"
@@ -400,14 +395,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :min="0"
                       :max="maxWaittime"
-                      class="tw:w-[85%] tw:mt-3 tw:ml-3"
+                      class="w-[85%] mt-3 ml-3"
                     />
                   </div>
                 </OCollapsible>
 
             </div>
           </div>
-          <div class="tw:flex tw:justify-end tw:px-2 tw:py-2 tw:shrink-0 tw:border-t">
+          <div class="flex justify-end px-2 py-2 shrink-0 border-t">
             <OButton
               variant="primary"
               size="sm-action"
@@ -419,9 +414,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #after>
-        <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+        <div class="flex flex-col h-full min-h-0">
         <OTable
-          class="tw:flex-1 tw:min-h-0"
+          class="flex-1 min-h-0"
           ref="qTable"
           data-test="nodes-main-table"
           :data="visibleRows"
@@ -445,9 +440,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               data-test="nodes-search-input"
               v-model="filterQuery"
-              class="tw:flex-1"
+              class="flex-1"
               :placeholder="t('nodes.search')"
             />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="nodes-list-refresh-btn"
+              @click="() => getData(true)"
+            >
+              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="nodesRefresh" />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -471,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="store.state.zoConfig.super_cluster_enabled"
             #cell-region="{ row }"
           >
-            <OTag type="fieldTag" class="badge-region tw:mr-1"
+            <OTag type="fieldTag" class="badge-region mr-1"
               >{{ row.region }}
               <OTooltip :content="t('nodes.region')" />
             </OTag>
@@ -490,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-cpu="{ row }">
             <OProgressBar
               size="sm"
-              class="tw:bg-[lightgrey] tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
+              class="bg-[lightgrey] w-[80%]! max-w-[80%] inline-block"
               :value="row.cpu_usage / 100"
               :variant="row.cpu_usage > 85 ? 'danger' : 'default'"
             />
@@ -500,7 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-memory="{ row }">
             <OProgressBar
               size="sm"
-              class="tw:bg-[lightgrey] tw:w-[80%]! tw:max-w-[80%] tw:inline-block"
+              class="bg-[lightgrey] w-[80%]! max-w-[80%] inline-block"
               :value="row.percentage_memory_usage / 100"
               :variant="row.percentage_memory_usage > 85 ? 'danger' : 'default'"
             />
@@ -546,6 +553,8 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -590,7 +599,7 @@ export default defineComponent({
     const filterOTableColumns: OTableColumnDef[] = [
       {
         id: "name",
-        header: "Name",
+        header: t("settings.nodesPage.name"),
         accessorKey: "name",
         meta: { align: "left" },
       },
@@ -843,7 +852,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading data...",
+        message: t("settings.nodesPage.loadingData"),
               timeout: 0,
 });
 
@@ -882,7 +891,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to fetch nodes. Please try again.",
+                t("settings.nodesPage.fetchFailed"),
               timeout: 5000,
             });
           }
@@ -1030,6 +1039,10 @@ export default defineComponent({
         filterClusterQuery.value,
       );
     });
+
+    useShortcuts([
+      { id: "nodesRefresh", handler: () => { if (!isInputFocused()) getData(true); } },
+    ]);
 
     return {
       t,

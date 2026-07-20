@@ -97,7 +97,7 @@ export function tokenizeTemplate(
 }
 
 /**
- * Return Tailwind/Quasar CSS classes for a wildcard chip based on the token
+ * Return Tailwind CSS classes for a wildcard chip based on the token
  * type so different data types are colour-coded at a glance.
  *
  * When the token is generic <*> and sampleValues are provided the function
@@ -118,11 +118,11 @@ export function wildcardChipColor(token: string, sampleValues?: any[]): string {
     return chipColorForLabel(label);
   }
 
-  if (token === "<*>") return "tw:bg-label-chip-pattern-bg tw:text-label-chip-pattern-text";
-  if (/^<:IP/.test(token)) return "tw:bg-label-chip-ip-bg tw:text-label-chip-ip-text";
-  if (/^<:(?:NUM|INT|FLOAT|HEX)/.test(token)) return "tw:bg-label-chip-num-bg tw:text-label-chip-num-text";
-  if (/^<:(?:TIMESTAMP|DATE|TIME)/.test(token)) return "tw:bg-label-chip-ts-bg tw:text-label-chip-ts-text";
-  return "tw:bg-label-chip-default-bg tw:text-label-chip-default-text";
+  if (token === "<*>") return "bg-label-chip-pattern-bg text-label-chip-pattern-text";
+  if (/^<:IP/.test(token)) return "bg-label-chip-ip-bg text-label-chip-ip-text";
+  if (/^<:(?:NUM|INT|FLOAT|HEX)/.test(token)) return "bg-label-chip-num-bg text-label-chip-num-text";
+  if (/^<:(?:TIMESTAMP|DATE|TIME)/.test(token)) return "bg-label-chip-ts-bg text-label-chip-ts-text";
+  return "bg-label-chip-default-bg text-label-chip-default-text";
 }
 
 /**
@@ -137,23 +137,23 @@ export function wildcardChipColor(token: string, sampleValues?: any[]): string {
  */
 export function chipColorForLabel(label: string): string {
   const colorMap: Record<string, string> = {
-    ip:      "tw:bg-label-chip-ip-bg tw:text-label-chip-ip-text",
-    ipv4:    "tw:bg-label-chip-ipv4-bg tw:text-label-chip-ipv4-text",
-    ipv6:    "tw:bg-label-chip-ipv6-bg tw:text-label-chip-ipv6-text",
-    method:  "tw:bg-label-chip-method-bg tw:text-label-chip-method-text",
-    url:     "tw:bg-label-chip-url-bg tw:text-label-chip-url-text",
-    num:     "tw:bg-label-chip-num-bg tw:text-label-chip-num-text",
-    float:   "tw:bg-label-chip-float-bg tw:text-label-chip-float-text",
-    hex:     "tw:bg-label-chip-hex-bg tw:text-label-chip-hex-text",
-    ts:      "tw:bg-label-chip-ts-bg tw:text-label-chip-ts-text",
-    date:    "tw:bg-label-chip-date-bg tw:text-label-chip-date-text",
-    time:    "tw:bg-label-chip-time-bg tw:text-label-chip-time-text",
-    id:      "tw:bg-label-chip-id-bg tw:text-label-chip-id-text",
-    email:   "tw:bg-label-chip-email-bg tw:text-label-chip-email-text",
-    str:     "tw:bg-label-chip-str-bg tw:text-label-chip-str-text",
-    pattern: "tw:bg-label-chip-pattern-bg tw:text-label-chip-pattern-text",
+    ip:      "bg-label-chip-ip-bg text-label-chip-ip-text",
+    ipv4:    "bg-label-chip-ipv4-bg text-label-chip-ipv4-text",
+    ipv6:    "bg-label-chip-ipv6-bg text-label-chip-ipv6-text",
+    method:  "bg-label-chip-method-bg text-label-chip-method-text",
+    url:     "bg-label-chip-url-bg text-label-chip-url-text",
+    num:     "bg-label-chip-num-bg text-label-chip-num-text",
+    float:   "bg-label-chip-float-bg text-label-chip-float-text",
+    hex:     "bg-label-chip-hex-bg text-label-chip-hex-text",
+    ts:      "bg-label-chip-ts-bg text-label-chip-ts-text",
+    date:    "bg-label-chip-date-bg text-label-chip-date-text",
+    time:    "bg-label-chip-time-bg text-label-chip-time-text",
+    id:      "bg-label-chip-id-bg text-label-chip-id-text",
+    email:   "bg-label-chip-email-bg text-label-chip-email-text",
+    str:     "bg-label-chip-str-bg text-label-chip-str-text",
+    pattern: "bg-label-chip-pattern-bg text-label-chip-pattern-text",
   };
-  return colorMap[label] ?? "tw:bg-label-chip-default-bg tw:text-label-chip-default-text";
+  return colorMap[label] ?? "bg-label-chip-default-bg text-label-chip-default-text";
 }
 
 /**

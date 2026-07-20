@@ -4,7 +4,7 @@
  * and (where indicated) opens the config sidebar, ready for assertions.
  */
 
-import { setupTestDashboard } from "./dashCreation.js";
+import { setupTestDashboard, deleteDashboard } from "./dashCreation.js";
 import { ingestionForMaps } from "./dashIngestion.js";
 import testLogger from '../../utils/test-logger.js';
 
@@ -35,6 +35,29 @@ export async function reopenPanelConfig(page, pm) {
   if (!isConfigOpen) {
     await pm.dashboardPanelConfigs.openConfigPanel();
   }
+}
+
+/**
+ * Cleanup for tests whose panel config can't be saved on this environment's backend
+ * (some `override_config` variants aren't accepted by every deployed backend build —
+ * an environment version-skew, not a product bug). Skips savePanel()/backToDashboardList()
+ * (which assume a successful save) and instead navigates straight to the dashboards
+ * list, discarding the unsaved add_panel edit, then deletes the test dashboard.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} dashboardName
+ */
+export async function discardAndCleanupTestDashboard(page, dashboardName) {
+  // Defensive: accept a native "leave site / discard changes" dialog if the app ever
+  // adds a beforeunload guard for unsaved panel edits. Not currently triggered (this
+  // app doesn't gate navigation on unsaved changes), but costs nothing to guard against.
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.goto(
+    `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}`
+  );
+  await page.locator('[data-test="dashboard-search"]').waitFor({ state: "visible", timeout: 15000 });
+  await deleteDashboard(page, dashboardName);
+  testLogger.info('Discarded unsaved panel edit and cleaned up test dashboard', { dashboardName });
 }
 
 export const generateDashboardName = () =>

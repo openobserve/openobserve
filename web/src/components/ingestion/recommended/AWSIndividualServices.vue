@@ -15,41 +15,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="aws-integration-grid tw:w-full">
-    <div class="tw:mb-4">
+  <div class="aws-integration-grid w-full">
+    <div class="mb-4">
       <OSearchInput
         v-model="searchQuery"
-        placeholder="Search AWS services..."
+        :placeholder="t('ingestion.awsSetup.searchPlaceholder')"
         clearable
-        class="tw:max-w-md"
+        class="max-w-md"
         data-test="aws-integration-search"
       />
     </div>
 
-    <div class="tw:mb-6">
+    <div class="mb-6">
       <OTabs
         v-model="activeCategory"
         dense
-        class="tw:text-gray-400"
         data-test="aws-integration-category-tabs"
       >
-        <OTab name="all" label="All Services" />
-        <OTab name="logs" label="Logs" />
-        <OTab name="metrics" label="Metrics" />
-        <OTab name="security" label="Security" />
-        <OTab name="networking" label="Networking" />
+        <OTab name="all" :label="t('ingestion.awsSetup.categoryAll')" />
+        <OTab name="logs" :label="t('ingestion.awsSetup.categoryLogs')" />
+        <OTab name="metrics" :label="t('ingestion.awsSetup.categoryMetrics')" />
+        <OTab name="security" :label="t('ingestion.awsSetup.categorySecurity')" />
+        <OTab
+          name="networking"
+          :label="t('ingestion.awsSetup.categoryNetworking')"
+        />
       </OTabs>
     </div>
 
     <div
       v-if="filteredIntegrations.length === 0"
-      class="tw:text-center tw:py-12 tw:text-[#666] tw:dark:text-[#999]"
+      class="text-center py-12 text-text-secondary"
     >
-      <OIcon name="search-off" class="tw:mb-2" style="width: 3rem; height: 3rem;" />
-      <div class="tw:text-base">No integrations found matching your search</div>
+      <OIcon name="search-off" class="mb-2 w-12 h-12" />
+      <div class="text-base">{{ t("ingestion.awsSetup.noResults") }}</div>
     </div>
 
-    <div class="integrations-grid tw:grid tw:grid-cols-4 tw:gap-4" v-else>
+    <!-- Responsive columns via utilities — replaces an unscoped <style> block
+         whose px media queries leaked to every page in the app. -->
+    <div
+      class="integrations-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+      v-else
+    >
       <AWSIntegrationTile
         v-for="integration in filteredIntegrations"
         :key="integration.id"
@@ -64,6 +71,7 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue'
 import { defineComponent, ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { awsIntegrations } from "@/utils/awsIntegrations";
 import AWSIntegrationTile from "./AWSIntegrationTile.vue";
@@ -84,6 +92,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const { t } = useI18n();
     const route = useRoute();
     const searchQuery = ref((route.query.search as string) || props.initialSearch || "");
     const activeCategory = ref("all");
@@ -133,6 +142,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       searchQuery,
       activeCategory,
       filteredIntegrations,
@@ -140,24 +150,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-@media (max-width: 1200px) {
-  .aws-integration-grid .integrations-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 900px) {
-  .aws-integration-grid .integrations-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 600px) {
-  .aws-integration-grid .integrations-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-</style>

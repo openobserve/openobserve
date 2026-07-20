@@ -1,12 +1,12 @@
 <template>
   <div
     data-test="gen-ai-agent-mapping-settings"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
+    class="flex flex-col h-full min-h-0"
   >
     <AppPageHeader
       :subtitle="t('settings.genAiAgentMapping.description')"
       icon="smart-toy"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
       data-test="gen-ai-agent-mapping-header"
     >
       <template #title>
@@ -49,15 +49,15 @@
 
     <div
       v-if="loading"
-      class="tw:flex tw:flex-1 tw:items-center tw:justify-center"
+      class="flex flex-1 items-center justify-center"
     >
       <OSpinner size="md" />
     </div>
 
     <template v-else>
       <!-- Scrollable form body -->
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:px-4 tw:py-4">
-        <div class="tw:grid tw:grid-cols-1 lg:tw:grid-cols-2 tw:gap-5">
+      <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+        <div class="grid grid-cols-1 gap-5">
           <OTextarea
             v-model="agentNameText"
             :label="t('settings.genAiAgentMapping.agentNameFields')"
@@ -94,7 +94,7 @@
       <!-- Sticky footer action bar (mirrors AddAlert): primary Save pinned at
            the bottom-right while the body scrolls. -->
       <div
-        class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:shrink-0 tw:px-4 tw:py-2.5 tw:border-t tw:border-border-default"
+        class="flex items-center justify-end gap-2 shrink-0 px-4 py-2.5 border-t border-border-default"
       >
         <OButton
           data-test="gen-ai-agent-mapping-save-btn"
@@ -122,7 +122,7 @@
       @click:secondary="clearRegistryDialogOpen = false"
       @click:primary="clearAgentRegistry"
     >
-      <p class="tw:text-sm tw:text-text-primary">
+      <p class="text-sm text-text-primary">
         {{ t("settings.genAiAgentMapping.clearRegistryDescription") }}
       </p>
     </ODialog>

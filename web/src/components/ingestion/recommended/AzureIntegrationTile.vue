@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="tw:h-full tw:flex tw:flex-col tw:transition-all tw:duration-200 tw:rounded-lg tw:hover:-translate-y-0.5 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] tw:dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]">
-    <OCardSection class="tw:pb-2">
-      <div class="tw:flex tw:items-start tw:justify-between tw:mb-2">
-        <div class="tw:font-semibold tw:text-base tw:leading-[1.4]" :class="store.state.theme === 'dark' ? 'tw:text-[#e0e0e0]' : 'tw:text-[#1a1a1a]'">
+  <OCard class="h-full flex flex-col transition-all duration-200 rounded-lg hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]">
+    <OCardSection class="pb-2">
+      <div class="flex items-start justify-between mb-2">
+        <div class="font-semibold text-base leading-snug text-text-heading">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -26,26 +26,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click="handleDocumentation()"
-          class="tw:opacity-70 tw:hover:opacity-100 tw:transition-opacity tw:duration-200"
+          class="opacity-70 hover:opacity-100 transition-opacity duration-200"
           :data-test="`azure-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />
           <OTooltip content="View Documentation" />
         </OButton>
       </div>
-      <div class="tw:text-sm tw:mb-3 tw:leading-normal tw:min-h-[3em]" :class="store.state.theme === 'dark' ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]'">
+      <div class="text-sm mb-3 leading-normal min-h-[3em] text-text-secondary">
         {{ integration.description }}
       </div>
     </OCardSection>
 
-    <OCardActions class="tw:pb-4">
+    <OCardActions class="pb-4">
       <!-- Deploy Button (ARM template) -->
       <OButton
         v-if="integration.armTemplate"
         variant="primary"
         size="sm"
         @click="handleDeploy()"
-        class="tw:flex-1"
+        class="flex-1"
         :data-test="`azure-${integration.id}-deploy-btn`"
         >Deploy</OButton
       >
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         @click="handleDocumentation()"
-        class="tw:flex-1"
+        class="flex-1"
         :data-test="`azure-${integration.id}-documentation-btn`"
         >Documentation</OButton
       >
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="handleDashboard"
         :disabled="!integration.hasDashboard"
-        class="tw:flex-1"
+        class="flex-1"
         :data-test="`azure-${integration.id}-dashboard-btn`"
         icon-left="dashboard"
       >

@@ -150,9 +150,9 @@ export default defineComponent({
         await getAllDashboards(store, selectedFolder.value.value);
         emit("updated", data.dashboardId, selectedFolder.value.value);
 
-        showPositiveNotification("Dashboard added successfully.");
+        showPositiveNotification(t("dashboard.addDashboardPage.addedSuccessfully"));
       } catch (err: any) {
-        showErrorNotification(err?.message ?? "Dashboard creation failed.");
+        showErrorNotification(err?.message ?? t("dashboard.addDashboardPage.creationFailed"));
       }
     };
 
@@ -179,7 +179,7 @@ export default defineComponent({
     onRejected(rejectedEntries: string | any[]) {
       toast({
         variant: "error",
-        message: `${rejectedEntries.length} file(s) did not pass validation constraints`,
+        message: this.t("dashboard.addDashboardPage.filesFailedValidation", { count: rejectedEntries.length }),
       });
     },
   },

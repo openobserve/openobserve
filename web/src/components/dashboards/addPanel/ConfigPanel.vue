@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="dashboardPanelData.data.type == 'custom_chart'" class="tw:pb-8">
-    <div class="tw:max-w-[300px] tw:mx-3">
-      <div class="tw:mb-2 tw:font-semibold">
+  <div v-if="dashboardPanelData.data.type == 'custom_chart'" class="pb-8">
+    <div class="max-w-[300px] mx-3">
+      <div class="mb-2 font-semibold">
         {{ t("dashboard.description") }}
       </div>
       <OTextarea
@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
   </div>
-  <div v-else class="tw:pb-8">
+  <div v-else class="pb-8">
     <!-- Search bar -->
     <div
-      class="tw:sticky tw:p-1 tw:top-0 tw:z-20 tw:bg-(--o2-card-bg-solid) tw:border-b tw:border-solid tw:border-(--o2-border-color)"
+      class="sticky p-1 top-0 z-20 bg-(--o2-card-bg-solid) border-b border-solid border-(--o2-border-color)"
       data-test="dashboard-config-search-wrapper"
     >
-      <div class="tw:flex tw:flex-nowrap tw:items-center" style="gap: 4px">
+      <div class="flex flex-nowrap items-center" style="gap: 4px">
         <OButton
           variant="ghost"
           size="icon"
@@ -53,11 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- No results empty state -->
     <div
       v-if="searchQuery && !anySectionVisible"
-      class="column tw:items-center tw:py-4 tw:text-center"
+      class="column items-center py-4 text-center"
       data-test="dashboard-config-no-results"
     >
-      <OIcon name="search-off" size="md" class="tw:mb-1 tw:text-gray-400" />
-      <div class="tw:text-gray-400 tw:text-xs">
+      <OIcon name="search-off" size="md" class="mb-1 text-gray-400" />
+      <div class="text-gray-400 text-xs">
         {{ t("dashboard.configPanelNoResultsFound", { query: searchQuery }) }}
       </div>
     </div>
@@ -73,14 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionGeneral')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <div
           v-show="isConfigOptionVisible('general', 'description')"
-          class="tw:max-w-[300px]"
+          class="max-w-[300px]"
         >
-          <div class="tw:mb-2 tw:font-semibold">
+          <div class="mb-2 font-semibold">
             {{ t("dashboard.description") }}
           </div>
           <OTextarea
@@ -114,9 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Panel Default Time Configuration -->
         <div
           v-show="isConfigOptionVisible('general', 'panel-default-time')"
-          class="tw:mb-2"
+          class="mb-2"
         >
-          <div class="tw:flex tw:items-center">
+          <div class="flex items-center">
             <OSwitch
               v-model="useDefaultTime"
               :label="t('dashboard.panelTimeEnabled')"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon"
-              class="tw:mt-1"
+              class="mt-1"
               @click.stop
               icon-left="info-outline"
             >
@@ -138,8 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
 
-          <div v-if="useDefaultTime" class="tw:mt-2">
-            <div class="tw:font-bold tw:mb-1">
+          <div v-if="useDefaultTime" class="mt-2">
+            <div class="font-bold mb-1">
               {{ t("dashboard.defaultDuration") }}
             </div>
             <div
@@ -147,9 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 showTimePicker ||
                 (panelTimeRange !== null && panelTimeRange !== undefined)
               "
-              class="tw:flex tw:items-center tw:flex-nowrap tw:overflow-visible"
+              class="flex items-center flex-nowrap overflow-visible"
             >
-              <div class="panel-time-picker-btn tw:flex-[1_1_0] tw:min-w-0 tw:overflow-visible">
+              <div class="panel-time-picker-btn flex-[1_1_0] min-w-0 overflow-visible">
                 <DateTimePickerDashboard
                   ref="panelTimePickerRef"
                   v-model="pickerValue"
@@ -157,12 +157,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :hide-relative-timezone="true"
                   menu-align="end"
                   data-test="dashboard-config-panel-time-picker"
-                  class="tw:w-fit tw:min-w-0 tw:max-w-full tw:overflow-hidden"
+                  class="w-fit min-w-0 max-w-full overflow-hidden"
                 />
                 <OTooltip :content="formattedPickerValue" max-width="320px" />
               </div>
               <OIcon
-                class="tw:mr-1 tw:ml-2 flex-shrink-0"
+                class="mr-1 ml-2 flex-shrink-0"
                 size="sm"
                 name="close"
                 style="cursor: pointer; flex-shrink: 0"
@@ -208,9 +208,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionPromqlTable')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <PromQLChartConfig
           :chart-type="dashboardPanelData.data.type"
           :is-config-option-visible="isConfigOptionVisible"
@@ -234,9 +234,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionGeographic')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <PromQLChartConfig :chart-type="dashboardPanelData.data.type" />
       </div>
     </OCollapsible>
@@ -252,9 +252,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLegend')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="o2-input tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSwitch
           v-if="shouldShowLegendsToggle(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'show-legends')"
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Legend Width + unit selector -->
           <div
             v-if="shouldShowLegendWidth(dashboardPanelData)"
-            class="tw:flex tw:items-end tw:justify-between tw:gap-[6px] tw:w-full tw:min-w-0"
+            class="flex items-end justify-between gap-[6px] w-full min-w-0"
           >
             <OInput
               v-model.number="legendWidthValue"
@@ -301,10 +301,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-width"
-              class="tw:flex-1 tw:min-w-0"
+              class="flex-1 min-w-0"
             />
             <div
-              class="tw:flex tw:items-center tw:gap-1 tw:mt-[9px] tw:shrink-0"
+              class="flex items-center gap-1 mt-[9px] shrink-0"
               v-if="shouldShowLegendWidthUnitContainer(dashboardPanelData)"
             >
               <OButton
@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Legend Height + unit selector -->
           <div
             v-if="shouldShowLegendHeight(dashboardPanelData)"
-            class="tw:flex tw:items-end tw:justify-between tw:gap-[6px] tw:w-full tw:min-w-0"
+            class="flex items-end justify-between gap-[6px] w-full min-w-0"
           >
             <OInput
               v-model.number="legendHeightValue"
@@ -353,10 +353,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :placeholder="t('dashboard.auto')"
               data-test="dashboard-config-legend-height"
-              class="tw:flex-1 tw:min-w-0"
+              class="flex-1 min-w-0"
             />
             <div
-              class="tw:flex tw:items-center tw:gap-1 tw:mt-[9px] tw:shrink-0"
+              class="flex items-center gap-1 mt-[9px] shrink-0"
               v-if="shouldShowLegendHeightUnitContainer(dashboardPanelData)"
             >
               <OButton
@@ -449,16 +449,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :items="dashboardSelectfieldPromQlList"
           search-regex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
-          class="tw:mt-2"
+          class="mt-2"
           :value-replace-fn="selectPromQlNameOption"
           data-test="dashboard-config-promql-legend"
         >
           <template v-slot:label>
-            <div class="tw:flex tw:items-center">
+            <div class="flex items-center">
               {{ t("dashboard.legendLabel") }}
               <div>
                 <OIcon
-                  class="tw:ml-1"
+                  class="ml-1"
                   size="sm"
                   name="info-outline"
                   data-test="dashboard-config-promql-legend-info"
@@ -482,9 +482,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionData')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="o2-input tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSelect
           v-show="isConfigOptionVisible('data', 'unit')"
           v-model="dashboardPanelData.data.config.unit"
@@ -573,9 +573,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'maps'
           "
           v-show="isConfigOptionVisible('data', 'query-label')"
-          class="tw:mt-3"
+          class="mt-3"
         >
-          <div class="tw:flex tw:items-center tw:gap-1 tw:mb-2" style="font-weight: 600">
+          <div class="flex items-center gap-1 mb-2" style="font-weight: 600">
             {{ t("dashboard.multiSqlQueryLabel") }}
             <OIcon name="info-outline" size="sm" />
             <OTooltip
@@ -593,7 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             size="sm"
             placeholder="{field_name}"
-            class="tw:w-full"
+            class="w-full"
             :data-test="`dashboard-config-legend-${dashboardPanelData.layout.currentQueryIndex}`"
             @focus="() => {
               const q = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
@@ -728,9 +728,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionAxis')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OInput
           v-if="shouldShowAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-width')"
@@ -756,12 +756,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
-          class="tw:flex tw:gap-2"
+          class="flex gap-2"
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'y-axis')"
         >
           <OInput
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             v-model.number="dashboardPanelData.data.config.y_axis_min"
             type="number"
             :placeholder="t('dashboard.auto')"
@@ -784,7 +784,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OInput>
           <OInput
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             v-model.number="dashboardPanelData.data.config.y_axis_max"
             type="number"
             :placeholder="t('dashboard.auto')"
@@ -830,9 +830,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLabels')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSelect
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'label-position')"
@@ -866,12 +866,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
-          class="tw:flex tw:gap-2"
+          class="flex gap-2"
           v-if="shouldShowAxisLabelConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'axis-label')"
         >
           <OInput
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             v-model.number="dashboardPanelData.data.config.axis_label_rotate"
             type="number"
             placeholder="0"
@@ -898,7 +898,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OInput>
           <OInput
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             v-model.number="
               dashboardPanelData.data.config.axis_label_truncate_width
             "
@@ -942,9 +942,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLineStyle')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="o2-input tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSelect
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'symbol')"
@@ -1003,9 +1003,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionTable')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSwitch
           v-show="isConfigOptionVisible('table', 'wrap')"
           v-model="dashboardPanelData.data.config.wrap_table_cells"
@@ -1083,9 +1083,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionPivotTable')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OSwitch
           v-if="!promqlMode && isPivotMode"
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-row-totals')"
@@ -1203,10 +1203,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.valueTransformations = v;
         }
       "
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
       <template #trigger>
-        <span class="tw:text-sm tw:font-medium">{{
+        <span class="text-sm font-medium">{{
           t("dashboard.configSectionValueTransformations")
         }}</span>
         <OIcon name="info-outline" size="sm" />
@@ -1215,7 +1215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <ValueMapping />
       </div>
     </OCollapsible>
@@ -1231,10 +1231,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.fieldOverrides = v;
         }
       "
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
       <template #trigger>
-        <span class="tw:text-sm tw:font-medium">{{
+        <span class="text-sm font-medium">{{
           t("dashboard.configSectionFieldOverrides")
         }}</span>
         <OIcon name="info-outline" size="sm" />
@@ -1243,7 +1243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OverrideConfig
           :dashboardPanelData="dashboardPanelData"
           :panelData="panelData"
@@ -1266,9 +1266,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionMap')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="o2-input tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <div v-if="dashboardPanelData.data.type == 'maps'">
           <OSelect
             v-model="dashboardPanelData.data.config.map_type.type"
@@ -1297,11 +1297,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-basemap"
         />
 
-        <div v-if="dashboardPanelData.data.type == 'geomap'" class="tw:flex tw:flex-col tw:gap-y-3">
+        <div v-if="dashboardPanelData.data.type == 'geomap'" class="flex flex-col gap-y-3">
           <span>{{ t("dashboard.initialView") }}</span>
-          <div class="tw:flex tw:gap-2">
+          <div class="flex gap-2">
             <OInput
-              class="tw:flex-1 tw:min-w-0"
+              class="flex-1 min-w-0"
               v-model.number="dashboardPanelData.data.config.map_view.lat"
               :label="t('dashboard.latitudeLabel')"
               type="number"
@@ -1311,7 +1311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-config-latitude"
             />
             <OInput
-              class="tw:flex-1 tw:min-w-0"
+              class="flex-1 min-w-0"
               v-model.number="dashboardPanelData.data.config.map_view.lng"
               :label="t('dashboard.longitudeLabel')"
               type="number"
@@ -1340,9 +1340,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-symbol"
           />
 
-          <div class="tw:flex tw:gap-2">
+          <div class="flex gap-2">
             <OInput
-              class="tw:flex-1 tw:min-w-0"
+              class="flex-1 min-w-0"
               v-if="
                 dashboardPanelData.data.config.map_symbol_style.size ===
                 'by Value'
@@ -1364,7 +1364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-config-map-symbol-min"
             />
             <OInput
-              class="tw:flex-1 tw:min-w-0"
+              class="flex-1 min-w-0"
               v-if="
                 dashboardPanelData.data.config.map_symbol_style.size ===
                 'by Value'
@@ -1455,9 +1455,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionGauge')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
@@ -1520,9 +1520,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionLayout')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <div v-show="isConfigOptionVisible('layout', 'trellis-layout')">
           <OSelect
             :label="t('dashboard.trellisLayout')"
@@ -1589,7 +1589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !(isBreakdownFieldEmpty || hasTimeShifts)
           "
           v-show="isConfigOptionVisible('layout', 'trellis-group-by')"
-          class="tw:flex tw:items-center"
+          class="flex items-center"
         >
           <OSwitch
             v-model="dashboardPanelData.data.config.trellis.group_by_y_axis"
@@ -1649,9 +1649,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionColors')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <ColorPaletteDropDown />
         <ColorBySeries :colorBySeriesData="panelData" />
       </div>
@@ -1668,10 +1668,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.drilldown = v;
         }
       "
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
       <template #trigger>
-        <span class="tw:text-sm tw:font-medium">{{
+        <span class="text-sm font-medium">{{
           t("dashboard.drilldown")
         }}</span>
         <OIcon
@@ -1684,7 +1684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <Drilldown :variablesData="variablesData" />
       </div>
     </OCollapsible>
@@ -1706,10 +1706,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.comparison = v;
         }
       "
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
       <template #trigger>
-        <span class="tw:text-sm tw:font-medium">{{
+        <span class="text-sm font-medium">{{
           t("dashboard.comparisonAgainst")
         }}</span>
         <OIcon
@@ -1722,7 +1722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <CustomDateTimePicker
           modelValue="0m"
           :isFirstEntry="true"
@@ -1734,14 +1734,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ].config.time_shift"
           :key="index"
         >
-          <div class="tw:flex tw:items-center">
+          <div class="flex items-center">
             <CustomDateTimePicker
               v-model="picker.offSet"
               :picker="picker"
               :isFirstEntry="false"
             />
             <OIcon
-              class="tw:mr-1 tw:ml-2"
+              class="mr-1 ml-2"
               size="sm"
               name="close"
               style="cursor: pointer"
@@ -1773,10 +1773,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           expandedSections.markLines = v;
         }
       "
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
       <template #trigger>
-        <span class="tw:text-sm tw:font-medium">{{
+        <span class="text-sm font-medium">{{
           t("dashboard.markLines")
         }}</span>
         <OIcon
@@ -1789,7 +1789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <MarkLineConfig />
       </div>
     </OCollapsible>
@@ -1806,9 +1806,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }
       "
       :label="t('dashboard.configSectionBackground')"
-      class="tw:border-t tw:border-solid tw:border-[var(--o2-border-color)]"
+      class="border-t border-solid border-[var(--o2-border-color)]"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3 tw:p-2 tw:ml-3 tw:overflow-x-hidden tw:box-border">
+      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
         <BackGroundColorConfig />
       </div>
     </OCollapsible>

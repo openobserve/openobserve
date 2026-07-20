@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full" data-test="dashboard-tab-settings">
+  <div class="flex flex-col h-full" data-test="dashboard-tab-settings">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
         <OButton
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #cell-drag>
           <div
-            class="tab-drag-handle tw:flex tw:items-center tw:justify-center tw:cursor-move"
+            class="tab-drag-handle flex items-center justify-center cursor-move"
             data-test="dashboard-tab-settings-drag-handle"
           >
             <OIcon name="drag-indicator" size="sm" />
@@ -55,16 +55,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-name="{ row }">
           <span
             v-if="row.tabId !== editTabId"
-            class="tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
+            class="block overflow-hidden text-ellipsis whitespace-nowrap"
             data-test="dashboard-tab-settings-tab-name"
             :data-test-tab-name="row.name"
             >{{ row.name }}</span
           >
-          <div v-else class="tw:flex tw:items-center tw:gap-1">
+          <div v-else class="flex items-center gap-1">
             <input
-              :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : ''"
+              :class="store.state.theme === 'dark' ? 'bg-gray-800' : ''"
               v-model="editTabObj.data.name"
-              class="tw:flex-1 tw:border tw:border-(--q-primary) tw:rounded tw:p-1 tw:outline-none tw:min-w-0 tw:focus:border-(--q-secondary)"
+              class="flex-1 border border-(--q-primary) rounded p-1 outline-none min-w-0 focus:border-(--q-secondary)"
               data-test="dashboard-tab-settings-tab-name-edit"
             />
             <OButton
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:justify-center tw:gap-1">
+          <div class="flex justify-center gap-1">
             <OButton
               variant="ghost"
               size="icon"
@@ -300,16 +300,18 @@ export default defineComponent({
         // emit refresh to rerender
         emit("refresh");
 
-        showPositiveNotification("Dashboard updated successfully.");
+        showPositiveNotification(t("dashboard.tabsSettings.dashboardUpdated"));
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab reorder failed",
+              t("dashboard.tabsSettings.tabReorderFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab reorder failed");
+          showErrorNotification(
+            error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"),
+          );
         }
         // emit refresh to rerender
         emit("refresh");
@@ -344,7 +346,7 @@ export default defineComponent({
           emit("refresh");
           await getDashboardData();
 
-          showPositiveNotification("Tab updated successfully");
+          showPositiveNotification(t("dashboard.tabsSettings.tabUpdated"));
           // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
@@ -354,10 +356,12 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab updation failed",
+              t("dashboard.tabsSettings.tabUpdationFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab updation failed");
+          showErrorNotification(
+            error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"),
+          );
         }
 
         // emit refresh to rerender
@@ -402,16 +406,18 @@ export default defineComponent({
         tabIdToBeDeleted.value = null;
         deletePopupVisible.value = false;
 
-        showPositiveNotification("Tab deleted successfully");
+        showPositiveNotification(t("dashboard.tabsSettings.tabDeleted"));
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab deletion failed",
+              t("dashboard.tabsSettings.tabDeletionFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab deletion failed", {
+          showErrorNotification(
+            error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"),
+            {
             timeout: 2000,
           });
         }

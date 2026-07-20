@@ -1,17 +1,17 @@
 <template>
   <div
     v-if="shouldShowJoins"
-    class="tw:w-full"
+    class="w-full"
     data-test="dashboard-joins-container"
   >
-    <div class="tw:flex tw:flex-row tw:pl-3">
-      <div class="tw:text-sm tw:whitespace-nowrap tw:min-w-32.5 tw:flex tw:items-center">{{ t("panel.joins") }}</div>
-      <span class="tw:flex tw:items-center tw:mx-0.5">:</span>
-      <div class="tw:m-1.25 tw:flex tw:flex-row tw:items-center tw:flex-wrap tw:gap-2" data-test="dashboard-filter-layout">
+    <div class="flex flex-row pl-3">
+      <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center">{{ t("panel.joins") }}</div>
+      <span class="flex items-center mx-0.5">:</span>
+      <div class="m-1.25 flex flex-row items-center flex-wrap gap-2" data-test="dashboard-filter-layout">
         <div
           v-for="(joinObj, index) in currentJoins"
           :key="index"
-          class="tw:flex tw:flex-row tw:mr-2 tw:my-1"
+          class="flex flex-row mr-2 my-1"
         >
           <OButtonGroup class="axis-field" radius="sm">
             <ODropdown>
@@ -22,28 +22,28 @@
                   :data-test="`dashboard-join-item-${index}`"
                   icon-right="arrow-drop-down"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-1.5">
+                  <div class="flex items-center gap-1.5">
                     <LeftJoinTypeSvg
                       v-if="joinObj?.joinType === 'left'"
                       :shouldFill="true"
-                      class="tw:h-5 tw:w-5 tw:shrink-0 tw:filter-[brightness(0)_invert(1)]"
+                      class="h-5 w-5 shrink-0 filter-[brightness(0)_invert(1)]"
                     />
                     <InnerJoinTypeSvg
                       v-else-if="joinObj?.joinType === 'inner'"
                       :shouldFill="true"
-                      class="tw:h-5 tw:w-5 tw:shrink-0 tw:filter-[brightness(0)_invert(1)]"
+                      class="h-5 w-5 shrink-0 filter-[brightness(0)_invert(1)]"
                     />
                     <RightJoinTypeSvg
                       v-else-if="joinObj?.joinType === 'right'"
                       :shouldFill="true"
-                      class="tw:h-5 tw:w-5 tw:shrink-0 tw:filter-[brightness(0)_invert(1)]"
+                      class="h-5 w-5 shrink-0 filter-[brightness(0)_invert(1)]"
                     />
-                    <span class="tw:leading-none">{{ joinObj?.stream }}</span>
+                    <span class="leading-none">{{ joinObj?.stream }}</span>
                   </div>
                 </OButton>
               </template>
               <div
-                class="tw:p-4"
+                class="p-4"
                 :data-test="`dashboard-join-menu-${index}`"
               >
                 <AddJoinPopUp

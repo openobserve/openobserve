@@ -33,35 +33,35 @@ describe("OProgressBar", () => {
   });
 
   describe("variant classes", () => {
-    it("applies tw:bg-progress-bar-default for variant=default", () => {
+    it("applies bg-progress-bar-default for variant=default", () => {
       const wrapper = mount(OProgressBar, { props: { value: 0.5 } });
       expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
-        "tw:bg-progress-bar-default"
+        "bg-progress-bar-default"
       );
     });
 
-    it("applies tw:bg-progress-bar-warning for variant=warning", () => {
+    it("applies bg-progress-bar-warning for variant=warning", () => {
       const wrapper = mount(OProgressBar, {
         props: { value: 0.9, variant: "warning" },
       });
       expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
-        "tw:bg-progress-bar-warning"
+        "bg-progress-bar-warning"
       );
     });
 
-    it("applies tw:bg-progress-bar-danger for variant=danger", () => {
+    it("applies bg-progress-bar-danger for variant=danger", () => {
       const wrapper = mount(OProgressBar, {
         props: { value: 1, variant: "danger" },
       });
       expect(wrapper.find("[role='progressbar'] div").classes()).toContain(
-        "tw:bg-progress-bar-danger"
+        "bg-progress-bar-danger"
       );
     });
   });
 
   describe("size classes", () => {
     const sizes = ["xs", "sm", "md", "lg"] as const;
-    const expected = { xs: "tw:h-1", sm: "tw:h-2", md: "tw:h-3", lg: "tw:h-5" };
+    const expected = { xs: "h-1", sm: "h-2", md: "h-3", lg: "h-5" };
 
     sizes.forEach((size) => {
       it(`applies ${expected[size]} for size="${size}"`, () => {
@@ -85,7 +85,7 @@ describe("OProgressBar", () => {
     it("does not render label span when no slot provided", () => {
       const wrapper = mount(OProgressBar, { props: { value: 0.5 } });
       // the label span only appears when $slots.default is present
-      expect(wrapper.find("span.tw\\:text-progress-bar-label").exists()).toBe(false);
+      expect(wrapper.find("span.text-progress-bar-label").exists()).toBe(false);
     });
   });
 

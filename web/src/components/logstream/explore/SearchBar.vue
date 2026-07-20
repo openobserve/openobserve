@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="logstream-explore-search-bar-container"
-    class="tw:pb-px tw:h-full tw:overflow-hidden"
+    class="pb-px h-full overflow-hidden"
     id="searchBarComponent"
   >
-    <div class="tw:flex tw:flex tw:justify-end">
-      <div class="tw:my-1">
+    <div class="flex flex justify-end">
+      <div class="my-1">
         <OButton
-          class="tw:mr-2"
+          class="mr-2"
           variant="ghost"
           size="sm"
           :disabled="
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="tw:pl-2 float-left tw:mr-2">
+        <div class="pl-2 float-left mr-2">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="tw:flex tw:h-[calc(100%-40px)]!">
-      <div class="tw:flex tw:flex-col" style="border-top: 1px solid #dbdbdb; height: 100px">
+    <div class="flex h-[calc(100%-40px)]!">
+      <div class="flex flex-col" style="border-top: 1px solid #dbdbdb; height: 100px">
         <b>Query Editor:</b>
         <code-query-editor
           editor-id="logsStreamQueryEditor"

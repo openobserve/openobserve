@@ -19,11 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   It centralizes the page padding and the vertical rhythm between sections
   (code blocks, doc links, notes) so every data-source tab looks identical.
-  Tune `tw:p-3` / `tw:gap-4` here to retune the spacing of ALL data-source
+  Tune `p-3` / `gap-4` here to retune the spacing of ALL data-source
   detail pages at once.
 -->
 <template>
-  <div class="tw:p-3 tw:flex tw:flex-col tw:gap-4 tw:text-sm">
+  <div class="p-3 flex flex-col gap-4 text-sm">
     <slot />
   </div>
 </template>

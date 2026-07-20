@@ -216,6 +216,7 @@ describe("useIngestionRoutes", () => {
       const metricRouteNames = metricsRoute.children.map((child: any) => child.name);
       
       expect(metricRouteNames).toContain("prometheus");
+      expect(metricRouteNames).toContain("vmagent");
       expect(metricRouteNames).toContain("otelCollector");
       expect(metricRouteNames).toContain("telegraf");
       expect(metricRouteNames).toContain("cloudwatchMetrics");

@@ -17,6 +17,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
+import { makeAddSettingVariableSchema } from "./AddSettingVariable.schema";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
+import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 
 // Mock external dependencies
 vi.mock("vue-i18n", () => ({
@@ -320,7 +325,7 @@ describe("AddSettingVariable", () => {
     });
 
     it("should update streams when stream type changes", async () => {
-      wrapper.vm.variableData.query_data.stream_type = "logs";
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
       
       await wrapper.vm.streamTypeUpdated();
       
@@ -331,9 +336,21 @@ describe("AddSettingVariable", () => {
       ]);
     });
 
+    it("uses the emitted $event value: fetches streams for the newly-selected type, not the previous one held by the form", async () => {
+      // The form projection still holds the PREVIOUS type ("logs") when the
+      // handler fires; branching on the emitted arg must fetch the NEW type's
+      // stream list. Without the fix, streamTypeUpdated would read "logs" off the
+      // form and NEVER fetch "metrics", so this assertion guards the arg is used.
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
+
+      await wrapper.vm.streamTypeUpdated("metrics");
+
+      expect(mockStreams.getStreams).toHaveBeenCalledWith("metrics", false);
+    });
+
     it("should update fields when stream changes", async () => {
-      wrapper.vm.variableData.query_data.stream_type = "logs";
-      wrapper.vm.variableData.query_data.stream = "stream1";
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
+      wrapper.vm.form.setFieldValue("query_data.stream", "stream1");
       
       await wrapper.vm.streamUpdated();
       
@@ -374,14 +391,52 @@ describe("AddSettingVariable", () => {
     });
 
     it("should remove filter when remove button clicked", async () => {
-      // Add a filter first
+      // Add a filter first (form-owned array; projection lags by a flush)
       wrapper.vm.addFilter();
       wrapper.vm.addFilter();
+      await flushPromises();
       const initialFilterCount = wrapper.vm.variableData.query_data.filter.length;
 
       wrapper.vm.removeFilter(0);
+      await flushPromises();
 
       expect(wrapper.vm.variableData.query_data.filter).toHaveLength(initialFilterCount - 1);
+    });
+
+    // START-HERE ① "non-negotiable gate" (field-array): deleting a NON-last
+    // filter row must keep each RENDERED value input aligned with its surviving
+    // row — assert the OFormCombobox→OCombobox `model-value` per row, NOT just the
+    // form data array. `:key="index"` is what keeps the indexed `name` bindings
+    // aligned after a mid-list delete.
+    it("keeps each filter row's RENDERED value input aligned after deleting a NON-last row", async () => {
+      // type is query_values by default → filter rows render. Seed 3 distinct rows
+      // (operator "=" needs a value, so the OFormCombobox is shown for each).
+      wrapper.vm.form.setFieldValue("query_data.filter", [
+        { name: "f0", operator: "=", value: "V0" },
+        { name: "f1", operator: "=", value: "V1" },
+        { name: "f2", operator: "=", value: "V2" },
+      ]);
+      await flushPromises();
+      await nextTick();
+
+      const renderedFilterValues = () =>
+        wrapper
+          .findAllComponents(OFormCombobox)
+          .filter((c: any) =>
+            /^query_data\.filter\[\d+\]\.value$/.test(c.props("name")),
+          )
+          .map((c: any) => c.findComponent(OCombobox).props("modelValue"));
+
+      expect(renderedFilterValues()).toEqual(["V0", "V1", "V2"]);
+
+      // Delete the MIDDLE (non-last) row via its delete button.
+      await wrapper
+        .find('[data-test="dashboard-variable-adhoc-close-1"]')
+        .trigger("click");
+      await flushPromises();
+      await nextTick();
+
+      expect(renderedFilterValues()).toEqual(["V0", "V2"]);
     });
 
     it("should have correct operator options for filters", () => {
@@ -413,13 +468,14 @@ describe("AddSettingVariable", () => {
       expect(Array.isArray(wrapper.vm.variableData.options)).toBe(true);
     });
 
-    it("should add new custom option", () => {
+    it("should add new custom option", async () => {
       const initialOptionsCount = wrapper.vm.variableData.options.length;
-      
+
       wrapper.vm.addField();
-      
+      await flushPromises();
+
       expect(wrapper.vm.variableData.options).toHaveLength(initialOptionsCount + 1);
-      
+
       const newOption = wrapper.vm.variableData.options[wrapper.vm.variableData.options.length - 1];
       expect(newOption).toEqual({
         label: "",
@@ -428,15 +484,48 @@ describe("AddSettingVariable", () => {
       });
     });
 
-    it("should remove custom option", () => {
+    it("should remove custom option", async () => {
       // Add options first
       wrapper.vm.addField();
       wrapper.vm.addField();
+      await flushPromises();
       const initialOptionsCount = wrapper.vm.variableData.options.length;
-      
+
       wrapper.vm.removeField(0);
-      
+      await flushPromises();
+
       expect(wrapper.vm.variableData.options).toHaveLength(initialOptionsCount - 1);
+    });
+
+    // START-HERE ① "non-negotiable gate" (field-array): deleting a NON-last custom
+    // option row must keep each RENDERED input aligned with its surviving row —
+    // assert the OFormInput→OInput `model-value` per row, NOT just the data array.
+    it("keeps each custom-option row's RENDERED inputs aligned after deleting a NON-last row", async () => {
+      // (this describe's beforeEach already set type = "custom")
+      wrapper.vm.variableData.options = [
+        { label: "L0", value: "V0", selected: false },
+        { label: "L1", value: "V1", selected: false },
+        { label: "L2", value: "V2", selected: false },
+      ];
+      await flushPromises();
+      await nextTick();
+
+      const renderedOptionValues = () =>
+        wrapper
+          .findAllComponents(OFormInput)
+          .filter((c: any) => /^options\[\d+\]\.value$/.test(c.props("name")))
+          .map((c: any) => c.findComponent(OInput).props("modelValue"));
+
+      expect(renderedOptionValues()).toEqual(["V0", "V1", "V2"]);
+
+      // Delete the MIDDLE (non-last) row via its delete button.
+      await wrapper
+        .find('[data-test="dashboard-custom-variable-1-remove"]')
+        .trigger("click");
+      await flushPromises();
+      await nextTick();
+
+      expect(renderedOptionValues()).toEqual(["V0", "V2"]);
     });
 
     it("should not remove option if only one exists", () => {
@@ -483,14 +572,12 @@ describe("AddSettingVariable", () => {
     });
 
     it("should handle multi-select default value selection", async () => {
-      wrapper.vm.variableData.type = "query_values";
-      wrapper.vm.variableData.selectAllValueForMultiSelect = "first";
-      await nextTick();
-
-      // OToggleGroupItem uses reka-ui context; simulate the model update directly
-      // as the reka-ui event chain does not fire in JSDOM
-      wrapper.vm.variableData.selectAllValueForMultiSelect = "all";
-      await nextTick();
+      // The form is the source (rule ②); drive it and read the projection back.
+      wrapper.vm.form.setFieldValue(
+        "selectAllValueForMultiSelect",
+        "all",
+      );
+      await flushPromises();
 
       expect(wrapper.vm.variableData.selectAllValueForMultiSelect).toBe("all");
     });
@@ -537,21 +624,278 @@ describe("AddSettingVariable", () => {
       expect(wrapper.emitted("close")).toBeTruthy();
     });
 
-    it("should save variable when form submitted", async () => {
-      // Set up valid form data
-      wrapper.vm.variableData.name = "test-variable";
+    it("should save variable when a valid form is submitted (schema passes)", async () => {
+      // The form is the sole source (rule ②); set valid values on it directly.
+      const f = wrapper.vm.form;
+      f.setFieldValue("scope", "global");
+      f.setFieldValue("name", "test-variable");
+      f.setFieldValue("type", "constant");
+      f.setFieldValue("value", "test-value");
+      await flushPromises();
+
+      // Drive the real form submit (schema gates it, @submit awaited).
+      await f.handleSubmit();
+      await flushPromises();
+
+      expect(f.state.isValid).toBe(true);
+      expect(mockLoading.execute).toHaveBeenCalled();
+    });
+
+    it("does NOT save when the schema is invalid (empty name)", async () => {
+      wrapper.vm.variableData.scope = "global";
+      wrapper.vm.variableData.name = "";
       wrapper.vm.variableData.type = "constant";
       wrapper.vm.variableData.value = "test-value";
-      
-      // Mock form validation to pass
-      const mockForm = {
-        validate: vi.fn().mockResolvedValue(true)
+      await flushPromises();
+
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockLoading.execute).not.toHaveBeenCalled();
+    });
+
+    it("rejects an invalid variable name (regex)", async () => {
+      wrapper.vm.variableData.scope = "global";
+      wrapper.vm.variableData.name = "bad name!";
+      wrapper.vm.variableData.type = "constant";
+      wrapper.vm.variableData.value = "v";
+      await flushPromises();
+
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockLoading.execute).not.toHaveBeenCalled();
+    });
+
+    it("requires a constant value when type is constant", async () => {
+      wrapper.vm.variableData.scope = "global";
+      wrapper.vm.variableData.name = "myvar";
+      wrapper.vm.variableData.type = "constant";
+      wrapper.vm.variableData.value = "";
+      await flushPromises();
+
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+    });
+
+    it("requires query_values stream_type / stream / field", async () => {
+      wrapper.vm.variableData.scope = "global";
+      wrapper.vm.variableData.name = "myvar";
+      wrapper.vm.variableData.type = "query_values";
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "");
+      wrapper.vm.form.setFieldValue("query_data.stream", "");
+      wrapper.vm.form.setFieldValue("query_data.field", "");
+      await flushPromises();
+
+      await wrapper.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+    });
+
+    // The scope→tabs/panels conditional requireds are exercised at the schema
+    // level (rendering the tabs <OFormSelect> needs dashboard tabs data that
+    // this unit mock omits). This preserves the restored BEFORE cross-field rule.
+    it("schema requires at least one tab when scope is tabs/panels", () => {
+      const schema = makeAddSettingVariableSchema((k: string) => k);
+      const base = {
+        scope: "tabs",
+        name: "myvar",
+        type: "constant",
+        value: "v",
+        selectedTabs: [],
+        selectedPanels: [],
       };
-      wrapper.vm.addVariableForm = mockForm;
-      
-      await wrapper.vm.onSubmit();
-      
-      expect(mockForm.validate).toHaveBeenCalled();
+      expect(schema.safeParse(base).success).toBe(false);
+      expect(
+        schema.safeParse({ ...base, selectedTabs: ["t1"] }).success,
+      ).toBe(true);
+    });
+
+    it("schema requires at least one panel when scope is panels", () => {
+      const schema = makeAddSettingVariableSchema((k: string) => k);
+      const base = {
+        scope: "panels",
+        name: "myvar",
+        type: "constant",
+        value: "v",
+        selectedTabs: ["t1"],
+        selectedPanels: [],
+      };
+      expect(schema.safeParse(base).success).toBe(false);
+      expect(
+        schema.safeParse({ ...base, selectedPanels: ["p1"] }).success,
+      ).toBe(true);
+    });
+  });
+
+  // §4 dropped row requireds, now restored on the FORM-OWNED field-arrays.
+  describe("Restored dropped row rules (#6 filter[].value, #7 options[].value)", () => {
+    const schema = makeAddSettingVariableSchema((k: string) => k);
+    const validBase = {
+      scope: "global",
+      name: "myvar",
+      type: "query_values",
+      query_data: { stream_type: "logs", stream: "s1", field: "f1", filter: [] },
+      options: [],
+    };
+
+    // ── Schema-level (the row rules in isolation) ──
+    it("§4 #6: filter value is required for value-needing operators", () => {
+      const withEmptyValue = {
+        ...validBase,
+        query_data: {
+          ...validBase.query_data,
+          filter: [{ name: "f", operator: "=", value: "" }],
+        },
+      };
+      expect(schema.safeParse(withEmptyValue).success).toBe(false);
+      const withValue = {
+        ...validBase,
+        query_data: {
+          ...validBase.query_data,
+          filter: [{ name: "f", operator: "=", value: "v" }],
+        },
+      };
+      expect(schema.safeParse(withValue).success).toBe(true);
+    });
+
+    it("§4 #6: filter value NOT required for Is Null / Is Not Null", () => {
+      const isNull = {
+        ...validBase,
+        query_data: {
+          ...validBase.query_data,
+          filter: [{ name: "f", operator: "Is Null", value: "" }],
+        },
+      };
+      expect(schema.safeParse(isNull).success).toBe(true);
+    });
+
+    it("filter row also requires name + operator", () => {
+      const noName = {
+        ...validBase,
+        query_data: {
+          ...validBase.query_data,
+          filter: [{ name: "", operator: "=", value: "v" }],
+        },
+      };
+      expect(schema.safeParse(noName).success).toBe(false);
+    });
+
+    it("§4 #7: option value is required (trim) + label required", () => {
+      const base = { scope: "global", name: "myvar", type: "custom" };
+      expect(
+        schema.safeParse({
+          ...base,
+          options: [{ label: "L", value: "", selected: true }],
+        }).success,
+      ).toBe(false);
+      expect(
+        schema.safeParse({
+          ...base,
+          options: [{ label: "", value: "V", selected: true }],
+        }).success,
+      ).toBe(false);
+      expect(
+        schema.safeParse({
+          ...base,
+          options: [{ label: "L", value: "V", selected: true }],
+        }).success,
+      ).toBe(true);
+    });
+
+    // ── Real-OForm (proves the field-array is wired + gates submit) ──
+    it("§4 #6 through the real form: empty filter value blocks submit", async () => {
+      const f = wrapper.vm.form;
+      f.setFieldValue("scope", "global");
+      f.setFieldValue("name", "myvar");
+      f.setFieldValue("type", "query_values");
+      f.setFieldValue("query_data.stream_type", "logs");
+      f.setFieldValue("query_data.stream", "s1");
+      f.setFieldValue("query_data.field", "f1");
+      f.setFieldValue("query_data.filter", [
+        { name: "f", operator: "=", value: "" },
+      ]);
+      await flushPromises();
+      await f.handleSubmit();
+      await flushPromises();
+      expect(f.state.isValid).toBe(false);
+
+      f.setFieldValue("query_data.filter", [
+        { name: "f", operator: "=", value: "v" },
+      ]);
+      await flushPromises();
+      await f.handleSubmit();
+      await flushPromises();
+      expect(f.state.isValid).toBe(true);
+    });
+
+    it("§4 #7 through the real form: empty option value blocks submit", async () => {
+      const f = wrapper.vm.form;
+      f.setFieldValue("scope", "global");
+      f.setFieldValue("name", "myvar");
+      f.setFieldValue("type", "custom");
+      f.setFieldValue("options", [{ label: "L", value: "", selected: true }]);
+      await flushPromises();
+      await f.handleSubmit();
+      await flushPromises();
+      expect(f.state.isValid).toBe(false);
+
+      f.setFieldValue("options", [{ label: "L", value: "V", selected: true }]);
+      await flushPromises();
+      await f.handleSubmit();
+      await flushPromises();
+      expect(f.state.isValid).toBe(true);
+    });
+  });
+
+  describe("max_record_size coercion (must reach backend as i64 / null)", () => {
+    // buildVariablePayload is the single place the form value is turned into the
+    // saved payload — the number <input> emits a STRING, so it must be coerced.
+    const baseQuery = (max_record_size: unknown) => ({
+      scope: "global",
+      selectedTabs: [],
+      selectedPanels: [],
+      name: "mrs",
+      type: "query_values",
+      query_data: {
+        stream_type: "logs",
+        stream: "s1",
+        field: "f1",
+        max_record_size,
+        filter: [],
+      },
+      options: [],
+    });
+
+    it("coerces a typed string (number <input>) to a Number", () => {
+      const payload = wrapper.vm.buildVariablePayload(baseQuery("100"));
+      expect(payload.query_data.max_record_size).toBe(100);
+      expect(typeof payload.query_data.max_record_size).toBe("number");
+    });
+
+    it("keeps an existing numeric value as a Number", () => {
+      const payload = wrapper.vm.buildVariablePayload(baseQuery(250));
+      expect(payload.query_data.max_record_size).toBe(250);
+    });
+
+    it("sends null when the field is empty / null / non-numeric (no limit)", () => {
+      expect(
+        wrapper.vm.buildVariablePayload(baseQuery("")).query_data
+          .max_record_size,
+      ).toBe(null);
+      expect(
+        wrapper.vm.buildVariablePayload(baseQuery(null)).query_data
+          .max_record_size,
+      ).toBe(null);
+      expect(
+        wrapper.vm.buildVariablePayload(baseQuery("abc")).query_data
+          .max_record_size,
+      ).toBe(null);
     });
   });
 
@@ -627,19 +971,28 @@ describe("AddSettingVariable", () => {
   });
 
   describe("Custom Value Management", () => {
-    it("should add custom value for multi-select", () => {
-      wrapper.vm.variableData.customMultiSelectValue = ["value1"];
-      
+    it("should add custom value for multi-select", async () => {
+      wrapper.vm.form.setFieldValue("customMultiSelectValue", [
+        "value1",
+      ]);
+      await flushPromises();
+
       wrapper.vm.addCustomValue();
-      
+      await flushPromises();
+
       expect(wrapper.vm.variableData.customMultiSelectValue).toEqual(["value1", ""]);
     });
 
-    it("should remove custom value", () => {
-      wrapper.vm.variableData.customMultiSelectValue = ["value1", "value2"];
-      
+    it("should remove custom value", async () => {
+      wrapper.vm.form.setFieldValue("customMultiSelectValue", [
+        "value1",
+        "value2",
+      ]);
+      await flushPromises();
+
       wrapper.vm.removeCustomValue(0);
-      
+      await flushPromises();
+
       expect(wrapper.vm.variableData.customMultiSelectValue).toEqual(["value2"]);
     });
   });
@@ -669,7 +1022,7 @@ describe("AddSettingVariable", () => {
     });
 
     it("should handle max record size validation", async () => {
-      wrapper.vm.variableData.query_data.max_record_size = "";
+      wrapper.vm.form.setFieldValue("query_data.max_record_size", "");
 
       await nextTick();
 
@@ -710,8 +1063,8 @@ describe("AddSettingVariable", () => {
 
     it("should skip schema fetch when stream is a variable reference", async () => {
       // Set stream to a variable reference
-      wrapper.vm.variableData.query_data.stream = "$var1";
-      wrapper.vm.variableData.query_data.field = "existing_field";
+      wrapper.vm.form.setFieldValue("query_data.stream", "$var1");
+      wrapper.vm.form.setFieldValue("query_data.field", "existing_field");
 
       await wrapper.vm.streamUpdated();
 
@@ -720,13 +1073,29 @@ describe("AddSettingVariable", () => {
     });
 
     it("should not reset field value when stream is a variable reference", async () => {
-      wrapper.vm.variableData.query_data.stream = "$var1";
-      wrapper.vm.variableData.query_data.field = "existing_field";
+      wrapper.vm.form.setFieldValue("query_data.stream", "$var1");
+      wrapper.vm.form.setFieldValue("query_data.field", "existing_field");
 
       await wrapper.vm.streamUpdated();
 
       // Field should be preserved since it was already set
       expect(wrapper.vm.variableData.query_data.field).toBe("existing_field");
+    });
+
+    it("uses the emitted $event value: selecting a $variable preserves the field even while the form still holds the previous real stream", async () => {
+      // Reproduces the edit flow: the form projection still holds the PREVIOUS
+      // real stream when the handler fires, but the select emits the new
+      // $variable. Branching on the emitted arg (not the stale projection) must
+      // classify it as a variable reference and preserve the field — otherwise
+      // the field is cleared and field-required validation blocks the save.
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
+      wrapper.vm.form.setFieldValue("query_data.stream", "regular-stream");
+      wrapper.vm.form.setFieldValue("query_data.field", "existing_field");
+
+      await wrapper.vm.streamUpdated("$var1");
+
+      expect(wrapper.vm.variableData.query_data.field).toBe("existing_field");
+      expect(mockStreams.getStream).not.toHaveBeenCalled();
     });
 
     it("should clear currentFieldsList when stream is a variable reference", async () => {
@@ -735,7 +1104,7 @@ describe("AddSettingVariable", () => {
         { name: "field1", type: "string" },
       ];
 
-      wrapper.vm.variableData.query_data.stream = "$var1";
+      wrapper.vm.form.setFieldValue("query_data.stream", "$var1");
 
       await wrapper.vm.streamUpdated();
 
@@ -743,8 +1112,8 @@ describe("AddSettingVariable", () => {
     });
 
     it("should fetch schema normally when stream has no variable reference", async () => {
-      wrapper.vm.variableData.query_data.stream_type = "logs";
-      wrapper.vm.variableData.query_data.stream = "regular-stream";
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
+      wrapper.vm.form.setFieldValue("query_data.stream", "regular-stream");
 
       await wrapper.vm.streamUpdated();
 
@@ -753,9 +1122,9 @@ describe("AddSettingVariable", () => {
     });
 
     it("should set empty field when stream is non-variable and updated", async () => {
-      wrapper.vm.variableData.query_data.stream_type = "logs";
-      wrapper.vm.variableData.query_data.stream = "regular-stream";
-      wrapper.vm.variableData.query_data.field = "old_field";
+      wrapper.vm.form.setFieldValue("query_data.stream_type", "logs");
+      wrapper.vm.form.setFieldValue("query_data.stream", "regular-stream");
+      wrapper.vm.form.setFieldValue("query_data.field", "old_field");
 
       await wrapper.vm.streamUpdated();
 

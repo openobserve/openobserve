@@ -5,22 +5,22 @@
   would appear in the app. Remove this file + its route once approved.
 -->
 <template>
-  <div :class="['es-demo-page', { dark: localDark, 'tw:[color-scheme:dark]': localDark }]">
-    <div class="tw:p-8 tw:flex tw:flex-col tw:gap-8 tw:bg-surface-base tw:min-h-screen">
-      <div class="tw:flex tw:items-start tw:justify-between tw:gap-4 tw:flex-wrap">
+  <div :class="['es-demo-page', { dark: localDark, '[color-scheme:dark]': localDark }]">
+    <div class="p-8 flex flex-col gap-8 bg-surface-base min-h-screen">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 class="tw:text-2xl tw:font-semibold tw:text-text-primary">
+          <h1 class="text-2xl font-semibold text-text-primary">
             Empty states — full set for review
           </h1>
-          <p class="tw:text-sm tw:text-text-secondary tw:mt-1 tw:max-w-2xl">
+          <p class="text-sm text-text-secondary mt-1 max-w-2xl">
             Every preset below is a real
-            <code class="tw:text-text-primary">&lt;OEmptyState&gt;</code> with its
+            <code class="text-text-primary">&lt;OEmptyState&gt;</code> with its
             production copy, illustration, and action. Each detailed scene has its
             own character micro-animation and pauses under OS "reduce motion".
             Nothing is wired into real pages yet.
           </p>
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2">
+        <div class="flex items-center gap-2">
           <OButton
             variant="outline"
             size="sm"
@@ -35,15 +35,15 @@
         </div>
       </div>
 
-      <div class="tw:grid tw:grid-cols-1 tw:xl:grid-cols-2 tw:gap-6">
-        <section v-for="p in presets" :key="p.preset" class="tw:flex tw:flex-col tw:gap-2">
-          <div class="tw:flex tw:items-baseline tw:gap-2">
-            <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wider tw:text-text-secondary">
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <section v-for="p in presets" :key="p.preset" class="flex flex-col gap-2">
+          <div class="flex items-baseline gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               {{ p.label }}
             </span>
-            <code class="tw:text-[0.7rem] tw:text-text-disabled">preset="{{ p.preset }}"</code>
+            <code class="text-[0.7rem] text-text-disabled">preset="{{ p.preset }}"</code>
           </div>
-          <div class="tw:rounded-xl tw:border tw:border-border-default tw:h-110 tw:overflow-hidden">
+          <div class="rounded-xl border border-border-default h-110 overflow-hidden">
             <OEmptyState
               :preset="p.preset"
               size="hero"
@@ -56,15 +56,15 @@
       </div>
 
       <div>
-        <h2 class="tw:text-lg tw:font-semibold tw:text-text-primary tw:mb-1">
+        <h2 class="text-lg font-semibold text-text-primary mb-1">
           Character — optional, only where it adds value
         </h2>
-        <p class="tw:text-sm tw:text-text-secondary tw:mb-3 tw:max-w-2xl">
+        <p class="text-sm text-text-secondary mb-3 max-w-2xl">
           The illustration is just a named choice, so a scene can opt into a
           character (e.g. a prominent first-run hero) while everything else stays
-          object-only. Same component, <code class="tw:text-text-primary">illustration="explorer"</code>.
+          object-only. Same component, <code class="text-text-primary">illustration="explorer"</code>.
         </p>
-        <div class="tw:rounded-xl tw:border tw:border-border-default tw:h-110 tw:overflow-hidden">
+        <div class="rounded-xl border border-border-default h-110 overflow-hidden">
           <OEmptyState
             size="hero"
             variant="create"
@@ -79,23 +79,23 @@
       </div>
 
       <div>
-        <h2 class="tw:text-lg tw:font-semibold tw:text-text-primary tw:mb-3">
+        <h2 class="text-lg font-semibold text-text-primary mb-3">
           Sizes — the same system at block &amp; inline scale
         </h2>
-        <div class="tw:grid tw:grid-cols-1 tw:xl:grid-cols-2 tw:gap-6">
-          <section class="tw:flex tw:flex-col tw:gap-2">
-            <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wider tw:text-text-secondary">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <section class="flex flex-col gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               size="block" (inside a card / dashboard panel)
             </span>
-            <div class="tw:rounded-xl tw:border tw:border-border-default tw:overflow-hidden">
+            <div class="rounded-xl border border-border-default overflow-hidden">
               <OEmptyState preset="no-search-results" size="block" @action="onAction('block')" />
             </div>
           </section>
-          <section class="tw:flex tw:flex-col tw:gap-2">
-            <span class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wider tw:text-text-secondary">
+          <section class="flex flex-col gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               size="inline" (table body / dropdown)
             </span>
-            <div class="tw:rounded-xl tw:border tw:border-border-default tw:overflow-hidden">
+            <div class="rounded-xl border border-border-default overflow-hidden">
               <OEmptyState preset="no-search-results" size="inline" @action="onAction('inline')" />
             </div>
           </section>

@@ -68,6 +68,7 @@ const ODrawerStub = {
     open: { type: Boolean, default: false },
     size: { type: String, default: undefined },
     title: { type: String, default: undefined },
+    titleDataTest: { type: String, default: undefined },
     subTitle: { type: String, default: undefined },
     persistent: { type: Boolean, default: false },
     showClose: { type: Boolean, default: true },
@@ -95,6 +96,8 @@ const ODrawerStub = {
       :data-persistent="String(!!persistent)"
       :data-show-close="String(!!showClose)"
     >
+      <span v-if="title" :data-test="titleDataTest">{{ title }}</span>
+      <span v-if="subTitle" data-test="o-drawer-sub-title">{{ subTitle }}</span>
       <slot name="header" />
       <slot name="header-left" />
       <slot name="header-right" />
@@ -263,11 +266,13 @@ describe("Schema Component Tests", () => {
     });
 
     // Test 6: openDialog function
-    it("should open dialog and initialize fields", () => {
+    it("should open dialog and initialize fields", async () => {
       wrapper.vm.openDialog();
-      
+      await wrapper.vm.$nextTick();
+
       expect(wrapper.vm.isDialogOpen).toBe(true);
       expect(wrapper.vm.formDirtyFlag).toBe(true);
+      // Rows are form-owned now (read via the reactive newSchemaFields view).
       expect(wrapper.vm.newSchemaFields.length).toBe(1);
       expect(wrapper.vm.newSchemaFields[0]).toEqual({
         name: "",
@@ -277,12 +282,17 @@ describe("Schema Component Tests", () => {
     });
 
     // Test 7: closeDialog function
-    it("should close dialog and reset fields", () => {
+    it("should close dialog and reset fields", async () => {
       wrapper.vm.isDialogOpen = true;
-      wrapper.vm.newSchemaFields = [{ name: "test", type: "string", index_type: [] }];
-      
+      // Seed rows through the form (single source of truth), not a local ref.
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "test", type: "string", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
       wrapper.vm.closeDialog();
-      
+      await wrapper.vm.$nextTick();
+
       expect(wrapper.vm.isDialogOpen).toBe(false);
       expect(wrapper.vm.newSchemaFields).toEqual([]);
     });
@@ -482,16 +492,16 @@ describe("Schema Component Tests", () => {
       expect(result).toBe("25-12-2023");
     });
 
-    // Test 23: convertUnixToQuasarFormat function
+    // Test 23: convertUnixToDateFormat function
     it("should convert unix timestamp correctly", () => {
       const unixMicroseconds = 1703505000000000; // 2023-12-25
-      const result = wrapper.vm.convertUnixToQuasarFormat(unixMicroseconds);
+      const result = wrapper.vm.convertUnixToDateFormat(unixMicroseconds);
       expect(result).toMatch(/\d{2}-\d{2}-\d{4}/);
     });
 
-    // Test 24: convertUnixToQuasarFormat with empty input
+    // Test 24: convertUnixToDateFormat with empty input
     it("should handle empty unix timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat("");
+      const result = wrapper.vm.convertUnixToDateFormat("");
       expect(result).toBe("");
     });
 
@@ -1836,6 +1846,21 @@ describe("Schema Component Tests", () => {
       expect(w.vm.redDaysList).toEqual([]);
     });
 
+    it("should ignore programmatic mount-replay date-change emits (userChangedValue false)", () => {
+      // On mount/remount <date-time> emits an absolute range with
+      // userChangedValue:false. dateChangeValue must ignore it so it does not
+      // push to redDaysList and trigger onSubmit — the cause of the infinite
+      // updateSettings/getStream loop on the Extended Retention tab.
+      mockUpdateSettings.mockClear();
+      w.vm.dateChangeValue({
+        relativeTimePeriod: null,
+        userChangedValue: false,
+        selectedDate: { from: "2024-06-15", to: "2024-06-16" },
+      });
+      expect(w.vm.redDaysList).toEqual([]);
+      expect(mockUpdateSettings).not.toHaveBeenCalled();
+    });
+
     it("should set IsdeleteBtnVisible when rows are selected", async () => {
       w.vm.updateActiveMainTab("redButton");
       await w.vm.$nextTick();
@@ -1979,27 +2004,47 @@ describe("Schema Component Tests", () => {
       expect(wrapper.vm.getConfigIcon.length).toBeGreaterThan(0);
     });
 
-    it("should add and remove schema fields", () => {
+    it("should add and remove schema fields via the form", async () => {
+      // Rows are owned by the child (StreamFieldInputs) through the form now —
+      // add/remove go through form.pushFieldValue / form.removeFieldValue, the
+      // same calls the child makes. The parent no longer exposes add/remove
+      // handlers.
       expect(wrapper.vm.newSchemaFields.length).toBe(0);
 
-      wrapper.vm.addSchemaField();
+      wrapper.vm.newSchemaFieldsForm.pushFieldValue("newSchemaFields", {
+        name: "",
+        type: "",
+        index_type: [],
+      });
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.newSchemaFields.length).toBe(1);
       expect(wrapper.vm.newSchemaFields[0].name).toBe("");
       expect(wrapper.vm.newSchemaFields[0].type).toBe("");
-      expect(wrapper.vm.formDirtyFlag).toBe(true);
 
-      wrapper.vm.addSchemaField();
+      wrapper.vm.newSchemaFieldsForm.pushFieldValue("newSchemaFields", {
+        name: "",
+        type: "",
+        index_type: [],
+      });
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.newSchemaFields.length).toBe(2);
 
-      wrapper.vm.removeSchemaField(wrapper.vm.newSchemaFields[0], 0);
+      wrapper.vm.newSchemaFieldsForm.removeFieldValue("newSchemaFields", 0);
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.newSchemaFields.length).toBe(1);
     });
 
-    it("should close dialog when last schema field is removed", () => {
+    it("should close dialog when last schema field is removed", async () => {
       wrapper.vm.isDialogOpen = true;
-      wrapper.vm.newSchemaFields = [{ name: "test", type: "string", index_type: [] }];
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "test", type: "string", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
 
-      wrapper.vm.removeSchemaField(wrapper.vm.newSchemaFields[0], 0);
+      // The child removes rows directly via the form; the parent's watch closes
+      // the dialog once the rows drain to empty (main's behavior, restored).
+      wrapper.vm.newSchemaFieldsForm.removeFieldValue("newSchemaFields", 0);
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.isDialogOpen).toBe(false);
       expect(wrapper.vm.newSchemaFields).toEqual([]);
@@ -3580,9 +3625,13 @@ describe("Schema Component Tests", () => {
     });
 
     it("should exercise onSubmit with non-empty newSchemaFields (maps)", async () => {
-      // Func 55, 56: newSchemaFields map callbacks in onSubmit
-      wrapper.vm.addSchemaField();
-      wrapper.vm.newSchemaFields[0] = { name: "test-field", type: "Utf8", index_type: [] };
+      // Func 55, 56: newSchemaFields map callbacks in onSubmit. The row gate
+      // validates the NORMALIZED name, so a dash is allowed — "test-field"
+      // normalizes to "test_field" (valid), passes the gate, and is saved.
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "test-field", type: "Utf8", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
 
       mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
 
@@ -3592,6 +3641,92 @@ describe("Schema Component Tests", () => {
       expect(mockUpdateSettings).toHaveBeenCalled();
       // newSchemaFields should be reset after successful save
       expect(wrapper.vm.newSchemaFields).toEqual([]);
+    });
+
+    it("should block onSubmit when a field name has invalid characters", async () => {
+      // Option A gating: "!" survives normalization, so "user!id" fails the row
+      // schema. onSubmit reveals the inline error and does NOT save — the fix for
+      // the dropped inline feedback (invalid names no longer pass silently).
+      wrapper.vm.isDialogOpen = true;
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "user!id", type: "Utf8", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(mockUpdateSettings).not.toHaveBeenCalled();
+      // Rows are preserved (not reset) so the user can correct them.
+      expect(wrapper.vm.newSchemaFields.length).toBe(1);
+    });
+
+    it("should block onSubmit when a field has no data type", async () => {
+      // The data-type select is visible + required in the Add Field(s) card, so a
+      // row with a valid name but no type also blocks the save.
+      wrapper.vm.isDialogOpen = true;
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "valid_name", type: "", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onSubmit();
+      await flushPromises();
+
+      expect(mockUpdateSettings).not.toHaveBeenCalled();
+      expect(wrapper.vm.newSchemaFields.length).toBe(1);
+    });
+
+    it("should save on Enter from a field-name input", async () => {
+      // Enter in the Add Field(s) name input triggers the settings save (the
+      // nested <form> otherwise swallows Enter with 2+ rows).
+      wrapper.vm.isDialogOpen = true;
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "valid_name", type: "Utf8", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      await wrapper.vm.onAddFieldsKeyup({
+        key: "Enter",
+        target: { tagName: "INPUT", name: "newSchemaFields[0].name" },
+      });
+      await flushPromises();
+
+      expect(mockUpdateSettings).toHaveBeenCalled();
+    });
+
+    it("should NOT save on Enter from the data-type select (only the name input submits)", async () => {
+      wrapper.vm.isDialogOpen = true;
+      wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
+        { name: "valid_name", type: "Utf8", index_type: [] },
+      ]);
+      await wrapper.vm.$nextTick();
+
+      mockUpdateSettings.mockClear();
+      mockUpdateSettings.mockResolvedValue({ data: { code: 200 } });
+
+      // Enter on the type field (dropdown) must not submit.
+      wrapper.vm.onAddFieldsKeyup({
+        key: "Enter",
+        target: { tagName: "INPUT", name: "newSchemaFields[0].type" },
+      });
+      // A non-Enter key on the name input must not submit either.
+      wrapper.vm.onAddFieldsKeyup({
+        key: "a",
+        target: { tagName: "INPUT", name: "newSchemaFields[0].name" },
+      });
+      await flushPromises();
+
+      expect(mockUpdateSettings).not.toHaveBeenCalled();
     });
 
     it("should exercise cross-links diff in onSubmit with modified links", async () => {

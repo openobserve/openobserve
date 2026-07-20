@@ -19,10 +19,10 @@
     <template #group-header="{ row, groupName }">
       <div
         :data-test="`logs-page-field-list-group-header-${row.group}`"
-        class="tw:font-semibold tw:text-xs tw:py-0.5 tw:px-[0.325rem] tw:cursor-pointer tw:text-field-list-group-text tw:bg-surface-subtle tw:h-full tw:w-full tw:flex! tw:justify-between tw:items-center tw:rounded-[0.25rem]"
+        class="font-semibold text-xs py-0.5 px-[0.325rem] cursor-pointer text-field-list-group-text bg-surface-subtle h-full w-full flex! justify-between items-center rounded-[0.25rem]"
         @click="$emit('toggle-group', row.group)"
       >
-        <div class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:gap-1">
+        <div class="flex-1 min-w-0 flex items-center gap-1">
           <span>{{ groupName }}</span>
           <OTag type="fieldTag">{{
             (showOnlyInterestingFields
@@ -34,7 +34,7 @@
           v-if="(expandGroupRowsFieldCount[row.group] ?? 0) > 0"
           variant="ghost"
           size="icon-xs-sq"
-          class="tw:flex-shrink-0"
+          class="flex-shrink-0"
         >
           <OIcon
             :name="
@@ -120,65 +120,65 @@
     <template #loading>
       <div
         data-test="logs-fieldlist-loading-skeleton"
-        class="tw:w-full tw:flex tw:flex-col"
+        class="w-full flex flex-col"
       >
         <!-- Group 1 header -->
-        <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2">
-          <OSkeleton type="rect" class="tw:h-3 tw:w-24 tw:rounded-sm" />
-          <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+        <div class="h-7 flex items-center justify-between px-2">
+          <OSkeleton type="rect" class="h-3 w-24 rounded-sm" />
+          <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
         </div>
         <!-- Group 1 fields -->
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:flex-1" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="flex-1" />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:w-3/4" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="w-3/4" />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:flex-1" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="flex-1" />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:w-4/5" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="w-4/5" />
         </div>
         <!-- Group 2 header -->
-        <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
-          <OSkeleton type="rect" class="tw:h-3 tw:w-16 tw:rounded-sm" />
-          <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+        <div class="h-7 flex items-center justify-between px-2 mt-2">
+          <OSkeleton type="rect" class="h-3 w-16 rounded-sm" />
+          <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
         </div>
         <!-- Group 2 field -->
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:w-2/3" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="w-2/3" />
         </div>
         <!-- Group 3 header -->
-        <div class="tw:h-7 tw:flex tw:items-center tw:justify-between tw:px-2 tw:mt-2">
-          <OSkeleton type="rect" class="tw:h-3 tw:w-32 tw:rounded-sm" />
-          <OSkeleton type="rect" class="tw:h-3 tw:w-3 tw:rounded-sm" />
+        <div class="h-7 flex items-center justify-between px-2 mt-2">
+          <OSkeleton type="rect" class="h-3 w-32 rounded-sm" />
+          <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
         </div>
         <!-- Group 3 fields -->
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:flex-1" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="flex-1" />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:w-4/5" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="w-4/5" />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:flex-1" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="flex-1" />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:w-3/4" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="w-3/4" />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-[0.375rem]">
-          <OSkeleton type="rect" class="tw:w-[0.875rem] tw:h-[0.875rem] tw:rounded-sm tw:shrink-0" />
-          <OSkeleton type="text" class="tw:flex-1" />
+        <div class="flex items-center gap-2 px-3 py-[0.375rem]">
+          <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+          <OSkeleton type="text" class="flex-1" />
         </div>
       </div>
     </template>
@@ -186,10 +186,10 @@
     <!-- Empty state -->
     <template #empty>
       <div
-        class="tw:text-center tw:py-[0.725rem] tw:flex tw:items-center tw:justify-center"
+        class="text-center py-[0.725rem] flex items-center justify-center"
       >
         <OIcon name="info" size="xs" />
-        <span class="tw:pl-[0.375rem]">No matching fields found.</span>
+        <span class="pl-[0.375rem]">{{ t('logs.logsPluginFieldList.noMatchingFields') }}</span>
       </div>
     </template>
 

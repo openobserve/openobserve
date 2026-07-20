@@ -326,7 +326,7 @@ describe("About", () => {
     });
 
     // The root element is a div; the second div inside has overflow-auto
-    const scrollContainer = wrapper.find(".tw\\:overflow-auto");
+    const scrollContainer = wrapper.find(".overflow-auto");
     expect(scrollContainer.exists()).toBe(true);
   });
 

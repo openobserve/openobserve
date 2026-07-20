@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:items-center"
+    class="flex items-center"
     data-test="dashboard-table-pagination-controls"
   >
     <!-- Records per page dropdown: only when pagination is enabled -->
     <div
       v-if="showPagination"
-      class="tw:flex tw:flex-row tw:items-center tw:gap-2"
+      class="flex flex-row items-center gap-2"
     >
-      <span class="tw:text-xs" data-test="dashboard-table-rows-per-page-label"
+      <span class="text-xs" data-test="dashboard-table-rows-per-page-label"
         >{{ t("dashboard.rowsPerPage") }}
       </span>
       <OSelect
@@ -32,13 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"
         :options="formattedPaginationOptions"
         size="sm"
-        class="tw:w-fit!"
+        class="w-fit!"
         data-test="dashboard-table-rows-per-page-select"
       />
     </div>
 
     <!-- Count display -->
-    <span class="tw:text-xs tw:px-2" data-test="dashboard-table-row-count">
+    <span class="text-xs px-2" data-test="dashboard-table-row-count">
       {{ countDisplay }}
     </span>
 

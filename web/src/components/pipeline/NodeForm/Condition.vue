@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     secondary-button-variant="outline"
     :neutral-button-label="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutral-button-variant="outline-destructive"
-    @click:primary="saveCondition"
+    form-id="condition-form"
     @click:secondary="openCancelDialog"
     @click:neutral="openDeleteDialog"
     @keydown.stop
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="o-drawer-close-btn"
         @mousedown.prevent
         @click="openCancelDialog"
-        class="tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:h-7 tw:w-7 tw:rounded-md tw:text-dialog-close-text tw:hover:bg-dialog-close-hover-bg tw:active:bg-dialog-close-active-bg tw:transition-colors tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring tw:cursor-pointer"
+        class="shrink-0 flex items-center justify-center h-7 w-7 rounded-md text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring cursor-pointer"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="18" y1="6" x2="6" y2="18" />
@@ -50,20 +50,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-condition-section"
-      class="stream-routing-section tw:w-full tw:min-h-full"
-      :class="store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white'"
+      class="stream-routing-section w-full min-h-full"
+      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
     >
 
 
-    <div class="tw:w-full tw:rounded-lg tw:px-3 stream-routing-container">
+    <OForm id="condition-form" :form="form">
+    <div class="w-full rounded-lg px-3 stream-routing-container">
       <div>
         <div
-          class="showLabelOnTop tw:font-bold text-h7"
+          class="showLabelOnTop font-bold text-h7"
           data-test="add-condition-query-input-title"
         >
           <div></div>
           <!-- Wrapper for FilterGroup with pipeline-specific styling -->
-          <div class="pipeline-filter-group-wrapper tw:max-w-full tw:overflow-x-visible!" @submit.stop.prevent>
+          <div class="pipeline-filter-group-wrapper max-w-full overflow-x-visible!" @submit.stop.prevent>
             <FilterGroup
               v-if="
                 conditionGroup &&
@@ -73,7 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :stream-fields="filteredColumns"
               :group="conditionGroup"
               :depth="0"
-              condition-input-width="tw:w-[130px]"
+              name-prefix="conditions"
+              condition-input-width="w-[130px]"
               :allow-custom-columns="true"
               module="pipelines"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
@@ -81,51 +83,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @remove-group="(groupId) => removeConditionGroup(groupId)"
               @input:update="(name, field) => onInputUpdate(name, field)"
             />
-            <div v-else class="tw:p-3 tw:text-gray-400">Loading conditions...</div>
+            <div v-else class="p-3 text-gray-400">Loading conditions...</div>
+          </div>
+          <!-- Schema error for the bridged FilterGroup model (no OForm* field to
+               render it, so surface the form-level `conditions` error here). -->
+          <div
+            v-if="conditionsError"
+            class="text-xs text-input-error-text mt-1"
+            data-test="add-condition-error"
+          >
+            {{ conditionsError }}
           </div>
           <div
-            class="note-container tw:bg-[#f9f290] tw:text-[#2d3748] tw:w-full tw:rounded-md tw:p-3 tw:my-3 tw:flex tw:flex-col tw:gap-2"
+            class="note-container bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 my-3 flex flex-col gap-2"
             data-test="add-condition-note-container"
           >
             <div
-              class="tw:text-sm tw:text-gray-800"
+              class="text-sm text-gray-800"
               data-test="add-condition-note-heading"
             >
               Condition value Guidelines:
             </div>
             <div
-              class="tw:flex tw:flex-col tw:gap-1 tw:text-sm tw:text-gray-800"
+              class="flex flex-col gap-1 text-sm text-gray-800"
               data-test="add-condition-note-info"
             >
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
                   To check for an empty value, use
-                  <span class="highlight tw:font-bold tw:text-[#007bff]">""</span>. Example:
-                  <span class="code tw:font-mono tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">app_name != ""</span>
+                  <span class="highlight font-bold text-[#007bff]">""</span>. Example:
+                  <span class="code font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">app_name != ""</span>
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
                   To check for an Null value, use
-                  <span class="highlight tw:font-bold tw:text-[#007bff]">null</span>. Example:
-                  <span class="code tw:font-mono tw:py-[1px] tw:px-[4px] tw:rounded-[3px] tw:bg-[rgba(0,0,0,0.06)] tw:text-[#b30059]">app_name != null</span>
+                  <span class="highlight font-bold text-[#007bff]">null</span>. Example:
+                  <span class="code font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">app_name != null</span>
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="info" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-amber-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
                   To add a custom column, type column name and press
-                  <span class="highlight tw:font-bold tw:text-[#007bff]">Enter</span>.
+                  <span class="highlight font-bold text-[#007bff]">Enter</span>.
                 </span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="warning" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-red-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-red-500" />
                 <span>If conditions are not met, the record will be dropped.</span>
               </div>
-              <div class="tw:flex tw:items-start tw:gap-2">
-                <OIcon name="warning" size="sm" class="tw:shrink-0 tw:mt-0.5 tw:text-red-500" />
+              <div class="flex items-start gap-2">
+                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-red-500" />
                 <span>If the record does not have the specified field, it will be dropped.</span>
               </div>
             </div>
@@ -133,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    </OForm>
   </div>
   </ODrawer>
   <confirm-dialog
@@ -156,6 +168,11 @@ import {
 import { useI18n } from "vue-i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { cloneDeep } from "lodash-es";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { makeConditionSchema, type ConditionForm } from "./Condition.schema";
 import {
   getTimezoneOffset,
   getUUID,
@@ -167,8 +184,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
-import useQuery from "@/composables/useQuery";
-import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -221,8 +236,6 @@ const store = useStore();
 
 const { getStream, getStreams } = useStreams();
 
-const { buildQueryPayload } = useQuery();
-
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
 const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
@@ -242,10 +255,6 @@ const isUpdating = ref(false);
 
 const filteredColumns: any = ref([]);
 
-const isValidSqlQuery = ref(true);
-
-const validateSqlQueryPromise = ref<Promise<unknown>>();
-
 const scheduledAlertRef = ref<any>(null);
 
 const filteredStreams: Ref<any[]> = ref([]);
@@ -253,8 +262,6 @@ const filteredStreams: Ref<any[]> = ref([]);
 const indexOptions = ref([]);
 
 const originalStreamFields: Ref<any[]> = ref([]);
-
-const isValidName: Ref<boolean> = ref(true);
 
 const isAggregationEnabled = ref(false);
 
@@ -431,22 +438,61 @@ const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
-const conditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
+// Initial conditions tree — loads existing node data synchronously via
+// getDefaultConditionGroup(). Seeds the form; after creation the form OWNS it.
+const initialConditions = getDefaultConditionGroup();
 
-// Create a deep copy to preserve the original state for comparison
+// Deep-copy snapshot for the dirty-check on Cancel.
 const originalConditionGroup: Ref<ConditionGroup> = ref(
-  JSON.parse(JSON.stringify(getDefaultConditionGroup())),
+  JSON.parse(JSON.stringify(initialConditions)),
 );
 
 // Simple incrementing key to force re-render when needed
 const filterGroupKey = ref(0);
 
+// ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
+// This component OWNS <OForm>. FilterGroup renders in FORM MODE (name-prefix=
+// "conditions"): FilterCondition name-binds each leaf's column/operator/value
+// straight into the form, and structural changes (add/remove/toggle/reorder) are
+// written to the form by updateGroup/removeConditionGroup below — mirroring
+// alerts' useAlertForm. SINGLE source of truth (form.useStore); no mirror ref, no
+// value-sync bridge. The schema's superRefine ("at least one condition") gates
+// submit (R3/R4).
+const form = useOForm<ConditionForm>({
+  defaultValues: { conditions: initialConditions },
+  schema: makeConditionSchema(t),
+  onSubmit: () => saveCondition(),
+});
+
+// Reactive READ-VIEW of the form-owned conditions tree, exposed as a WRITABLE
+// computed: reads come from form.useStore (drives FilterGroup's `:group`), and
+// any imperative write (restore-on-cancel) goes straight through the form via
+// setFieldValue. Still a SINGLE source of truth — no mirror ref, no copy.
+const conditionGroupStore = form.useStore(
+  (s: any) => s.values.conditions ?? getDefaultConditionGroup(),
+);
+const conditionGroup = computed({
+  get: () => conditionGroupStore.value,
+  set: (v: any) => form.setFieldValue("conditions", v),
+});
+
 // Watch for label changes specifically to force re-render
 watch(
-  () => conditionGroup.value.label,
+  () => (conditionGroup.value as any)?.label,
   () => {
     filterGroupKey.value++;
   },
+);
+
+// Surface the form-level `conditions` error (no OForm* field renders it) — a
+// reactive view of the SAME form, no mirror.
+const conditionsErrors = form.useStore(
+  (s: any) => s.fieldMeta?.conditions?.errors ?? [],
+);
+const conditionsError = computed(() =>
+  conditionsErrors.value.length
+    ? String(firstFieldError(conditionsErrors.value))
+    : "",
 );
 
 const filterColumns = (options: any[], val: String, update: Function) => {
@@ -469,12 +515,6 @@ const filterColumns = (options: any[], val: String, update: Function) => {
 const filterStreams = (val: string, update: any) => {
   filteredStreams.value = filterColumns(indexOptions.value, val, update);
 };
-
-const isValidStreamName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(streamRoute.value?.name);
-});
 
 const updateStreamFields = async (streamName: any, streamType: any) => {
   let streamCols: any = [];
@@ -589,54 +629,46 @@ const getFields = async () => {
 // Group management functions - Using shared utilities from alertDataTransforms
 // These functions are called when FilterGroup emits add-condition, add-group, or remove-group events
 
+// Structural change from FilterGroup (add-condition / add-group). The transform
+// utils MUTATE their context in place, and the form store is readonly, so run
+// them on a CLONE of the form's current conditions, then write the result back
+// with setFieldValue (mirrors alerts' useAlertForm.updateGroup).
 const updateGroup = (updatedGroup: any) => {
-  // Create a context object that matches the alert utility's expected structure
-  // The utility expects: context.formData.query_condition.conditions
-  // We need to create a temporary wrapper and then extract the updated value
+  const cloned = cloneDeep((form.state.values as any).conditions);
   const tempContext = {
-    formData: {
-      query_condition: {
-        conditions: conditionGroup.value,
-      },
-    },
+    formData: { query_condition: { conditions: cloned } },
   };
-
-  // Call the shared utility
   updateGroupUtil(updatedGroup, tempContext as any);
-
-  // Extract the updated value back
-  conditionGroup.value = tempContext.formData.query_condition.conditions;
+  form.setFieldValue(
+    "conditions",
+    tempContext.formData.query_condition.conditions,
+  );
 };
 
 const removeConditionGroup = (targetGroupId: string) => {
-  // Create a context object that matches the alert utility's expected structure
+  const cloned = cloneDeep((form.state.values as any).conditions);
   const tempContext = {
-    formData: {
-      query_condition: {
-        conditions: conditionGroup.value,
-      },
-    },
+    formData: { query_condition: { conditions: cloned } },
   };
-
-  // Call the shared utility
-  removeConditionGroupUtil(
-    targetGroupId,
-    conditionGroup.value,
-    tempContext as any,
+  removeConditionGroupUtil(targetGroupId, cloned, tempContext as any);
+  form.setFieldValue(
+    "conditions",
+    tempContext.formData.query_condition.conditions,
   );
-
-  // Extract the updated value back
-  conditionGroup.value = tempContext.formData.query_condition.conditions;
 };
 
-const onInputUpdate = (name: string, field: any) => {
-  // Handle input updates from FilterCondition component
+const onInputUpdate = (_name?: string, _field?: any) => {
+  // Leaf values are name-bound in form mode (FilterCondition writes them straight
+  // into the form), so there is no bridge to run here. Kept for the template's
+  // @input:update wiring / the bare-mode event surface.
 };
 
 const closeDialog = () => {
-  // Restore the original condition group when canceling
-  conditionGroup.value = JSON.parse(
-    JSON.stringify(originalConditionGroup.value),
+  // Restore the original condition group when canceling. conditionGroup is now a
+  // readonly form read-view, so write the restore THROUGH the form.
+  form.setFieldValue(
+    "conditions",
+    JSON.parse(JSON.stringify(originalConditionGroup.value)),
   );
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
@@ -667,31 +699,19 @@ const openCancelDialog = () => {
   }
 };
 
+// @submit handler — OForm only calls it once the schema passes (at least one
+// condition via superRefine over the bridged `conditions` field), so the schema
+// gates the save (the old imperative hasValidConditions toast is gone). Reads
+// the live `conditionGroup` (the bridged source of truth).
 const saveCondition = async () => {
   try {
-    // V2: Check if there are any valid conditions (use 'conditions' array)
-    const conditionsArray = (conditionGroup.value as any).conditions || [];
-    const hasValidConditions = conditionsArray.some((item: any) => {
-      // Check for nested groups (V2 format)
-      if (item.filterType === "group" && item.conditions) return true;
-      // Check for valid conditions
-      return item.column && item.operator;
-    });
-
-    if (!hasValidConditions) {
-      toast({
-        variant: "error",
-        message: "Please add at least one condition",
-      });
-      return;
-    }
-
     // V2: Send directly to backend (no transformation needed)
     // The conditionGroup is already in V2 format which matches backend
     let conditionData = {
       node_type: "condition",
       version: 2, // Numeric version for consistency with alerts
-      conditions: conditionGroup.value,
+      // Detach from the readonly form read-view before handing to addNode.
+      conditions: cloneDeep((form.state.values as any).conditions),
     };
 
     // Ensure currentSelectedNodeData has proper structure
@@ -757,41 +777,6 @@ const deleteRoute = () => {
   emit("cancel:hideform");
 };
 
-const validateSqlQuery = () => {
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: streamRoute.value.name as string,
-  });
-
-  delete query.aggs;
-
-  query.query.sql = streamRoute.value.query_condition?.sql || "";
-
-  validateSqlQueryPromise.value = new Promise((resolve, reject) => {
-    searchService
-      .search({
-        org_identifier: store.state.selectedOrganization.identifier,
-        query,
-        page_type: "logs",
-      })
-      .then((res: any) => {
-        isValidSqlQuery.value = true;
-        resolve("");
-      })
-      .catch((err: any) => {
-        if (err.response.data.code === 500) {
-          isValidSqlQuery.value = false;
-          toast({
-            variant: "error",
-            message: "Invalid SQL Query : " + err.response.data.message,
-          });
-          reject("");
-        } else isValidSqlQuery.value = true;
-
-        resolve("");
-      });
-  });
-};
 </script>
 
 <style>

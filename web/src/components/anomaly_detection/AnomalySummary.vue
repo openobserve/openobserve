@@ -15,27 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-full tw:flex tw:flex-col tw:relative">
+  <div class="h-full flex flex-col relative">
     <div
-      class="tw:text-[0.8125rem] tw:leading-[2.2] tw:flex-1 tw:overflow-y-auto tw:p-4"
+      class="text-[0.8125rem] leading-[2.2] flex-1 overflow-y-auto p-4"
       ref="summaryContainer"
       @scroll="checkScrollState"
     >
       <p
         v-if="summaryText"
-        class="summary-text tw:m-0 tw:whitespace-pre-line tw:tracking-[0.03em]"
+        class="summary-text m-0 whitespace-pre-line tracking-[0.03em]"
         v-html="summaryText"
       />
-      <p v-else class="tw:m-0 tw:italic tw:opacity-60">
+      <p v-else class="m-0 italic opacity-60">
         Fill in the setup step to see a summary.
       </p>
     </div>
 
-    <div v-show="showScrollToBottom" class="tw:absolute tw:bottom-5 tw:right-5 tw:z-1000 tw:pointer-events-none">
+    <div v-show="showScrollToBottom" class="absolute bottom-5 right-5 z-1000 pointer-events-none">
       <OButton
         variant="ghost"
         size="icon-sm"
-        class="tw:pointer-events-auto tw:backdrop-blur-sm tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)] tw:!border-2 tw:!border-[var(--o2-primary-color)] tw:!text-[var(--o2-primary-color)] tw:!bg-white/95 tw:dark:!bg-[rgba(30,30,30,0.9)]"
+        class="pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] !border-2 !border-[var(--o2-primary-color)] !text-[var(--o2-primary-color)] !bg-white/95 dark:!bg-[rgba(30,30,30,0.9)]"
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >

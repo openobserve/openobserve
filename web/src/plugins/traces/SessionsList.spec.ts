@@ -14,6 +14,14 @@ const mockTotal = ref(0);
 const mockLoading = ref(false);
 const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
+// These refs are module-scoped in useSessions (survive remount) — the
+// component reads/mutates them directly, so the mock must supply real refs.
+const mockLastRunAt = ref<number | null>(null);
+const mockLoadedOrg = ref<string | null>(null);
+const mockCurrentPage = ref(1);
+const mockRowsPerPage = ref(20);
+const mockAgents = ref<any[]>([]);
+const mockAgentsLoaded = ref(false);
 const mockFetchPage = vi.fn();
 const mockCancelAll = vi.fn();
 const mockListAgents = vi.fn();
@@ -28,6 +36,12 @@ vi.mock("./composables/useSessions", () => ({
     loading: mockLoading,
     error: mockError,
     hasLoadedOnce: mockHasLoadedOnce,
+    lastRunAt: mockLastRunAt,
+    loadedOrg: mockLoadedOrg,
+    currentPage: mockCurrentPage,
+    rowsPerPage: mockRowsPerPage,
+    agents: mockAgents,
+    agentsLoaded: mockAgentsLoaded,
     fetchPage: mockFetchPage,
     cancelAll: mockCancelAll,
   })),
@@ -225,6 +239,12 @@ beforeEach(() => {
   mockLoading.value = false;
   mockError.value = null;
   mockHasLoadedOnce.value = false;
+  mockLastRunAt.value = null;
+  mockLoadedOrg.value = null;
+  mockCurrentPage.value = 1;
+  mockRowsPerPage.value = 20;
+  mockAgents.value = [];
+  mockAgentsLoaded.value = false;
   mockRouteQuery = {};
 
   // Default: streams load fine

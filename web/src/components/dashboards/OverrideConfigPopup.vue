@@ -25,35 +25,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="override-config-accordion"
-      class="tw:grid tw:grid-cols-[264px_minmax(0,1fr)_360px] tw:max-[900px]:grid-cols-[220px_minmax(0,1fr)] tw:h-[calc(86vh-150px)] tw:overflow-hidden tw:-mx-(--spacing-dialog-content-px) tw:-my-(--spacing-dialog-content-py)"
+      class="grid grid-cols-[264px_minmax(0,1fr)_360px] max-[900px]:grid-cols-[220px_minmax(0,1fr)] h-[calc(86vh-150px)] overflow-hidden -mx-(--spacing-dialog-content-px) -my-(--spacing-dialog-content-py)"
     >
       <!-- Left: add-field dropdown + list of added fields -->
       <div
-        class="tw:flex tw:flex-col tw:gap-2.5 tw:min-w-0 tw:p-3 tw:border-r tw:border-[rgba(128,128,128,0.18)]"
+        class="flex flex-col gap-2.5 min-w-0 p-3 border-r border-[rgba(128,128,128,0.18)]"
       >
         <ODropdown
           v-model:open="addOpenLeft"
           align="start"
-          content-class="tw:min-w-(--reka-popper-anchor-width)!"
+          content-class="min-w-(--reka-popper-anchor-width)!"
         >
           <template #trigger>
             <button
               type="button"
               data-test="dashboard-addpanel-config-add-column"
-              class="tw:flex tw:items-center tw:justify-center tw:gap-1.5 tw:w-full tw:shrink-0 tw:p-[9px] tw:rounded-lg tw:border tw:border-dashed tw:border-[rgba(25,118,210,0.5)] tw:bg-transparent tw:cursor-pointer tw:text-[length:var(--text-sm,13px)] tw:font-medium tw:text-[var(--color-primary-600,#1976d2)] tw:transition-colors tw:hover:bg-[rgba(25,118,210,0.05)] tw:hover:border-[var(--color-primary-600,#1976d2)]"
+              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-[9px] rounded-lg border border-dashed border-[rgba(25,118,210,0.5)] bg-transparent cursor-pointer text-[length:var(--text-sm,13px)] font-medium text-[var(--color-primary-600,#1976d2)] transition-colors hover:bg-[rgba(25,118,210,0.05)] hover:border-[var(--color-primary-600,#1976d2)]"
             >
               <OIcon name="add" size="sm" />
               {{ t("dashboard.columnFormattingAddField") }}
             </button>
           </template>
-          <div class="tw:max-h-[17.5rem] tw:overflow-y-auto">
+          <div class="max-h-[17.5rem] overflow-y-auto">
             <ODropdownItem
               v-for="opt in availableToAdd"
               :key="opt.value"
               :data-test="`dashboard-addpanel-config-add-field-${opt.value}`"
               @select="addField(opt.value)"
             >
-              <span class="tw:flex tw:items-center tw:gap-2">
+              <span class="flex items-center gap-2">
                 <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
                   {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                 </span>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
             <div
               v-if="!availableToAdd.length"
-              class="tw:py-2 tw:px-2.5 tw:text-xs tw:text-[var(--o2-text-2,#9e9e9e)]"
+              class="py-2 px-2.5 text-xs text-[var(--o2-text-2,#9e9e9e)]"
             >
               {{ t("dashboard.columnFormattingAllAdded") }}
             </div>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-if="columnOverrides.length"
-          class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:flex tw:flex-col tw:gap-1"
+          class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1"
         >
           <div
             v-for="(col, idx) in columnOverrides"
@@ -79,10 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             role="button"
             tabindex="0"
             :data-test="`override-config-row-${idx}`"
-            class="tw:group tw:relative tw:flex tw:items-center tw:gap-2 tw:w-full tw:py-2 tw:pl-[9px] tw:pr-1.5 tw:rounded-lg tw:border-l-[3px] tw:border-transparent tw:cursor-pointer tw:outline-none tw:transition-colors tw:hover:bg-[rgba(128,128,128,0.05)]"
+            class="group relative flex items-center gap-2 w-full py-2 pl-[9px] pr-1.5 rounded-lg border-l-[3px] border-transparent cursor-pointer outline-none transition-colors hover:bg-[rgba(128,128,128,0.05)]"
             :class="
               idx === selectedIdx
-                ? 'tw:bg-[rgba(46,85,163,0.06)] tw:border-l-[var(--color-primary-600,#1976d2)]!'
+                ? 'bg-[rgba(46,85,163,0.06)] border-l-[var(--color-primary-600,#1976d2)]!'
                 : ''
             "
             @click="selectedIdx = idx"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
-              class="tw:flex-1 tw:min-w-0 tw:font-semibold tw:text-[length:var(--text-sm,13px)] tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:group-hover:pr-7"
+              class="flex-1 min-w-0 font-semibold text-[length:var(--text-sm,13px)] overflow-hidden text-ellipsis whitespace-nowrap group-hover:pr-7"
             >
               {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
             </span>
@@ -103,24 +103,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="close"
               :title="t('common.remove')"
               :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
-              class="tw:absolute! tw:right-1 tw:top-1/2 tw:-translate-y-1/2 tw:opacity-0 tw:group-hover:opacity-100 tw:transition-opacity"
+              class="absolute! right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
               @click.stop="removeColumn(idx)"
             />
           </div>
         </div>
         <div
           v-else
-          class="tw:flex-1 tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-1.5 tw:text-center tw:p-4"
+          class="flex-1 flex flex-col items-center justify-center gap-1.5 text-center p-4"
         >
           <OIcon
             name="format-color-text"
             size="lg"
-            class="tw:text-[var(--o2-text-2,#b0bec5)]"
+            class="text-[var(--o2-text-2,#b0bec5)]"
           />
-          <div class="tw:font-semibold tw:text-[length:var(--text-sm,13px)]">
+          <div class="font-semibold text-[length:var(--text-sm,13px)]">
             {{ t("dashboard.columnFormattingNoFields") }}
           </div>
-          <div class="tw:text-xs tw:text-[var(--o2-text-2,#9e9e9e)] tw:leading-[1.4]">
+          <div class="text-xs text-[var(--o2-text-2,#9e9e9e)] leading-[1.4]">
             {{ t("dashboard.columnFormattingNoFieldsHint") }}
           </div>
         </div>
@@ -128,23 +128,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Detail: controls + live preview for the selected field -->
       <template v-if="selectedCol">
-        <div class="tw:min-w-0 tw:overflow-y-auto">
+        <div class="min-w-0 overflow-y-auto">
           <ColumnFormatControls
             :col="selectedCol"
             :is-numeric="isNumericColumn(selectedCol)"
           />
         </div>
         <div
-          class="tw:flex tw:flex-col tw:gap-2 tw:min-w-0 tw:overflow-y-auto tw:p-3 tw:border-l tw:border-[rgba(128,128,128,0.18)]"
+          class="flex flex-col gap-2 min-w-0 overflow-y-auto p-3 border-l border-[rgba(128,128,128,0.18)]"
         >
           <div
-            class="tw:flex tw:items-center tw:gap-[5px] tw:text-[10px] tw:font-bold tw:tracking-[0.06em] tw:uppercase tw:text-[var(--o2-text-2,#757575)]"
+            class="flex items-center gap-[5px] text-[10px] font-bold tracking-[0.06em] uppercase text-[var(--o2-text-2,#757575)]"
           >
             <OIcon name="visibility" size="xs" />
             <span>{{ t("dashboard.inlinePreview") }}</span>
           </div>
           <div
-            class="cf-preview-table tw:border tw:border-[rgba(128,128,128,0.18)] tw:rounded-md tw:overflow-hidden"
+            class="cf-preview-table border border-[rgba(128,128,128,0.18)] rounded-md overflow-hidden"
           >
             <TableRenderer
               v-if="selectedPreview"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-pagination="false"
             />
           </div>
-          <div class="tw:text-[11px] tw:text-[var(--o2-text-2,#9e9e9e)]">
+          <div class="text-[11px] text-[var(--o2-text-2,#9e9e9e)]">
             {{ t("dashboard.columnFormattingSampleNote") }}
           </div>
         </div>
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty state: nothing added yet -->
       <div
         v-else
-        class="tw:col-start-2 tw:col-end-4 tw:max-[900px]:col-end-3 tw:flex tw:items-center tw:justify-center tw:p-6"
+        class="col-start-2 col-end-4 max-[900px]:col-end-3 flex items-center justify-center p-6"
       >
         <OEmptyState
           size="block"
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #illustration>
             <div
-              class="tw:w-[72px] tw:h-[72px] tw:rounded-2xl tw:bg-[rgba(128,128,128,0.08)] tw:flex tw:items-center tw:justify-center tw:text-[var(--o2-text-2,#90a4ae)]"
+              class="w-[72px] h-[72px] rounded-2xl bg-[rgba(128,128,128,0.08)] flex items-center justify-center text-[var(--o2-text-2,#90a4ae)]"
             >
               <OIcon name="tune" size="xl" />
             </div>
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown
               v-model:open="addOpenCenter"
               align="start"
-              content-class="tw:min-w-(--reka-popper-anchor-width)!"
+              content-class="min-w-(--reka-popper-anchor-width)!"
             >
               <template #trigger>
                 <OButton
@@ -192,14 +192,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("dashboard.columnFormattingAddField") }}
                 </OButton>
               </template>
-              <div class="tw:max-h-[17.5rem] tw:overflow-y-auto">
+              <div class="max-h-[17.5rem] overflow-y-auto">
                 <ODropdownItem
                   v-for="opt in availableToAdd"
                   :key="opt.value"
                   :data-test="`dashboard-addpanel-config-add-field-empty-${opt.value}`"
                   @select="addField(opt.value)"
                 >
-                  <span class="tw:flex tw:items-center tw:gap-2">
+                  <span class="flex items-center gap-2">
                     <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
                       {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                     </span>
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <div
                   v-if="!availableToAdd.length"
-                  class="tw:py-2 tw:px-2.5 tw:text-xs tw:text-[var(--o2-text-2,#9e9e9e)]"
+                  class="py-2 px-2.5 text-xs text-[var(--o2-text-2,#9e9e9e)]"
                 >
                   {{ t("dashboard.columnFormattingAllAdded") }}
                 </div>
@@ -220,9 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template #footer>
-      <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-        <span class="tw:text-xs tw:text-[var(--o2-text-2,#9e9e9e)]">{{ footerSummary }}</span>
-        <div class="tw:flex tw:gap-2">
+      <div class="flex items-center justify-between w-full">
+        <span class="text-xs text-[var(--o2-text-2,#9e9e9e)]">{{ footerSummary }}</span>
+        <div class="flex gap-2">
           <OButton
             variant="outline"
             data-test="override-config-popup-cancel"
@@ -376,8 +376,8 @@ export default defineComponent({
     // Field-type badge colour (num = blue, text = grey).
     const badgeClass = (isNum: boolean) =>
       isNum
-        ? "tw:text-[#2e55a3] tw:bg-[rgba(46,85,163,0.1)]"
-        : "tw:text-[#6b7280] tw:bg-[rgba(107,114,128,0.12)]";
+        ? "text-[#2e55a3] bg-[rgba(46,85,163,0.1)]"
+        : "text-[#6b7280] bg-[rgba(107,114,128,0.12)]";
 
     const getFieldLabel = (alias: string) => {
       if (!alias) return "";

@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButtonGroup
     :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="tw:p-0 float-left tw:mr-1 transform-selector element-box-shadow tw:border tw:border-button-outline-border"
+    class="p-0 float-left mr-1 transform-selector element-box-shadow border border-button-outline-border"
   >
     <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
-    <div class="tw:flex tw:items-center">
-      <div v-if="!hideToggle" class="tw:flex tw:items-center">
+    <div class="flex items-center">
+      <div v-if="!hideToggle" class="flex items-center">
         <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.showTransformEditor"
@@ -40,19 +40,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img
               v-if="transformIcon?.startsWith('img:')"
               :src="transformIcon.slice(4)"
-              alt="Transform"
-              class="tw:size-4"
+              :alt="t('logs.transformSelector.transform')"
+              class="size-4"
             />
             <OIcon v-else :name="transformIcon" size="sm" />
-            <OIcon name="arrow-drop-down" size="sm" class="tw:ms-0.5" />
+            <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
             <OTooltip :content="transformsLabel" :side-offset="2" />
           </OButton>
         </template>
-        <div data-test="logs-search-saved-function-list" class="tw:py-0">
+        <div data-test="logs-search-saved-function-list" class="py-0">
           <!-- Search Input -->
           <div
             data-test="logs-search-bar-transform-type-select"
-            class="logs-transform-type o2-input tw:mx-2"
+            class="logs-transform-type o2-input mx-2"
             style="padding-top: 0"
           >
             <OSelect
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.data.transformType"
               :options="transformTypes"
               :label="t('search.transformType')"
-              class="tw:py-1"
+              class="py-1"
               clearable
               @update:model-value="updateTransforms()"
             />
@@ -75,33 +75,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div v-if="filteredTransformOptions.length" class="tw:max-h-72 tw:overflow-y-auto">
-            <ul class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none">
+          <div v-if="filteredTransformOptions.length" class="max-h-72 overflow-y-auto">
+            <ul class="flex flex-col m-0 p-0 list-none">
               <li
                 v-for="(item, i) in filteredTransformOptions"
                 :key="'transform-' + item?.name"
                 :data-test="`logs-search-saved-transform-item-${item?.name}`"
-                class="tw:border-b saved-view-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
+                class="border-b saved-view-item flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
                 @click="selectTransform(item, true)"
               >
-                <span class="tw:text-sm tw:flex-1 tw:min-w-0">{{ item.name }}</span>
+                <span class="text-sm flex-1 min-w-0">{{ item.name }}</span>
               </li>
             </ul>
           </div>
           <div v-else>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+            <div class="flex items-center gap-2 px-3 py-2">
+              <div class="flex flex-col flex-1 min-w-0">
                 <span
                   v-if="searchObj.data.transformType === 'function'"
-                  class="tw:text-sm"
+                  class="text-sm"
                   >{{ t("search.savedFunctionNotFound") }}</span
                 >
                 <span
                   v-if="searchObj.data.transformType === 'action'"
-                  class="tw:text-sm"
+                  class="text-sm"
                   >{{ t("search.actionsNotFound") }}</span
                 >
-                <span v-if="!searchObj.data.transformType" class="tw:text-sm">{{
+                <span v-if="!searchObj.data.transformType" class="text-sm">{{
                   t("search.selectTransformType")
                 }}</span>
               </div>
@@ -165,8 +165,8 @@ const functionModel = ref(false);
 
 const transformTypes = computed(() => {
   return [
-    { label: "Function", value: "function" },
-    { label: "Action", value: "action" },
+    { label: t("logs.transformSelector.function"), value: "function" },
+    { label: t("logs.transformSelector.action"), value: "action" },
   ];
 });
 
@@ -310,7 +310,7 @@ const selectTransform = (item: any, isSelected: boolean) => {
 
 const updateActionSelection = (item: any) => {
   toast({
-    message: `${item?.name} action applied successfully`,
+    message: t("logs.transformSelector.actionApplied", { name: item?.name }),
     variant: "success",
   });
 };

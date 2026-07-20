@@ -196,29 +196,48 @@ export function buildPieChartConfig(
   chartPanelRef: any,
   seriesData: any[] = [],
   isDonut: boolean = false,
-): { radius: any; center: [string, string] } {
+): { radius: any; center: [string, string]; bottom: number } {
   const config = panelSchema.config || {};
   const chartAlign = config.chart_align;
 
   // Get chart dimensions
   const dimensions = getChartDimensions(chartPanelRef);
 
+  // The legend defaults to shown-at-bottom when unset, but the dimension
+  // helpers treat undefined as hidden — normalize both flags to match.
+  const legendShown = config.show_legends !== false;
+  const dimsSchema = {
+    ...panelSchema,
+    config: {
+      ...config,
+      show_legends: legendShown,
+      legends_position: config.legends_position ?? null,
+    },
+  };
+
   // Calculate available dimensions accounting for legend
   const chartDimensions = calculateChartDimensions(
-    panelSchema,
+    dimsSchema,
     dimensions.chartWidth,
     dimensions.chartHeight,
     seriesData,
   );
 
   // Calculate dynamic radius
-  const radiusPercent = calculatePieChartRadius(
-    panelSchema,
+  let radiusPercent = calculatePieChartRadius(
+    dimsSchema,
     chartDimensions.availableWidth,
     chartDimensions.availableHeight,
     dimensions.chartWidth,
     dimensions.chartHeight,
   );
+
+  // Outside labels need a band around the pie for leader lines + text
+  // (donut outer radius must stay above its 40% inner radius)
+  const outsideLabels =
+    config.show_label !== false && config.label_position !== "inside";
+  if (outsideLabels)
+    radiusPercent = Math.max(isDonut ? 45 : 30, radiusPercent - 12);
 
   // Set radius based on chart type
   const radius = isDonut
@@ -227,6 +246,13 @@ export function buildPieChartConfig(
 
   // Calculate center position based on alignment
   let center: [string, string] = config.center_position || ["50%", "50%"];
+
+  // Confine the pie's layout box (sectors AND outside labels) to the space
+  // above a bottom legend — ECharts spreads labels over the full box height
+  const legendAtBottom = legendShown && config.legends_position !== "right";
+  const bottom = legendAtBottom
+    ? Math.max(0, dimensions.chartHeight - chartDimensions.availableHeight)
+    : 0;
 
   // Apply chart alignment if configured
   if (chartAlign && config.legends_position === "right") {
@@ -243,5 +269,5 @@ export function buildPieChartConfig(
     }
   }
 
-  return { radius, center };
+  return { radius, center, bottom };
 }

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-x-3 tw:h-10"
+      class="sql-bar flex flex-row items-center justify-between gap-x-3 h-10"
       :style="{
         backgroundColor:
           store.state.theme === 'dark'
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.stop
     >
       <div
-        class="tw:flex tw:flex-row tw:items-center tw:flex-1 tw:min-w-0"
+        class="flex flex-row items-center flex-1 min-w-0"
         data-test="dashboard-query-data"
       >
         <div
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="editingQueryIndex === index"
                 @click.stop
-                class="tw:inline-block tw:w-22.5 tw:min-w-12.5 tw:max-w-40"
+                class="inline-block w-22.5 min-w-12.5 max-w-40"
               >
                 <OInput
                   ref="renameInputRef"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="tw:cursor-default tw:select-none tw:whitespace-nowrap"
+                class="cursor-pointer select-none whitespace-nowrap"
                 style="font-size: 12px"
                 :title="'Double-click to rename'"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    trigger is scoped to JUST the icon, not the entire OTab. -->
               <span
                 v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
-                class="tw:inline-flex tw:items-center tw:relative"
+                class="inline-flex items-center relative"
               >
                 <OIcon
                   :name="
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'visibility-off'
                       : 'visibility'
                   "
-                  class="tw:ml-1 tw:opacity-[0.7] tw:transition-all tw:duration-150 tw:hover:opacity-100 tw:hover:bg-[var(--o2-hover-gray)] tw:hover:rounded-full"
+                  class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-[var(--o2-hover-gray)] hover:rounded-full"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="close"
                 size="sm"
-                class="tw:opacity-60 tw:transition-all tw:duration-150 tw:hover:opacity-100 tw:hover:bg-[var(--o2-hover-gray)] tw:hover:rounded-full"
+                class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-[var(--o2-hover-gray)] hover:rounded-full"
                 @click.stop.prevent="removeTab(index)"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
@@ -141,12 +141,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-if="multiQueryWarning"
           type="warningNote"
-          class="dashboard-multi-query-warning tw:h-8 tw:mr-2"
+          class="dashboard-multi-query-warning h-8 mr-2"
         >
           {{ multiQueryWarning }}
         </OTag>
       </div>
-      <div class="tw:flex tw:items-center tw:gap-3 tw:shrink-0">
+      <div class="flex items-center gap-3 shrink-0">
         <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
@@ -171,16 +171,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div
-    class="tw:flex tw:flex-col tw:flex-1"
+    class="flex flex-col flex-1"
     :style="
       !dashboardPanelData.layout.showQueryBar ? 'height: 0px; flex: none;' : ''
     "
     style="overflow: hidden"
     data-test="dashboard-query"
   >
-      <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
-      <div class="tw:flex tw:flex-col" style="width: 100%; height: 100%">
-        <div class="tw:flex" style="height: 100%">
+      <div class="flex flex-col" style="width: 100%; height: 100%">
+      <div class="flex flex-col" style="width: 100%; height: 100%">
+        <div class="flex" style="height: 100%">
           <OSplitter
             style="width: 100%; height: 100%"
             v-model="splitterModel"
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <template #separator>
-              <div class="tw:w-1 tw:h-full tw:bg-(--o2-border) tw:transition-colors tw:hover:bg-[orange]"></div>
+              <div class="w-1 h-full bg-(--o2-border) transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
               <UnifiedQueryEditor
@@ -262,13 +262,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].vrlFunctionQuery && functionEditorPlaceholderFlag"
-                    class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
+                    class="absolute top-0 left-0 right-0 bottom-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                   >
-                    <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:dark:text-[#718096] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ vrlPlaceholder }}</span>
+                    <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
                   </div>
                 </div>
                 <div style="flex-shrink: 0; width: 100%">
-                  <div style="display: flex;" class="tw:items-center">
+                  <div style="display: flex;" class="items-center">
                     <OSelect
                       v-model="selectedFunction"
                       :label="t('dashboard.useSavedFunction')"
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       valueKey="function"
                       @search="onFunctionSearch"
                       @update:model-value="onFunctionSelect"
-                      class="tw:flex-1"
+                      class="flex-1"
                     />
                     <OButton
                       variant="ghost"
@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSplitter>
         </div>
       </div>
-      <div style="color: red; z-index: 100000" class="tw:mx-2 col-auto">
+      <div style="color: red; z-index: 100000" class="mx-2 col-auto">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
       </div>
     </div>
@@ -328,9 +328,10 @@ import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
-import { inject } from "vue";
+import { inject, type Ref } from "vue";
 import { onBeforeMount } from "vue";
 import { getImageURL } from "@/utils/zincutils";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
@@ -491,6 +492,13 @@ export default defineComponent({
 
     const queryEditorRef = ref(null);
 
+    // Server-error highlight ranges, provided by AddPanel.vue where the panel
+    // search runs. The composable forwards these to the editor.
+    const dashboardSqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
+      "dashboardSqlErrorRanges",
+      ref<SqlErrorRange[]>([]),
+    );
+
     const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
       useSqlEditorDiagnostics({
         queryEditorRef,
@@ -501,6 +509,7 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ]?.query ?? "",
         ),
+        externalErrors: dashboardSqlErrorRanges,
       });
 
     const currentEditorKeywords = computed(() => {
@@ -814,6 +823,32 @@ export default defineComponent({
       // Also call the existing updateQuery logic for autocomplete
       updateQuery(newQuery, {});
     };
+
+    /**
+     * Commit what the editor is showing into the tab being left, before the tab
+     * index moves. `handleQueryUpdate` writes the editor's debounced content
+     * into whatever tab is active when it fires, so switching tabs mid-debounce
+     * loses the edit: the outgoing tab never receives it, and `props.query`
+     * re-renders the editor from that tab's stale state.
+     *
+     * Must be `flush: "sync"` — a pre-flush watcher already runs too late, with
+     * `props.query` having overwritten the model. Custom queries only: in
+     * builder mode the editor is read-only and derived, never a source of truth.
+     */
+    watch(
+      () => dashboardPanelData.layout.currentQueryIndex,
+      (_newIndex, oldIndex) => {
+        const outgoing = dashboardPanelData.data.queries?.[oldIndex];
+        if (!outgoing?.customQuery) return;
+
+        const editorValue = queryEditorRef.value?.getValue?.();
+        if (typeof editorValue !== "string") return;
+
+        const trimmed = editorValue.trim();
+        if (trimmed && outgoing.query !== trimmed) outgoing.query = trimmed;
+      },
+      { flush: "sync" },
+    );
 
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: "sql" | "promql") => {

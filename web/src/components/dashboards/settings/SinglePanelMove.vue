@@ -23,19 +23,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     :title="title"
     :secondary-button-label="t('confirmDialog.cancel')"
-    primary-button-label="Move"
+    :primary-button-label="t('dashboard.singlePanelMove.move')"
     :primary-button-disabled="selectedMoveTabId === null"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
     <div>
-      <p class="tw:text-sm">{{ message }}</p>
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <p class="text-sm">{{ message }}</p>
+      <div class="flex items-center gap-2">
         <OSelect
-          label="Select Tab"
+          :label="t('dashboard.singlePanelMove.selectTab')"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
-          class="tw:flex-1"
+          class="flex-1"
           data-test="dashboard-tab-move-select"
           label-position="inside"
         />
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="add"
         >
           <template #icon-left><OIcon name="add" size="sm" /></template>
-          <OTooltip content="Add Tab" />
+          <OTooltip :content="t('dashboard.singlePanelMove.addTab')" />
         </OButton>
         <AddTab
           v-model:open="showAddTabDialog"

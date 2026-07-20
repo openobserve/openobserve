@@ -17,11 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="create-destination-form">
     <OForm
-      ref="formRef"
-      :schema="destinationSchema"
-      :default-values="formDefaultValues"
-      @submit="createDestination"
-      class="tw:w-full pipeline-add-remote-destination-form"
+      :form="form"
+      class="w-full pipeline-add-remote-destination-form"
       v-slot="{ isSubmitting }"
     >
       <!-- Stepper for Create New Destination.
@@ -30,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the External Destination drawer without overflowing/clipping. The
            footer below stays full-width so its top border lines up with the
            full-width page header (matching the other destination forms). -->
-      <div class="tw:w-full tw:max-w-[50vw]">
+      <div class="w-full max-w-[50vw]">
       <OStepper
         v-model="step"
         ref="stepper"
@@ -44,39 +41,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 1"
           :navigable="step > 1"
         >
-          <div class="tw:text-sm tw:font-medium tw:mb-3" style="font-weight: 500">
+          <div class="text-sm font-medium mb-3" style="font-weight: 500">
             Select Destination Type <span class="text-red">*</span>
           </div>
-          <div class="tw:grid tw:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] tw:gap-3 tw:mb-4">
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 mb-4">
             <div
               v-for="destType in destinationTypes"
               :key="destType.value"
               :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:py-[20px] tw:px-3 tw:border-2 tw:rounded-xl tw:cursor-pointer tw:[transition:all_0.3s_ease] tw:min-h-[120px] tw:hover:-translate-y-0.5"
+              class="destination-type-card relative flex flex-col items-center justify-center py-[20px] px-3 border-2 rounded-xl cursor-pointer [transition:all_0.3s_ease] min-h-[120px] hover:-translate-y-0.5"
               :class="[
-                { selected: formData.destination_type === destType.value },
+                { selected: destinationType === destType.value },
                 store.state.theme === 'dark'
-                  ? 'tw:border-[#424242] tw:bg-[#1e1e1e] tw:hover:border-[#5d9cec] tw:hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                  : 'tw:border-[var(--o2-border)] tw:bg-white tw:hover:border-[var(--o2-border-color)] tw:hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
+                  ? 'border-[#424242] bg-[#1e1e1e] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
+                  : 'border-[var(--o2-border)] bg-white hover:border-[var(--o2-border-color)] hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
               ]"
-              @click="formData.destination_type = destType.value"
+              @click="form.setFieldValue('destination_type', destType.value)"
             >
               <img
                 v-if="destType.image"
                 :src="destType.image"
                 :alt="destType.label"
-                class="tw:w-12 tw:h-12 tw:mb-2 tw:object-contain tw:[transition:all_0.3s_ease]"
+                class="w-12 h-12 mb-2 object-contain [transition:all_0.3s_ease]"
               />
               <OIcon
                 v-else
                 :name="destType.icon"
                 size="lg"
-                class="card-icon tw:mb-2 tw:text-[#666] tw:[transition:color_0.3s_ease]"
+                class="card-icon mb-2 text-[#666] [transition:color_0.3s_ease]"
               />
-              <div class="card-label tw:text-[13px] tw:font-medium tw:text-center tw:leading-[1.3] tw:mt-1 tw:text-[var(--o2-text-primary)]">{{ destType.label }}</div>
+              <div class="card-label text-[13px] font-medium text-center leading-[1.3] mt-1 text-[var(--o2-text-primary)]">{{ destType.label }}</div>
               <div
-                v-if="formData.destination_type === destType.value"
-                class="tw:absolute tw:top-[0.375rem] tw:right-[0.375rem] tw:w-5 tw:h-5 tw:rounded-full tw:overflow-hidden tw:bg-[var(--o2-positive)] tw:text-white tw:flex tw:items-center tw:justify-center tw:z-[1]"
+                v-if="destinationType === destType.value"
+                class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--o2-positive)] text-white flex items-center justify-center z-[1]"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                 <OIcon name="check" size="xs" />
@@ -93,16 +90,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 2"
           :navigable="step > 2"
         >
-          <div class="tw:text-sm tw:font-medium tw:mb-4" style="font-weight: 500">
+          <div class="text-sm font-medium mb-4" style="font-weight: 500">
             Connection Details
           </div>
 
-          <div class="tw:flex tw:flex-col tw:gap-4">
+          <div class="flex flex-col gap-4">
+            <!-- Name is the destination's identifier — it can't be changed once
+                 created, so lock it in edit mode (parity with the pre-migration
+                 AddDestination form, which rendered it readonly + disabled). -->
             <OFormInput
               data-test="add-destination-name-input"
               name="name"
               :label="t('alerts.name')"
               required
+              :readonly="isEditMode"
+              :disabled="isEditMode"
               tabindex="0"
             />
 
@@ -117,13 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- OpenObserve Organization and Stream fields -->
             <div
-              v-if="formData.destination_type === 'openobserve'"
-              class="tw:flex tw:gap-4"
+              v-if="destinationType === 'openobserve'"
+              class="flex gap-4"
             >
-              <div class="tw:w-1/2">
+              <div class="w-1/2">
                 <OFormInput
                   data-test="add-destination-openobserve-org-input"
-                  v-model="openobserveOrg"
                   name="org"
                   :label="'Organization'"
                   required
@@ -132,10 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div class="tw:w-1/2">
+              <div class="w-1/2">
                 <OFormInput
                   data-test="add-destination-openobserve-stream-input"
-                  v-model="openobserveStream"
                   name="stream"
                   :label="'Stream Name'"
                   required
@@ -148,19 +148,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OFormInput
               data-test="add-destination-url-endpoint-input"
-              v-model="formData.url_endpoint"
               name="url_endpoint"
               label="Endpoint Path"
-              :required="formData.destination_type !== 'custom'"
-              :disabled="formData.destination_type !== 'custom'"
+              :required="destinationType !== 'custom'"
+              :disabled="destinationType !== 'custom'"
               help-text="Path will be appended to base URL (must start with /)"
               tabindex="0"
             />
             <!-- Method field - only shown for Custom destination type -->
             <OFormSelect
-              v-if="formData.destination_type === 'custom'"
+              v-if="destinationType === 'custom'"
               data-test="add-destination-method-select"
-              v-model="formData.method"
               name="method"
               :label="t('alert_destinations.method')"
               required
@@ -171,22 +169,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Output Format field - disabled for all except Custom -->
             <OFormSelect
               data-test="add-destination-output-format-select"
-              v-model="formData.output_format"
               name="output_format"
               :label="t('alert_destinations.output_format')"
               required
               :options="outputFormats"
               labelKey="label"
               valueKey="value"
-              :disabled="formData.destination_type !== 'custom'"
+              :disabled="destinationType !== 'custom'"
               tabindex="0"
             />
 
             <!-- ESBulk Index Name field - only shown when output format is esbulk -->
             <OFormInput
-              v-if="formData.output_format === 'esbulk'"
+              v-if="outputFormat === 'esbulk'"
               data-test="add-destination-esbulk-index-input"
-              v-model="formData.esbulk_index"
               name="esbulk_index"
               :label="'ESBulk Index Name'"
               required
@@ -197,9 +193,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
             <OFormInput
-              v-if="formData.output_format === 'stringseparated'"
+              v-if="outputFormat === 'stringseparated'"
               data-test="add-destination-separator-input"
-              v-model="formData.separator"
               name="separator"
               :label="t('alert_destinations.separator')"
               required
@@ -210,13 +205,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destination-specific Metadata Section -->
-          <div v-if="showMetadataFields" class="tw:flex tw:flex-col tw:gap-4 tw:mt-4">
-            <div class="tw:w-full tw:text-[14px] tw:font-bold tw:text-(--o2-input-label-text-color)">
+          <div v-if="showMetadataFields" class="flex flex-col gap-4 mt-4">
+            <div class="w-full text-[14px] font-bold text-(--o2-input-label-text-color)">
               Metadata Configuration
             </div>
 
             <!-- Splunk Metadata Fields -->
-            <template v-if="formData.destination_type === 'splunk'">
+            <template v-if="destinationType === 'splunk'">
               <OFormInput
                 data-test="add-destination-metadata-source-input"
                 name="metadata.source"
@@ -246,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Datadog Metadata Fields -->
-            <template v-if="formData.destination_type === 'datadog'">
+            <template v-if="destinationType === 'datadog'">
               <OFormInput
                 data-test="add-destination-metadata-ddsource-input"
                 name="metadata.ddsource"
@@ -288,17 +283,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
 
-          <div class="tw:flex tw:flex-col tw:gap-1 tw:mt-4">
-            <div class="o-input-label tw:leading-tight tw:flex tw:items-center">
+          <div class="flex flex-col gap-1 mt-4">
+            <div class="o-input-label leading-tight flex items-center">
               Headers
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-2">
+            <div class="flex flex-col gap-2">
             <div
               v-for="(header, index) in apiHeaders"
               :key="index"
-              class="tw:flex tw:gap-1"
+              class="flex gap-1"
             >
-              <div class="tw:w-5/12">
+              <div class="w-5/12">
                 <OFormInput
                   :data-test="`add-destination-header-${header['key']}-key-input`"
                   :name="`headers[${index}].key`"
@@ -306,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div class="tw:w-5/12">
+              <div class="w-5/12">
                 <OFormInput
                   :data-test="`add-destination-header-${header['key']}-value-input`"
                   :name="`headers[${index}].value`"
@@ -314,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div class="tw:w-1/6 headers-btns">
+              <div class="w-1/6 headers-btns">
                 <OButton
                   :data-test="`add-destination-header-${header['key']}-delete-btn`"
                   variant="ghost-destructive"
@@ -337,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="tw:w-full tw:mt-3 tw:inline-flex">
+          <div class="w-full mt-3 inline-flex">
             <OFormSwitch
               data-test="add-destination-skip-tls-verify-toggle"
               name="skip_tls_verify"
@@ -347,36 +342,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Connection Notes Card -->
           <OCard
-            class="connection-notes-card tw:rounded-lg tw:border tw:border-[#e3f2fd] tw:mb-6 tw:mt-4 tw:bg-(--color-banner-info-bg)!"
+            class="connection-notes-card rounded-lg border border-[#e3f2fd] mb-6 mt-4 bg-(--color-banner-info-bg)!"
           >
             <OCardSection role="body">
-              <div class="tw:flex tw:items-center tw:mb-2">
+              <div class="flex items-center mb-2">
                 <OIcon
                   name="info"
                   size="md"
-                  class="tw:mr-2"
+                  class="mr-2"
                 />
-                <div class="tw:text-sm tw:font-medium">
+                <div class="text-sm font-medium">
                   {{ connectionNotes.title }}
                 </div>
               </div>
-              <div class="tw:text-sm">
-                <ol class="tw:leading-[1.8] tw:pl-3 tw:mb-0">
+              <div class="text-sm">
+                <ol class="leading-[1.8] pl-3 mb-0">
                   <li
                     v-for="(stepText, index) in connectionNotes.steps"
                     :key="index"
-                    class="tw:mb-2"
+                    class="mb-2"
                   >
                     {{ stepText }}
                   </li>
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="tw:mt-2 tw:p-2 tw:rounded-md tw:text-[13px]"
-                  :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-white'"
+                  class="mt-2 p-2 rounded-md text-[13px]"
+                  :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-white'"
                 >
                   <strong>Example:</strong>
-                  <code class="tw:ml-1 tw:bg-transparent tw:p-0 tw:font-[Monaco,Menlo,'Ubuntu_Mono',monospace] tw:text-[#1976d2]">{{ connectionNotes.example }}</code>
+                  <code class="ml-1 bg-transparent p-0 font-[Monaco,Menlo,'Ubuntu_Mono',monospace] text-[#1976d2]">{{ connectionNotes.example }}</code>
                 </div>
               </div>
             </OCardSection>
@@ -386,8 +381,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Form buttons -->
-      <div class="tw:flex tw:justify-start tw:mb-3 tw:pt-4 tw:border-t tw:border-border-default">
-        <div v-if="step === 1" class="tw:flex tw:gap-2">
+      <div class="flex justify-start mb-3 pt-4 border-t border-border-default">
+        <div v-if="step === 1" class="flex gap-2">
           <OButton
             data-test="step1-cancel-btn"
             variant="outline"
@@ -406,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Continue
           </OButton>
         </div>
-        <div v-if="step > 1" class="tw:flex tw:gap-2">
+        <div v-if="step > 1" class="flex gap-2">
           <OButton
             data-test="step3-back-btn"
             variant="outline"
@@ -441,10 +436,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch, onBeforeUnmount } from "vue";
+import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
 import { useStore } from "vuex";
@@ -455,6 +449,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
@@ -472,11 +467,6 @@ const props = defineProps<{
 const emit = defineEmits(["created", "updated", "cancel"]);
 const store = useStore();
 const { t } = useI18n();
-
-// OForm instance ref — used for the destination_type bridge (setFieldValue) and
-// to read the form-owned `name`/`url` values reactively (form.useStore).
-// Typed `any` because OForm is generic (its InstanceType isn't constructable).
-const formRef = ref<any>(null);
 
 // Co-located Zod schema (factory keeps the required message i18n-driven).
 // Named after the form per the playbook house style.
@@ -543,26 +533,6 @@ const destinationTypes = [
 
 const step = ref(1);
 
-const formData: Ref<DestinationData> = ref({
-  name: "",
-  url: "",
-  url_endpoint: "/api/default/default/_json", // Default endpoint for OpenObserve
-  method: "post",
-  skip_tls_verify: false,
-  template: "",
-  headers: {},
-  emails: "",
-  type: "http",
-  output_format: "json",
-  destination_type: "openobserve",
-  esbulk_index: "",
-  separator: "",
-});
-
-// OpenObserve specific fields
-const openobserveOrg = ref("default");
-const openobserveStream = ref("default");
-
 // A single Headers row. Matches the schema's `headerRowSchema` ({ key, value }).
 // No `uuid` — the dynamic array-field keys rows by index and add/remove operate
 // on the form's `headers` array by index (playbook §2).
@@ -608,344 +578,10 @@ const getDefaultHeaders = (destinationType: string): HeaderRow[] => {
   return headers;
 };
 
-// Headers are a FORM-OWNED dynamic array-field (`headers[i].key/.value`). The
-// form is the single source of truth; this local mirror is kept in sync from the
-// form's store (subscribed on mount) so the template v-for + the exposed
-// `apiHeaders` stay reactive across add/remove (a bare `form.state.values`
-// read in a computed would NOT re-render — playbook §2 gotcha).
-//
-// `initialHeaders` SEEDS `:default-values` (computed before the form mounts):
-// default headers for the default type, or the prefilled headers in edit mode.
-const initialHeaders = ref<HeaderRow[]>(getDefaultHeaders("openobserve"));
-const apiHeaders = ref<HeaderRow[]>(initialHeaders.value.slice());
-
-// Write the form's `headers` array. Before the form mounts (setup-time edit
-// prefill / immediate watches) there is no form yet → seed `initialHeaders`
-// instead so the value flows in via `:default-values`. After mount, set it on
-// the form (the single source of truth) and the store subscription mirrors it
-// back into `apiHeaders`.
-const setHeaders = (rows: HeaderRow[]) => {
-  const next = rows.map((h) => ({ key: h.key, value: h.value }));
-  if (formRef.value?.form) {
-    formRef.value.form.setFieldValue("headers", next, { dontUpdateMeta: true });
-  } else {
-    initialHeaders.value = next;
-    apiHeaders.value = next.slice();
-  }
-};
-
-// Metadata (Splunk source/sourcetype/hostname, Datadog
-// service/hostname/ddsource/ddtags) is FORM-OWNED via nested `metadata.*`
-// OFormInput fields. `initialMetadata` SEEDS `:default-values`; `setMetadata`
-// writes the whole object onto the form after mount (edit prefill), or seeds it
-// before mount.
-type MetadataValue = DestinationForm["metadata"];
-const initialMetadata = ref<MetadataValue>({});
-const setMetadata = (meta: MetadataValue) => {
-  const next = { ...(meta ?? {}) };
-  if (formRef.value?.form) {
-    formRef.value.form.setFieldValue("metadata", next, { dontUpdateMeta: true });
-  } else {
-    initialMetadata.value = next;
-  }
-};
-
-// Watch destination_type changes to set method, output_format, headers, and endpoint appropriately
-watch(
-  () => formData.value.destination_type,
-  (newType) => {
-    // Only auto-set values if not in edit mode
-    if (!isEditMode.value) {
-      if (newType !== "custom") {
-        // Set method to POST for all non-custom types
-        formData.value.method = "post";
-
-        // Set output_format based on destination type
-        if (newType === "splunk") {
-          formData.value.output_format = "nestedevent";
-        } else if (newType === "elasticsearch") {
-          formData.value.output_format = "esbulk";
-          // Set default index name if not already set
-          if (!formData.value.esbulk_index) {
-            formData.value.esbulk_index = "default";
-          }
-        } else {
-          formData.value.output_format = "json";
-        }
-      }
-
-      // Set endpoint based on destination type
-      if (newType === "openobserve") {
-        // For OpenObserve, use org and stream values
-        formData.value.url_endpoint = `/api/${openobserveOrg.value || "default"}/${openobserveStream.value || "default"}/_json`;
-      } else {
-        // For other types, use the default endpoint
-        formData.value.url_endpoint = defaultUrlEndpoint.value;
-      }
-
-      // Set default headers for the destination type (form-owned).
-      setHeaders(getDefaultHeaders(newType ?? "openobserve"));
-    }
-  },
-);
-
-// Function to populate form when editing an existing destination
-const populateFormForEdit = (destination: any) => {
-  formData.value.name = destination.name || "";
-  formData.value.method = destination.method || "post";
-  formData.value.skip_tls_verify = destination.skip_tls_verify || false;
-  formData.value.template = destination.template || "";
-
-  // Handle output_format
-  if (destination.output_format) {
-    if (
-      typeof destination.output_format === "object" &&
-      destination.output_format.esbulk
-    ) {
-      formData.value.output_format = "esbulk";
-      formData.value.esbulk_index =
-        destination.output_format.esbulk.index || "default";
-      formData.value.separator = "";
-    } else if (
-      typeof destination.output_format === "object" &&
-      destination.output_format.stringseparated
-    ) {
-      formData.value.output_format = "stringseparated";
-      formData.value.separator =
-        destination.output_format.stringseparated.separator || "";
-      formData.value.esbulk_index = "";
-    } else if (typeof destination.output_format === "string") {
-      formData.value.output_format = destination.output_format;
-      formData.value.esbulk_index = "";
-      formData.value.separator = "";
-    }
-  } else {
-    formData.value.output_format = "json";
-    formData.value.esbulk_index = "";
-    formData.value.separator = "";
-  }
-
-  // Use destination_type_name from backend, fallback to destination_type or default
-  const destType =
-    destination.destination_type_name || destination.destination_type;
-  formData.value.destination_type =
-    destType && destType.trim() !== "" ? destType : "openobserve";
-
-  // Split URL into hostname and endpoint for all destination types except custom
-  const fullUrl = destination.url || "";
-  if (fullUrl && formData.value.destination_type !== "custom") {
-    try {
-      // Add protocol if missing for URL parsing, but only if it looks like a valid URL
-      const hasProtocol = fullUrl.includes("://");
-      const looksLikeUrl = fullUrl.includes(".") || fullUrl.includes(":");
-      const urlToParse = hasProtocol
-        ? fullUrl
-        : looksLikeUrl
-          ? `https://${fullUrl}`
-          : fullUrl;
-
-      const url = new URL(urlToParse);
-      // Base URL is protocol + hostname + port (if any) - always include protocol for consistency
-      formData.value.url = url.origin;
-      // URL endpoint is the path + search + hash
-      const endpoint = url.pathname + url.search + url.hash;
-      // Only set endpoint if it's not just "/"
-      formData.value.url_endpoint = endpoint === "/" ? "" : endpoint;
-    } catch (error) {
-      // If URL parsing fails, try to split manually
-      console.warn(
-        "Failed to parse URL, attempting manual split:",
-        fullUrl,
-        error,
-      );
-      const firstSlashIndex = fullUrl.indexOf("/");
-      if (firstSlashIndex > 0) {
-        // Split at first slash
-        formData.value.url = fullUrl.substring(0, firstSlashIndex);
-        formData.value.url_endpoint = fullUrl.substring(firstSlashIndex);
-      } else {
-        // No slash found, keep full URL as-is
-        formData.value.url = fullUrl;
-        formData.value.url_endpoint = "";
-      }
-    }
-  } else {
-    // For custom destination or empty URL, don't split
-    formData.value.url = fullUrl;
-    formData.value.url_endpoint = "";
-  }
-
-  // Populate headers (form-owned dynamic array-field).
-  if (destination.headers && typeof destination.headers === "object") {
-    setHeaders(
-      Object.entries(destination.headers).map(([key, value]) => ({
-        key,
-        value: value as string,
-      })),
-    );
-  }
-
-  // Populate metadata object (form-owned). `formData.value.metadata` is kept
-  // so the rest of the component (showMetadataFields etc.) keeps working; the
-  // form's `metadata` is seeded via setMetadata so the OFormInput fields prefill.
-  if (destination.metadata && typeof destination.metadata === "object") {
-    formData.value.metadata = { ...destination.metadata };
-    setMetadata({ ...destination.metadata });
-  } else {
-    formData.value.metadata = {};
-    setMetadata({});
-  }
-
-  // Extract OpenObserve org and stream from endpoint if it's OpenObserve
-  if (
-    formData.value.destination_type === "openobserve" &&
-    formData.value.url_endpoint
-  ) {
-    // Parse endpoint like /api/{org}/{stream}/_json
-    const match = formData.value.url_endpoint.match(
-      /^\/api\/([^/]+)\/([^/]+)\/_json$/,
-    );
-    if (match) {
-      openobserveOrg.value = match[1] || "default";
-      openobserveStream.value = match[2] || "default";
-    }
-  }
-
-  // Move to step 2 since destination type is already selected
-  step.value = 2;
-};
-
-// Watch for destination prop changes to populate form in edit mode
-watch(
-  () => props.destination,
-  (destination) => {
-    if (destination) {
-      populateFormForEdit(destination);
-    }
-  },
-  { immediate: true },
-);
-
-// Snapshot of all field values for OForm defaultValues.
-// Defined AFTER the immediate watch above so that edit-mode values
-// (set synchronously by populateFormForEdit) are captured correctly.
-//
-// `name`/`url`/`skip_tls_verify`/`headers`/`metadata.*` are form-owned: the form
-// is the single source of truth at submit time, and this snapshot only SEEDS
-// them (blank/defaults for create, prefilled for edit). The remaining keys
-// mirror entangled `formData`/`openobserveOrg` values that stay component-owned
-// (sanctioned exception) — they are seeded here so the schema's superRefine can
-// validate them, and re-synced into the form on change by the bridge watches.
-const formDefaultValues: DestinationForm = {
-  name: formData.value.name,
-  url: formData.value.url,
-  skip_tls_verify: formData.value.skip_tls_verify ?? false,
-  headers: initialHeaders.value.map((h) => ({ key: h.key, value: h.value })),
-  metadata: { ...(initialMetadata.value ?? {}) },
-  destination_type: formData.value.destination_type,
-  url_endpoint: formData.value.url_endpoint ?? "",
-  method: formData.value.method ?? "post",
-  output_format: formData.value.output_format ?? "json",
-  esbulk_index: formData.value.esbulk_index ?? "",
-  separator: formData.value.separator ?? "",
-  org: openobserveOrg.value,
-  stream: openobserveStream.value,
-};
-
-// ── Bridge: keep the form's copy of the component-owned fields in sync ────────
-// `destination_type` is a custom card grid (not an <input>), so it can't be a
-// real OForm field — bridge it in via setFieldValue so superRefine can branch on
-// it. This watch→setFieldValue is the documented sanctioned exception. The
-// remaining entangled fields ARE rendered as OForm* (their name= is in the
-// schema) but stay v-model'd to component state and auto-prefilled, so mirror
-// their values in too, ensuring the schema validates the live values on submit.
-const syncToForm = (key: keyof DestinationForm, value: unknown) => {
-  formRef.value?.form?.setFieldValue(key, value, {
-    dontUpdateMeta: true,
-  });
-};
-
-watch(
-  () => formData.value.destination_type,
-  (dt) => syncToForm("destination_type", dt),
-  { immediate: true },
-);
-watch(
-  () => formData.value.url_endpoint,
-  (v) => syncToForm("url_endpoint", v ?? ""),
-);
-watch(
-  () => formData.value.method,
-  (v) => syncToForm("method", v ?? "post"),
-);
-watch(
-  () => formData.value.output_format,
-  (v) => syncToForm("output_format", v ?? "json"),
-);
-watch(
-  () => formData.value.esbulk_index,
-  (v) => syncToForm("esbulk_index", v ?? ""),
-);
-watch(
-  () => formData.value.separator,
-  (v) => syncToForm("separator", v ?? ""),
-);
-watch(openobserveOrg, (v) => syncToForm("org", v ?? ""));
-watch(openobserveStream, (v) => syncToForm("stream", v ?? ""));
-
-// ── Mirror the form-owned `headers` array into `apiHeaders` ───────────────────
-// Headers live on the form (`headers[i].key/.value`). Subscribe to the form's
-// store once it mounts so the template v-for + the exposed `apiHeaders` re-render
-// on every add/remove/edit (a plain `form.state.values` read in a computed would
-// NOT track array mutations — playbook §2 gotcha). Cleaned up on unmount.
-let unsubscribeHeaders: (() => void) | null = null;
-const syncApiHeadersFromForm = () => {
-  const rows = (formRef.value?.form?.state.values.headers ?? []) as HeaderRow[];
-  apiHeaders.value = rows.map((h) => ({ key: h.key, value: h.value }));
-};
-const stopFormReadyWatch = watch(
-  () => formRef.value?.form,
-  (form) => {
-    if (!form || unsubscribeHeaders) return;
-    syncApiHeadersFromForm();
-    unsubscribeHeaders = form.store.subscribe(syncApiHeadersFromForm).unsubscribe;
-    stopFormReadyWatch();
-  },
-  { immediate: true, flush: "post" },
-);
-onBeforeUnmount(() => unsubscribeHeaders?.());
-
-// Reactive reads of the form-owned `name`/`url` (single source of truth).
-const formName = computed<string>(
-  () => formRef.value?.form?.state.values.name ?? "",
-);
-const formUrl = computed<string>(
-  () => formRef.value?.form?.state.values.url ?? "",
-);
-// Metadata (Splunk/Datadog) is form-owned via the nested `metadata.*` OFormInput
-// fields, so read it from the form too — NOT from `formData.metadata`, which the
-// migrated inputs no longer write to.
-const formMetadata = computed<Record<string, any>>(
-  () => formRef.value?.form?.state.values.metadata ?? {},
-);
-
-// Watch destination_type changes to ensure method is set to "post" for non-custom types
-watch(
-  () => formData.value.destination_type,
-  (newType) => {
-    if (newType !== "custom") {
-      formData.value.method = "post";
-    }
-  },
-);
-
-const isValidDestination = computed(() => {
-  return !!(formName.value && formUrl.value && formData.value.method);
-});
-
-// Default URL endpoints for different destination types (shown as hint)
-const defaultUrlEndpoint = computed(() => {
-  switch (formData.value.destination_type) {
+// Default URL endpoints for different destination types (used as the seed value
+// when a non-OpenObserve type is selected, and shown as a hint).
+const endpointForType = (type: string): string => {
+  switch (type) {
     case "openobserve":
       return "/api/{org}/{stream}/_json";
     case "splunk":
@@ -963,57 +599,343 @@ const defaultUrlEndpoint = computed(() => {
     default:
       return "";
   }
+};
+
+// ── Rule ③ OWNER pattern: single source of truth = the TanStack form ──────────
+// This component OWNS <OForm> and drives all conditional rendering (the
+// destination-type card grid, the per-type/per-output_format v-ifs) off the
+// form's own state. It creates the form here with useOForm, reads it reactively
+// via form.useStore, writes it via form.setFieldValue — NO `formData` mirror,
+// NO sync watches, NO store.subscribe. The form is handed to <OForm :form="form">.
+//
+// `headers` and `metadata.*` are FORM-OWNED dynamic/nested fields; the
+// destination-type side-effects (method/output_format/url_endpoint/headers
+// defaulting) run in a single `{ flush: "sync" }` watch on the form's
+// destination_type. Edit-prefill seeds the form via `form.reset(record)`.
+
+// Build the create-mode default record. OpenObserve is the default type, so seed
+// the OpenObserve endpoint + default headers.
+const buildCreateDefaults = (): DestinationForm => ({
+  name: "",
+  url: "",
+  skip_tls_verify: false,
+  headers: getDefaultHeaders("openobserve").map((h) => ({
+    key: h.key,
+    value: h.value,
+  })),
+  metadata: {},
+  destination_type: "openobserve",
+  url_endpoint: "/api/default/default/_json", // Default endpoint for OpenObserve
+  method: "post",
+  output_format: "json",
+  esbulk_index: "",
+  separator: "",
+  org: "default",
+  stream: "default",
 });
 
-// Show metadata fields for specific destination types
-const showMetadataFields = computed(() => {
-  return ["splunk", "datadog"].includes(formData.value.destination_type);
+const form = useOForm<DestinationForm>({
+  defaultValues: buildCreateDefaults(),
+  schema: destinationSchema,
+  onSubmit: (value) => createDestination(value),
 });
 
-// Watch to ensure metadata is initialized when needed
+// True while an edit record is being seeded onto the form (form.reset). The
+// destination_type side-effect watch is suppressed during prefill so the
+// reset's explicit url_endpoint/output_format/headers aren't clobbered by the
+// create-mode defaulting — independent of the `destination` prop (tests call
+// populateFormForEdit directly).
+let isPrefilling = false;
+
+// ── Reactive reads of the form-owned state (the SINGLE source of truth) ────────
+// These drive the parent-side conditional rendering (card grid selection, the
+// per-type/per-output_format v-ifs) and the computed reads below.
+const destinationType = form.useStore((s: any) => s.values.destination_type);
+const outputFormat = form.useStore((s: any) => s.values.output_format);
+const formName = form.useStore((s: any) => s.values.name);
+const formUrl = form.useStore((s: any) => s.values.url);
+const formMethod = form.useStore((s: any) => s.values.method);
+const formUrlEndpoint = form.useStore((s: any) => s.values.url_endpoint);
+const formSeparator = form.useStore((s: any) => s.values.separator);
+const formEsbulkIndex = form.useStore((s: any) => s.values.esbulk_index);
+const formMetadata = form.useStore((s: any) => s.values.metadata ?? {});
+const openobserveOrg = form.useStore((s: any) => s.values.org);
+const openobserveStream = form.useStore((s: any) => s.values.stream);
+// `apiHeaders` is a reactive view of the form-owned `headers` array — drives the
+// template v-for + the exposed test surface. Reading via form.useStore tracks
+// every add/remove/edit (a bare `form.state.values` read would NOT re-render).
+const apiHeaders = form.useStore(
+  (s: any) => (s.values.headers ?? []) as HeaderRow[],
+);
+
+// ── Preserved cross-field side effect: defaulting on a REAL destination_type
+//    change ──────────────────────────────────────────────────────────────────
+// What the old destination_type watch did (set method/output_format/esbulk_index
+// /url_endpoint + reset headers), now reading + writing the SAME form. Guard
+// `prev !== undefined` so the initial seed does NOT clobber edit-prefill, and
+// skip in edit mode (the old watch did the same). `{ flush: "sync" }` matches the
+// old store-subscription timing so the cross-field resets land before any
+// subsequent same-tick write (both Stream and StreamSelection needed it).
 watch(
-  showMetadataFields,
-  (needsMetadata) => {
-    if (needsMetadata && !formData.value.metadata) {
-      formData.value.metadata = {};
+  form.useStore((s: any) => s.values.destination_type),
+  (newType, prev) => {
+    if (prev === undefined || newType === prev) return;
+    // Skip while seeding an edit record (prefill) or in edit mode (the old watch
+    // also skipped edit mode) — the reset already carries the correct values.
+    if (isPrefilling || isEditMode.value) return;
+
+    if (newType !== "custom") {
+      // Set method to POST for all non-custom types.
+      form.setFieldValue("method", "post", { dontUpdateMeta: true });
+
+      // Set output_format based on destination type.
+      if (newType === "splunk") {
+        form.setFieldValue("output_format", "nestedevent", {
+          dontUpdateMeta: true,
+        });
+      } else if (newType === "elasticsearch") {
+        form.setFieldValue("output_format", "esbulk", {
+          dontUpdateMeta: true,
+        });
+        // Set default index name if not already set.
+        if (!form.state.values.esbulk_index) {
+          form.setFieldValue("esbulk_index", "default", {
+            dontUpdateMeta: true,
+          });
+        }
+      } else {
+        form.setFieldValue("output_format", "json", { dontUpdateMeta: true });
+      }
+    }
+
+    // Set endpoint based on destination type.
+    if (newType === "openobserve") {
+      // For OpenObserve, use org and stream values.
+      form.setFieldValue(
+        "url_endpoint",
+        `/api/${form.state.values.org || "default"}/${form.state.values.stream || "default"}/_json`,
+        { dontUpdateMeta: true },
+      );
+    } else {
+      // For other types, use the default endpoint.
+      form.setFieldValue("url_endpoint", endpointForType(newType), {
+        dontUpdateMeta: true,
+      });
+    }
+
+    // Set default headers for the destination type (form-owned array-field).
+    form.setFieldValue(
+      "headers",
+      getDefaultHeaders(newType ?? "openobserve").map((h) => ({
+        key: h.key,
+        value: h.value,
+      })),
+      { dontUpdateMeta: true },
+    );
+  },
+  { flush: "sync" },
+);
+
+// Function to populate the form when editing an existing destination. Builds the
+// full edit record and seeds it onto the form via `form.reset(record)` — NOT a
+// per-field mirror loop (Rule ③).
+const populateFormForEdit = (destination: any) => {
+  const record: DestinationForm = {
+    name: destination.name || "",
+    url: "",
+    skip_tls_verify: destination.skip_tls_verify || false,
+    headers: [],
+    metadata: {},
+    destination_type: "openobserve",
+    url_endpoint: "",
+    method: destination.method || "post",
+    output_format: "json",
+    esbulk_index: "",
+    separator: "",
+    org: "default",
+    stream: "default",
+  };
+
+  // Handle output_format
+  if (destination.output_format) {
+    if (
+      typeof destination.output_format === "object" &&
+      destination.output_format.esbulk
+    ) {
+      record.output_format = "esbulk";
+      record.esbulk_index = destination.output_format.esbulk.index || "default";
+      record.separator = "";
+    } else if (
+      typeof destination.output_format === "object" &&
+      destination.output_format.stringseparated
+    ) {
+      record.output_format = "stringseparated";
+      record.separator =
+        destination.output_format.stringseparated.separator || "";
+      record.esbulk_index = "";
+    } else if (typeof destination.output_format === "string") {
+      record.output_format = destination.output_format;
+      record.esbulk_index = "";
+      record.separator = "";
+    }
+  } else {
+    record.output_format = "json";
+    record.esbulk_index = "";
+    record.separator = "";
+  }
+
+  // Use destination_type_name from backend, fallback to destination_type or default
+  const destType =
+    destination.destination_type_name || destination.destination_type;
+  record.destination_type =
+    destType && destType.trim() !== "" ? destType : "openobserve";
+
+  // Split URL into hostname and endpoint for all destination types except custom
+  const fullUrl = destination.url || "";
+  if (fullUrl && record.destination_type !== "custom") {
+    try {
+      // Add protocol if missing for URL parsing, but only if it looks like a valid URL
+      const hasProtocol = fullUrl.includes("://");
+      const looksLikeUrl = fullUrl.includes(".") || fullUrl.includes(":");
+      const urlToParse = hasProtocol
+        ? fullUrl
+        : looksLikeUrl
+          ? `https://${fullUrl}`
+          : fullUrl;
+
+      const url = new URL(urlToParse);
+      // Base URL is protocol + hostname + port (if any) - always include protocol for consistency
+      record.url = url.origin;
+      // URL endpoint is the path + search + hash
+      const endpoint = url.pathname + url.search + url.hash;
+      // Only set endpoint if it's not just "/"
+      record.url_endpoint = endpoint === "/" ? "" : endpoint;
+    } catch (error) {
+      // If URL parsing fails, try to split manually
+      console.warn(
+        "Failed to parse URL, attempting manual split:",
+        fullUrl,
+        error,
+      );
+      const firstSlashIndex = fullUrl.indexOf("/");
+      if (firstSlashIndex > 0) {
+        // Split at first slash
+        record.url = fullUrl.substring(0, firstSlashIndex);
+        record.url_endpoint = fullUrl.substring(firstSlashIndex);
+      } else {
+        // No slash found, keep full URL as-is
+        record.url = fullUrl;
+        record.url_endpoint = "";
+      }
+    }
+  } else {
+    // For custom destination or empty URL, don't split
+    record.url = fullUrl;
+    record.url_endpoint = "";
+  }
+
+  // Populate headers (form-owned dynamic array-field).
+  if (destination.headers && typeof destination.headers === "object") {
+    record.headers = Object.entries(destination.headers).map(
+      ([key, value]) => ({
+        key,
+        value: value as string,
+      }),
+    );
+  }
+
+  // Populate metadata object (form-owned nested fields).
+  if (destination.metadata && typeof destination.metadata === "object") {
+    record.metadata = { ...destination.metadata };
+  } else {
+    record.metadata = {};
+  }
+
+  // Extract OpenObserve org and stream from endpoint if it's OpenObserve
+  if (record.destination_type === "openobserve" && record.url_endpoint) {
+    // Parse endpoint like /api/{org}/{stream}/_json
+    const match = record.url_endpoint.match(
+      /^\/api\/([^/]+)\/([^/]+)\/_json$/,
+    );
+    if (match) {
+      record.org = match[1] || "default";
+      record.stream = match[2] || "default";
+    }
+  }
+
+  // Seed the whole record onto the form (single source of truth). Suppress the
+  // destination_type side-effect watch for the duration of the reset so the
+  // record's explicit url_endpoint/output_format/headers aren't clobbered by the
+  // create-mode defaulting. `{ flush: "sync" }` makes the watch fire during the
+  // reset, so the flag must wrap the reset call synchronously.
+  isPrefilling = true;
+  form.reset(record);
+  isPrefilling = false;
+
+  // Move to step 2 since destination type is already selected
+  step.value = 2;
+};
+
+// Watch for destination prop changes to populate form in edit mode
+watch(
+  () => props.destination,
+  (destination) => {
+    if (destination) {
+      populateFormForEdit(destination);
     }
   },
   { immediate: true },
 );
 
-// Watch OpenObserve org and stream to update endpoint dynamically
+const isValidDestination = computed(() => {
+  return !!(formName.value && formUrl.value && formMethod.value);
+});
+
+// Default URL endpoints for different destination types (shown as hint). Reads
+// the form-owned destination_type (single source of truth).
+const defaultUrlEndpoint = computed(() => endpointForType(destinationType.value));
+
+// Show metadata fields for specific destination types (form-owned read).
+const showMetadataFields = computed(() => {
+  return ["splunk", "datadog"].includes(destinationType.value);
+});
+
+// Keep the OpenObserve endpoint in sync with org/stream as the user edits them.
+// org/stream are form-owned (name="org"/"stream"); watch the form's values and
+// write url_endpoint back onto the form — a single source of truth.
 watch([openobserveOrg, openobserveStream], ([org, stream]) => {
-  if (formData.value.destination_type === "openobserve") {
-    formData.value.url_endpoint = `/api/${org || "default"}/${stream || "default"}/_json`;
+  if (destinationType.value === "openobserve") {
+    form.setFieldValue(
+      "url_endpoint",
+      `/api/${org || "default"}/${stream || "default"}/_json`,
+      { dontUpdateMeta: true },
+    );
   }
 });
 
 // Step validation
 const canProceedStep1 = computed(() => {
-  return !!formData.value.destination_type;
+  return !!destinationType.value;
 });
 
 const canProceedStep2 = computed(() => {
-  // name/url are form-owned — read them from the form (single source of truth).
+  // Every value is form-owned — read it from the form (single source of truth).
   const basicValidation =
     formName.value &&
     isValidResourceName(formName.value) &&
     formUrl.value &&
-    formData.value.method &&
-    formData.value.output_format;
+    formMethod.value &&
+    outputFormat.value;
 
   if (!basicValidation) return false;
 
   // Validate url_endpoint for non-custom destination types
-  if (
-    formData.value.destination_type !== "custom" &&
-    !formData.value.url_endpoint?.trim()
-  ) {
+  if (destinationType.value !== "custom" && !formUrlEndpoint.value?.trim()) {
     return false;
   }
 
   // Validate destination-specific metadata
-  if (formData.value.destination_type === "splunk") {
+  if (destinationType.value === "splunk") {
     return !!(
       formMetadata.value?.source?.trim() &&
       formMetadata.value?.sourcetype?.trim() &&
@@ -1021,15 +943,14 @@ const canProceedStep2 = computed(() => {
     );
   }
 
-  if (formData.value.destination_type === "elasticsearch") {
+  if (destinationType.value === "elasticsearch") {
     // Validate esbulk_index is set
     return !!(
-      formData.value.output_format === "esbulk" &&
-      formData.value.esbulk_index?.trim()
+      outputFormat.value === "esbulk" && formEsbulkIndex.value?.trim()
     );
   }
 
-  if (formData.value.destination_type === "datadog") {
+  if (destinationType.value === "datadog") {
     return !!(
       formMetadata.value?.ddsource?.trim() &&
       formMetadata.value?.ddtags?.trim()
@@ -1037,11 +958,11 @@ const canProceedStep2 = computed(() => {
   }
 
   // Additional validation for StringSeparated format
-  if (formData.value.output_format === "stringseparated") {
+  if (outputFormat.value === "stringseparated") {
     return !!(
-      formData.value.separator !== null &&
-      formData.value.separator !== undefined &&
-      formData.value.separator !== ""
+      formSeparator.value !== null &&
+      formSeparator.value !== undefined &&
+      formSeparator.value !== ""
     );
   }
 
@@ -1061,9 +982,9 @@ const prevStep = () => {
   }
 };
 
-// Connection notes for each destination type
+// Connection notes for each destination type (form-owned read).
 const connectionNotes = computed(() => {
-  switch (formData.value.destination_type) {
+  switch (destinationType.value) {
     case "openobserve":
       return {
         title: "OpenObserve Connection Details",
@@ -1168,23 +1089,20 @@ const connectionNotes = computed(() => {
 
 // @submit handler. OForm only calls this once the whole schema passes (incl. the
 // superRefine conditionals), so the schema — not a manual guard — gates the save.
-// `value` is the validated payload and the source of truth for the form-owned
-// `name`/`url`; the entangled fields still come from `formData`. Returning the
+// `value` is the validated payload and the SINGLE source of truth. Returning the
 // service promise lets OForm's awaited isSubmitting drive the Save spinner.
 //
 // `value` is optional so existing tests that invoke createDestination() directly
-// (driving formData) keep working — they fall back to the form-owned values.
+// keep working — they fall back to the form's live state (still the one source
+// of truth, never a mirror).
 const createDestination = (value?: DestinationForm) => {
-  // The @submit payload is the source of truth for every FORM-OWNED field
-  // (name/url/skip_tls_verify/headers/metadata). For direct test calls that pass
-  // no `value`, fall back to the form's live state, then component state.
-  const formValues = (formRef.value?.form?.state.values ?? {}) as Partial<
-    DestinationForm
-  >;
-  const name = value?.name ?? formName.value ?? formData.value.name ?? "";
-  const url = value?.url ?? formUrl.value ?? formData.value.url ?? "";
+  // Read every field from the form (single source of truth): the @submit payload
+  // if present, else the form's live state for direct test calls.
+  const v = (value ?? form.state.values) as DestinationForm;
+  const name = v.name ?? "";
+  const url = v.url ?? "";
 
-  if (!(name && url && formData.value.method)) {
+  if (!(name && url && v.method)) {
     toast({
       variant: "error",
       message: "Please fill required fields",
@@ -1198,67 +1116,63 @@ const createDestination = (value?: DestinationForm) => {
       timeout: 0,
 });
   // Headers from the form (form-owned array-field). Only non-empty rows persist.
-  const headerRows = (value?.headers ??
-    formValues.headers ??
-    apiHeaders.value) as HeaderRow[];
+  const headerRows = (v.headers ?? []) as HeaderRow[];
   const headers: Headers = {};
   headerRows.forEach((header) => {
     if (header["key"] && header["value"]) headers[header.key] = header.value;
   });
 
   // Merge URL + URL endpoint
-  const fullUrl = url + (formData.value.url_endpoint || "");
+  const fullUrl = url + (v.url_endpoint || "");
 
   // Handle output format - for esbulk, format as JSON object with index
   // For stringseparated, format as JSON object with separator
   // For all other formats (json, nestedevent, etc.), keep as string
-  let outputFormat: any = formData.value.output_format;
-  if (formData.value.output_format === "esbulk") {
+  let outputFormat: any = v.output_format;
+  if (v.output_format === "esbulk") {
     outputFormat = {
       esbulk: {
-        index: formData.value.esbulk_index,
+        index: v.esbulk_index,
       },
     };
-  } else if (outputFormat === "stringseparated" && formData.value.separator) {
+  } else if (outputFormat === "stringseparated" && v.separator) {
     outputFormat = {
       stringseparated: {
-        separator: formData.value.separator,
+        separator: v.separator,
       },
     };
   } else {
     // Keep output_format as string for json, nestedevent, and other formats
-    outputFormat = formData.value.output_format;
+    outputFormat = v.output_format;
   }
 
-  // skip_tls_verify is form-owned — read it from the @submit payload (fall back
-  // to the form's live state, then formData, for direct test calls).
-  const skipTlsVerify =
-    value?.skip_tls_verify ??
-    formValues.skip_tls_verify ??
-    formData.value.skip_tls_verify ??
-    false;
+  // skip_tls_verify is form-owned — read it from the validated payload.
+  const skipTlsVerify = v.skip_tls_verify ?? false;
 
   const payload: any = {
     url: fullUrl,
-    method: formData.value.method,
+    method: v.method,
     skip_tls_verify: skipTlsVerify,
-    template: formData.value.template,
+    // `template` is an alert-destination-model field this pipeline form never
+    // edits (there is no template input). Round-trip the existing value from the
+    // edit record so editing a destination that carries a template does not wipe
+    // it — exact parity with the pre-migration payload (`destination.template ||
+    // ""`). In create mode `props.destination` is undefined → "".
+    template: props.destination?.template || "",
     headers: headers,
     name: name,
     type: "http",
     output_format: outputFormat,
-    destination_type_name: formData.value.destination_type,
+    destination_type_name: v.destination_type,
   };
 
-  // Add metadata as JSON object (form-owned via nested metadata.* fields). Read
-  // it from the @submit payload, falling back to the form's live state, then
-  // formData. Only include non-empty values so we don't persist blank keys.
-  const metadataSource =
-    value?.metadata ?? formValues.metadata ?? formData.value.metadata ?? {};
+  // Add metadata as JSON object (form-owned via nested metadata.* fields). Only
+  // include non-empty values so we don't persist blank keys.
+  const metadataSource = v.metadata ?? {};
   const metadata: Record<string, string> = {};
-  Object.entries(metadataSource).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && String(v) !== "") {
-      metadata[k] = v as string;
+  Object.entries(metadataSource).forEach(([k, val]) => {
+    if (val !== undefined && val !== null && String(val) !== "") {
+      metadata[k] = val as string;
     }
   });
   if (Object.keys(metadata).length > 0) {
@@ -1316,65 +1230,41 @@ const createDestination = (value?: DestinationForm) => {
   }
 };
 
-// Add/remove operate on the FORM-OWNED `headers` array (the single source of
-// truth) via setHeaders; the store subscription mirrors the result back into
-// `apiHeaders` for the template v-for (playbook §2). The template's delete
-// button passes the row INDEX.
+// Add/remove operate DIRECTLY on the FORM-OWNED `headers` array (the single
+// source of truth) via pushFieldValue/removeFieldValue; the `apiHeaders`
+// form.useStore view re-renders the template v-for automatically. The template's
+// delete button passes the row INDEX.
 const addApiHeader = (key: string = "", value: string = "") => {
-  const rows = (formRef.value?.form?.state.values.headers ??
-    apiHeaders.value) as HeaderRow[];
-  setHeaders([
-    ...rows.map((h) => ({ key: h.key, value: h.value })),
-    { key, value },
-  ]);
+  form.pushFieldValue("headers", { key, value }, { dontUpdateMeta: true });
 };
 
 const deleteApiHeader = (index: number) => {
-  const rows = (formRef.value?.form?.state.values.headers ??
-    apiHeaders.value) as HeaderRow[];
-  const next = rows
-    .filter((_, i) => i !== index)
-    .map((h) => ({ key: h.key, value: h.value }));
+  form.removeFieldValue("headers", index, { dontUpdateMeta: true });
   // Always keep at least one (blank) row so the add button stays reachable.
-  setHeaders(next.length ? next : [{ key: "", value: "" }]);
+  if ((form.state.values.headers ?? []).length === 0) {
+    form.pushFieldValue("headers", { key: "", value: "" }, {
+      dontUpdateMeta: true,
+    });
+  }
 };
 
-// Reset form when needed
+// Reset the form back to the create-mode OpenObserve defaults (single source of
+// truth — no `formData` mirror to clear). `form.reset(record)` restores every
+// field, including the default headers.
 const resetForm = () => {
-  const defaultDestinationType = "openobserve";
-  formData.value = {
-    name: "",
-    url: "",
-    url_endpoint: "",
-    method: "post",
-    skip_tls_verify: false,
-    template: "",
-    headers: {},
-    emails: "",
-    type: "http",
-    output_format: "json",
-    destination_type: defaultDestinationType,
-    esbulk_index: "",
-    separator: "",
-  };
-  // Reset OpenObserve specific fields
-  openobserveOrg.value = "default";
-  openobserveStream.value = "default";
-  // Clear the form-owned fields (name/url) back to their blank defaults.
-  formRef.value?.form?.reset();
-  // Set default headers for OpenObserve
-  apiHeaders.value = getDefaultHeaders(defaultDestinationType);
+  form.reset(buildCreateDefaults());
   step.value = 1;
 };
 
-// Expose functions for testing
+// Expose functions for testing. `form` is the single source of truth — tests
+// read field values via `form.state.values` and set them via
+// `form.setFieldValue` (there is NO `formData` mirror anymore).
 defineExpose({
   getUUID,
   createDestination,
   addApiHeader,
   deleteApiHeader,
   resetForm,
-  formData,
   apiHeaders,
   isValidDestination,
   step,
@@ -1384,10 +1274,15 @@ defineExpose({
   canProceedStep2,
   connectionNotes,
   populateFormForEdit,
+  isEditMode,
+  defaultUrlEndpoint,
+  showMetadataFields,
+  destinationType,
+  outputFormat,
   openobserveOrg,
   openobserveStream,
-  // Form-owned (name/url) — exposed so tests can drive/read the real form.
-  formRef,
+  // The form itself — the single source of truth for every field.
+  form,
   formName,
   formUrl,
 });

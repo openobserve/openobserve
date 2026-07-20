@@ -31,12 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="o2-constrained-page tw:h-full tw:min-h-0 tw:overflow-y-auto"
+    class="o2-constrained-page h-full min-h-0 overflow-y-auto"
     data-test="constrained-page"
   >
     <div
-      class="tw:w-full"
-      :class="[alignClass, maxWidthClass, padded ? 'tw:px-6 tw:py-6' : '']"
+      class="w-full"
+      :class="[alignClass, maxWidthClass, padded ? 'px-6 py-6' : '']"
     >
       <slot />
     </div>
@@ -64,10 +64,10 @@ const props = withDefaults(
 
 // Literal class strings so Tailwind's content scanner keeps them in the build.
 const SIZE_CLASS = {
-  sm: "tw:max-w-2xl", // narrow single-column forms
-  md: "tw:max-w-3xl", // settings sections, org params
-  lg: "tw:max-w-5xl", // section hubs (Settings/IAM landing)
-  xl: "tw:max-w-7xl", // wide reading content
+  sm: "max-w-2xl", // narrow single-column forms
+  md: "max-w-3xl", // settings sections, org params
+  lg: "max-w-5xl", // section hubs (Settings/IAM landing)
+  xl: "max-w-7xl", // wide reading content
 } as const;
 
 const maxWidthClass = computed(() => SIZE_CLASS[props.size]);
@@ -75,6 +75,6 @@ const maxWidthClass = computed(() => SIZE_CLASS[props.size]);
 // `center` keeps the column centered (mx-auto); `left` pins it to the start so
 // form pages read left-aligned instead of floating in the middle of wide screens.
 const alignClass = computed(() =>
-  props.align === "left" ? "tw:mr-auto" : "tw:mx-auto",
+  props.align === "left" ? "mr-auto" : "mx-auto",
 );
 </script>

@@ -236,6 +236,16 @@ pub fn build_footer_cache<D: Directory>(directory: Arc<D>) -> tantivy::Result<by
             let _inv_idx = reader.inverted_index(field)?;
         }
     }
+    for (_, field_entry) in schema.fields() {
+        if !field_entry.is_fast() {
+            continue;
+        }
+        for reader in searcher.segment_readers() {
+            reader
+                .fast_fields()
+                .dynamic_column_handles(field_entry.name())?;
+        }
+    }
 
     let buf = cache_dir.cacher().to_bytes()?;
     Ok(buf)
@@ -247,7 +257,7 @@ mod tests {
 
     use tantivy::{
         directory::RamDirectory,
-        schema::{STORED, Schema, TEXT},
+        schema::{FAST, STORED, Schema, TEXT},
         *,
     };
 
@@ -591,6 +601,37 @@ mod tests {
 
         // The cache should contain data from reading the index
         assert!(bytes.len() > 100); // Should have meaningful content
+    }
+
+    #[test]
+    fn test_build_footer_cache_with_fast_field() {
+        let mut schema_builder = Schema::builder();
+        let timestamp_field = schema_builder.add_i64_field("timestamp", FAST | STORED);
+        let schema = schema_builder.build();
+
+        let ram_directory = RamDirectory::create();
+        let mut index_writer = IndexBuilder::new()
+            .schema(schema.clone())
+            .single_segment_index_writer(ram_directory.clone(), 50_000_000)
+            .unwrap();
+
+        index_writer
+            .add_document(doc!(timestamp_field => 1_i64))
+            .unwrap();
+        index_writer
+            .add_document(doc!(timestamp_field => 2_i64))
+            .unwrap();
+        index_writer.finalize().unwrap();
+
+        let bytes = build_footer_cache(ram_directory.into()).unwrap();
+        let cache = FooterCache::from_bytes(OwnedBytes::new(bytes.to_vec())).unwrap();
+        let has_fast_field_cache = cache
+            .data
+            .read()
+            .keys()
+            .any(|path| path.extension().is_some_and(|ext| ext == "fast"));
+
+        assert!(has_fast_field_cache);
     }
 
     #[test]

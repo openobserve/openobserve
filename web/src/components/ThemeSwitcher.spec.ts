@@ -22,8 +22,6 @@ const mockStore = createStore({
   },
 });
 
-// Install Quasar with proper plugins
-
 // Create i18n instance
 const i18n = createI18n({
   legacy: false,

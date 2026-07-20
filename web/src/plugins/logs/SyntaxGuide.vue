@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-cy="syntax-guide-button"
           variant="ghost"
           size="sm"
-          class="tw:w-full! tw:justify-start! tw:px-3! tw:py-1.5! tw:h-auto! tw:rounded-md! tw:gap-2! tw:font-normal!"
+          class="w-full! justify-start! px-3! py-1.5! h-auto! rounded-md! gap-2! font-normal!"
         >
           <template #icon-left>
-            <span class="tw:inline-flex tw:items-center tw:justify-center tw:w-7 tw:h-7 tw:rounded-md tw:bg-[var(--o2-section-header-bg)] tw:text-[var(--o2-text-secondary)] tw:shrink-0">
+            <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[var(--o2-section-header-bg)] text-[var(--o2-text-secondary)] shrink-0">
               <OIcon name="help" size="sm" />
             </span>
           </template>
@@ -52,15 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="sm"
           :class="[
-            noBorder ? 'tw:display-none!' : 'tw:ml-1',
+            noBorder ? 'display-none!' : 'ml-1',
             sqlmode ? 'sql-mode' : 'normal-mode',
-            noBorder ? 'tw:border-0! tw:bg-transparent! tw:p-0! tw:m-0! tw:w-full tw:justify-start tw:hover:bg-transparent!' : '',
+            noBorder ? 'border-0! bg-transparent! p-0! m-0! w-full justify-start hover:bg-transparent!' : '',
           ]"
-          class="tw:h-4.5!"
+          class="h-4.5!"
         >
           <OIcon name="help" size="sm" />
           <span v-if="label">{{ label }}</span>
-          <span v-else-if="!noBorder" class="tw:ml-1">Syntax Guide</span>
+          <span v-else-if="!noBorder" class="ml-1">{{ t('search.syntaxGuideLabel') }}</span>
           <OTooltip :content="t('search.syntaxGuideLabel')" />
         </OButton>
       </div>
@@ -70,63 +70,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="syntax-guide-title">
           <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
-        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
-                  For inverted index search of value 'error' use
+                  {{ t('logs.syntaxGuide.invertedIndexPre') }}
                   <span class="bg-highlight">match_all('error')</span>
-                  in query editor. Search terms are case-insensitive.
+                  {{ t('logs.syntaxGuide.invertedIndexPost') }}
                 </li>
                 <li>
-                  For prefix search use
+                  {{ t('logs.syntaxGuide.prefixPre') }}
                   <span class="bg-highlight">match_all('error*')</span>
-                  to find all terms starting with 'error'.
+                  {{ t('logs.syntaxGuide.prefixPost') }}
                 </li>
                 <li>
-                  For phrase prefix search use
+                  {{ t('logs.syntaxGuide.phrasePrefixPre') }}
                   <span class="bg-highlight">match_all('error code*')</span>
-                  to find phrases starting with 'error code'.
+                  {{ t('logs.syntaxGuide.phrasePrefixPost') }}
                 </li>
                 <li>
-                  For case sensitive search use
+                  {{ t('logs.syntaxGuide.caseSensitivePre') }}
                   <span class="bg-highlight">match_all('traceHits')</span>
-                  with exact case matching.
+                  {{ t('logs.syntaxGuide.caseSensitivePost') }}
                 </li>
                 <li>
-                  For postfix search use
+                  {{ t('logs.syntaxGuide.postfixPre') }}
                   <span class="bg-highlight">match_all('*failed')</span>
-                  to find all terms ending with 'failed'.
+                  {{ t('logs.syntaxGuide.postfixPost') }}
                 </li>
                 <li>
-                  For column search of value 'error' use
+                  {{ t('logs.syntaxGuide.columnSearchPre') }}
                   <span class="bg-highlight"
                     >str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
-                  For case-insensitive column search of value 'error' use
+                  {{ t('logs.syntaxGuide.columnSearchCaseInsensitivePre') }}
                   <span class="bg-highlight"
                     >str_match_ignore_case(<b>fieldname</b>, 'Error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
+                  {{ t('logs.syntaxGuide.codeColumnPre') }}
                   <span class="bg-highlight">code=200</span>
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
+                  {{ t('logs.syntaxGuide.streamColumnPre') }}
                   <span class="bg-highlight">stream='stderr'</span>
                 </li>
                 <li>
-                  For additional examples,
+                  {{ t('logs.syntaxGuide.additionalExamples') }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="tw:hover:underline text-primary"
-                    >click here</a
+                    class="hover:underline text-primary"
+                    >{{ t('logs.syntaxGuide.clickHere') }}</a
                   >.
                 </li>
               </ul>
@@ -136,85 +136,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="syntax-guide-title">
-          <div class="label">Syntax Guide: SQL Mode</div>
+          <div class="label">{{ t('logs.syntaxGuide.sqlModeTitle') }}</div>
         </div>
-        <div class="tw:border-t tw:my-1 tw:border-dropdown-separator" />
+        <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
           <div class="syntax-section">
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
-                  For inverted index search of value 'error' use
+                  {{ t('logs.syntaxGuide.invertedIndexPre') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
-                  in query editor. Search terms are case-insensitive.
+                  {{ t('logs.syntaxGuide.invertedIndexPost') }}
                 </li>
                 <li>
-                  For prefix search use
+                  {{ t('logs.syntaxGuide.prefixPre') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error*')</span
                   >
-                  to find all terms starting with 'error'.
+                  {{ t('logs.syntaxGuide.prefixPost') }}
                 </li>
                 <li>
-                  For phrase prefix search use
+                  {{ t('logs.syntaxGuide.phrasePrefixPre') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error
                     code*')</span
                   >
-                  to find phrases starting with 'error code'.
+                  {{ t('logs.syntaxGuide.phrasePrefixPost') }}
                 </li>
                 <li>
-                  For case sensitive search use
+                  {{ t('logs.syntaxGuide.caseSensitivePre') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
                     match_all('traceHits')</span
                   >
-                  with exact case matching.
+                  {{ t('logs.syntaxGuide.caseSensitivePost') }}
                 </li>
                 <li>
-                  For postfix search use
+                  {{ t('logs.syntaxGuide.postfixPre') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
                     match_all('*failed')</span
                   >
-                  to find all terms ending with 'failed'.
+                  {{ t('logs.syntaxGuide.postfixPost') }}
                 </li>
                 <li>
-                  For column search of value 'error' use
+                  {{ t('logs.syntaxGuide.columnSearchPre') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
+                  {{ t('logs.syntaxGuide.codeColumnPre') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
+                  {{ t('logs.syntaxGuide.streamColumnPre') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on column
-                  log use
+                  {{ t('logs.syntaxGuide.queryFunctionPre') }} <i>extract_ip</i>
+                  {{ t('logs.syntaxGuide.queryFunctionPost') }}
                   <span class="bg-highlight"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >
                 </li>
                 <li>
-                  For additional examples,
+                  {{ t('logs.syntaxGuide.additionalExamples') }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="tw:hover:underline text-primary"
-                    >click here</a
+                    class="hover:underline text-primary"
+                    >{{ t('logs.syntaxGuide.clickHere') }}</a
                   >.
                 </li>
               </ul>

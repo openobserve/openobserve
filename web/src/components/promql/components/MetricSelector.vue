@@ -1,23 +1,23 @@
 <template>
-  <div data-test="promql-metric-selector" class="tw:mb-2">
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
+  <div data-test="promql-metric-selector" class="mb-2">
+    <div style="display: flex; flex-direction: row" class="pl-3">
       <div
         data-test="promql-metric-selector-label"
-        class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-32.5"
+        class="text-sm whitespace-nowrap flex items-center min-w-32.5"
       >{{ t("panel.metric") }}</div>
-      <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
-      <div class="tw:m-1.25 tw:flex-1">
+      <span class="flex items-center ml-0.5 mr-0.5">:</span>
+      <div class="m-1.25 flex-1">
         <OSelect
           v-model="selectedMetric"
           :options="metrics"
-          label="Metric Name"
-          class="showLabelOnTop tw:min-w-75 tw:max-w-125"
+          :label="t('metrics.metricSelector.metricName')"
+          class="showLabelOnTop min-w-75 max-w-125"
           @update:model-value="onMetricSelect"
           clearable
           data-test="metric-selector"
         >
           <template #empty>
-            {{ loading ? "Loading metrics..." : "No metrics found" }}
+            {{ loading ? t('metrics.metricSelector.loadingMetrics') : t('metrics.metricSelector.noMetricsFound') }}
           </template>
         </OSelect>
       </div>

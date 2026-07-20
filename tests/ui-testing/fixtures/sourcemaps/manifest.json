@@ -1,0 +1,42 @@
+{
+  "description": "Deterministic sourcemap E2E fixture. The dist/ text artifacts are committed and MUST stay in sync with this manifest — the generated columns below were calibrated against the committed minified bundle (any drift makes the translate assertions fail loudly). Regenerate with build.sh and re-calibrate if src/ changes. The upload ZIPs named below are NOT committed; specs generate them at test time from dist/ via utils/zip-builder.js.",
+  "bundle": "main.e2efix01.js",
+  "bundleUrlPrefix": "http://localhost:8090",
+  "zip": "sourcemaps.zip",
+  "invalidZip": "invalid.zip",
+  "originalSourcePath": "src/errors/sync-errors.js",
+  "errors": {
+    "typeError": {
+      "message": "TypeError: Cannot read properties of undefined (reading 'profile')",
+      "generatedColumn": 28,
+      "expected": {
+        "line": 8,
+        "sourceContains": "return user.profile.name;"
+      }
+    },
+    "referenceError": {
+      "message": "ReferenceError: undeclaredVariableThatDoesNotExist is not defined",
+      "generatedColumn": 63,
+      "expected": {
+        "line": 13,
+        "sourceContains": "return undeclaredVariableThatDoesNotExist + 1;"
+      }
+    },
+    "rangeError": {
+      "message": "RangeError: Invalid array length",
+      "generatedColumn": 120,
+      "expected": {
+        "line": 18,
+        "sourceContains": "return new Array(-1);"
+      }
+    },
+    "customError": {
+      "message": "PaymentError: Insufficient funds in account",
+      "generatedColumn": 237,
+      "expected": {
+        "line": 29,
+        "sourceContains": "throw new PaymentError('Insufficient funds in account');"
+      }
+    }
+  }
+}

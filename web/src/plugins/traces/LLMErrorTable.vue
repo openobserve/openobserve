@@ -30,22 +30,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="rootEl"
-    class="card-container llm-trend-panel tw:rounded-lg tw:flex tw:flex-col tw:overflow-hidden"
+    class="card-container llm-trend-panel rounded-lg flex flex-col overflow-hidden"
   >
     <!-- Padding lives on the header only, so the table spans edge-to-edge
          (no left/right/bottom inset) and sits flush within the card. -->
     <div
-      class="tw:flex tw:items-baseline tw:justify-between tw:mb-[0.5rem] tw:px-[1rem] tw:pt-[1rem]"
+      class="flex items-baseline justify-between mb-[0.5rem] px-[1rem] pt-[1rem]"
     >
       <div>
         <div
-          class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]"
+          class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]"
         >
           {{ displayTitle }}
         </div>
         <div
           v-if="displaySubtitle"
-          class="tw:text-[0.7rem] tw:leading-normal tw:mt-[0.1rem]"
+          class="text-[0.7rem] leading-normal mt-[0.1rem]"
         >
           {{ displaySubtitle }}
         </div>
@@ -64,10 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       table-id="llm-recent-errors"
       show-index
       pagination="none"
-      :empty-message="panel.emptyStateText || 'No data'"
+      :empty-message="panel.emptyStateText || t('traces.lLMErrorTable.noData')"
       @row-click="onRowClick"
       data-test="llm-recent-errors-table"
-      class="tw:w-full"
+      class="w-full"
     >
       <!-- Time needs timezone formatting, so it keeps a cell template — but no
            text styling: it inherits OTable's default cell text like every other
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Operation is the one cell we colour — it names the failed span, so it
            reads in the error colour. -->
       <template #cell-operation="{ value }">
-        <span class="tw:text-[var(--o2-status-error-text)]">{{ value }}</span>
+        <span class="text-[var(--color-error-600)]">{{ value }}</span>
       </template>
 
       <!-- Trace id: only a title for the full value on hover; default text. -->
@@ -148,7 +148,7 @@ const loading = ref(false);
 const columns = [
   {
     id: "time",
-    header: "Time",
+    header: t("traces.lLMErrorTable.time"),
     accessorKey: "_timestamp",
     sortable: false,
     size: COL.createdAt,
@@ -156,7 +156,7 @@ const columns = [
   },
   {
     id: "service",
-    header: "Service",
+    header: t("traces.lLMErrorTable.service"),
     accessorKey: "service_name",
     sortable: false,
     // Half the usual stream-name width — service names here are short.
@@ -165,7 +165,7 @@ const columns = [
   },
   {
     id: "operation",
-    header: "Operation",
+    header: t("traces.lLMErrorTable.operation"),
     accessorKey: "operation",
     sortable: false,
     // Numeric size + flex: fills the leftover width and stays resizable.
@@ -174,7 +174,7 @@ const columns = [
   },
   {
     id: "trace_id",
-    header: "Trace ID",
+    header: t("traces.lLMErrorTable.traceId"),
     accessorKey: "trace_id",
     sortable: false,
     size: COL.url,
@@ -268,6 +268,6 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .llm-trend-panel {
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-border-default);
 }
 </style>

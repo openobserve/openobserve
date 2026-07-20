@@ -54,8 +54,17 @@ const iconSize = computed(() => (props.size === "xs" ? "xs" : "sm"));
       <OIcon
         name="search"
         :size="iconSize"
-        class="tw:cursor-pointer"
+        class="cursor-pointer"
       />
+    </template>
+
+    <!-- Forwarded so a search field can carry a control INSIDE its border — the
+         scope toggle the dashboard list puts in its search box, for one. Guarded
+         by `v-if`: OInput renders the right-hand span only when the slot exists,
+         and passing an always-present-but-empty template would give every plain
+         search input a padded, invisible box on its right. -->
+    <template v-if="$slots['icon-right']" #icon-right>
+      <slot name="icon-right" />
     </template>
   </OInput>
 </template>

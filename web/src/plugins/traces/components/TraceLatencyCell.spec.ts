@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, config } from "@vue/test-utils";
+import i18n from "@/locales";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 const mockSearchObj = {
   meta: {

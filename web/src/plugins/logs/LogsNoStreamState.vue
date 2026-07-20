@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   and a recent-streams chip row loaded from localStorage.
 -->
 <template>
-  <OEmptyState illustration="explorer" size="hero" :hide-action="true">
+  <OEmptyState illustration="stream-select" size="hero" :hide-action="true">
     <template #title>{{ t("logs.noStream.title") }}</template>
 
     <template #description>
@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-if="recentStreams.length" #extra>
-      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
-        <span class="tw:text-sm tw:font-semibold tw:text-text-secondary">
+      <div class="flex items-center justify-center gap-2 flex-wrap">
+        <span class="text-sm font-semibold text-text-secondary">
           {{ t("logs.noStream.recent") }}
         </span>
         <EmptyStateIngestionChip
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="storage"
           :data-test="`logs-no-stream-recent-${stream}`"
           @click="emit('pick-stream', stream)"
-        ><span class="tw:truncate tw:max-w-[10rem]">{{ stream }}</span></EmptyStateIngestionChip>
+        ><span class="truncate max-w-[10rem]">{{ stream }}</span></EmptyStateIngestionChip>
       </div>
     </template>
   </OEmptyState>

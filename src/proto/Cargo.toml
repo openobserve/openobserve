@@ -5,8 +5,6 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-async-trait.workspace = true
-datafusion.workspace = true
 datafusion-proto.workspace = true
 prost.workspace = true
 prost-wkt-types.workspace = true
@@ -14,7 +12,6 @@ serde.workspace = true
 serde_json.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
-tokio.workspace = true
 
 [build-dependencies]
 cargo_metadata = "0.19"

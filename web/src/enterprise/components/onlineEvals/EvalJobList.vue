@@ -5,6 +5,8 @@
   >
     <template #table>
       <OTable
+        v-model:selected-ids="selectedIds"
+        selection="multiple"
         data-test="eval-job-list-table"
         :data="numberedRows"
         :columns="columns"
@@ -20,13 +22,13 @@
         :persist-columns="true"
         table-id="eval-job-list"
         width="100%"
-        class="tw:w-full tw:h-full"
+        class="w-full h-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="tw:flex-1 tw:min-w-0"
+            class="flex-1 min-w-0"
             :placeholder="t('onlineEvals.job.searchPlaceholder')"
             data-test="eval-job-list-search-input"
             clearable
@@ -38,13 +40,26 @@
             :placeholder="t('onlineEvals.job.allStatuses')"
             size="md"
             width="sm"
-            class="tw:shrink-0"
+            class="shrink-0"
             data-test="eval-job-list-status-filter"
           />
         </template>
 
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="eval-job-list-refresh-btn"
+            @click="emit('refresh')"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="evalJobsRefresh" />
+          </OButton>
+        </template>
+
         <template #empty>
-          <div class="tw:flex tw:items-center tw:justify-center tw:py-8">
+          <div class="flex items-center justify-center py-8">
             <OEmptyState
               size="hero"
               preset="no-eval-jobs"
@@ -53,6 +68,23 @@
               @action="onEmptyAction"
             />
           </div>
+        </template>
+
+        <template #bottom="{ totalRows }">
+          <span class="o2-table-footer-title">
+            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.job.listTitle") }}
+          </span>
+          <OButton
+            v-if="selectedIds.length > 0"
+            variant="outline-destructive"
+            size="sm"
+            class="ml-3"
+            icon-left="delete"
+            data-test="eval-job-bulk-delete-btn"
+            @click="handleBulkDelete"
+          >
+            {{ t("onlineEvals.job.deleteBulkButton") }} ({{ selectedIds.length }})
+          </OButton>
         </template>
 
         <template #cell-status="{ row }">
@@ -64,11 +96,11 @@
         </template>
 
         <template #cell-stream="{ row }">
-          <span class="tw:font-mono tw:text-xs">{{ row.stream }}</span>
+          <span class="font-mono text-xs">{{ row.stream }}</span>
         </template>
 
         <template #cell-scorers="{ row }">
-          <span class="tw:font-mono tw:text-xs">{{ scorerCountText(row) }}</span>
+          <span class="font-mono text-xs">{{ scorerCountText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -76,7 +108,7 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center actions-container">
+          <div class="flex items-center actions-container">
             <OButton
               v-if="canActivate(row.status)"
               :data-test="`eval-job-list-${row.name}-activate-btn`"
@@ -123,9 +155,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -157,6 +192,8 @@ const emit = defineEmits<{
   (e: "delete", row: EvalJob): void;
   (e: "activate", row: EvalJob): void;
   (e: "pause", row: EvalJob): void;
+  (e: "delete-bulk", ids: string[]): void;
+  (e: "refresh"): void;
 }>();
 
 function canActivate(status: EvalJobStatus): boolean {
@@ -169,6 +206,26 @@ function canPause(status: EvalJobStatus): boolean {
 
 const { t } = useI18n();
 const statusFilter = ref<EvalJobStatus | null>(null);
+const selectedIds = ref<string[]>([]);
+
+function handleBulkDelete() {
+  const ids = [...selectedIds.value];
+  if (ids.length === 0) return;
+  emit("delete-bulk", ids);
+}
+
+// After the list reloads (e.g. following a bulk delete), drop any selected ids
+// whose rows no longer exist so the bulk-action button count stays accurate.
+// Pruning (rather than clearing on emit) keeps the selection intact if the user
+// cancels the confirm dialog.
+watch(
+  () => props.rows,
+  (rows) => {
+    const valid = new Set(rows.map((r) => r.id));
+    const pruned = selectedIds.value.filter((id) => valid.has(id));
+    if (pruned.length !== selectedIds.value.length) selectedIds.value = pruned;
+  },
+);
 
 const statusOptions = computed(() => [
   { label: t("onlineEvals.job.allStatuses"), value: null },
@@ -292,4 +349,8 @@ function formatDateShort(value: number) {
   if (!value) return "—";
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
 }
+
+useShortcuts([
+  { id: "evalJobsRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+]);
 </script>

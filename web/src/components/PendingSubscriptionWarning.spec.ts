@@ -106,7 +106,7 @@ describe('PendingSubscriptionWarning.vue', () => {
     });
 
     it('has the main container rendered', () => {
-      // Structural CSS classes (Quasar/Tailwind utility classes) must not be
+      // Structural CSS classes (Tailwind utility classes) must not be
       // asserted in unit tests — use existence or semantic checks instead.
       wrapper = createWrapper();
       expect(wrapper.find('div').exists()).toBe(true);

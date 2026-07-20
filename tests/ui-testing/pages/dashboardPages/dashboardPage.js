@@ -276,7 +276,14 @@ export class DashboardPage {
     await this.dashboardPanelNameInput.waitFor({ state: 'visible', timeout: 10000 });
     await this.dashboardPanelNameInput.click();
     await this.dashboardPanelNameInput.fill(this.panelName);
-    await this.dashboardPanelNameInput.press('Enter');
+    // Do NOT press Enter here. Post UX revamp the panel-name field is an
+    // OFormInput inside <OForm id="add-panel-form"> (AddPanel.vue) whose only
+    // input it is, so Enter triggers the form's implicit submit → onSave →
+    // savePanelChangesToDashboard, which saves the panel and navigates away,
+    // detaching the Apply button mid-flow (see reports E2E timeouts on
+    // [data-test="dashboard-apply"]). The legacy q-input ignored Enter;
+    // .fill() already commits the title through OFormInput's reactive binding,
+    // so no key press is needed to "commit" the name.
     await expect(this.applyButton).toBeVisible();
     await this.applyButton.click();
     await this.page.waitForTimeout(5000);

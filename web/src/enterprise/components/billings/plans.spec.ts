@@ -87,7 +87,6 @@ vi.mock("@/enterprise/components/billings/TrialPeriod.vue", () => ({
 describe("Plans Component", () => {
   let wrapper: any;
   let mockRouter: any;
-  let mockNotify: any;
 
   const mockSubscriptionResponse = {
     data: {
@@ -104,8 +103,6 @@ describe("Plans Component", () => {
     mockRouter = {
       push: vi.fn(),
     };
-
-    mockNotify = vi.fn();
 
     // Setup mocks with default successful responses
     (BillingService.list_subscription as any).mockResolvedValue(
@@ -148,9 +145,6 @@ describe("Plans Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $q: {
-            notify: mockNotify,
-          },
         },
       },
     });
@@ -464,9 +458,6 @@ describe("Plans Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $q: {
-            notify: mockNotify,
-          },
         },
       },
     });
@@ -602,15 +593,10 @@ describe("Plans Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $q: {
-            notify: mockNotify,
-          },
         },
       },
     });
 
-    // Clear previous calls
-    mockNotify.mockClear();
 
     const errorTypes = [
       { error: new Error("Simple error"), expectedMessage: "Simple error" },

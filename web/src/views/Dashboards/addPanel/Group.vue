@@ -2,13 +2,13 @@
   <div
     data-test="dashboard-group"
     :style="`--group-index: ${groupNestedIndex}; padding-left: ${groupNestedIndex > 0 ? '0.3125rem' : '0'}; background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));`"
-    class="tw:flex tw:p-0 tw:rounded-[5px]"
+    class="flex p-0 rounded-[5px]"
   >
-    <div class="tw:flex tw:flex-row tw:flex-wrap tw:items-center" data-test="dashboard-group-conditions">
+    <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
         :key="index"
-        class="tw:inline-flex tw:items-center tw:mr-2.5 tw:min-h-8.75 tw:gap-2"
+        class="inline-flex items-center mr-2.5 min-h-8.75 gap-2"
         data-test="dashboard-group-condition-group"
       >
         <Group
@@ -60,7 +60,7 @@
         </ODropdownItem>
       </ODropdown>
     </div>
-    <div v-if="groupNestedIndex !== 0" class="tw:border-l tw:border-[#f5f5f5] tw:flex tw:justify-between tw:items-center">
+    <div v-if="groupNestedIndex !== 0" class="border-l border-[#f5f5f5] flex justify-between items-center">
       <OButton
         variant="ghost"
         size="icon"

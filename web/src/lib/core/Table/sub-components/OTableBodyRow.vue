@@ -8,12 +8,24 @@ const handledNavEvents = new WeakSet<KeyboardEvent>();
 
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { computed, inject, ref, onMounted, onBeforeUnmount, watch, useSlots } from "vue";
+import {
+  computed,
+  inject,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+  useSlots,
+} from "vue";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH, TABLE_CHECKBOX_COL_PAD_LEFT } from "../OTable.types";
+import {
+  TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
+  TABLE_CHECKBOX_COL_PAD_LEFT,
+} from "../OTable.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
@@ -45,12 +57,16 @@ const props = defineProps<{
   statusBarColor?: string;
   /** Enable hover-visible copy button on cells */
   enableCellCopy?: boolean;
-  /** Per-cell tw:inline style function */
+  /** Per-cell inline style function */
   getCellStyle?: (params: {
     columnId: string;
     row: any;
     value: any;
   }) => Record<string, any>;
+  /** When true, renders a drag handle grip icon as the first cell. */
+  enableRowReorder?: boolean;
+  /** Per-row predicate: when false, the drag handle is hidden for this row. */
+  rowDraggable?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -60,9 +76,7 @@ const emit = defineEmits<{
   "row-dblclick": [row: any, event: MouseEvent];
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
-  "cell-click": [
-    params: { columnId: string; row: any; value: any },
-  ];
+  "cell-click": [params: { columnId: string; row: any; value: any }];
 }>();
 
 const slots = useSlots();
@@ -100,12 +114,13 @@ const treeMeta = computed(() => {
 });
 const isTreeParent = computed(() => !!treeMeta.value?.isParent);
 const isTreeExpanded = computed(() => !!treeMeta.value?.isExpanded);
-const showTreeWarning = computed(() =>
-  treeCtx?.value?.enabled &&
-  isTreeParent.value &&
-  isTreeExpanded.value &&
-  treeCtx.value.hasWarning(props.row.original) &&
-  !!slots["tree-warning"],
+const showTreeWarning = computed(
+  () =>
+    treeCtx?.value?.enabled &&
+    isTreeParent.value &&
+    isTreeExpanded.value &&
+    treeCtx.value.hasWarning(props.row.original) &&
+    !!slots["tree-warning"],
 );
 
 /**
@@ -113,14 +128,16 @@ const showTreeWarning = computed(() =>
  * Used to align the warning row's content + connector line under the chevron.
  */
 const treeConnectorX = computed(() => {
+  const expansionWidth = props.expansionEnabled ? 32 : 0; // w-8
   const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
-  const expansionWidth = props.expansionEnabled ? 32 : 0; // tw:w-8
-  const cellPaddingLeft = 8; // tw:px-2
+  const dragWidth = props.enableRowReorder ? 16 : 0; // w-4
+  const cellPaddingLeft = 8; // px-2
   const halfChevron = 9; // 18px / 2
   const parentDepth = treeMeta.value?.depth ?? 0;
   return (
-    selectionWidth +
     expansionWidth +
+    selectionWidth +
+    dragWidth +
     cellPaddingLeft +
     parentDepth * 16 +
     halfChevron
@@ -129,7 +146,11 @@ const treeConnectorX = computed(() => {
 
 function onClick(event: MouseEvent) {
   const target = event.target as HTMLElement | null;
-  if (target?.closest("button, a, input, select, textarea, label, [role='button']")) {
+  if (
+    target?.closest(
+      "button, a, input, select, textarea, label, [role='button']",
+    )
+  ) {
     return;
   }
   emit("row-click", props.row.original, event);
@@ -168,15 +189,20 @@ const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     const tr = rowRef.value?.closest("tr");
     if (!tr) return;
-    let sibling = e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
+    let sibling =
+      e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
     while (sibling && !sibling.matches("tr[data-test^='o2-table-row-']")) {
-      sibling = e.key === "ArrowDown" ? sibling.nextElementSibling : sibling.previousElementSibling;
+      sibling =
+        e.key === "ArrowDown"
+          ? sibling.nextElementSibling
+          : sibling.previousElementSibling;
     }
     if (sibling instanceof HTMLElement) {
       e.preventDefault();
       isHovered.value = false;
       if (sibling.hasAttribute("tabindex")) sibling.focus();
-      else sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      else
+        sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
     }
     return;
   }
@@ -184,7 +210,9 @@ const handleKeydown = (e: KeyboardEvent) => {
   // Enter triggers the row's click handler (same as a mouse click)
   if (e.key === "Enter") {
     e.preventDefault();
-    rowRef.value?.closest("tr")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    rowRef.value
+      ?.closest("tr")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     return;
   }
 
@@ -198,7 +226,10 @@ const handleKeydown = (e: KeyboardEvent) => {
   const btn = rowRef.value?.querySelector<HTMLElement>(
     `[data-row-action='${action}']`,
   );
-  if (btn) { e.preventDefault(); btn.click(); }
+  if (btn) {
+    e.preventDefault();
+    btn.click();
+  }
 };
 
 onMounted(() => window.addEventListener("keydown", handleKeydown));
@@ -228,17 +259,13 @@ function onRowBlur() {
     :data-test="`o2-table-row-${row.index}`"
     :tabindex="clickable ? 0 : undefined"
     :class="[
-      'tw:group/row',
-      'tw:transition-colors tw:duration-150',
-      clickable ? 'tw:cursor-pointer' : '',
-      'tw:hover:bg-table-row-hover-bg',
-      clickable ? 'tw:focus:outline-none tw:focus-visible:bg-table-row-hover-bg' : '',
-      isRowSelected
-        ? 'tw:bg-table-row-selected-bg'
-        : '',
-      !isRowSelected && isStriped
-        ? 'tw:bg-table-row-striped-bg'
-        : '',
+      'group/row',
+      'transition-colors duration-150',
+      clickable ? 'cursor-pointer' : '',
+      'hover:bg-table-row-hover-bg',
+      clickable ? 'focus:outline-none focus-visible:bg-table-row-hover-bg' : '',
+      isRowSelected ? 'bg-table-row-selected-bg' : '',
+      !isRowSelected && isStriped ? 'bg-table-row-striped-bg' : '',
       statusBarColor ? 'o2-table-row-with-status' : '',
       rowClass,
     ]"
@@ -258,7 +285,10 @@ function onRowBlur() {
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
-      :class="['tw:w-4 tw:min-w-4 tw:px-0 tw:text-center tw:align-middle', bordered ? 'tw:border-b tw:border-table-row-divider' : '']"
+      :class="[
+        'w-4 min-w-4 px-0 text-center align-middle',
+        bordered ? 'border-b border-table-row-divider' : '',
+      ]"
       data-test="o2-table-expand-cell"
     >
       <OTableExpandButton
@@ -273,14 +303,21 @@ function onRowBlur() {
     <td
       v-if="selectionEnabled"
       :class="[
-        'tw:text-left tw:align-middle',
-        bordered ? 'tw:border-b tw:border-table-row-divider' : '',
-        isRowSelectable && !isRowSelectable(row.original) ? 'tw:cursor-not-allowed' : '',
+        'text-left align-middle',
+        bordered ? 'border-b border-table-row-divider' : '',
+        isRowSelectable && !isRowSelectable(row.original)
+          ? 'cursor-not-allowed'
+          : '',
       ]"
-      :style="{ width: TABLE_CHECKBOX_COL_WIDTH + 'px', minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
+      :style="{
+        width: TABLE_CHECKBOX_COL_WIDTH + 'px',
+        minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
+        maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
+        paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px',
+      }"
       data-test="o2-table-select-cell"
     >
-      <div class="tw:flex tw:items-center tw:justify-start">
+      <div class="flex items-center justify-start">
         <OTableSelectCheckbox
           :model-value="isRowSelected ?? false"
           :row-id="String(row.index)"
@@ -288,6 +325,20 @@ function onRowBlur() {
           @update:model-value="emit('toggle-selection', row.original)"
         />
       </div>
+    </td>
+
+    <!-- Drag handle cell -->
+    <td
+      v-if="enableRowReorder"
+      :class="[
+        'w-4 min-w-4 px-0 text-center align-middle',
+        bordered ? 'border-b border-table-row-divider' : '',
+        rowDraggable === false ? 'invisible' : '',
+      ]"
+      class="o2-table-drag-handle"
+      data-test="o2-table-row-drag-handle"
+    >
+      <OIcon name="drag-indicator" size="xs" class="text-text-secondary cursor-grab transition-opacity" />
     </td>
 
     <!-- Data cells -->
@@ -322,17 +373,22 @@ function onRowBlur() {
   <tr
     v-if="showTreeWarning"
     :data-test="`o2-table-tree-warning-${row.index}`"
-    class="tw:bg-(--color-warning-surface,rgba(251,191,36,0.08))"
+    class="bg-(--color-warning-surface,rgba(251,191,36,0.08))"
   >
     <td
-      :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
+      :colspan="
+        row.getVisibleCells().length +
+        (expansionEnabled ? 1 : 0) +
+        (selectionEnabled ? 1 : 0) +
+        (enableRowReorder ? 1 : 0)
+      "
       :class="[
-        'o2-table-tree-warning-cell tw:relative',
-        bordered ? 'tw:border-b tw:border-table-row-divider' : '',
+        'o2-table-tree-warning-cell relative',
+        bordered ? 'border-b border-table-row-divider' : '',
       ]"
       :style="{ '--o2-tree-connector-x': treeConnectorX + 'px' }"
     >
-      <div class="tw:relative tw:z-1 tw:flex tw:items-center tw:justify-center">
+      <div class="relative z-1 flex items-center justify-center">
         <slot name="tree-warning" :row="row.original" />
       </div>
     </td>
@@ -342,11 +398,16 @@ function onRowBlur() {
   <tr
     v-if="hasExpansionSlot && isExpanded"
     :data-test="`o2-table-expanded-row-${row.index}`"
-    class="tw:bg-table-row-expanded-bg"
+    class="bg-table-row-expanded-bg"
   >
     <td
-      :colspan="row.getVisibleCells().length + (expansionEnabled ? 1 : 0) + (selectionEnabled ? 1 : 0)"
-      :class="bordered ? 'tw:border-b tw:border-table-row-divider' : ''"
+      :colspan="
+        row.getVisibleCells().length +
+        (expansionEnabled ? 1 : 0) +
+        (selectionEnabled ? 1 : 0) +
+        (enableRowReorder ? 1 : 0)
+      "
+      :class="bordered ? 'border-b border-table-row-divider' : ''"
     >
       <slot name="expansion" :row="row.original" />
     </td>

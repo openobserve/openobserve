@@ -6,10 +6,10 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full tw:p-4 tw:min-h-0" data-test="scorer-library">
+  <div class="flex flex-col h-full p-4 min-h-0" data-test="scorer-library">
     <div
       v-if="isLoadingCatalog"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:p-8"
+      class="flex flex-col items-center justify-center flex-1 p-8"
       data-test="scorer-library-loading"
     >
       <OSpinner size="lg" />
@@ -17,34 +17,34 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:p-8 tw:text-(--o2-text-muted)"
+      class="flex flex-col items-center justify-center flex-1 p-8 text-(--color-text-secondary)"
       data-test="scorer-library-error"
     >
-      <OIcon name="error-outline" class="tw:mb-2" style="width: 3em; height: 3em" />
-      <div class="tw:text-red-500">{{ loadError }}</div>
-      <OButton variant="primary" size="sm" class="tw:mt-4" @click="loadCatalog">
+      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
+      <div class="text-red-500">{{ loadError }}</div>
+      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
         Retry
       </OButton>
     </div>
 
     <div
       v-else-if="providers.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:p-8 tw:text-(--o2-text-muted)"
+      class="flex flex-col items-center justify-center flex-1 p-8 text-(--color-text-secondary)"
       data-test="scorer-library-no-providers"
     >
       Create a Provider first before importing LLM Judge scorers.
     </div>
 
-    <div v-else class="tw:flex tw:flex-col tw:min-h-0 tw:flex-1">
-      <div class="tw:flex tw:items-end tw:gap-3 tw:mb-4">
-        <div class="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:w-60">
-          <label class="tw:text-xs tw:font-semibold tw:text-(--o2-text) tw:whitespace-nowrap">Provider</label>
+    <div v-else class="flex flex-col min-h-0 flex-1">
+      <div class="flex items-end gap-3 mb-4">
+        <div class="flex items-center gap-2 shrink-0 w-60">
+          <label class="text-xs font-semibold text-(--color-text-secondary) whitespace-nowrap">Provider</label>
           <OSelect
             v-model="selectedProviderId"
             :options="providerOptions"
             placeholder="Select provider"
             size="md"
-            class="tw:w-full"
+            class="w-full"
             data-test="scorer-library-provider-select"
           />
         </div>
@@ -52,15 +52,15 @@ the Free Software Foundation, either version 3 of the License, or
           v-model="searchQuery"
           placeholder="Search Scorers..."
           clearable
-          class="tw:flex-1 tw:min-w-0"
+          class="flex-1 min-w-0"
           data-test="scorer-library-search"
         />
       </div>
 
-      <div class="tw:flex tw:items-center tw:justify-between tw:gap-3 tw:mb-2 tw:pl-4.25 tw:pr-3">
+      <div class="flex items-center justify-between gap-3 mb-2 pl-4.25 pr-3">
         <label
           v-if="filteredEntries.length > 0"
-          class="tw:inline-flex tw:items-center tw:gap-2 tw:py-0.5 tw:px-1 tw:text-xs tw:font-medium tw:text-(--o2-text) tw:select-none"
+          class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-(--color-text-secondary) select-none"
           data-test="scorer-library-select-all"
         >
           <OCheckbox
@@ -69,49 +69,49 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
         </label>
-        <span class="tw:text-xs tw:text-gray-500">
+        <span class="text-xs text-(--color-text-secondary)">
           {{ filteredEntries.length }} scorer(s)
         </span>
       </div>
 
-      <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
+      <div class="overflow-y-auto flex-1 min-h-0">
         <section
           v-for="group in groupedEntries"
           :key="group.category"
-          class="tw:mt-4 tw:first:mt-0"
+          class="mt-4 first:mt-0"
           :data-test="`scorer-library-section-${group.category}`"
         >
-          <h4 class="tw:flex tw:items-baseline tw:gap-1.5 tw:m-0 tw:mb-1.5 tw:text-xs tw:font-bold tw:uppercase tw:tracking-[0.04em] tw:text-(--o2-text)">
+          <h4 class="flex items-baseline gap-1.5 m-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-(--color-text-heading)">
             <span>{{ group.category }}</span>
-            <span class="tw:font-medium tw:text-(--o2-text-muted)">({{ group.entries.length }})</span>
+            <span class="font-medium text-(--color-text-secondary)">({{ group.entries.length }})</span>
           </h4>
           <ul
-            class="tw:flex tw:flex-col tw:rounded tw:border tw:border-border"
+            class="flex flex-col rounded border border-(--color-border-default)"
           >
             <li
               v-for="entry in group.entries"
               :key="entry.name"
-              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:border-l-4"
+              class="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors duration-200 border-l-4"
               :class="[
                 isSelected(entry.name)
-                  ? 'selected-item tw:bg-[color-mix(in_srgb,var(--o2-brand)_6%,transparent)] tw:border-primary'
-                  : 'tw:border-transparent tw:hover:bg-gray-50',
+                  ? 'selected-item bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)] border-primary'
+                  : 'border-transparent hover:bg-(--color-table-row-hover-bg)',
               ]"
               :data-test="`scorer-library-item-${entry.name}`"
               @click="toggle(entry)"
             >
-              <div class="tw:shrink-0 tw:pr-2">
+              <div class="shrink-0 pr-2">
                 <OCheckbox
                   :model-value="isSelected(entry.name)"
                   @update:model-value="toggle(entry)"
                   @click.stop
                 />
               </div>
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm tw:font-medium">{{ entry.displayName }}</span>
+              <div class="flex flex-col flex-1 min-w-0">
+                <span class="text-sm font-medium">{{ entry.displayName }}</span>
                 <span
                   v-if="entry.description"
-                  class="tw:block tw:text-xs tw:text-muted-foreground"
+                  class="block text-xs text-(--color-text-secondary)"
                 >
                   {{ entry.description }}
                 </span>

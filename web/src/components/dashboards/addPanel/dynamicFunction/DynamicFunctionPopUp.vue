@@ -3,29 +3,29 @@
     data-test="dynamic-function-popup-root"
     :class="
       !customQuery && !fields.isDerived
-        ? 'tw:flex tw:gap-2'
-        : 'tw:flex tw:flex-col tw:gap-y-2'
+        ? 'flex gap-2'
+        : 'flex flex-col gap-y-2'
     "
   >
     <div style="width: auto; flex-shrink: 0;">
-      <div class="tw:font-semibold tw:text-[13px] tw:pb-3" data-test="dynamic-function-popup-property-label">Property</div>
+      <div class="font-semibold text-[13px] pb-3" data-test="dynamic-function-popup-property-label">{{ t('dashboard.dynamicFunctionPopUp.property') }}</div>
       <div style="display: flex; flex-direction: column; gap: 14px">
         <div>
-          <div class="tw:text-[13px] tw:font-normal tw:leading-[70%] tw:pb-0.75" data-test="dynamic-function-popup-label-text">Label</div>
+          <div class="text-[13px] font-normal leading-[70%] pb-0.75" data-test="dynamic-function-popup-label-text">{{ t('dashboard.dynamicFunctionPopUp.label') }}</div>
           <OInput
             v-model="fields.label"
             size="sm"
-            class="tw:w-full"
+            class="w-full"
             data-test="dynamic-function-popup-label-input"
           />
         </div>
         <div>
-          <div class="tw:text-[13px] tw:font-normal tw:leading-[70%] tw:pb-0.75">Alias</div>
+          <div class="text-[13px] font-normal leading-[70%] pb-0.75">{{ t('dashboard.dynamicFunctionPopUp.alias') }}</div>
           <OInput
             v-model="fields.alias"
             size="sm"
             disabled
-            class="tw:w-full"
+            class="w-full"
             data-test="dynamic-function-popup-alias-input"
           />
         </div>
@@ -52,14 +52,14 @@
       >
         <OTab
           name="build"
-          label="Build"
-          class="tw:flex-1"
+          :label="t('dashboard.dynamicFunctionPopUp.build')"
+          class="flex-1"
           data-test="dynamic-function-popup-tab-build"
         />
         <OTab
           name="raw"
-          label="Raw"
-          class="tw:flex-1"
+          :label="t('dashboard.dynamicFunctionPopUp.raw')"
+          class="flex-1"
           data-test="dynamic-function-popup-tab-raw"
         />
       </OTabs>
@@ -72,8 +72,8 @@
         animated
       >
         <OTabPanel name="build">
-          <div class="tw:pt-2" style="max-height: 26.25rem; overflow: auto;">
-            <div class="tw:font-semibold tw:text-[13px] tw:pb-3">Configuration</div>
+          <div class="pt-2" style="max-height: 26.25rem; overflow: auto;">
+            <div class="font-semibold text-[13px] pb-3">{{ t('dashboard.dynamicFunctionPopUp.configuration') }}</div>
             <SelectFunction
               v-model="fields"
               data-test="dynamic-function-popup-select-function"
@@ -82,7 +82,7 @@
           </div>
         </OTabPanel>
         <OTabPanel name="raw">
-          <div class="tw:pt-2">
+          <div class="pt-2">
             <div style="display: flex; width: 100%">
               <div style="width: 100%; padding-right: 0.75rem">
                 <RawQueryBuilder
@@ -96,11 +96,11 @@
       </OTabPanels>
 
       <div
-        class="tw:pt-2 tw:pr-3"
+        class="pt-2 pr-3"
         v-if="!customQuery && !fields.isDerived && allowAggregation"
       >
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-          <span class="tw:font-bold">Having</span>
+        <div class="flex items-center gap-2 mb-2">
+          <span class="font-bold">{{ t('dashboard.dynamicFunctionPopUp.having') }}</span>
 
           <OButton
             variant="outline"
@@ -110,26 +110,26 @@
             data-test="dynamic-function-popup-having-add-btn"
             icon-left="add"
           >
-            Add
+            {{ t('dashboard.dynamicFunctionPopUp.add') }}
           </OButton>
         </div>
 
         <div
-          class="tw:flex tw:space-x-2 tw:items-center"
+          class="flex space-x-2 items-center"
           v-if="isHavingFilterVisible()"
         >
           <OSelect
             v-model="getHavingCondition().operator"
             :options="havingOperators"
-            class="tw:w-[60px]"
+            class="w-[60px]"
             data-test="dynamic-function-popup-having-operator"
           />
 
           <OInput
             v-model.number="getHavingCondition().value"
-            class="tw:w-1/2"
+            class="w-1/2"
             type="number"
-            placeholder="Value"
+            :placeholder="t('dashboard.dynamicFunctionPopUp.value')"
             data-test="dynamic-function-popup-having-value"
           />
 
@@ -143,18 +143,18 @@
           </OButton>
         </div>
       </div>
-      <div v-if="chartType === 'table'" class="tw:mt-2 tw:mb-2">
+      <div v-if="chartType === 'table'" class="mt-2 mb-2">
         <div>
           <OCheckbox
             v-model="fields.treatAsNonTimestamp"
-            label="Mark this field as non-timestamp"
+            :label="t('dashboard.dynamicFunctionPopUp.markAsNonTimestamp')"
             data-test="dynamic-function-popup-treat-as-non-timestamp"
           />
         </div>
-        <div class="tw:mt-1">
+        <div class="mt-1">
           <OCheckbox
             v-model="fields.showFieldAsJson"
-            label="Render Data as JSON / Array"
+            :label="t('dashboard.dynamicFunctionPopUp.renderDataAsJson')"
             data-test="dynamic-function-popup-show-field-as-json"
           />
         </div>

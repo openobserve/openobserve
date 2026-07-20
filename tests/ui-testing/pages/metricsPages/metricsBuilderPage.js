@@ -686,6 +686,39 @@ export class MetricsBuilderPage {
     }
 
     /**
+     * Remove every operation currently in the builder, leaving an empty list.
+     *
+     * The panel editor SEEDS the selected metric's default query, and in Builder
+     * mode that seed carries its operations with it — a gauge lands as
+     * `avg(metric{})` (one `Avg` chip), a counter as `sum(rate(metric{}[5m]))`
+     * (two chips). See `applyPromqlSeed` in web/src/utils/dashboard/promqlSeed.ts,
+     * driven by `useDefaultPanelFields`. The builder therefore does NOT open empty
+     * on the metrics page, and specs that build a query from scratch have to strip
+     * the seed first or every count/query-text assertion is off by the seed.
+     *
+     * @returns {Promise<number>} the operation count after clearing (0 on success)
+     */
+    async clearOperations(timeout = 10000) {
+        // The seed is written by the stream watcher once the metric auto-selection
+        // resolves, so wait for that before counting — otherwise we can clear an
+        // empty list and have the seeded chips appear right after.
+        await this.getStreamSelectedValue();
+        await this.operationChips.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+
+        // Remove from the tail: the chips are indexed, so deleting the last one is
+        // the only removal whose own remove button is guaranteed to disappear —
+        // deleting index 0 of many just shifts the rest down and `removeOperation`
+        // would sit out its full hidden-state timeout on a button that is still there.
+        const deadline = Date.now() + timeout;
+        let count = await this.getOperationCount();
+        while (count > 0 && Date.now() < deadline) {
+            await this.removeOperation(count - 1);
+            count = await this.getOperationCount();
+        }
+        return count;
+    }
+
+    /**
      * Get operation text at index
      * @param {number} index
      */
@@ -1341,6 +1374,14 @@ export class MetricsBuilderPage {
             .waitFor({ state: 'attached', timeout: 15000 })
             .catch(() => {});
 
+        // `data-test-loading="false"` is not enough on its own: switching the chart
+        // type re-mounts the panel, so a table left over from the previous render is
+        // already attached and "not loading" while the new one has yet to hydrate its
+        // rows — we would measure that stale, empty table. Wait for the first row to
+        // actually exist. Times out quietly when the query legitimately has no data,
+        // leaving the caller's rowCount assertion to fail on the real state.
+        await this.tableRows.first().waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+
         // Get header texts via the data-test header cells
         const headers = [];
         const headerCount = await this.tableHeaderCells.count().catch(() => 0);
@@ -1448,7 +1489,7 @@ export class MetricsBuilderPage {
         await this.dashboardDropdownPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
         // Click an empty area of the Add-to-Dashboard ODrawer panel to dismiss any
-        // open Quasar menu from prior dropdowns (folder/dashboard).
+        // open menu from prior dropdowns (folder/dashboard).
         if (await this.dashboardDialogEl.isVisible({ timeout: 1000 }).catch(() => false)) {
             await this.dashboardDialogEl.click({ position: { x: 5, y: 5 }, force: true }).catch(() => {});
         }

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-end tw:gap-2">
+  <div class="flex items-end gap-2">
     <!-- select new dashboard -->
     <OSelect
       v-model="selectedDashboard"
@@ -23,14 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="dashboardList"
       data-test="dashboard-dropdown-dashboard-selection"
       labelKey="label"
-      class="tw:flex-1"
+      class="flex-1"
     />
 
     <OButton
       data-test="dashboard-dashboard-new-add"
       variant="outline"
       size="icon-xs-sq"
-      class="tw:h-8! tw:w-8!"
+      class="h-8! w-8!"
       @click="
         () => {
           showAddDashboardDialog = true;
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="showAddDashboardDialog"
     size="sm"
-    title="New dashboard"
+    :title="t('dashboard.selectDashboardDropdown.newDashboard')"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"
     form-id="add-dashboard-form"

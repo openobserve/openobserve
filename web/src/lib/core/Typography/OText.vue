@@ -39,77 +39,78 @@ const resolvedAs = computed(
   () => props.as ?? variantDefaultAs[props.variant ?? "body"],
 );
 
-// All classes reference design tokens via tw: prefix.
+// All classes reference design tokens via  prefix.
 // Color tokens (--color-typography-*) are defined in component.css and
-// registered in the @theme inline block so `tw:text-typography-*` works.
+// registered in the @theme inline block so `text-typography-*` works.
 // Font sizes use Tailwind's built-in scale (text-sm = 14px, text-xs = 12px).
 const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // Page title: compact, authoritative. Designed for the page header rail.
-  // Target: same visual weight as Datadog / Grafana page titles — quiet but clear.
+  // Deliberately restrained: a dense observability UI wants the page title to
+  // orient you, not to shout over the data it sits above.
   "page-title": [
-    "tw:text-sm tw:font-medium",
-    "tw:text-typography-page-title",
-    "tw:leading-tight",
+    "text-sm font-medium",
+    "text-typography-page-title",
+    "leading-tight",
   ].join(" "),
 
   // Section group label (gray eyebrow). Recedes via color + size, not weight.
   "section": [
-    "tw:text-[11.5px] tw:font-medium",
-    "tw:text-typography-section",
-    "tw:leading-none",
+    "text-[11.5px] font-medium",
+    "text-typography-section",
+    "leading-none",
   ].join(" "),
 
   // Panel / card title: mixed-case, slightly heavier than body, primary color.
   // For collapsible triggers, sidebar group headings, widget card headers.
   "panel-title": [
-    "tw:text-xs tw:font-medium",
-    "tw:text-typography-panel-title",
-    "tw:leading-tight",
+    "text-xs font-medium",
+    "text-typography-panel-title",
+    "leading-tight",
   ].join(" "),
 
   // Default body text. Most table cells, descriptions, and paragraphs.
   "body": [
-    "tw:text-sm tw:font-normal",
-    "tw:text-typography-body",
+    "text-sm font-normal",
+    "text-typography-body",
   ].join(" "),
 
   // Emphasized body: same size as body but medium. Names, totals, values.
   "body-strong": [
-    "tw:text-sm tw:font-medium",
-    "tw:text-typography-body",
+    "text-sm font-medium",
+    "text-typography-body",
   ].join(" "),
 
   // Compact label: 12px medium. Filter labels, column sub-labels, pill text.
   "label": [
-    "tw:text-xs tw:font-medium",
-    "tw:text-typography-label",
-    "tw:leading-none",
+    "text-xs font-medium",
+    "text-typography-label",
+    "leading-none",
   ].join(" "),
 
   // Metadata: timestamps, record counts, helper text, last-updated info.
   // Visually recessive — secondary color, no emphasis.
   "meta": [
-    "tw:text-xs tw:font-normal",
-    "tw:text-typography-meta",
-    "tw:leading-none",
+    "text-xs font-normal",
+    "text-typography-meta",
+    "leading-none",
   ].join(" "),
 
   // Monospace: cron expressions, stream names (non-linked), field paths, IDs.
   // Uses IBM Plex Mono via the --font-mono CSS custom property.
   // For actual executable code / query content, prefer OCode instead.
   "mono": [
-    "tw:text-xs tw:[font-family:var(--font-mono)]",
+    "text-xs [font-family:var(--font-mono)]",
     // HANDOFF §2.1: tabular figures + tight tracking for IDs/counts/timestamps.
-    "tw:[font-feature-settings:'tnum'] tw:tracking-[-0.2px]",
-    "tw:text-typography-mono",
-    "tw:leading-none",
+    "[font-feature-settings:'tnum'] tracking-[-0.2px]",
+    "text-typography-mono",
+    "leading-none",
   ].join(" "),
 };
 
 const classes = computed(() => [
   variantClasses[props.variant ?? "body"],
-  props.truncate ? "tw:truncate tw:max-w-full tw:overflow-hidden" : "",
-  props.nowrap ? "tw:whitespace-nowrap" : "",
+  props.truncate ? "truncate max-w-full overflow-hidden" : "",
+  props.nowrap ? "whitespace-nowrap" : "",
 ]);
 </script>
 

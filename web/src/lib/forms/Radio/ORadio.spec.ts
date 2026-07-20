@@ -67,7 +67,7 @@ describe("ORadio", () => {
       global: { components: { ORadio } },
     });
 
-    expect(wrapper.find("button").classes()).toContain("tw:size-3");
+    expect(wrapper.find("button").classes()).toContain("size-3");
   });
 });
 

@@ -100,16 +100,18 @@ test.describe("Org-Level Ingestion Tokens", () => {
         await pageManager.ingestionTokensPage.gotoIngestionTokensTab();
         await pageManager.ingestionTokensPage.clickCreateToken();
 
-        // Primary button should be disabled when name is empty
-        await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeDisabled();
-
-        // Typing a valid name should enable the button
-        await pageManager.ingestionTokensPage.fillTokenName('valid-name');
+        // R3: Save stays enabled; the Zod schema gates the submit, not the button.
         await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeEnabled();
 
-        // Clearing the name should disable the button again
-        await pageManager.ingestionTokensPage.fillTokenName('');
-        await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeDisabled();
+        // Submitting with an empty name reveals the inline required error and does
+        // NOT create the token (the dialog stays open).
+        await pageManager.ingestionTokensPage.clickCreate();
+        await expect(page.locator('[data-test="ingestion-token-name-input-error"]')).toBeVisible();
+        await expect(pageManager.ingestionTokensPage.dialogPrimaryBtn).toBeVisible();
+
+        // Typing a valid name clears the error.
+        await pageManager.ingestionTokensPage.fillTokenName('valid-name');
+        await expect(page.locator('[data-test="ingestion-token-name-input-error"]')).toBeHidden();
 
         // Cancel and close
         await pageManager.ingestionTokensPage.clickCancel();

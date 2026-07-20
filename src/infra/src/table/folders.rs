@@ -42,6 +42,7 @@ pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
         FolderType::Dashboards => 0,
         FolderType::Alerts => 1,
         FolderType::Reports => 2,
+        FolderType::Synthetics => 3,
     }
 }
 
@@ -243,6 +244,16 @@ async fn list_models(
         .order_by(Column::Id, sea_orm::Order::Asc)
         .all(db)
         .await
+}
+
+/// Deletes all folders belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]

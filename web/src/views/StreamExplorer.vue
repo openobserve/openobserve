@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:rounded-md">
+  <div class="rounded-md">
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
@@ -10,10 +10,10 @@
       :is-loading="isLoading"
       @change:date-time="updateDateTime"
     />
-    <div class="tw:h-[calc(100vh-197px)]">
+    <div class="h-[calc(100vh-197px)]">
       <OTable
         data-test="stream-explorer-results-table"
-        class="tw:h-full"
+        class="h-full"
         :data="rows"
         :columns="tableColumns"
         row-key="_rowKey"

@@ -130,7 +130,7 @@ const dot = computed(() =>
 
 <template>
   <!-- Empty typed value: a plain dash in PRIMARY text (never the disabled grey). -->
-  <span v-if="isEmpty" class="tw:text-text-primary" v-bind="$attrs">{{ emptyLabel }}</span>
+  <span v-if="isEmpty" class="text-text-primary" v-bind="$attrs">{{ emptyLabel }}</span>
   <OBadge
     v-else
     :variant="variant"

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Home — OpenObserve RUM CDN Sample</title>
+
+  <!-- Warm the CDN connection so the async bundle fetch starts faster -->
+  <link rel="preconnect" href="https://browsersdk.openobserve.ai" crossorigin />
+  <link rel="dns-prefetch" href="https://browsersdk.openobserve.ai" />
+
+  <!--
+    OpenObserve RUM + Logs async loader stub. This SAME block must appear in the
+    <head> of every page so the SDK initializes on each navigation. It installs
+    the OO_RUM / OO_LOGS queues synchronously, then loads the bundles async.
+  -->
+  <script>
+    (function (h, o, u, n, g) {
+      h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
+      var s = o.createElement(u); s.async = 1; s.src = n;
+      var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-logs.js', 'OO_LOGS');
+    (function (h, o, u, n, g) {
+      h[g] = h[g] || { q: [], onReady: function (c) { this.q.push(c); } };
+      var s = o.createElement(u); s.async = 1; s.src = n;
+      var f = o.getElementsByTagName(u)[0]; f.parentNode.insertBefore(s, f);
+    })(window, document, 'script', 'https://browsersdk.openobserve.ai/0.3.4/openobserve-rum.js', 'OO_RUM');
+  </script>
+
+  <!-- Shared SDK config + init -->
+  <script src="./oo-rum.js"></script>
+  <!-- Shared styles -->
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <nav class="site-nav" aria-label="Primary">
+    <span class="brand">O2 RUM Demo</span>
+    <a href="./index.html" data-test="nav-home-link" aria-current="page">Home</a>
+    <a href="./products.html" data-test="nav-products-link">Products</a>
+    <a href="./checkout.html" data-test="nav-checkout-link">Checkout</a>
+    <a href="./about.html" data-test="nav-about-link">About</a>
+  </nav>
+
+  <main>
+    <h1>OpenObserve RUM — CDN Sample</h1>
+    <p class="sub">
+      Navigate between pages to build a multi-view session, then use the buttons
+      below to generate actions, errors, and logs. Check your OpenObserve org's
+      RUM dashboard and Session Replay.
+    </p>
+
+    <section>
+      <h2>SDK status</h2>
+      <div id="status">Initializing…</div>
+    </section>
+
+    <section>
+      <h2>Session</h2>
+      <div class="row">
+        <button data-test="rum-sample-reset-session-btn" onclick="window.ooSample.resetSession()">
+          Reset session &amp; reload
+        </button>
+        <button data-test="rum-sample-set-user-btn" onclick="window.ooSample.setUser()">
+          Set RUM user
+        </button>
+        <input id="user-name" data-test="rum-sample-user-name-input" placeholder="User name" value="Captain Hook" />
+      </div>
+      <small class="status">Reset clears the <code>_oo_s</code> cookie so a fresh session is re-sampled for replay.</small>
+    </section>
+
+    <section>
+      <h2>User actions (RUM)</h2>
+      <div class="row">
+        <button class="primary" data-test="rum-sample-track-action-btn" onclick="window.ooSample.trackAction()">
+          Track custom action
+        </button>
+        <button data-test="rum-sample-slow-task-btn" onclick="window.ooSample.runLongTask()">
+          Run long task
+        </button>
+        <button data-test="rum-sample-fetch-btn" onclick="window.ooSample.doFetch()">
+          Fetch a resource
+        </button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Errors &amp; logs</h2>
+      <div class="row">
+        <button data-test="rum-sample-throw-error-btn" onclick="window.ooSample.throwError()">
+          Throw uncaught error
+        </button>
+        <button data-test="rum-sample-reject-btn" onclick="window.ooSample.rejectPromise()">
+          Unhandled rejection
+        </button>
+        <button data-test="rum-sample-log-info-btn" onclick="window.ooSample.logInfo()">
+          Send info log
+        </button>
+        <button data-test="rum-sample-log-error-btn" onclick="window.ooSample.logError()">
+          Send error log
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>

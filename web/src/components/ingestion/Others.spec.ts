@@ -36,20 +36,6 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
-};
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn()
-  };
-});
-
 describe("Others Component", () => {
   let wrapper: VueWrapper<any>;
 

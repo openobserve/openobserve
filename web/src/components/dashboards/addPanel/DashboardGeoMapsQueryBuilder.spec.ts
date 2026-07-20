@@ -854,7 +854,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
       const latitudeContainer = wrapper.find(
         '[data-test="dashboard-latitude-layout"]',
       );
-      expect(latitudeContainer.classes()).toContain("tw:bg-[rgba(0,0,0,0.042)]");
+      expect(latitudeContainer.classes()).toContain("bg-[rgba(0,0,0,0.042)]");
     });
 
     it("should apply drop-entered class when drag area matches", () => {
@@ -866,7 +866,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         '[data-test="dashboard-latitude-layout"]',
       );
       expect(latitudeContainer.classes()).toContain(
-        "tw:bg-[var(--color-field-list-row-hover-bg)]",
+        "bg-[var(--color-field-list-row-hover-bg)]",
       );
     });
 
@@ -879,7 +879,7 @@ describe("DashboardGeoMapsQueryBuilder", () => {
         '[data-test="dashboard-latitude-layout"]',
       );
       expect(latitudeContainer.classes()).not.toContain(
-        "tw:bg-[var(--color-field-list-row-hover-bg)]",
+        "bg-[var(--color-field-list-row-hover-bg)]",
       );
     });
   });

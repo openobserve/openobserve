@@ -19,14 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
+  <div class="p-0 h-full flex flex-col">
     <!-- Standard page header: title + actions only. Search moved into the
          table's own toolbar (built-in global filter). -->
     <AppPageHeader
       :title="t('serviceAccounts.header')"
       icon="manage-accounts"
       :subtitle="t('serviceAccounts.headerSubtitle')"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
         <OButton
@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
     </AppPageHeader>
-      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="card-container tw:h-full">
+      <div class="w-full flex-1 min-h-0 overflow-hidden">
+        <div class="card-container h-full">
           <OTable
             :frame="false"
             :data="serviceAccountsState.service_accounts_users"
@@ -65,14 +65,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #toolbar>
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+              <div class="flex items-center gap-2 w-full">
                 <OSearchInput
                   v-model="filterQuery"
                   :placeholder="t('serviceAccounts.search')"
-                  class="tw:flex-1"
+                  class="flex-1"
                   data-test="iam-service-accounts-search-input"
                 />
               </div>
+            </template>
+            <template #toolbar-trailing>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="refresh"
+                :loading="loading"
+                data-test="iam-service-accounts-refresh-btn"
+                @click="getServiceAccountsUsers"
+              >
+                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamServiceAccountsRefresh" />
+              </OButton>
             </template>
             <template #empty>
               <OEmptyState
@@ -91,7 +103,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
                 <span data-test="service-accounts-system-account-label" class="text-weight-medium">{{ row.first_name }}</span>
-                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="tw:ml-2" />
+                <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="ml-2" />
+              </template>
+              <template v-else-if="isSyntheticSA(row.email)">
+                <!-- UI-created accounts store `<name>.<org>@sa.internal`; show
+                     the friendly name first, full identifier (the Basic-auth
+                     username) beneath it. -->
+                <div :data-test="`service-accounts-email-${row.email}`" class="flex flex-col">
+                  <span class="font-medium">{{ saDisplayName(row.email) }}</span>
+                  <span class="text-xs text-text-secondary">{{ row.email }}</span>
+                </div>
               </template>
               <template v-else>
                 <span :data-test="`service-accounts-email-${row.email}`"><OUserCell :value="row.email" /></span>
@@ -114,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-created_at="{ row }">
               <span
                 :data-test="`service-accounts-created-${row.email}`"
-                class="tw:text-text-primary"
+                class="text-text-primary"
               >{{ formatCreatedAt(row.created_at) }}</span>
             </template>
 
@@ -122,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="row.is_system">
                 <span
                   data-test="service-accounts-system-managed-badge"
-                  class="tw:inline-flex tw:items-center tw:gap-1"
+                  class="inline-flex items-center gap-1"
                 >
                   <OTag type="serviceAccountKind" value="managed" />
                   <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
@@ -159,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom>
-              <span class="o2-table-footer-title tw:text-text-primary">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
+              <span class="o2-table-footer-title">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
               <OButton
                 v-if="selectedAccounts.length > 0"
                 data-test="service-accounts-list-delete-accounts-btn"
@@ -218,25 +239,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="isShowToken"
       persistent
       size="md"
-      :title="wizardStep === 1
-        ? t('serviceAccounts.tokenReveal.step1Title')
-        : t('serviceAccounts.tokenReveal.step2Title')"
+      :title="t('serviceAccounts.tokenReveal.step1Title')"
     >
+      <!-- Single screen: access is granted in the create form itself, so the
+           old two-step wizard collapsed to just the token reveal, followed by
+           an access summary (creation only — rotate shows the token alone). -->
       <div data-test="service-accounts-token-wizard">
-        <!-- Step indicator -->
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-3 tw:text-xs tw:text-text-secondary">
-          <span
-            :class="wizardStep === 1 ? 'tw:text-primary tw:font-medium' : 'tw:text-text-secondary'"
-          >1. {{ t('serviceAccounts.tokenReveal.step1Title') }}</span>
-          <span class="tw:text-text-secondary">›</span>
-          <span
-            :class="wizardStep === 2 ? 'tw:text-primary tw:font-medium' : 'tw:text-text-secondary'"
-          >2. {{ t('serviceAccounts.tokenReveal.step2Title') }}</span>
-        </div>
-
-        <!-- ── Step 1: copy the token (irreversible) ──────────── -->
-        <div v-if="wizardStep === 1" data-test="service-accounts-token-step-1">
-          <p class="tw:text-xs tw:text-text-secondary tw:mb-3">
+        <div data-test="service-accounts-token-step-1">
+          <p class="text-xs text-text-secondary mb-3">
             {{ t('serviceAccounts.tokenReveal.copyHint') }}
           </p>
 
@@ -248,114 +258,141 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTabPanels v-model="tokenTab" animated>
             <OTabPanel name="curl">
-              <pre class="tw:bg-surface-subtle tw:text-text-primary tw:p-3 tw:rounded tw:text-xs tw:overflow-auto tw:whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenCurlSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="header">
-              <pre class="tw:bg-surface-subtle tw:text-text-primary tw:p-3 tw:rounded tw:text-xs tw:overflow-auto tw:whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenHeaderSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="env">
-              <pre class="tw:bg-surface-subtle tw:text-text-primary tw:p-3 tw:rounded tw:text-xs tw:overflow-auto tw:whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenEnvSnippet
               }}</pre>
             </OTabPanel>
           </OTabPanels>
 
-          <div class="tw:flex tw:items-center tw:gap-2 tw:mt-3">
+          <div class="flex items-center gap-2 mt-3">
             <OButton
               data-test="service-accounts-list-token-copy-btn"
               variant="outline"
               size="icon-md"
               :title="t('serviceAccounts.copyToken')"
-              @click.stop="copyToClipboard(serviceToken, { successMessage: 'Token Copied Successfully!', timeout: 5000 })"
+              @click.stop="copyToClipboard(serviceToken, { successMessage: t('serviceAccounts.toast.tokenCopied'), timeout: 5000 })"
             >
               <OIcon name="content-copy" size="sm" />
             </OButton>
-            <span class="tw:text-xs tw:text-text-secondary">{{ t('serviceAccounts.copyToken') }}</span>
+            <span class="text-xs text-text-secondary">{{ t('serviceAccounts.copyToken') }}</span>
 
             <OButton
               data-test="service-accounts-list-token-download-btn"
               variant="outline"
               size="icon-md"
-              class="tw:ml-2"
+              class="ml-2"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >
               <OIcon name="file-download" size="sm" />
             </OButton>
-            <span class="tw:text-xs tw:text-text-secondary">{{ t('serviceAccounts.downloadToken') }}</span>
+            <span class="text-xs text-text-secondary">{{ t('serviceAccounts.downloadToken') }}</span>
           </div>
 
-          <div class="tw:flex tw:justify-end tw:mt-4 tw:pt-3 tw:border-t tw:border-border-default">
-            <OButton
-              data-test="service-accounts-token-next-btn"
-              variant="primary"
-              size="sm"
-              @click="wizardStep = 2"
-            >
-              {{ t('serviceAccounts.tokenReveal.next') }} →
-            </OButton>
-          </div>
-        </div>
-
-        <!-- ── Step 2: grant permissions (reversible) ─────────── -->
-        <div v-else data-test="service-accounts-token-step-2">
+          <!-- ── Access grant status ──
+               Pending: the create flow's grant fan-out has not settled yet
+               (the token is shown immediately; grants resolve behind it).
+               Summary: what was granted / what failed.
+               Otherwise (rotate, or created with nothing selected): the
+               grant nudge + quick links — rotate keeps this guidance too,
+               since the account may well have no permissions. -->
           <div
-            data-test="service-accounts-list-token-next-step"
-            class="tw:flex tw:items-start tw:gap-2"
+            v-if="tokenAccessPending"
+            data-test="service-accounts-token-access-pending"
+            class="mt-4 flex items-center gap-2"
           >
-            <OIcon
-              v-if="showGroupLink"
-              name="warning"
-              size="sm"
-              class="tw:text-amber-500 tw:mt-0.5"
-            />
-            <span class="tw:text-xs tw:text-text-secondary">{{ tokenNextStepHint }}</span>
+            <OSpinner size="xs" />
+            <span class="text-xs text-text-secondary">{{ t('serviceAccounts.tokenReveal.applying') }}</span>
           </div>
 
-          <div v-if="showGroupLink" class="tw:flex tw:flex-wrap tw:items-center tw:justify-center tw:gap-3 tw:mt-3">
-            <router-link
-              data-test="service-accounts-list-token-add-to-role"
-              :to="roleLinkTarget"
-              class="tw:group tw:inline-flex tw:items-center tw:gap-1.5 tw:rounded-md tw:border tw:border-border-default tw:px-2.5 tw:py-1.5 tw:text-xs tw:text-text-primary tw:transition-colors tw:hover:border-primary tw:hover:bg-primary/5"
-              @click="isShowToken = false"
+          <div
+            v-else-if="hasAccessGrants || hasAccessFailures"
+            data-test="service-accounts-token-access-summary"
+            class="mt-4"
+          >
+            <div v-if="grantedRolesText" class="flex items-start gap-2 mb-1">
+              <OIcon name="check" size="sm" class="text-success-500 mt-0.5 shrink-0" />
+              <span class="text-xs text-text-secondary">{{ grantedRolesText }}</span>
+            </div>
+            <div v-if="grantedGroupsText" class="flex items-start gap-2 mb-1">
+              <OIcon name="check" size="sm" class="text-success-500 mt-0.5 shrink-0" />
+              <span class="text-xs text-text-secondary">{{ grantedGroupsText }}</span>
+            </div>
+
+            <div
+              v-if="failedRolesText"
+              data-test="service-accounts-token-access-failed"
+              class="flex items-start gap-2 mb-1"
             >
-              <OIcon name="shield" size="sm" class="tw:text-primary tw:shrink-0" />
-              <span class="tw:font-medium">{{ t('serviceAccounts.tokenReveal.addToRole') }}</span>
-              <OIcon
-                name="arrow-right"
-                size="sm"
-                class="tw:text-text-secondary tw:shrink-0 tw:transition-transform tw:group-hover:translate-x-0.5"
-              />
-            </router-link>
-            <router-link
-              data-test="service-accounts-list-token-add-to-group"
-              :to="groupLinkTarget"
-              class="tw:group tw:inline-flex tw:items-center tw:gap-1.5 tw:rounded-md tw:border tw:border-border-default tw:px-2.5 tw:py-1.5 tw:text-xs tw:text-text-primary tw:transition-colors tw:hover:border-primary tw:hover:bg-primary/5"
-              @click="isShowToken = false"
-            >
-              <OIcon name="group" size="sm" class="tw:text-primary tw:shrink-0" />
-              <span class="tw:font-medium">{{ t('serviceAccounts.tokenReveal.addToGroup') }}</span>
-              <OIcon
-                name="arrow-right"
-                size="sm"
-                class="tw:text-text-secondary tw:shrink-0 tw:transition-transform tw:group-hover:translate-x-0.5"
-              />
-            </router-link>
+              <OIcon name="warning" size="sm" class="text-amber-500 mt-0.5 shrink-0" />
+              <span class="text-xs text-text-secondary">{{ failedRolesText }}</span>
+            </div>
+            <div v-if="failedGroupsText" class="flex items-start gap-2 mb-1">
+              <OIcon name="warning" size="sm" class="text-amber-500 mt-0.5 shrink-0" />
+              <span class="text-xs text-text-secondary">{{ failedGroupsText }}</span>
+            </div>
+            <p v-if="hasAccessFailures" class="text-xs text-text-secondary mt-1">
+              {{ t('serviceAccounts.tokenReveal.failedHint') }}
+            </p>
           </div>
 
-          <div class="tw:flex tw:justify-between tw:mt-4 tw:pt-3 tw:border-t tw:border-border-default">
-            <OButton
-              data-test="service-accounts-token-back-btn"
-              variant="outline"
-              size="sm"
-              @click="wizardStep = 1"
-            >
-              ← {{ t('serviceAccounts.tokenReveal.back') }}
-            </OButton>
+          <div v-else class="mt-4">
+              <div
+                data-test="service-accounts-list-token-next-step"
+                class="flex items-start gap-2"
+              >
+                <OIcon
+                  v-if="showGroupLink"
+                  name="warning"
+                  size="sm"
+                  class="text-amber-500 mt-0.5"
+                />
+                <span class="text-xs text-text-secondary">{{ tokenNextStepHint }}</span>
+              </div>
+
+              <div v-if="showGroupLink" class="flex flex-wrap items-center justify-center gap-3 mt-3">
+                <router-link
+                  data-test="service-accounts-list-token-add-to-role"
+                  :to="roleLinkTarget"
+                  class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                  @click="isShowToken = false"
+                >
+                  <OIcon name="shield" size="sm" class="text-primary shrink-0" />
+                  <span class="font-medium">{{ t('serviceAccounts.tokenReveal.addToRole') }}</span>
+                  <OIcon
+                    name="arrow-right"
+                    size="sm"
+                    class="text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                  />
+                </router-link>
+                <router-link
+                  data-test="service-accounts-list-token-add-to-group"
+                  :to="groupLinkTarget"
+                  class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                  @click="isShowToken = false"
+                >
+                  <OIcon name="group" size="sm" class="text-primary shrink-0" />
+                  <span class="font-medium">{{ t('serviceAccounts.tokenReveal.addToGroup') }}</span>
+                  <OIcon
+                    name="arrow-right"
+                    size="sm"
+                    class="text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                  />
+                </router-link>
+              </div>
+          </div>
+
+          <div class="flex justify-end mt-4 pt-3 border-t border-border-default">
             <OButton
               data-test="service-accounts-token-done-btn"
               variant="primary"
@@ -387,6 +424,10 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 import AddServiceAccount from "./AddServiceAccount.vue";
+import {
+  isSyntheticServiceAccountEmail,
+  serviceAccountDisplayName,
+} from "./AddServiceAccount.schema";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -396,6 +437,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
 import { b64EncodeStandard } from "@/utils/formatters";
@@ -415,7 +457,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel },
+  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel, OSpinner },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();
@@ -443,10 +485,59 @@ export default defineComponent({
     const tokenAccountEmail = ref("");
 
     const tokenTab = ref("curl");
-    // Token reveal is a 2-step wizard: 1 = copy token (irreversible, first),
-    // 2 = grant permissions (reversible, can be done later). Always reset to 1
-    // each time the dialog is revealed.
-    const wizardStep = ref(1);
+
+    // Access-grant outcome from the create flow ({ assigned, failed } buckets
+    // of role/group names), shown under the token. Null on token rotate.
+    const tokenAccess = ref<{
+      assigned: { roles: string[]; groups: string[] };
+      failed: { roles: string[]; groups: string[] };
+    } | null>(null);
+    // True while the create flow's grant fan-out is still settling — the token
+    // is revealed immediately and the outcome fills in when it resolves.
+    const tokenAccessPending = ref(false);
+
+    const hasAccessGrants = computed(
+      () =>
+        !!tokenAccess.value &&
+        tokenAccess.value.assigned.roles.length +
+          tokenAccess.value.assigned.groups.length >
+          0,
+    );
+    const hasAccessFailures = computed(
+      () =>
+        !!tokenAccess.value &&
+        tokenAccess.value.failed.roles.length +
+          tokenAccess.value.failed.groups.length >
+          0,
+    );
+    const grantedRolesText = computed(() =>
+      tokenAccess.value?.assigned.roles.length
+        ? t("serviceAccounts.tokenReveal.grantedRoles", {
+            roles: tokenAccess.value.assigned.roles.join(", "),
+          })
+        : "",
+    );
+    const grantedGroupsText = computed(() =>
+      tokenAccess.value?.assigned.groups.length
+        ? t("serviceAccounts.tokenReveal.grantedGroups", {
+            groups: tokenAccess.value.assigned.groups.join(", "),
+          })
+        : "",
+    );
+    const failedRolesText = computed(() =>
+      tokenAccess.value?.failed.roles.length
+        ? t("serviceAccounts.tokenReveal.failedRoles", {
+            roles: tokenAccess.value.failed.roles.join(", "),
+          })
+        : "",
+    );
+    const failedGroupsText = computed(() =>
+      tokenAccess.value?.failed.groups.length
+        ? t("serviceAccounts.tokenReveal.failedGroups", {
+            groups: tokenAccess.value.failed.groups.join(", "),
+          })
+        : "",
+    );
 
     // OpenObserve authenticates API requests with HTTP Basic auth —
     // base64("<identifier>:<token>"), NOT a Bearer token. The service account's
@@ -508,13 +599,31 @@ export default defineComponent({
       },
     }));
 
-    const revealToken = (token: string, email: string) => {
+    const revealToken = (
+      token: string,
+      email: string,
+      access: typeof tokenAccess.value = null,
+    ) => {
       serviceToken.value = token;
       tokenAccountEmail.value = email;
       tokenTab.value = "curl";
-      wizardStep.value = 1;
+      tokenAccess.value = access;
+      tokenAccessPending.value = false;
       isShowToken.value = true;
     };
+
+    // UI-created accounts use the synthetic `<name>.<org>@sa.internal`
+    // identifier; the list shows the friendly name for those.
+    const isSyntheticSA = (email: string) =>
+      isSyntheticServiceAccountEmail(
+        email,
+        store.state.selectedOrganization.identifier,
+      );
+    const saDisplayName = (email: string) =>
+      serviceAccountDisplayName(
+        email,
+        store.state.selectedOrganization.identifier,
+      );
 
     const serviceAccounts = ref([]);
     const selectedAccounts: any = ref([]);
@@ -626,7 +735,7 @@ export default defineComponent({
     const getServiceAccountsUsers = async () =>{
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading service accounts...",
+        message: t("serviceAccounts.toast.loading"),
               timeout: 0,
 });
 
@@ -746,16 +855,37 @@ export default defineComponent({
       URL.revokeObjectURL(link.href); // Cleanup
     };
 
-    const addMember = async (res: any, data: any, operationType: string) => {
+    const addMember = async (
+      res: any,
+      data: any,
+      operationType: string,
+      access: typeof tokenAccess.value | Promise<typeof tokenAccess.value> = null,
+    ) => {
       showAddUserDialog.value = false;
       if (res.code == 200 ) {
         if (operationType == "created") {
             toast({
-              message: "Service Account created successfully.",
+              message: t("serviceAccounts.toast.created"),
               variant: "success",
             });
 
-          revealToken(res.token, data.email);
+          // The grant fan-out may still be in flight (the dialog emits its
+          // promise so the show-once token is never blocked on it). Reveal
+          // the token immediately; fill the access outcome in when it lands.
+          if (access && typeof (access as any).then === "function") {
+            revealToken(res.token, data.email, null);
+            tokenAccessPending.value = true;
+            (access as Promise<typeof tokenAccess.value>).then((resolved) => {
+              tokenAccess.value = resolved;
+              tokenAccessPending.value = false;
+            });
+          } else {
+            revealToken(
+              res.token,
+              data.email,
+              access as typeof tokenAccess.value,
+            );
+          }
           if (
             store.state.selectedOrganization.identifier == data.organization
           ) {
@@ -779,7 +909,7 @@ export default defineComponent({
         } else {
           setTimeout(() => {
             toast({
-              message: "Service Account updated successfully.",
+              message: t("serviceAccounts.toast.updated"),
               variant: "success",
             });
           }, 2000);
@@ -806,7 +936,7 @@ export default defineComponent({
         .then(async (res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: "Service Account deleted successfully.",
+              message: t("serviceAccounts.toast.deleted"),
               variant: "success",
             });
             await getServiceAccountsUsers();
@@ -815,7 +945,7 @@ export default defineComponent({
         .catch((err: any) => {
           if(err.response?.status != 403){
             toast({
-            message: err.response?.data?.message || "Error while deleting user.",
+            message: err.response?.data?.message || t("serviceAccounts.toast.deleteError"),
             variant: "error",
             });
           }
@@ -841,17 +971,17 @@ export default defineComponent({
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
-            message: `Successfully deleted ${successful.length} service account(s)`,
+            message: t("serviceAccounts.toast.bulkDeleteSuccess", { count: successful.length }),
             variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
-            message: `Deleted ${successful.length} service account(s), but ${unsuccessful.length} failed`,
+            message: t("serviceAccounts.toast.bulkDeletePartial", { successful: successful.length, failed: unsuccessful.length }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: `Failed to delete ${unsuccessful.length} service account(s)`,
+            message: t("serviceAccounts.toast.bulkDeleteFailed", { failed: unsuccessful.length }),
             variant: "error",
           });
         }
@@ -862,7 +992,7 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
-            message: err?.response?.data?.message || err?.message || "Error while deleting service accounts",
+            message: err?.response?.data?.message || err?.message || t("serviceAccounts.toast.bulkDeleteError"),
             variant: "error",
           });
         }
@@ -876,7 +1006,7 @@ export default defineComponent({
           revealToken(res.data.token, row.email);
 
         toast({
-          message: "Service token refreshed successfully.",
+          message: t("serviceAccounts.toast.rotated"),
           variant: "success",
         });
 
@@ -884,7 +1014,7 @@ export default defineComponent({
       }).catch((err)=>{
         if(err.response?.status != 403){
           toast({
-          message: err.response?.data?.message || "Error while refreshing token.",
+          message: err.response?.data?.message || t("serviceAccounts.toast.rotateError"),
           variant: "error",
           });
         }
@@ -957,7 +1087,16 @@ export default defineComponent({
       isShowToken,
       serviceToken,
       tokenTab,
-      wizardStep,
+      tokenAccess,
+      tokenAccessPending,
+      hasAccessGrants,
+      hasAccessFailures,
+      grantedRolesText,
+      grantedGroupsText,
+      failedRolesText,
+      failedGroupsText,
+      isSyntheticSA,
+      saDisplayName,
       revealToken,
       tokenCurlSnippet,
       tokenHeaderSnippet,

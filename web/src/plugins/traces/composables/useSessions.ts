@@ -16,6 +16,7 @@
 import { ref } from "vue";
 import { useStore } from "vuex";
 import sessionsService from "@/services/sessions";
+import { type GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 import { compactSql } from "../config/llmInsightsPanels";
 
@@ -135,6 +136,33 @@ export interface SessionRow {
   firstUserMessage: string;
 }
 
+// ---------------------------------------------------------------------------
+// Module-scoped list state — a singleton that outlives the SessionsList
+// component. Because it isn't re-created on each mount, navigating into a
+// session detail and back restores the previously fetched page instead of
+// re-hitting the API. Fresh data comes only from an explicit refresh or a date
+// change.
+// ---------------------------------------------------------------------------
+const sessions = ref<SessionRow[]>([]);
+const total = ref(0);
+const loading = ref(false);
+const error = ref<string | null>(null);
+const hasLoadedOnce = ref(false);
+// When the current page was last fetched (drives the header's "last refreshed"
+// label) and the org it was fetched for (so switching org re-fetches rather
+// than showing the previous org's sessions).
+const lastRunAt = ref<number | null>(null);
+const loadedOrg = ref<string | null>(null);
+// Shared pagination so the page/size the user was on is preserved across the
+// unmount/remount cycle and stays in sync with the restored rows.
+const currentPage = ref(1);
+const rowsPerPage = ref(20);
+// Agent-filter list is loaded lazily by `loadSessions` (agent mode only), so it
+// lives here too — otherwise a back-navigation, which skips that load, would
+// reset `agentsLoaded` to false and strand the agent picker on its skeleton.
+const agents = ref<GenAiAgentListItem[]>([]);
+const agentsLoaded = ref(false);
+
 /**
  * Composable owning the Sessions tab's list state and fetch flow.
  *
@@ -143,7 +171,10 @@ export interface SessionRow {
  * session level on the server (GROUP BY gen_ai_conversation_id) and
  * the dashboard renders one row per session.
  *
- * State is per-mount, mirroring `useLLMInsights`.
+ * List state is a module-scoped singleton so it survives the SessionsList
+ * component's unmount/remount cycle (e.g. drilling into a session detail and
+ * navigating back) — the list only re-fetches on an explicit refresh or a date
+ * change, not on every remount.
  *
  * @example
  *   const { sessions, total, loading, error, fetchPage, cancelAll }
@@ -157,12 +188,6 @@ export function useSessions() {
   // session-list and session-detail endpoints
   // don't expose final assistant text or per-span output.
   const { executeQuery, cancelAll } = useLLMStreamQuery();
-
-  const sessions = ref<SessionRow[]>([]);
-  const total = ref(0);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const hasLoadedOnce = ref(false);
 
   /**
    * Fetch one page of sessions from the backend's dedicated sessions
@@ -227,6 +252,10 @@ export function useSessions() {
       });
       total.value = Number(body.total) || 0;
       hasLoadedOnce.value = true;
+      // Stamp when/which-org this page was fetched — used to keep the "last
+      // refreshed" label accurate and to invalidate the cache on org switch.
+      lastRunAt.value = Date.now();
+      loadedOrg.value = orgId;
     } catch (e: any) {
       // axios error shape — surface the server's message if present.
       const serverMsg =
@@ -579,6 +608,12 @@ export function useSessions() {
     loading,
     error,
     hasLoadedOnce,
+    lastRunAt,
+    loadedOrg,
+    currentPage,
+    rowsPerPage,
+    agents,
+    agentsLoaded,
     fetchPage,
     fetchSession,
     fetchTurnDetail,

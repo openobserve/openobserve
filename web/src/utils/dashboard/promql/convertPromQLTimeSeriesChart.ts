@@ -147,9 +147,9 @@ export class TimeSeriesConverter implements PromQLChartConverter {
     return {
       series,
       xAxis: buildXAxis(panelSchema, store, hasData),
-      yAxis: buildYAxis(panelSchema),
+      yAxis: buildYAxis(panelSchema, 0, store),
       grid: buildDynamicGrid(panelSchema, chartPanelRef, series),
-      tooltip: buildTooltip(panelSchema, "axis"),
+      tooltip: buildTooltip(panelSchema, "axis", store, extras?.hoveredSeriesState),
       // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
       // This ensures consistent behavior with SQL charts
     };

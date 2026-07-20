@@ -1,0 +1,123 @@
+[package]
+name = "openobserve-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "dep:o2_dex",
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "dep:o2_ratelimit",
+    "openobserve-api-management/enterprise",
+    "openobserve-api-query/enterprise",
+    "openobserve-core/enterprise",
+]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "openobserve-api-management/cloud",
+    "openobserve-api-query/cloud",
+    "openobserve-core/cloud",
+]
+vectorscan = [
+    "openobserve-api-query/vectorscan",
+    "openobserve-core/vectorscan",
+]
+vortex = [
+    "config/vortex",
+    "openobserve-api-query/vortex",
+    "openobserve-core/vortex",
+]
+profiling = [
+    "dep:tikv-jemalloc-ctl",
+    "dep:tikv-jemalloc-sys",
+    "dep:jemalloc_pprof",
+    "dep:pprof",
+]
+
+# tikv-jemalloc-sys is a link-time dependency: it forces the "profiling"
+# feature on the jemalloc sys crate that jemalloc_pprof requires.
+[package.metadata.cargo-machete]
+ignored = ["tikv-jemalloc-sys"]
+
+[dependencies]
+openobserve-core.workspace = true
+openobserve-api-management.workspace = true
+openobserve-api-query.workspace = true
+openobserve-api-common.workspace = true
+openobserve-mcp.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+mime_guess.workspace = true
+ahash.workspace = true
+anyhow.workspace = true
+base64.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+datafusion.workspace = true
+arrow.workspace = true
+arrow-flight.workspace = true
+arrow-schema.workspace = true
+flate2.workspace = true
+futures.workspace = true
+hashbrown.workspace = true
+http-auth-basic.workspace = true
+itertools.workspace = true
+log.workspace = true
+o2_dex = { workspace = true, optional = true }
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+o2_ratelimit = { workspace = true, optional = true }
+opentelemetry.workspace = true
+opentelemetry-proto.workspace = true
+parking_lot.workspace = true
+prost.workspace = true
+proto.workspace = true
+rand.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+rust-embed-for-web.workspace = true
+web.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+snap.workspace = true
+svix-ksuid.workspace = true
+time.workspace = true
+tikv-jemalloc-ctl = { workspace = true, optional = true }
+tikv-jemalloc-sys = { workspace = true, optional = true }
+jemalloc_pprof = { workspace = true, optional = true }
+pprof = { workspace = true, optional = true }
+tokio.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true
+url.workspace = true
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
+config.workspace = true
+infra.workspace = true
+ingester.workspace = true
+zip.workspace = true
+futures-util.workspace = true
+tokio-stream.workspace = true
+mime.workspace = true
+flight.workspace = true
+async-stream.workspace = true
+
+[dev-dependencies]
+expect-test.workspace = true
+base64.workspace = true
+float-cmp.workspace = true
+multer.workspace = true
+rcgen.workspace = true

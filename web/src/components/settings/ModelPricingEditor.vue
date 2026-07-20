@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:rounded-md tw:p-0 tw:flex tw:flex-col"
+    class="rounded-md p-0 flex flex-col"
     style="min-height: 0; height: 100%; overflow: hidden"
   >
     <!-- Header -->
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'model-pricing-editor-back-btn',
       }"
       :title="headerTitle"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #title>
         <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>
@@ -35,8 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AppPageHeader>
 
     <!-- Form Body -->
+    <OForm
+      :form="form"
+      v-slot="{ isSubmitting }"
+      class="flex flex-col"
+      style="flex: 1; min-height: 0;"
+    >
     <div
-      class="tw:px-3 tw:py-3"
+      class="px-3 py-3"
       style="
         flex: 1;
         min-height: 0;
@@ -44,29 +50,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         overflow-y: auto;
       "
     >
-      <div style="max-width: 760px" class="tw:flex tw:flex-col tw:gap-6">
+      <div style="max-width: 760px" class="flex flex-col gap-6">
         <!-- ── Model Details Card ── -->
-        <div class="tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <div class="tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px] tw:dark:bg-[rgba(255,255,255,0.04)]">
+        <div class="border border-(--o2-border-color) rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--o2-border-color) rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
-              <div class="form-card-title tw:text-[13px] tw:font-semibold">
+              <div class="form-card-title text-[13px] font-semibold">
                 {{ t("modelPricing.modelDetails") }}
               </div>
-              <div class="form-card-subtitle tw:text-[11px] tw:opacity-60 tw:mt-px">
+              <div class="form-card-subtitle text-[11px] opacity-60 mt-px">
                 {{ t("modelPricing.modelDetailsDesc") }}
               </div>
             </div>
           </div>
-          <div class="form-card-body tw:flex tw:flex-row tw:gap-4 tw:px-4 tw:pt-[10px] tw:pb-2">
-            <div class="tw:flex-1">
-              <div class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label tw:text-xs tw:font-semibold tw:opacity-75 tw:h-5">
+          <div class="form-card-body flex flex-row gap-4 px-4 pt-[10px] pb-2">
+            <div class="flex-1">
+              <div class="flex items-center gap-1 mb-1 field-label text-xs font-semibold opacity-75 h-5">
                 {{ t("modelPricing.modelNameField") }}
-                <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1" data-test="model-pricing-name-info-btn">
+                <OButton variant="ghost" size="icon-xs-sq" class="ml-1" data-test="model-pricing-name-info-btn">
                   <OIcon
                     name="info"
                     size="xs"
                     :class="
-                      store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
+                      store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
                     "
                   />
                   <OTooltip
@@ -76,30 +82,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </OButton>
               </div>
-              <OInput
-                v-model="model.name"
+              <OFormInput
+                name="name"
                 :placeholder="t('modelPricing.modelNamePlaceholder')"
-                :error="nameTouched && !!nameError"
-                :error-message="nameError"
-                @blur="nameTouched = true"
-                @update:model-value="nameTouched = true"
                 data-test="model-pricing-name-input"
               />
             </div>
-            <div class="tw:flex-1 tw:flex tw:items-start tw:gap-1">
-              <div class="tw:flex-1">
+            <div class="flex-1 flex items-start gap-1">
+              <div class="flex-1">
                 <div
-                  class="tw:flex tw:items-center tw:gap-1 tw:mb-1 field-label tw:text-xs tw:font-semibold tw:opacity-75 tw:h-5"
+                  class="flex items-center gap-1 mb-1 field-label text-xs font-semibold opacity-75 h-5"
                 >
                   {{ t("modelPricing.matchPatternField") }}
-                  <OButton variant="ghost" size="icon-xs-sq" class="tw:ml-1" data-test="model-pricing-pattern-info-btn">
+                  <OButton variant="ghost" size="icon-xs-sq" class="ml-1" data-test="model-pricing-pattern-info-btn">
                     <OIcon
                       name="info"
                       size="xs"
                       :class="
                         store.state.theme === 'dark'
-                          ? 'tw:text-gray-400'
-                          : 'tw:text-gray-400'
+                          ? 'text-gray-400'
+                          : 'text-gray-400'
                       "
                     />
                     <OTooltip
@@ -109,20 +111,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </OButton>
                 </div>
-                <OInput
-                  v-model="model.match_pattern"
+                <OFormInput
+                  name="match_pattern"
                   :placeholder="t('modelPricing.matchPatternPlaceholder')"
-                  :error="patternTouched && !!regexError"
-                  :error-message="regexError"
-                  @blur="patternTouched = true"
-                  @update:model-value="patternTouched = true"
                   data-test="model-pricing-pattern-input"
                 />
               </div>
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="tw:opacity-50 tw:text-(--q-primary) tw:hover:opacity-100"
+                class="opacity-50 text-(--q-primary) hover:opacity-100"
                 data-test="model-pricing-pattern-examples-btn"
                 @click="showExamples = true"
               >
@@ -146,22 +144,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('modelPricing.patternExamplesTitle')"
           :sub-title="t('modelPricing.patternExamplesDesc')"
         >
-          <div class="examples-table tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
-            <div class="tw:grid tw:grid-cols-[180px_1fr_auto] tw:gap-3 tw:py-[6px] tw:px-3 tw:bg-[rgba(0,0,0,0.03)] tw:border-b tw:border-(--o2-border-color) tw:text-[10px] tw:font-bold tw:uppercase tw:tracking-[0.06em] tw:opacity-45 tw:dark:bg-[rgba(255,255,255,0.05)]">
+          <div class="examples-table border border-(--o2-border-color) rounded-lg overflow-hidden">
+            <div class="grid grid-cols-[180px_1fr_auto] gap-3 py-[6px] px-3 bg-[rgba(0,0,0,0.03)] border-b border-(--o2-border-color) text-[10px] font-bold uppercase tracking-[0.06em] opacity-45 dark:bg-[rgba(255,255,255,0.05)]">
               <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
               <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
             </div>
             <div
               v-for="ex in patternExamples"
               :key="ex.name"
-              class="examples-table-row tw:grid tw:grid-cols-[180px_1fr_auto] tw:gap-3 tw:items-center tw:py-2 tw:px-3 tw:border-b tw:border-(--o2-border-color) tw:text-xs"
+              class="examples-table-row grid grid-cols-[180px_1fr_auto] gap-3 items-center py-2 px-3 border-b border-(--o2-border-color) text-xs"
             >
-              <span class="examples-model-name tw:font-medium">{{ ex.name }}</span>
-              <code class="tw:font-mono tw:text-[11px] tw:bg-[rgba(0,0,0,0.04)] tw:py-px tw:px-[6px] tw:rounded tw:break-all tw:dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
+              <span class="examples-model-name font-medium">{{ ex.name }}</span>
+              <code class="font-mono text-[11px] bg-[rgba(0,0,0,0.04)] py-px px-[6px] rounded break-all dark:bg-[rgba(255,255,255,0.08)]">{{ ex.match_pattern }}</code>
               <OButton
                 variant="ghost"
                 size="icon-xs-sq"
-                class="tw:opacity-40 tw:hover:opacity-100"
+                class="opacity-40 hover:opacity-100"
                 :data-test="`model-pricing-example-copy-btn-${ex.name}`"
                 @click="copyPattern(ex.match_pattern)"
               >
@@ -174,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   :class="
                     copiedPattern === ex.match_pattern
-                      ? 'tw:text-green-500'
+                      ? 'text-green-500'
                       : ''
                   "
                 />
@@ -192,43 +190,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODialog>
 
         <!-- ── Pricing Tiers ── -->
-        <div class="tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:shadow-[0_1px_3px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
-          <div class="tw:flex tw:flex-row tw:items-center tw:justify-between tw:gap-3 tw:py-[10px] tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:rounded-t-[10px] tw:dark:bg-[rgba(255,255,255,0.04)]">
+        <div class="border border-(--o2-border-color) rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)]">
+          <div class="flex flex-row items-center justify-between gap-3 py-[10px] px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--o2-border-color) rounded-t-[10px] dark:bg-[rgba(255,255,255,0.04)]">
             <div>
-              <div class="form-card-title tw:text-[13px] tw:font-semibold">
+              <div class="form-card-title text-[13px] font-semibold">
                 {{ t("modelPricing.pricingTiers") }}
               </div>
-              <div class="form-card-subtitle tw:text-[11px] tw:opacity-60 tw:mt-px">
+              <div class="form-card-subtitle text-[11px] opacity-60 mt-px">
                 {{ t("modelPricing.pricingTiersDesc") }}
               </div>
             </div>
           </div>
 
-          <div class="form-card-body tw:flex tw:flex-col tw:gap-3 tw:px-4 tw:pt-[10px] tw:pb-2">
+          <div class="form-card-body flex flex-col gap-3 px-4 pt-[10px] pb-2">
             <div
-              v-for="(tier, idx) in model.tiers"
-              :key="idx as number"
-              class="tw:border tw:border-(--o2-border-color) tw:rounded-[10px] tw:overflow-hidden tw:shadow-[0_1px_4px_rgba(0,0,0,0.05)] tw:dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
+              v-for="(tier, idx) in formTiers"
+              :key="idx"
+              class="border border-(--o2-border-color) rounded-[10px] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)]"
             >
               <!-- Tier Header -->
-              <div class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:py-2 tw:px-4 tw:bg-[rgba(0,0,0,0.025)] tw:border-b tw:border-(--o2-border-color) tw:dark:bg-[rgba(255,255,255,0.04)]">
-                <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="tier-name-label tw:text-xs tw:font-medium tw:opacity-50 tw:whitespace-nowrap tw:shrink-0">{{
+              <div class="flex items-center justify-between gap-2 py-2 px-4 bg-[rgba(0,0,0,0.025)] border-b border-(--o2-border-color) dark:bg-[rgba(255,255,255,0.04)]">
+                <div class="flex items-center gap-2">
+                  <span class="tier-name-label text-xs font-medium opacity-50 whitespace-nowrap shrink-0">{{
                     t("modelPricing.tierName")
                   }}</span>
-                  <OInput
-                    v-model="tier.name"
+                  <OFormInput
+                    :name="`tiers[${idx}].name`"
                     :placeholder="t('modelPricing.tierNamePlaceholder')"
                     :data-test="`model-pricing-tier-name-input-${idx}`"
                   />
                 </div>
-                <div class="tw:flex tw:items-center tw:gap-2 tw:flex-shrink-0">
+                <div class="flex items-center gap-2 flex-shrink-0">
                   <OButton
-                    v-if="model.tiers.length > 1"
+                    v-if="formTiers.length > 1"
                     variant="outline-destructive"
                     size="icon"
+                    type="button"
                     :data-test="`model-pricing-tier-remove-btn-${idx}`"
-                    @click="removeTier(idx as number)"
+                    @click="removeTier(idx)"
                   >
                     <OIcon name="delete" size="sm" />
                   </OButton>
@@ -236,36 +235,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Tier Body -->
-              <div class="tier-body tw:p-3 tw:px-4 tw:flex tw:flex-col tw:gap-3">
+              <div class="tier-body p-3 px-4 flex flex-col gap-3">
                 <!-- Condition row (non-default tiers only) -->
                 <div
-                  v-if="(idx as number) > 0 && tier.condition"
-                  class="tw:py-3 tw:px-[14px] tw:rounded-lg tw:bg-[rgba(0,0,0,0.02)] tw:border tw:border-(--o2-border-color) tw:dark:bg-[rgba(255,255,255,0.03)]"
+                  v-if="idx > 0 && tier.condition"
+                  class="py-3 px-[14px] rounded-lg bg-[rgba(0,0,0,0.02)] border border-(--o2-border-color) dark:bg-[rgba(255,255,255,0.03)]"
                 >
-                  <div class="sub-label tw:mb-2 tw:text-[11px] tw:font-semibold tw:tracking-[0.06em] tw:opacity-65">
+                  <div class="sub-label mb-2 text-[11px] font-semibold tracking-[0.06em] opacity-65">
                     {{ t("modelPricing.applyTierWhen") }}
                   </div>
-                  <div class="tw:flex tw:gap-2 tw:items-end tw:flex-nowrap">
-                    <div class="tw:flex-1 tw:min-w-[130px]">
-                      <OInput
-                        v-model="tier.condition.usage_key"
+                  <div class="flex gap-2 items-end flex-nowrap">
+                    <div class="flex-1 min-w-[130px]">
+                      <OFormInput
+                        :name="`tiers[${idx}].condition.usage_key`"
                         :label="t('modelPricing.usageKeyCol')"
                         :placeholder="t('modelPricing.usageKeyPlaceholder')"
                         :data-test="`model-pricing-tier-condition-key-input-${idx}`"
                       />
                     </div>
-                    <div class="tw:w-[90px] tw:flex-shrink-0">
-                      <OSelect
-                        v-model="tier.condition.operator"
+                    <div class="w-[90px] flex-shrink-0">
+                      <OFormSelect
+                        :name="`tiers[${idx}].condition.operator`"
                         :options="operators"
-                        labelKey="label"
-                        valueKey="value"
+                        label-key="label"
+                        value-key="value"
                         :data-test="`model-pricing-tier-condition-operator-select-${idx}`"
                       />
                     </div>
-                    <div class="tw:w-[140px] tw:flex-shrink-0">
-                      <OInput
-                        v-model.number="tier.condition.value"
+                    <div class="w-[140px] flex-shrink-0">
+                      <OFormInput
+                        :name="`tiers[${idx}].condition.value`"
                         :label="t('modelPricing.threshold')"
                         type="number"
                         :data-test="`model-pricing-tier-condition-value-input-${idx}`"
@@ -275,30 +274,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Quick Setup -->
-                <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-                  <span class="sub-label tw:text-[11px] tw:font-semibold tw:tracking-[0.06em] tw:opacity-65">{{
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="sub-label text-[11px] font-semibold tracking-[0.06em] opacity-65">{{
                     t("modelPricing.quickSetup")
                   }}</span>
                   <OButton
                     v-for="tpl in usageTemplates"
                     :key="tpl.name"
                     variant="pricing-chip"
-                    :active="isTemplateActive(tier, tpl.keys)"
-                    class="tw:!rounded-[1.25rem] tw:!h-auto tw:!py-[0.3125rem] tw:!px-[0.875rem] tw:!text-xs tw:!font-medium tw:!gap-[0.375rem]"
+                    type="button"
+                    :active="isTemplateActive(idx, tpl.keys)"
+                    class="!rounded-[1.25rem] !h-auto !py-[0.3125rem] !px-[0.875rem] !text-xs !font-medium !gap-[0.375rem]"
                     :data-test="`model-pricing-tier-template-btn-${idx}-${tpl.name.toLowerCase()}`"
-                    @click="applyTemplate(tier, tpl.keys)"
+                    @click="applyTemplate(idx, tpl.keys)"
                   >
                     <template #icon-left>
                       <span
-                        class="pricing-chip-dot tw:w-[7px] tw:h-[7px] tw:rounded-full tw:shrink-0 tw:inline-block"
+                        class="pricing-chip-dot w-[7px] h-[7px] rounded-full shrink-0 inline-block"
                         :style="{ background: tpl.color }"
                       />
                     </template>
                     {{ tpl.name }}
                     <span
-                      v-if="isTemplateActive(tier, tpl.keys)"
-                      class="tw:text-sm tw:leading-none tw:opacity-75 tw:ml-0.5 tw:hover:opacity-100"
-                      @click.stop="clearTemplate(tier, tpl.keys)"
+                      v-if="isTemplateActive(idx, tpl.keys)"
+                      class="text-sm leading-none opacity-75 ml-0.5 hover:opacity-100"
+                      @click.stop="clearTemplate(idx, tpl.keys)"
                       >×</span
                     >
                   </OButton>
@@ -306,97 +306,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Price Table -->
                 <div>
-                  <div class="price-table-label tw:mb-2 tw:text-[11px] tw:font-semibold tw:tracking-[0.03em]">
+                  <div class="price-table-label mb-2 text-[11px] font-semibold tracking-[0.03em]">
                     {{ t("modelPricing.tokenPrices") }}
-                    <span class="price-table-label-sub tw:font-normal tw:opacity-55 tw:tracking-normal">
+                    <span class="price-table-label-sub font-normal opacity-55 tracking-normal">
                       {{ t("modelPricing.tokenPricesUnit") }}</span
                     >
                   </div>
 
-                  <div class="price-table tw:overflow-hidden">
+                  <div class="price-table overflow-hidden">
                     <!-- Column headers (only when rows exist) -->
                     <div
-                      v-if="Object.keys(tier.prices).length"
-                      class="price-table-head tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:py-[6px] tw:px-3 tw:text-[11px] tw:font-semibold tw:tracking-[0.01em] tw:opacity-45"
+                      v-if="tier.prices.length"
+                      class="price-table-head grid grid-cols-[1fr_160px_auto] gap-2 py-[6px] px-3 text-[11px] font-semibold tracking-[0.01em] opacity-45"
                     >
                       <span>{{ t("modelPricing.usageKeyCol") }}</span>
                       <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
                       <span></span>
                     </div>
 
-                    <!-- Existing rows — use stable numeric index as :key so
-                         renaming a key doesn't destroy/recreate the DOM node -->
+                    <!-- Existing rows — form-owned (tiers[i].prices[j]); value
+                         is held PER-MILLION so it binds directly. -->
+                    <!-- Key by INDEX (matching the index-based field names): a
+                         stable-id key makes Vue reuse+reorder row components on a
+                         middle delete, but each field's `form.Field` binds to its
+                         `name` at creation and does NOT re-bind when the name
+                         shifts — so reused rows would show stale (shifted) values.
+                         Index keys keep each position's name fixed. (Same pattern
+                         as CreateDestinationForm's headers.) -->
                     <div
-                      v-for="(entry, entryIdx) in priceEntries(tier)"
-                      :key="entry.stableId"
-                      class="price-row tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:items-center tw:py-0.5 tw:px-3"
+                      v-for="(_entry, entryIdx) in tier.prices"
+                      :key="entryIdx"
+                      class="price-row grid grid-cols-[1fr_160px_auto] gap-2 items-start py-0.5 px-3"
                     >
-                      <OInput
-                        :model-value="entry.key"
+                      <OFormInput
+                        :name="`tiers[${idx}].prices[${entryIdx}].key`"
                         :placeholder="t('modelPricing.usageKeyPlaceholder')"
                         :data-test="`model-pricing-price-key-input-${idx}-${entryIdx}`"
-                        @update:model-value="
-                          (val: any) => renamePriceByIndex(tier, entryIdx, val)
-                        "
                       />
-                      <OInput
-                        :model-value="toPerMillion(entry.value)"
+                      <OFormInput
+                        :name="`tiers[${idx}].prices[${entryIdx}].value`"
                         type="number"
                         :min="0"
                         step="0.01"
                         :placeholder="t('modelPricing.pricePlaceholder')"
                         :data-test="`model-pricing-price-value-input-${idx}-${entryIdx}`"
-                        @update:model-value="
-                          (val: any) =>
-                            updatePrice(
-                              tier,
-                              entry.key,
-                              fromPerMillion(Number(val)),
-                            )
-                        "
                       >
                         <template #icon-left
-                          ><span class="price-dollar tw:text-xs tw:pb-0.5">$</span></template
+                          ><span class="price-dollar text-xs pb-0.5">$</span></template
                         >
-                      </OInput>
-                      <OButton
-                        variant="outline-destructive"
-                        size="icon"
-                        :data-test="`model-pricing-price-delete-btn-${idx}-${entryIdx}`"
-                        @click="deletePrice(tier, entry.key)"
-                      >
-                        <OIcon name="delete" size="sm" />
-                      </OButton>
+                      </OFormInput>
+                      <!-- Fixed input-height band keeps the delete button centered
+                           against the input row even when the key field grows a
+                           below-field error (row is items-start so the error can't
+                           push the value input / this button downward). -->
+                      <div class="h-8.5 flex items-center">
+                        <OButton
+                          variant="outline-destructive"
+                          size="icon"
+                          type="button"
+                          :data-test="`model-pricing-price-delete-btn-${idx}-${entryIdx}`"
+                          @click="removePrice(idx, entryIdx)"
+                        >
+                          <OIcon name="delete" size="sm" />
+                        </OButton>
+                      </div>
                     </div>
 
                     <!-- Empty state -->
                     <div
-                      v-if="!Object.keys(tier.prices).length"
-                      class="price-empty tw:flex tw:flex-col tw:items-center tw:p-4 tw:gap-[3px]"
+                      v-if="!tier.prices.length"
+                      class="price-empty flex flex-col items-center p-4 gap-[3px]"
                     >
-                      <div class="price-empty-title tw:text-xs tw:font-medium">
+                      <div class="price-empty-title text-xs font-medium">
                         {{ t("modelPricing.noPricesDefined") }}
                       </div>
-                      <div class="price-empty-sub tw:text-[11px] tw:opacity-55">
+                      <div class="price-empty-sub text-[11px] opacity-55">
                         {{ t("modelPricing.noPricesDesc") }}
                       </div>
                     </div>
 
-                    <!-- Add row -->
+                    <!-- Add row (staging draft, form-owned) -->
                     <div
-                      class="price-add-row tw:grid tw:grid-cols-[1fr_160px_auto] tw:gap-2 tw:items-center tw:py-1 tw:px-3"
+                      class="price-add-row grid grid-cols-[1fr_160px_auto] gap-2 items-center py-1 px-3"
                       :class="{
-                        'price-add-row--no-top': !Object.keys(tier.prices)
-                          .length,
+                        'price-add-row--no-top': !tier.prices.length,
                       }"
                     >
-                      <OInput
-                        v-model="addState[idx as number].key"
+                      <OFormInput
+                        :name="`tiers[${idx}].draftKey`"
                         :placeholder="t('modelPricing.addUsageKeyPlaceholder')"
                         :data-test="`model-pricing-add-price-key-input-${idx}`"
                       />
-                      <OInput
-                        v-model.number="addState[idx as number].value"
+                      <OFormInput
+                        :name="`tiers[${idx}].draftValue`"
                         type="number"
                         :min="0"
                         step="0.01"
@@ -404,15 +406,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-add-price-value-input-${idx}`"
                       >
                         <template #icon-left
-                          ><span class="price-dollar tw:text-xs tw:pb-0.5">$</span></template
+                          ><span class="price-dollar text-xs pb-0.5">$</span></template
                         >
-                      </OInput>
+                      </OFormInput>
                       <OButton
                         variant="outline"
                         size="icon"
-                        :disabled="!addState[idx as number].key.trim()"
+                        type="button"
+                        :disabled="!String(tier.draftKey ?? '').trim()"
                         :data-test="`model-pricing-add-price-btn-${idx}`"
-                        @click="addPrice(tier, idx)"
+                        @click="addPrice(idx)"
                       >
                         <OIcon name="add" size="xs" />
                       </OButton>
@@ -421,59 +424,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Price Preview Table -->
                   <div
-                    v-if="previewEntries(tier, idx as number).length"
-                    class="tw:mt-5 tw:border tw:rounded"
+                    v-if="previewEntries(tier).length"
+                    class="mt-5 border rounded"
                     style="
                       background: rgba(0, 0, 0, 0.015);
                       border-color: var(--o2-border-color);
                     "
                   >
                     <div
-                      class="tw:px-4 tw:py-2 tw:text-xs tw:text-gray-500 tw:font-semibold tw:border-b"
+                      class="px-4 py-2 text-xs text-gray-500 font-semibold border-b"
                       style="border-color: var(--o2-border-color)"
                     >
                       {{ t("modelPricing.pricePreview") }}
                     </div>
                     <table
-                      class="tw:w-full tw:text-xs"
+                      class="w-full text-xs"
                       style="border-collapse: collapse"
                     >
                       <thead>
                         <tr
-                          class="tw:text-left tw:text-gray-400 tw:border-b"
+                          class="text-left text-gray-400 border-b"
                           style="border-color: var(--o2-border-color)"
                         >
-                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                          <th class="px-4 py-2 font-medium">
                             {{ t("modelPricing.usageType") }}
                           </th>
-                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                          <th class="px-4 py-2 font-medium">
                             {{ t("modelPricing.perThousand") }}
                           </th>
-                          <th class="tw:px-4 tw:py-2 tw:font-medium">
+                          <th class="px-4 py-2 font-medium">
                             {{ t("modelPricing.perMillion") }}
                           </th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr
-                          v-for="entry in previewEntries(tier, idx as number)"
-                          :key="entry.stableId"
-                          class="tw:border-b tw:last:border-none"
+                          v-for="entry in previewEntries(tier)"
+                          :key="entry.pending ? '__pending__' : entry.key"
+                          class="border-b last:border-none"
                           :class="{
-                            'preview-row-pending tw:opacity-50 tw:italic': entry.stableId === -1,
+                            'preview-row-pending opacity-50 italic': entry.pending,
                           }"
                           style="border-color: var(--o2-border-color)"
                         >
                           <td
-                            class="tw:px-4 tw:py-2 tw:text-gray-600 tw:font-medium"
+                            class="px-4 py-2 text-gray-600 font-medium"
                           >
                             {{ entry.key }}
                           </td>
-                          <td class="tw:px-4 tw:py-2 tw:text-gray-600">
-                            ${{ formatPreviewCost(entry.value, 1000) }}
+                          <td class="px-4 py-2 text-gray-600">
+                            ${{ formatPreviewCost(fromPerMillion(entry.value), 1000) }}
                           </td>
-                          <td class="tw:px-4 tw:py-2 tw:text-gray-600">
-                            ${{ formatPreviewCost(entry.value, 1000000) }}
+                          <td class="px-4 py-2 text-gray-600">
+                            ${{ formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
                           </td>
                         </tr>
                       </tbody>
@@ -485,7 +488,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm-action"
-              class="tw:self-start"
+              type="button"
+              class="self-start"
               data-test="model-pricing-add-tier-btn"
               @click="addTier"
             >
@@ -497,10 +501,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Footer -->
-    <div class="page-footer tw:flex tw:items-center tw:justify-end tw:gap-2 tw:px-6 tw:h-[50px] tw:shrink-0 tw:border-t tw:border-(--o2-border-color)">
+    <div class="page-footer flex items-center justify-end gap-2 px-6 h-[50px] shrink-0 border-t border-(--o2-border-color)">
       <OButton
         variant="outline"
         size="sm-action"
+        type="button"
+        :disabled="isSubmitting"
         @click="goBack"
         data-test="model-pricing-editor-cancel-btn"
       >
@@ -509,14 +515,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="primary"
         size="sm-action"
-        :loading="saving"
-        :disabled="!!nameError || !!regexError"
-        @click="save"
+        type="submit"
+        :loading="isSubmitting"
         data-test="model-pricing-editor-save-btn"
       >
         {{ t("modelPricing.save") }}
       </OButton>
     </div>
+    </OForm>
   </div>
 </template>
 
@@ -529,25 +535,26 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeModelPricingSchema,
+  type ModelPricingForm,
+} from "./ModelPricingEditor.schema";
 
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const route = useRoute();
 
-const saving = ref(false);
 const existingModels = ref<any[]>([]);
-const nameTouched = ref(false);
-const patternTouched = ref(false);
-const addState = ref<Array<{ key: string; value: number }>>([
-  { key: "", value: 0 },
-]);
+
 const showExamples = ref(false);
 const copiedPattern = ref<string | null>(null);
 
@@ -574,38 +581,10 @@ const orgIdentifier = computed(
   () => store.state.selectedOrganization?.identifier || "",
 );
 
-/** Real-time name validation. */
-const nameError = computed(() => {
-  const name = model.value.name;
-  if (!name || !name.trim()) return t("modelPricing.nameRequired");
-  if (name.length > 256) return t("modelPricing.nameTooLong");
-  return "";
-});
-
-/**
- * Strip Rust/PCRE tw:inline flag groups that JavaScript RegExp doesn't understand.
- * Handles: (?i), (?m), (?s), (?x), (?u), and combinations like (?ims).
- * Does NOT strip flag-scoped groups like (?i:...) — those are left as non-capturing groups.
- */
-function stripInlineFlags(pattern: string): string {
-  // (?FLAGS) where FLAGS is one or more of i, m, s, x, u — standalone (not followed by ':')
-  return pattern.replace(/\(\?[imsxu]+\)/g, "");
-}
-
-/** Real-time regex validation — shows error as the user types. */
-const regexError = computed(() => {
-  const pattern = model.value.match_pattern;
-  if (!pattern || !pattern.trim()) return t("modelPricing.patternRequired");
-  if (pattern.length > 512) return t("modelPricing.patternTooLong");
-  try {
-    // Strip Rust-specific tw:inline flags before testing with JS RegExp.
-    // The backend (Rust regex crate) is the authority; this is a best-effort client check.
-    new RegExp(stripInlineFlags(pattern));
-    return "";
-  } catch (e: any) {
-    return t("modelPricing.invalidRegex", { error: e.message });
-  }
-});
+// Scalar validation is now schema-driven (name + match_pattern). The manual
+// nameError/regexError computeds + nameTouched/patternTouched refs + the
+// :disabled Save gate are gone (R3).
+const modelPricingSchema = makeModelPricingSchema(t);
 
 const isEdit = computed(
   () => !!route.query.id && route.query.duplicate !== "true",
@@ -615,6 +594,29 @@ const headerTitle = computed(() =>
 );
 
 const model = ref<any>(createEmptyModel());
+
+// Dynamic defaults (edit-prefill projects the working model) → a typed computed.
+// `model.value` holds the API-shaped record (per-token price MAP); the form holds
+// the per-million ROW shape, so convert. For edit mode the async load re-seeds
+// the form via form.reset(modelToForm(...)) in onBeforeMount once data arrives.
+const modelPricingDefaults = computed(
+  (): ModelPricingForm => modelToForm(model.value),
+);
+
+// Rule ③ OWNER pattern: this component OWNS <OForm> and must read the form-owned
+// `tiers` array reactively to drive the v-for rows, so it creates the form here
+// with useOForm and hands it to <OForm :form="form"> — ONE source of truth, no
+// mirror ref / store.subscribe copy. `save` is the awaited submit handler (auto
+// Save spinner). Async edit-prefill re-seeds via form.reset() once data loads.
+const form = useOForm<ModelPricingForm>({
+  defaultValues: modelPricingDefaults.value,
+  schema: modelPricingSchema,
+  onSubmit: save,
+});
+
+// Reactive view of the form-owned `tiers` array — form.useStore tracks array
+// mutations (a plain form.state.values read in a computed would not).
+const formTiers = form.useStore((s: any) => s.values.tiers ?? []);
 
 function createEmptyModel() {
   return {
@@ -626,15 +628,80 @@ function createEmptyModel() {
   };
 }
 
+// API-shaped tier (per-token price map). Used to seed the working `model`.
 function newTier(name: string, condition: any = null) {
   return { name, condition, prices: {} as Record<string, number> };
 }
 
-function resetAddState(tierCount: number) {
-  addState.value = Array.from({ length: tierCount }, () => ({
-    key: "",
-    value: 0,
+// ── map ↔ rows converters (the field-array unlock) ───────────────────────────
+// One blank FORM tier (per-million row shape) for "Add tier".
+function newFormTier(name: string, condition: any = null) {
+  return {
+    name,
+    condition,
+    prices: [] as Array<{ key: string; value: number }>,
+    draftKey: "",
+    draftValue: 0,
+  };
+}
+
+// API model (per-token price MAP) → FORM value (per-million ROW array).
+function modelToForm(m: any): ModelPricingForm {
+  const tiers = (m?.tiers ?? []).map((tier: any, i: number) => ({
+    name: tier.name ?? "",
+    condition:
+      i === 0
+        ? null
+        : tier.condition
+          ? { ...tier.condition }
+          : { usage_key: "input", operator: "gt", value: 0 },
+    prices: Object.entries(tier.prices ?? {}).map(([k, v]) => ({
+      key: k,
+      value: toPerMillion(Number(v)),
+    })),
+    draftKey: "",
+    draftValue: 0,
   }));
+  return {
+    name: m?.name ?? "",
+    match_pattern: m?.match_pattern ?? "",
+    tiers,
+  };
+}
+
+// FORM value (per-million ROW array) → API tiers (per-token price MAP). Drops
+// blank keys and auto-commits each tier's non-empty draft row.
+function formToModelTiers(tiers: any[]): any[] {
+  return (tiers ?? []).map((tier: any, i: number) => {
+    const prices: Record<string, number> = {};
+    for (const row of tier.prices ?? []) {
+      const k = String(row.key ?? "").trim();
+      if (k) prices[k] = fromPerMillion(Number(row.value) || 0);
+    }
+    const dk = String(tier.draftKey ?? "").trim();
+    if (dk) prices[dk] = fromPerMillion(Number(tier.draftValue) || 0);
+    return {
+      name: tier.name,
+      condition:
+        i === 0
+          ? null
+          : tier.condition
+            ? {
+                usage_key: tier.condition.usage_key,
+                operator: tier.condition.operator,
+                value: Number(tier.condition.value) || 0,
+              }
+            : null,
+      prices,
+    };
+  });
+}
+
+// Replace the whole form-owned tiers array (the safe field-array mutation, as
+// CreateDestinationForm does for `headers`); `formTiers` (form.useStore) re-syncs
+// reactively and the template re-renders.
+function setTiers(next: any[]) {
+  form.setFieldValue("tiers", next, { dontUpdateMeta: true });
 }
 
 const usageTemplates = [
@@ -669,99 +736,93 @@ const operators = [
   { label: "!=", value: "neq" },
 ];
 
+// ── Field-array operations (whole-array setFieldValue; `formTiers`
+//    (form.useStore) re-syncs reactively + re-renders) ──────────────────────
 function addTier() {
-  model.value.tiers.push(
-    newTier(t("modelPricing.tierConditionalName"), {
+  setTiers([
+    ...formTiers.value,
+    newFormTier(t("modelPricing.tierConditionalName"), {
       usage_key: "input",
       operator: "gt",
       value: 200000,
     }),
-  );
-  addState.value.push({ key: "", value: 0 });
+  ]);
 }
 
 function removeTier(idx: number) {
-  model.value.tiers.splice(idx, 1);
-  addState.value.splice(idx, 1);
+  setTiers(formTiers.value.filter((_: any, i: number) => i !== idx));
 }
 
-function updatePrice(tier: any, key: string, value: number) {
-  tier.prices[key] = value;
+function removePrice(tierIdx: number, entryIdx: number) {
+  setTiers(
+    formTiers.value.map((tier: any, i: number) =>
+      i !== tierIdx
+        ? tier
+        : {
+            ...tier,
+            prices: tier.prices.filter(
+              (_: any, j: number) => j !== entryIdx,
+            ),
+          },
+    ),
+  );
 }
 
-function deletePrice(tier: any, key: string) {
-  delete tier.prices[key];
-  tier.prices = { ...tier.prices };
+// Commit a tier's staging draft row into its committed price rows, then clear
+// the draft. (Validation of the key happens schema-side / at submit.)
+function addPrice(tierIdx: number) {
+  setTiers(
+    formTiers.value.map((tier: any, i: number) => {
+      if (i !== tierIdx) return tier;
+      const dk = String(tier.draftKey ?? "").trim();
+      if (!dk) return tier;
+      return {
+        ...tier,
+        prices: [
+          ...tier.prices,
+          { key: dk, value: Number(tier.draftValue) || 0 },
+        ],
+        draftKey: "",
+        draftValue: 0,
+      };
+    }),
+  );
 }
 
-/** Stable ID counter for price entries — survives key renames without resetting. */
-let nextStableId = 0;
-const stableIdMap = new WeakMap<any, Map<number, number>>();
-
-/** Convert tier.prices object to an array with stable IDs for v-for :key.
- *  Each entry gets a numeric stableId that persists across key renames. */
-function priceEntries(
-  tier: any,
-): Array<{ key: string; value: number; stableId: number }> {
-  if (!stableIdMap.has(tier)) stableIdMap.set(tier, new Map());
-  const idMap = stableIdMap.get(tier)!;
-  return Object.entries(tier.prices || {}).map(([k, v], idx) => {
-    if (!idMap.has(idx)) idMap.set(idx, nextStableId++);
-    return { key: k, value: Number(v), stableId: idMap.get(idx)! };
-  });
-}
-
-/** Rename a price entry by its array index — keeps the DOM node alive. */
-function renamePriceByIndex(tier: any, index: number, newKey: string) {
-  const entries = Object.entries(tier.prices);
-  if (index < 0 || index >= entries.length) return;
-  const [oldKey, val] = entries[index];
-  if (newKey === oldKey) return;
-  const keyError = validateUsageKey(newKey);
-  if (keyError) {
-    notifyWarn(keyError);
-    return;
-  }
-  // Rebuild the object preserving insertion order with the new key at the same position
-  const rebuilt: Record<string, number> = {};
-  for (let i = 0; i < entries.length; i++) {
-    if (i === index) {
-      rebuilt[newKey] = val as number;
-    } else {
-      rebuilt[entries[i][0]] = entries[i][1] as number;
-    }
-  }
-  tier.prices = rebuilt;
-}
-
-function renamePrice(tier: any, oldKey: string, newKey: string) {
-  if (!newKey || newKey === oldKey) return;
-  const val = tier.prices[oldKey];
-  delete tier.prices[oldKey];
-  tier.prices[newKey] = val;
-  tier.prices = { ...tier.prices };
-}
-
-function isTemplateActive(tier: any, templateKeys: string[]): boolean {
-  const priceKeys = Object.keys(tier.prices || {});
+function isTemplateActive(tierIdx: number, templateKeys: string[]): boolean {
+  const tier = formTiers.value[tierIdx];
+  if (!tier) return false;
+  const priceKeys = (tier.prices ?? []).map((r: any) => r.key);
   if (priceKeys.length !== templateKeys.length) return false;
   return templateKeys.every((k) => priceKeys.includes(k));
 }
 
-function applyTemplate(tier: any, keys: string[]) {
-  const next: Record<string, number> = {};
-  for (const key of keys) {
-    next[key] = tier.prices[key] ?? 0;
-  }
-  tier.prices = next;
+function applyTemplate(tierIdx: number, keys: string[]) {
+  setTiers(
+    formTiers.value.map((tier: any, i: number) => {
+      if (i !== tierIdx) return tier;
+      const newPrices = keys.map((k) => {
+        const found = (tier.prices ?? []).find((r: any) => r.key === k);
+        return { key: k, value: found ? found.value : 0 };
+      });
+      return { ...tier, prices: newPrices };
+    }),
+  );
 }
 
-function clearTemplate(tier: any, keys: string[]) {
-  const next = { ...tier.prices };
-  for (const key of keys) {
-    delete next[key];
-  }
-  tier.prices = next;
+function clearTemplate(tierIdx: number, keys: string[]) {
+  setTiers(
+    formTiers.value.map((tier: any, i: number) =>
+      i !== tierIdx
+        ? tier
+        : {
+            ...tier,
+            prices: (tier.prices ?? []).filter(
+              (r: any) => !keys.includes(r.key),
+            ),
+          },
+    ),
+  );
 }
 
 function toPerMillion(perToken: number): number {
@@ -772,22 +833,19 @@ function fromPerMillion(perMillion: number): number {
   return perMillion > 0 ? perMillion / 1_000_000 : 0;
 }
 
-/** Entries for the live preview = committed prices + any pending add-row entry. */
-function previewEntries(tier: any, idx: number) {
-  const committed = priceEntries(tier);
-  const pending = addState.value[idx];
-  if (pending?.key.trim()) {
-    const pendingValue = fromPerMillion(pending.value || 0);
-    // Don't duplicate if the key already exists
-    if (!committed.find((e) => e.key === pending.key.trim())) {
-      committed.push({
-        key: pending.key.trim(),
-        value: pendingValue,
-        stableId: -1,
-      });
-    }
+/** Live preview = committed price rows + the (non-empty) draft. Values are
+ *  PER-MILLION; the template converts to per-token for the cost columns. */
+function previewEntries(
+  tier: any,
+): Array<{ key: string; value: number; pending?: boolean }> {
+  const out = (tier.prices ?? [])
+    .filter((r: any) => String(r.key ?? "").trim())
+    .map((r: any) => ({ key: String(r.key), value: Number(r.value) || 0 }));
+  const dk = String(tier.draftKey ?? "").trim();
+  if (dk && !out.find((e: any) => e.key === dk)) {
+    out.push({ key: dk, value: Number(tier.draftValue) || 0, pending: true });
   }
-  return committed;
+  return out;
 }
 
 function formatPreviewCost(costPerUnit: number, multiplier: number) {
@@ -804,23 +862,6 @@ function validateUsageKey(key: string): string | null {
   if (/^\d+$/.test(key)) return t("modelPricing.usageKeyPureInteger");
   if (/\s/.test(key)) return t("modelPricing.usageKeyContainsSpaces");
   return null;
-}
-
-function addPrice(tier: any, idx: number | string): boolean {
-  const i = Number(idx);
-  const key = (addState.value[i]?.key || "").trim();
-  if (!key) return true;
-  const keyError = validateUsageKey(key);
-  if (keyError) {
-    notifyWarn(keyError);
-    return false;
-  }
-  tier.prices = {
-    ...tier.prices,
-    [key]: fromPerMillion(addState.value[i].value || 0),
-  };
-  addState.value[i] = { key: "", value: 0 };
-  return true;
 }
 
 function goBack() {
@@ -847,59 +888,55 @@ function notifyError(prefix: string, e: any) {
   });
 }
 
-async function save() {
-  const m = model.value;
+// @submit handler. The schema validates name/match_pattern + per-row key
+// validity + condition.usage_key before @submit fires (R3). Two STRUCTURAL
+// rules that don't map to a single field stay here as guards (toasts): a draft
+// row with a value but no key, and "the default tier needs ≥1 non-zero price".
+// `value` is the raw form value (per-million ROW shape); convert to the API
+// (per-token MAP) shape for the payload.
+async function save(value?: ModelPricingForm) {
+  const tiers = (value?.tiers ?? formTiers.value) as any[];
 
-  // Auto-commit any pending add-row values before validation.
-  // Users often type a price and hit Save without clicking "+".
-  for (let i = 0; i < m.tiers.length; i++) {
-    const pending = addState.value[i];
-    if (pending && pending.value > 0 && !pending.key.trim()) {
-      notifyWarn(
-        t("modelPricing.tierPriceMissingKey", { name: m.tiers[i].name }),
-      );
-      return;
-    }
-    if (pending && pending.key.trim()) {
-      if (!addPrice(m.tiers[i], i)) return;
-    }
-  }
-
-  // Validate condition usage_key on non-default tiers — must not be a pure integer
-  for (let i = 1; i < m.tiers.length; i++) {
-    const c = m.tiers[i].condition;
-    if (!c) continue;
-    const key = (c.usage_key || "").trim();
-    if (key && /^\d+$/.test(key)) {
-      notifyWarn(
-        t("modelPricing.tierUsageKeyPlainNumber", {
-          name: m.tiers[i].name || `#${i + 1}`,
-        }),
-      );
+  // Draft-row guards: a non-empty draft key must be a valid usage key; a draft
+  // with a value but no key is an error (mirrors the old addPrice/save guards).
+  for (const tier of tiers) {
+    const dk = String(tier.draftKey ?? "").trim();
+    if (dk) {
+      const keyError = validateUsageKey(dk);
+      if (keyError) {
+        notifyWarn(keyError);
+        return;
+      }
+    } else if (Number(tier.draftValue) > 0) {
+      notifyWarn(t("modelPricing.tierPriceMissingKey", { name: tier.name }));
       return;
     }
   }
 
-  // Name and pattern have tw:inline errors — just mark fields as touched so errors show,
-  // no duplicate snackbar needed.
-  if (nameError.value || regexError.value) {
-    nameTouched.value = true;
-    patternTouched.value = true;
-    return;
-  }
-
-  // Require at least one price in the default tier (no tw:inline field for this)
-  const defaultTier = m.tiers?.[0];
+  // Require at least one non-zero price in the default tier (committed + draft).
+  const defaultTier = tiers[0];
   if (defaultTier) {
-    const priceValues = Object.values(defaultTier.prices || {}) as number[];
-    if (priceValues.length === 0 || priceValues.every((v: number) => v === 0)) {
+    const values = (defaultTier.prices ?? [])
+      .filter((r: any) => String(r.key ?? "").trim())
+      .map((r: any) => Number(r.value) || 0);
+    if (String(defaultTier.draftKey ?? "").trim()) {
+      values.push(Number(defaultTier.draftValue) || 0);
+    }
+    if (values.length === 0 || values.every((v: number) => v === 0)) {
       notifyWarn(t("modelPricing.addDefaultPrice"));
       return;
     }
   }
-  if (m.tiers.length > 0) {
-    m.tiers[0].condition = null;
-  }
+
+  // Build the API-shaped payload: keep the loaded record's metadata (id,
+  // enabled, valid_from, sort_order, org_id, source) from `model`, take the
+  // validated scalars + converted tiers from the form.
+  const m: any = {
+    ...model.value,
+    name: value?.name ?? model.value.name,
+    match_pattern: value?.match_pattern ?? model.value.match_pattern,
+    tiers: formToModelTiers(tiers),
+  };
 
   // Warn if another enabled org entry has the same pattern and higher priority
   // (same valid_from context — it will shadow this entry at runtime).
@@ -916,7 +953,8 @@ async function save() {
     return other.name.localeCompare(m.name) < 0;
   });
 
-  saving.value = true;
+  // Loading is form-driven: OForm awaits this handler, so the Save button's
+  // spinner (isSubmitting) spans the POST — no manual flag needed.
   try {
     if (m.id) {
       await modelPricingService.update(orgIdentifier.value, m.id, m);
@@ -939,8 +977,6 @@ async function save() {
     goBack();
   } catch (e: any) {
     notifyError(t("modelPricing.errSave"), e);
-  } finally {
-    saving.value = false;
   }
 }
 
@@ -966,12 +1002,10 @@ onBeforeMount(async () => {
       const found = res.data;
       if (found) {
         model.value = JSON.parse(JSON.stringify(found));
-        nameTouched.value = true;
-        patternTouched.value = true; // existing model — show validation immediately
         if (isDuplicate) {
           model.value.id = null;
           model.value.org_id = orgIdentifier.value;
-          model.value.name = model.value.name + " (Copy)";
+          model.value.name = model.value.name + t("settings.modelPricingEditor.copySuffix");
           // Clear source so create endpoint assigns the correct one
           delete model.value.source;
         }
@@ -984,12 +1018,16 @@ onBeforeMount(async () => {
             };
           }
         }
+        // Data arrived after mount → re-seed the whole form (scalars + the
+        // converted tier/price rows) once (the documented "async edit-prefill"
+        // pattern; not a per-keystroke watch). formTiers (form.useStore) updates
+        // reactively from the reset — no manual re-sync.
+        form.reset(modelToForm(model.value));
       }
     } catch (e: any) {
       notifyError(t("modelPricing.errLoadModel"), e);
     }
   }
-  resetAddState(model.value.tiers.length);
 });
 </script>
 

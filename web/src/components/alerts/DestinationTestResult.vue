@@ -13,26 +13,26 @@ See the License for the specific language governing permissions and
 limitations under the License. -->
 
 <template>
-  <div data-test="destination-test-result" class="tw:mt-3">
+  <div data-test="destination-test-result" class="mt-3">
     <!-- Success State -->
     <div
       v-if="result && result.success"
       data-test="test-result-success"
-      class="tw:flex tw:gap-3 tw:py-3 tw:px-4 tw:rounded tw:border-l-[3px] tw:border-solid tw:border-(--q-positive) tw:bg-[rgba(76,175,80,0.08)] tw:dark:bg-[rgba(76,175,80,0.12)]"
+      class="flex gap-3 py-3 px-4 rounded border-l-[3px] border-solid border-(--q-positive) bg-[rgba(76,175,80,0.08)] dark:bg-[rgba(76,175,80,0.12)]"
     >
-      <div class="tw:shrink-0 tw:pt-[2px] tw:text-(--q-positive)">
+      <div class="shrink-0 pt-[2px] text-(--q-positive)">
         <OIcon name="check-circle" size="md" />
       </div>
-      <div class="tw:flex-1 tw:min-w-0">
-        <div data-test="test-success-message" class="tw:text-[13px] tw:font-medium tw:leading-[1.4] tw:mb-1">
+      <div class="flex-1 min-w-0">
+        <div data-test="test-success-message" class="text-[13px] font-medium leading-[1.4] mb-1">
           {{ t('alerts.testSuccessMessage') }}
         </div>
-        <div data-test="test-success-timestamp" class="tw:text-[11px] tw:text-(--q-text-secondary) tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+        <div data-test="test-success-timestamp" class="text-[11px] text-(--q-text-secondary) flex items-center gap-2 flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
+          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -43,27 +43,27 @@ limitations under the License. -->
     <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
-      class="tw:flex tw:gap-3 tw:py-3 tw:px-4 tw:rounded tw:border-l-[3px] tw:border-solid tw:border-(--q-negative) tw:bg-[rgba(244,67,54,0.08)] tw:dark:bg-[rgba(244,67,54,0.12)]"
+      class="flex gap-3 py-3 px-4 rounded border-l-[3px] border-solid border-(--q-negative) bg-[rgba(244,67,54,0.08)] dark:bg-[rgba(244,67,54,0.12)]"
     >
-      <div class="tw:shrink-0 tw:pt-[2px] tw:text-(--q-negative)">
+      <div class="shrink-0 pt-[2px] text-(--q-negative)">
         <OIcon name="error" size="md" />
       </div>
-      <div class="tw:flex-1 tw:min-w-0">
-        <div data-test="test-failure-message" class="tw:text-[13px] tw:font-medium tw:leading-[1.4] tw:mb-1">
+      <div class="flex-1 min-w-0">
+        <div data-test="test-failure-message" class="text-[13px] font-medium leading-[1.4] mb-1">
           {{ getFailureMessage(result) }}
         </div>
-        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="tw:text-[11px] tw:text-(--q-text-secondary) tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="text-[11px] text-(--q-text-secondary) flex items-center gap-2 flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-(--q-text-secondary)">
+          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-(--q-text-secondary)">
             {{ result.responseTime }}ms
           </span>
         </div>
 
         <!-- Suggested Fix -->
-        <div v-if="getSuggestedFix(result)" class="result-suggestion tw:flex tw:items-start tw:gap-2 tw:mt-2 tw:p-2 tw:bg-[rgba(255,193,7,0.1)] tw:dark:bg-[rgba(255,193,7,0.15)] tw:rounded-[3px] tw:text-[11px] tw:text-(--q-text) tw:leading-[1.4]">
+        <div v-if="getSuggestedFix(result)" class="result-suggestion flex items-start gap-2 mt-2 p-2 bg-[rgba(255,193,7,0.1)] dark:bg-[rgba(255,193,7,0.15)] rounded-[3px] text-[11px] text-(--q-text) leading-[1.4]">
           <OIcon name="lightbulb" size="sm" />
           <span>{{ getSuggestedFix(result) }}</span>
         </div>
@@ -73,35 +73,35 @@ limitations under the License. -->
           v-if="result.error || result.responseBody"
           v-model="errorDetailsOpen"
           data-test="test-failure-details-expansion"
-          class="tw:mt-2 tw:bg-transparent"
+          class="mt-2 bg-transparent"
         >
           <template #trigger>
-            <div class="tw:flex tw:items-center tw:text-(--q-text-secondary) tw:text-[11px]">
-              <OIcon name="info" size="xs" class="tw:mr-1" />
-              <span class="tw:text-xs">{{ t('alerts.viewDetails') }}</span>
+            <div class="flex items-center text-(--q-text-secondary) text-[11px]">
+              <OIcon name="info" size="xs" class="mr-1" />
+              <span class="text-xs">{{ t('alerts.viewDetails') }}</span>
             </div>
           </template>
 
-          <div data-test="test-failure-details" class="tw:pt-2">
-            <div v-if="result.error" data-test="test-error-message" class="error-item tw:mb-3">
-              <div class="tw:text-[10px] tw:font-semibold tw:uppercase tw:tracking-[0.5px] tw:text-(--q-text-secondary) tw:mb-1">{{ t('alerts.error') }}</div>
-              <div class="tw:text-[11px] tw:text-(--q-text) tw:leading-[1.5] tw:break-words">{{ result.error }}</div>
+          <div data-test="test-failure-details" class="pt-2">
+            <div v-if="result.error" data-test="test-error-message" class="error-item mb-3">
+              <div class="text-[10px] font-semibold uppercase tracking-[0.5px] text-(--q-text-secondary) mb-1">{{ t('alerts.error') }}</div>
+              <div class="text-[11px] text-(--q-text) leading-[1.5] break-words">{{ result.error }}</div>
             </div>
 
-            <div v-if="result.statusCode" data-test="test-http-status" class="error-item tw:mb-3">
-              <div class="tw:text-[10px] tw:font-semibold tw:uppercase tw:tracking-[0.5px] tw:text-(--q-text-secondary) tw:mb-1">{{ t('alerts.httpStatus') }}</div>
-              <div class="tw:text-[11px] tw:text-(--q-text) tw:leading-[1.5] tw:break-words">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
+            <div v-if="result.statusCode" data-test="test-http-status" class="error-item mb-3">
+              <div class="text-[10px] font-semibold uppercase tracking-[0.5px] text-(--q-text-secondary) mb-1">{{ t('alerts.httpStatus') }}</div>
+              <div class="text-[11px] text-(--q-text) leading-[1.5] break-words">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
             </div>
 
-            <div v-if="result.responseBody" data-test="test-response-body" class="error-item tw:mb-3">
-              <div class="tw:text-[10px] tw:font-semibold tw:uppercase tw:tracking-[0.5px] tw:text-(--q-text-secondary) tw:mb-1">{{ t('alerts.responseBody') }}</div>
-              <pre class="tw:bg-[rgba(0,0,0,0.05)] tw:dark:bg-[rgba(255,255,255,0.05)] tw:border tw:border-[rgba(0,0,0,0.1)] tw:dark:border-[rgba(255,255,255,0.1)] tw:rounded-[3px] tw:p-2 tw:font-['Monaco','Consolas','Courier_New',monospace] tw:text-[10px] tw:leading-[1.5] tw:max-h-[150px] tw:overflow-y-auto tw:m-0 tw:whitespace-pre tw:text-(--q-text)">{{ formatResponseBody(result.responseBody) }}</pre>
+            <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
+              <div class="text-[10px] font-semibold uppercase tracking-[0.5px] text-(--q-text-secondary) mb-1">{{ t('alerts.responseBody') }}</div>
+              <pre class="bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.05)] border border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.1)] rounded-[3px] p-2 font-['Monaco','Consolas','Courier_New',monospace] text-[10px] leading-[1.5] max-h-[150px] overflow-y-auto m-0 whitespace-pre text-(--q-text)">{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
         </OCollapsible>
 
         <!-- Retry Button -->
-        <div class="tw:mt-3 tw:pt-2 tw:border-t tw:border-[rgba(0,0,0,0.08)] tw:dark:border-[rgba(255,255,255,0.08)]">
+        <div class="mt-3 pt-2 border-t border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)]">
           <OButton
             data-test="test-retry-button"
             variant="ghost-primary"
@@ -119,16 +119,16 @@ limitations under the License. -->
     <div
       v-else-if="isLoading"
       data-test="test-result-loading"
-      class="tw:flex tw:gap-3 tw:py-3 tw:px-4 tw:rounded tw:border-l-[3px] tw:border-solid tw:border-(--q-primary) tw:bg-[rgba(33,150,243,0.08)] tw:dark:bg-[rgba(33,150,243,0.12)]"
+      class="flex gap-3 py-3 px-4 rounded border-l-[3px] border-solid border-(--q-primary) bg-[rgba(33,150,243,0.08)] dark:bg-[rgba(33,150,243,0.12)]"
     >
-      <div class="tw:shrink-0 tw:pt-[2px] tw:text-(--q-primary)">
+      <div class="shrink-0 pt-[2px] text-(--q-primary)">
         <OSpinner size="xs" />
       </div>
-      <div class="tw:flex-1 tw:min-w-0">
-        <div class="tw:text-[13px] tw:font-medium tw:leading-[1.4] tw:mb-1">
+      <div class="flex-1 min-w-0">
+        <div class="text-[13px] font-medium leading-[1.4] mb-1">
           {{ t('alerts.testInProgress') }}
         </div>
-        <div class="tw:text-[11px] tw:text-(--q-text-secondary) tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+        <div class="text-[11px] text-(--q-text-secondary) flex items-center gap-2 flex-wrap">
           {{ t('alerts.sendingNotification') }}
         </div>
       </div>
@@ -138,10 +138,10 @@ limitations under the License. -->
     <div
       v-else
       data-test="test-result-idle"
-      class="tw:flex tw:items-center tw:gap-2 tw:py-[10px] tw:px-3 tw:rounded tw:bg-[rgba(0,0,0,0.02)] tw:dark:bg-[rgba(255,255,255,0.02)] tw:border tw:border-[rgba(0,0,0,0.08)] tw:dark:border-[rgba(255,255,255,0.08)]"
+      class="flex items-center gap-2 py-[10px] px-3 rounded bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] border border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)]"
     >
       <OIcon name="info" size="sm" />
-      <span class="tw:text-[11px] tw:text-(--q-text-secondary) tw:leading-[1.4]">
+      <span class="text-[11px] text-(--q-text-secondary) leading-[1.4]">
         {{ t('alerts.testIdleMessage') }}
       </span>
     </div>

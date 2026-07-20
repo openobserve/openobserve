@@ -48,7 +48,7 @@ describe("SpanStatusPill", () => {
         wrapper
           .find('[data-test="span-row-status-pill"]')
           .classes(),
-      ).toContain("tw:bg-badge-error-soft-bg");
+      ).toContain("bg-badge-error-soft-bg");
     });
 
     it("should not apply the success class", () => {
@@ -56,7 +56,7 @@ describe("SpanStatusPill", () => {
         wrapper
           .find('[data-test="span-row-status-pill"]')
           .classes(),
-      ).not.toContain("tw:bg-badge-success-soft-bg");
+      ).not.toContain("bg-badge-success-soft-bg");
     });
 
     it("should display the ERROR label", () => {
@@ -76,7 +76,7 @@ describe("SpanStatusPill", () => {
         wrapper
           .find('[data-test="span-row-status-pill"]')
           .classes(),
-      ).toContain("tw:bg-badge-error-soft-bg");
+      ).toContain("bg-badge-error-soft-bg");
     });
 
     it("should not apply the success class", () => {
@@ -84,7 +84,7 @@ describe("SpanStatusPill", () => {
         wrapper
           .find('[data-test="span-row-status-pill"]')
           .classes(),
-      ).not.toContain("tw:bg-badge-success-soft-bg");
+      ).not.toContain("bg-badge-success-soft-bg");
     });
 
     it("should display the original cased label", () => {
@@ -104,7 +104,7 @@ describe("SpanStatusPill", () => {
         wrapper
           .find('[data-test="span-row-status-pill"]')
           .classes(),
-      ).toContain("tw:bg-badge-success-soft-bg");
+      ).toContain("bg-badge-success-soft-bg");
     });
 
     it("should not apply the error class", () => {
@@ -112,7 +112,7 @@ describe("SpanStatusPill", () => {
         wrapper
           .find('[data-test="span-row-status-pill"]')
           .classes(),
-      ).not.toContain("tw:bg-badge-error-soft-bg");
+      ).not.toContain("bg-badge-error-soft-bg");
     });
 
     it("should display the OK label", () => {
@@ -132,7 +132,7 @@ describe("SpanStatusPill", () => {
         wrapper
           .find('[data-test="span-row-status-pill"]')
           .classes(),
-      ).toContain("tw:bg-badge-default-soft-bg");
+      ).toContain("bg-badge-default-soft-bg");
     });
 
     it("should not apply the error class", () => {
@@ -140,7 +140,7 @@ describe("SpanStatusPill", () => {
         wrapper
           .find('[data-test="span-row-status-pill"]')
           .classes(),
-      ).not.toContain("tw:bg-badge-error-soft-bg");
+      ).not.toContain("bg-badge-error-soft-bg");
     });
 
     it("should display UNSET as the label", () => {

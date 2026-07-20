@@ -51,13 +51,13 @@ const effectiveError = computed(
 const hasError = computed(() => !!effectiveError.value);
 
 const heightClasses: Record<NonNullable<ColorProps["size"]>, string> = {
-  sm: "tw:h-8 tw:text-xs",
-  md: "tw:h-10 tw:text-sm",
+  sm: "h-8 text-xs",
+  md: "h-10 text-sm",
 };
 
 const swatchSize: Record<NonNullable<ColorProps["size"]>, string> = {
-  sm: "tw:size-5",
-  md: "tw:size-6",
+  sm: "size-5",
+  md: "size-6",
 };
 
 // Canonical hex value for the swatch preview and Reka color bridge
@@ -119,35 +119,35 @@ function handleClear() {
 }
 
 const wrapperClasses = computed(() => [
-  "tw:flex tw:items-stretch tw:w-full tw:rounded-md tw:border tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150",
-  "tw:ring-offset-1 tw:ring-offset-surface-base",
-  "tw:bg-datepicker-bg",
+  "flex items-stretch w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "ring-offset-1 ring-offset-surface-base",
+  "bg-datepicker-bg",
   hasError.value
-    ? "tw:border-datepicker-error-border"
-    : "tw:border-datepicker-border tw:hover:border-datepicker-hover-border",
-  "tw:focus-within:border-datepicker-focus-border",
-  "tw:focus-within:ring-2 tw:focus-within:ring-datepicker-focus-ring",
+    ? "border-datepicker-error-border"
+    : "border-datepicker-border hover:border-datepicker-hover-border",
+  "focus-within:border-datepicker-focus-border",
+  "focus-within:ring-2 focus-within:ring-datepicker-focus-ring",
   props.disabled
-    ? "tw:bg-datepicker-disabled-bg tw:border-datepicker-disabled-border tw:opacity-60"
+    ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60"
     : "",
   heightClasses[props.size ?? "md"],
 ]);
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="wrapperAttrs" class="flex flex-col gap-1 w-full">
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="tw:text-xs tw:font-medium tw:text-datepicker-label tw:leading-none tw:flex tw:items-center tw:gap-1"
+      class="text-xs font-medium text-datepicker-label leading-none flex items-center gap-1"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help tw:text-datepicker-label"
+        class="cursor-help text-datepicker-label"
       ><slot name="tooltip" /></OIcon>
     </label>
 
@@ -158,12 +158,12 @@ const wrapperClasses = computed(() => [
           type="button"
           :disabled="disabled || readonly"
           :aria-label="label ? `${label} — pick color` : 'Pick color'"
-          class="tw:flex tw:items-center tw:ps-2 tw:pe-1 tw:shrink-0 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:transition-[box-shadow] tw:duration-150 tw:rounded-s-md"
-          :class="disabled || readonly ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer'"
+          class="flex items-center ps-2 pe-1 shrink-0 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150 rounded-s-md"
+          :class="disabled || readonly ? 'cursor-not-allowed' : 'cursor-pointer'"
         >
           <span
             :class="[
-              'tw:rounded tw:border tw:border-datepicker-border tw:shadow-sm',
+              'rounded border border-datepicker-border shadow-sm',
               swatchSize[size ?? 'md'],
             ]"
             :style="{ background: swatchHex }"
@@ -175,7 +175,7 @@ const wrapperClasses = computed(() => [
         <PopoverContent
           :side-offset="6"
           align="start"
-          class="tw:z-[10001] tw:rounded-lg tw:border tw:shadow-md tw:p-3 tw:flex tw:flex-col tw:gap-3 tw:bg-colorpicker-popup-bg tw:border-colorpicker-popup-border"
+          class="z-[10001] rounded-lg border shadow-md p-3 flex flex-col gap-3 bg-colorpicker-popup-bg border-colorpicker-popup-border"
           style="width: 220px"
         >
           <!-- Saturation / Brightness area -->
@@ -185,14 +185,14 @@ const wrapperClasses = computed(() => [
             color-space="hsb"
             x-channel="saturation"
             y-channel="brightness"
-            class="tw:w-full tw:rounded tw:overflow-hidden tw:relative"
+            class="w-full rounded overflow-hidden relative"
             style="height: 140px"
             @update:model-value="handlePickerChange"
             v-slot="{ style: areaStyle }"
           >
-            <ColorAreaArea class="tw:w-full tw:h-full" :style="areaStyle" />
+            <ColorAreaArea class="w-full h-full" :style="areaStyle" />
             <ColorAreaThumb
-              class="tw:size-4 tw:rounded-full tw:border-2 tw:border-colorpicker-thumb tw:shadow tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:transition-[box-shadow] tw:duration-150"
+              class="size-4 rounded-full border-2 border-colorpicker-thumb shadow outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
             />
           </ColorAreaRoot>
 
@@ -201,12 +201,12 @@ const wrapperClasses = computed(() => [
             :model-value="pickerColor"
             color-space="hsb"
             channel="hue"
-            class="tw:relative tw:flex tw:items-center tw:w-full tw:h-4 tw:rounded"
+            class="relative flex items-center w-full h-4 rounded"
             @update:model-value="handlePickerChange"
           >
-            <ColorSliderTrack class="tw:w-full tw:h-3 tw:rounded tw:overflow-hidden" />
+            <ColorSliderTrack class="w-full h-3 rounded overflow-hidden" />
             <ColorSliderThumb
-              class="tw:size-4 tw:rounded-full tw:border-2 tw:border-colorpicker-thumb tw:shadow tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:transition-[box-shadow] tw:duration-150"
+              class="size-4 rounded-full border-2 border-colorpicker-thumb shadow outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
             />
           </ColorSliderRoot>
 
@@ -217,7 +217,7 @@ const wrapperClasses = computed(() => [
             maxlength="7"
             placeholder="#000000"
             :disabled="disabled"
-            class="tw:w-full tw:rounded tw:border tw:px-2 tw:py-1 tw:text-xs tw:font-mono tw:outline-none tw:text-datepicker-text tw:placeholder:text-datepicker-placeholder tw:bg-datepicker-bg tw:border-datepicker-border tw:focus:border-datepicker-focus-border"
+            class="w-full rounded border px-2 py-1 text-xs font-mono outline-none text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border"
             @input="handleText"
           />
         </PopoverContent>
@@ -238,11 +238,11 @@ const wrapperClasses = computed(() => [
         :tabindex="inputTabindex"
         maxlength="7"
         :class="[
-          'tw:flex-1 tw:min-w-0 tw:bg-transparent tw:outline-none tw:font-mono',
-          'tw:text-datepicker-text tw:placeholder:text-datepicker-placeholder',
-          'tw:disabled:cursor-not-allowed',
-          'tw:ps-2',
-          clearable ? 'tw:pe-2' : 'tw:pe-3',
+          'flex-1 min-w-0 bg-transparent outline-none font-mono',
+          'text-datepicker-text placeholder:text-datepicker-placeholder',
+          'disabled:cursor-not-allowed',
+          'ps-2',
+          clearable ? 'pe-2' : 'pe-3',
         ]"
         @input="handleText"
         @blur="emit('blur', $event)"
@@ -254,14 +254,14 @@ const wrapperClasses = computed(() => [
         type="button"
         tabindex="-1"
         aria-label="Clear"
-        class="tw:flex tw:items-center tw:pe-2 tw:text-datepicker-icon tw:hover:opacity-80 tw:transition-colors"
+        class="flex items-center pe-2 text-datepicker-icon hover:opacity-80 transition-colors"
         @click="handleClear"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 16 16"
           fill="currentColor"
-          class="tw:size-3.5"
+          class="size-3.5"
           aria-hidden="true"
         >
           <path
@@ -271,17 +271,17 @@ const wrapperClasses = computed(() => [
       </button>
     </div>
 
-    <div v-if="effectiveError || helpText" class="tw:flex tw:items-center tw:gap-2">
+    <div v-if="effectiveError || helpText" class="flex items-center gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
-        class="tw:text-xs tw:text-datepicker-error-text tw:leading-none"
+        class="text-xs text-datepicker-error-text leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
       <span
         v-else-if="helpText"
-        class="tw:text-xs tw:text-datepicker-label tw:leading-none"
+        class="text-xs text-datepicker-label leading-none"
       >
         {{ helpText }}
       </span>

@@ -21,8 +21,6 @@ const node = document.createElement('div');
 node.setAttribute('id', 'app');
 document.body.appendChild(node);
 
-// Install Quasar
-
 describe('O2AIContextAddBtn', () => {
   let wrapper;
 
@@ -33,14 +31,14 @@ describe('O2AIContextAddBtn', () => {
       ai_enabled: true
     };
 
-    // Mount component with Quasar
+    // Mount component
     wrapper = mount(O2AIContextAddBtn, {
       attachTo: document.body,
       global: {
         plugins: [],
         provide: { store },
         stubs: {
-          'q-btn': false // Don't stub q-btn to test actual Quasar button
+          'q-btn': false // Don't stub q-btn to test actual button
         }
       },
       props: {
@@ -111,6 +109,6 @@ describe('O2AIContextAddBtn', () => {
   it('has correct button attributes', () => {
     const button = wrapper.find('[data-test="o2-ai-context-add-btn"]');
     expect(button.attributes('flat')).toBe(undefined);
-    expect(button.classes()).toContain('tw:group');
+    expect(button.classes()).toContain('group');
   });
 });

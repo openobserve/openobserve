@@ -22,18 +22,18 @@ const iconComponent = computed(() => iconRegistry[props.name as keyof typeof ico
 // Maps semantic size tokens to Tailwind size utilities (width + height).
 // md = 24px matches the default OIcon rendering size.
 const sizeClasses: Record<NonNullable<IconProps["size"]>, string> = {
-  xs: "tw:size-3",   // 12px
-  sm: "tw:size-4",   // 16px
-  md: "tw:size-6",   // 24px
-  lg: "tw:size-8",   // 32px
-  xl: "tw:size-10",  // 40px
+  xs: "size-3",   // 12px
+  sm: "size-4",   // 16px
+  md: "size-6",   // 24px
+  lg: "size-8",   // 32px
+  xl: "size-10",  // 40px
 };
 
 /** Project rule: every bin/delete icon renders in the destructive (red) color
  *  by default. The OIcon itself owns this so we don't have to thread a class
  *  through every consumer (`<OIcon name="delete" />` etc. — there are ~30+
  *  sites across the codebase). Consumers can still override by passing
- *  `class="tw:text-..."` since custom class wins via attribute-fallthrough. */
+ *  `class="text-..."` since custom class wins via attribute-fallthrough. */
 const isDestructiveIcon = computed<boolean>(() =>
   Boolean(
     props.name &&
@@ -49,11 +49,11 @@ const isDestructiveIcon = computed<boolean>(() =>
 
 <template>
   <span
-    class="tw:inline-flex tw:shrink-0 tw:items-center tw:justify-center tw:align-middle"
+    class="inline-flex shrink-0 items-center justify-center align-middle"
     :class="[
       sizeClasses[size],
       isDestructiveIcon
-        ? 'tw:text-[var(--o2-destructive,#dc2626)] tw:rounded tw:transition-colors tw:hover:bg-[var(--color-error-100,#fee2e2)]'
+        ? 'text-[var(--o2-destructive,#dc2626)] rounded transition-colors hover:bg-[var(--color-error-100,#fee2e2)]'
         : '',
     ]"
     :data-destructive-icon="isDestructiveIcon ? 'true' : undefined"
@@ -63,15 +63,15 @@ const isDestructiveIcon = computed<boolean>(() =>
         : { 'aria-hidden': 'true' }
     "
   >
-    <!-- img: prefix → external image (Quasar-compat) -->
+    <!-- img: prefix → external image -->
     <img
       v-if="isImgIcon"
       :src="imgSrc"
       :alt="label || ''"
-      class="tw:size-full tw:object-contain"
+      class="size-full object-contain"
     />
     <!-- Registry icon (Material Symbols, regular weight — the main-branch look). -->
-    <component v-else-if="iconComponent" :is="iconComponent" class="tw:size-full" />
+    <component v-else-if="iconComponent" :is="iconComponent" class="size-full" />
     <slot />
   </span>
 </template>

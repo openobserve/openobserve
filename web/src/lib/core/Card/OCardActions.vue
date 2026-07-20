@@ -9,15 +9,15 @@ const props = withDefaults(defineProps<OCardActionsProps>(), {
 defineSlots<OCardActionsSlots>();
 
 const alignClass: Record<NonNullable<OCardActionsProps["align"]>, string> = {
-  left: "tw:justify-start",
-  center: "tw:justify-center",
-  right: "tw:justify-end",
-  between: "tw:justify-between",
+  left: "justify-start",
+  center: "justify-center",
+  right: "justify-end",
+  between: "justify-between",
 };
 
 const classes = computed(() => [
-  "tw:flex tw:flex-row tw:flex-wrap tw:items-center tw:gap-2",
-  "tw:flex-none tw:px-4 tw:py-3",
+  "flex flex-row flex-wrap items-center gap-2",
+  "flex-none px-4 py-3",
   alignClass[props.align ?? "right"],
 ]);
 </script>

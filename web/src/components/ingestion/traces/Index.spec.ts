@@ -46,15 +46,7 @@ vi.mock("vue-router", () => ({
   RouterView: { template: "<div data-test='router-view'></div>" },
 }));
 
-// quasar has been removed from the project; provide only the minimal
-// useQuasar interface that child components (OTabs, OSplitter) may access.
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    notify: vi.fn(),
-  }),
-}));
-
-// copyToClipboard now lives in @/utils/clipboard, not quasar
+// copyToClipboard now lives in @/utils/clipboard
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
 }));

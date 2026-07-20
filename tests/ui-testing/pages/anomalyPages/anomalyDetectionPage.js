@@ -66,7 +66,7 @@ class AnomalyDetectionPage {
             saveButton: '[data-test="add-alert-submit-btn"]',
             cancelButton: '[data-test="add-alert-cancel-btn"]',
 
-            // Generic Quasar components
+            // Generic framework components
             qToggle: '.q-toggle',
             qMenuItem: '[data-test$="-popover"] [data-test$="-option"]',
             qMenu: '[data-test$="-popover"]',
@@ -174,7 +174,7 @@ class AnomalyDetectionPage {
     async clickTab(tabName) {
         // Try multiple base selectors with filter pattern to avoid injection
         const baseSelectors = [
-            '[class*="tw:cursor-pointer"]',
+            '[class*="cursor-pointer"]',
             '[role="group"] button',
             'button',
             '[role="tab"]'
@@ -328,7 +328,7 @@ class AnomalyDetectionPage {
 
         // Try multiple ways to find and click the Alerting tab
         const tabSelectors = [
-            '[class*="tw:cursor-pointer"]:has-text("Alerting")',
+            '[class*="cursor-pointer"]:has-text("Alerting")',
             'text=Alerting',
             'button:has-text("Alerting")',
             '[role="group"] button:has-text("Alerting")'
@@ -728,7 +728,7 @@ class AnomalyDetectionPage {
     async expectEditModeOpen() {
         // Detection Config tab should be visible when in edit mode
         const tabSelectors = [
-            '[class*="tw:cursor-pointer"]:has-text("Detection Config")',
+            '[class*="cursor-pointer"]:has-text("Detection Config")',
             'text=Detection Config',
             'button:has-text("Detection Config")',
             '[role="group"] button:has-text("Detection Config")'

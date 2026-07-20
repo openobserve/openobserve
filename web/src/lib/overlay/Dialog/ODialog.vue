@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// Copyright 2026 OpenObserve Inc.
+
 import type { DialogProps, DialogEmits, DialogSlots } from "./ODialog.types";
 import {
   DialogClose,
@@ -14,6 +16,7 @@ import { ref, watch, watchEffect, useSlots, computed, nextTick, useAttrs, inject
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -83,6 +86,21 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
   }
   clearBodyValidation();
   handleOpenChange(false);
+}
+
+// Modal keystroke containment. When focus sits on a non-field element inside
+// the dialog (a footer button, the panel itself after clicking empty space),
+// a bare printable key would bubble to the window-level shortcut manager and
+// fire page shortcuts on top of the open modal (e.g. logs "s" opening Saved
+// Views over Saved Functions). Swallow those here. Keys typed in input-like
+// elements pass through untouched (the shortcut manager already ignores
+// them), as do modifier combos (Ctrl/⌘ shortcuts stay app-wide by design) and
+// non-printable keys — Escape must keep reaching reka's dismiss layer.
+function handleContentKeydown(e: KeyboardEvent) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length !== 1) return;
+  if (isInputFocused(e.target)) return;
+  e.stopPropagation();
 }
 
 function handleInteractOutside(e: Event) {
@@ -158,24 +176,24 @@ const sizeClasses = computed(() => {
   // When an explicit width is supplied, skip max-w presets (full-screen is the exception)
   if (props.width) {
     return props.size === "full"
-      ? "tw:w-screen tw:h-screen tw:max-w-none tw:rounded-none"
-      : "tw:max-w-none";
+      ? "w-screen h-screen max-w-none rounded-none"
+      : "max-w-none";
   }
   switch (props.size) {
     case "xs":
-      return "tw:max-w-[min(320px,calc(100vw-2rem))] tw:w-full";
+      return "max-w-[min(320px,calc(100vw-2rem))] w-full";
     case "sm":
-      return "tw:max-w-[min(480px,calc(100vw-2rem))] tw:w-full";
+      return "max-w-[min(480px,calc(100vw-2rem))] w-full";
     case "md":
-      return "tw:max-w-[min(640px,calc(100vw-2rem))] tw:w-full";
+      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
     case "lg":
-      return "tw:max-w-[min(800px,calc(100vw-2rem))] tw:w-full";
+      return "max-w-[min(800px,calc(100vw-2rem))] w-full";
     case "xl":
-      return "tw:max-w-[min(1024px,calc(100vw-2rem))] tw:w-full";
+      return "max-w-[min(1024px,calc(100vw-2rem))] w-full";
     case "full":
-      return "tw:w-screen tw:h-screen tw:max-w-none tw:rounded-none";
+      return "w-screen h-screen max-w-none rounded-none";
     default:
-      return "tw:max-w-[min(640px,calc(100vw-2rem))] tw:w-full";
+      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
   }
 });
 
@@ -190,7 +208,7 @@ const contentStyle = computed(() => {
 });
 
 // ── Validation reset on cancel-path close ───────────────────────────────────
-/** Reset Quasar q-field validation for every field in the body slot so that
+/** Reset q-field validation for every field in the body slot so that
  *  cancel-path closes (Cancel button, ×, Escape, overlay click) never surface
  *  lazy-rules validation errors to the user. */
 function clearBodyValidation() {
@@ -224,24 +242,45 @@ function handleBodyFocusIn(e: FocusEvent) {
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 
+// Text fields take priority; a select/combobox trigger (OSelect listbox
+// trigger, reka SelectTrigger, q-select) is the second tier so a dialog whose
+// only field is a select still keeps keyboard focus on a field — otherwise
+// keystrokes land on a plain button and leak to page-level single-letter
+// shortcuts (e.g. "s" on logs opening Save View over an open dialog).
+const AUTOFOCUS_TEXT_FIELDS = [
+  'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
+  'textarea:not([disabled])',
+].join(', ');
+const AUTOFOCUS_COMBOBOX =
+  '[role="combobox"]:not([disabled]):not([aria-disabled="true"])';
+const AUTOFOCUS_ANY_FIELD = `${AUTOFOCUS_TEXT_FIELDS}, ${AUTOFOCUS_COMBOBOX}`;
+
+function findAutoFocusTarget(root: Element): HTMLElement | null {
+  const scan = (selector: string): HTMLElement[] => {
+    const nested = Array.from(root.querySelectorAll<HTMLElement>(selector));
+    return root.matches(selector) ? [root as HTMLElement, ...nested] : nested;
+  };
+  const textField = scan(AUTOFOCUS_TEXT_FIELDS).find(
+    (el) =>
+      !el.closest(
+        '.q-select, .o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]',
+      ),
+  );
+  if (textField) return textField;
+  return (
+    scan(AUTOFOCUS_COMBOBOX).find((el) => !el.closest('[data-no-autofocus]')) ??
+    null
+  );
+}
+
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
   nextTick(() => {
     const body = bodyRef.value;
-    if (body) {
-      const candidates = body.querySelectorAll<HTMLElement>(
-        [
-          'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
-          'textarea:not([disabled])',
-        ].join(', ')
-      );
-      const firstField = Array.from(candidates).find(
-        (el) => !el.closest('.q-select, .o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]')
-      );
-      if (firstField) {
-        firstField.focus();
-        return;
-      }
+    const field = body ? findAutoFocusTarget(body) : null;
+    if (field) {
+      field.focus();
+      return;
     }
     // No form field found → focus primary button (confirm dialog pattern)
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
@@ -250,6 +289,57 @@ function handleOpenAutoFocus(event: Event) {
     }
   });
 }
+
+// ── Focus repair on body content swaps ───────────────────────────────────────
+// A v-if/v-else swap inside the body (e.g. a Create/Update toggle replacing an
+// input with a select) leaves focus on whatever was clicked — a toggle button
+// — or drops it to <body> when the focused field itself was removed. Either
+// way the next keystroke bypasses the input-focus guard and fires page-level
+// single-letter shortcuts. When a mutation batch both removes and adds fields,
+// move focus to the first field of the newly added content — unless the user
+// is still focused in a field that survived the swap.
+watchEffect((cleanup) => {
+  if (!internalOpen.value) return;
+  const body = bodyRef.value;
+  if (!body) return;
+
+  const containsField = (node: Node): node is Element =>
+    node instanceof Element &&
+    (node.matches(AUTOFOCUS_ANY_FIELD) ||
+      !!node.querySelector(AUTOFOCUS_ANY_FIELD));
+
+  const observer = new MutationObserver((records) => {
+    const added = records
+      .flatMap((r) => Array.from(r.addedNodes))
+      .filter(containsField);
+    const removedField = records
+      .flatMap((r) => Array.from(r.removedNodes))
+      .some(containsField);
+    if (!added.length || !removedField) return;
+
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      body.contains(active) &&
+      active.matches(AUTOFOCUS_ANY_FIELD)
+    ) {
+      return;
+    }
+
+    nextTick(() => {
+      for (const el of added) {
+        if (!el.isConnected) continue;
+        const field = findAutoFocusTarget(el);
+        if (field) {
+          field.focus();
+          return;
+        }
+      }
+    });
+  });
+  observer.observe(body, { childList: true, subtree: true });
+  cleanup(() => observer.disconnect());
+});
 
 // ── Focus-trap workaround for portaled elements ─────────────────────────────
 // Same workaround as ODrawer — see the comment block there for full rationale.
@@ -311,11 +401,11 @@ watch(internalOpen, (open) => {
         data-test="o-dialog-overlay"
         :style="{ zIndex: overlayZIndex }"
         :class="[
-          'tw:fixed tw:inset-0',
-          'tw:bg-dialog-overlay',
-          'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
-          'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
-          'tw:data-[state=open]:duration-110 tw:data-[state=closed]:duration-90',
+          'fixed inset-0',
+          'bg-dialog-overlay',
+          'data-[state=open]:animate-in data-[state=open]:fade-in-0',
+          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+          'data-[state=open]:duration-110 data-[state=closed]:duration-90',
         ]"
       />
 
@@ -330,44 +420,45 @@ watch(internalOpen, (open) => {
           // `transform`-based -translate utilities) so the zoom animation —
           // which drives `transform` — composes cleanly and the panel scales
           // from true center instead of sliding diagonally.
-          'tw:fixed tw:left-1/2 tw:top-1/2 tw:[translate:-50%_-50%]',
+          'fixed left-1/2 top-1/2 [translate:-50%_-50%]',
           // Layout — flex-col so header/footer stick and only body scrolls
-          'tw:flex tw:flex-col tw:overflow-hidden',
+          'flex flex-col overflow-hidden',
           // Size
           sizeClasses,
           // Non-full: cap height so the flex structure actually clips
-          !isFullSize && 'tw:max-h-[90vh]',
+          !isFullSize && 'max-h-[90vh]',
           // Surface
-          'tw:bg-dialog-bg tw:border tw:border-dialog-border',
-          !isFullSize && 'tw:rounded-xl',
-          'tw:shadow-dialog',
+          'bg-dialog-bg border border-dialog-border',
+          !isFullSize && 'rounded-xl',
+          'shadow-dialog',
           // Typography
-          'tw:text-dialog-content-text',
+          'text-dialog-content-text',
           // Focus ring
-          'tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring',
+          'outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring',
           // Animation — single-direction rise: slides up from ~24px below while
           // fading in, soft ease-out-expo settle (150ms); fades + drops back out
           // (100ms). No scale, so nothing squishes — it just glides into place.
-          'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0 tw:data-[state=open]:slide-in-from-bottom-6',
-          'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0 tw:data-[state=closed]:slide-out-to-bottom-2',
-          'tw:data-[state=open]:duration-150 tw:data-[state=open]:ease-[cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[state=closed]:duration-100 tw:data-[state=closed]:ease-in',
+          'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-6',
+          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-2',
+          'data-[state=open]:duration-150 data-[state=open]:ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'data-[state=closed]:duration-100 data-[state=closed]:ease-in',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
+        @keydown="handleContentKeydown"
       >
         <!--
           DialogTitle is ALWAYS rendered for accessibility.
           sr-only so Reka never throws an accessibility warning.
           The visible title in the header is a plain <span> to avoid <h2> browser styles.
         -->
-        <DialogTitle class="tw:sr-only tw:absolute">
+        <DialogTitle class="sr-only absolute">
           {{ title ?? "Dialog" }}
         </DialogTitle>
 
         <!-- Required by Reka; hidden from view -->
-        <DialogDescription class="tw:sr-only tw:absolute">
+        <DialogDescription class="sr-only absolute">
           {{ title ?? "Dialog" }}
         </DialogDescription>
 
@@ -375,46 +466,46 @@ watch(internalOpen, (open) => {
         <div
           v-if="hasHeader"
           :class="[
-            'tw:flex tw:items-center tw:gap-2 tw:shrink-0',
-            'tw:px-(--spacing-dialog-header-px) tw:py-(--spacing-dialog-header-py)',
-            'tw:bg-dialog-header-bg tw:text-dialog-header-text',
-            'tw:border-b tw:border-dialog-header-border',
-            !isFullSize && 'tw:rounded-t-xl',
+            'flex items-center gap-2 shrink-0',
+            'px-(--spacing-dialog-header-px) py-(--spacing-dialog-header-py)',
+            'bg-dialog-header-bg text-dialog-header-text',
+            'border-b border-dialog-header-border',
+            !isFullSize && 'rounded-t-xl',
           ]"
         >
           <!-- CASE 1: Full override — backward compat, sub-slots are ignored -->
-          <div v-if="slots.header" class="tw:flex-1 tw:min-w-0">
+          <div v-if="slots.header" class="flex-1 min-w-0">
             <slot name="header" />
           </div>
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
             <!-- Title + subtitle block — fixed width, never grows -->
-            <div v-if="title || subTitle" class="tw:shrink-0 tw:min-w-0">
+            <div v-if="title || subTitle" class="shrink-0 min-w-0">
               <span
                 v-if="title"
-                class="tw:text-base tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block"
+                class="text-base font-semibold text-dialog-header-text truncate block"
               >
                 {{ title }}
               </span>
               <span
                 v-if="subTitle"
-                class="tw:text-sm tw:text-dialog-content-text tw:opacity-70 tw:truncate tw:block tw:mt-0.5"
+                class="text-sm text-dialog-content-text opacity-70 truncate block mt-0.5"
               >
                 {{ subTitle }}
               </span>
             </div>
 
             <!-- #header-left sub-slot — grows to fill space, content flows left-to-right after title -->
-            <div v-if="slots['header-left']" class="tw:flex-1 tw:min-w-0 tw:flex tw:items-center tw:justify-start tw:gap-2">
+            <div v-if="slots['header-left']" class="flex-1 min-w-0 flex items-center justify-start gap-2">
               <slot name="header-left" />
             </div>
 
             <!-- Spacer — fills gap when #header-left is absent; pushes header-right toward the close button -->
-            <div v-if="!slots['header-left']" class="tw:flex-1" />
+            <div v-if="!slots['header-left']" class="flex-1" />
 
             <!-- #header-right sub-slot — shrinks to content width, anchored just before the close button -->
-            <div v-if="slots['header-right']" class="tw:shrink-0 tw:flex tw:items-center tw:gap-2">
+            <div v-if="slots['header-right']" class="shrink-0 flex items-center gap-2">
               <slot name="header-right" />
             </div>
           </template>
@@ -427,14 +518,14 @@ watch(internalOpen, (open) => {
               data-test="o-dialog-close-btn"
               @mousedown.prevent
               :class="[
-                'tw:shrink-0 tw:flex tw:items-center tw:justify-center',
-                'tw:h-7 tw:w-7 tw:rounded-md',
-                'tw:text-dialog-close-text',
-                'tw:hover:bg-dialog-close-hover-bg',
-                'tw:active:bg-dialog-close-active-bg',
-                'tw:transition-colors tw:duration-150',
-                'tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-dialog-focus-ring',
-                'tw:cursor-pointer',
+                'shrink-0 flex items-center justify-center',
+                'h-7 w-7 rounded-md',
+                'text-dialog-close-text',
+                'hover:bg-dialog-close-hover-bg',
+                'active:bg-dialog-close-active-bg',
+                'transition-colors duration-150',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring',
+                'cursor-pointer',
               ]"
             >
               <svg
@@ -464,13 +555,13 @@ watch(internalOpen, (open) => {
         <div
           ref="bodyRef"
           :class="[
-            'tw:min-h-0 tw:overflow-x-hidden',
-            isFullSize ? 'tw:flex-1 tw:overflow-hidden tw:p-0' : 'tw:overflow-y-auto',
-            !isFullSize && 'tw:px-(--spacing-dialog-content-px) tw:py-(--spacing-dialog-content-py)',
-            'tw:text-dialog-content-text',
-            !isFullSize && canScrollUp && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
-            !isFullSize && canScrollDown && 'tw:[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
-            !isFullSize && canScrollUp && canScrollDown && 'tw:[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            'min-h-0 overflow-x-hidden',
+            isFullSize ? 'flex-1 overflow-hidden p-0' : 'overflow-y-auto',
+            !isFullSize && 'px-(--spacing-dialog-content-px) py-(--spacing-dialog-content-py)',
+            'text-dialog-content-text',
+            !isFullSize && canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
+            !isFullSize && canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            !isFullSize && canScrollUp && canScrollDown && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
           @focusin="handleBodyFocusIn"
         >
@@ -481,17 +572,17 @@ watch(internalOpen, (open) => {
         <div
           v-if="hasFooter"
           :class="[
-            'tw:shrink-0',
-            'tw:px-(--spacing-dialog-footer-px) tw:py-(--spacing-dialog-footer-py)',
-            'tw:bg-dialog-footer-bg',
-            'tw:border-t tw:border-dialog-footer-border',
-            !isFullSize && 'tw:rounded-b-xl',
+            'shrink-0',
+            'px-(--spacing-dialog-footer-px) py-(--spacing-dialog-footer-py)',
+            'bg-dialog-footer-bg',
+            'border-t border-dialog-footer-border',
+            !isFullSize && 'rounded-b-xl',
           ]"
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->
           <div
             v-if="!slots.footer"
-            class="tw:flex tw:items-center tw:justify-between tw:gap-2"
+            class="flex items-center justify-between gap-2"
           >
             <!-- Left: neutral button -->
             <div>
@@ -509,7 +600,7 @@ watch(internalOpen, (open) => {
             </div>
 
             <!-- Right: secondary + primary -->
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <OButton
                 v-if="secondaryButtonLabel"
                 data-test="o-dialog-secondary-btn"

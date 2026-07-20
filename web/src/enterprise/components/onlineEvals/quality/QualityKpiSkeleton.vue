@@ -1,21 +1,21 @@
 <template>
   <div
-    class="tw:grid tw:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] tw:gap-[10px]"
+    class="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-[10px]"
     :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
   >
     <div
       v-for="n in count"
       :key="n"
-      class="tw:pt-3 tw:px-3.5 tw:pb-2.5 tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:rounded-md tw:flex tw:flex-col tw:gap-2 tw:min-h-24"
+      class="pt-3 px-3.5 pb-2.5 bg-(--color-surface-base) border border-(--color-border-default) rounded-lg flex flex-col gap-2 min-h-24"
       :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
       data-test="quality-kpi-skeleton"
     >
       <SkeletonBox width="55%" height="11px" rounded />
-      <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
+      <div class="flex items-baseline justify-between gap-2">
         <SkeletonBox width="50%" height="22px" rounded />
         <SkeletonBox width="22%" height="11px" rounded />
       </div>
-      <div class="tw:flex tw:items-end tw:gap-[3px] tw:h-[28px] tw:mt-auto">
+      <div class="flex items-end gap-[3px] h-[28px] mt-auto">
         <SkeletonBox
           v-for="bar in 14"
           :key="bar"
@@ -38,16 +38,6 @@ const store = useStore();
 </script>
 
 <style>
-.dark-tile-content {
-  --tile-bg: #2b2c2d;
-  --tile-border: #444444;
-}
-
-.light-tile-content {
-  --tile-bg: #ffffff;
-  --tile-border: #e7eaee;
-}
-
 .skeleton-box {
   position: relative;
   overflow: hidden;

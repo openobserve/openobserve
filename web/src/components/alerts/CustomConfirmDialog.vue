@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div data-test="custom-confirm-card">
-      <p data-test="dialog-message" class="tw:text-sm tw:leading-relaxed">{{ message }}</p>
+      <p data-test="dialog-message" class="text-sm leading-relaxed">{{ message }}</p>
     </div>
   </ODialog>
 </template>

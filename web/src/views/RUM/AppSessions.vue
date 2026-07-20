@@ -15,17 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+  <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
     <template v-if="isSessionReplayEnabled">
       <div>
-        <div class="card-container tw:border-b tw:border-border-default tw:py-[0.375rem] tw:px-[0.375rem]">
-          <div class="tw:flex tw:items-start tw:gap-1">
+        <div
+          class="card-container border-b border-border-default py-[0.375rem] px-[0.375rem]"
+        >
+          <div class="flex items-start gap-1">
             <!-- Query editor (flex-grow to fill available space) -->
-            <div class="tw:flex-1 tw:min-w-0 tw:relative">
+            <div class="flex-1 min-w-0 relative">
               <query-editor
                 ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
-                :class="['tw:border', 'tw:solid', 'tw:border-[var(--o2-border-color)]', 'tw:p-[0.25rem]', 'tw:rounded-[0.375rem]', 'tw:overflow-y-auto', queryEditorHeight]"
+                :class="[
+                  'border',
+                  'solid',
+                  'border-[var(--o2-border-color)]',
+                  'p-[0.25rem]',
+                  'rounded-[0.375rem]',
+                  'overflow-y-auto',
+                  queryEditorHeight,
+                ]"
                 v-model:query="sessionState.data.editorValue"
                 :debounce-time="300"
                 :keywords="effectiveKeywords"
@@ -36,14 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:pt-0.75 tw:pr-2 tw:pb-0 tw:pl-[2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
+                class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
               >
-                <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+                <span class="query-editor-placeholder-typewriter">{{
+                  editorPlaceholder
+                }}</span>
               </div>
             </div>
 
             <!-- Controls on the right -->
-            <div class="tw:flex tw:items-start tw:gap-1 tw:shrink-0">
+            <div class="flex items-start gap-1 shrink-0">
               <syntax-guide />
               <date-time
                 auto-apply
@@ -66,139 +78,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm-toolbar"
                 :title="t('metrics.runQuery')"
                 @click="runQuery"
-                class="tw:shrink-0"
+                class="shrink-0"
               >
                 {{ t("metrics.runQuery") }}
               </OButton>
-            </div><!-- end controls -->
-          </div><!-- end flex row -->
-        </div><!-- end card-container -->
-      </div><!-- end toolbar wrapper -->
-
-      <!-- KPI summary strip -->
-      <div class="card-container tw:border-b tw:border-border-default">
-        <SessionsMetricsStrip
-          :total="kpiMetrics.total"
-          :error-sessions="kpiMetrics.errorSessions"
-          :frustrated-sessions="kpiMetrics.frustratedSessions"
-          :bounced-sessions="kpiMetrics.bouncedSessions"
-          :bounce-base="kpiMetrics.bounceBase"
-          :avg-duration-ms="kpiMetrics.avgDurationMs"
-          :median-duration-ms="kpiMetrics.medianDurationMs"
-          :sessions-delta-pct="kpiDeltas?.sessionsPct ?? null"
-          :errors-delta="kpiDeltas?.errors ?? null"
-          :frustrated-delta="kpiDeltas?.frustrated ?? null"
-          :active-card="activeMetricCard"
-          @select="handleMetricSelect"
-        />
-
-        <!-- One actionable insight for the current window, when one exists -->
-        <div v-if="topInsight" class="tw:px-2 tw:pb-2">
-          <SessionsInsightBanner
-            :insight="topInsight"
-            @apply="applyInsightFilter(topInsight)"
-            @filter="filterSessionsByInsightError(topInsight)"
-            @open-error-tracking="openInsightInErrorTracking(topInsight)"
-          />
+              <OTableColumnToggle
+                :columns="tableColumns"
+                :column-visibility="columnVisibility"
+                @update:column-visibility="setColumnVisibility"
+              />
+              <!-- Refresh button -->
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                icon-left="refresh"
+                :loading="isLoading.length > 0"
+                data-test="rum-app-sessions-refresh-btn"
+                class="shrink-0"
+                @click="runQuery"
+              >
+                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="rumSessionsRefresh" />
+              </OButton>
+            </div>
+            <!-- end controls -->
+          </div>
+          <!-- end flex row -->
         </div>
-
-        <!-- Segment filters -->
-        <div
-          class="tw:flex tw:flex-wrap tw:items-center tw:gap-4 tw:px-2 tw:pb-2"
-          data-test="rum-app-sessions-segment-filters"
-        >
-          <OToggleGroup
-            :model-value="healthSegment"
-            type="single"
-            :label="t('rum.health')"
-            label-position="left"
-            @update:model-value="(v: any) => setHealthSegment(v)"
-          >
-            <OToggleGroupItem
-              value="all"
-              size="xs"
-              data-test="rum-app-sessions-health-all"
-            >{{ t("rum.all") }}</OToggleGroupItem>
-            <OToggleGroupItem
-              value="errors"
-              size="xs"
-              data-test="rum-app-sessions-health-errors"
-            >{{ t("rum.withErrors") }} · {{ sessionsSummary.errorSessions }}</OToggleGroupItem>
-            <OToggleGroupItem
-              value="frustrated"
-              size="xs"
-              data-test="rum-app-sessions-health-frustrated"
-            >{{ t("rum.frustrated") }} · {{ sessionsSummary.frustratedSessions }}</OToggleGroupItem>
-            <OToggleGroupItem
-              value="clean"
-              size="xs"
-              data-test="rum-app-sessions-health-clean"
-            >{{ t("rum.clean") }} · {{ sessionsSummary.cleanSessions }}</OToggleGroupItem>
-          </OToggleGroup>
-
-          <OToggleGroup
-            :model-value="typeSegment"
-            type="single"
-            :label="t('rum.type')"
-            label-position="left"
-            @update:model-value="(v: any) => setTypeSegment(v)"
-          >
-            <OToggleGroupItem
-              value="all"
-              size="xs"
-              data-test="rum-app-sessions-type-all"
-            >{{ t("rum.all") }}</OToggleGroupItem>
-            <OToggleGroupItem
-              value="engaged"
-              size="xs"
-              data-test="rum-app-sessions-type-engaged"
-            >{{ t("rum.engaged") }} · {{ sessionsSummary.engagedSessions }}</OToggleGroupItem>
-            <OToggleGroupItem
-              value="bounced"
-              size="xs"
-              data-test="rum-app-sessions-type-bounced"
-            >{{ t("rum.bounced") }} · {{ sessionsSummary.bouncedSessions }}</OToggleGroupItem>
-          </OToggleGroup>
-
-          <OToggleGroup
-            :model-value="deviceSegment"
-            type="single"
-            :label="t('rum.device')"
-            label-position="left"
-            @update:model-value="(v: any) => setDeviceSegment(v)"
-          >
-            <OToggleGroupItem
-              value="all"
-              size="xs"
-              data-test="rum-app-sessions-device-all"
-            >{{ t("rum.all") }}</OToggleGroupItem>
-            <OToggleGroupItem
-              value="desktop"
-              size="xs"
-              data-test="rum-app-sessions-device-desktop"
-            >{{ t("rum.desktop") }} · {{ sessionsSummary.deviceCounts.desktop }}</OToggleGroupItem>
-            <OToggleGroupItem
-              value="mobile"
-              size="xs"
-              data-test="rum-app-sessions-device-mobile"
-            >{{ t("rum.mobile") }} · {{ sessionsSummary.deviceCounts.mobile }}</OToggleGroupItem>
-            <OToggleGroupItem
-              value="tablet"
-              size="xs"
-              data-test="rum-app-sessions-device-tablet"
-            >{{ t("rum.tablet") }} · {{ sessionsSummary.deviceCounts.tablet }}</OToggleGroupItem>
-          </OToggleGroup>
-        </div>
+        <!-- end card-container -->
       </div>
+      <!-- end toolbar wrapper -->
 
       <OSplitter
-        class="logs-horizontal-splitter tw:flex-1 tw:min-h-0"
+        class="logs-horizontal-splitter flex-1 min-h-0"
         v-model="splitterModel"
         unit="px"
         :horizontal="false"
       >
         <template #before>
-          <div class="card-container tw:p-[0.325rem] tw:h-full tw:overflow-auto tw:border-r tw:border-border-default">
+          <div class="card-container p-[0.325rem] h-full overflow-auto border-r border-border-default">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -215,20 +132,156 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #after>
-          <div class="tw:h-full">
-            <div class="card-container tw:h-full">
+          <div class="h-full flex flex-col min-h-0">
+      <!-- KPI summary strip -->
+      <div class="card-container border-b border-border-default">
+        <SessionsMetricsStrip
+          :total="kpiMetrics.total"
+          :error-sessions="kpiMetrics.errorSessions"
+          :frustrated-sessions="kpiMetrics.frustratedSessions"
+          :bounced-sessions="kpiMetrics.bouncedSessions"
+          :bounce-base="kpiMetrics.bounceBase"
+          :avg-duration-ms="kpiMetrics.avgDurationMs"
+          :median-duration-ms="kpiMetrics.medianDurationMs"
+          :sessions-delta-pct="kpiDeltas?.sessionsPct ?? null"
+          :errors-delta="kpiDeltas?.errors ?? null"
+          :frustrated-delta="kpiDeltas?.frustrated ?? null"
+          :active-card="activeMetricCard"
+          @select="handleMetricSelect"
+        />
+
+        <!-- One actionable insight for the current window, when one exists -->
+        <div v-if="topInsight" class="px-2 pb-2">
+          <SessionsInsightBanner
+            :insight="topInsight"
+            @apply="applyInsightFilter(topInsight)"
+            @filter="filterSessionsByInsightError(topInsight)"
+            @open-error-tracking="openInsightInErrorTracking(topInsight)"
+          />
+        </div>
+
+        <!-- Segment filters -->
+        <div
+          class="flex flex-wrap items-center gap-4 px-2 pb-2"
+          data-test="rum-app-sessions-segment-filters"
+        >
+          <OToggleGroup
+            :model-value="healthSegment"
+            type="single"
+            :label="t('rum.health')"
+            label-position="left"
+            @update:model-value="(v: any) => setHealthSegment(v)"
+          >
+            <OToggleGroupItem
+              value="all"
+              size="xs"
+              data-test="rum-app-sessions-health-all"
+              >{{ t("rum.all") }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="errors"
+              size="xs"
+              data-test="rum-app-sessions-health-errors"
+              >{{ t("rum.withErrors") }} ·
+              {{ sessionsSummary.errorSessions }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="frustrated"
+              size="xs"
+              data-test="rum-app-sessions-health-frustrated"
+              >{{ t("rum.frustrated") }} ·
+              {{ sessionsSummary.frustratedSessions }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="clean"
+              size="xs"
+              data-test="rum-app-sessions-health-clean"
+              >{{ t("rum.clean") }} ·
+              {{ sessionsSummary.cleanSessions }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+
+          <OToggleGroup
+            :model-value="typeSegment"
+            type="single"
+            :label="t('rum.type')"
+            label-position="left"
+            @update:model-value="(v: any) => setTypeSegment(v)"
+          >
+            <OToggleGroupItem
+              value="all"
+              size="xs"
+              data-test="rum-app-sessions-type-all"
+              >{{ t("rum.all") }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="engaged"
+              size="xs"
+              data-test="rum-app-sessions-type-engaged"
+              >{{ t("rum.engaged") }} ·
+              {{ sessionsSummary.engagedSessions }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="bounced"
+              size="xs"
+              data-test="rum-app-sessions-type-bounced"
+              >{{ t("rum.bounced") }} ·
+              {{ sessionsSummary.bouncedSessions }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+
+          <OToggleGroup
+            :model-value="deviceSegment"
+            type="single"
+            :label="t('rum.device')"
+            label-position="left"
+            @update:model-value="(v: any) => setDeviceSegment(v)"
+          >
+            <OToggleGroupItem
+              value="all"
+              size="xs"
+              data-test="rum-app-sessions-device-all"
+              >{{ t("rum.all") }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="desktop"
+              size="xs"
+              data-test="rum-app-sessions-device-desktop"
+              >{{ t("rum.desktop") }} ·
+              {{ sessionsSummary.deviceCounts.desktop }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="mobile"
+              size="xs"
+              data-test="rum-app-sessions-device-mobile"
+              >{{ t("rum.mobile") }} ·
+              {{ sessionsSummary.deviceCounts.mobile }}</OToggleGroupItem
+            >
+            <OToggleGroupItem
+              value="tablet"
+              size="xs"
+              data-test="rum-app-sessions-device-tablet"
+              >{{ t("rum.tablet") }} ·
+              {{ sessionsSummary.deviceCounts.tablet }}</OToggleGroupItem
+            >
+          </OToggleGroup>
+        </div>
+      </div>
+
+            <div class="card-container flex-1 min-h-0">
                 <OTable
                   :data="tableRows"
                   :columns="tableColumns"
+                  :column-visibility="columnVisibility"
                   :loading="isLoading.length > 0"
                   row-key="session_id"
                   pagination="none"
                   virtual-scroll
                   :dense="false"
                   :row-height="54"
-                  class="tw:h-full"
+                  class="h-full"
                   data-test="rum-sessions-table"
-                  row-class="tw:cursor-pointer"
+                  row-class="cursor-pointer"
                   :get-row-status-color="getSessionStatusColor"
                   @row-click="handleRowClick"
                   @scroll-end="handleScrollEnd"
@@ -238,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #empty>
                     <div
                       v-if="hasSegmentFilteredOutAllRows"
-                      class="tw:flex tw:flex-col tw:items-center tw:gap-2 tw:py-8"
+                      class="flex flex-col items-center gap-2 py-8"
                       data-test="rum-app-sessions-segment-empty"
                     >
                       <p>{{ t("rum.noMatchingSessions") }}</p>
@@ -257,17 +310,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="tw:cursor-pointer session-play-icon tw:text-[var(--o2-icon-color)] tw:hover:text-[var(--o2-primary-btn-bg)]"
+                      class="cursor-pointer session-play-icon text-[var(--o2-icon-color)] hover:text-[var(--o2-primary-btn-bg)]"
                     />
                   </template>
                   <template #cell-session="{ row }">
-                    <div class="tw:flex tw:flex-col tw:justify-center tw:gap-0.5 tw:min-w-0">
+                    <div class="flex flex-col justify-center gap-0.5 min-w-0">
                       <OUserCell
                         :value="row.user_email || 'Unknown'"
-                        class="tw:font-medium tw:truncate"
+                        class="font-medium truncate"
                       />
                       <div
-                        class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-[var(--o2-text-caption)]"
+                        class="flex items-center gap-1.5 text-xs text-[var(--o2-text-caption)]"
                       >
                         <span
                           class="o2-monospace-font"
@@ -304,18 +357,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <SessionLocationColumn :column="row" />
                   </template>
                   <template #cell-duration="{ row }">
-                    <div class="tw:flex tw:flex-col tw:items-end tw:gap-0.5">
-                      <span class="tw:tabular-nums tw:font-medium">{{
+                    <div class="flex flex-col items-end gap-0.5">
+                      <span class="tabular-nums font-medium">{{
                         formatSessionDuration(row.time_spent)
                       }}</span>
                       <small
                         v-if="row.is_bounce"
-                        class="tw:text-[var(--o2-status-warning-text)]"
+                        class="text-[var(--o2-status-warning-text)]"
                         data-test="rum-app-sessions-bounced-text"
                       >{{ t("rum.bounced").toLowerCase() }}</small>
                       <small
                         v-else-if="row.is_active"
-                        class="tw:text-[var(--o2-status-success-text)]"
+                        class="text-[var(--o2-status-success-text)]"
                         data-test="rum-app-sessions-active-text"
                       >{{ t("rum.active") }}</small>
                     </div>
@@ -328,12 +381,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div class="card-container">
-        <div class="tw:p-4 enable-rum tw:max-w-[64rem]">
-          <div class="tw:pb-4">
-            <div class="tw:text-left tw:text-xl tw:font-semibold tw:font-bold tw:pb-3">
+        <div class="p-4 enable-rum max-w-[64rem]">
+          <div class="pb-4">
+            <div class="text-left text-xl font-semibold font-bold pb-3">
               {{ t("rum.discoverSessionTitle") }}
             </div>
-            <div class="tw:text-base tw:font-medium">
+            <div class="text-base font-medium">
               {{ t("rum.discoverSessionMessage") }}
             </div>
             <div>
@@ -366,8 +419,14 @@ import {
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -405,6 +464,9 @@ import {
   removeFieldCondition,
 } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -431,12 +493,7 @@ const HEALTH_SEGMENTS: HealthSegment[] = [
   "clean",
 ];
 const TYPE_SEGMENTS: TypeSegment[] = ["all", "engaged", "bounced"];
-const DEVICE_SEGMENTS: DeviceSegment[] = [
-  "all",
-  "desktop",
-  "mobile",
-  "tablet",
-];
+const DEVICE_SEGMENTS: DeviceSegment[] = ["all", "desktop", "mobile", "tablet"];
 
 interface WindowTotals {
   total: number;
@@ -468,7 +525,6 @@ const props = defineProps({
 const streamFields: Ref<any[]> = ref([]);
 const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 
-
 const { sessionState } = useSession();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
@@ -493,22 +549,29 @@ const completeQuery = computed(() => {
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
   const lines = (sessionState.data.editorValue.match(/\n/g) || []).length + 1;
-  if (lines === 1) return 'tw:h-[2rem]!';
-  if (lines === 2) return 'tw:h-[3.5rem]!';
-  return 'tw:h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
+  if (lines === 1) return "h-[2rem]!";
+  if (lines === 2) return "h-[3.5rem]!";
+  return "h-[5rem]!"; // 3+ lines, capped at 5rem (approx 3 lines)
 });
 
 const isMounted = ref(false);
 const editorFocused = ref(false);
 const sessionQueryEditorRef = ref<any>(null);
 
-const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
-  useSqlEditorDiagnostics({
-    queryEditorRef: sessionQueryEditorRef,
-    sqlMode: computed(() => false),
-    query: computed(() => sessionState.data.editorValue ?? ""),
-    streamName: computed(() => rumSessionStreamName),
-  });
+// Server-error highlight ranges, forwarded to the filter editor by the composable.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+
+const {
+  onFocus: _sqlOnFocus,
+  onBlur: _sqlOnBlur,
+  onQueryChange: _sqlOnQueryChange,
+} = useSqlEditorDiagnostics({
+  queryEditorRef: sessionQueryEditorRef,
+  sqlMode: computed(() => false),
+  query: computed(() => sessionState.data.editorValue ?? ""),
+  streamName: computed(() => rumSessionStreamName),
+  externalErrors: sqlErrorRanges,
+});
 
 const onQueryEditorFocus = () => {
   editorFocused.value = true;
@@ -534,8 +597,10 @@ const {
 const updateAutoComplete = (value: string) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
-  autoCompleteData.value.cursorIndex = sessionQueryEditorRef.value?.getCursorIndex?.();
-  autoCompleteData.value.popup.open = sessionQueryEditorRef.value?.triggerAutoComplete;
+  autoCompleteData.value.cursorIndex =
+    sessionQueryEditorRef.value?.getCursorIndex?.();
+  autoCompleteData.value.popup.open =
+    sessionQueryEditorRef.value?.triggerAutoComplete;
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = "logs";
   autoCompleteData.value.streamName = rumSessionStreamName;
@@ -585,6 +650,9 @@ const userDataSet = new Set([
   "resource_url",
 ]);
 
+const { columnVisibility, setColumnVisibility } =
+  useExternalColumnToggle("rum-sessions-list");
+
 const tableColumns = [
   {
     id: "action_play",
@@ -599,6 +667,7 @@ const tableColumns = [
     header: t("rum.userSession"),
     accessorFn: (row: any) => row["user_email"] || "Unknown",
     sortable: true,
+    hideable: true,
     meta: { align: "left", autoWidth: true },
   },
   {
@@ -606,6 +675,7 @@ const tableColumns = [
     header: t("rum.activity"),
     accessorFn: (row: any) => row["events"] || 0,
     sortable: true,
+    hideable: true,
     size: 220,
     meta: { align: "left" },
   },
@@ -616,6 +686,7 @@ const tableColumns = [
     accessorFn: (row: any) =>
       (row["error_count"] || 0) * 1000 + (row["frustration_count"] || 0),
     sortable: true,
+    hideable: true,
     size: 160,
     meta: { align: "left" },
   },
@@ -624,6 +695,7 @@ const tableColumns = [
     header: t("rum.location"),
     accessorFn: (row: any) => row["country"] || "",
     sortable: true,
+    hideable: true,
     size: 360,
     meta: { align: "left" },
   },
@@ -632,6 +704,7 @@ const tableColumns = [
     header: t("rum.duration"),
     accessorFn: (row: any) => row["time_spent"] || 0,
     sortable: true,
+    hideable: true,
     size: COL.duration,
     meta: { align: "right" },
   },
@@ -648,8 +721,6 @@ onMounted(async () => {
     getSessions();
   }
 });
-
-
 
 const getStreamFields = () => {
   isLoading.value.push(true);
@@ -726,6 +797,7 @@ const getStreamFields = () => {
 
 const getSessions = () => {
   sessionState.data.sessions = {};
+  sqlErrorRanges.value = [];
 
   const interval = getTimeInterval(
     dateTime.value.startTime,
@@ -851,6 +923,18 @@ const getSessions = () => {
       toast({
         message: err.response?.data?.message || "Error while fetching sessions",
         variant: "error",
+      });
+
+      // Locate the offending field in the filter and squiggle it in the editor.
+      rangesFromServerError({
+        code: err.response?.data?.code,
+        message: err.response?.data?.message,
+        errorDetail: err.response?.data?.error_detail,
+        sqlMode: false,
+        query: sessionState.data.editorValue,
+        streamName: rumSessionStreamName,
+      }).then((ranges) => {
+        sqlErrorRanges.value = ranges;
       });
     })
     .finally(() => {
@@ -1149,8 +1233,7 @@ const classifyDevice = (family?: string, os?: string): DeviceSegment => {
 const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
     ...row,
-    is_bounce:
-      (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
+    is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
     is_active: !!row.end_time && Date.now() - row.end_time <= ACTIVE_WINDOW_MS,
     device_type: classifyDevice(row.device_family, row.os),
   })),
@@ -1320,7 +1403,10 @@ const tableRows = computed(() =>
       return false;
     if (typeSegment.value === "bounced" && !row.is_bounce) return false;
     if (typeSegment.value === "engaged" && row.is_bounce) return false;
-    if (deviceSegment.value !== "all" && row.device_type !== deviceSegment.value)
+    if (
+      deviceSegment.value !== "all" &&
+      row.device_type !== deviceSegment.value
+    )
       return false;
     return true;
   }),
@@ -1338,7 +1424,8 @@ const activeMetricCard = computed(() => {
 });
 
 const setHealthSegment = (value: HealthSegment | undefined | null) => {
-  healthSegment.value = value && HEALTH_SEGMENTS.includes(value) ? value : "all";
+  healthSegment.value =
+    value && HEALTH_SEGMENTS.includes(value) ? value : "all";
   updateUrlQueryParams();
 };
 
@@ -1404,7 +1491,10 @@ const handleRowClick = (row: any) => {
 const handleScrollEnd = () => {
   if (!isLoading.value.length) {
     const totalFetchedSessions = Object.keys(sessionState.data.sessions).length;
-    if (totalFetchedSessions > 0 && totalFetchedSessions % sessionState.data.resultGrid.size === 0) {
+    if (
+      totalFetchedSessions > 0 &&
+      totalFetchedSessions % sessionState.data.resultGrid.size === 0
+    ) {
       sessionState.data.resultGrid.currentPage++;
       // getSessions();
     }
@@ -1513,8 +1603,7 @@ function updateUrlQueryParams() {
   query["query"] = b64EncodeUnicode(sessionState.data.editorValue);
 
   if (healthSegment.value !== "all") query["health"] = healthSegment.value;
-  if (typeSegment.value !== "all")
-    query["session_type"] = typeSegment.value;
+  if (typeSegment.value !== "all") query["session_type"] = typeSegment.value;
   if (deviceSegment.value !== "all") query["device"] = deviceSegment.value;
 
   query["org_identifier"] = store.state.selectedOrganization.identifier;
@@ -1526,6 +1615,10 @@ const getStarted = () => {
     name: "rumMonitoring",
   });
 };
+
+useShortcuts([
+  { id: "rumSessionsRefresh", handler: () => { if (!isInputFocused()) runQuery(); } },
+]);
 </script>
 <style>
 .sessions_page {

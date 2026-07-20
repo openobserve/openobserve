@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    fmt,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use arrow::array::RecordBatch;
@@ -28,7 +31,7 @@ use config::{
 use datafusion::{
     self,
     physical_plan::{
-        ExecutionPlan,
+        DisplayFormatType, ExecutionPlan,
         display::DisplayableExecutionPlan,
         metrics::{self, ExecutionPlanMetricsSet, MetricBuilder, MetricValue},
     },
@@ -186,10 +189,14 @@ fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
     let plan = &metrics_info.plan;
     let is_super_cluster = metrics_info.is_super_cluster;
     let func = &metrics_info.func;
-    let plan_with_metrics = DisplayableExecutionPlan::with_metrics(plan.as_ref())
-        .set_show_statistics(false)
-        .indent(false)
-        .to_string();
+    let plan_with_metrics = if is_super_cluster {
+        format_leader_plan(plan.as_ref())
+    } else {
+        DisplayableExecutionPlan::with_metrics(plan.as_ref())
+            .set_show_statistics(false)
+            .indent(false)
+            .to_string()
+    };
     let stage = if func() {
         if is_super_cluster { 1 } else { 2 }
     } else {
@@ -203,13 +210,59 @@ fn collect_metrics(metrics_info: &MetricsInfo) -> Vec<Metrics> {
     }]
 }
 
+fn format_leader_plan(plan: &dyn ExecutionPlan) -> String {
+    let mut output = String::new();
+    write_plan(&mut output, plan, 0);
+    output
+}
+
+struct PlanDisplay<'a>(&'a dyn ExecutionPlan);
+
+impl fmt::Display for PlanDisplay<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt_as(DisplayFormatType::Default, f)
+    }
+}
+
+fn write_plan(output: &mut String, plan: &dyn ExecutionPlan, indent: usize) {
+    use fmt::Write;
+
+    write!(output, "{:indent$}", "", indent = indent * 2).expect("write to String");
+    write!(output, "{}", PlanDisplay(plan)).expect("write to String");
+
+    if let Some(metrics) = plan.metrics() {
+        let metrics = metrics
+            .aggregate_by_name()
+            .sorted_for_display()
+            .timestamps_removed();
+        write!(output, ", metrics=[{metrics}]").expect("write to String");
+    } else {
+        write!(output, ", metrics=[]").expect("write to String");
+    }
+    writeln!(output).expect("write to String");
+
+    if plan.name() == "RemoteScanExec" {
+        return;
+    }
+
+    for child in plan.children() {
+        write_plan(output, child.as_ref(), indent + 1);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::search::ScanStats;
-    use datafusion::physical_plan::empty::EmptyExec;
+    use datafusion::{
+        common::Result,
+        execution::{SendableRecordBatchStream, TaskContext},
+        physical_plan::{
+            DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties, empty::EmptyExec,
+        },
+    };
     use parking_lot::Mutex;
 
     use super::*;
@@ -235,6 +288,54 @@ mod tests {
     fn create_test_execution_plan() -> Arc<dyn ExecutionPlan> {
         let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int32, false)]));
         Arc::new(EmptyExec::new(schema))
+    }
+
+    #[derive(Debug)]
+    struct NamedExec {
+        name: &'static str,
+        inner: Arc<dyn ExecutionPlan>,
+    }
+
+    impl DisplayAs for NamedExec {
+        fn fmt_as(&self, _t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            write!(f, "{}", self.name)
+        }
+    }
+
+    impl ExecutionPlan for NamedExec {
+        fn name(&self) -> &'static str {
+            self.name
+        }
+
+        fn properties(&self) -> &Arc<PlanProperties> {
+            self.inner.properties()
+        }
+
+        fn children(&self) -> Vec<&Arc<dyn ExecutionPlan>> {
+            vec![&self.inner]
+        }
+
+        fn with_new_children(
+            self: Arc<Self>,
+            _children: Vec<Arc<dyn ExecutionPlan>>,
+        ) -> Result<Arc<dyn ExecutionPlan>> {
+            unimplemented!()
+        }
+
+        fn execute(
+            &self,
+            _partition: usize,
+            _context: Arc<TaskContext>,
+        ) -> Result<SendableRecordBatchStream> {
+            unimplemented!()
+        }
+    }
+
+    fn create_named_test_execution_plan(
+        name: &'static str,
+        inner: Arc<dyn ExecutionPlan>,
+    ) -> Arc<dyn ExecutionPlan> {
+        Arc::new(NamedExec { name, inner })
     }
 
     #[test]
@@ -427,6 +528,44 @@ mod tests {
         let metrics = collect_metrics(&metrics_info);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].stage, 1); // func() returns false, stage defaults to 1
+    }
+
+    #[test]
+    fn test_super_cluster_stops_at_remote_scan() {
+        let follower_plan =
+            create_named_test_execution_plan("FollowerOnlyExec", create_test_execution_plan());
+        let remote_scan_plan = create_named_test_execution_plan("RemoteScanExec", follower_plan);
+        let region_leader_plan =
+            create_named_test_execution_plan("SortPreservingMergeExec", remote_scan_plan);
+        let metrics_info = MetricsInfo {
+            plan: region_leader_plan,
+            is_super_cluster: true,
+            func: Box::new(|| true),
+        };
+
+        let metrics = collect_metrics(&metrics_info);
+        assert_eq!(metrics.len(), 1);
+        assert!(metrics[0].metrics.contains("SortPreservingMergeExec"));
+        assert!(metrics[0].metrics.contains("RemoteScanExec"));
+        assert!(!metrics[0].metrics.contains("FollowerOnlyExec"));
+    }
+
+    #[test]
+    fn test_non_super_cluster_keeps_remote_scan_child_metrics() {
+        let follower_plan =
+            create_named_test_execution_plan("FollowerOnlyExec", create_test_execution_plan());
+        let remote_scan_plan = create_named_test_execution_plan("RemoteScanExec", follower_plan);
+        let region_leader_plan =
+            create_named_test_execution_plan("SortPreservingMergeExec", remote_scan_plan);
+        let metrics_info = MetricsInfo {
+            plan: region_leader_plan,
+            is_super_cluster: false,
+            func: Box::new(|| true),
+        };
+
+        let metrics = collect_metrics(&metrics_info);
+        assert_eq!(metrics.len(), 1);
+        assert!(metrics[0].metrics.contains("FollowerOnlyExec, metrics=[]"));
     }
 
     #[test]

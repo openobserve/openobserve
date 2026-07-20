@@ -1,14 +1,14 @@
 <template>
-  <div class="condition tw:flex tw:items-center tw:gap-2">
+  <div class="condition flex items-center gap-2">
     <OSelect
       v-if="conditionIndex !== 0"
       v-model="condition.logicalOperator"
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
-      class="condition-logical-operator tw:w-fit tw:max-w-[8rem]"
+      class="condition-logical-operator w-fit max-w-[8rem]"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
-    <OButtonGroup class="axis-field tw:shrink-0" radius="sm">
+    <OButtonGroup class="axis-field shrink-0" radius="sm">
       <ODropdown
         @update:open="(v: boolean) => v && loadFilterItem(condition.column)"
       >
@@ -22,10 +22,10 @@
             {{ computedLabel(condition) }}
           </OButton>
         </template>
-        <div class="tw:p-4 tw:w-72">
+        <div class="p-4 w-72">
           <div style="display: flex; align-items: center; gap: 4px">
             <StreamFieldSelect
-              class="tw:w-full"
+              class="w-full"
               :streams="getAllSelectedStreams()"
               v-model="condition.column"
               :data-test="`dashboard-add-condition-column-${conditionIndex}`"
@@ -40,19 +40,19 @@
             </OButton>
           </div>
           <div>
-            <div class="tw:p-1">
-              <div class="tw:gap-1">
+            <div class="p-1">
+              <div class="gap-1">
                 <OTabs v-model="condition.type" dense>
                   <OTab
                     name="list"
                     :label="t('common.list')"
-                    class="tw:flex-1"
+                    class="flex-1"
                     :data-test="`dashboard-add-condition-list-${conditionIndex}`"
                   ></OTab>
                   <OTab
                     name="condition"
                     :label="t('common.condition')"
-                    class="tw:flex-1"
+                    class="flex-1"
                     :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
                   ></OTab>
                 </OTabs>
@@ -60,7 +60,7 @@
                 <div>
                   <OTabPanels v-model="condition.type" animated>
                     <OTabPanel name="condition">
-                      <div class="tw:flex tw:flex-col tw:gap-2">
+                      <div class="flex flex-col gap-2">
                         <OSelect
                           v-model="condition.operator"
                           :options="operators"
@@ -106,7 +106,7 @@
       <OButton
         variant="outline"
         size="icon-chip"
-        class="tw:shrink-0"
+        class="shrink-0"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
         icon-left="close"

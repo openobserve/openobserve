@@ -18,15 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="showTrialPeriodMsg"
     data-test="trial-period-container"
-    class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:rounded-md tw:w-full tw:bg-(--o2-status-warning-bg) tw:border tw:border-(--o2-status-warning-text) tw:text-(--o2-status-warning-text)"
+    class="flex items-center gap-3 px-4 py-2 rounded-md w-full bg-(--o2-status-warning-bg) border border-(--o2-status-warning-text) text-(--o2-status-warning-text)"
   >
     <!-- Warning icon -->
-    <OIcon name="warning" size="sm" class="tw:shrink-0 tw:text-(--o2-status-warning-text)" />
+    <OIcon name="warning" size="sm" class="shrink-0 text-(--o2-status-warning-text)" />
 
     <!-- Message + subtitle on one line -->
-    <p class="tw:flex-1 tw:min-w-0 tw:m-0 tw:text-sm tw:truncate">
-      <strong class="tw:font-semibold">{{ getTrialPeriodMessage() }}</strong>
-      <span class="tw:mx-1 tw:opacity-60">·</span>
+    <p class="flex-1 min-w-0 m-0 text-sm truncate">
+      <strong class="font-semibold">{{ getTrialPeriodMessage() }}</strong>
+      <span class="mx-1 opacity-60">·</span>
       <span>Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
     </p>
 
@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="currentPage != 'billing'"
       variant="warning"
       size="xs"
-      class="tw:shrink-0"
+      class="shrink-0"
       @click="redirectBilling"
     >{{ t("billing.upgradeNow") }}</OButton>
     <OButton
       v-else
       variant="warning"
       size="xs"
-      class="tw:shrink-0"
+      class="shrink-0"
       @click="redirectContactSupport"
     >{{ t("billing.contactSupport") }}</OButton>
   </div>

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:justify-between tw:w-full tw:py-px tw:px-1 tw:border-t tw:border-(--o2-border-color) tw:bg-(--o2-card-bg)"
-    :class="showSchemaToggle || showQuickMode ? 'tw:flex' : ''"
+    class="justify-between w-full py-px px-1 border-t border-(--o2-border-color) bg-(--o2-card-bg)"
+    :class="showSchemaToggle || showQuickMode ? 'flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
     <div v-if="showSchemaToggle">
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle tw:p-0 tw:mt-1"
+        class="schema-field-toggle p-0 mt-1"
       >
         <OToggleGroupItem
           v-for="opt in schemaToggleOptions"
@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="opt.slot === 'user_defined_slot'">
-            <OIcon name="person" size="xs" class="tw:text-[10px]!"></OIcon>
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
+            <OIcon name="person" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-user-defined-fields-warning-tooltip`"
               :content="t('search.userDefinedSchemaLabel')"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               align="center"
             >
               <template #content>
-                <span class="tw:font-bold">{{ t("search.allFieldsLabel") }}</span>
-                <hr class="tw:my-1 tw:opacity-50" />
+                <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
+                <hr class="my-1 opacity-50" />
                 {{ t("search.allFieldsWarningMsg") }}
               </template>
             </OTooltip>
@@ -69,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <OIcon name="info-outline" size="xs" class="tw:text-[10px]!" />
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="text-[10px]!" />
+            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="opt.slot === 'all_fields_slot' ? `${dataTestPrefix}-all-fields-btn` : `${dataTestPrefix}-interesting-fields-btn`"
         >
           <template v-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
@@ -107,8 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               align="center"
             >
               <template #content>
-                <span class="tw:font-bold">{{ t("search.allFieldsLabel") }}</span>
-                <hr class="tw:my-1 tw:opacity-50" />
+                <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
+                <hr class="my-1 opacity-50" />
                 {{ t("search.allFieldsWarningMsg") }}
               </template>
             </OTooltip>
@@ -116,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <OIcon name="info-outline" size="xs" class="tw:text-[10px]!" />
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="text-[10px]!" />
+            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -131,9 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Pagination and Reset Controls -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:gap-1">
+    <div class="flex items-center justify-end gap-1">
       <!-- Pagination -->
-      <div v-if="pagesNumber > 1" class="tw:flex tw:items-center tw:gap-0.5">
+      <div v-if="pagesNumber > 1" class="flex items-center gap-0.5">
         <OTooltip
           :data-test="`${dataTestPrefix}-fields-list-pagination-tooltip`"
           :content="'Total Fields: ' + totalFieldsCount"
@@ -180,12 +180,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Reset Fields Icon -->
-      <div class="tw:flex tw:items-center">
+      <div class="flex items-center">
         <OIcon
           name="restart-alt"
           size="sm"
           :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
-          class="tw:cursor-pointer tw:text-sm tw:opacity-70 tw:transition-opacity tw:duration-200 tw:hover:opacity-100!"
+          class="cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100!"
           @click="$emit('reset-fields')"
         />
         <OTooltip

@@ -16,28 +16,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-anomaly-alerting tw:h-full"
+    class="step-anomaly-alerting h-full"
     :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content tw:px-3 tw:py-4 tw:rounded-lg tw:h-full tw:overflow-y-auto tw:border tw:bg-[var(--color-surface-overlay)] tw:border-[var(--color-border-default)]"
+      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto border bg-[var(--color-surface-overlay)] border-[var(--color-border-default)]"
     >
       <!-- Enable Notifications toggle -->
-      <div class="tw:flex tw:items-start tw:mb-6!  tw:pb-0!">
+      <div class="flex items-start mb-6!  pb-0!">
         <div
-          class="tw:font-semibold tw:flex tw:items-center"
+          class="font-semibold flex items-center"
           style="width: 190px; height: 36px"
         >
           {{ t('alerts.anomaly.notifications') }}
           <OIcon
             name="info"
             size="sm"
-            class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
+            class="ml-1 cursor-pointer text-gray-400"
           >
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </OIcon>
         </div>
-        <div class="tw:flex tw:items-center tw:h-11">
+        <div class="flex items-center h-11">
           <OSwitch
             v-model="config.alert_enabled"
             :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
@@ -49,17 +49,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Destination picker (shown when alert_enabled) -->
       <div
         v-if="config.alert_enabled"
-        class="tw:flex tw:items-start tw:mb-6! tw:pb-0!"
+        class="flex items-start mb-6! pb-0!"
       >
         <div
-          class="tw:font-semibold tw:flex tw:items-center"
+          class="font-semibold flex items-center"
           style="width: 190px; height: 36px"
         >
           {{ t("alerts.destination") }}
-          <span class="tw:text-red-500 tw:ml-1">*</span>
+          <span class="text-red-500 ml-1">*</span>
         </div>
-        <div class="tw:flex tw:flex-col">
-          <div class="tw:flex tw:items-center">
+        <div class="flex flex-col">
+          <div class="flex items-center">
             <OSelect
               v-model="config.alert_destination_ids"
               :options="destinations"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="name"
               multiple
               searchable
-              class="tw:min-h-auto! tw:h-auto!"
+              class="min-h-auto! h-auto!"
               style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
             >
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trailing>
                     <button
                       type="button"
-                      aria-label="Remove"
-                      class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                      :aria-label="t('common.remove')"
+                      class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
                       @click="removeAtIndex(index)"
                     >
                       <OIcon name="close" size="xs" />
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     index === visibleChipCount &&
                     config.alert_destination_ids.length > visibleChipCount
                   "
-                  class="tw:text-[13px] tw:text-gray-500 tw:ml-1 tw:whitespace-nowrap"
+                  class="text-[13px] text-gray-500 ml-1 whitespace-nowrap"
                 >
                   +{{ config.alert_destination_ids.length - visibleChipCount }}
                 </span>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="sm"
-              class="tw:ml-1"
+              class="ml-1"
               :title="t('alerts.alertSettings.refreshDestinations')"
               @click="$emit('refresh:destinations')"
               icon-left="refresh"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="outline"
               size="sm"
-              class="tw:ml-2"
+              class="ml-2"
               @click="openAddDestination"
             >
               {{ t('alerts.anomaly.addNewDestination') }}
@@ -123,8 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               config.alert_enabled && config.alert_destination_ids.length === 0
             "
-            class="text-red-8 tw:pt-1"
-            style="font-size: 11px; line-height: 12px"
+            class="text-xs text-input-error-text pt-1"
             data-test="anomaly-destination-error"
           >
             {{ t('alerts.anomaly.destinationRequired') }}
@@ -135,11 +134,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Info note when notifications disabled -->
       <div
         v-if="!config.alert_enabled"
-        class="tw:flex tw:items-start tw:gap-2 tw:text-xs tw:mt-2"
-        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+        class="flex items-start gap-2 text-xs mt-2"
+        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
       >
         <OIcon name="info" size="sm"
-class="tw:mt-px tw:flex-shrink-0" />
+class="mt-px flex-shrink-0" />
         <span>{{ t('alerts.anomaly.disabledNotificationsInfo') }}</span>
       </div>
     </div>

@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #before>
           <div
             data-test="dashboard-custom-markdown-editor-flex-col"
-            class="tw:flex tw:flex-col"
+            class="flex flex-col"
             style="height: 100%; display: flex; flex-direction: column;"
           >
             <CodeQueryEditor
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #separator>
           <div
             data-test="dashboard-custom-markdown-editor-splitter-separator"
-            class="tw:w-1 tw:h-full tw:bg-[var(--o2-border,#e5e7eb)] tw:transition-colors tw:hover:bg-orange-500"
+            class="w-1 h-full bg-[var(--o2-border,#e5e7eb)] transition-colors hover:bg-orange-500"
           ></div>
         </template>
         <template #after>

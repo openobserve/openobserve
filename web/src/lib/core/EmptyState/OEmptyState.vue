@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[
-      'o2-empty-state tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:overflow-hidden',
+      'o2-empty-state relative flex flex-col items-center justify-center overflow-hidden',
       sizeClass.root,
       { 'o2-empty-state--hero': size === 'hero' },
     ]"
@@ -44,13 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="showBackdrop"
       aria-hidden="true"
-      class="tw:absolute tw:inset-0 tw:pointer-events-none"
+      class="absolute inset-0 pointer-events-none"
       :style="dotGridStyle"
     />
 
-    <div :class="['tw:relative tw:flex tw:flex-col tw:items-center tw:text-center', sizeClass.stack]">
+    <div :class="['relative flex flex-col items-center text-center', sizeClass.stack]">
       <!-- illustration (hero/block) — preset/illustration prop or slot -->
-      <div v-if="hasIllustration" class="tw:shrink-0">
+      <div v-if="hasIllustration" class="shrink-0">
         <slot name="illustration">
           <component
             :is="illustrationComponent"
@@ -64,21 +64,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- inline size shows a compact icon instead of a full illustration -->
       <span
         v-else-if="inlineIcon"
-        :class="['o2-empty-state__inline-icon tw:inline-flex tw:items-center tw:justify-center tw:rounded-full', sizeClass.iconWrap]"
+        :class="['o2-empty-state__inline-icon inline-flex items-center justify-center rounded-full', sizeClass.iconWrap]"
       >
         <OIcon :name="inlineIcon" :size="size === 'inline' ? 'lg' : 'xl'" />
       </span>
 
-      <div :class="['tw:flex tw:flex-col tw:max-w-xl', sizeClass.copy]">
+      <div :class="['flex flex-col max-w-xl', sizeClass.copy]">
         <component
           :is="size === 'inline' ? 'p' : 'h2'"
-          :class="['tw:font-medium tw:text-text-primary tw:tracking-[-0.01em]', sizeClass.title]"
+          :class="['font-medium text-text-primary tracking-[-0.01em]', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
         </component>
         <p
           v-if="resolvedDescription || $slots.description"
-          :class="['tw:text-text-secondary tw:leading-relaxed', sizeClass.description]"
+          :class="['text-text-secondary leading-relaxed', sizeClass.description]"
         >
           <slot name="description">{{ resolvedDescription }}</slot>
         </p>
@@ -88,7 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (+ optional secondary) button(s) from preset/props -->
       <div
         v-if="$slots.actions || showCards || resolvedActionLabel || secondaryActionLabel"
-        :class="['tw:flex tw:flex-wrap tw:items-center tw:justify-center', sizeClass.actions]"
+        :class="[
+          props.columns
+            ? 'flex flex-wrap justify-center'
+            : 'flex flex-nowrap items-stretch justify-center',
+          sizeClass.actions,
+        ]"
       >
         <slot name="actions">
           <template v-if="showCards">
@@ -174,6 +179,11 @@ const props = withDefaults(
     secondaryActionLabel?: string;
     /** Suppress the preset's actions (e.g. table empties with no CTA). */
     hideAction?: boolean;
+    /**
+     * Whether to wrap action cards onto multiple rows (flex-wrap) instead of
+     * forcing a single row (flex-nowrap). Use when you have more than 2-3 cards.
+     */
+    columns?: boolean;
     /**
      * The underlying list HAS items but the current filter/search matched none.
      * Switches to a "no results" treatment (magnifier + "No {noun} found" +
@@ -324,38 +334,38 @@ const SIZE_MAP: Record<
   }
 > = {
   hero: {
-    root: "tw:w-full tw:h-full tw:min-h-[320px] tw:px-6 tw:py-12",
-    stack: "tw:gap-7",
-    copy: "tw:gap-2.5",
-    actions: "tw:gap-3 tw:pt-1",
-    extra: "tw:w-full tw:flex tw:flex-col tw:items-center tw:gap-3 tw:pt-2",
-    title: "tw:text-2xl!",
-    description: "tw:text-base",
+    root: "w-full h-full min-h-[320px] px-6 py-12",
+    stack: "gap-7",
+    copy: "gap-2.5",
+    actions: "gap-3 pt-1",
+    extra: "w-full flex flex-col items-center gap-3 pt-2",
+    title: "text-2xl!",
+    description: "text-base",
     illustrationWidth: 300,
     iconWrap: "",
   },
   block: {
-    root: "tw:w-full tw:min-h-[260px] tw:px-6 tw:py-10",
-    stack: "tw:gap-5",
-    copy: "tw:gap-2",
-    actions: "tw:gap-2.5 tw:pt-0.5",
-    extra: "tw:w-full tw:flex tw:flex-col tw:items-center tw:gap-2 tw:pt-1",
-    title: "tw:text-lg!",
-    description: "tw:text-sm",
+    root: "w-full min-h-[260px] px-6 py-10",
+    stack: "gap-5",
+    copy: "gap-2",
+    actions: "gap-2.5 pt-0.5",
+    extra: "w-full flex flex-col items-center gap-2 pt-1",
+    title: "text-lg!",
+    description: "text-sm",
     illustrationWidth: 150,
     iconWrap: "",
   },
   inline: {
-    root: "tw:w-full tw:min-h-[160px] tw:px-4 tw:py-8",
-    stack: "tw:gap-3",
-    copy: "tw:gap-1",
-    actions: "tw:gap-2 tw:pt-1",
-    extra: "tw:w-full tw:flex tw:flex-col tw:items-center tw:gap-1.5 tw:pt-1",
-    title: "tw:text-sm!",
-    description: "tw:text-xs",
+    root: "w-full min-h-[160px] px-4 py-8",
+    stack: "gap-3",
+    copy: "gap-1",
+    actions: "gap-2 pt-1",
+    extra: "w-full flex flex-col items-center gap-1.5 pt-1",
+    title: "text-sm!",
+    description: "text-xs",
     illustrationWidth: 0,
     iconWrap:
-      "tw:w-12 tw:h-12 tw:bg-surface-subtle tw:text-text-secondary tw:mb-0.5",
+      "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
   },
 };
 const sizeClass = computed(() => SIZE_MAP[size.value]);

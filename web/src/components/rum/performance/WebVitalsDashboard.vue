@@ -17,28 +17,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md relative-position">
+  <div class="rounded-md relative-position">
     <div
       class="performance-dashboard"
-      :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
+      :class="isLoading.length ? 'invisible' : 'visible'"
     >
       <div
         data-test="learn-web-vitals-link"
-        class="tw:font-bold tw:ml-3 tw:px-2 tw:rounded tw:mt-2 tw:py-1 tw:text-sm tw:w-fit tw:flex tw:items-center"
+        class="font-bold ml-3 px-2 rounded mt-2 py-1 text-sm w-fit flex items-center"
         :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
       >
         <OIcon
           name="info"
           size="sm"
-          class="tw:mr-1"
+          class="mr-1"
         />
         {{ t("rum.learnWebVitalsLabel") }}
         <a
           href="https://web.dev/articles/vitals"
           title="https://web.dev/articles/vitals"
-          class="tw:ml-1"
+          class="ml-1"
           target="_blank"
-          :class="store.state.theme === 'dark' ? 'text-white' : 'tw:text-gray-800'"
+          :class="store.state.theme === 'dark' ? 'text-white' : 'text-gray-800'"
         >
           {{ t("rum.clickHereLabel") }}
         </a>
@@ -56,11 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:absolute tw:w-full tw:h-[calc(100vh-15.625rem)] tw:top-0"
+      class="pb-4 flex items-center justify-center text-center absolute w-full h-[calc(100vh-15.625rem)] top-0"
     >
       <div>
-        <OSpinner size="md" class="tw:mx-auto tw:block" />
-        <div class="tw:text-center tw:w-full">Loading Dashboard</div>
+        <OSpinner size="md" class="mx-auto block" />
+        <div class="text-center w-full">Loading Dashboard</div>
       </div>
     </div>
   </div>

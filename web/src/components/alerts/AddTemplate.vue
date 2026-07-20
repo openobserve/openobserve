@@ -14,28 +14,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:rounded-md tw:p-0 o2-custom-bg"
+  <div class="p-0 o2-custom-bg"
     style="height: calc(100vh - 48px); min-height: inherit"
   >
     <AppPageHeader
+      :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
+      title-data-test="add-template-title"
       :back="{
         label: t('alert_templates.header'),
         onClick: () => emit('cancel:hideform'),
       }"
-      class="card-container tw:px-3 tw:border-b tw:border-border-default"
-    >
-      <template #title>
-        <span data-test="add-template-title">
-          <template v-if="isUpdatingTemplate">{{
-            t("alert_templates.updateTitle")
-          }}</template>
-          <template v-else-if="isClone">{{
-            t("alert_templates.cloneTitle")
-          }}</template>
-          <template v-else>{{ t("alert_templates.addTitle") }}</template>
-        </span>
-      </template>
-    </AppPageHeader>
+      class="px-3 border-b border-border-default"
+    />
 
     <OSplitter
       v-model="splitterModel"
@@ -44,98 +34,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
-        <div class="card-container tw:h-full tw:flex tw:flex-col">
-          <div class="tw:p-3 tw:overflow-auto">
-            <div class="tw:w-full tw:pb-2 tw:pt-2 o2-input">
-            <OInput
+        <OForm
+          :form="form"
+          v-slot="{ isSubmitting }"
+          class="card-container h-full flex flex-col"
+        >
+          <div class="p-3 overflow-auto">
+            <div class="w-full pb-2 pt-2 o2-input">
+            <OFormInput
+              name="name"
               data-test="add-template-name-input"
-              v-model="formData.name"
-              :label="t('alerts.name') + ' *'"
+              :label="t('alerts.name')"
+              required
               :readonly="isUpdatingTemplate"
               :disabled="isUpdatingTemplate"
               tabindex="0"
-              :error="!!nameError"
-              :error-message="nameError"
-              @update:model-value="nameError = ''"
             />
           </div>
-          <div class="tw:w-full tw:pb-3">
-            <div class="app-tabs-container tw:w-fit">
+          <div class="w-full pb-3">
+            <div class="app-tabs-container w-fit">
               <app-tabs
                 class="tabs-selection-container"
                 :tabs="tabs"
-                v-model:active-tab="formData.type"
+                :active-tab="templateType"
+                @update:active-tab="onTypeChange"
               />
             </div>
           </div>
-          <div v-if="formData.type === 'email'" class="tw:w-full tw:pt-1 o2-input">
-            <OInput
+          <div v-if="templateType === 'email'" class="w-full pt-1 o2-input">
+            <OFormInput
+              name="title"
               data-test="add-template-email-title-input"
-              v-model="formData.title"
-              :label="t('alerts.title') + ' *'"
+              :label="t('alerts.title')"
+              required
               tabindex="0"
-              :error="!!titleError"
-              :error-message="titleError"
-              @update:model-value="titleError = ''"
             />
           </div>
-          <div class="tw:w-full tw:py-3 ">
+          <div class="w-full py-3 ">
             <div
-              class="tw:pb-2 tw:font-bold"
+              class="pb-2 font-bold flex items-center gap-0.5"
               data-test="add-template-body-input-title"
             >
-              {{ t("alert_templates.body") + " *" }}
+              <span>{{ t("alert_templates.body") }}</span>
+              <span aria-hidden="true" class="select-none">*</span>
             </div>
-            <template v-if="formData.type === 'email'">
-              <query-editor
-                data-test="template-body-editor"
-                ref="queryEditorRef"
-                editor-id="template-body-editor"
-                class="tw:w-full tw:min-h-[310px]! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto tw:mb-3"
-                language="markdown"
-                v-model:query="formData.body"
-              />
-            </template>
-            <template v-else>
-              <query-editor
-                data-test="template-body-editor"
-                ref="queryEditorRef"
-                editor-id="template-body-editor"
-                class="tw:w-full tw:min-h-[310px]! tw:rounded-[5px] tw:border tw:border-(--o2-border-color) tw:resize-y tw:overflow-auto tw:mb-3"
-                language="json"
-                v-model:query="formData.body"
-              />
-            </template>
+            <!-- `:key` forces a remount when the type flips. CodeQueryEditor
+                 reads `language` only at monaco.editor.create() — it never
+                 watches the prop, and setModelLanguage is used nowhere — so
+                 without this the editor keeps its mount-time language and paints
+                 a markdown body with JSON errors (pre-migration got the remount
+                 for free from two v-if/v-else editors). -->
+            <query-editor
+              :key="bodyLanguage"
+              data-test="template-body-editor"
+              editor-id="template-body-editor"
+              class="w-full min-h-[310px]! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto mb-3"
+              :language="bodyLanguage"
+              :query="body"
+              @update:query="onBodyChange"
+            />
             </div>
           </div>
           <div
-            class="tw:flex tw:justify-end tw:gap-2 tw:px-4 tw:py-4 tw:w-full tw:bg-[var(--q-card-background)] tw:border-t tw:border-border-default"
+            class="flex justify-end gap-2 px-4 py-4 w-full bg-[var(--q-card-background)] border-t border-border-default"
           >
             <OButton
               v-close-popup
               variant="outline"
               size="sm-action"
+              :disabled="isSubmitting"
               @click="$emit('cancel:hideform')"
               data-test="add-template-cancel-btn"
             >{{ t('alerts.cancel') }}</OButton>
             <OButton
               variant="primary"
               size="sm-action"
-              @click="saveTemplate"
+              :loading="isSubmitting"
               data-test="add-template-submit-btn"
+              @click="handleSave"
             >{{ t('alerts.save') }}</OButton>
           </div>
-        </div>
+        </OForm>
       </template>
       <template v-slot:after>
         <div
-          class="tw:px-2 tw:pt-2 tw:h-full tw:overflow-auto card-container tw:border-l tw:border-border-default"
+          class="px-2 pt-2 h-full overflow-auto card-container border-l border-border-default"
         >
-          <div class="tw:font-bold tw:py-2 tw:px-1 tw:text-sm tw:font-medium">
+          <div class="font-bold py-2 px-1 text-sm font-medium">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
-          <OSeparator class="tw:-ml-2 tw:mr-2" />
-          <div class="tw:py-3 tw:px-1">
+          <OSeparator class="-ml-2 mr-2" />
+          <div class="py-3 px-1">
             <div>org_name, stream_type, stream_name</div>
             <div>alert_name, alert_type</div>
             <div>alert_period, alert_operator, alert_threshold</div>
@@ -145,25 +134,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               alert_trigger_time, alert_trigger_time_millis,
               alert_trigger_time_seconds, alert_trigger_time_str
             </div>
-            <div><b>rows</b> multiple lines of row template</div>
-            <div><b>All of the stream fields are variables.</b></div>
-            <div>{rows:N} {var:N} used to limit rows or string length.</div>
+            <div><b>rows</b> {{ t("alert_templates.variableRowsDescription") }}</div>
+            <div><b>{{ t("alert_templates.variableStreamFields") }}</b></div>
+            <div>{{ t("alert_templates.variableLimits") }}</div>
           </div>
-          <div class="tw:pb-3 tw:px-1">
-            <div class="tw:font-bold text-body-1 tw:pb-2">
+          <div class="pb-3 px-1">
+            <div class="font-bold text-body-1 pb-2">
               {{ t("alert_templates.variable_usage_examples") }}:
             </div>
             <div
               v-for="(template, index) in sampleTemplates"
-              class="tw:pb-3"
+              class="pb-3"
               :key="template.name"
               :data-test="`add-template-sample-template-${index}`"
             >
-              <div class="tw:flex tw:justify-between tw:items-center">
-                <div class="tw:pb-1">{{ template.name }}</div>
+              <div class="flex justify-between items-center">
+                <div class="pb-1">{{ template.name }}</div>
                 <OIcon
                   data-test="add-template-sample-template-copy-btn"
-                  class="tw:cursor-pointer"
+                  class="cursor-pointer"
                   name="content-copy"
                   size="xs"
                   @click="copyTemplateBody(template.body)"
@@ -171,9 +160,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 data-test="add-template-sample-template-text"
-                class="tw:bg-black/[0.07] tw:px-2 tw:rounded"
+                class="bg-black/[0.07] px-2 rounded"
               >
-                <pre class="tw:text-[10px] tw:my-0">
+                <pre class="text-[10px] my-0">
                     {{ template.body }}
                   </pre
                 >
@@ -188,9 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   ref,
-  onBeforeMount,
   onActivated,
   computed,
+  watch,
   defineAsyncComponent,
 } from "vue";
 import type { Ref } from "vue";
@@ -200,10 +189,11 @@ import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
-import type { TemplateData, Template } from "@/ts/interfaces/index";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import type { TemplateData } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
-import { isValidResourceName } from "@/utils/zincutils";
 import AppTabs from "@/components/common/AppTabs.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -215,6 +205,11 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import {
+  makeAddTemplateSchema,
+  addTemplateDefaults,
+  type AddTemplateForm,
+} from "./AddTemplate.schema";
 
 const props = withDefaults(
   defineProps<{
@@ -235,18 +230,58 @@ const QueryEditor = defineAsyncComponent(
 );
 const { t } = useI18n();
 const splitterModel: Ref<number> = ref(75);
-const formData: Ref<Template> = ref({
-  name: "",
-  body: "",
-  type: "http",
-  title: "",
-});
 const store = useStore();
-const editorRef: any = ref(null);
+const router = useRouter();
 const isUpdatingTemplate = ref(false);
-const nameError = ref('');
-const titleError = ref('');
 const { track } = useReo();
+
+// Owner pattern (Rule ③): AddTemplate OWNS <OForm>, and it needs to read `type`
+// at setup to drive conditional rendering (the email title input v-if + the
+// Monaco editor language). So the form is created here via useOForm and handed
+// to <OForm :form="form">; state is read with form.useStore (single source of
+// truth — no mirror), written with form.setFieldValue.
+const addTemplateSchema = makeAddTemplateSchema(t);
+const form = useOForm<AddTemplateForm>({
+  defaultValues: addTemplateDefaults(),
+  schema: addTemplateSchema,
+  onSubmit: saveTemplate,
+});
+
+// Reactive views of the two bridged values.
+const templateType = form.useStore((s: any) => s.values.type as "http" | "email");
+const body = form.useStore((s: any) => (s.values.body as string) ?? "");
+const bodyLanguage = computed(() =>
+  templateType.value === "email" ? "markdown" : "json",
+);
+
+// app-tabs is a UI toggle whose value is the schema discriminator (not an
+// <input>) → bridge it into the form (sanctioned Rule-② bridge).
+const onTypeChange = (value: unknown) => {
+  form.setFieldValue("type", value as "http" | "email");
+};
+
+// PARITY with pre-migration saveTemplate (HEAD ~:334-346): an unfilled required
+// field ALWAYS toasted "Please fill required fields". Post-migration the schema
+// rejects the submit BEFORE onSubmit(saveTemplate) runs — and saveTemplate owns
+// every toast — so a rejected save said nothing at all. `body` is the sharp edge:
+// it's a bare Monaco bridged in via setFieldValue with no name= binding, so it has
+// no field to highlight either. Restore the toast on a rejected submit.
+const handleSave = async () => {
+  await form.handleSubmit();
+  if (!form.state.isValid) {
+    toast({
+      variant: "error",
+      message: t("common.fillRequiredFields"),
+      timeout: 1500,
+    });
+  }
+};
+
+// Bare Monaco body → bridge its value into the form so schema min(1) covers it.
+const onBodyChange = (value: unknown) => {
+  form.setFieldValue("body", (value as string) ?? "");
+};
+
 const sampleTemplates = [
   {
     name: "Slack",
@@ -274,45 +309,57 @@ const sampleTemplates = [
 ]`,
   },
 ];
-onActivated(() => setupTemplateData());
-onBeforeMount(() => {
-  setupTemplateData();
-});
 
 const tabs = computed(() => [
   {
-    label: "Web Hook",
+    label: t("alerts.webhook"),
     value: "http",
     style: {},
     icon: "webhook",
   },
   {
-    label: "Email",
+    label: t("alerts.email"),
     value: "email",
     style: {},
     icon: "mail",
   },
 ]);
 
-const setupTemplateData = () => {
+// Edit/clone prefill arrives via the `template` prop (possibly async). Seed the
+// form with form.reset(record) when it loads — NOT a per-field setFieldValue
+// loop (playbook §4 "Resetting / repopulating form values").
+const applyTemplateData = () => {
   const params = router.currentRoute.value.query;
+  const next = addTemplateDefaults();
   if (props.template) {
     // Clone mode pre-fills the form but stays in create mode so save
     // produces a new template; edit mode would overwrite the original.
     isUpdatingTemplate.value = !props.isClone;
-    formData.value.name = props.template.name;
-    formData.value.body = props.template.body;
-    formData.value.type = props.template.type;
-    formData.value.title = props.template.title;
+    next.name = props.template.name;
+    next.body = props.template.body;
+    next.type = props.template.type as "http" | "email";
+    next.title = props.template.title;
+  } else {
+    isUpdatingTemplate.value = false;
   }
 
-  if (params.type) {
-    formData.value.type = params.type as "email" | "http";
+  // A ?type= query param (e.g. deep link) preselects the tab. Guard the cast so
+  // an unexpected value can never enter the enum-typed form.
+  if (params.type === "email" || params.type === "http") {
+    next.type = params.type;
   }
+
+  form.reset(next);
 };
 
-const isTemplateBodyValid = () => {
-  const result = validateTemplateBody(formData.value.body);
+watch(() => props.template, applyTemplateData, { immediate: true });
+onActivated(() => applyTemplateData());
+
+// http bodies must be valid JSON (with template placeholders). This stays a
+// submit-time toast side-effect — NOT a schema rule — to preserve the exact
+// pre-migration behaviour (Rule ④).
+const isTemplateBodyValid = (bodyValue: string) => {
+  const result = validateTemplateBody(bodyValue);
 
   if (!result.valid) {
     toast({
@@ -325,112 +372,82 @@ const isTemplateBodyValid = () => {
   return result.valid;
 };
 
-const router = useRouter();
-
-const isTemplateFilled = () =>
-  formData.value.name.trim().trim().length &&
-  formData.value.body.trim().trim().length;
-
-const saveTemplate = () => {
-  if (!isTemplateFilled()) {
-    const name = formData.value.name;
-    nameError.value = !name.trim() ? t('common.nameRequired')
-      : (!isValidResourceName(name) ? 'Characters like :, ?, /, #, and spaces are not allowed.' : '');
-    titleError.value = (formData.value.type === 'email' && !formData.value.title?.trim()) ? 'Field is required!' : '';
-    toast({
-      variant: "error",
-      message: "Please fill required fields",
-      timeout: 1500,
-    });
-    return;
-  }
-
-  // Here checking is template body json valid
-  if (formData.value.type !== "email" && !isTemplateBodyValid()) return;
+// @submit(value) is the source of truth. OForm awaits this, so the inline Save
+// button's spinner (v-slot isSubmitting) spans the whole request.
+async function saveTemplate(value: AddTemplateForm) {
+  // Here checking is template body json valid (http only).
+  if (value.type !== "email" && !isTemplateBodyValid(value.body)) return;
 
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait...",
-      timeout: 0,
-});
+    message: t("common.pleaseWait"),
+    timeout: 0,
+  });
+
+  // Same payload the pre-migration form built (identical for http/email):
+  // template_name = raw name; data.name = trimmed name.
+  const data = {
+    name: value.name.trim(),
+    body: value.body,
+    type: value.type,
+    title: value.title,
+  };
+
+  const onSuccess = () => {
+    dismiss();
+    emit("get:templates");
+    emit("cancel:hideform");
+    toast({
+      variant: "success",
+      message: t("alert_templates.savedSuccessfully"),
+    });
+  };
+
+  const onError = (err: any) => {
+    if (err.response?.status == 403) {
+      return;
+    }
+    dismiss();
+    toast({
+      variant: "error",
+      message: err.response?.data?.error || err.response?.data?.message,
+    });
+  };
 
   if (isUpdatingTemplate.value) {
-    templateService
+    const request = templateService
       .update({
         org_identifier: store.state.selectedOrganization.identifier,
-        template_name: formData.value.name,
-        data: {
-          name: formData.value.name.trim(),
-          body: formData.value.body,
-          type: formData.value.type,
-          title: formData.value.title,
-        },
+        template_name: value.name,
+        data,
       })
-      .then(() => {
-        dismiss();
-        emit("get:templates");
-        emit("cancel:hideform");
-        toast({
-          variant: "success",
-          message: `Template Saved Successfully.`,
-        });
-      })
-      .catch((err) => {
-        if (err.response?.status == 403) {
-          return;
-        }
-        dismiss();
-        toast({
-          variant: "error",
-          message: err.response?.data?.error || err.response?.data?.message,
-        });
-      });
+      .then(onSuccess)
+      .catch(onError);
     track("Button Click", {
       button: "Update Template",
       page: "Add Template",
     });
-  } else {
-    {
-      templateService
-        .create({
-          org_identifier: store.state.selectedOrganization.identifier,
-          template_name: formData.value.name,
-          data: {
-            name: formData.value.name.trim(),
-            body: formData.value.body,
-            type: formData.value.type,
-            title: formData.value.title,
-          },
-        })
-        .then(() => {
-          dismiss();
-          emit("get:templates");
-          emit("cancel:hideform");
-          toast({
-            variant: "success",
-            message: `Template Saved Successfully.`,
-          });
-        })
-        .catch((err) => {
-          if (err.response?.status == 403) {
-            return;
-          }
-          dismiss();
-          toast({
-            variant: "error",
-            message: err.response?.data?.error || err.response?.data?.message,
-          });
-        });
-      track("Button Click", {
-        button: "Create Template",
-        page: "Add Template",
-      });
-    }
+    return request;
   }
-};
+
+  const request = templateService
+    .create({
+      org_identifier: store.state.selectedOrganization.identifier,
+      template_name: value.name,
+      data,
+    })
+    .then(onSuccess)
+    .catch(onError);
+  track("Button Click", {
+    button: "Create Template",
+    page: "Add Template",
+  });
+  return request;
+}
+
 const copyTemplateBody = (text: any) => {
   copyToClipboard(JSON.parse(JSON.stringify(text)), {
-    successMessage: "Content Copied Successfully!",
+    successMessage: t("alert_templates.contentCopied"),
     timeout: 1000,
   });
 };

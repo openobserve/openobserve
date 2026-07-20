@@ -26,15 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length && !loading"
-        class="tw:w-full tw:text-center tw:mt-4 tw:font-bold tw:text-gray-600"
+        class="w-full text-center mt-4 font-bold text-gray-600"
         style="margin-top: 64px; font-size: 18px"
       >
-        <span> No Permissions Selected </span>
+        <span> {{ t('iam.permissionsTable.noPermissionsSelected') }} </span>
       </div>
       <div
         data-test="edit-role-permissions-table-loading-resources-loader"
         v-show="parent.expand && parent.is_loading"
-        class="tw:flex tw:items-center"
+        class="flex items-center"
         :style="{
           paddingLeft: level
             ? parent.has_entities
@@ -46,12 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '',
         }"
       >
-        <OSpinner size="xs" class="tw:my-2 tw:mx-0 tw:mr-2" />
-        <div>Loading Resources...</div>
+        <OSpinner size="xs" class="my-2 mx-0 mr-2" />
+        <div>{{ t('iam.permissionsTable.loadingResources') }}</div>
       </div>
       <div
         v-if="level && getFilteredRows.length === 50"
-        class="tw:py-2 tw:text-left tw:text-gray-700 tw:bg-white tw:relative"
+        class="py-2 text-left text-gray-700 bg-white relative"
         :style="{
           paddingLeft: level
             ? parent.has_entities
@@ -63,13 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '',
         }"
       >
-        Showing <span class="tw:font-bold"> Top 50 </span> resources (Search to get
-        specific resource)
+        {{ t('iam.permissionsTable.showing') }} <span class="font-bold"> {{ t('iam.permissionsTable.top50') }} </span> {{ t('iam.permissionsTable.resourcesSearchHint') }}
       </div>
       <div
         :data-test="`edit-role-${parent ? parent.name : 'main'}-permissions-table`"
         :id="`permissions-table-${parent.resourceName}`"
-        :class="level > 0 ? 'tw:overflow-y-auto tw:overflow-x-hidden' : ''"
+        :class="level > 0 ? 'overflow-y-auto overflow-x-hidden' : ''"
         :style="{
           maxHeight: level > 0 ? '400px' : undefined,
         }"
@@ -102,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col}-checkbox`"
               v-model="row.permission[col].value"
               :value="col"
-              class="filter-check-box tw:cursor-pointer"
+              class="filter-check-box cursor-pointer"
               @update:model-value="handlePermissionChange(row, col)"
             />
           </template>
@@ -120,15 +119,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </template>
           <template #empty>
-            <div v-if="level === 0" class="tw:py-16 tw:flex tw:justify-center tw:items-center">
+            <div v-if="level === 0" class="py-16 flex justify-center items-center">
               <NoData :filtered="!!filter" @action="emits('update:filter', '')" />
             </div>
             <div
               v-else
               data-test="edit-role-permissions-table-no-resources-title"
-              class="tw:py-2 tw:px-4 tw:text-sm tw:text-text-secondary"
+              class="py-2 px-4 text-sm text-text-secondary"
             >
-              No Resources Present
+              {{ t('iam.permissionsTable.noResourcesPresent') }}
             </div>
           </template>
         </OTable>
@@ -225,7 +224,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowAll",
-    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5' }, [
+    header: () => h('div', { class: 'flex items-center gap-1.5' }, [
       h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowAll'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowAll'), class: 'filter-check-box cursor-pointer' }),
       h('span', {}, t('iam.all')),
     ]),
@@ -238,7 +237,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowList",
-    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5' }, [
+    header: () => h('div', { class: 'flex items-center gap-1.5' }, [
       h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowList'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowList'), class: 'filter-check-box cursor-pointer' }),
       h('span', {}, t('iam.list')),
     ]),
@@ -251,7 +250,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowGet",
-    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5' }, [
+    header: () => h('div', { class: 'flex items-center gap-1.5' }, [
       h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowGet'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowGet'), class: 'filter-check-box cursor-pointer' }),
       h('span', {}, t('iam.get')),
     ]),
@@ -264,7 +263,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowPost",
-    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5 tw:whitespace-nowrap' }, [
+    header: () => h('div', { class: 'flex items-center gap-1.5 whitespace-nowrap' }, [
       h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowPost'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowPost'), class: 'filter-check-box cursor-pointer' }),
       h('span', {}, t('iam.create')),
     ]),
@@ -277,7 +276,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowPut",
-    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5 tw:whitespace-nowrap' }, [
+    header: () => h('div', { class: 'flex items-center gap-1.5 whitespace-nowrap' }, [
       h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowPut'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowPut'), class: 'filter-check-box cursor-pointer' }),
       h('span', {}, t('iam.update')),
     ]),
@@ -290,7 +289,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowDelete",
-    header: () => h('div', { class: 'tw:flex tw:items-center tw:gap-1.5 tw:whitespace-nowrap' }, [
+    header: () => h('div', { class: 'flex items-center gap-1.5 whitespace-nowrap' }, [
       h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowDelete'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowDelete'), class: 'filter-check-box cursor-pointer' }),
       h('span', {}, t('iam.delete')),
     ]),

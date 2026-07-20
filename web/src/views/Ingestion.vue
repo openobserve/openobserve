@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="tw:rounded-md ingestionPage tw:h-full tw:flex tw:flex-col" data-test="ingestion-page">
+  <div class="ingestionPage h-full flex flex-col" data-test="ingestion-page">
     <!-- Standard page header: title + icon. Search / token controls live in the
          toolbar row below. -->
     <!-- Standard page header: title + icon, with search / token controls and the
@@ -26,15 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('ingestion.header')"
       icon="data-plus-line"
       tabs-below
-      class="tw:shrink-0 tw:px-4"
+      class="shrink-0 px-4"
     >
       <template #actions>
-        <div class="tw:w-50 tw:flex-none">
+        <div class="w-50 flex-none">
           <OSearchInput
             v-model="globalSearchQuery"
             :placeholder="t('common.search')"
             clearable
-            class="tw:w-full indexlist-search-input"
+            class="w-full indexlist-search-input"
             data-test="recommended-list-search-input"
           />
         </div>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="tokenOptions"
           label-key="label"
           value-key="value"
-          class="tw:max-w-xs"
+          class="max-w-xs"
           style="min-width: 220px"
           @update:model-value="onTokenSelected"
         />
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #tabs>
         <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
-        <div class="tw:-ml-3 tw:w-full">
+        <div class="-ml-3 w-full">
         <OTabs v-model="ingestTabType" align="left">
           <ORouteTab
             name="recommended"
@@ -160,11 +160,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       "
-      class="text-subtitle tw:bg-amber-500 tw:p-2 tw:font-bold tw:mx-2.5 tw:mt-1 tw:rounded-md"
+      class="text-subtitle bg-amber-500 p-2 font-bold mx-2.5 mt-1 rounded-md"
     >
       {{ t("ingestion.redirectionIngestionMsg") }}
     </div>
-    <div class="tw:flex-1 tw:min-h-0">
+    <div class="flex-1 min-h-0">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"
@@ -264,6 +264,7 @@ export default defineComponent({
     const activeTab = ref("recommended");
     const metricRoutes = [
       "prometheus",
+      "vmagent",
       "otelCollector",
       "telegraf",
       "cloudwatchMetrics",
@@ -351,7 +352,7 @@ export default defineComponent({
           if (res.data.data.passcode == "") {
             toast({
               variant: "error",
-              message: "API Key not found.",
+              message: "Passcode not found.",
               timeout: 5000,
             });
           } else {
@@ -383,7 +384,7 @@ export default defineComponent({
           if (res.data.data.passcode == "") {
             toast({
               variant: "error",
-              message: "API Key not found.",
+              message: "Passcode not found.",
               timeout: 5000,
             });
           } else {

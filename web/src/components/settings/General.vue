@@ -19,134 +19,134 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <!-- Section header (title + description) is provided full-width by the
          Settings shell; this component renders only the form content. -->
-    <!-- platform settings section -->
-    <div class="">
+    <!-- platform settings section. The page gutter is owned by the Settings
+         shell's ConstrainedPage; this block adds none of its own. -->
+    <div>
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
-      <div class="tw:w-full tw:flex tw:flex-col">
-        <OForm @submit.stop="onSubmit.execute">
+      <div class="w-full flex flex-col">
+        <OForm
+          :schema="generalSettingsSchema"
+          :default-values="generalSettingsDefaults"
+          @submit="saveGeneralSettings"
+          v-slot="{ isSubmitting }"
+        >
           <!-- scape interval section -->
-          <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
-            <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
+          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+            <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.scrapintervalLabel") }}
             </span>
-            <OInput
-              v-model.number="scrapeIntereval"
+            <OFormInput
+              name="scrape_interval"
               type="number"
               min="0"
-              class="tw:ml-2"
-              :error="!!scrapeIntervalError"
-              :error-message="scrapeIntervalError"
-              @update:model-value="scrapeIntervalError = ''"
+              class="ml-2"
               data-test="general-settings-scrape-interval"
               style="width: 120px"
             />
-            <span class="individual-setting-description tw:text-[13px] tw:opacity-70">
+            <span class="individual-setting-description text-[13px] opacity-70">
               {{ t("settings.scrapeIntervalDescription") }}
             </span>
           </div>
 
           <!-- Max Series Per Query section -->
-          <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
-            <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
+          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+            <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
-            <OInput
-              v-model.number="maxSeriesPerQuery"
+            <OFormInput
+              name="max_series_per_query"
               type="number"
               :min="1000"
               :max="1000000"
-              class="tw:ml-2"
-              :error="!!maxSeriesError"
-              :error-message="maxSeriesError"
-              @update:model-value="maxSeriesError = ''"
+              class="ml-2"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
               data-test="general-settings-max-series-per-query"
               style="width: 180px"
             >
               <template v-slot:icon-right>
-                <OIcon name="info" size="sm" class="tw:cursor-pointer">
+                <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" :content="t('settings.maxSeriesPerQueryTooltip')" />
                 </OIcon>
               </template>
-            </OInput>
-            <span class="individual-setting-description tw:text-[13px] tw:opacity-70">
+            </OFormInput>
+            <span class="individual-setting-description text-[13px] opacity-70">
               {{ t("settings.maxSeriesPerQueryDescription") }}
             </span>
           </div>
 
           <!-- Manage Theme section -->
-          <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
-            <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
+          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+            <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.manageTheme") }}
             </span>
             <div
-              class="tw:flex tw:gap-2 tw:items-center"
+              class="flex gap-2 items-center"
               style="margin-left: -60px"
             >
               <!-- Light Mode Theme -->
               <div
-                class="tw:group/chip tw:inline-flex tw:items-center tw:gap-2 tw:py-[6px] tw:pr-3 tw:pl-[6px] tw:rounded-[20px] tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-[rgba(0,0,0,0.1)] tw:hover:bg-[rgba(0,0,0,0.06)] tw:hover:border-(--o2-primary-color) tw:hover:-translate-y-px tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-[rgba(255,255,255,0.15)] tw:dark:hover:bg-[rgba(255,255,255,0.08)] tw:dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                class="group/chip inline-flex items-center gap-2 py-[6px] pr-3 pl-[6px] rounded-[20px] cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-(--o2-primary-color) hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
                 <div
-                  class="color-circle tw:w-6 tw:h-6 tw:rounded-full tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:shadow-[0_1px_3px_rgba(0,0,0,0.2)] tw:relative tw:overflow-hidden"
+                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.2)] relative overflow-hidden"
                   :style="{ backgroundColor: customLightColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="tw:opacity-0 tw:transition-opacity tw:duration-200 tw:[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] tw:group-hover/chip:opacity-90"
+                    class="opacity-0 transition-opacity duration-200 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label tw:text-[11px] tw:font-semibold tw:opacity-50 tw:tracking-[0.5px]">{{ t("settings.light") }}</span>
-                <span class="chip-value tw:font-['SF_Mono','Monaco','Menlo',monospace] tw:text-[11px] tw:font-medium tw:opacity-70 tw:tracking-[-0.2px]">{{ customLightColor }}</span>
+                <span class="chip-label text-[11px] font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.light") }}</span>
+                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-[11px] font-medium opacity-70 tracking-[-0.2px]">{{ customLightColor }}</span>
               </div>
 
               <!-- Dark Mode Theme -->
               <div
-                class="tw:group/chip tw:inline-flex tw:items-center tw:gap-2 tw:py-[6px] tw:pr-3 tw:pl-[6px] tw:rounded-[20px] tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-[rgba(0,0,0,0.04)] tw:border tw:border-[rgba(0,0,0,0.1)] tw:hover:bg-[rgba(0,0,0,0.06)] tw:hover:border-(--o2-primary-color) tw:hover:-translate-y-px tw:hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-[rgba(255,255,255,0.15)] tw:dark:hover:bg-[rgba(255,255,255,0.08)] tw:dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                class="group/chip inline-flex items-center gap-2 py-[6px] pr-3 pl-[6px] rounded-[20px] cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-(--o2-primary-color) hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
                 <div
-                  class="color-circle tw:w-6 tw:h-6 tw:rounded-full tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:shadow-[0_1px_3px_rgba(0,0,0,0.2)] tw:relative tw:overflow-hidden"
+                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.2)] relative overflow-hidden"
                   :style="{ backgroundColor: customDarkColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="tw:opacity-0 tw:transition-opacity tw:duration-200 tw:[filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] tw:group-hover/chip:opacity-90"
+                    class="opacity-0 transition-opacity duration-200 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label tw:text-[11px] tw:font-semibold tw:opacity-50 tw:tracking-[0.5px]">{{ t("settings.dark") }}</span>
-                <span class="chip-value tw:font-['SF_Mono','Monaco','Menlo',monospace] tw:text-[11px] tw:font-medium tw:opacity-70 tw:tracking-[-0.2px]">{{ customDarkColor }}</span>
+                <span class="chip-label text-[11px] font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.dark") }}</span>
+                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-[11px] font-medium opacity-70 tracking-[-0.2px]">{{ customDarkColor }}</span>
               </div>
 
               <!-- Reset Button -->
               <div
-                class="tw:group/resetChip tw:inline-flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-full tw:cursor-pointer tw:transition-all tw:duration-200 tw:bg-transparent tw:border tw:border-dashed tw:border-[rgba(0,0,0,0.2)] tw:opacity-60 tw:hover:bg-[rgba(239,68,68,0.08)] tw:hover:border-[rgba(239,68,68,0.4)] tw:hover:border-solid tw:hover:opacity-100 tw:hover:-translate-y-px tw:hover:rotate-180 tw:dark:border-[rgba(255,255,255,0.25)] tw:dark:hover:bg-[rgba(239,68,68,0.15)] tw:dark:hover:border-[rgba(239,68,68,0.5)]"
+                class="group/resetChip inline-flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-all duration-200 bg-transparent border border-dashed border-[rgba(0,0,0,0.2)] opacity-60 hover:bg-[rgba(239,68,68,0.08)] hover:border-[rgba(239,68,68,0.4)] hover:border-solid hover:opacity-100 hover:-translate-y-px hover:rotate-180 dark:border-[rgba(255,255,255,0.25)] dark:hover:bg-[rgba(239,68,68,0.15)] dark:hover:border-[rgba(239,68,68,0.5)]"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
-                <OIcon name="refresh" size="sm" class="tw:group-hover/resetChip:text-[rgb(239,68,68)] tw:dark:group-hover/resetChip:text-[rgb(248,113,113)]" />
+                <OIcon name="refresh" size="sm" class="group-hover/resetChip:text-[rgb(239,68,68)] dark:group-hover/resetChip:text-[rgb(248,113,113)]" />
                 <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
-            <span class="individual-setting-description tw:self-start tw:text-[13px] tw:opacity-70">
+            <span class="individual-setting-description self-start text-[13px] opacity-70">
               {{ t("settings.themeManagementDescription") }}
             </span>
           </div>
 
           <span>&nbsp;</span>
 
-          <div class="tw:flex tw:justify-start">
+          <div class="flex justify-start">
             <OButton
               data-test="dashboard-add-submit"
-              :loading="onSubmit.isLoading.value"
+              :loading="isSubmitting"
               variant="primary"
               size="sm-action"
-              @click="onSubmit.execute"
+              type="submit"
             >
               {{ t("dashboard.save") }}
             </OButton>
@@ -162,27 +162,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.identifier
       "
     >
-      <div class="tw:py-2">
+      <div class="py-2">
         <GroupHeader
           :title="t('settings.enterpriseFeatures')"
           :showIcon="false"
         />
       </div>
-      <div class="">
-        <div class="settings-grid-item no-border-bottom tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
-          <span class="individual-setting-title tw:text-sm tw:font-medium tw:leading-5">
+      <div>
+        <div class="settings-grid-item no-border-bottom grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+          <span class="individual-setting-title text-sm font-medium leading-5">
             {{ t("settings.customLogoText") }}
           </span>
           <div
             v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
-            class="tw:flex tw:gap-2 tw:items-center"
+            class="flex gap-2 items-center"
           >
             <OInput
-              class="tw:w-[250px] tw:mr-sm"
+              class="w-[250px] mr-sm"
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
-            <div class="tw:flex tw:gap-x-2">
+            <div class="flex gap-x-2">
               <OButton
                 type="button"
                 variant="outline-destructive"
@@ -192,17 +192,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 data-test="settings_ent_logo_custom_text_save_btn"
-                :loading="onSubmit.isLoading.value"
+                :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
-                type="submit"
+                type="button"
                 @click="updateCustomText"
                 icon-left="check"
               />
             </div>
           </div>
-          <div v-else class="tw:flex tw:items-center">
-            <span class="tw:w-[190px] tw:text-center tw:truncate"
+          <div v-else class="flex items-center">
+            <span class="w-[190px] text-center truncate"
               >{{
                 store.state.zoConfig.custom_logo_text ||
                 t("settings.noTextAvailable")
@@ -217,22 +217,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OButton
               data-test="settings_ent_logo_custom_text_edit_btn"
-              :loading="onSubmit.isLoading.value"
+              :loading="loadingState"
               variant="outline"
               size="icon-xs-sq"
-              class="tw:ml-2"
-              type="submit"
+              class="ml-2"
+              type="button"
               @click="editingText = !editingText"
               icon-left="edit"
             />
           </div>
-          <span class="individual-setting-description tw:text-[13px] tw:opacity-70">
+          <span class="individual-setting-description text-[13px] opacity-70">
             {{ t("settings.customLogoTextDescription") }}
           </span>
         </div>
         <!-- Light Mode Logo -->
-        <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
-          <div class="tw:pt-2 individual-setting-title tw:text-sm tw:font-medium tw:leading-5 tw:w-full tw:mb-5">
+        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+          <div class="pt-2 individual-setting-title text-sm font-medium leading-5 w-full mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
           <div
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig.custom_logo_img != null
             "
-            class="tw:w-full"
+            class="w-full"
           >
             <img
               data-test="setting_ent_custom_logo_img"
@@ -249,18 +249,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :alt="t('settings.logoLabel')"
               style="max-width: 150px; max-height: 31px"
-              class="tw:mx-3"
+              class="mx-3"
             />
             <OButton
               data-test="setting_ent_custom_logo_img_delete_btn"
               variant="ghost-destructive"
               size="icon-xs-sq"
-              class="tw:mx-3"
+              class="mx-3"
               @click="confirmDeleteLogo('light')"
               icon-left="delete"
             />
           </div>
-          <div v-else class="tw:flex tw:items-start tw:gap-2">
+          <div v-else class="flex items-start gap-2">
             <OFile
               data-test="setting_ent_custom_logo_img_file_upload"
               v-model="filesLight"
@@ -270,13 +270,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
               :help-text="t('settings.fileFormatConstraint')"
-              class="tw:mx-0 o2-file-input"
+              class="mx-0 o2-file-input"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
               </template>
             </OFile>
-            <div class="tw:flex tw:gap-x-2 tw:pt-5.75">
+            <div class="flex gap-x-2 pt-5.75">
               <OButton
                 type="button"
                 variant="outline-destructive"
@@ -286,23 +286,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 data-test="settings_ent_logo_custom_light_save_btn"
-                :loading="onSubmit.isLoading.value"
+                :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
-                type="submit"
+                type="button"
                 @click="uploadImage(filesLight, 'light')"
                 icon-left="check"
               />
             </div>
           </div>
-          <span class="individual-setting-description tw:-translate-y-[5px] tw:text-[13px] tw:opacity-70">
+          <span class="individual-setting-description -translate-y-[5px] text-[13px] opacity-70">
               {{ t("settings.customLogoLightDescription") }}
             </span>
           </div>
 
         <!-- Dark Mode Logo -->
-        <div class="settings-grid-item tw:grid tw:grid-cols-3 tw:gap-4 tw:items-center tw:py-4 tw:border-b tw:border-(--o2-border-color)">
-          <div class="tw:pt-2 individual-setting-title tw:text-sm tw:font-medium tw:leading-5 tw:w-full tw:mb-5">
+        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+          <div class="pt-2 individual-setting-title text-sm font-medium leading-5 w-full mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
           <div
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
               store.state.zoConfig.custom_logo_dark_img != null
             "
-            class="tw:w-full"
+            class="w-full"
           >
             <img
               data-test="setting_ent_custom_logo_dark_img"
@@ -320,18 +320,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :alt="t('settings.logoLabel')"
               style="max-width: 150px; max-height: 31px"
-              class="tw:mx-3"
+              class="mx-3"
             />
             <OButton
               data-test="setting_ent_custom_logo_dark_img_delete_btn"
               variant="ghost-destructive"
               size="icon-xs-sq"
-              class="tw:mx-3"
+              class="mx-3"
               @click="confirmDeleteLogo('dark')"
               icon-left="delete"
             />
           </div>
-          <div v-else class="tw:flex tw:items-start tw:gap-2">
+          <div v-else class="flex items-start gap-2">
             <OFile
               data-test="setting_ent_custom_logo_dark_img_file_upload"
               v-model="filesDark"
@@ -341,13 +341,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
               :help-text="t('settings.fileFormatConstraint')"
-              class="tw:mx-0 o2-file-input"
+              class="mx-0 o2-file-input"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
               </template>
             </OFile>
-            <div class="tw:flex tw:gap-x-2 tw:pt-5.75">
+            <div class="flex gap-x-2 pt-5.75">
               <OButton
                 type="button"
                 variant="outline-destructive"
@@ -357,26 +357,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 data-test="settings_ent_logo_custom_dark_save_btn"
-                :loading="onSubmit.isLoading.value"
+                :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
-                type="submit"
+                type="button"
                 @click="uploadImage(filesDark, 'dark')"
                 icon-left="check"
               />
             </div>
           </div>
-          <span class="individual-setting-description tw:-translate-y-[5px] tw:text-[13px] tw:opacity-70">
+          <span class="individual-setting-description -translate-y-[5px] text-[13px] opacity-70">
               {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
+      </div>
+    </div>
+
+    <!-- Danger Zone: delete this organization (owner/admin only).
+         Backend gate is the per-org RBAC check on DELETE /api/{org_id}/organizations;
+         this UI gate just hides the action for non-admins of the current org. -->
+    <div
+      id="dangerZone"
+      v-if="canDeleteOrg"
+      data-test="general-settings-danger-zone"
+      class="mt-8 overflow-hidden rounded-lg border border-(--color-banner-error-soft-border)"
+    >
+      <!-- Red-accented header signals this section is destructive. -->
+      <div
+        class="flex items-center gap-2 border-b border-(--color-banner-error-soft-border) bg-(--color-banner-error-soft-bg) px-5 py-3"
+      >
+        <OIcon name="warning" size="sm" class="text-(--color-banner-error-soft-text)" />
+        <span class="text-base font-bold text-(--color-banner-error-soft-text)">
+          {{ t("settings.dangerZone") }}
+        </span>
+      </div>
+
+      <!-- Action row: what the action does, and the control that does it. The org
+           name is interpolated so the sentence names the thing being destroyed. -->
+      <div class="flex items-start justify-between gap-6 bg-surface-base px-5 py-4">
+        <div class="flex flex-col gap-1">
+          <span class="text-sm font-semibold text-text-primary">
+            {{ t("settings.deleteOrganizationTitle") }}
+          </span>
+          <i18n-t
+            keypath="settings.deleteOrganizationDescription"
+            tag="p"
+            class="max-w-3xl text-sm text-text-secondary"
+          >
+            <template #name>
+              <span class="font-semibold text-text-primary">{{ deleteOrgName }}</span>
+            </template>
+          </i18n-t>
+        </div>
+        <OButton
+          data-test="general-settings-delete-org-btn"
+          variant="outline-destructive"
+          size="sm-action"
+          icon-left="delete"
+          class="shrink-0"
+          :loading="deleting"
+          @click="openDeleteOrgDialog"
+        >
+          {{ t("settings.deleteOrganization") }}
+        </OButton>
+      </div>
+
+      <!-- Consequence strip: the four things worth knowing before deciding —
+           reversibility, blast radius, who is affected, and who may do it. -->
+      <div
+        data-test="general-settings-delete-org-facts"
+        class="grid grid-cols-4 divide-x divide-border-default border-t border-border-default bg-surface-base"
+      >
+        <div
+          v-for="fact in deleteOrgFacts"
+          :key="fact.key"
+          :data-test="`general-settings-delete-org-fact-${fact.key}`"
+          class="flex flex-col gap-1 px-5 py-4"
+        >
+          <div class="flex items-center gap-2">
+            <OIcon :name="fact.icon" size="sm" class="shrink-0 text-text-muted" />
+            <span class="text-sm font-semibold text-text-primary">{{ fact.title }}</span>
+          </div>
+          <span class="text-xs text-text-secondary">{{ fact.detail }}</span>
+        </div>
       </div>
     </div>
   </div>
   <OSpinner
     v-if="loadingState"
     size="md"
-    class="tw:fixed tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2"
+    class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
     data-test="general-settings-loading-indicator"
   />
   <ODialog data-test="general-delete-image-dialog"
@@ -396,21 +466,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => !v && onColorPickerClose()"
     size="xs"
     :title="t('settings.pickCustomColor')"
-    primary-button-label="Close"
+    :primary-button-label="t('settings.general.close')"
     @click:primary="showColorPicker = false"
   >
     <OColor v-model="tempColor" @update:model-value="updateCustomColor" />
+  </ODialog>
+
+  <ODialog
+    data-test="general-delete-org-dialog"
+    v-model:open="confirmDeleteOrg"
+    size="sm"
+    :title="t('settings.deleteOrganization')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('settings.deleteOrganization')"
+    primary-button-variant="destructive"
+    :primary-button-disabled="!deleteConfirmMatches"
+    @update:open="(v) => !v && (deleteConfirmInput = '')"
+    @click:secondary="confirmDeleteOrg = false"
+    @click:primary="deleteOrg"
+  >
+    <div class="flex flex-col gap-3">
+      <!-- What will happen -->
+      <p class="text-sm text-text-primary">
+        {{
+          t("settings.deleteOrganizationConfirm", {
+            name: deleteOrgName,
+          })
+        }}
+      </p>
+
+      <!-- Blast radius in concrete numbers. Fetched only when this dialog opens
+           (see fetchOrgScope) and treated as contextual — if it fails to load the
+           delete flow still works, the user just decides without the counts. -->
+      <p
+        v-if="orgScopeLoading"
+        class="text-xs text-text-secondary"
+      >
+        {{ t("settings.deleteOrganizationScopeLoading") }}
+      </p>
+      <p
+        v-else-if="orgScope"
+        data-test="general-delete-org-scope"
+        class="text-xs font-semibold text-text-primary"
+      >
+        {{ orgScope }}
+      </p>
+
+      <!-- Irreversible-action warning callout -->
+      <div
+        class="flex items-start gap-2 rounded border border-(--color-banner-error-soft-border) bg-(--color-banner-error-soft-bg) px-3 py-2"
+      >
+        <OIcon
+          name="warning"
+          size="sm"
+          class="mt-0.5 shrink-0 text-(--color-banner-error-soft-text)"
+        />
+        <div class="flex flex-col gap-1">
+          <p class="text-xs text-(--color-banner-error-soft-text)">
+            {{ t("settings.deleteOrganizationWarning") }}
+          </p>
+          <p class="text-xs text-(--color-banner-error-soft-text)">
+            {{ t("settings.deleteOrganizationRecoverable") }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Type-to-confirm gate -->
+      <div class="flex flex-col gap-1">
+        <label class="block text-xs text-text-secondary">
+          <i18n-t keypath="settings.deleteOrganizationTypeToConfirm" tag="span">
+            <template #name>
+              <span class="font-semibold text-text-primary">{{ deleteOrgName }}</span>
+            </template>
+          </i18n-t>
+        </label>
+        <OInput
+          data-test="general-delete-org-confirm-input"
+          v-model="deleteConfirmInput"
+          :placeholder="deleteOrgName"
+          size="sm"
+          autocomplete="off"
+          @keyup.enter="deleteConfirmMatches && deleteOrg()"
+        />
+      </div>
+    </div>
   </ODialog>
 </template>
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useLoading } from "@/composables/useLoading";
 import organizations from "@/services/organizations";
+import usersService from "@/services/users";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
 import configService from "@/services/config";
@@ -418,6 +568,8 @@ import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
+import { useLocalOrganization } from "@/utils/zincutils";
+import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -426,8 +578,13 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeGeneralSettingsSchema,
+  type GeneralSettingsForm,
+} from "./General.schema";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -454,6 +611,7 @@ export default defineComponent({
     OInput,
     OFile,
     OForm,
+    OFormInput,
     OColor,
 },
   setup() {
@@ -461,16 +619,20 @@ export default defineComponent({
 
     const store = useStore();
     const router: any = useRouter();
-    const scrapeIntervalError = ref("");
-    const maxSeriesError = ref("");
-    const scrapeIntereval = ref(
-      store.state?.organizationData?.organizationSettings?.scrape_interval ??
+
+    // Schema-driven validation replaces the manual scrapeIntervalError /
+    // maxSeriesError refs + the imperative if-checks in onSubmit.
+    // Built once from the component's `t` so the messages are localized.
+    const generalSettingsSchema = makeGeneralSettingsSchema(t);
+    // Dynamic defaults (edit-prefill from the store) → a typed computed.
+    const generalSettingsDefaults = computed((): GeneralSettingsForm => ({
+      scrape_interval:
+        store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15,
-    );
-    const maxSeriesPerQuery = ref(
-      store.state?.organizationData?.organizationSettings
-        ?.max_series_per_query ?? null,
-    );
+      max_series_per_query:
+        store.state?.organizationData?.organizationSettings
+          ?.max_series_per_query ?? null,
+    }));
 
     const loadingState = ref(false);
     const customText = ref("");
@@ -514,10 +676,7 @@ export default defineComponent({
      * Priority: Vuex store tempThemeColors > organizationSettings > defaults
      */
     const updateFromStore = () => {
-      // Update scrape interval setting
-      scrapeIntereval.value =
-        store.state?.organizationData?.organizationSettings?.scrape_interval ??
-        15;
+      // (scrape_interval is now form-owned via :default-values — no ref to sync.)
 
       // Get theme colors from store with priority order
       // 1. Check Vuex store for temporary preview colors (highest priority)
@@ -559,9 +718,171 @@ export default defineComponent({
       }
     };
 
+    // ===== Delete organization (Danger Zone) =====
+    // The current user's role in the *currently selected* org. Sourced the same
+    // way IAM Users page does it: match our email in the org members list.
+    const currentUserRole = ref("");
+    const confirmDeleteOrg = ref(false);
+    const deleting = ref(false);
+    // Human members of this org, counted from the same list that resolves our role
+    // (service accounts excluded — they aren't people who lose access).
+    const memberCount = ref(0);
+    // Formatted "N dashboards · N streams · N GB data", loaded on dialog open.
+    const orgScope = ref("");
+    const orgScopeLoading = ref(false);
+
+    // Type-to-confirm gate: the destructive action is only enabled once the user
+    // types the exact org name. Guards against accidental clicks on an irreversible
+    // action (same pattern GitHub/Stripe use for delete-repo/close-account).
+    const deleteConfirmInput = ref("");
+    const deleteOrgName = computed(
+      () =>
+        store.state.selectedOrganization?.label ||
+        store.state.selectedOrganization?.identifier ||
+        "",
+    );
+    const deleteConfirmMatches = computed(
+      () => deleteConfirmInput.value.trim() === deleteOrgName.value,
+    );
+
+    // Only cloud builds expose self-service org deletion. Backend enforces the
+    // real per-org RBAC check; this only governs visibility.
+    const canDeleteOrg = computed(() => {
+      if (config.isCloud !== "true") return false;
+      const role = currentUserRole.value?.toLowerCase();
+      return role === "root" || role === "admin";
+    });
+
+    // The consequence strip under the Danger Zone header. Grace period is stated
+    // without a duration on purpose: the real value lives in the enterprise config
+    // (org_deletion_grace_period_days) and is not exposed to the frontend, so any
+    // number rendered here would be a guess.
+    const deleteOrgFacts = computed(() => [
+      {
+        key: "grace",
+        icon: "access-time",
+        title: t("settings.deleteFactGracePeriod"),
+        detail: t("settings.deleteFactGracePeriodDetail"),
+      },
+      {
+        key: "scope",
+        icon: "dashboard",
+        title: t("settings.deleteFactEverything"),
+        detail: t("settings.deleteFactEverythingDetail"),
+      },
+      {
+        key: "members",
+        icon: "group",
+        title: t(
+          "settings.deleteFactMembers",
+          { n: memberCount.value },
+          memberCount.value,
+        ),
+        detail: t("settings.deleteFactMembersDetail"),
+      },
+      {
+        key: "owner",
+        icon: "shield",
+        title: t("settings.deleteFactOwner"),
+        detail: t("settings.deleteFactOwnerDetail"),
+      },
+    ]);
+
+    const fetchCurrentUserRole = async () => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId || config.isCloud !== "true") return;
+      try {
+        const res = await usersService.orgUsers(orgId);
+        const me = store.state.userInfo?.email?.toLowerCase();
+        const members = res.data?.data || [];
+        const mine = members.find(
+          (m: any) => m.email?.toLowerCase() === me,
+        );
+        currentUserRole.value = mine?.role?.toLowerCase() || "";
+        memberCount.value = members.filter((m: any) => !m.is_system).length;
+      } catch {
+        // On error, leave role empty -> button stays hidden.
+        currentUserRole.value = "";
+        memberCount.value = 0;
+      }
+    };
+
+    // /summary is an expensive query (it lists every stream, runs a usage search
+    // over the triggers stream, and lists pipelines, alerts, functions and
+    // dashboards), so it is deferred to the moment the user actually opens the
+    // confirm dialog rather than run on every General Settings visit. Cached after
+    // the first successful load.
+    const fetchOrgScope = async () => {
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId || orgScope.value || orgScopeLoading.value) return;
+      orgScopeLoading.value = true;
+      try {
+        const res = await organizations.get_organization_summary(orgId);
+        orgScope.value = t("settings.deleteOrganizationScope", {
+          dashboards: res.data?.total_dashboards ?? 0,
+          streams: res.data?.streams?.num_streams ?? 0,
+          size: formatSizeFromMB(
+            String(res.data?.streams?.total_storage_size ?? 0),
+          ),
+        });
+      } catch {
+        // Contextual only — the delete flow stays usable without the counts.
+        orgScope.value = "";
+      } finally {
+        orgScopeLoading.value = false;
+      }
+    };
+
+    const openDeleteOrgDialog = () => {
+      confirmDeleteOrg.value = true;
+      fetchOrgScope();
+    };
+
+    const deleteOrg = async () => {
+      const org = store.state.selectedOrganization;
+      const orgId = org?.identifier;
+      if (!orgId) return;
+      deleting.value = true;
+      try {
+        await organizations.delete_org(orgId);
+        confirmDeleteOrg.value = false;
+        deleteConfirmInput.value = "";
+        toast({
+          variant: "success",
+          message: t("settings.deleteOrganizationInitiated"),
+        });
+        // The just-deleted org is now hidden/blocked by the backend, so we must
+        // move the user off it. Clear the locally-remembered org and re-fetch the
+        // org list (via the update_org flag MainLayout watches): its stale-org
+        // guard then auto-selects a surviving org, or lands on the empty state if
+        // this was the user's only org.
+        useLocalOrganization("");
+        store.dispatch("setSelectedOrganization", {});
+        router.push({
+          path: "/",
+          query: { update_org: Date.now().toString() },
+        });
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          message:
+            e?.response?.data?.message ||
+            e?.message ||
+            t("settings.somethingWentWrong"),
+        });
+      } finally {
+        deleting.value = false;
+      }
+    };
+
+    onMounted(() => {
+      fetchCurrentUserRole();
+    });
+
     onActivated(() => {
       // Initialize from store on mount
       updateFromStore();
+      fetchCurrentUserRole();
     });
 
     // Watch for changes in organization settings (backend config)
@@ -585,44 +906,24 @@ export default defineComponent({
       },
     );
 
-    const onSubmit = useLoading(async () => {
-      // Validate scrape interval
-      if (!scrapeIntereval.value && scrapeIntereval.value !== 0) {
-        scrapeIntervalError.value = t("settings.scrapeIntervalRequired") || "Scrape interval is required";
-        return;
-      }
-      if (scrapeIntereval.value < 0) {
-        scrapeIntervalError.value = t("settings.scrapeIntervalPositive") || "Scrape interval must be a positive number";
-        return;
-      }
-      // Validate max series per query (optional field — only validate when provided)
-      if (
-        maxSeriesPerQuery.value !== null &&
-        maxSeriesPerQuery.value !== undefined &&
-        maxSeriesPerQuery.value !== ""
-      ) {
-        if (maxSeriesPerQuery.value < 1000) {
-          maxSeriesError.value = t("settings.maxSeriesMinError") || "Minimum value is 1000";
-          return;
-        }
-        if (maxSeriesPerQuery.value > 1000000) {
-          maxSeriesError.value = t("settings.maxSeriesMaxError") || "Maximum value is 1000000";
-          return;
-        }
-      }
+    // @submit handler — fires only once the schema passes (scrape_interval
+    // required + ≥0; max_series_per_query optional range). The <input
+    // type="number"> emits a string, so coerce at use. Awaited by OForm so the
+    // inline Save button's spinner spans the POST (no useLoading wrapper).
+    const saveGeneralSettings = async (value: GeneralSettingsForm) => {
+      const maxSeriesRaw = value.max_series_per_query;
+      const maxSeriesNum =
+        maxSeriesRaw === null || maxSeriesRaw === undefined || maxSeriesRaw === ""
+          ? null
+          : Number(maxSeriesRaw);
 
       try {
         //set organizations settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
-          scrape_interval: scrapeIntereval.value,
-          max_series_per_query:
-            maxSeriesPerQuery.value === null ||
-            maxSeriesPerQuery.value === undefined ||
-            maxSeriesPerQuery.value === ""
-              ? null
-              : maxSeriesPerQuery.value,
+          scrape_interval: Number(value.scrape_interval),
+          max_series_per_query: maxSeriesNum,
           light_mode_theme_color: customLightColor.value,
           dark_mode_theme_color: customDarkColor.value,
         });
@@ -654,7 +955,7 @@ export default defineComponent({
           message: err?.message || t("settings.somethingWentWrong"),
         });
       }
-    });
+    };
 
     const uploadImage = (fileList: any = null, theme: string = "light") => {
       const selectedFiles = fileList || files.value;
@@ -891,7 +1192,7 @@ export default defineComponent({
 
     /**
      * Toggle between light and dark theme modes
-     * Updates the store, Quasar dark mode, and applies the corresponding theme color
+     * Updates the store, dark mode, and applies the corresponding theme color
      * @param mode - 'light' or 'dark' theme mode to switch to
      */
     const toggleThemeMode = (mode: "light" | "dark") => {
@@ -1024,25 +1325,27 @@ export default defineComponent({
       store,
       config,
       router,
-      scrapeIntereval,
-      scrapeIntervalError,
-      maxSeriesPerQuery,
-      maxSeriesError,
-      onSubmit,
+      // Form wiring (Options-API: schema + defaults MUST be returned so :schema
+      // resolves and validation runs).
+      generalSettingsSchema,
+      generalSettingsDefaults,
+      saveGeneralSettings,
       files,
       filesLight,
       filesDark,
       logoThemeToDelete,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
-        return `${t("settings.fileFormatConstraint")} ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
+        return t("settings.general.fileCounterLabel", {
+          constraint: t("settings.fileFormatConstraint"),
+          filesNumber: CounterLabelParams.filesNumber,
+          totalSize: CounterLabelParams.totalSize,
+        });
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),
       filesMaxTotalSize: ref(null),
       filesMaxNumber: ref(null),
       onRejected(rejectedEntries: string | any[]) {
-        //  plugin needs to be installed
-        // https://quasar.dev/quasar-plugins/notify#Installation
         toast({
           variant: "error",
           message: t("settings.filesValidationFailed", {
@@ -1069,13 +1372,25 @@ export default defineComponent({
       updateCustomColor,
       resetThemeColors,
       currentPickerMode,
+      // Delete organization (Danger Zone)
+      canDeleteOrg,
+      confirmDeleteOrg,
+      deleting,
+      deleteOrg,
+      deleteConfirmInput,
+      deleteOrgName,
+      deleteConfirmMatches,
+      deleteOrgFacts,
+      openDeleteOrgDialog,
+      orgScope,
+      orgScopeLoading,
     };
   },
 });
 </script>
 
 <style>
-/* The theme chips' dark background/border are set via `tw:dark:*` utilities,
+/* The theme chips' dark background/border are set via `dark:*` utilities,
    which don't apply in this app (dark mode is toggled by `body.body--dark`,
    not the OS media query Tailwind's `dark:` variant targets). Restore them
    with class-based rules so the chips keep their fill + border in dark mode. */
@@ -1088,4 +1403,3 @@ export default defineComponent({
   border-color: rgba(255, 255, 255, 0.25);
 }
 </style>
-

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="tw:flex tw:gap-1">
+    <div class="flex gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
         v-if="showQueryType"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-sql-query-type"
         >
-          <template #icon-left><OIcon name="database" size="xs" class="tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="database" size="xs" class="shrink-0" /></template>
           {{ t("panel.SQL") }}
         </OToggleGroupItem>
         <OToggleGroupItem
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-promql-query-type"
         >
-          <template #icon-left><OIcon name="show-chart" size="xs" class="tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="show-chart" size="xs" class="shrink-0" /></template>
           {{ t("panel.promQL") }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-builder-query-type"
         >
-          <template #icon-left><OIcon name="build" size="xs" class="tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="build" size="xs" class="shrink-0" /></template>
           {{ t("panel.builder") }}
         </OToggleGroupItem>
         <OToggleGroupItem
@@ -63,13 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-custom-query-type"
         >
-          <template #icon-left><OIcon name="code" size="xs" class="tw:shrink-0" /></template>
+          <template #icon-left><OIcon name="code" size="xs" class="shrink-0" /></template>
           {{ t("panel.custom") }}
         </OToggleGroupItem>
       </OToggleGroup>
     </div>
     <ConfirmDialog
-      title="Change Query Mode"
+      :title="t('dashboard.queryTypeSelector.changeQueryMode')"
       :message="confirmDialogMessage"
       @update:ok="changeToggle()"
       @update:cancel="confirmQueryModeChangeDialog = false"
@@ -130,7 +130,7 @@ export default defineComponent({
     const SEED_ON_TOGGLE_PAGES = ["dashboard", "metrics", "build", "logs"];
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDialogMessage = ref(
-      "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
+      t("dashboard.queryTypeSelector.changeQueryModeConfirm"),
     );
 
     const selectedButtonQueryType = ref("sql");
@@ -266,12 +266,14 @@ export default defineComponent({
             selectedQueryType === "builder"
           ) {
             // Switching from PromQL custom to builder
-            confirmDialogMessage.value =
-              "Are you sure you want to switch to builder mode? Your custom PromQL query will be wiped off.";
+            confirmDialogMessage.value = t(
+              "dashboard.queryTypeSelector.switchToBuilderConfirm",
+            );
           } else {
             // Default message for other transitions
-            confirmDialogMessage.value =
-              "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.";
+            confirmDialogMessage.value = t(
+              "dashboard.queryTypeSelector.changeQueryModeConfirm",
+            );
           }
 
           dashboardPanelData.data.queries[
@@ -358,6 +360,106 @@ export default defineComponent({
             ].query = "";
           }
         }
+      },
+    );
+
+    /**
+     * Picking the `metrics` stream type selects PromQL.
+     *
+     * SQL over a metrics stream is legal but it is not what anyone reaching for a
+     * metric wants — they want PromQL, and having to notice and flip a toggle to
+     * get it is a step with no decision in it. The panel then seeds itself with
+     * the metric's default function (see `useDefaultPanelFields`).
+     *
+     * Only on a panel with no query: an existing SQL-over-metrics panel opened
+     * for editing keeps its query type. SQL stays one click away.
+     */
+    watch(
+      () =>
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.stream_type,
+      async (streamType) => {
+        if (streamType !== "metrics") return;
+        if (dashboardPanelData.data.queryType === "promql") return;
+        if (dashboardPanelData.data.type === "custom_chart") return;
+
+        const query =
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ];
+        if (!query) return;
+
+        // A SAVED panel is never converted, full stop. Its id is assigned when
+        // it is loaded for editing (new panels carry `id: ""`), and — unlike the
+        // stream guard below — it survives a stream-TYPE change, which clears
+        // `fields.stream` before this watcher runs. Without this, flipping the
+        // stream type to `metrics` on a saved SQL panel went through
+        // `changeToggle()` and silently wiped every query, axis and filter.
+        if (dashboardPanelData.data.id) return;
+
+        // A stream is already chosen ⇒ this is not a fresh selection: either an
+        // existing panel is being loaded for editing (whose query type is the
+        // user's, not ours to change), or they have already built something.
+        // Changing the stream TYPE clears the stream, so the new-panel flow
+        // reaches here with it empty.
+        if (query.fields?.stream) return;
+
+        // A hand-written query is never overridden. NOT `query.query` alone: the
+        // editor auto-generates a SQL query (`SELECT … FROM ""`) before a stream
+        // is even picked, so a non-empty query is not evidence the user wrote one
+        // — `customQuery` is.
+        if (query.customQuery && query.query) return;
+
+        // Everything above inspects the CURRENT slot, but what we are about to
+        // do is panel-wide: `changeToggle` flips `data.queryType` and clears
+        // EVERY query, because SQL and PromQL are not interchangeable. So the
+        // other slots get a say.
+        //
+        // SQL over a metrics stream is legal — this watcher's whole premise is
+        // that it is merely never what anyone wants — so a SQL panel can quite
+        // reasonably gain a second query on a metrics stream. Adding one used to
+        // erase the first query's SQL and convert the panel to PromQL, which no
+        // one asked for. A panel with a query already written in it is one the
+        // user is building; converting it is their call, one click away.
+        // "Has something in it" is a query string AND a stream to run it
+        // against: a slot the user has not pointed at anything yet still carries
+        // the editor's placeholder SQL (`SELECT histogram(_timestamp) … FROM ""`),
+        // and treating that as work would block the auto-select on exactly the
+        // brand-new panels it exists for.
+        const siblingsHaveWork = dashboardPanelData.data.queries.some(
+          (q: any, index: number) =>
+            index !== dashboardPanelData.layout.currentQueryIndex &&
+            !!q?.query?.trim() &&
+            !!q?.fields?.stream,
+        );
+        if (siblingsHaveWork) return;
+
+        // WAIT for the DOM. The PromQL item in the toggle group is `v-if`-ed on
+        // `stream_type == "metrics"`, so at this instant it does not exist yet —
+        // setting the group's value to "promql" now makes it reject an unknown
+        // value and snap back to "sql", which the watcher below then writes into
+        // the panel. One tick later the item is rendered and the value sticks.
+        await nextTick();
+        if (
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ]?.fields?.stream_type !== "metrics"
+        ) {
+          return;
+        }
+
+        // Go through `changeToggle`, exactly as a click on the PromQL button
+        // would. Assigning `data.queryType` directly looked equivalent and was
+        // not: it skipped `removeXYFilters()`, so the X/Y fields a new panel
+        // ships with (`x_axis_1` / `y_axis_1` — visible in the placeholder SQL
+        // `SELECT histogram(_timestamp) … FROM ""`) survived into PromQL mode and
+        // the panel failed validation on Apply with "X-Axis is not supported for
+        // PromQL". This one call clears X/Y and the filters, drops the
+        // now-incompatible SQL query, and re-seeds the builder defaults.
+        query.customQuery = false;
+        popupSelectedButtonType.value = "promql";
+        await changeToggle();
       },
     );
 

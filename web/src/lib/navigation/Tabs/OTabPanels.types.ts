@@ -13,7 +13,7 @@ export interface OTabPanelsProps {
   animated?: boolean
   /** Keeps all panel DOM alive when switching (avoids remounting) */
   keepAlive?: boolean
-  /** Adds `tw:flex-1` so panels fill remaining space in a flex parent. Default: false */
+  /** Adds `flex-1` so panels fill remaining space in a flex parent. Default: false */
   grow?: boolean
   /** Overflow/scroll behavior of the panels container. Default: 'none' */
   scroll?: TabPanelsScroll

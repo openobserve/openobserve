@@ -115,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
     </template>
 
-      <div class="tw:w-full tw:h-full">
-        <div class="card-container tw:h-full tw:overflow-y-auto tw:pt-0.5">
+      <div class="w-full h-full">
+        <div class="card-container h-full overflow-y-auto pt-0.5">
           <router-view
             :title="ingestiontabs"
             :currOrgIdentifier="currOrgIdentifier"

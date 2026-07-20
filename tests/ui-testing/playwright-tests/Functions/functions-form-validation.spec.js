@@ -58,17 +58,24 @@ test.describe('Functions Form Validation', { tag: ['@functions-form-validation',
       await fv.expectFunctionNameError('Invalid');
     });
 
-    test('should show name error when name is cleared after focus', async ({ page }) => {
-      testLogger.info('Test: name field cleared after focus → error visible');
+    test('should show name error when name is cleared after revalidation starts', async ({ page }) => {
+      testLogger.info('Test: after first submit, clearing the name live-shows the error');
       const fv = pm.functionsFormValidation;
 
       await fv.openAddFunctionForm(process.env.ORGNAME || 'default');
 
-      // Type then clear — triggers blur validation
-      await fv.fillFunctionName('test_fv_fn_001');
-      await fv.functionNameField.fill('');
-      await fv.functionNameField.blur();
+      // The form uses submit-then-change validation (revalidateLogic): errors stay
+      // hidden while typing/on blur until the first submit. Submit with an empty
+      // name to reveal the error and switch the field into live change-revalidation.
+      await fv.clickSave();
+      await fv.expectFunctionNameErrorVisible();
 
+      // Now revalidating on change: a valid name clears the error…
+      await fv.fillFunctionName('test_fv_fn_001');
+      await fv.functionNameError.waitFor({ state: 'hidden', timeout: 5000 });
+
+      // …and clearing it live-re-shows the required error (no submit needed now).
+      await fv.functionNameField.fill('');
       await fv.expectFunctionNameErrorVisible();
     });
 

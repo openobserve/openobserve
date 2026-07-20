@@ -15,16 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
-    <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex flex-col h-full p-0">
+    <div class="flex flex-col h-full">
       <!-- Standard section header: title only. Search moved into the table toolbar. -->
       <AppPageHeader
         :title="t('settings.organizationManagement')"
         icon="lan"
-        :subtitle="'Create and manage organizations'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        :subtitle="t('settings.organizationManagementPage.subtitle')"
+        class="shrink-0 px-4 border-b border-border-default"
       />
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:mt-2.5 tw:overflow-hidden">
+      <div class="card-container flex-1 min-h-0 mt-2.5 overflow-hidden">
       <OTable
         :frame="false"
         data-test="org-management-list-table"
@@ -47,9 +47,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             data-test="org-management-search-input"
             v-model="filterQuery"
-            class="tw:w-64 no-border o2-search-input"
+            class="w-64 no-border o2-search-input"
             :placeholder="t('settings.searchOrgs')"
           />
+        </template>
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="org-management-list-refresh-btn"
+            @click="getData"
+          >
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="orgManagementRefresh" />
+          </OButton>
         </template>
         <template #empty>
           <OEmptyState
@@ -61,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
+          <div class="flex items-center gap-1 justify-center">
             <OButton
               variant="ghost"
               size="icon-xs-circle"
@@ -79,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-add-contract-btn"
               @click.stop="toggleContractDialog(row, 'create')"
             >
-              <OTooltip content="Add Contract" />
+              <OTooltip :content="t('settings.organizationManagementPage.addContract')" />
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
@@ -89,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-extend-contract-btn"
               @click.stop="toggleContractDialog(row, 'extend')"
             >
-              <OTooltip content="Extend Contract" />
+              <OTooltip :content="t('settings.organizationManagementPage.extendContract')" />
             </OButton>
             <OButton
               v-if="row.billing_provider === 'no_op'"
@@ -99,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-revoke-contract-btn"
               @click.stop="confirmRevokeContract(row)"
             >
-              <OTooltip content="Revoke" />
+              <OTooltip :content="t('settings.organizationManagementPage.revoke')" />
             </OButton>
             <OButton
               v-if="!row.org_storage_enabled"
@@ -109,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="org-management-storage-enable-btn"
               @click.stop="toggleOrgStorage(row)"
             >
-              <OTooltip content="Enable Storage" />
+              <OTooltip :content="t('settings.organizationManagementPage.enableStorage')" />
             </OButton>
             <OButton
               v-else
@@ -117,10 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-circle"
               icon-left="cloud-done"
               disabled
-              class="tw:text-green-500"
+              class="text-green-500"
               data-test="org-management-storage-enabled-btn"
             >
-              <OTooltip content="Storage Enabled" />
+              <OTooltip :content="t('settings.organizationManagementPage.storageEnabled')" />
             </OButton>
           </div>
         </template>
@@ -133,31 +145,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="organization-management-extend-trial-dialog"
       v-model:open="extendTrialPrompt"
       size="sm"
-      :title="`Extend Trial for ${extendTrialDataRow?.name}`"
-      sub-title="Set the new trial extension period."
+      :title="t('settings.organizationManagementPage.extendTrialTitle', { name: extendTrialDataRow?.name })"
+      :sub-title="t('settings.organizationManagementPage.extendTrialSubtitle')"
       :secondary-button-label="t('common.cancel')"
-      :primary-button-label="`Extend trial by ${extendedTrial} week(s)`"
+      :primary-button-label="t('settings.organizationManagementPage.extendTrialByWeeks', { n: extendedTrial })"
+      form-id="org-extend-trial-form"
       @click:secondary="extendTrialPrompt = false"
-      @click:primary="updateTrialPeriod(extendTrialDataRow.identifier, extendedTrial)"
     >
-      <div class="tw:flex tw:flex-col tw:gap-3">
-        <div class="tw:font-bold">Week(s)</div>
-        <div class="tw:flex tw:gap-1">
-          <span
-            v-for="page in 4"
-            :key="page"
-            @click="extendedTrial = page"
-            :class="[
-              'tw:cursor-pointer tw:px-2 tw:py-1 tw:border tw:border-gray-300',
-              extendedTrial === page
-                ? 'tw:bg-(--o2-primary-btn-bg) tw:text-(--o2-primary-btn-text) tw:border-(--o2-primary-btn-bg)'
-                : 'tw:bg-white tw:text-gray-700 tw:border-gray-300',
-            ]"
-          >
-            {{ page }}
-          </span>
+      <OForm
+        id="org-extend-trial-form"
+        ref="extendTrialFormRef"
+        :schema="extendTrialSchema"
+        :default-values="extendTrialDefaults"
+        @submit="onExtendTrialSubmit"
+      >
+        <div class="flex flex-col gap-3">
+          <div class="font-bold">{{ t('settings.organizationManagementPage.weeks') }}</div>
+          <div class="flex gap-1">
+            <span
+              v-for="page in 4"
+              :key="page"
+              @click="extendedTrial = page"
+              :class="[
+                'cursor-pointer px-2 py-1 border border-gray-300',
+                extendedTrial === page
+                  ? 'bg-(--o2-primary-btn-bg) text-(--o2-primary-btn-text) border-(--o2-primary-btn-bg)'
+                  : 'bg-white text-gray-700 border-gray-300',
+              ]"
+            >
+              {{ page }}
+            </span>
+          </div>
         </div>
-      </div>
+      </OForm>
     </ODialog>
 
     <!-- External Contract Dialog -->
@@ -165,28 +185,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="organization-management-contract-dialog"
       v-model:open="contractPrompt"
       size="sm"
-      :title="`${contractMode === 'create' ? 'Create' : 'Extend'} External Contract for ${contractDataRow?.name}`"
+      :title="contractMode === 'create'
+        ? t('settings.organizationManagementPage.createContractTitle', { name: contractDataRow?.name })
+        : t('settings.organizationManagementPage.extendContractTitle', { name: contractDataRow?.name })"
       :secondary-button-label="t('common.cancel')"
-      :primary-button-label="contractMode === 'create' ? 'Create Contract' : 'Extend Contract'"
+      :primary-button-label="contractMode === 'create'
+        ? t('settings.organizationManagementPage.createContract')
+        : t('settings.organizationManagementPage.extendContract')"
+      form-id="org-contract-form"
       @click:secondary="contractPrompt = false"
-      @click:primary="submitContract"
     >
-      <div class="tw:mb-3">
-        <div class="tw:font-bold tw:mb-1">
-          {{ contractMode === 'create' ? 'End Date' : 'New End Date' }}
-        </div>
-        <OInput
-          v-model="contractEndDate"
-          type="date"
-          data-test="contract-end-date-input"
-        />
-      </div>
-      <div
-        v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
-        class="tw:text-xs tw:text-gray-500"
+      <OForm
+        id="org-contract-form"
+        :schema="contractSchema"
+        :default-values="contractDefaults()"
+        @submit="submitContract"
       >
-        Current end date: {{ formatMicrosToDate(contractDataRow.contract_end_date) }}
-      </div>
+        <div class="mb-3">
+          <OFormInput
+            name="contractEndDate"
+            type="date"
+            data-test="contract-end-date-input"
+            :label="contractMode === 'create'
+              ? t('settings.organizationManagementPage.endDate')
+              : t('settings.organizationManagementPage.newEndDate')"
+            required
+          />
+        </div>
+        <div
+          v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
+          class="text-xs text-gray-500"
+        >
+          {{ t('settings.organizationManagementPage.currentEndDate', { date: formatMicrosToDate(contractDataRow.contract_end_date) }) }}
+        </div>
+      </OForm>
     </ODialog>
   </div>
 </template>
@@ -205,7 +237,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OrganizationServices from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -216,6 +249,15 @@ import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
+import {
+  makeContractSchema,
+  contractDefaults,
+  extendTrialSchema,
+  type ContractForm,
+  type ExtendTrialForm,
+} from "./OrganizationManagement.schema";
 
 export default defineComponent({
   name: "PageAlerts",
@@ -225,7 +267,8 @@ export default defineComponent({
     OButton,
     ODialog,
     OTooltip,
-    OInput,
+    OForm,
+    OFormInput,
     OSearchInput,
     OTable,
   },
@@ -247,7 +290,26 @@ export default defineComponent({
     const contractPrompt = ref(false);
     const contractDataRow = ref<any>({});
     const contractMode = ref<"create" | "extend">("create");
-    const contractEndDate = ref("");
+
+    // ── Form schemas (Options-API: MUST be returned from setup() or :schema
+    //    resolves to undefined and validation silently no-ops). ───────────────
+    // The contract message is mode-aware; the dialog body remounts on open
+    // (reka-ui), so a freshly-mounted <OForm> always reads the current schema.
+    const contractSchema = computed(() => makeContractSchema(contractMode.value));
+
+    // Extend-trial week count is bridged from the pill grid into the form below.
+    // Dynamic defaults (project the current pill value) → a typed computed.
+    const extendTrialFormRef = ref<any>(null);
+    const extendTrialDefaults = computed(
+      (): ExtendTrialForm => ({ extendedTrial: extendedTrial.value }),
+    );
+
+    // Keep the form's copy of the bridged pill value in sync (the pill grid is a
+    // custom control, not an <input>, so it is bridged via setFieldValue — the
+    // documented sanctioned exception, as CreateDestinationForm does).
+    watch(extendedTrial, (v) => {
+      extendTrialFormRef.value?.form?.setFieldValue("extendedTrial", Number(v));
+    });
 
     onMounted(() => {
       if (
@@ -305,7 +367,7 @@ export default defineComponent({
       },
       {
         id: "billing_provider",
-        header: "Provider",
+        header: t("settings.organizationManagementPage.provider"),
         accessorKey: "billing_provider",
         sortable: true,
         resizable: true,
@@ -335,7 +397,7 @@ export default defineComponent({
       },
       {
         id: "contract_end_date",
-        header: "Contract End",
+        header: t("settings.organizationManagementPage.contractEnd"),
         accessorKey: "contract_end_date_display",
         sortable: true,
         resizable: true,
@@ -354,10 +416,10 @@ export default defineComponent({
     ];
 
     const subscriptionPlans: any = {
-      "0": "Free",
-      "1": "Pay as you go",
-      "2": "Enterprise",
-      "3": "External Contract",
+      "0": t("settings.organizationManagementPage.planFree"),
+      "1": t("settings.organizationManagementPage.planPayAsYouGo"),
+      "2": t("settings.organizationManagementPage.planEnterprise"),
+      "3": t("settings.organizationManagementPage.planExternalContract"),
     };
 
     const formatMicrosToDate = (micros: number): string => {
@@ -376,7 +438,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading data...",
+        message: t("settings.organizationManagementPage.loadingData"),
               timeout: 0,
 });
 
@@ -425,7 +487,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to fetch organization data. Please try again.",
+                t("settings.organizationManagementPage.fetchDataError"),
               timeout: 5000,
             });
           }
@@ -443,34 +505,34 @@ export default defineComponent({
     const toggleContractDialog = (row: any, mode: "create" | "extend") => {
       contractDataRow.value = row;
       contractMode.value = mode;
-      contractEndDate.value = "";
+      // No contractEndDate reset needed: the dialog body remounts on open and
+      // <OForm :default-values> re-seeds the field to blank.
       contractPrompt.value = true;
     };
 
-    const submitContract = () => {
+    // @submit handler — fires only once the schema passes (contractEndDate
+    // required), so the old toast required-guards are gone. Awaited by OForm, so
+    // the footer Save spinner spans the POST automatically.
+    const submitContract = async (value: ContractForm) => {
       const metaOrg = store.state.selectedOrganization.identifier;
 
       if (contractMode.value === "create") {
-        if (!contractEndDate.value) {
-          toast({ variant: "error", message: "End date is required." });
-          return;
-        }
         const payload = {
           org_id: contractDataRow.value.identifier,
-          end_date: dateToMicros(contractEndDate.value),
+          end_date: dateToMicros(value.contractEndDate),
         };
 
         loading.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Creating external contract...",
+          message: t("settings.organizationManagementPage.creatingContract"),
                   timeout: 0,
 });
-        OrganizationServices.create_external_contract(metaOrg, payload)
+        return OrganizationServices.create_external_contract(metaOrg, payload)
           .then(() => {
             toast({
               variant: "success",
-              message: "External contract created successfully.",
+              message: t("settings.organizationManagementPage.contractCreatedSuccess"),
             });
             contractPrompt.value = false;
             getData();
@@ -484,31 +546,27 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to create external contract.",
+                t("settings.organizationManagementPage.createContractError"),
               timeout: 5000,
             });
           });
       } else {
-        if (!contractEndDate.value) {
-          toast({ variant: "error", message: "New end date is required." });
-          return;
-        }
         const payload = {
           org_id: contractDataRow.value.identifier,
-          new_end_date: dateToMicros(contractEndDate.value),
+          new_end_date: dateToMicros(value.contractEndDate),
         };
 
         loading.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Extending external contract...",
+          message: t("settings.organizationManagementPage.extendingContract"),
                   timeout: 0,
 });
-        OrganizationServices.extend_external_contract(metaOrg, payload)
+        return OrganizationServices.extend_external_contract(metaOrg, payload)
           .then(() => {
             toast({
               variant: "success",
-              message: "External contract extended successfully.",
+              message: t("settings.organizationManagementPage.contractExtendedSuccess"),
             });
             contractPrompt.value = false;
             getData();
@@ -522,7 +580,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to extend external contract.",
+                t("settings.organizationManagementPage.extendContractError"),
               timeout: 5000,
             });
           });
@@ -531,22 +589,22 @@ export default defineComponent({
 
     const confirmRevokeContract = async (row: any) => {
       const ok = await confirm({
-        title: "Revoke External Contract",
-        message: `Are you sure you want to revoke the external contract for "${row.name}"? The organization will revert to the Free tier.`,
+        title: t("settings.organizationManagementPage.revokeConfirmTitle"),
+        message: t("settings.organizationManagementPage.revokeConfirmMessage", { name: row.name }),
       });
       if (ok) {
         const metaOrg = store.state.selectedOrganization.identifier;
         loading.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Revoking external contract...",
+          message: t("settings.organizationManagementPage.revokingContract"),
                   timeout: 0,
 });
         OrganizationServices.revoke_external_contract(metaOrg, row.identifier)
           .then(() => {
             toast({
               variant: "success",
-              message: "External contract revoked successfully.",
+              message: t("settings.organizationManagementPage.contractRevokedSuccess"),
             });
             getData();
             loading.value = false;
@@ -559,7 +617,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to revoke external contract.",
+                t("settings.organizationManagementPage.revokeContractError"),
               timeout: 5000,
             });
           });
@@ -568,14 +626,14 @@ export default defineComponent({
 
     const toggleOrgStorage = async (row: any) => {
       const ok = await confirm({
-        title: "Enable BYOB",
-        message: `Are you sure you want to enable BYOB for "${row.name}"?`,
+        title: t("settings.organizationManagementPage.enableByobTitle"),
+        message: t("settings.organizationManagementPage.enableByobMessage", { name: row.name }),
       });
       if (ok) {
         loading.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "enabling storage settings...",
+          message: t("settings.organizationManagementPage.enablingStorage"),
                   timeout: 0,
 });
         orgStorageService
@@ -583,7 +641,7 @@ export default defineComponent({
           .then(() => {
             toast({
               variant: "success",
-              message: "Storage settings enabled successfully.",
+              message: t("settings.organizationManagementPage.storageEnabledSuccess"),
             });
             getData();
             loading.value = false;
@@ -596,7 +654,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to enable storage settings.",
+                t("settings.organizationManagementPage.enableStorageError"),
               timeout: 5000,
             });
           });
@@ -612,11 +670,10 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message:
-          "Please wait while processing trial period extension request...",
+        message: t("settings.organizationManagementPage.processingTrialExtension"),
               timeout: 0,
 });
-      OrganizationServices.extend_trial_period(
+      return OrganizationServices.extend_trial_period(
         store.state.selectedOrganization.identifier,
         payload,
       )
@@ -624,7 +681,7 @@ export default defineComponent({
           if (response.data) {
             toast({
               variant: "success",
-              message: "Trial period extended successfully.",
+              message: t("settings.organizationManagementPage.trialExtendedSuccess"),
             });
             extendTrialPrompt.value = false;
             extendTrialDataRow.value = {};
@@ -642,11 +699,21 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to extend trial period. Please try again.",
+                t("settings.organizationManagementPage.extendTrialError"),
               timeout: 5000,
             });
           }
         });
+    };
+
+    // @submit handler for the extend-trial dialog — awaited by OForm so the
+    // footer Save spinner spans the POST. The week count comes from the
+    // schema-validated form value (bridged from the pill grid).
+    const onExtendTrialSubmit = async (value: ExtendTrialForm) => {
+      return updateTrialPeriod(
+        extendTrialDataRow.value?.identifier,
+        Number(value.extendedTrial),
+      );
     };
 
     const filterData = (rows: string | any[], terms: string) => {
@@ -669,6 +736,10 @@ export default defineComponent({
       return filterData(tabledata.value || [], filterQuery.value);
     });
 
+    useShortcuts([
+      { id: "orgManagementRefresh", handler: () => { if (!isInputFocused()) getData(); } },
+    ]);
+
     return {
       t,
       columns,
@@ -686,7 +757,6 @@ export default defineComponent({
       contractPrompt,
       contractDataRow,
       contractMode,
-      contractEndDate,
       toggleContractDialog,
       submitContract,
       confirmRevokeContract,
@@ -696,6 +766,14 @@ export default defineComponent({
       filterData,
       visibleRows,
       store,
+      // Form wiring (Options-API: schemas/defaults MUST be returned so :schema
+      // resolves and validation runs).
+      contractSchema,
+      contractDefaults,
+      extendTrialSchema,
+      extendTrialDefaults,
+      extendTrialFormRef,
+      onExtendTrialSubmit,
     };
   },
 });

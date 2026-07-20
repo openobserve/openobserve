@@ -182,10 +182,15 @@ describe("PipelineEditor", () => {
       comparePipelinesById: vi.fn(),
     }));
 
-    // Create teleport target so Teleport to="#o2-page-actions" doesn't error
+    // Create teleport targets so Teleport to="#o2-page-actions" /
+    // "#o2-page-title-trail" (the name input) don't error
     const teleportTarget = document.createElement("div");
     teleportTarget.id = "o2-page-actions";
     document.body.appendChild(teleportTarget);
+
+    const titleTrailTarget = document.createElement("div");
+    titleTrailTarget.id = "o2-page-title-trail";
+    document.body.appendChild(titleTrailTarget);
 
     wrapper = mount(PipelineEditor, {
       attachTo: document.body,
@@ -255,9 +260,13 @@ describe("PipelineEditor", () => {
       expect(wrapper.vm.validationErrors).toEqual([]);
     });
 
-    it("initializes pipelineNameError as false", () => {
-      // pipelineNameError lives on pipelineObj (from useDnD), not on vm directly
-      expect(mockPipelineObj.pipelineNameError).toBeFalsy();
+    it("seeds the OForm name from the pipeline already loaded in the store at mount", () => {
+      // Regression: `pipelineObj` is a module-level singleton that survives
+      // navigation, so on re-editing a pipeline its name is already present at
+      // mount (no post-mount change). The store→form watch is `immediate` so
+      // metaForm is seeded here — otherwise a change-only watch never fires and
+      // save wrongly reports "Pipeline name is required".
+      expect(wrapper.vm.metaForm.state.values.name).toBe("test-pipeline");
     });
 
     it("initializes confirmDialogMeta as hidden", () => {
@@ -377,6 +386,21 @@ describe("PipelineEditor", () => {
       expect(wrapper.vm.confirmDialogBasicPipeline).toBe(false);
       // onSubmitPipeline delegates to the pipeline service
       expect(pipelineService.createPipeline).toHaveBeenCalled();
+    });
+
+    it("resetBasicDialog only closes the basic dialog and stays on the editor (no navigation)", async () => {
+      const routerPushSpy = vi
+        .spyOn(router, "push")
+        .mockImplementation(() => Promise.resolve());
+      wrapper.vm.confirmDialogBasicPipeline = true;
+
+      wrapper.vm.resetBasicDialog();
+      await flushPromises();
+
+      expect(wrapper.vm.confirmDialogBasicPipeline).toBe(false);
+      // Cancelling must NOT redirect to the pipelines listing.
+      expect(routerPushSpy).not.toHaveBeenCalled();
+      routerPushSpy.mockRestore();
     });
   });
 
@@ -541,7 +565,6 @@ describe("PipelineEditor", () => {
   describe("savePipeline Validations", () => {
     beforeEach(async () => {
       wrapper.vm.onSubmitPipeline = vi.fn().mockResolvedValue(true);
-      wrapper.vm.pipelineNameInputRef = { focus: vi.fn() };
       const { toast } = await import("@/lib/feedback/Toast/useToast");
       vi.mocked(toast).mockClear();
     });
@@ -555,11 +578,45 @@ describe("PipelineEditor", () => {
       );
     });
 
-    it("sets pipelineNameError to true when name is empty", async () => {
+    it("blocks the save when the pipeline name is empty", async () => {
       mockPipelineObj.currentSelectedPipeline.name = "";
       await wrapper.vm.savePipeline();
-      // pipelineNameError is set on pipelineObj (from useDnD mock)
-      expect(mockPipelineObj.pipelineNameError).toBe(true);
+      // OForm validation fails, so save never reaches the create call.
+      expect(pipelineService.createPipeline).not.toHaveBeenCalled();
+    });
+
+    it("saves an edited pipeline whose name was only present at mount (no post-mount change)", async () => {
+      // Regression: re-editing a pipeline leaves its name in the module-level
+      // singleton store BEFORE mount, so there is no post-mount change to fire a
+      // change-only watch. The name here ("test-pipeline") comes from the mount
+      // fixture and is never reassigned — save must still clear name validation
+      // and reach the update call instead of toasting "Pipeline name is required".
+      mockPipelineObj.isEditPipeline = true;
+      mockPipelineObj.currentSelectedPipeline.nodes = [
+        {
+          id: "n1",
+          io_type: "input",
+          type: "input",
+          data: { node_type: "stream", stream_name: "in", stream_type: "logs" },
+        },
+        {
+          id: "n2",
+          io_type: "output",
+          type: "output",
+          data: { node_type: "stream", stream_name: "out", stream_type: "logs" },
+        },
+      ];
+      mockPipelineObj.currentSelectedPipeline.edges = [
+        { source: "n1", target: "n2" },
+      ];
+
+      await wrapper.vm.savePipeline();
+
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      expect(toast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("required") })
+      );
+      expect(pipelineService.updatePipeline).toHaveBeenCalled();
     });
 
     it("shows error notification when source node is missing", async () => {

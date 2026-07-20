@@ -30,28 +30,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          header above a centered reading column. -->
     <div
       v-if="isConstrainedSection"
-      class="tw:h-full tw:min-h-0 tw:flex tw:flex-col"
+      class="h-full min-h-0 flex flex-col"
     >
       <AppPageHeader
+        :title="activeSectionItem?.label || ''"
+        :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
         :subtitle="activeSectionItem?.description || ''"
         :icon="(activeSectionItem?.icon as any)"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-subtle"
-      >
-        <template #title>
-          <span :data-test="`settings-${activeSectionItem?.key}-page-title`">{{ activeSectionItem?.label || '' }}</span>
-        </template>
-      </AppPageHeader>
+        class="shrink-0 px-4 border-b border-border-subtle"
+      />
       <ConstrainedPage
         size="lg"
         align="left"
         :padded="false"
-        class="tw:flex-1 tw:min-h-0 tw:px-4 tw:py-3"
+        class="flex-1 min-h-0 px-4 py-3"
       >
         <router-view title="" />
       </ConstrainedPage>
     </div>
     <!-- Table/list sections render their own AppPageHeader inside. -->
-    <section v-else class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden">
+    <section v-else class="h-full min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
       <router-view title="" />
     </section>
   </PageLayout>
@@ -334,9 +332,10 @@ export default defineComponent({
         {
           key: "gen_ai_agent_mapping",
           label: t("settings.genAiAgentMapping.tabLabel"),
-          description: "Map GenAI spans to agent identifiers",
+          description: t("settings.index.genAiAgentMappingDesc"),
           icon: "smart-toy",
           to: { name: "genAiAgentMapping", query: { org_identifier: org } },
+          visible: (isEnt || isCloud) && !!z.online_evals_enabled,
           dataTest: "gen-ai-agent-mapping-tab",
           group: "Data & AI",
         },

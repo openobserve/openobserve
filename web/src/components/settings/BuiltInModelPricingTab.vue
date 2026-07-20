@@ -15,17 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="built-in-model-pricing-container card-container tw:h-full tw:flex tw:flex-col">
+  <div class="built-in-model-pricing-container card-container h-full flex flex-col">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar tw:p-3 tw:shrink-0 tw:border-b tw:border-(--q-color-separator)">
-      <div class="tw:flex tw:items-center tw:justify-between tw:flex-wrap">
+    <div class="filters-bar p-3 shrink-0 border-b border-(--q-color-separator)">
+      <div class="flex items-center justify-between flex-wrap">
         <!-- Text search -->
-        <div class="tw:flex tw:gap-3">
+        <div class="flex gap-3">
           <OSearchInput
             v-model="searchQuery"
             :placeholder="t('modelPricing.searchByModelName')"
             clearable
-            class="no-border tw:w-[220px]"
+            class="no-border w-[220px]"
             data-test="built-in-model-pricing-search"
           />
         </div>
@@ -46,17 +46,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Error State -->
-    <div v-if="error" class="tw:text-center tw:p-6">
+    <div v-if="error" class="text-center p-6">
       <OIcon name="error" style="width: 50px; height: 50px;" />
-      <div class="tw:mt-3 tw:text-red-500">{{ error }}</div>
-      <span class="tw:mt-2">
+      <div class="mt-3 text-red-500">{{ error }}</div>
+      <span class="mt-2">
         <OButton variant="ghost-primary" size="sm" @click="fetchModels()">
           {{ t("modelPricing.tryAgain") }}
         </OButton>
       </span>
     </div>
 
-    <div v-else class="tw:mb-3 tw:px-3">
+    <div v-else class="mb-3 px-3">
       <OTable
         :data="filteredModels"
         :columns="columns"
@@ -70,15 +70,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         table-id="settings-builtin-model-pricing"
         selection="multiple"
         v-model:selected-ids="selectedIds"
-        class="tw:h-[calc(100vh-120px)]"
+        class="h-[calc(100vh-120px)]"
         data-test="built-in-model-pricing-table"
       >
         <!-- Model name + description -->
         <template #cell-name="{ row, value }">
-          <div class="tw:font-semibold">{{ value }}</div>
+          <div class="font-semibold">{{ value }}</div>
           <div
             v-if="row.description"
-            class="tw:text-xs"
+            class="text-xs"
             style="max-width: 260px; white-space: normal; line-height: 1.3; color: var(--o2-text-muted)"
           >
             {{ row.description }}
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Pattern -->
         <template #cell-pattern="{ row, value }">
           <code
-            class="tw:text-xs"
+            class="text-xs"
             style="word-break: break-all; white-space: normal"
           >
             {{ value || "—" }}
@@ -105,10 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (a.condition ? 1 : 0) - (b.condition ? 1 : 0),
               )"
               :key="idx"
-              class="tier-row tw:py-px"
+              class="tier-row py-px"
               :class="{ 'tier-conditional': !!tier.condition }"
             >
-              <div class="tier-name tw:text-[11px] tw:font-semibold tw:text-[#555] tw:mb-px" :class="tier.condition ? 'tw:text-[#888]' : ''">
+              <div class="tier-name text-[11px] font-semibold text-[#555] mb-px" :class="tier.condition ? 'text-[#888]' : ''">
                 <span v-if="tier.condition">
                   {{ tier.name }}
                   <span style="font-weight: 400; color: var(--o2-text-muted)">
@@ -119,11 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <span v-else>{{ tier.name }}</span>
               </div>
-              <div class="tw:flex tw:gap-0.75 tw:flex-wrap tw:items-center">
+              <div class="flex gap-0.75 flex-wrap items-center">
                 <span
                   v-for="[key, price] in sortedPriceEntries(tier.prices)"
                   :key="key"
-                  class="tw:inline-flex tw:items-center tw:px-1.5 tw:py-px tw:rounded-[6px] tw:text-[11px] tw:font-semibold tw:whitespace-nowrap tw:text-[#555] tw:border tw:border-[#ccc] tw:dark:text-[#bbb] tw:dark:border-[#555]"
+                  class="inline-flex items-center px-1.5 py-px rounded-[6px] text-[11px] font-semibold whitespace-nowrap text-[#555] border border-[#ccc] dark:text-[#bbb] dark:border-[#555]"
                 >
                   {{ fmtKey(key) }}: ${{ fmtPrice(price) }}
                 </span>
@@ -133,9 +133,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div class="tw:w-full tw:flex tw:flex-col flex-center tw:p-6">
+          <div class="w-full flex flex-col flex-center p-6">
             <OIcon name="search-off" style="width: 50px; height: 50px;" />
-            <div class="tw:mt-3" style="color: var(--o2-text-muted)">
+            <div class="mt-3" style="color: var(--o2-text-muted)">
               {{ t("modelPricing.noModelsFound") }}
             </div>
           </div>
@@ -143,20 +143,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #bottom="bottomProps">
           <div
-            class="tw:flex tw:items-center tw:gap-4 tw:py-2 tw:px-1 tw:text-xs"
-            style="color: var(--o2-text-muted)"
+            class="flex items-center gap-4 py-2 px-1 o2-table-footer-title"
           >
             <span
-              >{{ bottomProps.totalRows }} model{{
-                bottomProps.totalRows !== 1 ? "s" : ""
+              >{{
+                bottomProps.totalRows !== 1
+                  ? t("settings.builtInModelPricingTab.modelCountPlural", { count: bottomProps.totalRows })
+                  : t("settings.builtInModelPricingTab.modelCountSingular", { count: bottomProps.totalRows })
               }}</span
             >
             <span
               v-if="selectedIds.length > 0"
               style="color: var(--o2-primary-color)"
-              class="tw:font-semibold"
+              class="font-semibold"
             >
-              {{ selectedIds.length }} selected
+              {{ t("settings.builtInModelPricingTab.selectedCount", { count: selectedIds.length }) }}
             </span>
           </div>
         </template>
@@ -305,7 +306,7 @@ export default defineComponent({
           }));
           loading.value = false;
           toast({
-            message: `${models.value.length} models loaded`,
+            message: t("settings.builtInModelPricingTab.modelsLoaded", { count: models.value.length }),
             variant: "success",
           });
           return;
@@ -326,7 +327,9 @@ export default defineComponent({
         });
       } catch (e: any) {
         error.value =
-          e.response?.data?.message || e.message || "Failed to load models";
+          e.response?.data?.message ||
+          e.message ||
+          t("settings.builtInModelPricingTab.failedToLoadModels");
         toast({
           variant: "error",
           message: error.value,
@@ -342,7 +345,7 @@ export default defineComponent({
       const selected = models.value.filter((m) => selectedIds.value.includes(m.name));
       if (selected.length === 0) {
         toast({
-          message: "No models selected. Please select at least one model.",
+          message: t("settings.builtInModelPricingTab.noModelsSelected"),
           variant: "warning",
         });
         return;
@@ -384,7 +387,7 @@ export default defineComponent({
 </script>
 
 <style>
-/* Tier pricing rows — sibling selector not convertible to tw: */
+/* Tier pricing rows — sibling selector not convertible to  */
 .tier-row + .tier-row {
   border-top: 1px dashed var(--o2-border);
   margin-top: 2px;

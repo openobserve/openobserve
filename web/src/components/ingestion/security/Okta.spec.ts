@@ -94,7 +94,7 @@ describe('Okta.vue Comprehensive Coverage', () => {
     it('should apply correct styling to documentation link', () => {
       wrapper = createWrapper();
       const docLink = wrapper.find('a');
-      expect(docLink.classes()).toContain('tw:text-text-link');
+      expect(docLink.classes()).toContain('text-text-link');
     });
 
     it('should render documentation text correctly', () => {

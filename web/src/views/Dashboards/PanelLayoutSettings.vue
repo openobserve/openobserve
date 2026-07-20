@@ -21,13 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('panel.layout')"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"
+    form-id="panel-layout-settings-form"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
-    @click:primary="submitForm()"
   >
     <div
     data-test="panel-layout-settings-content"
-    class="tw:p-0"
+    class="p-0"
     style="min-height: inherit"
   >
     <div>
@@ -35,22 +35,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="panel-layout-settings-height"
         class="o2-input"
       >
-        <OInput
-          v-model.number="updatedLayout.h"
-          :label="t('dashboard.panelHeight') + ' *'"
-          type="number"
-          style="min-width: 220px"
-          :error-message="heightError"
-          :error="!!heightError"
-          @update:model-value="heightError = ''"
-          data-test="panel-layout-settings-height-input"
-        />
+        <OForm id="panel-layout-settings-form" :form="form">
+          <OFormInput
+            name="h"
+            :label="t('dashboard.panelHeight')"
+            required
+            type="number"
+            style="min-width: 220px"
+            data-test="panel-layout-settings-height-input"
+          />
+        </OForm>
 
-        <div class="tw:text-[12px] tw:flex tw:items-center tw:gap-1 tw:mt-1">
-          <span class="tw:whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
+        <div class="text-[12px] flex items-center gap-1 mt-1">
+          <span class="whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
           <OIcon
             name="info-outline"
-            class="tw:cursor-pointer tw:shrink-0"
+            class="cursor-pointer shrink-0"
             size="xs"
            />
             <OTooltip content="1 unit = 30px" />
@@ -64,18 +64,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from "vue";
+import { computed, defineComponent, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "../../utils/zincutils";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import {
+  makePanelLayoutSettingsSchema,
+  type PanelLayoutSettingsForm,
+} from "./PanelLayoutSettings.schema";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { ODialog, OInput, OTooltip,
+  components: { ODialog, OForm, OFormInput, OTooltip,
     OIcon,
 },
   props: {
@@ -94,29 +100,40 @@ export default defineComponent({
     const { t } = useI18n();
     const router = useRouter();
 
-    const updatedLayout = ref({ ...props.layout });
-    const heightError = ref("");
+    const panelLayoutSettingsSchema = makePanelLayoutSettingsSchema(t);
 
-    const savePanelLayout = () => {
-      emit("save:layout", { ...updatedLayout.value });
-    };
+    // OWNER pattern (rule ③): this component renders <OForm> and needs the live
+    // height to compute the row-count preview, so it creates the form with
+    // useOForm and reads it via form.useStore — ONE source of truth, no mirror.
+    // Only `h` is editable; w/x/y/i are carried over from props.layout at submit.
+    // @submit (baked in) fires only after the schema passes (required + > 0).
+    const form = useOForm<PanelLayoutSettingsForm>({
+      defaultValues: { h: props.layout?.h },
+      schema: panelLayoutSettingsSchema,
+      onSubmit: (value) => {
+        emit("save:layout", { ...props.layout, h: Number(value.h) });
+      },
+    });
 
-    const submitForm = () => {
-      if (!updatedLayout.value.h || updatedLayout.value.h <= 0) {
-        heightError.value = !updatedLayout.value.h
-          ? t("common.required")
-          : t("common.valueMustBeGreaterThanZero");
-        return;
-      }
-      heightError.value = "";
-      savePanelLayout();
-    };
+    // The form is owned here and the component persists across opens (the parent
+    // toggles `:open`; its `v-if` is on the panel data, not cleared on close), so
+    // reset on BOTH transitions: re-seed `h` on open, and clear submit-state +
+    // errors on close so a failed submit's error doesn't linger on reopen.
+    watch(
+      () => props.open,
+      () => {
+        form.reset({ h: props.layout?.h });
+      },
+    );
 
+    // "Approximately N table rows" preview tracks the typed height — read it
+    // reactively from the form (rule ③: form.useStore, NOT a local copy).
+    const liveHeight = form.useStore((s: any) => Number(s.values?.h ?? 0));
 
     const getRowCount = computed(() => {
       // 24 is the height of toolbar
       // 28.5 is the height of each "row"
-      const count = Number(Math.ceil((updatedLayout.value.h * 30 - 24) / 28.5));
+      const count = Number(Math.ceil((liveHeight.value * 30 - 24) / 28.5));
 
       if (count < 0) return 0;
 
@@ -128,11 +145,8 @@ export default defineComponent({
       store,
       router,
       getImageURL,
-      savePanelLayout,
-      submitForm,
+      form,
       getRowCount,
-      updatedLayout,
-      heightError,
     };
   },
 });

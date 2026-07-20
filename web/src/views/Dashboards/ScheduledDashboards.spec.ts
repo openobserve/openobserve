@@ -75,7 +75,7 @@ vi.mock('@/utils/zincutils', () => ({
 }));
 
 vi.mock('@/utils/date', () => ({
-  convertUnixToQuasarFormat: vi.fn((timestamp: number) => {
+  convertUnixToDateFormat: vi.fn((timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleString();
   })
 }));
@@ -249,7 +249,7 @@ describe('ScheduledDashboards', () => {
     it('should apply light-mode class when theme is light', () => {
       mockStore.state.theme = 'light';
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('tw:bg-white');
+      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('bg-white');
     });
   });
 

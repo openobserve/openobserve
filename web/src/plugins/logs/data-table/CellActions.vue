@@ -1,21 +1,21 @@
 <template>
   <div
-    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] table-cell-actions tw:translate-y-[-50%] tw:h-full! tw:flex! tw:items-center tw:justify-center tw:rounded tw:max-h-10! tw:px-2"
+    class="field_overlay absolute right-0 top-[50%] table-cell-actions translate-y-[-50%] h-full! flex! items-center justify-center rounded max-h-10! px-2"
     :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
-    <span class="tw:mx-1">
+    <span class="mx-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
         @click.prevent.stop="copyLogToClipboard(row[column.id])"
-        title="Copy"
+        :title="t('logs.cellActions.copy')"
       >
         <OIcon name="content-copy" size="xs" />
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="tw:mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
@@ -23,25 +23,25 @@
           addSearchTerm(column.id, row[column.id], 'include')
         "
         :data-test="`log-details-include-field-${row[column.id]}`"
-        title="Include Term"
+        :title="t('logs.cellActions.includeTerm')"
       >
         <OIcon style="height: 8px; width: 8px">
-          <EqualIcon class="tw:size-full" />
+          <EqualIcon class="size-full" />
         </OIcon>
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="tw:mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
         @click.prevent.stop="
           addSearchTerm(column.id, row[column.id], 'exclude')
         "
-        title="Exclude Term"
+        :title="t('logs.cellActions.excludeTerm')"
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
         <OIcon style="height: 8px; width: 8px">
-          <NotEqualIcon class="tw:size-full" />
+          <NotEqualIcon class="size-full" />
         </OIcon>
       </OButton>
     </span>
@@ -62,6 +62,7 @@
 import { computed } from "vue";
 import type { PropType } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -93,6 +94,7 @@ const props = defineProps({
 });
 
 const store = useStore();
+const { t } = useI18n();
 
 const emit = defineEmits([
   "copy",
@@ -113,7 +115,7 @@ const addSearchTerm = (
 };
 
 const backgroundClass = computed(() =>
-  store.state.theme === "dark" ? "tw:bg-black" : "tw:bg-white",
+  store.state.theme === "dark" ? "bg-black" : "bg-white",
 );
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);

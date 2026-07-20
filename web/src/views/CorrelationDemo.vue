@@ -1,21 +1,21 @@
 <template>
-  <div class="tw:rounded-md tw:p-3">
-    <div class="tw:flex tw:gap-3">
+  <div class="rounded-md p-3">
+    <div class="flex gap-3">
       <!-- Left: Simulated Log Viewer -->
-      <div class="tw:w-2/3">
+      <div class="w-2/3">
         <OCard>
           <OCardSection role="header">
-            <div class="tw:text-xl tw:font-semibold">Sample Logs (Click to See Correlation)</div>
+            <div class="text-xl font-semibold">Sample Logs (Click to See Correlation)</div>
           </OCardSection>
 
           <OSeparator />
 
           <OCardSection role="body">
-            <div class="log-viewer tw:flex tw:flex-col tw:gap-3">
+            <div class="log-viewer flex flex-col gap-3">
               <!-- Sample Log 1 -->
-              <div class="log-line tw:group tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog1)">
-                <div class="log-timestamp tw:font-mono tw:text-xs tw:text-[var(--q-primary)] tw:mb-2">2025-12-02 10:23:45</div>
-                <div class="log-content tw:flex tw:flex-col tw:gap-1 tw:text-[13px]">
+              <div class="log-line group p-4 bg-(--q-dark-page,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--q-primary) hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog1)">
+                <div class="log-timestamp font-mono text-xs text-[var(--q-primary)] mb-2">2025-12-02 10:23:45</div>
+                <div class="log-content flex flex-col gap-1 text-[13px]">
                   <div><strong>service.name:</strong> checkout-api</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>k8s.deployment.name:</strong> checkout-v2</div>
@@ -24,13 +24,13 @@
                     timeout
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)] tw:group-hover:opacity-100" />
+                <OIcon name="link" size="sm" class="absolute top-4 right-4 opacity-0 transition-opacity duration-200 text-[var(--q-primary)] group-hover:opacity-100" />
               </div>
 
               <!-- Sample Log 2 -->
-              <div class="log-line tw:group tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog2)">
-                <div class="log-timestamp tw:font-mono tw:text-xs tw:text-[var(--q-primary)] tw:mb-2">2025-12-02 10:24:12</div>
-                <div class="log-content tw:flex tw:flex-col tw:gap-1 tw:text-[13px]">
+              <div class="log-line group p-4 bg-(--q-dark-page,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--q-primary) hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog2)">
+                <div class="log-timestamp font-mono text-xs text-[var(--q-primary)] mb-2">2025-12-02 10:24:12</div>
+                <div class="log-content flex flex-col gap-1 text-[13px]">
                   <div><strong>service.name:</strong> inventory-service</div>
                   <div><strong>k8s.cluster:</strong> prod-us-east</div>
                   <div><strong>environment:</strong> production</div>
@@ -38,13 +38,13 @@
                     <strong>message:</strong> Database connection timeout
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)] tw:group-hover:opacity-100" />
+                <OIcon name="link" size="sm" class="absolute top-4 right-4 opacity-0 transition-opacity duration-200 text-[var(--q-primary)] group-hover:opacity-100" />
               </div>
 
               <!-- Sample Log 3 -->
-              <div class="log-line tw:group tw:p-4 tw:bg-(--q-dark-page,#f5f5f5) tw:rounded-lg tw:border-2 tw:border-transparent tw:cursor-pointer tw:transition-all tw:duration-200 tw:relative tw:hover:border-(--q-primary) tw:hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog3)">
-                <div class="log-timestamp tw:font-mono tw:text-xs tw:text-[var(--q-primary)] tw:mb-2">2025-12-02 10:25:30</div>
-                <div class="log-content tw:flex tw:flex-col tw:gap-1 tw:text-[13px]">
+              <div class="log-line group p-4 bg-(--q-dark-page,#f5f5f5) rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 relative hover:border-(--q-primary) hover:bg-(--q-dark-page,#eeeeee)" @click="selectLog(sampleLog3)">
+                <div class="log-timestamp font-mono text-xs text-[var(--q-primary)] mb-2">2025-12-02 10:25:30</div>
+                <div class="log-content flex flex-col gap-1 text-[13px]">
                   <div><strong>service.name:</strong> user-auth</div>
                   <div><strong>k8s.cluster:</strong> prod-us-west</div>
                   <div><strong>region:</strong> us-west-2</div>
@@ -53,17 +53,17 @@
                     user_123
                   </div>
                 </div>
-                <OIcon name="link" size="sm" class="tw:absolute tw:top-4 tw:right-4 tw:opacity-0 tw:transition-opacity tw:duration-200 tw:text-[var(--q-primary)] tw:group-hover:opacity-100" />
+                <OIcon name="link" size="sm" class="absolute top-4 right-4 opacity-0 transition-opacity duration-200 text-[var(--q-primary)] group-hover:opacity-100" />
               </div>
             </div>
           </OCardSection>
         </OCard>
 
         <!-- Instructions -->
-        <OCard class="tw:mt-4">
+        <OCard class="mt-4">
           <OCardSection role="body">
-            <div class="tw:text-xl tw:font-semibold">How to Use</div>
-            <ol class="tw:m-2">
+            <div class="text-xl font-semibold">How to Use</div>
+            <ol class="m-2">
               <li>Click any log line above to see related telemetry</li>
               <li>The correlation panel will appear on the right</li>
               <li>View the extracted service dimensions</li>
@@ -71,9 +71,9 @@
               <li>Click "View" to navigate (demo mode shows query)</li>
             </ol>
 
-            <OSeparator class="tw:my-4" />
+            <OSeparator class="my-4" />
 
-            <div class="tw:text-sm tw:font-medium tw:mb-2">Current Status:</div>
+            <div class="text-sm font-medium mb-2">Current Status:</div>
             <div>
               <OTag v-if="isServiceStreamsEnabled" type="featureStatus" value="enabled">
                 Service Streams: Enabled
@@ -82,7 +82,7 @@
                 Service Streams: Disabled
               </OTag>
             </div>
-            <div class="tw:mt-1 tw:text-xs tw:text-gray-400">
+            <div class="mt-1 text-xs text-gray-400">
               Note: This is a demo using simulated data. In production,
               correlation will use real service_streams data.
             </div>
@@ -91,7 +91,7 @@
       </div>
 
       <!-- Right: Correlation Panel -->
-      <div class="tw:w-1/3">
+      <div class="w-1/3">
         <TelemetryCorrelationPanel
           :show="showCorrelation"
           :context="selectedContext"
@@ -102,9 +102,9 @@
 
         <!-- Fallback when panel is closed -->
         <OCard v-if="!showCorrelation">
-          <OCardSection class="tw:text-center tw:p-6">
+          <OCardSection class="text-center p-6">
             <OIcon name="info" size="lg" />
-            <div class="tw:text-gray-400 tw:mt-3">
+            <div class="text-gray-400 mt-3">
               Click a log line to see related telemetry
             </div>
           </OCardSection>
@@ -122,11 +122,11 @@
       @click:primary="showQueryDialog = false"
     >
       <div>
-        <div class="tw:text-xs tw:text-gray-400 tw:mb-2">
+        <div class="text-xs text-gray-400 mb-2">
           This query would be executed to fetch related
           {{ queryPreview.type }}:
         </div>
-        <pre class="query-preview tw:bg-(--q-dark-page,#f5f5f5) tw:p-4 tw:rounded tw:font-mono tw:text-xs tw:overflow-x-auto tw:whitespace-pre-wrap tw:wrap-break-word">{{ queryPreview.sql }}</pre>
+        <pre class="query-preview bg-(--q-dark-page,#f5f5f5) p-4 rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap wrap-break-word">{{ queryPreview.sql }}</pre>
       </div>
     </ODialog>
   </div>

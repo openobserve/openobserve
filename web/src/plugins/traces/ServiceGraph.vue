@@ -1,201 +1,277 @@
 <template>
-  <OCard class="tw:h-full tw:flex tw:flex-col">
+  <OCard class="h-full flex flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:p-[0.375rem] tw:pb-0">
-      <!-- Stream selector -->
+    <div class="flex items-center gap-2 p-[0.375rem] pb-0">
+      <!-- Stream selector (hidden when a parent drives selection, e.g. the
+           Agent Graph page which selects by agent). -->
       <div
+        v-if="!hideStreamSelector"
         data-test="service-graph-stream-selector"
-        class="tw:w-[11rem] tw:flex-shrink-0"
+        class="w-44 flex-shrink-0"
       >
         <OSelect
           :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="tw:w-[auto] tw:flex-shrink-0 tw:rounded"
+          class="w-auto flex-shrink-0 rounded"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
-        <OTooltip v-if="availableStreams.length === 0" content="No streams detected. Ensure service graph metrics include stream_name labels." />
+        <OTooltip v-if="availableStreams.length === 0" :content="t('traces.serviceGraph.noStreamsDetected')" />
       </div>
       <!-- Search input -->
       <div data-test="service-graph-search-input">
         <OSearchInput
           v-model="searchFilter"
-          class="tw:w-[14rem]!"
-          placeholder="Search Services"
+          class="w-56!"
+          :placeholder="t('traces.serviceGraph.searchPlaceholder')"
           :debounce="300"
           @update:model-value="applyFilters"
           clearable
         />
       </div>
       <!-- Spacer -->
-      <div class="tw:flex-1" />
+      <div class="flex-1" />
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="tw:flex tw:flex-row tw:items-center tw:gap-3 tw:p-[0.325rem] tw:rounded tw:border tw:border-[var(--o2-border-color)]!"
+        class="flex flex-row items-center gap-3 p-[0.325rem] rounded border border-[var(--o2-border-color)]!"
       >
         <div
           data-test="sg-legend"
-          class="tw:flex tw:flex-row tw:items-center tw:gap-3 tw:min-w-0"
+          class="flex flex-row items-center gap-3 min-w-0"
         >
           <!-- Border Color -->
           <div
-            class="tw:mb-0! tw:whitespace-nowrap tw:text-(--o2-text-4)! tw:font-bold tw:text-xs"
+            class="mb-0! whitespace-nowrap text-(--o2-text-4)! font-bold text-xs"
           >
-            Border Color
-            <span class="tw:font-normal tw:opacity-55">| Errors</span>
+            {{ t("traces.serviceGraph.borderColor") }}
+            <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.borderColorMetric") }}</span>
           </div>
-          <div class="tw:flex! tw:flex-row tw:gap-2">
+          <div class="flex! flex-row gap-2">
             <div
-              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
+              v-for="level in healthLevels"
+              :key="level.key"
+              class="flex flex-row items-center gap-1.5 flex-none"
+              :data-test="`sg-legend-${level.key}`"
             >
-              <div class="tw:w-3 tw:h-3 tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent" style="border-color: #52c41a"></div>
-              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                <div
-                  class="tw:text-left tw:text-(--o2-text-2)! tw:text-[11px] tw:font-semibold"
-                >
-                  Healthy
+              <span
+                class="sg-health-ring"
+                :class="`sg-health-ring--${level.key}`"
+              />
+              <div class="flex flex-row items-baseline gap-1">
+                <div class="text-left text-(--o2-text-2)! text-xs font-semibold">
+                  {{ level.label }}
                 </div>
-                <div class="tw:text-left tw:text-[10px] tw:opacity-55">&lt; 1%</div>
-              </div>
-            </div>
-            <div
-              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-            >
-              <div class="tw:w-3 tw:h-3 tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent" style="border-color: #faad14"></div>
-              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                <div
-                  class="tw:text-left tw:text-(--o2-text-2)! tw:text-[11px] tw:font-semibold"
-                >
-                  Degraded
-                </div>
-                <div class="tw:text-left tw:text-[10px] tw:opacity-55">1 – 5%</div>
-              </div>
-            </div>
-            <div
-              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-            >
-              <div class="tw:w-3 tw:h-3 tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent" style="border-color: #fa8c16"></div>
-              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                <div
-                  class="tw:text-left tw:text-(--o2-text-2)! tw:text-[11px] tw:font-semibold"
-                >
-                  Warning
-                </div>
-                <div class="tw:text-left tw:text-[10px] tw:opacity-55">5 – 10%</div>
-              </div>
-            </div>
-            <div
-              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5 tw:flex-none"
-            >
-              <div class="tw:w-3 tw:h-3 tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent" style="border-color: #f5222d"></div>
-              <div class="tw:flex tw:flex-row tw:items-baseline tw:gap-1">
-                <div
-                  class="tw:text-left tw:text-(--o2-text-2)! tw:text-[11px] tw:font-semibold"
-                >
-                  Critical
-                </div>
-                <div class="tw:text-left tw:text-[10px] tw:opacity-55">&gt; 10%</div>
+                <div class="text-left text-[0.625rem] opacity-55">{{ level.range }}</div>
               </div>
             </div>
           </div>
         </div>
+        <OSeparator vertical class="self-stretch mx-1" />
+        <!-- Inventory chip: the at-a-glance "how big is my system" number. Fixed
+             width regardless of how many kinds exist. Click to expand the
+             per-kind distribution (read-only here — the show/hide toggles live
+             in the "Show types" control next to it). -->
+        <ODropdown side="bottom" align="start">
+          <template #trigger>
+            <OButton
+              data-test="service-graph-entity-count"
+              variant="ghost"
+              size="xs"
+              icon-right="expand-more"
+            >
+              <span class="font-bold text-(--o2-text-2)">{{ totalEntities }}</span>
+              <span class="ml-1 text-(--o2-text-4)">{{ t("traces.serviceGraph.entities") }}</span>
+            </OButton>
+          </template>
+          <div class="min-w-48" data-test="service-graph-entity-distribution">
+            <ODropdownGroup :label="t('traces.serviceGraph.distribution')">
+              <ODropdownItem
+                v-for="row in kindRows"
+                :key="row.key"
+                :data-test="`service-graph-distribution-${row.key}`"
+              >
+                {{ row.label }}
+                <span class="ms-auto ps-4 tabular-nums opacity-70">{{
+                  row.count
+                }}</span>
+              </ODropdownItem>
+            </ODropdownGroup>
+            <ODropdownSeparator />
+            <ODropdownItem data-test="service-graph-distribution-total">
+              <span class="font-semibold">{{ t("traces.serviceGraph.total") }}</span>
+              <span class="ms-auto ps-4 tabular-nums font-semibold">{{
+                totalEntities
+              }}</span>
+            </ODropdownItem>
+          </div>
+        </ODropdown>
+        <OSeparator vertical class="self-stretch mx-1" />
+        <!-- "Show types": one control that unifies the kind inventory (each
+             kind's count) with the kind filter (show/hide) and the layout mode.
+             Counts and toggles sit together so the numbers and the control that
+             acts on them are the same thing, not two divorced widgets. -->
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              data-test="service-graph-density-btn"
+              variant="outline"
+              size="xs"
+              icon-left="filter-list"
+              :active="activeFilterCount > 0"
+            >
+              {{ t("traces.serviceGraph.showTypes") }}
+              <!-- Filter-active dot: signals the graph is filtered (some types
+                   hidden → entities withheld) rather than simply empty. A plain
+                   dot avoids the "is that N shown or N hidden?" ambiguity of a
+                   count; the per-type detail lives in the dropdown below. The
+                   button is `active` (primary fill) when filtered, so a white
+                   dot reads clearly on top of it. -->
+              <span
+                v-if="activeFilterCount > 0"
+                class="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-white"
+                data-test="service-graph-active-filter-indicator"
+              />
+              <OTooltip
+                v-if="activeFilterCount > 0"
+                :content="t('traces.serviceGraph.typesFiltered')"
+              />
+            </OButton>
+          </template>
+          <div
+            class="p-2 flex flex-col gap-2 min-w-52"
+            data-test="service-graph-collapse-mode"
+          >
+            <div class="text-[0.625rem] font-bold uppercase opacity-60">
+              {{ t("traces.serviceGraph.layout") }}
+            </div>
+            <OToggleGroup
+              :model-value="collapseMode"
+              class="w-full"
+              @update:model-value="(v) => setCollapseMode(v as string)"
+            >
+              <OToggleGroupItem
+                v-for="m in (['auto', 'expanded', 'collapsed'] as const)"
+                :key="m"
+                :value="m"
+                size="xs"
+                class="flex-1"
+                :data-test="`service-graph-collapse-${m}`"
+              >
+                {{ t(`traces.serviceGraph.mode.${m}`) }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <div class="text-[0.625rem] font-bold uppercase opacity-60 mt-1">
+              {{ t("traces.serviceGraph.types") }}
+            </div>
+            <!-- Each row: type name + live count, with a checkbox to show/hide.
+                 Services are the graph's spine (always shown) so their row is a
+                 count-only, non-toggleable entry rather than a disabled box. -->
+            <div
+              v-for="row in kindRows"
+              :key="row.key"
+              :data-test="row.toggleable ? `service-graph-kind-toggle-${row.key}` : `service-graph-kind-count-${row.key}`"
+              class="flex items-center gap-2 text-xs"
+            >
+              <OCheckbox
+                v-if="row.toggleable"
+                size="xs"
+                :model-value="!hiddenKinds.has(row.key)"
+                @update:model-value="toggleKindVisibility(row.key)"
+              />
+              <!-- Spacer aligning the always-on Services row with the checkboxes -->
+              <span v-else class="inline-block w-3.5 shrink-0" />
+              <span class="flex-1">{{ row.label }}</span>
+              <span class="tabular-nums opacity-70">{{ row.count }}</span>
+            </div>
+          </div>
+        </ODropdown>
         <OSeparator
           vertical
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
-          class="tw:self-stretch tw:mx-1"
+          class="self-stretch mx-1"
         />
         <div
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
           data-test="sg-node-size-info"
-          class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:min-w-0"
+          class="flex flex-row items-center gap-2 min-w-0"
         >
           <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
           <div
-            class="tw:mb-0! tw:whitespace-nowrap tw:text-(--o2-text-4)! tw:font-bold tw:text-xs"
+            class="mb-0! whitespace-nowrap text-(--o2-text-4)! font-bold text-xs"
           >
-            Node Size
-            <span class="tw:font-normal tw:opacity-55">| Requests</span>
+            {{ t("traces.serviceGraph.nodeSize") }}
+            <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span>
           </div>
-          <div class="tw:flex tw:items-center tw:gap-1 tw:py-0!">
-            <div
-              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5"
-            >
-              <div
-                class="tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent tw:shrink-0"
-                style="width: 16px; height: 16px; border-color: #52c41a"
-              ></div>
-              <span class="tw:text-[11px] tw:text-(--o2-text-2)!"
-                >Low</span
-              >
+          <div class="flex items-center gap-1 py-0!">
+            <div class="flex flex-row items-center gap-1.5">
+              <span class="sg-size-ring sg-size-ring--sm" />
+              <span class="text-xs text-(--o2-text-2)!">{{ t("traces.serviceGraph.sizeLow") }}</span>
             </div>
-            <div class="tw:opacity-35 tw:text-[16px] tw:tracking-[2px] tw:mb-0">···</div>
-            <div
-              class="tw:flex tw:flex-row tw:items-center tw:gap-1.5"
-            >
-              <div
-                class="tw:rounded-full tw:border-2 tw:border-solid tw:bg-transparent tw:shrink-0"
-                style="width: 28px; height: 28px; border-color: #52c41a"
-              ></div>
-              <span class="tw:text-[11px] tw:text-(--o2-text-2)!"
-                >High</span
-              >
+            <div class="opacity-35 text-base tracking-[0.125rem] mb-0">···</div>
+            <div class="flex flex-row items-center gap-1.5">
+              <span class="sg-size-ring sg-size-ring--lg" />
+              <span class="text-xs text-(--o2-text-2)!">{{ t("traces.serviceGraph.sizeHigh") }}</span>
             </div>
           </div>
         </div>
       </div>
     </div>
     <OCardSection
-      class="tw:flex-1 tw:min-h-0 tw:relative tw:overflow-hidden service-graph-container"
+      class="flex-1 min-h-0 relative overflow-hidden service-graph-container"
     >
       <!-- Graph Visualization -->
-      <OCard class="tw:rounded-lg tw:shadow-sm tw:h-full">
-        <OCardSection class="tw:p-0 tw:h-full" style="height: 100%">
+      <OCard class="rounded-lg shadow-sm h-full">
+        <OCardSection class="p-0 h-full" style="height: 100%">
           <div
             data-test="service-graph-container"
-            class="graph-container tw:h-full tw:w-full tw:rounded tw:overflow-hidden tw:bg-[var(--o2-bg)]"
+            class="graph-container h-full w-full rounded overflow-hidden bg-[var(--o2-bg)]"
             style="position: relative"
           >
-            <div v-if="loading" class="tw:flex tw:items-center tw:justify-center tw:h-full">
-              <div class="tw:text-center tw:flex tw:flex-col tw:items-center">
+            <div v-if="loading" class="flex items-center justify-center h-full">
+              <div class="text-center flex flex-col items-center">
                 <OSpinner size="xl" />
-                <div class="tw:text-base tw:font-medium tw:mt-3 tw:text-gray-400">
-                  Loading service graph...
+                <div class="text-base font-medium mt-3 text-gray-400">
+                  {{ t("traces.serviceGraph.loading") }}
                 </div>
               </div>
             </div>
             <div
               v-else-if="error"
-              class="tw:flex flex-center tw:h-full tw:items-center tw:justify-center tw:p-[0.675rem]"
+              class="flex flex-center h-full items-center justify-center p-[0.675rem]"
             >
               <div>
                 <OIcon name="error-outline" style="width: 4em; height: 4em;" />
-                <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-[var(--o2-text-primary)]">
+                <div class="text-xl font-semibold mt-3 text-[var(--o2-text-primary)]">
                   {{ error }}
                 </div>
                 <OButton
                   variant="outline"
                   size="sm-action"
                   @click="loadServiceGraph"
-                  class="tw:mt-4"
+                  class="mt-4"
                   icon-left="refresh"
                 >
-                  Retry
+                  {{ t("traces.serviceGraph.retry") }}
                 </OButton>
               </div>
             </div>
             <div
               v-else-if="!graphData.nodes.length"
-              class="tw:flex tw:h-full tw:items-center tw:justify-center"
+              class="flex h-full items-center justify-center"
             >
-              <ServiceGraphNoDataState />
+              <ServiceGraphNoDataState
+                @jump-to-stream-data="
+                  (from, to) => $emit('jump-to-stream-data', from, to)
+                "
+              />
             </div>
             <div
               v-else
               ref="graphContainerRef"
-              class="tw:h-full tw:relative tw:overflow-hidden"
+              class="h-full relative overflow-hidden"
             >
               <ChartRenderer
                 ref="chartRendererRef"
@@ -203,9 +279,50 @@
                 :data="chartData"
                 :key="chartKey"
                 render-type="svg"
-                class="tw:h-full"
+                class="h-full"
                 @click="handleNodeClick"
               />
+
+              <!-- Zoom controls: mouse-wheel zoom is disabled (pan only), so
+                   these explicit buttons drive zoom + fit-to-screen. Floated
+                   bottom-right like a map control. -->
+              <div
+                class="absolute bottom-3 right-3 z-10 flex flex-col rounded-md border border-border-default bg-surface-panel shadow-sm overflow-hidden"
+                data-test="service-graph-zoom-controls"
+              >
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="add"
+                  class="rounded-none"
+                  data-test="service-graph-zoom-in"
+                  @click="zoomIn"
+                >
+                  <OTooltip side="left" :content="t('traces.serviceGraph.zoomIn')" />
+                </OButton>
+                <OSeparator />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="remove"
+                  class="rounded-none"
+                  data-test="service-graph-zoom-out"
+                  @click="zoomOut"
+                >
+                  <OTooltip side="left" :content="t('traces.serviceGraph.zoomOut')" />
+                </OButton>
+                <OSeparator />
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="fullscreen"
+                  class="rounded-none"
+                  data-test="service-graph-fit-screen"
+                  @click="fitToScreen"
+                >
+                  <OTooltip side="left" :content="t('traces.serviceGraph.fitToScreen')" />
+                </OButton>
+              </div>
 
               <!-- Service Graph Side Panel (node) -->
               <ServiceGraphSidePanel
@@ -230,16 +347,16 @@
   <ODialog data-test="service-graph-settings-dialog"
     v-model:open="showSettings"
     size="sm"
-    title="Service Graph Settings"
-    secondary-button-label="Close"
-    primary-button-label="Reset"
+    :title="t('traces.serviceGraph.settingsTitle')"
+    :secondary-button-label="t('traces.serviceGraph.close')"
+    :primary-button-label="t('traces.serviceGraph.reset')"
     @click:secondary="showSettings = false"
     @click:primary="resetSettings"
   >
-    <div class="tw:gap-3">
-      <div class="tw:text-xs tw:text-gray-400">
-        Stream-based topology - all data persisted to storage
-        <OTooltip content="Service graph uses stream-only architecture with zero in-memory state" />
+    <div class="gap-3">
+      <div class="text-xs text-gray-400">
+        {{ t("traces.serviceGraph.settingsDescription") }}
+        <OTooltip :content="t('traces.serviceGraph.settingsTooltip')" />
       </div>
     </div>
   </ODialog>
@@ -258,6 +375,7 @@ import {
 import * as echarts from "echarts";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -265,6 +383,10 @@ import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
+import {
+  applyGraphCollapse,
+  GROUP_PREFIX,
+} from "@/utils/traces/applyGraphCollapse";
 import {
   formatNumber,
   formatLatency,
@@ -286,6 +408,13 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ServiceGraphNoDataState from "./ServiceGraphNoDataState.vue";
 import { getEffectiveTimeRange } from "@/utils/date";
 
@@ -304,12 +433,43 @@ export default defineComponent({
     OIcon,
     OCard,
     OCardSection,
+    ODropdown,
+    ODropdownItem,
+    ODropdownGroup,
+    ODropdownSeparator,
+    OCheckbox,
+    OToggleGroup,
+    OToggleGroupItem,
     ServiceGraphNoDataState,
   },
-  emits: ["view-traces", "request:stream-change"],
+  props: {
+    // Optional external stream override. When set (e.g. by the standalone
+    // Agent Graph page, which selects by agent → its source_stream), it seeds
+    // the internal streamFilter and keeps it in sync, instead of the component
+    // sourcing the stream from the shared traces store.
+    streamFilter: {
+      type: String,
+      default: undefined,
+    },
+    // Hide the built-in stream dropdown when the parent owns selection.
+    hideStreamSelector: {
+      type: Boolean,
+      default: false,
+    },
+    // Agent-node highlighting (indigo tint, larger size, radar-ping halo) is a
+    // treatment for the dedicated Agent Graph page ONLY. On the regular Service
+    // Graph tab agents are rendered like any other node. The Agent Graph page
+    // sets this true; every other mount leaves it false.
+    agentHighlight: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
+    const { t } = useI18n();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
 
@@ -327,12 +487,30 @@ export default defineComponent({
 
     const searchFilter = ref("");
 
-    // Stream filter — synced from traces page selected stream
+    // Stream filter — an external `streamFilter` prop (Agent Graph page) wins;
+    // otherwise sync from the traces page selected stream / localStorage.
     const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
     const storedStreamFilter = localStorage.getItem(
       "serviceGraph_streamFilter",
     );
-    const streamFilter = ref(tracesStream || storedStreamFilter || "default");
+    const streamFilter = ref(
+      props.streamFilter || tracesStream || storedStreamFilter || "default",
+    );
+    // Keep the internal ref in sync when the parent drives the stream (e.g. the
+    // Agent Graph page selecting by agent → its source_stream) AND reload the
+    // graph. The built-in dropdown delegates reload to its parent via
+    // `request:stream-change`; a parent-driven stream has no such round-trip, so
+    // we refetch here directly. `loadServiceGraph` is hoisted (defined later in
+    // setup) — safe because the watcher callback only runs on later changes.
+    watch(
+      () => props.streamFilter,
+      (next) => {
+        if (next && next !== streamFilter.value) {
+          streamFilter.value = next;
+          loadServiceGraph();
+        }
+      },
+    );
     const availableStreams = ref<string[]>([]);
 
     const graphData = ref<any>({
@@ -345,7 +523,151 @@ export default defineComponent({
       edges: [],
     });
 
+    // Adaptive-collapse state: when the graph is large, inferred dependency kinds
+    // (database/queue/external/rpc) collapse into per-kind boundary nodes so the
+    // overview stays readable. Users can drill into a kind, hide a kind, or
+    // override the mode. Services are never collapsed.
+    const collapseMode = ref<"auto" | "expanded" | "collapsed">("auto");
+    const collapseThreshold = ref(40);
+    // Per-KIND expand (whole-kind drill-in, e.g. from a future "expand all
+    // externals" control) and per-GROUP expand (one caller's boundary, by its
+    // full `__group_<kind>__<caller>` id). Clicking a single group toggles only
+    // that group so one caller's externals expand without touching another's.
+    const expandedKinds = ref<Set<string>>(new Set());
+    const expandedGroups = ref<Set<string>>(new Set());
+    const hiddenKinds = ref<Set<string>>(new Set());
+
+    /** Toggle a single boundary group by its id (`__group_<kind>__<caller>`). */
+    const toggleGroupExpansion = (groupId: string) => {
+      const s = new Set(expandedGroups.value);
+      s.has(groupId) ? s.delete(groupId) : s.add(groupId);
+      expandedGroups.value = s;
+      lastChartOptions.value = null;
+      applyFilters();
+    };
+    const setCollapseMode = (m: "auto" | "expanded" | "collapsed") => {
+      collapseMode.value = m;
+      lastChartOptions.value = null;
+      applyFilters();
+    };
+
+    // ── Zoom controls ─────────────────────────────────────────────────────────
+    // The mouse still zooms (roam:true) so you can focus an area with the wheel;
+    // scaleLimit on the series bounds it so it can't run away (the old "erratic"
+    // feel). The +/- buttons drive the SAME series `zoom` option via setOption,
+    // reading the chart's CURRENT zoom first so button + wheel stay in sync.
+    const ZOOM_MIN = 0.4;
+    const ZOOM_MAX = 4;
+
+    // The live zoom level from the chart (kept in sync with wheel zoom), so a
+    // button press adjusts from where the user actually is, not a stale ref.
+    const currentZoom = (chart: any): number => {
+      const opt = chart.getOption?.();
+      const z = opt?.series?.[0]?.zoom;
+      return typeof z === "number" && z > 0 ? z : 1;
+    };
+
+    const zoomBy = (factor: number) => {
+      const chart = chartRendererRef.value?.chart;
+      if (!chart) return;
+      const next = Math.min(
+        ZOOM_MAX,
+        Math.max(ZOOM_MIN, currentZoom(chart) * factor),
+      );
+      // Merge only the zoom so positions/data stay put.
+      chart.setOption({ series: [{ zoom: next }] }, { lazyUpdate: true });
+    };
+
+    const zoomIn = () => zoomBy(1.25);
+    const zoomOut = () => zoomBy(1 / 1.25);
+
+    // Fit-to-screen: recreate the chart (keyed on chartKey) so ECharts re-fits
+    // the full graph bounding box into the panel at zoom 1, re-centered — the
+    // reliable reset for both tree (layout:none) and graph series (also clears
+    // any wheel pan/zoom the user applied).
+    const fitToScreen = () => {
+      lastChartOptions.value = null;
+      chartKey.value++;
+    };
+    const toggleKindVisibility = (kind: string) => {
+      const s = new Set(hiddenKinds.value);
+      s.has(kind) ? s.delete(kind) : s.add(kind);
+      hiddenKinds.value = s;
+      lastChartOptions.value = null;
+      applyFilters();
+    };
+
     const stats = ref<any>(null);
+
+    // Count nodes by kind (from backend service_type) for the legend. Nodes with
+    // no inferred type are instrumented services; the rest are inferred deps.
+    const kindCounts = computed(() => {
+      const counts = {
+        service: 0,
+        database: 0,
+        queue: 0,
+        external: 0,
+        rpc: 0,
+        agent: 0,
+        tool: 0,
+        model: 0,
+      };
+      // Count the RAW backend topology, not the collapsed view — the legend must
+      // report the true entity counts regardless of collapse/expand state, and
+      // must never count a boundary node (which represents N members) as one.
+      for (const n of graphData.value.nodes || []) {
+        if ((n as any).is_group) continue;
+        const t = (n as any).service_type;
+        if (t === "database") counts.database++;
+        else if (t === "queue") counts.queue++;
+        else if (t === "external") counts.external++;
+        else if (t === "rpc") counts.rpc++;
+        else if (t === "agent") counts.agent++;
+        else if (t === "tool") counts.tool++;
+        else if (t === "model") counts.model++;
+        else counts.service++;
+      }
+      return counts;
+    });
+
+    // Total entity count for the header inventory chip. Sums every kind — the
+    // single "how big is my system" number a user reads at a glance.
+    const totalEntities = computed(() => {
+      const c = kindCounts.value;
+      return c.service + c.database + c.queue + c.external + c.rpc;
+    });
+
+    // The kind rows for the "Show types" control: label + count + whether the
+    // user can hide it. Services are always shown (they're the graph's spine),
+    // so only the dependency kinds are toggleable. Order matches the graph's
+    // reading order. Counts and toggles live together so the inventory and the
+    // filter are one thing, not two.
+    // Health levels for the "Border Color | Errors" legend: label + error-rate
+    // range + the CSS class carrying its color token. Data-driven so the legend
+    // markup is one v-for (no repeated inline-styled swatches).
+    const healthLevels = computed(() => [
+      { key: "healthy", label: t("traces.serviceGraph.status.healthy"), range: t("traces.serviceGraph.range.healthy") },
+      { key: "degraded", label: t("traces.serviceGraph.status.degraded"), range: t("traces.serviceGraph.range.degraded") },
+      { key: "warning", label: t("traces.serviceGraph.status.warning"), range: t("traces.serviceGraph.range.warning") },
+      { key: "critical", label: t("traces.serviceGraph.status.critical"), range: t("traces.serviceGraph.range.critical") },
+    ]);
+
+    const kindRows = computed(() => [
+      { key: "service", label: t("traces.serviceGraph.kind.service"), count: kindCounts.value.service, toggleable: false },
+      { key: "database", label: t("traces.serviceGraph.kind.database"), count: kindCounts.value.database, toggleable: true },
+      { key: "queue", label: t("traces.serviceGraph.kind.queue"), count: kindCounts.value.queue, toggleable: true },
+      { key: "external", label: t("traces.serviceGraph.kind.external"), count: kindCounts.value.external, toggleable: true },
+      { key: "rpc", label: t("traces.serviceGraph.kind.rpc"), count: kindCounts.value.rpc, toggleable: true },
+      { key: "agent", label: t("traces.serviceGraph.kind.agent"), count: kindCounts.value.agent, toggleable: true },
+      { key: "tool", label: t("traces.serviceGraph.kind.tool"), count: kindCounts.value.tool, toggleable: true },
+      { key: "model", label: t("traces.serviceGraph.kind.model"), count: kindCounts.value.model, toggleable: true },
+    ]);
+
+    // How many entity types the user has hidden. Non-zero means the graph is
+    // filtered — the "Show types" button reflects this (active state + count)
+    // so the user knows entities are being withheld, not that the graph is
+    // simply empty.
+    const activeFilterCount = computed(() => hiddenKinds.value.size);
 
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
@@ -374,7 +696,11 @@ export default defineComponent({
       ) {
         return {
           options: lastChartOptions.value.data.options,
-          notMerge: false,
+          // Full-replace even on a cache hit: graph uses fixed node positions,
+          // so replacing re-renders at the same coordinates (no jump) while
+          // never leaving a stale wrong-type series behind. Consistent with the
+          // fresh-compute path below.
+          notMerge: true,
           lazyUpdate: true,
           silent: true,
         };
@@ -386,15 +712,25 @@ export default defineComponent({
               filteredGraphData.value,
               layoutType,
               store.state.theme === 'dark',
+              // Pass the live panel height so the tree can auto-shrink its
+              // label font + node size to the fit-to-view compression, keeping
+              // labels from overlapping on tall (many-leaf) graphs.
+              graphContainerRef.value?.clientHeight || 700,
+              // Agent highlighting (tint/size/ping) only on the Agent Graph page.
+              props.agentHighlight,
             )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
-              layoutType,
+              // Graph view defaults to the layered directional layout (deps as
+              // terminal leaves); honor an explicit 'force' choice from the user.
+              layoutType === "force" ? "force" : "layered",
               new Map(),
               store.state.theme === 'dark',
               undefined,
               graphContainerRef.value?.clientWidth || 1200,
               graphContainerRef.value?.clientHeight || 700,
+              // Agent highlighting (tint/size/ping) only on the Agent Graph page.
+              props.agentHighlight,
             );
 
       // Cache the options for graph view
@@ -411,7 +747,13 @@ export default defineComponent({
 
       return {
         ...newOptions,
-        notMerge: vizType === "graph" ? false : true, // Merge for graph, replace for tree
+        // Always full-replace. ECharts cannot swap a series TYPE via a merge, so
+        // a merge (the old graph path) left the previous `tree` series in place
+        // and Graph View rendered blank after a tree→graph switch. Both views now
+        // use fixed node positions (tree: computeTreeLayout; graph: layered
+        // layout with explicit x/y), so a replace re-renders at the same
+        // coordinates — no zoom/pan jump — while guaranteeing the series swaps.
+        notMerge: true,
         lazyUpdate: true, // Prevent viewport reset when only styles change
         silent: true, // Disable animations during update to prevent position jumps
       };
@@ -655,7 +997,7 @@ export default defineComponent({
           const data = series.getData();
           const count = data.count();
 
-          // Collect node layout positions + names
+          // Collect node layout positions + names + direction-aware value
           for (let i = 0; i < count; i++) {
             const layout = data.getItemLayout(i);
             if (layout) {
@@ -664,6 +1006,7 @@ export default defineComponent({
                 x: layout.x,
                 y: layout.y,
                 name: data.getName(i),
+                value: data.get("value", i) as number,
               });
             }
           }
@@ -752,6 +1095,14 @@ export default defineComponent({
       // Also try immediately (works if chart already rendered)
       buildEdgeData();
 
+      // NOTE: the agent "radar ping" halo is NOT drawn here. It is baked into
+      // each agent node's own symbol SVG (see getServiceIconDataUrl) as native
+      // SMIL <animate> rings — the graph renders in SVG mode, so they animate.
+      // Doing it in the symbol (rather than an ECharts `graphic` overlay) keeps
+      // the halo perfectly centred on the node and moving/zooming with it; the
+      // overlay approach drifted because `graphic` lives outside the roam
+      // (pan/zoom) transform applied to the series group.
+
       // Use imported helper functions for testability
 
       // Position and show the tooltip at mouse coords
@@ -789,6 +1140,7 @@ export default defineComponent({
         mouseX: number,
         mouseY: number,
         nodeName: string,
+        requestsOverride?: number,
       ) => {
         resetToTextTooltip();
 
@@ -800,10 +1152,15 @@ export default defineComponent({
           return;
         }
 
-        const requests = node.requests || 0;
+        // Use direction-aware value from tree node when available (matches the
+        // label), else fall back to the backend's node-level aggregate.
+        const requests =
+          requestsOverride !== undefined
+            ? requestsOverride
+            : (node.requests || 0);
         const errors = node.errors || 0;
         const errRate =
-          node.error_rate ?? (requests > 0 ? (errors / requests) * 100 : 0);
+          node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
         tooltipEl.innerHTML = generateNodeTooltipContent(
           nodeName,
           requests,
@@ -896,7 +1253,7 @@ export default defineComponent({
           }
           const key = `node:${nearestNode.name}`;
           activeKey = key;
-          showNodeTooltip(e.offsetX, e.offsetY, nearestNode.name);
+          showNodeTooltip(e.offsetX, e.offsetY, nearestNode.name, nearestNode.value);
           return;
         }
 
@@ -1115,68 +1472,66 @@ export default defineComponent({
         const orgId = store.state.selectedOrganization.identifier;
 
         if (!orgId) {
-          throw new Error("No organization selected");
+          throw new Error(t("traces.serviceGraph.noOrganizationSelected"));
         }
 
         const { startTime, endTime } = getEffectiveTimeRange(
           searchObj.data.datetime,
         );
 
+        // Topology, node kinds, edges and latency all come from the
+        // pre-aggregated _o2_service_graph stream via /topology/current. The
+        // backend hourly job (processor + build_topology) computes the complete,
+        // classified topology — queue consumers, collision handling, GenAI
+        // agent/tool/model edges — incrementally per window, so reading it here
+        // is a cheap small-stream read that scales to TB-level trace volumes
+        // (we do NOT re-scan raw traces per load). The UI is a thin renderer.
+        const streamName =
+          streamFilter.value && streamFilter.value !== "all"
+            ? streamFilter.value
+            : undefined;
         const response = await serviceGraphService.getCurrentTopology(orgId, {
-          streamName:
-            streamFilter.value && streamFilter.value !== "all"
-              ? streamFilter.value
-              : undefined,
+          streamName,
           startTime,
           endTime,
         });
-
-        // Convert API response to expected format
-        const rawData = response.data;
-
-        // Ensure nodes have all required fields
-        const nodes = (rawData.nodes || []).map((node: any) => ({
-          id: node.id,
-          label: node.label || node.id,
-          requests: node.requests || 0,
-          errors: node.errors || 0,
-          error_rate: node.error_rate || 0,
-          is_virtual: node.is_virtual || false,
-          service_type: node.service_type || undefined,
+        const raw = response?.data ?? { nodes: [], edges: [] };
+        const nodeIds = new Set((raw.nodes ?? []).map((n: any) => n.id));
+        const nodes = (raw.nodes ?? []).map((n: any) => ({
+          id: n.id,
+          label: n.label ?? n.id,
+          requests: n.requests ?? 0,
+          errors: n.errors ?? 0,
+          error_rate: n.error_rate ?? 0,
+          service_type: n.service_type ?? undefined,
         }));
-
-        // Ensure edges have all required fields and valid node references
-        const nodeIds = new Set(nodes.map((n: any) => n.id));
-        const edges = (rawData.edges || [])
-          .filter((edge: any) => {
-            // Filter out edges with missing endpoints
-            const hasValidEndpoints =
-              edge.from &&
-              edge.to &&
-              nodeIds.has(edge.from) &&
-              nodeIds.has(edge.to);
-            if (!hasValidEndpoints) {
-              console.warn(
-                "[ServiceGraph] Skipping edge with invalid endpoints:",
-                edge,
-              );
-            }
-            return hasValidEndpoints;
-          })
-          .map((edge: any) => ({
-            id: `${edge.from}->${edge.to}`,
-            from: edge.from,
-            to: edge.to,
-            total_requests: edge.total_requests || 0,
-            failed_requests: edge.failed_requests || 0,
-            error_rate: edge.error_rate || 0,
-            p50_latency_ns: edge.p50_latency_ns || 0,
-            p95_latency_ns: edge.p95_latency_ns || 0,
-            p99_latency_ns: edge.p99_latency_ns || 0,
-            baseline_p50_latency_ns: edge.baseline_p50_latency_ns ?? null,
-            baseline_p95_latency_ns: edge.baseline_p95_latency_ns ?? null,
-            baseline_p99_latency_ns: edge.baseline_p99_latency_ns ?? null,
+        const edges = (raw.edges ?? [])
+          .filter(
+            (e: any) =>
+              e.to && nodeIds.has(e.to) && (e.from == null || nodeIds.has(e.from)),
+          )
+          .map((e: any) => ({
+            from: e.from ?? null,
+            to: e.to,
+            total_requests: e.total_requests ?? 0,
+            failed_requests: e.failed_requests ?? 0,
+            error_rate: e.error_rate ?? 0,
+            p50_latency_ns: e.p50_latency_ns ?? 0,
+            p95_latency_ns: e.p95_latency_ns ?? 0,
+            p99_latency_ns: e.p99_latency_ns ?? 0,
+            connection_type: e.connection_type ?? undefined,
           }));
+
+        // Deterministic order. The backend does not guarantee node/edge order,
+        // and the layouts (computeTreeLayout Y-slots, computeForceLayout seed)
+        // are order-sensitive — so without this, the SAME topology renders a
+        // DIFFERENT graph each fetch. Sort nodes by id and edges by (from,to) so
+        // an identical topology always produces an identical graph.
+        nodes.sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)));
+        edges.sort((a: any, b: any) => {
+          const f = String(a.from ?? "").localeCompare(String(b.from ?? ""));
+          return f !== 0 ? f : String(a.to).localeCompare(String(b.to));
+        });
 
         graphData.value = {
           nodes,
@@ -1211,23 +1566,20 @@ export default defineComponent({
 
         // Provide detailed error messages based on error type
         if (err.message === "Request timeout") {
-          error.value =
-            "Request timed out. The service graph may be processing large amounts of data. Please try again.";
+          error.value = t("traces.serviceGraph.errorRequestTimeout");
         } else if (err.response?.status === 404) {
-          error.value =
-            "Service Graph API endpoint not found. Ensure you're running enterprise version of OpenObserve.";
+          error.value = t("traces.serviceGraph.errorApiNotFound");
         } else if (err.response?.status === 403) {
-          error.value =
-            "Access denied. You may not have permission to view the service graph for this organization.";
+          error.value = t("traces.serviceGraph.errorAccessDenied");
         } else if (err.response?.status === 500) {
-          error.value = "Server error occurred. Check server logs for details.";
+          error.value = t("traces.serviceGraph.errorServerError");
         } else if (err.message === "Network Error" || !navigator.onLine) {
-          error.value = "Network error. Please check your internet connection.";
+          error.value = t("traces.serviceGraph.errorNetwork");
         } else {
           error.value =
             err.response?.data?.message ||
             err.message ||
-            "Failed to load service graph data. Please check server logs.";
+            t("traces.serviceGraph.errorLoadFailed");
         }
       } finally {
         loading.value = false;
@@ -1348,13 +1700,29 @@ export default defineComponent({
         nodes = nodes.filter((n) => usedNodeIds.has(n.id));
       }
 
-      filteredGraphData.value = { nodes, edges };
+      // Adaptive collapse: fold large dependency fan-outs into boundary nodes,
+      // drop hidden kinds, honoring the current mode/expand/hide state.
+      filteredGraphData.value = applyGraphCollapse(
+        { nodes, edges },
+        {
+          mode: collapseMode.value,
+          expandedKinds: expandedKinds.value,
+          expandedGroups: expandedGroups.value,
+          hiddenKinds: hiddenKinds.value,
+          threshold: collapseThreshold.value,
+        },
+      );
     };
 
     // Watch composable viz/layout state changes from SearchBar toolbar
     watch(
       () => searchObj.meta.serviceGraphVisualizationType,
       () => {
+        // Only clear the cache — do NOT bump chartKey (that would recreate the
+        // ChartRenderer and replay the tree expand animation). The clean series
+        // swap comes from chartData rendering with notMerge:true (full replace),
+        // which lets a `type:"tree"` series be replaced by a `type:"graph"` one
+        // (and vice-versa) — a merge cannot swap series types.
         lastChartOptions.value = null;
       },
     );
@@ -1413,6 +1781,17 @@ export default defineComponent({
 
     // Side Panel Handlers
     const handleNodeClick = (params: any) => {
+      // A collapsed boundary node: clicking it expands/collapses that kind
+      // instead of opening the side panel.
+      const d = params?.data;
+      const clickedId: string | undefined = d?.id ?? d?.name;
+      if (d?.is_group || clickedId?.startsWith?.(GROUP_PREFIX)) {
+        // Boundary id is `__group_<kind>__<caller>`. Toggle THIS specific group
+        // (one caller's dependencies) — not the whole kind — so expanding
+        // payment's externals leaves product's externals collapsed.
+        if (clickedId) toggleGroupExpansion(clickedId);
+        return;
+      }
       // Check if it's a node click (for graph visualization)
       if (params.dataType === "node" && params.data) {
         // Check if clicking the same node - if so, close the panel
@@ -1467,10 +1846,16 @@ export default defineComponent({
     });
 
     return {
+      t,
       loading,
       error,
       graphData,
       filteredGraphData,
+      kindCounts,
+      totalEntities,
+      kindRows,
+      activeFilterCount,
+      healthLevels,
       stats,
       showSettings,
       lastUpdated,
@@ -1487,6 +1872,18 @@ export default defineComponent({
       applyFilters,
       onStreamFilterChange,
       resetSettings,
+      // Adaptive collapse
+      collapseMode,
+      collapseThreshold,
+      expandedKinds,
+      expandedGroups,
+      hiddenKinds,
+      toggleGroupExpansion,
+      setCollapseMode,
+      toggleKindVisibility,
+      zoomIn,
+      zoomOut,
+      fitToScreen,
       // Node side panel
       selectedNode,
       showSidePanel,
@@ -1499,6 +1896,46 @@ export default defineComponent({
 
 <!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
 <style>
+/* Legend swatches — driven by the shared health-color design tokens so the
+   legend rings match the graph's node border colors without inline styles. */
+.sg-health-ring {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+  border: 2px solid;
+  background: transparent;
+  flex: none;
+}
+.sg-health-ring--healthy {
+  border-color: var(--o2-service-health-healthy);
+}
+.sg-health-ring--degraded {
+  border-color: var(--o2-service-health-degraded);
+}
+.sg-health-ring--warning {
+  border-color: var(--o2-service-health-warning);
+}
+.sg-health-ring--critical {
+  border-color: var(--o2-service-health-critical);
+}
+
+/* Node-size legend rings: two sizes, both the "healthy" hue (size, not health,
+   is what this legend communicates). */
+.sg-size-ring {
+  border-radius: 9999px;
+  border: 2px solid var(--o2-service-health-healthy);
+  background: transparent;
+  flex-shrink: 0;
+}
+.sg-size-ring--sm {
+  width: 1rem;
+  height: 1rem;
+}
+.sg-size-ring--lg {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
 .service-graph-container {
   background: #0f1419 !important;
 }
@@ -1519,7 +1956,7 @@ export default defineComponent({
 /*
  * Target dashed edge paths rendered by ECharts graph series.
  * ECharts SVG mode may set stroke-dasharray as an HTML attribute OR inside
- * an tw:inline style depending on the version — we cover both.
+ * an inline style depending on the version — we cover both.
  */
 .graph-container svg path[stroke-dasharray],
 .graph-container svg path[style*="stroke-dasharray"] {

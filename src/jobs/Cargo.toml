@@ -1,0 +1,48 @@
+[package]
+name = "openobserve-jobs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "dep:o2_dex",
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "openobserve-core/enterprise",
+]
+cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
+vectorscan = ["openobserve-core/vectorscan"]
+vortex = ["openobserve-core/vortex"]
+
+[dependencies]
+openobserve-core.workspace = true
+anyhow.workspace = true
+arrow.workspace = true
+arrow-schema.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+config.workspace = true
+futures.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+ingester.workspace = true
+log.workspace = true
+openobserve-vrl.workspace = true
+o2_dex = { workspace = true, optional = true }
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+prometheus.workspace = true
+proto.workspace = true
+regex.workspace = true
+report_server.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+wal.workspace = true

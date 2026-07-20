@@ -39,20 +39,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
         <template #bottom="scope" v-if="showLegendFooter">
-          <div class="tw:flex tw:items-center tw:w-full" data-test="dashboard-table-pagination">
-            <div class="tw:flex tw:items-center tw:gap-1">
+          <div class="flex items-center w-full" data-test="dashboard-table-pagination">
+            <div class="flex items-center gap-1">
               <OSelect
                 v-model="selectedLegend"
                 :options="legendOptions"
                 style="min-width: 200px; max-width: 400px"
-                placeholder="Select series to filter"
+                :placeholder="t('dashboard.promQLTableChart.selectSeriesToFilter')"
               >
                 <template #icon-left>
                   <OIcon name="filter-list" size="xs" />
                 </template>
               </OSelect>
             </div>
-            <div class="tw:flex-1" />
+            <div class="flex-1" />
             <TablePaginationControls
               :show-pagination="config.table_pagination && !store.state.printMode"
               :pagination="scope.pagination"
@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -103,6 +104,7 @@ export default defineComponent({
 },
   setup(props) {
     const store = useStore();
+    const { t } = useI18n();
     const filter = ref("");
     const loading = ref(false);
     const innerTableRef = ref<any>(null);
@@ -152,7 +154,7 @@ export default defineComponent({
 
       if (tableMode === "all") {
         // In "all" mode, add "All series" option
-        options.push({ label: "All series", value: "__all__" });
+        options.push({ label: t("dashboard.promQLTableChart.allSeries"), value: "__all__" });
       }
 
       // Add individual legend options
@@ -241,6 +243,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       filter,
       store,
       loading,

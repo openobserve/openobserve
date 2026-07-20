@@ -32,18 +32,18 @@ const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
 const variantClass = computed(() => {
   switch (props.variant) {
     case "info":
-      return "tw:bg-(--color-banner-info-bg) tw:border tw:border-(--color-banner-info-border) tw:text-(--color-banner-info-text)";
+      return "bg-(--color-banner-info-bg) border border-(--color-banner-info-border) text-(--color-banner-info-text)";
     case "success":
-      return "tw:bg-(--color-banner-success-bg) tw:border tw:border-(--color-banner-success-border) tw:text-(--color-banner-success-text)";
+      return "bg-(--color-banner-success-bg) border border-(--color-banner-success-border) text-(--color-banner-success-text)";
     case "warning":
-      return "tw:bg-(--color-banner-warning-bg) tw:border tw:border-(--color-banner-warning-border) tw:border-l-4 tw:border-l-(--color-banner-warning-border) tw:text-(--color-banner-warning-text)";
+      return "bg-(--color-banner-warning-bg) border border-(--color-banner-warning-border) border-l-4 border-l-(--color-banner-warning-border) text-(--color-banner-warning-text)";
     case "error":
-      return "tw:bg-(--color-banner-error-bg) tw:text-(--color-banner-error-text)";
+      return "bg-(--color-banner-error-bg) text-(--color-banner-error-text)";
     // Tinted error for hints/insights — solid `error` stays for hard failures.
     case "error-soft":
-      return "tw:bg-(--color-banner-error-soft-bg) tw:border tw:border-(--color-banner-error-soft-border) tw:border-l-4 tw:border-l-(--color-banner-error-soft-border) tw:text-(--color-banner-error-soft-text)";
+      return "bg-(--color-banner-error-soft-bg) border border-(--color-banner-error-soft-border) border-l-4 border-l-(--color-banner-error-soft-border) text-(--color-banner-error-soft-text)";
     default:
-      return "tw:bg-(--color-banner-default-bg) tw:text-(--color-banner-default-text)";
+      return "bg-(--color-banner-default-bg) text-(--color-banner-default-text)";
   }
 });
 </script>
@@ -53,25 +53,25 @@ const variantClass = computed(() => {
     :role="ariaRole"
     :data-test="dataTest"
     :class="[
-      'tw:flex tw:rounded-md',
-      inlineActions ? 'tw:flex-row tw:items-center tw:gap-3' : 'tw:flex-col tw:gap-2',
-      dense ? 'tw:p-2' : 'tw:p-4',
+      'flex rounded-md',
+      inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
+      dense ? 'p-2' : 'p-4',
       variantClass,
     ]"
   >
     <div
       :class="[
-        'tw:flex tw:flex-row tw:items-start tw:gap-3',
-        inlineActions ? 'tw:flex-1' : '',
+        'flex flex-row items-start gap-3',
+        inlineActions ? 'flex-1' : '',
       ]"
     >
-      <div v-if="showIconArea" class="tw:shrink-0 tw:flex tw:items-start">
+      <div v-if="showIconArea" class="shrink-0 flex items-start">
         <slot name="icon">
           <OIcon :name="icon" size="sm" />
         </slot>
       </div>
 
-      <div class="tw:flex-1 tw:text-sm">
+      <div class="flex-1 text-sm">
         <slot />
         <template v-if="showContentProp">{{ content }}</template>
       </div>

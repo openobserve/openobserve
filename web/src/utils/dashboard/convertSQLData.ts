@@ -23,8 +23,7 @@
  */
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
-import { calculateOptimalFontSize } from "./chartDimensionUtils";
-import { METRIC_COPY_BTN_RESERVE_PX } from "./sql/charts/convertSQLMetricChart";
+import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
 import {
   calculateGridPositions,
   getTrellisGrid,
@@ -339,46 +338,55 @@ export const convertMultiSQLData = async (
       }
     });
 
+    // read the panel dimensions once — offsetWidth/offsetHeight are live DOM
+    // reads and this block references them for every grid cell
+    const panelW = chartPanelRef?.value?.offsetWidth ?? 0;
+    const panelH = chartPanelRef?.value?.offsetHeight ?? 0;
     const gridData = calculateGridPositions(
-      chartPanelRef.value.offsetWidth,
-      chartPanelRef.value.offsetHeight,
+      panelW,
+      panelH,
       allMetricSeries.length,
     );
-    const isDark = store.state.theme === "dark";
+    const isDark = store?.state?.theme === "dark";
     const longestText = allMetricSeries.reduce(
       (acc: string, s: any) =>
         (s._metricText ?? "").length > acc.length ? (s._metricText ?? "") : acc,
       "",
     );
-    const sharedFontSize = calculateOptimalFontSize(
-      longestText,
-      gridData.gridWidth - METRIC_COPY_BTN_RESERVE_PX,
-    );
     const labelFontSize = Math.max(
       11,
       Math.min(14, Math.round(gridData.gridWidth / 30)),
     );
+    // The label renders below the value inside the same cell, so the value's
+    // vertical budget is the cell height minus the label line and gaps.
+    // Sizing against the longest value keeps all cells' fonts identical.
+    const sharedFontSize = calculateMetricFontSize(
+      longestText,
+      gridData.gridWidth,
+      gridData.gridHeight - labelFontSize - 10,
+    );
 
     allMetricSeries.forEach((s: any, idx: number) => {
-      const cell = gridData.gridArray[idx];
+      const cell = gridData?.gridArray?.[idx];
+      if (!cell) return;
       const cx =
-        ((parseFloat(cell.left) + parseFloat(cell.width) / 2) / 100) *
-        chartPanelRef.value.offsetWidth;
+        ((parseFloat(cell.left) + parseFloat(cell.width) / 2) / 100) * panelW;
       const cy =
-        ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) *
-        chartPanelRef.value.offsetHeight;
-      const fill = s._metricFillColor ?? (isDark ? "#fff" : "#000");
+        ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) * panelH;
+      const fill = s?._metricFillColor ?? (isDark ? "#fff" : "#000");
       // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
       // copy icon beside the number, clamped inside the cell.
       s._metricLayout = {
-        left: (parseFloat(cell.left) / 100) * chartPanelRef.value.offsetWidth,
-        top: (parseFloat(cell.top) / 100) * chartPanelRef.value.offsetHeight,
-        width: (parseFloat(cell.width) / 100) * chartPanelRef.value.offsetWidth,
-        height:
-          (parseFloat(cell.height) / 100) * chartPanelRef.value.offsetHeight,
+        left: (parseFloat(cell.left) / 100) * panelW,
+        top: (parseFloat(cell.top) / 100) * panelH,
+        width: (parseFloat(cell.width) / 100) * panelW,
+        height: (parseFloat(cell.height) / 100) * panelH,
         cx,
         cy: cy - labelFontSize / 2 - 2,
         fontSize: sharedFontSize,
+        // vertical space under the value taken by the field label, so a
+        // below-the-value copy button clears it
+        labelClearance: labelFontSize * 1.2 + 8,
       };
       s.renderItem = () => {
         try {

@@ -1,10 +1,10 @@
 ﻿<template>
-  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:min-h-0">
+  <div class="w-full h-full flex flex-col min-h-0">
     <AppPageHeader
       :title="t('search_history.title')"
       icon="history"
       :back="{ onClick: closeSearchHistory }"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+      class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
           <OButton
@@ -19,14 +19,14 @@
             <OTooltip :content="t('search.messageWrapContent')" />
           </OButton>
           <div
-            class="tw:text-[#f5a623] tw:border tw:border-[#f5a623] tw:flex tw:items-center tw:px-2 tw:h-[36px] tw:rounded-md"
+            class="text-[#f5a623] border border-[#f5a623] flex items-center px-2 h-[36px] rounded-md"
           >
-            <OIcon name="info" class="tw:mr-1" size="sm" />
+            <OIcon name="info" class="mr-1" size="sm" />
             <div>
               {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
             </div>
           </div>
-          <div class="tw:[&_#date-time-button]:h-9!">
+          <div class="[&_#date-time-button]:h-9!">
             <date-time
               data-test-name="search-history-date-time"
               ref="searchDateTimeRef"
@@ -39,17 +39,20 @@
 
           <div>
             <OButton
-              variant="primary"
-              size="sm"
+              variant="outline"
+              size="icon-sm"
+              class="h-9! w-9!"
+              icon-left="refresh"
+              :loading="isLoading"
+              data-test="search-history-get-history-btn"
               @click="fetchSearchHistory"
-              :disabled="isLoading"
             >
-              {{ t("search_history.get_history") }}
+              <OTooltip side="bottom" :content="t('search_history.get_history')" shortcut-id="searchHistoryRefresh" />
             </OButton>
           </div>
       </template>
     </AppPageHeader>
-    <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="card-container flex-1 min-h-0 overflow-hidden">
           <OTable
             :frame="false"
             :data="dataToBeLoaded"
@@ -80,11 +83,11 @@
             </template>
 
             <template #cell-sql="{ row }">
-              <span class="tw:text-text-primary">{{ row.sql }}</span>
+              <span class="text-text-primary">{{ row.sql }}</span>
             </template>
 
             <template #expansion="{ row }">
-              <div class="app-tabs-container tw:w-fit tw:my-1">
+              <div class="app-tabs-container w-fit my-1">
                 <app-tabs
                   data-test="expanded-list-tabs"
                   class="tabs-selection-container"
@@ -93,17 +96,17 @@
                 />
               </div>
               <div v-show="activeTab === 'query'">
-                <div class="tw:text-left tw:px-2 tw:mb-2 expanded-content">
-                  <div class="tw:flex tw:items-center tw:py-2 tw:gap-2">
+                <div class="text-left px-2 mb-2 expanded-content">
+                  <div class="flex items-center py-2 gap-2">
                     <strong
-                      >SQL Query :
+                      >{{ t('logs.searchHistory.sqlQueryLabel') }}
                       <span>
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="copy-btn-sql tw:ml-2"
+                          class="copy-btn-sql ml-2"
                           @click.stop="
-                            copyToClipboard(row.sql, { successMessage: 'SQL Query Copied Successfully!', timeout: 5000 })
+                            copyToClipboard(row.sql, { successMessage: t('logs.searchHistory.sqlQueryCopied'), timeout: 5000 })
                           "
                         >
                           <OIcon name="content-copy" size="sm" /> </OButton></span
@@ -111,13 +114,13 @@
                     <OButton
                       variant="outline-destructive"
                       size="chip"
-                      class="copy-btn tw:mx-2"
+                      class="copy-btn mx-2"
                       @click.stop="goToLogs(row)"
                     >
                       <template #icon-left
                         ><OIcon name="search" size="sm"
                       /></template>
-                      Logs
+                      {{ t('logs.searchHistory.logs') }}
                     </OButton>
                     <OButton
                       v-if="
@@ -133,10 +136,10 @@
                       <template #icon-left
                         ><OIcon name="analytics" size="sm"
                       /></template>
-                      Inspect
+                      {{ t('logs.searchHistory.inspect') }}
                     </OButton>
                   </div>
-                  <div class="tw:flex tw:items-start tw:justify-center">
+                  <div class="flex items-start justify-center">
                     <div class="scrollable-content expanded-sql">
                       <pre style="text-wrap: wrap">{{ row?.sql }}</pre>
                     </div>
@@ -144,20 +147,20 @@
                 </div>
                 <div
                   v-if="row?.function"
-                  class="tw:text-left tw:mb-2 tw:px-2 expanded-content"
+                  class="text-left mb-2 px-2 expanded-content"
                 >
-                  <div class="tw:flex tw:items-center tw:py-2">
+                  <div class="flex items-center py-2">
                     <strong
-                      >Function Definition :
+                      >{{ t('logs.searchHistory.functionDefinitionLabel') }}
                       <span>
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="copy-btn-function tw:ml-2"
+                          class="copy-btn-function ml-2"
                           @click.stop="
                             copyToClipboard(
                               row.function,
-                              { successMessage: 'Function Defination Copied Successfully!', timeout: 5000 },
+                              { successMessage: t('logs.searchHistory.functionDefinitionCopied'), timeout: 5000 },
                             )
                           "
                         >
@@ -165,7 +168,7 @@
                     ></strong>
                   </div>
 
-                  <div class="tw:flex tw:items-start tw:justify-center">
+                  <div class="flex items-start justify-center">
                     <div class="scrollable-content expanded-function">
                       <pre style="text-wrap: wrap">{{ row?.function }}</pre>
                     </div>
@@ -185,21 +188,21 @@
             </template>
 
             <template #empty>
-              <div v-if="!isLoading" class="tw:flex tw:w-full">
+              <div v-if="!isLoading" class="flex w-full">
                 <OEmptyState size="hero" preset="no-search-history" />
               </div>
             </template>
 
             <template #bottom>
               <div
-                class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]"
+                class="flex items-center justify-between w-full h-[48px]"
               >
                 <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:w-[100px] tw:mr-md"
+                  class="o2-table-footer-title flex items-center w-[100px] mr-md"
                 >
                   {{ resultTotal }} {{ t("search_history.results") }}
                 </div>
-                <div class="tw:ml-auto tw:mr-2">Max Limit : <b>1000</b></div>
+                <div class="ml-auto mr-2">{{ t('logs.searchHistory.maxLimit') }} <b>1000</b></div>
               </div>
             </template>
           </OTable>
@@ -236,6 +239,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 
@@ -302,12 +307,12 @@ export default defineComponent({
     const activeTab = ref("query");
     const tabs = ref([
       {
-        label: "Query / Function",
+        label: t("logs.searchHistory.queryFunctionTab"),
         value: "query",
         icon: "code",
       },
       {
-        label: "More Details",
+        label: t("logs.searchHistory.moreDetailsTab"),
         value: "more_details",
         icon: "info",
       },
@@ -364,8 +369,7 @@ export default defineComponent({
         if (!startTime) {
           toast({
             variant: "error",
-            message:
-              "The selected start time is  invalid. Please choose a valid time",
+            message: t("logs.searchHistory.invalidStartTime"),
             timeout: 5000,
           });
           isLoading.value = false;
@@ -374,8 +378,7 @@ export default defineComponent({
         if (!endTime) {
           toast({
             variant: "error",
-            message:
-              "The selected end time is  invalid. Please choose a valid time",
+            message: t("logs.searchHistory.invalidEndTime"),
             timeout: 5000,
           });
           isLoading.value = false;
@@ -440,7 +443,7 @@ export default defineComponent({
       } catch (error) {
         toast({
           variant: "error",
-          message: "Failed to fetch search history. Please try again later.",
+          message: t("logs.searchHistory.fetchFailed"),
           timeout: 5000,
         });
         console.log(error, "error");
@@ -452,10 +455,10 @@ export default defineComponent({
     const delayMessage = computed(() => {
       const delay = store.state.zoConfig.usage_publish_interval;
       if (delay <= 60) {
-        return "60 seconds";
+        return t("logs.searchHistory.sixtySeconds");
       } else {
         const minutes = Math.floor(delay / 60);
-        return `${minutes} minute(s)`;
+        return t("logs.searchHistory.minutes", { minutes });
       }
     });
 
@@ -587,6 +590,9 @@ export default defineComponent({
     watch(
       () => props.isClicked,
       (value) => {
+        // This is a v-show sub-view of the Logs page: only own the keyboard
+        // scope while actually visible, otherwise hand it back to the logs page.
+        getManager()?.setScope(value ? "search-history" : "logs");
         if (value == true && !isLoading.value) {
           fetchSearchHistory();
         }
@@ -611,6 +617,14 @@ export default defineComponent({
         return filtered;
       }, {});
     }
+    useShortcuts([
+      { id: "searchHistoryRefresh", handler: () => { if (!isInputFocused()) fetchSearchHistory(); } },
+    ]);
+    // useShortcuts activates this sub-view's scope on mount, but it mounts while
+    // hidden inside the Logs page — restore the logs scope until it's shown.
+    onMounted(() => {
+      if (!props.isClicked) getManager()?.setScope("logs");
+    });
     return {
       searchObj,
       store,
