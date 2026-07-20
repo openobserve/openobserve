@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       data-test="scheduled-dashboards-container"
-      class="scheduled-dashboards h-fit bg-surface-panel"
+      class="scheduled-dashboards h-fit"
     >
     <OTable class="w-full"
       data-test="scheduled-dashboard-table"

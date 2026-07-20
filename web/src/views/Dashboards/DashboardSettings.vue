@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
   <div
     data-test="dashboard-settings-main-container"
-    class="p-0 bg-surface-panel [min-height:inherit] h-full"
-   
+    class="p-0 [min-height:inherit] h-full"
   >
 
     <OSplitter class="h-full"
