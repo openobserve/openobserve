@@ -272,7 +272,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // Register job runtime for metrics collection
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                openobserve_core::runtime_metrics::register_runtime("job".to_string(), handle);
+                config::runtime_metrics::register_runtime("job".to_string(), handle);
             }
 
             job_init_tx.send(true).ok();
@@ -313,10 +313,7 @@ async fn main() -> Result<(), anyhow::Error> {
         };
 
         // Register gRPC runtime for metrics collection
-        openobserve_core::runtime_metrics::register_runtime(
-            "grpc".to_string(),
-            rt.handle().clone(),
-        );
+        config::runtime_metrics::register_runtime("grpc".to_string(), rt.handle().clone());
 
         let _guard = rt.enter();
         rt.block_on(async move {
@@ -337,11 +334,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Register main HTTP runtime for metrics collection
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        openobserve_core::runtime_metrics::register_runtime("http".to_string(), handle);
+        config::runtime_metrics::register_runtime("http".to_string(), handle);
     }
 
     // Start runtime metrics collector
-    openobserve_core::runtime_metrics::start_metrics_collector().await;
+    config::runtime_metrics::start_metrics_collector().await;
 
     // let node online
     let _ = cluster::set_online().await;

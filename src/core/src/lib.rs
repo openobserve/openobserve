@@ -63,7 +63,6 @@ mod pipeline_adapter;
 pub use openobserve_search_service::promql;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
-pub mod runtime_metrics;
 pub use openobserve_ingestion::schema;
 pub mod search;
 #[cfg(feature = "enterprise")]

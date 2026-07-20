@@ -17,15 +17,16 @@
 use std::collections::HashMap;
 use std::{sync::Mutex, time::Duration};
 
-use config::metrics::TOKIO_RUNTIME_TASKS;
-#[cfg(tokio_unstable)]
-use config::metrics::{
-    TOKIO_RUNTIME_TASKS_TOTAL, TOKIO_RUNTIME_WORKER_DURATION_SECONDS, TOKIO_RUNTIME_WORKER_METRICS,
-    TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS,
-};
 use tokio::runtime::Handle;
 #[cfg(tokio_unstable)]
 use tokio::sync::RwLock;
+
+use crate::metrics::TOKIO_RUNTIME_TASKS;
+#[cfg(tokio_unstable)]
+use crate::metrics::{
+    TOKIO_RUNTIME_TASKS_TOTAL, TOKIO_RUNTIME_WORKER_DURATION_SECONDS, TOKIO_RUNTIME_WORKER_METRICS,
+    TOKIO_RUNTIME_WORKER_POLL_TIME_SECONDS,
+};
 
 static RUNTIME_HANDLES: Mutex<Vec<(String, Handle)>> = Mutex::new(Vec::new());
 
@@ -266,7 +267,7 @@ mod tests {
     async fn test_update_basic_runtime_info_sets_workers_to_minus_one() {
         // Use a label name unique to this test to avoid interference from other tests.
         update_basic_runtime_info("basic_test_unique").await;
-        let gauge = config::metrics::TOKIO_RUNTIME_TASKS
+        let gauge = crate::metrics::TOKIO_RUNTIME_TASKS
             .with_label_values(&["basic_test_unique", "workers"])
             .get();
         assert_eq!(gauge, -1);

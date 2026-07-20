@@ -25,6 +25,7 @@ pub mod meta;
 pub mod metrics;
 pub mod prebuilt_loader;
 pub mod router;
+pub mod runtime_metrics;
 pub mod stats;
 pub mod tantivy;
 pub mod utils;

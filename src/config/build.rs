@@ -19,6 +19,7 @@ use chrono::{DateTime, SecondsFormat, Utc};
 
 fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rustc-check-cfg=cfg(tokio_unstable)");
 
     // build information
     let output = Command::new("git")

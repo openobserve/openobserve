@@ -111,7 +111,6 @@ o2_openfga = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
-prometheus.workspace = true
 promql-parser.workspace = true
 prost.workspace = true
 prost-wkt-types.workspace = true
