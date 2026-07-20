@@ -18,6 +18,7 @@
 #![recursion_limit = "256"]
 
 pub mod infra;
+pub mod kv;
 pub mod meta;
 pub mod short_url;
 pub mod system_settings;

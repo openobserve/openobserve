@@ -18,7 +18,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use infra::db::{delete_from_db_coordinator, put_into_db_coordinator};
 
-use crate::{common::infra::config::KVS, service::db};
+use crate::infra::config::KVS;
 
 fn mk_cache_key(org_id: &str, key: &str) -> String {
     // NOTE: This assumes org_id does not contain '/' character.
@@ -102,6 +102,10 @@ pub async fn list_keys(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow
     Ok(keys)
 }
 
+pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow::Error> {
+    list_keys(org_id, prefix).await
+}
+
 /// Watch function for KV changes
 ///
 /// This function watches the `/kv/` path in the coordinator for event notifications.
@@ -112,7 +116,7 @@ pub async fn list_keys(org_id: &str, prefix: &str) -> Result<Vec<String>, anyhow
 /// Actual KV data is stored in the `kv_store` table.
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/kv/";
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching kv");
@@ -125,7 +129,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            db::Event::Put(ev) => {
+            infra::db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 // Parse org_id and key from item_key (format: "org_id/key")
                 let parts: Vec<&str> = item_key.splitn(2, '/').collect();
@@ -149,11 +153,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 KVS.insert(item_key.to_string(), item_value);
             }
-            db::Event::Delete(ev) => {
+            infra::db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 KVS.remove(item_key);
             }
-            db::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
 }

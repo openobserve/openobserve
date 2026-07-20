@@ -77,7 +77,9 @@ pub mod functions {
 }
 #[cfg(feature = "enterprise")]
 pub mod keys;
-pub mod kv;
+pub mod kv {
+    pub use common::kv::*;
+}
 #[cfg(feature = "enterprise")]
 pub mod license;
 pub mod metas;

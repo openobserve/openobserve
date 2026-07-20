@@ -44,7 +44,7 @@ pub mod ingestion_tokens {
 pub mod ingestion_types {
     pub use openobserve_ingestion::types::*;
 }
-pub mod kv;
+pub use ::common::kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
 pub use openobserve_ingestion::{logs, metadata, metrics};
