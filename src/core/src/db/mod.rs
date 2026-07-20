@@ -90,8 +90,12 @@ pub mod org_ingestion_tokens {
 pub mod org_status;
 #[cfg(feature = "enterprise")]
 pub mod org_storage_providers;
-pub mod org_users;
-pub mod organization;
+pub mod org_users {
+    pub use openobserve_organization::repository::org_users::*;
+}
+pub mod organization {
+    pub use openobserve_organization::repository::organization::*;
+}
 pub mod pipeline_errors {
     pub use openobserve_pipeline::repository::pipeline_errors::*;
 }
@@ -123,7 +127,9 @@ pub mod sourcemaps;
 pub mod system_settings {
     pub use common::system_settings::*;
 }
-pub mod user;
+pub mod user {
+    pub use openobserve_organization::repository::user::*;
+}
 
 pub(crate) use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
 

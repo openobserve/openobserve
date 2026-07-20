@@ -13,6 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::{
+    infra::config::ORG_USERS,
+    meta::organization::{
+        AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer, OrgSummary,
+        Organization, PipelineSummary, RumIngestionToken, StreamSummary, TriggerStatus,
+        TriggerStatusSearchResult,
+    },
+};
 use config::{
     ider,
     meta::{
@@ -28,6 +36,10 @@ use config::{
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
+use openobserve_ingestion::tokens as ingestion_tokens;
+use openobserve_self_reporting as self_reporting;
+#[cfg(feature = "cloud")]
+use openobserve_self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 #[cfg(feature = "cloud")]
 use {
     ::common::meta::organization::{
@@ -42,24 +54,11 @@ use {
     },
 };
 
-#[cfg(feature = "cloud")]
-use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
-    common::{
-        infra::config::ORG_USERS,
-        meta::organization::{
-            AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
-            OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
-            TriggerStatus, TriggerStatusSearchResult,
-        },
-        utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
-    },
-    service::{
-        db::{self, org_users},
-        ingestion_tokens, self_reporting,
-        stream::get_streams,
-        users::add_admin_to_org,
-    },
+    auth::{delete_org_tuples, is_root_user, save_org_tuples},
+    db,
+    db::org_users,
+    users::add_admin_to_org,
 };
 
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
@@ -116,7 +115,7 @@ async fn create_and_assign_sre_readonly_role(
 }
 
 pub async fn get_summary(org_id: &str) -> OrgSummary {
-    let streams = get_streams(org_id, None, false, None).await;
+    let streams = crate::streams(org_id, None, false, None).await;
     let mut stream_summary = StreamSummary::default();
     let mut has_trigger_stream = false;
     for stream in streams.iter() {
@@ -152,7 +151,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
             .collect::<Vec<_>>()
     };
 
-    let pipelines = super::pipeline::list_user_pipelines(org_id, None)
+    let pipelines = openobserve_pipeline::management::list_user_pipelines(org_id, None)
         .await
         .unwrap_or_default();
     let pipeline_summary = PipelineSummary {
@@ -183,7 +182,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         ),
     };
 
-    let functions = db::functions::list(org_id).await.unwrap_or_default();
+    let functions = crate::transforms(org_id).await.unwrap_or_default();
     let dashboards = table::dashboards::list(ListDashboardsParams::new(org_id))
         .await
         .unwrap_or_default();
@@ -1347,10 +1346,11 @@ pub async fn get_sre_agent_credentials(org_id: &str) -> Result<(String, String),
 
 #[cfg(test)]
 mod tests {
+    use common::meta::user::UserRequest;
     use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::users};
+    use crate::users;
 
     // TODO: move these tests to integration tests,
     // the below test case will fail as is_root_user()

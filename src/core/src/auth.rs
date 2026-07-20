@@ -15,15 +15,11 @@
 
 use std::{collections::HashMap, fmt::Debug};
 
+use ::common::meta::user::AuthTokens;
 #[cfg(feature = "enterprise")]
 use ::common::meta::user::AuthTokensExt;
-use ::common::{
-    infra::config::{ORG_USERS, PASSWORD_HASH},
-    meta::{
-        organization::DEFAULT_ORG,
-        user::{AuthTokens, UserOrgRole},
-    },
-};
+#[cfg(test)]
+use ::common::meta::{organization::DEFAULT_ORG, user::UserOrgRole};
 use axum::{
     Json,
     extract::FromRequestParts,
@@ -31,10 +27,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use base64::Engine;
-use config::{
-    meta::user::UserRole,
-    utils::{hash::get_passcode_hash, json},
-};
+#[cfg(test)]
+use config::meta::user::UserRole;
+use config::utils::json;
 #[cfg(feature = "enterprise")]
 use {
     crate::users::get_user, jsonwebtoken::TokenData, o2_dex::service::auth::get_dex_jwks,
@@ -103,6 +98,9 @@ pub use ::common::utils::auth::{
 // domain-management blocklist validate identically. Re-exported here to preserve the existing
 // `::common::utils::auth::{EMAIL_REGEX, is_valid_email}` API.
 pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
+pub use openobserve_organization::auth::{
+    delete_org_tuples, get_hash, get_role, is_root_user, save_org_tuples,
+};
 
 #[cfg(feature = "enterprise")]
 pub fn is_ofga_object_visible(
@@ -115,65 +113,6 @@ pub fn is_ofga_object_visible(
         permitted_objects.contains(&format!("{object_type}:{object_id}"))
             || permitted_objects.contains(&format!("{object_type}:_all_{org_id}"))
     })
-}
-
-pub fn get_hash(pass: &str, salt: &str) -> String {
-    let key = format!("{pass}{salt}");
-    let hash = PASSWORD_HASH.get(&key);
-    match hash {
-        Some(ret_hash) => ret_hash.value().to_string(),
-        None => {
-            let password_hash = get_passcode_hash(pass, salt);
-            PASSWORD_HASH.insert(key, password_hash.clone());
-            password_hash
-        }
-    }
-}
-
-pub fn is_root_user(user_id: &str) -> bool {
-    match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
-        Some(user) => user.role.eq(&UserRole::Root),
-        None => false,
-    }
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn save_org_tuples(org_id: &str) {
-    use o2_openfga::config::get_config as get_openfga_config;
-
-    if get_openfga_config().enabled {
-        o2_openfga::authorizer::authz::save_org_tuples(org_id).await
-    }
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn save_org_tuples(_org_id: &str) {}
-
-#[cfg(feature = "enterprise")]
-pub async fn delete_org_tuples(org_id: &str) {
-    use o2_openfga::config::get_config as get_openfga_config;
-
-    if get_openfga_config().enabled
-        && let Err(e) = o2_openfga::authorizer::authz::delete_org_tuples(org_id).await
-    {
-        log::error!("[auth] failed to delete org tuples for {org_id}: {e}");
-    }
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn delete_org_tuples(_org_id: &str) {}
-
-#[cfg(feature = "enterprise")]
-pub fn get_role(role: &UserOrgRole) -> UserRole {
-    use std::str::FromStr;
-
-    let role = o2_openfga::authorizer::roles::get_role(format!("{}", role.base_role));
-    UserRole::from_str(&role).unwrap()
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub fn get_role(_role: &UserOrgRole) -> UserRole {
-    UserRole::Admin
 }
 
 fn deserialize_trimmed<'de, D>(deserializer: D) -> Result<String, D::Error>

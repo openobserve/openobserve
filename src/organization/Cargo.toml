@@ -1,0 +1,50 @@
+[package]
+name = "openobserve-organization"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "common/enterprise",
+    "config/enterprise",
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "openobserve-alerts/enterprise",
+    "openobserve-pipeline/enterprise",
+    "openobserve-self-reporting/enterprise",
+]
+cloud = [
+    "enterprise",
+    "common/cloud",
+    "o2_enterprise/cloud",
+    "openobserve-alerts/cloud",
+    "openobserve-pipeline/cloud",
+    "openobserve-self-reporting/cloud",
+]
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+common.workspace = true
+config.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+lettre.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+openobserve-alerts.workspace = true
+openobserve-ingestion.workspace = true
+openobserve-pipeline.workspace = true
+openobserve-self-reporting.workspace = true
+serde_json.workspace = true
+tokio.workspace = true

@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use common::infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN};
 use config::meta::user::{DBUser, User, UserOrg, UserRole};
 #[cfg(feature = "enterprise")]
 use infra::table::users::UserUpdate;
@@ -27,13 +28,7 @@ use infra::{
 use o2_enterprise::enterprise::cloud::{InvitationRecord, org_invites};
 
 use super::org_users::{self, get_cached_user_org};
-use crate::{
-    common::{
-        infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
-        utils::auth::is_root_user,
-    },
-    service::db,
-};
+use crate::{auth::is_root_user, db};
 
 pub const USER_RECORD_KEY: &str = "/user_record/";
 pub async fn get_user_record(email: &str) -> Result<users::UserRecord, anyhow::Error> {

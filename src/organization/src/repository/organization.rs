@@ -15,6 +15,12 @@
 
 use std::sync::Arc;
 
+// #[cfg(feature = "cloud")]
+// use o2_enterprise::enterprise::cloud::org_usage::{self, OrgUsageRecord};
+use common::{
+    infra::config::{ORGANIZATION_SETTING, ORGANIZATIONS},
+    meta::organization::{Organization, OrganizationSetting},
+};
 use config::utils::json;
 use infra::{
     db::put_into_db_coordinator,
@@ -22,15 +28,7 @@ use infra::{
     table::organizations,
 };
 
-// #[cfg(feature = "cloud")]
-// use o2_enterprise::enterprise::cloud::org_usage::{self, OrgUsageRecord};
-use crate::{
-    common::{
-        infra::config::{ORGANIZATION_SETTING, ORGANIZATIONS},
-        meta::organization::{Organization, OrganizationSetting},
-    },
-    service::db,
-};
+use crate::db;
 
 // DBKey to set settings for an org
 pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";

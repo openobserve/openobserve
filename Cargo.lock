@@ -6882,6 +6882,7 @@ dependencies = [
  "openobserve-dashboards",
  "openobserve-enrichment",
  "openobserve-ingestion",
+ "openobserve-organization",
  "openobserve-pipeline",
  "openobserve-reports",
  "openobserve-scheduler",
@@ -7074,6 +7075,31 @@ dependencies = [
  "tokio",
  "tonic",
  "wal",
+]
+
+[[package]]
+name = "openobserve-organization"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "hashbrown 0.16.1",
+ "infra",
+ "lettre",
+ "log",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-alerts",
+ "openobserve-ingestion",
+ "openobserve-pipeline",
+ "openobserve-self-reporting",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

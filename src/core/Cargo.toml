@@ -23,6 +23,7 @@ enterprise = [
     "openobserve-alerts/enterprise",
     "openobserve-ingestion/enterprise",
     "openobserve-enrichment/enterprise",
+    "openobserve-organization/enterprise",
     "openobserve-pipeline/enterprise",
     "openobserve-transform/enterprise",
     "openobserve-scheduler/enterprise",
@@ -39,6 +40,7 @@ cloud = [
     "common/cloud",
     "openobserve-alerts/cloud",
     "openobserve-self-reporting/cloud",
+    "openobserve-organization/cloud",
 ]
 vectorscan = [
     "o2_enterprise/vectorscan",
@@ -60,6 +62,7 @@ common.workspace = true
 openobserve-alerts.workspace = true
 openobserve-ingestion.workspace = true
 openobserve-enrichment.workspace = true
+openobserve-organization.workspace = true
 openobserve-pipeline.workspace = true
 openobserve-transform.workspace = true
 openobserve-scheduler.workspace = true

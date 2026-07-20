@@ -25,6 +25,18 @@ use axum::{
     Json, http,
     response::{IntoResponse, Response},
 };
+use common::{
+    infra::config::{ORG_USERS, ROOT_USER, USERS_RUM_TOKEN},
+    meta::{
+        http::HttpResponse as MetaHttpResponse,
+        organization::{DEFAULT_ORG, OrgRoleMapping},
+        service_account::ServiceAccountCreateResponse,
+        user::{
+            UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode,
+            get_default_user_org,
+        },
+    },
+};
 #[cfg(feature = "enterprise")]
 use config::meta::ratelimit::CachedUserRoles;
 use config::{
@@ -39,22 +51,11 @@ use o2_openfga::{
     authorizer::authz::delete_service_account_from_org, config::get_config as get_openfga_config,
 };
 
-use super::db::org_users::get_cached_user_org;
 use crate::{
-    common::{
-        infra::config::{ORG_USERS, ROOT_USER, USERS_RUM_TOKEN},
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            organization::{DEFAULT_ORG, OrgRoleMapping},
-            service_account::ServiceAccountCreateResponse,
-            user::{
-                UpdateUser, UserList, UserOrgRole, UserRequest, UserResponse, UserUpdateMode,
-                get_default_user_org,
-            },
-        },
-        utils::auth::{get_hash, get_role, is_root_user, is_valid_email},
-    },
-    service::{db, organization},
+    auth::{get_hash, get_role, is_root_user, is_valid_email},
+    db,
+    db::org_users::get_cached_user_org,
+    organization,
 };
 
 fn redact_token(token: &str) -> String {
@@ -1169,7 +1170,7 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Resp
                     invite.expires_at,
                     only_pending,
                     now,
-                    db::org_status::is_blocked,
+                    crate::org_is_blocked,
                 ) {
                     continue;
                 }

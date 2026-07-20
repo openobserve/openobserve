@@ -58,7 +58,7 @@ pub mod org_cleanup;
 pub mod org_storage_providers;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
-pub mod organization;
+pub use openobserve_organization::organization;
 pub mod pipeline {
     pub use openobserve_pipeline::management::*;
 
@@ -152,7 +152,8 @@ pub mod tls;
 pub mod traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;
-pub mod users;
+pub use openobserve_organization::users;
+mod organization_adapter;
 
 /// Private import namespace retained while core's remaining composition modules are migrated to
 /// their owning crates. It is intentionally not part of the public API.
