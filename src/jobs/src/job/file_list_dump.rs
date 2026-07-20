@@ -35,7 +35,7 @@ impl SchemaService for CoreSchemaService {
         schema: &Schema,
         min_ts: Option<i64>,
     ) -> Result<(), anyhow::Error> {
-        crate::service::db::schema::merge(org_id, stream_name, stream_type, schema, min_ts)
+        openobserve_catalog::schema::merge(org_id, stream_name, stream_type, schema, min_ts)
             .await
             .map(|_| ())
     }

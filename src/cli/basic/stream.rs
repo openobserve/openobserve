@@ -19,7 +19,6 @@ use config::{
     utils::json,
 };
 use infra::schema::unwrap_stream_settings;
-use openobserve_core::db;
 
 /// Reset the `index_updated_at` field in stream settings.
 ///
@@ -30,11 +29,13 @@ use openobserve_core::db;
 pub async fn reset_index_updated_at(stream: &str, time: Option<i64>) -> Result<(), anyhow::Error> {
     let streams = if stream.trim().is_empty() {
         // load the schema cache so we can enumerate all streams from it
-        db::schema::cache().await?;
+        openobserve_catalog::schema::cache().await?;
         let mut all = Vec::new();
-        for org_id in db::schema::list_organizations_from_cache().await {
+        for org_id in openobserve_catalog::schema::list_organizations_from_cache().await {
             for stream_type in ALL_STREAM_TYPES {
-                for stream_name in db::schema::list_streams_from_cache(&org_id, stream_type).await {
+                for stream_name in
+                    openobserve_catalog::schema::list_streams_from_cache(&org_id, stream_type).await
+                {
                     all.push((org_id.clone(), stream_type, stream_name));
                 }
             }
@@ -78,7 +79,8 @@ pub async fn reset_index_updated_at(stream: &str, time: Option<i64>) -> Result<(
 
         let mut metadata = schema.metadata().clone();
         metadata.insert("settings".to_string(), json::to_string(&settings)?);
-        db::schema::update_setting(&org_id, &stream_name, stream_type, metadata).await?;
+        openobserve_catalog::schema::update_setting(&org_id, &stream_name, stream_type, metadata)
+            .await?;
 
         println!("reset index_updated_at to {updated_at} for {org_id}/{stream_type}/{stream_name}");
     }

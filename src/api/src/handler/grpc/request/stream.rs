@@ -15,7 +15,6 @@
 
 use config::meta::stream::StreamType;
 use futures_util::future::try_join_all;
-use openobserve_core::db;
 use proto::cluster_rpc::{
     StreamStats, StreamStatsEntry, StreamStatsRequest, StreamStatsResponse, streams_server::Streams,
 };
@@ -126,7 +125,7 @@ impl Streams for StreamServiceImpl {
             // Internal-token caller (cluster RPC): may specify an org or list all.
             match req.org_id {
                 Some(org) => vec![org],
-                None => db::schema::list_organizations_from_cache().await,
+                None => openobserve_catalog::schema::list_organizations_from_cache().await,
             }
         };
 

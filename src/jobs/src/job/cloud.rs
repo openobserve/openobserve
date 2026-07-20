@@ -179,7 +179,7 @@ async fn run_ai_quota_check() {
 async fn check_all_orgs_ai_quota() {
     use openobserve_core::trial_quota;
 
-    let orgs = openobserve_core::db::schema::list_organizations_from_cache().await;
+    let orgs = openobserve_catalog::schema::list_organizations_from_cache().await;
 
     // Pre-fetch all notified checkpoints in a single GROUP-BY query to avoid
     // one DB round-trip per org (N+1).

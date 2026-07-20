@@ -76,7 +76,12 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         stream_name: &str,
         stream_type: StreamType,
     ) -> anyhow::Result<()> {
-        crate::db::schema::ensure_gen_ai_fields_in_schema(org_id, stream_name, stream_type).await
+        openobserve_catalog::schema::ensure_gen_ai_fields_in_schema(
+            org_id,
+            stream_name,
+            stream_type,
+        )
+        .await
     }
 
     async fn set_stream_is_llm(
@@ -86,7 +91,13 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         stream_type: StreamType,
         is_llm_stream: bool,
     ) -> anyhow::Result<()> {
-        crate::db::schema::set_stream_is_llm(org_id, stream_name, stream_type, is_llm_stream).await
+        openobserve_catalog::schema::set_stream_is_llm(
+            org_id,
+            stream_name,
+            stream_type,
+            is_llm_stream,
+        )
+        .await
     }
 
     async fn merge_schema(
@@ -97,7 +108,7 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         schema: &Schema,
         min_ts: Option<i64>,
     ) -> anyhow::Result<Option<(Schema, Vec<Field>)>> {
-        crate::db::schema::merge(org_id, stream_name, stream_type, schema, min_ts).await
+        openobserve_catalog::schema::merge(org_id, stream_name, stream_type, schema, min_ts).await
     }
 
     async fn update_schema_setting(
@@ -107,7 +118,8 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         stream_type: StreamType,
         metadata: HashMap<String, String>,
     ) -> anyhow::Result<()> {
-        crate::db::schema::update_setting(org_id, stream_name, stream_type, metadata).await
+        openobserve_catalog::schema::update_setting(org_id, stream_name, stream_type, metadata)
+            .await
     }
 
     async fn save_stream_settings(
@@ -145,7 +157,7 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         stream_type: Option<StreamType>,
         fetch_schema: bool,
     ) -> anyhow::Result<Vec<StreamSchema>> {
-        crate::db::schema::list(org_id, stream_type, fetch_schema).await
+        openobserve_catalog::schema::list(org_id, stream_type, fetch_schema).await
     }
 
     #[cfg(feature = "enterprise")]

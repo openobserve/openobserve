@@ -289,7 +289,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     // reset stream stats table data
                     infra_file_list::reset_stream_stats().await?;
                     // load stream list
-                    db::schema::cache().await?;
+                    openobserve_catalog::schema::cache().await?;
                     // update stats from file list
                     openobserve_compactor::stats::update_stats_from_file_list()
                         .await

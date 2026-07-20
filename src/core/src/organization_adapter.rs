@@ -32,7 +32,7 @@ impl openobserve_organization::Runtime for CoreOrganizationRuntime {
         &self,
         org_id: &str,
     ) -> anyhow::Result<Vec<common::meta::stream::StreamSchema>> {
-        crate::db::schema::list(org_id, None, false).await
+        openobserve_catalog::schema::list(org_id, None, false).await
     }
 
     async fn delete_stream_schema(
@@ -41,7 +41,7 @@ impl openobserve_organization::Runtime for CoreOrganizationRuntime {
         stream_name: &str,
         stream_type: config::meta::stream::StreamType,
     ) -> anyhow::Result<()> {
-        crate::db::schema::delete(org_id, stream_name, Some(stream_type)).await
+        openobserve_catalog::schema::delete(org_id, stream_name, Some(stream_type)).await
     }
 
     #[cfg(feature = "enterprise")]

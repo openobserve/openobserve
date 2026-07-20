@@ -722,7 +722,8 @@ mod tests {
     use super::*;
     use crate::{
         common::meta::user::UserRequest,
-        service::{self, organization, users},
+        organization,
+        service::{self, users},
     };
 
     #[test]

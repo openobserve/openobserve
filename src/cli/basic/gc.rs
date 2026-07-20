@@ -33,7 +33,6 @@ use config::{
     meta::stream::{ALL_STREAM_TYPES, StreamType, TimeRange},
     utils::time::now,
 };
-use openobserve_core::db;
 
 /// Entry point for the `gc-file-list` command.
 ///
@@ -88,8 +87,8 @@ pub async fn run(
         total_files += files;
     } else {
         // process every stream: load schema cache to enumerate orgs/streams
-        db::schema::cache().await?;
-        let orgs = db::schema::list_organizations_from_cache().await;
+        openobserve_catalog::schema::cache().await?;
+        let orgs = openobserve_catalog::schema::list_organizations_from_cache().await;
         for org_id in orgs {
             for stream_type in ALL_STREAM_TYPES {
                 // enrichment tables and file_list streams are not subject to data
@@ -99,7 +98,9 @@ pub async fn run(
                 {
                     continue;
                 }
-                let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+                let streams =
+                    openobserve_catalog::schema::list_streams_from_cache(&org_id, stream_type)
+                        .await;
                 for stream_name in streams {
                     let (dirs, files) = gc_stream(
                         &org_id,

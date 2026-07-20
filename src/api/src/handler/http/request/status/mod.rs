@@ -1601,7 +1601,7 @@ const CACHE_MODULES: &[&str] = &[
 // Helper function to reload cache for a specific module
 async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
     match module {
-        "schema" => db::schema::cache().await,
+        "schema" => openobserve_catalog::schema::cache().await,
         "organization" => db::organization::cache().await,
         "user" => db::user::cache().await,
         "session" => db::session::cache().await,

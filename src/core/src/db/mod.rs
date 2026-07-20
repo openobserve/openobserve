@@ -83,7 +83,7 @@ pub mod file_list {
     }
 
     pub async fn cache_stats() -> infra::errors::Result<()> {
-        let orgs = crate::db::schema::list_organizations_from_cache().await;
+        let orgs = openobserve_catalog::schema::list_organizations_from_cache().await;
         openobserve_catalog::file_list::cache_stats(&orgs).await
     }
 }
@@ -130,7 +130,9 @@ pub mod saved_view {
 pub mod scheduler {
     pub use openobserve_scheduler::*;
 }
-pub mod schema;
+pub mod schema {
+    pub use openobserve_catalog::schema::*;
+}
 pub mod search_job {
     pub mod search_job_partitions {
         pub use openobserve_search_service::repository::search_job::search_job_partitions::*;
@@ -211,15 +213,6 @@ pub(crate) async fn put(
 pub(crate) async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
     let db = infra_db::get_db().await;
     db.list(prefix).await
-}
-
-#[inline]
-pub(crate) async fn list_values_by_start_dt(
-    prefix: &str,
-    start_dt: Option<(i64, i64)>,
-) -> Result<Vec<(i64, Bytes)>> {
-    let db = infra_db::get_db().await;
-    db.list_values_by_start_dt(prefix, start_dt).await
 }
 
 #[cfg(test)]

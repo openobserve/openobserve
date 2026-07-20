@@ -203,7 +203,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             };
 
             // reset all metrics
-            let orgs = openobserve_core::db::schema::list_organizations_from_cache().await;
+            let orgs = openobserve_catalog::schema::list_organizations_from_cache().await;
             for org in orgs {
                 for stream_type in ALL_STREAM_TYPES {
                     if metrics::COMPACT_PENDING_JOBS

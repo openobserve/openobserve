@@ -97,7 +97,7 @@ impl openobserve_self_reporting::Runtime for CoreSelfReportingRuntime {
         schema: &Schema,
         min_ts: Option<i64>,
     ) -> anyhow::Result<()> {
-        crate::db::schema::merge(org_id, stream_name, stream_type, schema, min_ts)
+        openobserve_catalog::schema::merge(org_id, stream_name, stream_type, schema, min_ts)
             .await
             .map(|_| ())
     }

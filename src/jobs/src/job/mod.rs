@@ -472,7 +472,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("short url cache failed");
 
     // initialize metadata watcher
-    tokio::task::spawn(db::schema::watch());
+    tokio::task::spawn(openobserve_catalog::schema::watch());
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
@@ -519,7 +519,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::yield_now().await;
 
     // cache core metadata
-    db::schema::cache().await.expect("stream cache failed");
+    openobserve_catalog::schema::cache()
+        .await
+        .expect("stream cache failed");
     db::functions::cache()
         .await
         .expect("functions cache failed");
@@ -1012,7 +1014,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("Failed to clean up old JSON format enrichment tables");
 
-    db::schema::cache_enrichment_tables()
+    openobserve_catalog::schema::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards

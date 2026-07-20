@@ -20,6 +20,7 @@ use std::{
 
 use arrow_schema::{DataType, Field, Schema};
 use bytes::Bytes;
+use common::{infra::config::ORGANIZATIONS, meta::stream::StreamSchema};
 use config::{
     cluster::LOCAL_NODE_ID,
     get_config,
@@ -43,13 +44,11 @@ use {
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
-use crate::{
-    common::{
-        infra::config::{ENRICHMENT_TABLES, ORGANIZATIONS},
-        meta::stream::StreamSchema,
-    },
-    service::{db, enrichment::StreamTable, organization::check_and_create_org},
-};
+#[derive(Clone)]
+struct EnrichmentTableRef {
+    org_id: String,
+    stream_name: String,
+}
 
 pub async fn merge(
     org_id: &str,
@@ -326,12 +325,8 @@ pub async fn delete(
         // Enrichment table size is not deleted by schema delete
         // Since we are storing the current size of the table in bytes in the meta table,
         // when we delete enrichment table, we need to delete the size from the db as well.
-        if let Err(e) = super::enrichment_table::delete_table_size(org_id, stream_name).await {
-            log::error!("Failed to delete table size: {e}");
-        }
-        if let Err(e) = super::enrichment_table::delete_meta_table_stats(org_id, stream_name).await
-        {
-            log::error!("Failed to delete meta table stats: {e}");
+        if let Err(e) = super::delete_enrichment_metadata(org_id, stream_name).await {
+            log::error!("Failed to delete enrichment metadata: {e}");
         }
     }
 
@@ -416,7 +411,7 @@ pub async fn list(
         None => format!("/schema/{org_id}/"),
         Some(stream_type) => format!("/schema/{org_id}/{stream_type}/"),
     };
-    let items = db::list(&db_key).await?;
+    let items = infra::db::get_db().await.list(&db_key).await?;
     let mut schemas: HashMap<(String, StreamType), Vec<(Bytes, i64)>> =
         HashMap::with_capacity(items.len());
     for (key, val) in items {
@@ -480,7 +475,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let audit_enabled = false;
     let cfg = get_config();
     let key = "/schema/";
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("[Schema:watch] Start watching stream schema");
@@ -494,7 +489,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         log::debug!("[Schema:watch] Received event: {ev:?}");
         match ev {
-            db::Event::Put(ev) => {
+            infra::db::Event::Put(ev) => {
                 let key_columns = ev.key.split('/').collect::<Vec<&str>>();
                 let (ev_key, mut ev_start_dt) = if key_columns.len() > 5 {
                     (
@@ -531,14 +526,17 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     Some((ev_start_dt, now_micros()))
                 };
 
-                let mut schema_versions =
-                    match db::list_values_by_start_dt(&format!("{ev_key}/"), ts_range).await {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("[Schema:watch] Error getting value: {e}");
-                            continue;
-                        }
-                    };
+                let mut schema_versions = match infra::db::get_db()
+                    .await
+                    .list_values_by_start_dt(&format!("{ev_key}/"), ts_range)
+                    .await
+                {
+                    Ok(val) => val,
+                    Err(e) => {
+                        log::error!("[Schema:watch] Error getting value: {e}");
+                        continue;
+                    }
+                };
                 if schema_versions.is_empty() {
                     log::warn!("[Schema:watch] No schema versions found, skip");
                     continue;
@@ -615,12 +613,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 // if it doesn't exist. Hence, we need to check if the org exists in the cache
                 if (cfg.common.create_org_through_ingestion || usage_enabled || audit_enabled)
                     && !ORGANIZATIONS.read().await.contains_key(org_id)
-                    && let Err(e) = check_and_create_org(org_id).await
+                    && let Err(e) = super::check_and_create_org(org_id).await
                 {
                     log::error!("Failed to save organization in database: {e}");
                 }
             }
-            db::Event::Delete(ev) => {
+            infra::db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let columns = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = columns[0];
@@ -656,7 +654,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
-                    super::compact::files::del_offset(org_id, stream_type, stream_name).await
+                    super::delete_compaction_offset(org_id, stream_type, stream_name).await
                 {
                     log::error!("[Schema:watch] del_offset: {e}");
                 }
@@ -696,7 +694,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                 });
             }
-            db::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
     Ok(())
@@ -704,7 +702,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let db_key = "/schema/";
-    let items = db::list(db_key).await?;
+    let items = infra::db::get_db().await.list(db_key).await?;
     let items_num = items.len();
     let mut schemas: HashMap<String, Vec<(i64, Bytes)>> = HashMap::with_capacity(items_num);
 
@@ -895,10 +893,9 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
 
         tables.insert(
             schema_key.to_owned(),
-            StreamTable {
+            EnrichmentTableRef {
                 org_id: org_id.to_string(),
                 stream_name: stream_name.to_string(),
-                data: vec![].into(),
             },
         );
     }
@@ -916,7 +913,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         HashMap<String, Vec<config::meta::enrichment_table::EnrichmentTableUrlJob>>,
     > = HashMap::new();
     for org_id in org_tables.keys() {
-        match db::enrichment_table::list_url_jobs(org_id).await {
+        match super::list_enrichment_url_jobs(org_id).await {
             Ok(jobs) => {
                 // Group jobs by table_name since multiple jobs can exist per table
                 let mut jobs_map: HashMap<
@@ -1010,18 +1007,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         let start = std::time::Instant::now();
         // Only use the primary region if specified to fetch enrichment table data assuming only the
         // primary region contains the data.
-        let data =
-            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true)
-                .await?;
-        let len = data.len();
-        ENRICHMENT_TABLES.insert(
-            key,
-            StreamTable {
-                org_id: tbl.org_id.clone(),
-                stream_name: tbl.stream_name.clone(),
-                data,
-            },
-        );
+        let len = super::cache_enrichment_table(&key, &tbl.org_id, &tbl.stream_name).await?;
         log::info!(
             "EnrichmentTables Cached: org_id: {}, stream_name: {}, len: {}, took {:?}",
             tbl.org_id,

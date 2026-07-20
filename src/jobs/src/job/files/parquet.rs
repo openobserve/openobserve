@@ -875,7 +875,7 @@ async fn merge_files(
         {
             // Get stream count for this type (cached, 5-min TTL — counts rarely change).
             let stream_count =
-                openobserve_core::db::schema::get_stream_count_cached(&org_id, stream_type).await;
+                openobserve_catalog::schema::get_stream_count_cached(&org_id, stream_type).await;
 
             // Get coverage deficit: how many known services are missing streams of this type.
             // Derived entirely from the in-memory cache — no DB I/O.

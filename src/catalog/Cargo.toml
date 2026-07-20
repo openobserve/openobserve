@@ -14,11 +14,16 @@ enterprise = ["dep:o2_enterprise", "config/enterprise"]
 
 [dependencies]
 anyhow.workspace = true
+arrow-schema.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+common.workspace = true
 config.workspace = true
 dashmap.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
 ingester.workspace = true
+itertools.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 proto.workspace = true

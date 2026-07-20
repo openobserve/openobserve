@@ -15,7 +15,6 @@
 
 use config::{cluster::LOCAL_NODE, deverbatim, get_config, spawn_pausable_job};
 use openobserve_compactor::stats::update_stats_from_file_list;
-use openobserve_core::db;
 use tokio::time;
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -88,7 +87,7 @@ async fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
         "cache_stream_stats",
         std::cmp::max(60, get_config().limit.calculate_stats_interval),
         {
-            let orgs = db::schema::list_organizations_from_cache().await;
+            let orgs = openobserve_catalog::schema::list_organizations_from_cache().await;
             if let Err(e) = openobserve_catalog::file_list::cache_stats(&orgs).await {
                 log::error!("[STATS] run cached stream stats error: {e}");
             } else {

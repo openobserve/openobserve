@@ -101,7 +101,7 @@ pub async fn get_streams(
     fetch_schema: bool,
     permitted_streams: Option<Vec<String>>,
 ) -> Vec<Stream> {
-    let indices = db::schema::list(org_id, stream_type, fetch_schema)
+    let indices = openobserve_catalog::schema::list(org_id, stream_type, fetch_schema)
         .await
         .unwrap_or_default();
 
@@ -596,7 +596,7 @@ pub async fn save_stream_settings(
     if !metadata.contains_key("created_at") {
         metadata.insert("created_at".to_string(), now_micros().to_string());
     }
-    db::schema::update_setting(org_id, stream_name, stream_type, metadata)
+    openobserve_catalog::schema::update_setting(org_id, stream_name, stream_type, metadata)
         .await
         .unwrap();
 
@@ -625,7 +625,7 @@ pub async fn save_stream_settings(
                         metadata.insert("created_at".to_string(), now_micros().to_string());
                     }
 
-                    if let Err(e) = db::schema::update_setting(
+                    if let Err(e) = openobserve_catalog::schema::update_setting(
                         org_id,
                         &distinct_stream,
                         StreamType::Metadata,
@@ -1018,7 +1018,9 @@ pub async fn delete_stream(
     }
 
     // delete stream schema
-    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
+    if let Err(e) =
+        openobserve_catalog::schema::delete(org_id, stream_name, Some(stream_type)).await
+    {
         return Ok((
             http::StatusCode::INTERNAL_SERVER_ERROR,
             [(ERROR_HEADER, format!("failed to delete stream schema: {e}"))],
@@ -1273,7 +1275,7 @@ pub async fn delete_fields(
     if fields.is_empty() {
         return Ok(());
     }
-    db::schema::delete_fields(
+    openobserve_catalog::schema::delete_fields(
         org_id,
         stream_name,
         stream_type.unwrap_or_default(),

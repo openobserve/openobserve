@@ -25,10 +25,7 @@ use hashbrown::HashMap;
 use infra::{cache, cluster::get_cached_online_nodes, db::get_db};
 use tokio::time;
 
-use crate::{
-    common::infra::config::{ORG_USERS, USERS},
-    service::db,
-};
+use crate::common::infra::config::{ORG_USERS, USERS};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // load metrics
@@ -157,13 +154,14 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     }
 
     let stream_types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = openobserve_catalog::schema::list_organizations_from_cache().await;
     metrics::META_NUM_ORGANIZATIONS
         .with_label_values::<&str>(&[])
         .set(orgs.len() as i64);
     for org_id in &orgs {
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(org_id, stream_type).await;
+            let streams =
+                openobserve_catalog::schema::list_streams_from_cache(org_id, stream_type).await;
             if !streams.is_empty() {
                 metrics::META_NUM_STREAMS
                     .with_label_values::<&str>(&[org_id.as_str(), stream_type.as_str()])

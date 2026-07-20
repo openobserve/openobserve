@@ -224,6 +224,7 @@ async-stream.workspace = true
 sourcemap.workspace = true
 openobserve-api.workspace = true
 openobserve-alerts.workspace = true
+openobserve-catalog.workspace = true
 openobserve-compactor.workspace = true
 openobserve-core.workspace = true
 openobserve-ingestion.workspace = true
