@@ -13,10 +13,68 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value;
+// Compatibility re-exports for call sites (alerts, HTTP handlers) that mix
+// these with `MetricsQueryRequest` and `search`. New code should depend on the
+// `promql` crate directly.
+pub use ::promql::{
+    DEFAULT_LOOKBACK, MAX_DATA_POINTS, MINIMAL_INTERVAL, adjust_start_end, micros, name_visitor,
+    round_step,
+};
+use config::meta::{promql::value, search::SearchEventType};
 use proto::cluster_rpc;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 pub mod cache;
+pub mod search;
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct MetricsQueryRequest {
+    pub query: String,
+    pub start: i64,
+    pub end: i64,
+    pub step: i64,
+    pub query_exemplars: bool,
+    pub use_cache: Option<bool>,
+    pub search_type: Option<SearchEventType>,
+    pub regions: Vec<String>,
+    pub clusters: Vec<String>,
+}
+
+impl From<MetricsQueryRequest> for proto::cluster_rpc::MetricsQueryRequest {
+    fn from(req: MetricsQueryRequest) -> Self {
+        let query = proto::cluster_rpc::MetricsQueryStmt {
+            query: req.query,
+            start: req.start,
+            end: req.end,
+            step: req.step,
+            query_exemplars: req.query_exemplars,
+            query_data: false,
+            label_selector: vec![],
+        };
+        let trace_id = config::ider::generate_trace_id();
+        Self {
+            job: Some(proto::cluster_rpc::Job {
+                trace_id: trace_id.clone(),
+                job: trace_id[..7].to_string(),
+                stage: 0,
+                partition: 0,
+            }),
+            org_id: String::new(),
+            need_wal: false,
+            query: Some(query),
+            use_cache: req.use_cache.unwrap_or(true),
+            timeout: 0,
+            search_event_type: req
+                .search_type
+                .map(|value| value.to_string())
+                .unwrap_or_default(),
+            regions: req.regions,
+            clusters: req.clusters,
+            is_super_cluster: false,
+        }
+    }
+}
 
 pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: value::Value) {
     match value {

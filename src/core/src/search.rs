@@ -164,6 +164,28 @@ impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
             .await
     }
 
+    async fn query_file_keys(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_level: config::meta::stream::PartitionTimeLevel,
+        time_min: i64,
+        time_max: i64,
+    ) -> Result<Vec<config::meta::stream::FileKey>, Error> {
+        crate::file_list::query(
+            trace_id,
+            org_id,
+            stream_type,
+            stream_name,
+            time_level,
+            time_min,
+            time_max,
+        )
+        .await
+    }
+
     async fn calculate_files_size(
         &self,
         files: &[config::meta::stream::FileKey],
@@ -177,6 +199,20 @@ impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
 
     async fn tantivy_secondary_index_updated_at(&self) -> i64 {
         crate::db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await
+    }
+
+    async fn max_promql_series(&self, org_id: &str) -> usize {
+        match crate::db::organization::get_org_setting(org_id).await {
+            Ok(settings) => settings
+                .max_series_per_query
+                .unwrap_or_else(|| config::get_config().limit.metrics_max_series_response),
+            Err(err) => {
+                log::warn!(
+                    "Failed to fetch org settings for {org_id}, using default limit: {err:?}"
+                );
+                config::get_config().limit.metrics_max_series_response
+            }
+        }
     }
 
     async fn cached_search(

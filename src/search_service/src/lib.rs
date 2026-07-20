@@ -20,7 +20,11 @@
 
 use std::sync::{Arc, LazyLock, OnceLock};
 
-use config::meta::{search, stream::StreamType};
+use config::meta::{
+    search,
+    self_reporting::usage::{RequestStats, UsageType},
+    stream::{FileKey, PartitionTimeLevel, StreamType},
+};
 use infra::errors::Error;
 
 pub mod cache;
@@ -48,7 +52,7 @@ pub static SEARCH_SERVER: LazyLock<Searcher> = LazyLock::new(Searcher::new);
 
 #[async_trait::async_trait]
 pub trait GrpcRuntime:
-    partition::PartitionRuntime + streaming::StreamingRuntime + Send + Sync
+    cache::CacheRuntime + partition::PartitionRuntime + streaming::StreamingRuntime + Send + Sync
 {
     async fn enrichment_table_start_time(&self, org_id: &str, stream_name: &str) -> i64;
 
@@ -62,6 +66,17 @@ pub trait GrpcRuntime:
         ids: &[i64],
     ) -> Result<Vec<config::meta::stream::FileKey>, Error>;
 
+    async fn query_file_keys(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_level: PartitionTimeLevel,
+        time_min: i64,
+        time_max: i64,
+    ) -> Result<Vec<FileKey>, Error>;
+
     async fn calculate_files_size(
         &self,
         files: &[config::meta::stream::FileKey],
@@ -70,6 +85,8 @@ pub trait GrpcRuntime:
     async fn tantivy_index_updated_at(&self) -> i64;
 
     async fn tantivy_secondary_index_updated_at(&self) -> i64;
+
+    async fn max_promql_series(&self, org_id: &str) -> usize;
 
     async fn cached_search(
         &self,
@@ -111,4 +128,69 @@ fn grpc_runtime() -> Result<&'static Arc<dyn GrpcRuntime>, tonic::Status> {
     GRPC_RUNTIME
         .get()
         .ok_or_else(|| tonic::Status::failed_precondition("search gRPC runtime is not installed"))
+}
+
+pub(crate) async fn query_promql_file_keys(
+    trace_id: &str,
+    org_id: &str,
+    stream_name: &str,
+    time_level: PartitionTimeLevel,
+    time_min: i64,
+    time_max: i64,
+) -> Result<Vec<FileKey>, Error> {
+    let runtime = GRPC_RUNTIME
+        .get()
+        .ok_or_else(|| Error::Message("search runtime is not installed".to_string()))?;
+    runtime
+        .query_file_keys(
+            trace_id,
+            org_id,
+            StreamType::Metrics,
+            stream_name,
+            time_level,
+            time_min,
+            time_max,
+        )
+        .await
+}
+
+pub(crate) async fn calculate_promql_files_size(
+    files: &[FileKey],
+) -> Result<search::ScanStats, Error> {
+    let runtime = GRPC_RUNTIME
+        .get()
+        .ok_or_else(|| Error::Message("search runtime is not installed".to_string()))?;
+    runtime.calculate_files_size(files).await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn report_promql_usage(
+    stats: RequestStats,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    usage_type: UsageType,
+    num_functions: u16,
+    timestamp: i64,
+) {
+    if let Some(runtime) = GRPC_RUNTIME.get() {
+        runtime
+            .report_search_usage(
+                stats,
+                org_id,
+                stream_name,
+                stream_type,
+                usage_type,
+                num_functions,
+                timestamp,
+            )
+            .await;
+    }
+}
+
+pub(crate) async fn max_promql_series(org_id: &str) -> usize {
+    match GRPC_RUNTIME.get() {
+        Some(runtime) => runtime.max_promql_series(org_id).await,
+        None => config::get_config().limit.metrics_max_series_response,
+    }
 }

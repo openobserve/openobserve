@@ -7133,11 +7133,13 @@ dependencies = [
  "opentelemetry",
  "parking_lot 0.12.5",
  "promql",
+ "promql-parser",
  "prost 0.14.3",
  "proto",
  "rand 0.10.1",
  "rayon",
  "search",
+ "serde",
  "serde_json",
  "sqlparser",
  "svix-ksuid",
@@ -7145,6 +7147,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-opentelemetry",
+ "utoipa",
 ]
 
 [[package]]

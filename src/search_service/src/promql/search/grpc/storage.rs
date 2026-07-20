@@ -15,6 +15,10 @@
 
 use std::sync::Arc;
 
+use ::search::{
+    datafusion::exec::register_metrics_table,
+    index::{Condition, IndexCondition},
+};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -35,23 +39,18 @@ use infra::{
     schema::{get_partition_time_level, get_stream_setting_index_fields, unwrap_stream_settings},
 };
 use itertools::Itertools;
-use openobserve_search_service::{
-    grpc::{
-        QueryParams,
-        storage::{cache_files, calc_target_partitions, tantivy_search},
-    },
-    query_utils::match_source,
-};
 use promql_parser::label::{MatchOp, Matchers};
 use tracing::Instrument;
 
 use crate::{
-    file_list,
-    promql::search::grpc::Context,
-    search::{
-        datafusion::exec::register_metrics_table,
-        index::{Condition, IndexCondition},
+    calculate_promql_files_size,
+    grpc::{
+        QueryParams,
+        storage::{cache_files, calc_target_partitions, tantivy_search},
     },
+    promql::search::grpc::Context,
+    query_promql_file_keys,
+    query_utils::match_source,
 };
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
@@ -133,7 +132,7 @@ pub(crate) async fn create_context(
     }
 
     // calculate scan size
-    let mut scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
+    let mut scan_stats = match calculate_promql_files_size(&files).await {
         Ok(size) => size,
         Err(err) => {
             log::error!("[trace_id {trace_id}] calculate files size error: {err}");
@@ -276,10 +275,9 @@ async fn get_file_list(
     filters: &[(String, Vec<String>)],
 ) -> Result<Vec<FileKey>> {
     let (time_min, time_max) = time_range;
-    let results = match file_list::query(
+    let results = match query_promql_file_keys(
         trace_id,
         org_id,
-        StreamType::Metrics,
         stream_name,
         time_level,
         time_min,

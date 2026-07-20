@@ -19,12 +19,13 @@ use std::{
 };
 
 use ::promql::{DEFAULT_LOOKBACK, PromqlContext, TableProvider, name_visitor};
+use ::search;
 use async_trait::async_trait;
 use config::{
     meta::{
         promql::value,
         search::{ScanStats, SearchEventType},
-        stream::{FileKey, PartitionTimeLevel, StreamType},
+        stream::{FileKey, PartitionTimeLevel},
     },
     utils::time::{now_micros, second_micros},
 };
@@ -35,8 +36,6 @@ use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 use tokio::sync::mpsc;
-
-use crate::search;
 
 mod storage;
 mod wal;
@@ -100,7 +99,7 @@ impl TableProvider for StorageProvider {
         trace_id: &str,
     ) -> datafusion::error::Result<Option<tokio::sync::oneshot::Receiver<()>>> {
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        if openobserve_search_service::SEARCH_SERVER
+        if crate::SEARCH_SERVER
             .insert_sender(trace_id, abort_sender, true)
             .await
             .is_err()
@@ -412,10 +411,9 @@ async fn get_max_file_list(
     let mut file_list = Vec::new();
     let mut max_records = 0;
     for stream_name in metrics_name {
-        let stream_file_list = crate::file_list::query(
+        let stream_file_list = crate::query_promql_file_keys(
             trace_id,
             org_id,
-            StreamType::Metrics,
             &stream_name,
             PartitionTimeLevel::default(),
             start,

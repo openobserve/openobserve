@@ -61,7 +61,7 @@ pub mod org_storage_providers;
 pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
-pub mod promql;
+pub use openobserve_search_service::promql;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
