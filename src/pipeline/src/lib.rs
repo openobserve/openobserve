@@ -20,5 +20,6 @@ pub mod eval_jobs;
 mod http;
 pub mod management;
 pub mod ports;
+pub mod providers;
 pub mod repository;
 pub mod service;

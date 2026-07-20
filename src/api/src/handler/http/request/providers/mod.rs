@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, response::Response};
+use openobserve_pipeline::providers::{self, ProviderError};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::UserEmail;
@@ -24,7 +25,6 @@ use crate::{
     handler::http::models::providers::{
         ListProvidersResponseBody, ProviderRequestBody, ProviderResponseBody,
     },
-    service::providers::{self, ProviderError},
 };
 
 /// ListProviders

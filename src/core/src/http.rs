@@ -21,10 +21,12 @@ use axum::{
 use infra::errors;
 #[cfg(feature = "enterprise")]
 use openobserve_pipeline::eval_jobs::EvalJobError;
+#[cfg(feature = "enterprise")]
+use openobserve_pipeline::providers::ProviderError;
 
 use crate::common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
 #[cfg(feature = "enterprise")]
-use crate::{providers::ProviderError, ratelimit::rule::RatelimitError};
+use crate::ratelimit::rule::RatelimitError;
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
     match err {
