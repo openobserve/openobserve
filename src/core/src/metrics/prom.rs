@@ -49,6 +49,7 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use proto::prometheus_rpc;
 
+use super::native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram};
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
@@ -83,7 +84,6 @@ pub async fn remote_write(
     let election_interval = cfg.limit.metrics_leader_election_interval * 1000000;
     let mut last_received: i64 = 0;
     let mut has_entry = false;
-    let mut accept_record: bool;
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -184,6 +184,13 @@ pub async fn remote_write(
     for event in &request.timeseries {
         if let Some(name_label) = event.labels.iter().find(|l| l.name == NAME_LABEL) {
             let metric_name = format_stream_name(name_label.value.to_string());
+            if !event.histograms.is_empty() {
+                // native histograms degrade into classic histogram streams (see the
+                // `event.histograms` loop below), so preload those streams too
+                for suffix in CLASSIC_HISTOGRAM_SUFFIXES {
+                    unique_metrics.insert(format!("{metric_name}{suffix}"));
+                }
+            }
             unique_metrics.insert(metric_name);
         }
     }
@@ -297,49 +304,39 @@ pub async fn remote_write(
         // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
         // before the loop to avoid repeated async queries
 
-        // parse samples
-        let sample_start = std::time::Instant::now();
-        for sample in event.samples {
-            sample_count += 1;
-            // NaN -> no observation -> no record; infinities clamp. Shared with the OTLP
-            // writer so the two ingestion paths cannot drift apart on this.
-            let Some(sample_val) = super::sanitize_metric_value(sample.value) else {
-                continue;
-            };
-            let metric = Metric {
-                labels: &labels,
-                value: sample_val,
-            };
-
-            if first_line && dedup_enabled && !cluster_name.is_empty() {
-                let lock = METRIC_CLUSTER_LEADER.read().await;
-                match lock.get(&cluster_name) {
-                    Some(leader) => {
-                        last_received = leader.last_received;
-                        has_entry = true;
-                    }
-                    None => {
-                        has_entry = false;
-                    }
+        // HA leader election decides whether this replica's request is accepted at all. It
+        // runs on the first timeseries that carries any data -- checking `samples` alone
+        // would never elect for a request that carries only native histograms.
+        if first_line
+            && dedup_enabled
+            && !cluster_name.is_empty()
+            && (!event.samples.is_empty() || !event.histograms.is_empty())
+        {
+            let lock = METRIC_CLUSTER_LEADER.read().await;
+            match lock.get(&cluster_name) {
+                Some(leader) => {
+                    last_received = leader.last_received;
+                    has_entry = true;
                 }
-                drop(lock);
-                accept_record = if !replica_label.is_empty() {
-                    prom_ha_handler(
-                        has_entry,
-                        &cluster_name,
-                        &replica_label,
-                        last_received,
-                        election_interval,
-                    )
-                    .await
-                } else {
-                    true
-                };
-                has_entry = true;
-                first_line = false;
-            } else {
-                accept_record = true
+                None => {
+                    has_entry = false;
+                }
             }
+            drop(lock);
+            let accept_record = if !replica_label.is_empty() {
+                prom_ha_handler(
+                    has_entry,
+                    &cluster_name,
+                    &replica_label,
+                    last_received,
+                    election_interval,
+                )
+                .await
+            } else {
+                true
+            };
+            has_entry = true;
+            first_line = false;
             if !accept_record {
                 // do not accept any entries for request
                 let time = start.elapsed().as_secs_f64();
@@ -365,6 +362,21 @@ pub async fn remote_write(
                     .inc();
                 return Ok(());
             }
+        }
+
+        // parse samples
+        let sample_start = std::time::Instant::now();
+        for sample in event.samples {
+            sample_count += 1;
+            // NaN -> no observation -> no record; infinities clamp. Shared with the OTLP
+            // writer so the two ingestion paths cannot drift apart on this.
+            let Some(sample_val) = super::sanitize_metric_value(sample.value) else {
+                continue;
+            };
+            let metric = Metric {
+                labels: &labels,
+                value: sample_val,
+            };
 
             let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
@@ -374,31 +386,54 @@ pub async fn remote_write(
             );
 
             // ready to be buffered for downstream processing
-            if stream_executable_pipelines
-                .get(&metric_name)
-                .is_some_and(|v| !v.is_empty())
-            {
-                // buffer to pipeline for batch processing
-                stream_pipeline_inputs
-                    .entry(metric_name.to_owned())
-                    .or_default()
-                    .push((value, timestamp));
-            } else {
-                // get json object
-                let mut local_val = match value.take() {
-                    json::Value::Object(val) => val,
-                    _ => unreachable!(),
+            buffer_metric_record(
+                &metric_name,
+                value,
+                timestamp,
+                &stream_executable_pipelines,
+                &user_defined_schema_map,
+                &mut stream_pipeline_inputs,
+                &mut json_data_by_stream,
+            );
+        }
+
+        // parse native histograms: there is no native storage or query support yet, so
+        // each native histogram sample degrades into its classic representation --
+        // `_count`, `_sum` and cumulative `le` `_bucket` records, the same shape the
+        // OTLP exponential-histogram path writes -- so existing PromQL
+        // (histogram_quantile etc.) works on it unchanged.
+        for hp in &event.histograms {
+            sample_count += 1;
+            let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
+            for (suffix, le, value) in expand_native_histogram(hp) {
+                let Some(value) = super::sanitize_metric_value(value) else {
+                    continue;
                 };
-
-                if let Some(Some(fields)) = user_defined_schema_map.get(&metric_name) {
-                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                let mut hist_labels = labels.clone();
+                if let Some(name) = hist_labels.get_mut(NAME_LABEL) {
+                    name.push_str(suffix);
                 }
-
-                // buffer to downstream processing directly
-                json_data_by_stream
-                    .entry(metric_name.clone())
-                    .or_default()
-                    .push((local_val, timestamp));
+                if let Some(le) = le {
+                    hist_labels.insert(BUCKET_LABEL.to_string(), le);
+                }
+                let metric = Metric {
+                    labels: &hist_labels,
+                    value,
+                };
+                let mut value: json::Value = json::to_value(&metric).unwrap();
+                value.as_object_mut().unwrap().insert(
+                    TIMESTAMP_COL_NAME.to_string(),
+                    json::Value::Number(timestamp.into()),
+                );
+                buffer_metric_record(
+                    &format!("{metric_name}{suffix}"),
+                    value,
+                    timestamp,
+                    &stream_executable_pipelines,
+                    &user_defined_schema_map,
+                    &mut stream_pipeline_inputs,
+                    &mut json_data_by_stream,
+                );
             }
         }
         sample_processing_time += sample_start.elapsed().as_micros();
@@ -1161,6 +1196,48 @@ pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String>
                 .first()
                 .map(|m| m.value.clone())
         }
+    }
+}
+
+/// Per-stream buffer of records ready for the write path, keyed by stream name.
+type JsonDataByStream = HashMap<String, Vec<(json::Map<String, json::Value>, i64)>>;
+
+/// Routes one metric record either into its stream's pipeline input buffer or, with UDS
+/// trimming applied, directly into the per-stream write buffer.
+fn buffer_metric_record(
+    metric_name: &str,
+    mut value: json::Value,
+    timestamp: i64,
+    stream_executable_pipelines: &HashMap<String, Vec<ExecutablePipeline>>,
+    user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
+    stream_pipeline_inputs: &mut HashMap<String, Vec<(json::Value, i64)>>,
+    json_data_by_stream: &mut JsonDataByStream,
+) {
+    if stream_executable_pipelines
+        .get(metric_name)
+        .is_some_and(|v| !v.is_empty())
+    {
+        // buffer to pipeline for batch processing
+        stream_pipeline_inputs
+            .entry(metric_name.to_owned())
+            .or_default()
+            .push((value, timestamp));
+    } else {
+        // get json object
+        let mut local_val = match value.take() {
+            json::Value::Object(val) => val,
+            _ => unreachable!(),
+        };
+
+        if let Some(Some(fields)) = user_defined_schema_map.get(metric_name) {
+            local_val = crate::service::ingestion::refactor_map(local_val, fields);
+        }
+
+        // buffer to downstream processing directly
+        json_data_by_stream
+            .entry(metric_name.to_owned())
+            .or_default()
+            .push((local_val, timestamp));
     }
 }
 

@@ -20,6 +20,7 @@ use config::{
 use datafusion::arrow::datatypes::Schema;
 
 pub mod json;
+mod native_histogram;
 pub mod otlp;
 mod otlp_json_compat;
 pub mod prom;
