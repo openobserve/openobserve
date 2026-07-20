@@ -368,14 +368,28 @@ export class PipelinesPage {
     // Methods from PipelinePage
     async openPipelineMenu() {
         await openNavFlyoutChild(this.page, 'pipeline');
-        // pipelineTab.click() auto-waits for actionability, so the pre-click sleep
-        // was redundant. After the click, wait for the pipeline list page to render
-        // instead of a blind 2s — resolves in ~0.5-1s on the common path. Best-effort
-        // (.catch) so callers that immediately page.goto elsewhere aren't blocked.
-        await this.pipelineTab.click();
-        await this.page.locator('[data-test="pipeline-list-page"]')
+        // openNavFlyoutChild navigates via a hover-flyout force-click that can
+        // intermittently miss (the flyout self-closes on settle), leaving us on the
+        // previous page. That was the dominant Pipelines-shard flake: the follow-up
+        // pipelineTab.click() then timed out at the 45s action timeout because the
+        // streamPipelines tab only exists on the pipeline list page. Confirm we
+        // actually landed; if not, navigate directly — a goto is deterministic and
+        // needs no flyout.
+        const onPipelinePage = await this.page.locator('[data-test="pipeline-list-page"]')
             .waitFor({ state: 'visible', timeout: 15000 })
-            .catch(() => {});
+            .then(() => true)
+            .catch(() => false);
+        if (!onPipelinePage) {
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/pipeline/pipelines?org_identifier=${process.env["ORGNAME"]}`
+            );
+            await this.page.locator('[data-test="pipeline-list-page"]')
+                .waitFor({ state: 'visible', timeout: 30000 });
+        }
+        // Ensure the Stream Pipelines section tab is selected. Wait for it to render
+        // before clicking so the click never races the page mount.
+        await this.pipelineTab.waitFor({ state: 'visible', timeout: 15000 });
+        await this.pipelineTab.click();
     }
 
     async addPipeline() {
@@ -971,14 +985,52 @@ export class PipelinesPage {
     }
 
     async navigateToAddEnrichmentTable() {
-        await openNavFlyoutChild(this.page, 'pipeline');
-        // The enrichment-table tab uses a Reka-based OToggleGroup — `force` avoids
-        // visibility races when the tab list animates in.
-        await this.enrichmentTableTabLocator.click({ force: true });
-        await this.addEnrichmentTableText.click();
-        // The Add Enrichment Table form (`add-enrichment-table-page`) renders
-        // inside the same parent — wait for it to be visible before returning.
-        await this.addEnrichmentTablePage.waitFor({ state: 'visible', timeout: 15000 });
+        // Land directly on the enrichment-tables LIST page instead of the old
+        // two-hop route (flyout → pipelines list → click the
+        // `pipeline-section-tab-enrichmentTables` OTab). That tab lives in the
+        // pipelines page header (PipelineSectionTabs, rendered in AppPageHeader's
+        // #tabs slot) and only mounts once that page has fully rendered — so on
+        // cloud a slow/missed flyout nav left the tab locator unattached and the
+        // blind `force` click timed out at 45s (systematic across every test).
+        // `enrichmentTables` has its own left-nav flyout child, so navigate
+        // straight to its list page and skip the fragile section-tab hop.
+        const enrichmentListUrlRe = /\/pipeline\/enrichment-tables/;
+        const listPage = this.page.locator('[data-test="enrichment-tables-list-page"]');
+
+        // Prefer SPA nav via the direct flyout child; fall back to a hard goto
+        // if the hover-driven flyout click misses (same recovery pattern as
+        // enrichmentPage.gotoEnrichmentTablesWithOrg).
+        try {
+            await openNavFlyoutChild(this.page, 'enrichment');
+            await this.page.waitForURL(enrichmentListUrlRe, { timeout: 15000 });
+        } catch (navError) {
+            testLogger.warn('Enrichment flyout nav missed — falling back to direct goto', {
+                error: navError.message,
+            });
+            let org = process.env.ORGNAME;
+            try {
+                org = new URL(this.page.url()).searchParams.get('org_identifier') || org;
+            } catch { /* about:blank etc. — keep ORGNAME fallback */ }
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/pipeline/enrichment-tables?org_identifier=${org}`,
+                { waitUntil: 'domcontentloaded' },
+            );
+            await this.page.waitForURL(enrichmentListUrlRe, { timeout: 15000 });
+        }
+
+        // Wait for the list page container, then settle+retry the Add-button
+        // click. The OButton in the AppPageHeader #actions slot can detach
+        // mid-render while the list hydrates (documented add-btn detach race),
+        // so re-resolve the locator and tolerate a transient detach. Short-circuit
+        // if a prior attempt already opened the form (the Add button is v-if'd
+        // out once the form mounts, so re-asserting its visibility would loop).
+        await listPage.waitFor({ state: 'visible', timeout: 20000 });
+        await expect(async () => {
+            if (await this.addEnrichmentTablePage.isVisible().catch(() => false)) return;
+            await expect(this.addEnrichmentTableText).toBeVisible({ timeout: 5000 });
+            await this.addEnrichmentTableText.click({ timeout: 5000 });
+            await expect(this.addEnrichmentTablePage).toBeVisible({ timeout: 10000 });
+        }).toPass({ timeout: 45000 });
     }
 
     async uploadEnrichmentTable(fileName, fileContentPath) {
@@ -1122,11 +1174,34 @@ export class PipelinesPage {
     }
 
     async navigateToStreams() {
+        // `menu-link-/streams-item` is the "Data" nav group tile: it both opens a
+        // hover flyout and navigates. A plain click can register as the hover-open
+        // (flyout appears, page stays blank) without navigating — the same flyout
+        // race that hit openPipelineMenu. Confirm the streams page rendered; if not,
+        // navigate directly. A blind 1s wait previously let refreshStreamStats() fire
+        // against a page that had not loaded.
         await this.streamsMenuItem.click();
-        await this.page.waitForTimeout(1000);
+        const onStreamsPage = await this.page.locator('[data-test="log-stream-table"]')
+            .waitFor({ state: 'visible', timeout: 15000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!onStreamsPage) {
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/streams?org_identifier=${process.env["ORGNAME"]}`
+            );
+            await this.page.locator('[data-test="log-stream-table"]')
+                .waitFor({ state: 'visible', timeout: 30000 });
+        }
     }
 
     async refreshStreamStats() {
+        // The refresh button is an OButton with :loading bound to the stream-stats
+        // fetch; while loading it is rendered disabled. Clicking during that window
+        // makes Playwright wait on actionability and time out at 45s under CI load
+        // (the pipeline-dynamic flake). Wait for it to settle (visible + enabled)
+        // before clicking.
+        await this.refreshStatsButton.waitFor({ state: 'visible', timeout: 30000 });
+        await expect(this.refreshStatsButton).toBeEnabled({ timeout: 30000 });
         await this.refreshStatsButton.click();
         await this.page.waitForTimeout(1000);
     }
@@ -1144,6 +1219,22 @@ export class PipelinesPage {
     }
 
     async openTimestampMenu() {
+        // The destination-stream data ingested by exploreStreamAndNavigateToPipeline
+        // may not be indexed yet when the logs explorer first renders (indexing
+        // latency is high on loaded envs), so the first row can be absent and a bare
+        // click dead-waits the full 45s action timeout (the pipeline-core:56 flake
+        // once navigation stopped failing earlier). Re-run the query until a row
+        // appears instead of clicking into an empty table.
+        const runQueryBtn = this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
+        for (let attempt = 1; attempt <= 6; attempt++) {
+            if (await this.timestampColumnMenu.isVisible({ timeout: 10000 }).catch(() => false)) {
+                break;
+            }
+            // Re-trigger the search so newly-indexed rows are picked up.
+            await runQueryBtn.first().click({ timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(3000);
+        }
+        await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 15000 });
         await this.timestampColumnMenu.click();
     }
 

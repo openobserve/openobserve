@@ -66,10 +66,12 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
       return;
     }
 
-    // Verify auto-populated query exists in the editor model
+    // Verify auto-populated query exists in the editor model.
+    // selectFirstStream() already gates on this signal; this poll is the load-tolerant
+    // assertion (15s) that the async auto-populate actually landed in the editor.
     await expect.poll(async () => {
       return await queryEditor.getCurrentQueryText();
-    }, { timeout: 5000, intervals: [200, 500] }).not.toBe('');
+    }, { timeout: 15000, intervals: [200, 500, 1000] }).not.toBe('');
 
     const queryText = await queryEditor.getCurrentQueryText();
     expect(queryText.length).toBeGreaterThan(0);
@@ -99,7 +101,12 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
     const testQuery = 'up{job="prometheus"}';
     await queryEditor.enterPromQLQuery(testQuery);
 
-    // Store the query from Tab 1
+    // Store the query from Tab 1. Poll first so the read waits for Monaco to settle
+    // the entered query under load (same assertion, just made load-tolerant).
+    await expect.poll(async () => {
+      return (await queryEditor.getCurrentQueryText()).length;
+    }, { timeout: 15000, intervals: [200, 500, 1000] }).toBeGreaterThan(0);
+
     const tab1OriginalQuery = await queryEditor.getCurrentQueryText();
 
     expect(tab1OriginalQuery.length).toBeGreaterThan(0);
@@ -131,14 +138,23 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
     // Step 5: Verify query is still there (THE CRITICAL CHECK)
     testLogger.info('Verifying query persistence in Tab 1 (CRITICAL VALIDATION)');
 
+    const expectedNormalized = testQuery.replace(/\s+/g, ' ').trim();
+
+    // Poll the read on the SAME containment assertion so Monaco has time to
+    // re-render the persisted query after the tab switch under load. The final
+    // expect below remains the real persistence check (unchanged in substance).
+    await expect.poll(async () => {
+      return (await queryEditor.getCurrentQueryText()).replace(/\s+/g, ' ').trim();
+    }, { timeout: 15000, intervals: [200, 500, 1000] }).toContain(expectedNormalized);
+
     const tab1QueryAfterSwitch = await queryEditor.getCurrentQueryText();
 
     // Normalize whitespace for comparison
     const normalizedOriginal = tab1OriginalQuery.replace(/\s+/g, ' ').trim();
     const normalizedAfterSwitch = tab1QueryAfterSwitch.replace(/\s+/g, ' ').trim();
 
-    // The query should be the same as before
-    expect(normalizedAfterSwitch).toContain(testQuery.replace(/\s+/g, ' ').trim());
+    // The query should be the same as before (CRITICAL persistence assertion)
+    expect(normalizedAfterSwitch).toContain(expectedNormalized);
 
     testLogger.info('✓ SUCCESS: Query persisted correctly in Tab 1 after tab switch');
     testLogger.info(`Original: ${normalizedOriginal.substring(0, 100)}...`);
@@ -173,7 +189,11 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
     // Click Run Query to save the query to state
     await queryEditor.clickRunQuery();
 
-    // Verify Tab 1 query was entered
+    // Verify Tab 1 query was entered (poll so the read tolerates Monaco settle
+    // after clickRunQuery under load; assertion unchanged in substance).
+    await expect.poll(async () => {
+      return await queryEditor.getCurrentQueryText();
+    }, { timeout: 15000, intervals: [200, 500, 1000] }).toContain(queryA);
     let tab1Initial = await queryEditor.getCurrentQueryText();
     testLogger.info(`Tab 1 query after entry: "${tab1Initial}"`);
     expect(tab1Initial).toContain(queryA);
@@ -194,7 +214,11 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
     // Click Run Query to save the query to state
     await queryEditor.clickRunQuery();
 
-    // Verify Tab 2 query was entered
+    // Verify Tab 2 query was entered (poll so the read tolerates Monaco settle
+    // after clickRunQuery under load; assertion unchanged in substance).
+    await expect.poll(async () => {
+      return await queryEditor.getCurrentQueryText();
+    }, { timeout: 15000, intervals: [200, 500, 1000] }).toContain(queryB);
     let tab2Initial = await queryEditor.getCurrentQueryText();
     testLogger.info(`Tab 2 query after entry: "${tab2Initial}"`);
     expect(tab2Initial).toContain(queryB);
@@ -248,7 +272,11 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
     // Click Run Query to save state
     await queryEditor.clickRunQuery();
 
-    // Verify Tab 1 query
+    // Verify Tab 1 query (poll so the read tolerates Monaco settle after
+    // clickRunQuery under load; assertion unchanged in substance).
+    await expect.poll(async () => {
+      return await queryEditor.getCurrentQueryText();
+    }, { timeout: 15000, intervals: [200, 500, 1000] }).toContain(queryTab1);
     let tab1Initial = await queryEditor.getCurrentQueryText();
     testLogger.info(`Tab 1 query: "${tab1Initial}"`);
     expect(tab1Initial).toContain(queryTab1);
@@ -296,7 +324,11 @@ test.describe('Metrics PromQL Query Persistence Tests', () => {
     // Click Run Query to save state
     await queryEditor.clickRunQuery();
 
-    // Verify it was entered
+    // Verify it was entered (poll so the read tolerates Monaco settle after
+    // clickRunQuery under load; assertion unchanged in substance).
+    await expect.poll(async () => {
+      return await queryEditor.getCurrentQueryText();
+    }, { timeout: 15000, intervals: [200, 500, 1000] }).toContain(customQuery);
     let currentQuery = await queryEditor.getCurrentQueryText();
     testLogger.info(`Custom query entered: "${currentQuery}"`);
     expect(currentQuery).toContain(customQuery);

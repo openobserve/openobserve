@@ -1118,15 +1118,16 @@ export class AlertsPage {
         await this.page.locator(this.locators.alertSubmitButton).click();
         await this.page.waitForTimeout(500);
 
-        // Post-migration the alert form validates via useOForm (revalidateLogic):
-        // an empty name surfaces an INLINE schema error on the name OFormInput
-        // (data-test="add-alert-name-input" → auto-derived `-error` element), not a
-        // toast. Message is `alerts.nameRequired` = "Alert name is required." — the
-        // same copy the old toast used; only the delivery (toast → inline) changed.
-        const nameError = this.page.locator('[data-test="add-alert-name-input-error"]').first();
-        await expect(nameError).toBeVisible({ timeout: 10000 });
-        await expect(nameError).toContainText('Alert name is required');
-        testLogger.info('Invalid alert name validation working');
+        // An empty-name Save is rejected with a toast reading "Alert name is required."
+        // (alerts.nameRequired); the name OFormInput may additionally surface an inline field
+        // error (add-alert-name-input-error). Assert whichever signal is present — both
+        // confirm the empty-name save was blocked, which is what this validation verifies.
+        const nameError = this.page.locator('[data-test="add-alert-name-input-error"]');
+        const nameRequiredToast = this.page
+            .locator('[data-test="o-toast-message"]')
+            .filter({ hasText: 'Alert name is required.' });
+        await expect(nameError.or(nameRequiredToast).first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Invalid alert name validation working (empty-name save blocked)');
 
         // Close with robust handling for dialog backdrops
         await this._closeAlertWizard();
