@@ -3,7 +3,14 @@
 // from O2_TOKEN_MIGRATION_PLAN.md §3 (A–R). Debt can only shrink.
 //
 //   node scripts/check-design-consistency.mjs            # fail if any file/category exceeds baseline
+//   node scripts/check-design-consistency.mjs --strict   # ALSO fail if the baseline is stale (has slack) — CI mode
 //   node scripts/check-design-consistency.mjs --baseline # (re)write design-debt-baseline.json
+//
+// --strict is what CI runs (lint:design:strict). Plain mode lets a file sit
+// below its baseline (leaving headroom a future raw token could refill without
+// tripping the guard); --strict forbids that slack, so every bypass category is
+// strictly monotonic-down and NO new raw token can land anywhere — including in a
+// file that still carries pre-existing debt. Improve → re-baseline → commit.
 //
 // Phase B: ratchet mode (this file). Phase G: delete the baseline → zero tolerance
 // (except `stylePxUnit`, which stays ratchet-only per §12.4).
@@ -277,21 +284,54 @@ for (const [rel, c] of Object.entries(current)) {
   }
 }
 // count improvements (any file/category strictly below baseline, or dropped to 0)
+// and record them: in --strict mode a below-baseline count is a STALE baseline,
+// i.e. slack the ratchet is leaving open. That slack is exactly where a future
+// raw token would land WITHOUT tripping the guard (a file at baseline 5 that has
+// since dropped to 2 would silently accept 3 new raw var()s). Closing it makes
+// every category monotonically shrink and forbids ANY new raw-token bypass —
+// even inside a file that still carries pre-existing debt.
+const stale = [];
 for (const [rel, bc] of Object.entries(base)) {
   for (const [k, b] of Object.entries(bc)) {
     const n = (current[rel] && current[rel][k]) || 0;
-    if (n < b) improved += b - n;
+    if (n < b) {
+      improved += b - n;
+      stale.push({ rel, k, n, b });
+    }
   }
 }
+
+// --strict (used by CI): the baseline must equal reality — no headroom. Passed
+// by `lint:design:strict` in build-pr-image.yml / playwright.yml.
+const STRICT = process.argv.includes("--strict");
 
 if (regressions.length) {
   console.error(`\ncheck-design-consistency: ${regressions.length} regression(s) above baseline:\n`);
   for (const { rel, k, n, b } of regressions.slice(0, 60))
     console.error(`  ${rel}  [${k}]  ${b} → ${n}  (+${n - b})`);
   if (regressions.length > 60) console.error(`  …and ${regressions.length - 60} more`);
-  console.error(`\nUse the sanctioned utilities/tokens (§4) instead. See O2_TOKEN_MIGRATION_PLAN.md.\n`);
+  console.error(`\nUse the sanctioned utilities/tokens (§4) instead. See DESIGN_TOKEN_STANDARD.md.\n`);
+  process.exit(1);
+}
+
+if (STRICT && stale.length) {
+  console.error(
+    `\ncheck-design-consistency (--strict): baseline is STALE — ${stale.length} file/category ` +
+      `pair(s) are below their recorded debt, i.e. ${improved} occurrence(s) of slack the\n` +
+      `ratchet would let a future raw token silently refill. Lock the win in:\n`,
+  );
+  for (const { rel, k, n, b } of stale.slice(0, 60))
+    console.error(`  ${rel}  [${k}]  ${b} → ${n}  (−${b - n})`);
+  if (stale.length > 60) console.error(`  …and ${stale.length - 60} more`);
+  console.error(
+    `\nRun:  node scripts/check-design-consistency.mjs --baseline   and commit the tightened baseline.\n`,
+  );
   process.exit(1);
 }
 
 console.log(`OK — no design-consistency regressions (${Object.keys(current).length} files scanned).`);
-if (improved) console.log(`Improved by ${improved} occurrences below baseline — re-run with --baseline and commit the update.`);
+if (improved)
+  console.log(
+    `Improved by ${improved} occurrence(s) below baseline — re-run with --baseline and commit the update` +
+      (STRICT ? "" : " (required in --strict / CI)") + ".",
+  );

@@ -57,8 +57,8 @@ jobs:
       - name: Check for undefined CSS custom properties
         run: cd web && npm run lint:tokens
 
-      - name: Check design-token consistency (ratchet — debt can only shrink)
-        run: cd web && npm run lint:design
+      - name: Check design-token consistency (strict ratchet — no raw-token creep, no slack)
+        run: cd web && npm run lint:design:strict
 
       - name: Lint styles (stylelint — bans legacy --o2-* tokens)
         run: cd web && npm run lint:styles
