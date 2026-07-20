@@ -160,8 +160,6 @@ pub mod grouping {
     }
 }
 #[cfg(feature = "enterprise")]
-pub mod incidents;
-#[cfg(feature = "enterprise")]
 pub mod org_config {
     pub use openobserve_alerts::service::org_config::*;
 }
@@ -245,17 +243,19 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
         notify_rows: &[Map<String, Value>],
         timestamp: i64,
     ) -> anyhow::Result<Option<openobserve_alerts::ports::IncidentRoute>> {
-        Ok(crate::alerts::incidents::correlate_alert_to_incident(
-            alert,
-            row,
-            notify_rows,
-            timestamp,
+        Ok(
+            openobserve_alerts::service::incidents::correlate_alert_to_incident(
+                alert,
+                row,
+                notify_rows,
+                timestamp,
+            )
+            .await?
+            .map(|outcome| openobserve_alerts::ports::IncidentRoute {
+                incident_id: outcome.incident_id().to_string(),
+                service_name: outcome.service_name().to_string(),
+            }),
         )
-        .await?
-        .map(|outcome| openobserve_alerts::ports::IncidentRoute {
-            incident_id: outcome.incident_id().to_string(),
-            service_name: outcome.service_name().to_string(),
-        }))
     }
 
     #[cfg(feature = "enterprise")]
@@ -312,6 +312,104 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
         )
         .await
         .map_err(|error| PermissionError::Other(error.to_string()))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn report_incident_created(&self, org_id: &str, incident_id: &str, timestamp: i64) {
+        crate::self_reporting::report_request_usage_stats(
+            config::meta::self_reporting::usage::RequestStats {
+                records: 1,
+                request_body: Some(serde_json::json!({"incident_id": incident_id}).to_string()),
+                ..Default::default()
+            },
+            org_id,
+            "",
+            StreamType::Metadata,
+            config::meta::self_reporting::usage::UsageType::NewIncident,
+            0,
+            timestamp,
+        )
+        .await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn service_graph_edges(&self, org_id: &str) -> anyhow::Result<Vec<Value>> {
+        Ok(
+            crate::traces::service_graph::query_edges_from_stream_internal(
+                org_id, None, None, None,
+            )
+            .await?,
+        )
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn sre_agent_credentials(&self, org_id: &str) -> anyhow::Result<(String, String)> {
+        crate::organization::get_sre_agent_credentials(org_id).await
+    }
+
+    #[cfg(feature = "cloud")]
+    async fn record_new_incident_ai_usage(&self, org_id: &str, incident_id: &str) {
+        use crate::trial_quota::{AiUsageContext, TrialQuotaFeature};
+
+        let deduction =
+            crate::trial_quota::try_deduct(org_id, TrialQuotaFeature::NewIncident).await;
+        let usage_ctx = AiUsageContext {
+            user_email: "system@openobserve.ai".to_string(),
+            incident_id: Some(incident_id.to_string()),
+            ..Default::default()
+        };
+        if deduction.is_ok() {
+            crate::trial_quota::record_free_ai_usage(
+                org_id,
+                &usage_ctx,
+                TrialQuotaFeature::NewIncident,
+            );
+        } else if crate::trial_quota::org_has_active_subscription(org_id).await {
+            crate::trial_quota::record_billable_ai_usage(
+                org_id,
+                &usage_ctx,
+                TrialQuotaFeature::NewIncident,
+            );
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    async fn allow_incident_reanalysis(
+        &self,
+        org_id: &str,
+        user_email: &str,
+        incident_id: &str,
+    ) -> bool {
+        use crate::trial_quota::{AiUsageContext, TrialQuotaFeature};
+
+        let usage_ctx = AiUsageContext {
+            user_email: user_email.to_string(),
+            incident_id: Some(incident_id.to_string()),
+            ..Default::default()
+        };
+        match crate::trial_quota::try_deduct(org_id, TrialQuotaFeature::IncidentReAnalysis).await {
+            Ok(_) => {
+                crate::trial_quota::record_free_ai_usage(
+                    org_id,
+                    &usage_ctx,
+                    TrialQuotaFeature::IncidentReAnalysis,
+                );
+                true
+            }
+            Err(error) => {
+                if crate::trial_quota::org_has_active_subscription(org_id).await {
+                    crate::trial_quota::record_billable_ai_usage(
+                        org_id,
+                        &usage_ctx,
+                        TrialQuotaFeature::IncidentReAnalysis,
+                    );
+                    true
+                } else {
+                    log::info!("[INCIDENTS::RCA] Skipping reanalysis for org {org_id}: {error}");
+                    false
+                }
+            }
+        }
     }
 }
 

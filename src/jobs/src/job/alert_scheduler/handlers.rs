@@ -1082,7 +1082,7 @@ async fn handle_alert_triggers(
                 .enabled
             && let Some(first_row) = data.first()
         {
-            match crate::service::alerts::incidents::correlate_alert_to_incident(
+            match openobserve_alerts::service::incidents::correlate_alert_to_incident(
                 &alert,
                 first_row,
                 &data,

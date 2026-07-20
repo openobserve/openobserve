@@ -133,7 +133,7 @@ pub async fn list_incidents(
     Path(org_id): Path<String>,
     Query(query): Query<ListIncidentsQuery>,
 ) -> Response {
-    match openobserve_core::alerts::incidents::list_incidents(
+    match openobserve_alerts::service::incidents::list_incidents(
         &org_id,
         query.status.as_deref(),
         query.limit,
@@ -173,7 +173,8 @@ pub async fn list_incidents(
     )
 )]
 pub async fn get_incident(Path((org_id, incident_id)): Path<(String, String)>) -> Response {
-    match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id).await
+    match openobserve_alerts::service::incidents::get_incident_with_alerts(&org_id, &incident_id)
+        .await
     {
         Ok(Some(incident)) => MetaHttpResponse::json(incident),
         Ok(None) => MetaHttpResponse::not_found("Incident not found"),
@@ -222,7 +223,7 @@ pub async fn update_incident(
                 return MetaHttpResponse::bad_request("Title cannot exceed 255 characters");
             }
 
-            match openobserve_core::alerts::incidents::update_title(
+            match openobserve_alerts::service::incidents::update_title(
                 &org_id,
                 &incident_id,
                 &title,
@@ -241,7 +242,7 @@ pub async fn update_incident(
             }
         }
         UpdatePayload::Severity { severity } => {
-            match openobserve_core::alerts::incidents::update_severity(
+            match openobserve_alerts::service::incidents::update_severity(
                 &org_id,
                 &incident_id,
                 severity.as_str(),
@@ -255,7 +256,7 @@ pub async fn update_incident(
                     let events = infra::table::incident_events::get(&org_id, &incident_id)
                         .await
                         .unwrap_or_default();
-                    let in_flight = openobserve_core::alerts::incidents::is_analysis_in_flight(
+                    let in_flight = openobserve_alerts::service::incidents::is_analysis_in_flight(
                         &events,
                         cooldown * 2,
                     );
@@ -274,7 +275,7 @@ pub async fn update_incident(
             }
         }
         UpdatePayload::Status { status } => {
-            match openobserve_core::alerts::incidents::update_status(
+            match openobserve_alerts::service::incidents::update_status(
                 &org_id,
                 &incident_id,
                 status.as_str(),
@@ -423,7 +424,7 @@ pub async fn trigger_incident_rca(
         let events = infra::table::incident_events::get(&org_id, &incident_id)
             .await
             .unwrap_or_default();
-        if openobserve_core::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
+        if openobserve_alerts::service::incidents::is_analysis_in_flight(&events, cooldown * 2) {
             return MetaHttpResponse::bad_request("Analysis already in progress");
         }
     }
@@ -441,38 +442,40 @@ pub async fn trigger_incident_rca(
     .await;
 
     // Get incident with alerts
-    let incident =
-        match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
-            .await
-        {
-            Ok(Some(i)) => i,
-            Ok(None) => {
-                let _ = infra::table::incident_events::append(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Incident not found",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        None,
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::not_found("Incident not found");
-            }
-            Err(e) => {
-                let _ = infra::table::incident_events::append(
-                    &org_id,
-                    &incident_id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
-                        "Database error",
-                        config::meta::alerts::incidents::AnalysisTriggerType::Manual,
-                        Some(format!("{:#}", e)),
-                    ),
-                )
-                .await;
-                return MetaHttpResponse::internal_error(e);
-            }
-        };
+    let incident = match openobserve_alerts::service::incidents::get_incident_with_alerts(
+        &org_id,
+        &incident_id,
+    )
+    .await
+    {
+        Ok(Some(i)) => i,
+        Ok(None) => {
+            let _ = infra::table::incident_events::append(
+                &org_id,
+                &incident_id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
+                    "Incident not found",
+                    config::meta::alerts::incidents::AnalysisTriggerType::Manual,
+                    None,
+                ),
+            )
+            .await;
+            return MetaHttpResponse::not_found("Incident not found");
+        }
+        Err(e) => {
+            let _ = infra::table::incident_events::append(
+                &org_id,
+                &incident_id,
+                config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
+                    "Database error",
+                    config::meta::alerts::incidents::AnalysisTriggerType::Manual,
+                    Some(format!("{:#}", e)),
+                ),
+            )
+            .await;
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
 
     // Build RCA context — include previous analysis so the agent can build on it
     let previous_analysis = infra::table::alert_incidents::get_topology(&org_id, &incident_id)
@@ -557,7 +560,7 @@ pub async fn trigger_incident_rca(
         let incident_id_bg = incident_id.clone();
         let user_email_bg = user_email.user_id.clone();
         tokio::spawn(async move {
-            if let Err(e) = openobserve_core::alerts::incidents::trigger_rca_for_incident(
+            if let Err(e) = openobserve_alerts::service::incidents::trigger_rca_for_incident(
                 org_id_bg.clone(),
                 incident_id_bg.clone(),
                 true,

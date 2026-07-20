@@ -18,5 +18,7 @@ pub mod alert;
 pub mod deduplication;
 pub mod destinations;
 #[cfg(feature = "enterprise")]
+pub mod incidents;
+#[cfg(feature = "enterprise")]
 pub mod org_config;
 pub mod templates;

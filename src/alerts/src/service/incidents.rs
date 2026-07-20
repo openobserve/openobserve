@@ -62,7 +62,7 @@ async fn extract_filtered_semantic_dimensions(
     use config::meta::alerts::incidents::KeyType;
 
     // Load ServiceIdentityConfig with auto-configuration applied
-    let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
+    let identity_config = common::system_settings::get_service_identity_config(org_id).await;
 
     // Validate config has at least one set
     if identity_config.sets.is_empty() {
@@ -74,7 +74,7 @@ async fn extract_filtered_semantic_dimensions(
     }
 
     // Load semantic groups for field mapping
-    let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+    let semantic_groups = common::system_settings::get_semantic_field_groups(org_id).await;
 
     // Collect all distinguish_by group IDs from ALL identity sets (flattened)
     // Don't require a specific set to "match" - extract whatever we can
@@ -274,7 +274,7 @@ async fn collect_incident_destinations(
 
     for ia in &incident_alerts {
         if let Some((_folder, other_alert)) =
-            crate::db::alerts::alert::get_alert_from_cache(org_id, &ia.alert_id).await
+            crate::repository::alert::get_alert_from_cache(org_id, &ia.alert_id).await
         {
             for dest in &other_alert.destinations {
                 if seen.insert(dest.clone()) {
@@ -365,7 +365,7 @@ async fn send_incident_notifications(
     let mut err_parts: Vec<String> = Vec::new();
 
     for dest_name in dest_names {
-        match crate::db::alerts::destinations::get(org_id, dest_name).await {
+        match crate::repository::destinations::get(org_id, dest_name).await {
             Ok(dest) => {
                 use config::meta::destinations::Module;
                 let Module::Alert {
@@ -375,12 +375,8 @@ async fn send_incident_notifications(
                     err_parts.push(format!("{dest_name}: not an alert destination"));
                     continue;
                 };
-                match openobserve_alerts::service::alert::dispatch_notification(
-                    &destination_type,
-                    &subject,
-                    msg.clone(),
-                )
-                .await
+                match super::alert::dispatch_notification(&destination_type, &subject, msg.clone())
+                    .await
                 {
                     Ok(resp) => success_parts.push(format!("{dest_name}: {resp}")),
                     Err(e) => {
@@ -439,7 +435,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
     };
 
     let Some((_folder, first_alert)) =
-        crate::db::alerts::alert::get_alert_from_cache(org_id, first_alert_id).await
+        crate::repository::alert::get_alert_from_cache(org_id, first_alert_id).await
     else {
         log::debug!(
             "[incidents] Alert {first_alert_id} not in cache, skipping severity notification for {incident_id}"
@@ -502,7 +498,7 @@ pub async fn correlate_alert_to_incident(
     #[cfg(feature = "enterprise")]
     {
         let semantic_groups =
-            crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+            common::system_settings::get_semantic_field_groups(&alert.org_id).await;
         let condition_dims =
             o2_enterprise::enterprise::alerts::sql_parser::extract_dimensions_from_alert_conditions(
                 &alert.query_condition,
@@ -590,37 +586,7 @@ pub async fn correlate_alert_to_incident(
         outcome,
         IncidentCorrelationOutcome::NewIncidentCreated { .. }
     ) {
-        let deduction = crate::trial_quota::try_deduct(
-            &alert.org_id,
-            crate::trial_quota::TrialQuotaFeature::NewIncident,
-        )
-        .await;
-
-        let usage_ctx = crate::trial_quota::AiUsageContext {
-            user_email: "system@openobserve.ai".to_string(),
-            incident_id: Some(outcome.incident_id().to_string()),
-            ..Default::default()
-        };
-        match &deduction {
-            Ok(_) => {
-                crate::trial_quota::record_free_ai_usage(
-                    &alert.org_id,
-                    &usage_ctx,
-                    crate::trial_quota::TrialQuotaFeature::NewIncident,
-                );
-            }
-            Err(_) => {
-                if crate::trial_quota::org_has_active_subscription(&alert.org_id).await {
-                    crate::trial_quota::record_billable_ai_usage(
-                        &alert.org_id,
-                        &usage_ctx,
-                        crate::trial_quota::TrialQuotaFeature::NewIncident,
-                    );
-                }
-                // Note: incident is already created at this point — we don't roll it
-                // back on quota exhaustion. The deduction failure is logged by try_deduct.
-            }
-        }
+        crate::ports::record_new_incident_ai_usage(&alert.org_id, outcome.incident_id()).await;
     }
 
     // Send incident notification unless rows are empty (manual trigger path)
@@ -666,9 +632,9 @@ async fn query_service_discovery_key(
 ) -> Option<ServiceDiscoveryResult> {
     #[cfg(feature = "enterprise")]
     {
-        let identity_config = crate::db::system_settings::get_service_identity_config(org_id).await;
+        let identity_config = common::system_settings::get_service_identity_config(org_id).await;
 
-        let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
+        let semantic_groups = common::system_settings::get_semantic_field_groups(org_id).await;
 
         match o2_enterprise::enterprise::service_streams::storage::correlate(
             org_id,
@@ -838,21 +804,7 @@ async fn create_new_incident(
         severity
     );
 
-    // Report incident creation to the usage stream
-    crate::self_reporting::report_request_usage_stats(
-        config::meta::self_reporting::usage::RequestStats {
-            records: 1,
-            request_body: Some(serde_json::json!({"incident_id": incident.id}).to_string()),
-            ..Default::default()
-        },
-        org_id,
-        "",
-        config::meta::stream::StreamType::Metadata,
-        config::meta::self_reporting::usage::UsageType::NewIncident,
-        0,
-        triggered_at,
-    )
-    .await;
+    crate::ports::report_incident_created(org_id, &incident.id, triggered_at).await;
 
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
@@ -1341,8 +1293,6 @@ pub async fn enrich_with_topology(
     use AlertNode;
     use EdgeType;
 
-    use crate::traces::service_graph;
-
     // Get current topology or create new
     let mut topology = infra::table::alert_incidents::get_topology(org_id, incident_id)
         .await?
@@ -1419,11 +1369,7 @@ pub async fn enrich_with_topology(
                 EdgeType::Temporal
             } else {
                 // Query service graph to check for a known dependency
-                let raw_sg_edges = match service_graph::query_edges_from_stream_internal(
-                    org_id, None, None, None,
-                )
-                .await
-                {
+                let raw_sg_edges = match crate::ports::service_graph_edges(org_id).await {
                     Ok(e) => e,
                     Err(e) => {
                         log::debug!(
@@ -1663,43 +1609,14 @@ pub async fn trigger_rca_for_incident(
 
     // AI credit check for reanalysis (cloud only)
     #[cfg(feature = "cloud")]
-    if reanalysis {
-        let deduction = crate::trial_quota::try_deduct(
-            &org_id,
-            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-        )
-        .await;
-
-        let usage_ctx = crate::trial_quota::AiUsageContext {
-            user_email: _user_email.clone(),
-            incident_id: Some(incident_id.clone()),
-            ..Default::default()
-        };
-        match &deduction {
-            Ok(_) => {
-                crate::trial_quota::record_free_ai_usage(
-                    &org_id,
-                    &usage_ctx,
-                    crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                );
-            }
-            Err(e) => {
-                if crate::trial_quota::org_has_active_subscription(&org_id).await {
-                    crate::trial_quota::record_billable_ai_usage(
-                        &org_id,
-                        &usage_ctx,
-                        crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
-                    );
-                } else {
-                    log::info!("[INCIDENTS::RCA] Skipping reanalysis for org {org_id}: {e}");
-                    return Ok(());
-                }
-            }
-        }
+    if reanalysis
+        && !crate::ports::allow_incident_reanalysis(&org_id, &_user_email, &incident_id).await
+    {
+        return Ok(());
     }
 
     // Create RCA agent client with SA credentials
-    let (email, token) = crate::organization::get_sre_agent_credentials(&org_id).await?;
+    let (email, token) = crate::ports::sre_agent_credentials(&org_id).await?;
     let auth_header = ::common::utils::auth::build_basic_auth_header(&email, &token);
 
     let client =

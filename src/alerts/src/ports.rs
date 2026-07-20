@@ -68,6 +68,26 @@ pub trait RuntimeServices: Send + Sync + 'static {
         user_id: Option<&str>,
         folder_id: Option<&str>,
     ) -> Result<Option<Vec<String>>, PermissionError>;
+
+    #[cfg(feature = "enterprise")]
+    async fn report_incident_created(&self, org_id: &str, incident_id: &str, timestamp: i64);
+
+    #[cfg(feature = "enterprise")]
+    async fn service_graph_edges(&self, org_id: &str) -> anyhow::Result<Vec<Value>>;
+
+    #[cfg(feature = "enterprise")]
+    async fn sre_agent_credentials(&self, org_id: &str) -> anyhow::Result<(String, String)>;
+
+    #[cfg(feature = "cloud")]
+    async fn record_new_incident_ai_usage(&self, org_id: &str, incident_id: &str);
+
+    #[cfg(feature = "cloud")]
+    async fn allow_incident_reanalysis(
+        &self,
+        org_id: &str,
+        user_email: &str,
+        incident_id: &str,
+    ) -> bool;
 }
 
 static RUNTIME_SERVICES: OnceLock<Arc<dyn RuntimeServices>> = OnceLock::new();
@@ -143,5 +163,48 @@ pub async fn permitted_alerts(
         None => Err(PermissionError::Other(
             "alert runtime services are not installed".to_string(),
         )),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn report_incident_created(org_id: &str, incident_id: &str, timestamp: i64) {
+    if let Ok(runtime) = runtime_services() {
+        runtime
+            .report_incident_created(org_id, incident_id, timestamp)
+            .await;
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn service_graph_edges(org_id: &str) -> anyhow::Result<Vec<Value>> {
+    runtime_services()?.service_graph_edges(org_id).await
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn sre_agent_credentials(org_id: &str) -> anyhow::Result<(String, String)> {
+    runtime_services()?.sre_agent_credentials(org_id).await
+}
+
+#[cfg(feature = "cloud")]
+pub async fn record_new_incident_ai_usage(org_id: &str, incident_id: &str) {
+    if let Ok(runtime) = runtime_services() {
+        runtime
+            .record_new_incident_ai_usage(org_id, incident_id)
+            .await;
+    }
+}
+
+#[cfg(feature = "cloud")]
+pub async fn allow_incident_reanalysis(org_id: &str, user_email: &str, incident_id: &str) -> bool {
+    match runtime_services() {
+        Ok(runtime) => {
+            runtime
+                .allow_incident_reanalysis(org_id, user_email, incident_id)
+                .await
+        }
+        Err(error) => {
+            log::error!("incident runtime unavailable: {error}");
+            false
+        }
     }
 }

@@ -35,6 +35,7 @@ cloud = [
     "enterprise",
     "o2_enterprise/cloud",
     "common/cloud",
+    "openobserve-alerts/cloud",
 ]
 vectorscan = [
     "o2_enterprise/vectorscan",
