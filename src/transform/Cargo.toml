@@ -11,16 +11,25 @@ enterprise = ["dep:o2_enterprise", "config/enterprise"]
 cloud = ["enterprise", "o2_enterprise/cloud"]
 
 [dependencies]
+anyhow.workspace = true
 async-trait.workspace = true
+axum.workspace = true
+bytes.workspace = true
+chrono.workspace = true
 config.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 regex.workspace = true
 rquickjs.workspace = true
+serde.workspace = true
 serde_json.workspace = true
+tracing.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true
 
 [dev-dependencies]
+http-body-util.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

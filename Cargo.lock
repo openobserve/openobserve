@@ -7252,15 +7252,24 @@ dependencies = [
 name = "openobserve-transform"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
+ "axum",
+ "bytes",
+ "chrono",
  "config",
  "enrichment",
+ "hashbrown 0.16.1",
+ "http-body-util",
+ "infra",
  "log",
  "o2_enterprise",
  "regex",
  "rquickjs",
+ "serde",
  "serde_json",
  "tokio",
+ "tracing",
  "vrl",
 ]
 

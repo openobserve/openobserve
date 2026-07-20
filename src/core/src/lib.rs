@@ -33,7 +33,7 @@ pub use openobserve_enrichment::{enrichment, enrichment_table};
 pub mod file_downloader;
 pub mod file_list;
 pub mod folders;
-pub mod functions;
+pub use openobserve_transform::management as functions;
 pub mod github;
 pub mod grpc;
 pub mod http;
@@ -154,6 +154,7 @@ pub mod traces;
 pub mod trial_quota;
 pub use openobserve_organization::users;
 mod organization_adapter;
+mod transform_adapter;
 
 /// Private import namespace retained while core's remaining composition modules are migrated to
 /// their owning crates. It is intentionally not part of the public API.
@@ -169,11 +170,5 @@ mod common {
 
         #[cfg(feature = "enterprise")]
         pub use crate::ofga;
-    }
-
-    pub mod utils {
-        pub use ::common::utils::*;
-
-        pub use crate::auth;
     }
 }

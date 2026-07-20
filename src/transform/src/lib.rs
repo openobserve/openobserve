@@ -19,23 +19,27 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::LazyLock,
+    sync::{Arc, LazyLock, OnceLock},
 };
 
 use config::{
     DEFAULT_ORG, RwHashMap,
     meta::{
         function::{Transform, VRLCompilerConfig, VRLResultResolver, VRLRuntimeConfig},
+        pipeline::PipelineDependencyItem,
+        self_reporting::error::ErrorData,
         stream::StreamType,
     },
     metrics,
     utils::json::Value,
 };
 use vector_enrichment::{Table, TableRegistry};
-use vrl::compiler::{CompilationResult, TargetValueRef, runtime::Runtime};
+use vrl::compiler::{CompilationResult, TargetValueRef, runtime::Runtime as VrlRuntime};
 
 pub mod enrichment;
 pub mod js;
+pub mod management;
+pub mod repository;
 
 use enrichment::ENRICHMENT_TABLES;
 pub use js::{JSRuntimeConfig, apply_js_fn, compile_js_function, init_js_runtime};
@@ -43,6 +47,86 @@ pub use js::{JSRuntimeConfig, apply_js_fn, compile_js_function, init_js_runtime}
 /// Query and ingestion transform definitions, keyed by `org_id/function_name`.
 pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
     LazyLock::new(Default::default);
+
+#[derive(Debug, Clone)]
+pub struct PipelineRefreshError {
+    pub id: String,
+    pub name: String,
+    pub message: String,
+}
+
+#[async_trait::async_trait]
+pub trait TransformRuntime: Send + Sync {
+    async fn set_function_ownership(&self, org_id: &str, function_name: &str);
+
+    async fn remove_function_ownership(&self, org_id: &str, function_name: &str);
+
+    async fn refresh_pipelines_using_function(
+        &self,
+        org_id: &str,
+        function_name: &str,
+    ) -> Result<(), PipelineRefreshError>;
+
+    async fn pipeline_dependencies(
+        &self,
+        org_id: &str,
+        function_name: &str,
+    ) -> Vec<PipelineDependencyItem>;
+
+    async fn publish_function_error(&self, error: ErrorData);
+}
+
+static TRANSFORM_RUNTIME: OnceLock<Arc<dyn TransformRuntime>> = OnceLock::new();
+
+pub fn install_runtime(runtime: Arc<dyn TransformRuntime>) -> Result<(), &'static str> {
+    TRANSFORM_RUNTIME
+        .set(runtime)
+        .map_err(|_| "transform runtime is already installed")
+}
+
+pub(crate) async fn set_function_ownership(org_id: &str, function_name: &str) {
+    if let Some(runtime) = TRANSFORM_RUNTIME.get() {
+        runtime.set_function_ownership(org_id, function_name).await;
+    }
+}
+
+pub(crate) async fn remove_function_ownership(org_id: &str, function_name: &str) {
+    if let Some(runtime) = TRANSFORM_RUNTIME.get() {
+        runtime
+            .remove_function_ownership(org_id, function_name)
+            .await;
+    }
+}
+
+pub(crate) async fn refresh_pipelines_using_function(
+    org_id: &str,
+    function_name: &str,
+) -> Result<(), PipelineRefreshError> {
+    match TRANSFORM_RUNTIME.get() {
+        Some(runtime) => {
+            runtime
+                .refresh_pipelines_using_function(org_id, function_name)
+                .await
+        }
+        None => Ok(()),
+    }
+}
+
+pub(crate) async fn pipeline_dependencies(
+    org_id: &str,
+    function_name: &str,
+) -> Vec<PipelineDependencyItem> {
+    match TRANSFORM_RUNTIME.get() {
+        Some(runtime) => runtime.pipeline_dependencies(org_id, function_name).await,
+        None => Vec::new(),
+    }
+}
+
+pub(crate) async fn publish_function_error(error: ErrorData) {
+    if let Some(runtime) = TRANSFORM_RUNTIME.get() {
+        runtime.publish_function_error(error).await;
+    }
+}
 
 /// Process-wide enrichment tables such as MaxMind databases.
 ///
@@ -73,8 +157,8 @@ pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {
         .collect()
 }
 
-pub fn init_vrl_runtime() -> Runtime {
-    Runtime::new(vrl::prelude::state::RuntimeState::default())
+pub fn init_vrl_runtime() -> VrlRuntime {
+    VrlRuntime::new(vrl::prelude::state::RuntimeState::default())
 }
 
 pub fn get_enrichment_tables(org_id: &str) -> HashMap<String, Box<dyn Table + Send + Sync>> {
@@ -142,7 +226,7 @@ pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 
 /// Apply a previously compiled VRL transform and preserve the original row on failure.
 pub fn apply_vrl_fn(
-    runtime: &mut Runtime,
+    runtime: &mut VrlRuntime,
     vrl_runtime: &VRLResultResolver,
     row: Value,
     org_id: &str,

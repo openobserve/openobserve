@@ -70,7 +70,9 @@ pub mod enrichment_table {
     pub use openobserve_enrichment::repository::*;
 }
 pub mod file_list;
-pub mod functions;
+pub mod functions {
+    pub use openobserve_transform::repository::*;
+}
 #[cfg(feature = "enterprise")]
 pub mod keys;
 pub mod kv;
@@ -179,31 +181,6 @@ pub(crate) async fn put(
             })?;
     }
 
-    Ok(())
-}
-
-#[inline]
-pub(crate) async fn delete(
-    key: &str,
-    with_prefix: bool,
-    need_watch: bool,
-    start_dt: Option<i64>,
-) -> Result<()> {
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::delete(
-            key,
-            with_prefix,
-            need_watch,
-            start_dt,
-        )
-        .await
-        .map_err(|e| Error::Message(e.to_string()))?;
-    }
-
-    let db = infra_db::get_db().await;
-    db.delete(key, with_prefix, need_watch, start_dt).await?;
     Ok(())
 }
 
