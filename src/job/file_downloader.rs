@@ -565,6 +565,14 @@ pub async fn queue_download(
     Ok(())
 }
 
+/// Returns true when the record count is unknown or the file contains enough
+/// records to be worth downloading into the cache.
+pub fn should_download(records: i64) -> bool {
+    // A zero value can mean the record count was not populated by an older
+    // gRPC sender. Treat it as unknown rather than as an undersized file.
+    records == 0 || records >= get_config().limit.file_download_min_records
+}
+
 // if the file timestamp is in the past window, it should be prioritized
 fn should_prioritize_file(ts: i64, window_secs: i64) -> bool {
     let window_micros = window_secs * 1_000_000;
@@ -598,8 +606,17 @@ mod tests {
     use config::utils::time::{day_micros, hour_micros, now_micros};
 
     use super::{
-        FileInfo, PriorityDownloadQueue, exceeds_max_age, file_data, processing_files, queued_files,
+        FileInfo, PriorityDownloadQueue, exceeds_max_age, file_data, processing_files,
+        queued_files, should_download,
     };
+
+    #[test]
+    fn test_should_download() {
+        assert!(should_download(0));
+        assert!(!should_download(99));
+        assert!(should_download(100));
+        assert!(should_download(101));
+    }
 
     #[test]
     fn test_exceeds_max_age_disabled() {
