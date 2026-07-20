@@ -15,7 +15,6 @@
 
 //! Private import prelude for composition code that has not yet moved to a domain crate.
 
-pub use config::utils::schema::format_stream_name;
 use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 

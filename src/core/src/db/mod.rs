@@ -66,7 +66,9 @@ pub mod dashboards {
     }
 }
 pub mod distinct_values;
-pub mod enrichment_table;
+pub mod enrichment_table {
+    pub use openobserve_enrichment::repository::*;
+}
 pub mod file_list;
 pub mod functions;
 #[cfg(feature = "enterprise")]

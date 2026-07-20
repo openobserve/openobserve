@@ -22,6 +22,7 @@ enterprise = [
     "search/enterprise",
     "openobserve-alerts/enterprise",
     "openobserve-ingestion/enterprise",
+    "openobserve-enrichment/enterprise",
     "openobserve-pipeline/enterprise",
     "openobserve-transform/enterprise",
     "openobserve-scheduler/enterprise",
@@ -40,6 +41,7 @@ cloud = [
 vectorscan = [
     "o2_enterprise/vectorscan",
     "openobserve-ingestion/vectorscan",
+    "openobserve-enrichment/vectorscan",
     "search/vectorscan",
     "openobserve-search-service/vectorscan",
 ]
@@ -55,6 +57,7 @@ vortex = [
 common.workspace = true
 openobserve-alerts.workspace = true
 openobserve-ingestion.workspace = true
+openobserve-enrichment.workspace = true
 openobserve-pipeline.workspace = true
 openobserve-transform.workspace = true
 openobserve-scheduler.workspace = true

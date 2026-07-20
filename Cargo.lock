@@ -6880,6 +6880,7 @@ dependencies = [
  "openobserve-catalog",
  "openobserve-compactor",
  "openobserve-dashboards",
+ "openobserve-enrichment",
  "openobserve-ingestion",
  "openobserve-pipeline",
  "openobserve-reports",
@@ -6949,6 +6950,46 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "openobserve-enrichment"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-json",
+ "arrow-schema",
+ "async-trait",
+ "axum",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "csv",
+ "enrichment",
+ "futures",
+ "futures-util",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "maxminddb",
+ "multer",
+ "o2_enterprise",
+ "openobserve-catalog",
+ "openobserve-compactor",
+ "openobserve-ingestion",
+ "openobserve-search-service",
+ "openobserve-transform",
+ "parquet",
+ "proto",
+ "rayon",
+ "reqwest 0.13.2",
+ "search",
+ "serde",
+ "serde_json",
+ "tokio",
+ "vrl",
 ]
 
 [[package]]

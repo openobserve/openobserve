@@ -263,6 +263,7 @@ members = [
     "src/pipeline",
     "src/ingester",
     "src/ingestion",
+    "src/enrichment",
     "src/wal",
     "src/proto",
     "src/report_server",
@@ -290,6 +291,7 @@ web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
 openobserve-alerts = { path = "src/alerts" }
 openobserve-ingestion = { path = "src/ingestion" }
+openobserve-enrichment = { path = "src/enrichment" }
 openobserve-pipeline = { path = "src/pipeline" }
 openobserve-scheduler = { path = "src/scheduler" }
 openobserve-self-reporting = { path = "src/self_reporting" }

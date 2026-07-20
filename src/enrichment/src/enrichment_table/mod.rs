@@ -23,12 +23,18 @@ use axum::{
 };
 use bytes::Bytes;
 use chrono::Utc;
+use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
     get_config,
     meta::stream::StreamType,
-    utils::{flatten::format_key, json, schema::infer_json_schema_from_map, time::BASE_TIME},
+    utils::{
+        flatten::format_key,
+        json,
+        schema::{format_stream_name, infer_json_schema_from_map},
+        time::BASE_TIME,
+    },
 };
 use hashbrown::HashSet;
 use infra::{
@@ -38,16 +44,9 @@ use infra::{
         SchemaCache,
     },
 };
+use openobserve_ingestion::schema::{check_for_schema, stream_schema_exists};
 
-use crate::{
-    common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-    service::{
-        db,
-        enrichment::storage::Values,
-        format_stream_name,
-        schema::{check_for_schema, stream_schema_exists}, /* self_reporting::report_request_usage_stats, */
-    },
-};
+use crate::{db, enrichment::storage::Values};
 
 pub mod geoip;
 pub mod url_processor;
@@ -309,7 +308,7 @@ pub async fn delete_enrichment_table(
 ) {
     log::info!("deleting enrichment table  {stream_name}");
     // delete stream schema
-    if let Err(e) = db::schema::delete(org_id, stream_name, Some(stream_type)).await {
+    if let Err(e) = crate::delete_stream_schema(org_id, stream_name, stream_type).await {
         log::error!("Error deleting stream schema: {e}");
     }
 

@@ -148,7 +148,7 @@ impl openobserve_search_service::partition::PartitionRuntime for CoreSearchRunti
 #[async_trait::async_trait]
 impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
     async fn enrichment_table_start_time(&self, org_id: &str, stream_name: &str) -> i64 {
-        crate::db::enrichment_table::get_start_time(org_id, stream_name).await
+        openobserve_enrichment::repository::get_start_time(org_id, stream_name).await
     }
 
     async fn query_file_keys_by_ids(

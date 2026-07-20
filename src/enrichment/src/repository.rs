@@ -26,6 +26,7 @@ use config::{
 };
 use infra::{cache::stats, db as infra_db, table::enrichment_table_urls};
 use openobserve_search_service::cluster::http as search_cluster;
+use openobserve_transform::enrichment::ENRICHMENT_TABLES;
 use rayon::prelude::*;
 use vrl::prelude::NotNan;
 #[cfg(feature = "enterprise")]
@@ -36,13 +37,73 @@ use {
     openobserve_search_service::SEARCH_SERVER,
 };
 
-use crate::{
-    common::infra::config::ENRICHMENT_TABLES,
-    service::{
-        db as db_service,
-        enrichment::{StreamTable, storage::Values},
-    },
-};
+use crate::enrichment::{StreamTable, storage::Values};
+
+mod db_service {
+    use bytes::Bytes;
+    use infra::{db as infra_db, errors::Result};
+
+    pub async fn get(key: &str) -> Result<Bytes> {
+        infra_db::get_db().await.get(key).await
+    }
+
+    pub async fn put(
+        key: &str,
+        value: Bytes,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()> {
+        infra_db::get_db()
+            .await
+            .put(key, value.clone(), need_watch, start_dt)
+            .await?;
+
+        #[cfg(feature = "enterprise")]
+        {
+            use infra::errors::Error;
+            use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+
+            if get_o2_config().super_cluster.enabled {
+                o2_enterprise::enterprise::super_cluster::queue::put(
+                    key, value, need_watch, start_dt,
+                )
+                .await
+                .map_err(|err| Error::Message(err.to_string()))?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete(
+        key: &str,
+        with_prefix: bool,
+        need_watch: bool,
+        start_dt: Option<i64>,
+    ) -> Result<()> {
+        #[cfg(feature = "enterprise")]
+        {
+            use infra::errors::Error;
+            use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+
+            if get_o2_config().super_cluster.enabled {
+                o2_enterprise::enterprise::super_cluster::queue::delete(
+                    key,
+                    with_prefix,
+                    need_watch,
+                    start_dt,
+                )
+                .await
+                .map_err(|err| Error::Message(err.to_string()))?;
+            }
+        }
+
+        infra_db::get_db()
+            .await
+            .delete(key, with_prefix, need_watch, start_dt)
+            .await
+    }
+}
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
@@ -504,24 +565,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = keys[0];
                 let stream_name = keys[2];
 
-                let data = match super::super::enrichment::get_enrichment_table(
-                    org_id,
-                    stream_name,
-                    false,
-                )
-                .await
+                let data = match crate::enrichment::get_enrichment_table(org_id, stream_name, false)
+                    .await
                 {
                     Ok(data) => data,
                     Err(e) => {
                         log::error!(
                             "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
                         );
-                        match super::super::enrichment::get_enrichment_table(
-                            org_id,
-                            stream_name,
-                            false,
-                        )
-                        .await
+                        match crate::enrichment::get_enrichment_table(org_id, stream_name, false)
+                            .await
                         {
                             Ok(data) => data,
                             Err(e) => {

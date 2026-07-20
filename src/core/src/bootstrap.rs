@@ -18,9 +18,24 @@ use config::{cache_instance_id, ider};
 
 use crate::db::metas;
 
+struct CoreEnrichmentRuntime;
+
+#[async_trait::async_trait]
+impl openobserve_enrichment::Runtime for CoreEnrichmentRuntime {
+    async fn register_file(
+        &self,
+        account: &str,
+        key: &str,
+        meta: config::meta::stream::FileMeta,
+    ) -> Result<(), infra::errors::Error> {
+        crate::db::file_list::set(account, key, Some(meta), false).await
+    }
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     crate::alerts::install_runtime_services();
     crate::ingestion::install_runtime_services();
+    let _ = openobserve_enrichment::install_runtime(std::sync::Arc::new(CoreEnrichmentRuntime));
 
     let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,

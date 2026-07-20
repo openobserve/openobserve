@@ -1644,8 +1644,7 @@ async fn process_enrichment_table_url(
     use std::collections::HashMap;
 
     use config::meta::stream::StreamType;
-
-    use crate::schema::stream_schema_exists;
+    use openobserve_ingestion::schema::stream_schema_exists;
 
     let mut stream_schema_map: HashMap<String, infra::schema::SchemaCache> = HashMap::new();
     stream_schema_exists(
@@ -1749,8 +1748,7 @@ async fn save_enrichment_batch(
             time::BASE_TIME,
         },
     };
-
-    use crate::schema::{check_for_schema, stream_schema_exists};
+    use openobserve_ingestion::schema::{check_for_schema, stream_schema_exists};
 
     let stream_name = format_stream_name(table_name.to_string());
 
