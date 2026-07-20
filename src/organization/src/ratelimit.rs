@@ -16,6 +16,8 @@
 use std::future::Future;
 
 use anyhow::Context;
+use axum::response::{IntoResponse, Response};
+use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::ratelimit::RatelimitRule;
 use infra::table::ratelimit::RuleEntry;
 use o2_enterprise::enterprise::super_cluster::queue::ratelimit::{
@@ -158,6 +160,15 @@ pub async fn list(
     infra::table::ratelimit::list(org, api, user_id)
         .await
         .map_err(RatelimitError::DbError)
+}
+
+impl IntoResponse for RatelimitError {
+    fn into_response(self) -> Response {
+        match self {
+            RatelimitError::NotFound(_) => MetaHttpResponse::not_found(self),
+            error => MetaHttpResponse::bad_request(error),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -25,8 +25,6 @@ use openobserve_pipeline::eval_jobs::EvalJobError;
 use openobserve_pipeline::providers::ProviderError;
 
 use crate::common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
-#[cfg(feature = "enterprise")]
-use crate::ratelimit::rule::RatelimitError;
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
     match err {
@@ -132,16 +130,6 @@ impl From<ProviderError> for Response {
             ProviderError::ProviderInUse(scorers) => MetaHttpResponse::conflict(format!(
                 "Provider is used by active scorers: {scorers}. Unlink or replace the provider before deleting it."
             )),
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-impl From<RatelimitError> for Response {
-    fn from(value: RatelimitError) -> Self {
-        match value {
-            RatelimitError::NotFound(_) => MetaHttpResponse::not_found(value),
-            error => MetaHttpResponse::bad_request(error),
         }
     }
 }

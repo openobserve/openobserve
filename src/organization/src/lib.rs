@@ -24,6 +24,8 @@ pub mod org_storage_providers;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
+#[cfg(feature = "enterprise")]
+pub mod ratelimit;
 pub mod repository;
 pub mod session;
 pub mod status;

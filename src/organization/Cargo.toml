@@ -67,6 +67,7 @@ sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+thiserror.workspace = true
 utoipa.workspace = true
 url.workspace = true
 version-compare.workspace = true

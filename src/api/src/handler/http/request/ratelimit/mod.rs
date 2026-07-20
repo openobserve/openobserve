@@ -20,7 +20,8 @@ use axum::{
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
-    crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::ratelimit},
+    crate::common::meta::http::HttpResponse as MetaHttpResponse,
+    axum::response::IntoResponse,
     config::meta::ratelimit::{Interval, RatelimitRule, RatelimitRuleUpdater},
     infra::table::ratelimit::RuleEntry,
     o2_ratelimit::dataresource::{
@@ -500,9 +501,9 @@ pub async fn update_ratelimit(
             stat_interval_ms,
         );
         log::debug!("RatelimitRule::from_updater rules: {rules:?}");
-        match ratelimit::rule::update(RuleEntry::UpsertBatch(rules)).await {
+        match openobserve_organization::ratelimit::update(RuleEntry::UpsertBatch(rules)).await {
             Ok(()) => MetaHttpResponse::ok("Ratelimit rule updated successfully"),
-            Err(e) => e.into(),
+            Err(e) => e.into_response(),
         }
     }
 

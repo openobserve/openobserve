@@ -56,10 +56,8 @@ pub mod pipeline {
     pub use crate::pipeline_adapter::install_record_sink;
 }
 mod pipeline_adapter;
-pub use openobserve_search_service::promql;
-#[cfg(feature = "enterprise")]
-pub mod ratelimit;
 pub use openobserve_ingestion::schema;
+pub use openobserve_search_service::promql;
 pub mod search;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs {
