@@ -164,6 +164,15 @@ jobs:
             exit 0
           fi
 
+          # A cancelled/skipped ENT run almost always means a NEWER push/label superseded it
+          # (the engine's concurrency is cancel-in-progress). That is NOT a spec failure — the
+          # newer run is authoritative and reports on its own. Don't post a scary "Needs Review"
+          # comment or fail the gate on it; defer to the newer run.
+          if [ "$CONCL" = "cancelled" ] || [ "$CONCL" = "skipped" ] || [ -z "$CONCL" ]; then
+            echo "::notice::ENT run concluded '$CONCL' (likely superseded by a newer push) — deferring to the newer run, not failing the gate."
+            exit 0
+          fi
+
           echo "::error::Enterprise e2e specs failed (conclusion: $CONCL)."
           gh pr comment "$PR" --repo openobserve/openobserve --body \
             "### 🚫 ENT e2e gate — Needs Review
