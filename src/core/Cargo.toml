@@ -11,12 +11,10 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
-    "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "common/enterprise",
     "config/enterprise",
-    "promql/enterprise",
     "search/enterprise",
     "openobserve-alerts/enterprise",
     "openobserve-ingestion/enterprise",
@@ -51,7 +49,6 @@ vectorscan = [
     "openobserve-catalog/vectorscan",
 ]
 vortex = [
-    "dep:vortex",
     "config/vortex",
     "o2_enterprise?/vortex",
     "openobserve-compactor/vortex",
@@ -73,70 +70,19 @@ openobserve-reports.workspace = true
 openobserve-search-service.workspace = true
 openobserve-self-reporting.workspace = true
 openobserve-catalog.workspace = true
-promql.workspace = true
 search.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
-async-recursion.workspace = true
-aws-sdk-sns.workspace = true
-base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
-cron.workspace = true
-csv.workspace = true
-dashmap.workspace = true
-datafusion.workspace = true
-datafusion-proto.workspace = true
-datafusion-functions-json.workspace = true
-arrow.workspace = true
-arrow-json.workspace = true
 arrow-schema.workspace = true
-parquet.workspace = true
-object_store.workspace = true
-vortex = { workspace = true, optional = true }
-flate2.workspace = true
-futures.workspace = true
-hashbrown.workspace = true
-jsonwebtoken.workspace = true
 log.workspace = true
-maxminddb.workspace = true
-md5.workspace = true
-o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
-parking_lot.workspace = true
-promql-parser.workspace = true
-prost.workspace = true
-prost-wkt-types.workspace = true
 proto.workspace = true
-rand.workspace = true
-rayon.workspace = true
-regex.workspace = true
-sea-orm.workspace = true
-serde.workspace = true
 serde_json.workspace = true
-snap.workspace = true
-sqlparser.workspace = true
-svix-ksuid.workspace = true
-thiserror.workspace = true
-time.workspace = true
-tiktoken-rs.workspace = true
 tokio.workspace = true
-tonic.workspace = true
 tracing.workspace = true
-url.workspace = true
-utoipa.workspace = true
-version-compare.workspace = true
-vector-enrichment.workspace = true
-vrl.workspace = true
 config.workspace = true
 infra.workspace = true
-ingester.workspace = true
 wal.workspace = true
-lettre.workspace = true
-futures-util.workspace = true
-flight.workspace = true
-
-[dev-dependencies]
-expect-test.workspace = true
-multer.workspace = true
