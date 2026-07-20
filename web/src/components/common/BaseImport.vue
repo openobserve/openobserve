@@ -54,7 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
-    <div class="flex flex-1 min-h-0 px-page-edge" :class="contentWrapperClass">
+    <!-- No px-page-edge here: the tabs section carries its own px-page-edge so
+         it aligns with the header back-button icon (which is inset one
+         page-edge from the container). A page-edge on this wrapper too would
+         double the inset and push the content past the header icon. -->
+    <div class="flex flex-1 min-h-0" :class="contentWrapperClass">
       <div class="flex w-full min-h-0" :style="contentStyle">
         <OSplitter
           v-if="showSplitter"
@@ -67,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div class="w-full h-full flex flex-col border-r border-border-default">
               <!-- Tabs Section -->
-              <div class="bg-card-glass-bg py-2 px-2 mb-1 shrink-0">
+              <div class="bg-card-glass-bg py-2.5 px-page-edge mb-1 shrink-0">
                 <div class="app-tabs-container h-9 w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
@@ -102,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-url-editor mx-2 flex-1 min-h-0 box-border w-[calc(100%-1rem)] border border-card-glass-border rounded-default overflow-hidden"
+                    class="import-url-editor flex-1 min-h-0 border border-card-glass-border rounded-default overflow-hidden"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -116,8 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div class="mb-1 flex shrink-0 w-[calc(100%-0.625rem)]">
-                      <div class="pr-2 w-full">
+                    <div class="mb-1 flex shrink-0 w-full">
+                      <div class="w-full">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
@@ -147,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-file-editor mx-2 flex-1 min-h-0 box-border w-[calc(100%-1rem)] border border-card-glass-border rounded-default overflow-hidden"
+                    class="import-file-editor flex-1 min-h-0 border border-card-glass-border rounded-default overflow-hidden"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
