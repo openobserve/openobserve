@@ -114,10 +114,19 @@ const { t } = useI18n();
 const DEST = "dest:";
 const WF = "wf:";
 
+// Every list below is API-backed, so a failed or partially-loaded fetch can hand
+// us null/undefined entries — `getFormattedDestinations` maps `destination.name`,
+// which is `undefined` for any malformed row, and an unreachable backend yields
+// exactly that. These lists are read inside computeds during render, so ONE bad
+// entry used to throw and blank the whole alert form. Drop bad entries instead: a
+// missing option is a missing row, never a broken page.
+const isFilled = <T,>(v: T | null | undefined): v is T =>
+  v !== null && v !== undefined && v !== "";
+
 // The selection as one tagged array, derived from the two backend fields.
 const propsCombined = computed<string[]>(() => [
-  ...(props.destinations || []).map((d) => `${DEST}${d}`),
-  ...(props.workflows || []).map((w) => `${WF}${w}`),
+  ...(props.destinations || []).filter(isFilled).map((d) => `${DEST}${d}`),
+  ...(props.workflows || []).filter(isFilled).map((w) => `${WF}${w}`),
 ]);
 
 // Internal ORDERED model the OSelect binds to. We keep our own copy so the
@@ -140,21 +149,26 @@ watch(propsCombined, (next) => {
 // Grouped, type-tagged options. Headers + Workflows group only when enterprise;
 // in OSS this is a plain destinations list (unchanged behavior).
 // Normalize a raw option (string or {label,value}) to a { name, label } pair.
-const norm = (o: RawOption): { name: string; label: string } => {
+// Returns null for anything unusable (see the isFilled note above) so the caller
+// can drop it rather than render a `dest:undefined` row or throw.
+const norm = (o: RawOption): { name: string; label: string } | null => {
+  if (!isFilled(o)) return null;
   if (typeof o === "string") return { name: o, label: o };
-  return { name: String(o.value), label: o.label ?? String(o.value) };
+  if (!isFilled((o as Option).value)) return null;
+  const value = String((o as Option).value);
+  return { name: value, label: (o as Option).label ?? value };
 };
 
+const toTagged = (list: RawOption[] | undefined, tag: string) =>
+  (list || [])
+    .map(norm)
+    .filter(isFilled)
+    .map(({ name, label }) => ({ label, value: `${tag}${name}` }));
+
 const options = computed(() => {
-  const dests = (props.destinationOptions || []).map((o) => {
-    const { name, label } = norm(o);
-    return { label, value: `${DEST}${name}` };
-  });
+  const dests = toTagged(props.destinationOptions, DEST);
   if (!props.isEnterprise) return dests;
-  const wfs = (props.workflowOptions || []).map((o) => {
-    const { name, label } = norm(o);
-    return { label, value: `${WF}${name}` };
-  });
+  const wfs = toTagged(props.workflowOptions, WF);
   return [
     { header: true, label: t("alerts.alertSettings.targetsDestinationsGroup") },
     ...dests,
@@ -166,7 +180,11 @@ const options = computed(() => {
 // Split the tagged selection back into the two backend fields. Keep the control's
 // own order in `model` so the chips don't jump when props round-trip back.
 const onUpdate = (vals: unknown) => {
-  const arr = Array.isArray(vals) ? (vals as string[]) : [];
+  // Strings only — `v.startsWith` below would throw on a null the control ever
+  // handed back, taking the form down on a click rather than on load.
+  const arr = (Array.isArray(vals) ? vals : []).filter(
+    (v): v is string => typeof v === "string",
+  );
   model.value = arr;
   const dests = arr
     .filter((v) => v.startsWith(DEST))

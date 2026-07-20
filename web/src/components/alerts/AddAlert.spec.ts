@@ -505,6 +505,60 @@ describe("AddAlert (OForm owner)", () => {
     });
   });
 
+  // ── Workflows link (enterprise/cloud) ──────────────────────────────────────
+  // REGRESSION GUARD. The zod migration made `formData` a READ-ONLY view of the
+  // form (form.useStore), so the pre-migration `formData.value.workflows = x`
+  // became a silent no-op — the write vanished and the link never reached the
+  // payload. Every other setter goes through setF(); updateWorkflows must too.
+  // This merged CLEANLY (the two sides never touched the same lines), so nothing
+  // but a test can catch it.
+  describe("workflows link survives to the payload (read-view write guard)", () => {
+    it("updateWorkflows WRITES THROUGH to the form (not to the read-view)", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+
+      wrapper.vm.updateWorkflows(["wf-1", "wf-2"]);
+      await flushPromises();
+
+      // Read back off the FORM, which is the single source of truth. A write to
+      // the read-view would leave this at [].
+      expect(form.state.values.workflows).toEqual(["wf-1", "wf-2"]);
+    });
+
+    it("ships the linked workflows in the create payload", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+
+      wrapper.vm.updateWorkflows(["wf-1"]);
+      await flushPromises();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      const [, payload] = (alertsService.create_by_alert_id as any).mock
+        .calls[0];
+      expect(payload.workflows).toEqual(["wf-1"]);
+    });
+
+    it("defaults to [] so OSS alerts ship the field empty, never undefined", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      const [, payload] = (alertsService.create_by_alert_id as any).mock
+        .calls[0];
+      expect(payload.workflows).toEqual([]);
+    });
+  });
+
   describe("create save path (payload parity — Rule ④)", () => {
     it("creates an alert with the EXACT payload (keys + types + conditions {version:2})", async () => {
       wrapper = mountAlert();

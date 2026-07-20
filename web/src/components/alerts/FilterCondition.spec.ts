@@ -653,4 +653,84 @@ describe('FilterCondition.vue Form Mode (namePrefix + OForm)', () => {
     expect(wrapper.findAllComponents(OSelect).length).toBe(2);
     expect(wrapper.findComponent(OInput).exists()).toBe(true);
   });
+
+  // ── Custom columns (`allowCustomColumns`) ────────────────────────────────
+  // A user may type a column that is not in streamFields and press Enter; OSelect
+  // emits `create` with the typed term (it only EMITS — it does not set the
+  // value), so FilterCondition must add the option AND select it. This is the
+  // pipeline / workflow path: ConditionBuilder wraps FilterGroup in an <OForm>
+  // but passes NO name-prefix, so childNamePrefix() returns '' and the condition
+  // renders in BARE mode. The form-mode branch deliberately has no @create (see
+  // the comment on the OFormSelect) — these tests pin that split so the shared
+  // dual-mode refactor cannot silently drop the affordance again.
+  describe('custom column creation (bare mode)', () => {
+    const mountBare = (props: Record<string, unknown> = {}) =>
+      mount(FilterCondition, {
+        props: {
+          condition: makeCondition(),
+          streamFields,
+          index: 0,
+          label: 'and',
+          depth: 0,
+          isFirstInGroup: true,
+          allowCustomColumns: true,
+          ...props,
+        },
+        global: { plugins: [mockI18n], provide: { store: mockStore } },
+      });
+
+    it('marks the column select creatable when allowCustomColumns is on', () => {
+      const wrapper = mountBare();
+      expect(wrapper.findAllComponents(OSelect)[0].props('creatable')).toBe(true);
+    });
+
+    it('adds the typed term as an option AND selects it', async () => {
+      const condition = makeCondition();
+      const wrapper = mountBare({ condition });
+
+      const columnSelect = wrapper.findAllComponents(OSelect)[0];
+      await columnSelect.vm.$emit('create', 'my_custom_col');
+      await nextTick();
+
+      // selected onto the bound condition...
+      expect(condition.column).toBe('my_custom_col');
+      // ...and present in the options so it renders instead of showing blank.
+      const options = columnSelect.props('options') as any[];
+      expect(options.some((o) => o.value === 'my_custom_col')).toBe(true);
+      // and the parent is told, so the pipeline/workflow node persists it.
+      expect(wrapper.emitted('input:update')).toBeTruthy();
+    });
+
+    it('keeps a custom column after the field list is re-filtered (search)', async () => {
+      const condition = makeCondition();
+      const wrapper = mountBare({ condition });
+      const columnSelect = wrapper.findAllComponents(OSelect)[0];
+
+      await columnSelect.vm.$emit('create', 'kept_col');
+      await nextTick();
+      // Searching rebuilds filteredFields from allColumns(); a custom column that
+      // lived only in filteredFields would vanish here.
+      await columnSelect.vm.$emit('search', 'kept');
+      await nextTick();
+
+      const options = columnSelect.props('options') as any[];
+      expect(options.some((o) => o.value === 'kept_col')).toBe(true);
+    });
+
+    it('ignores blank terms and does not duplicate an existing column', async () => {
+      const condition = makeCondition();
+      const wrapper = mountBare({ condition });
+      const columnSelect = wrapper.findAllComponents(OSelect)[0];
+
+      await columnSelect.vm.$emit('create', '   ');
+      await nextTick();
+      expect(condition.column).toBe('');
+
+      await columnSelect.vm.$emit('create', 'field1');
+      await nextTick();
+      const options = columnSelect.props('options') as any[];
+      expect(options.filter((o) => o.value === 'field1')).toHaveLength(1);
+      expect(condition.column).toBe('field1');
+    });
+  });
 });

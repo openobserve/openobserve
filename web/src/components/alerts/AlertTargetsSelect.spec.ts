@@ -323,4 +323,82 @@ describe("AlertTargetsSelect", () => {
       expect(wrapper.emitted("create-workflow")).toHaveLength(1);
     });
   });
+
+  // ── Malformed / partially-loaded lists ─────────────────────────────────────
+  // REGRESSION: with the backend unreachable, `getFormattedDestinations` maps
+  // `destination.name` over rows that have no `name`, producing [undefined].
+  // `norm()` then read `.value` off undefined INSIDE a computed, which throws
+  // during render — and because this control sits in the alert form, the whole
+  // page went blank instead of simply showing an empty dropdown. A degraded API
+  // must degrade the list, never the page.
+  describe("resilience to malformed option/selection data", () => {
+    it("renders (does not throw) when destinationOptions contains undefined", () => {
+      expect(() =>
+        createWrapper({ destinationOptions: [undefined, null, "slack"] }),
+      ).not.toThrow();
+    });
+
+    it("drops the bad entries and keeps the good ones", () => {
+      const wrapper = createWrapper({
+        destinationOptions: [undefined, "slack", null, "", "pagerduty"],
+      });
+      expect(select(wrapper).props("options")).toEqual([
+        { label: "slack", value: "dest:slack" },
+        { label: "pagerduty", value: "dest:pagerduty" },
+      ]);
+    });
+
+    it("drops object options whose value is missing", () => {
+      const wrapper = createWrapper({
+        isEnterprise: true,
+        workflowOptions: [
+          { label: "no value" },
+          { id: "wf-1", name: "nope" },
+          { label: "Escalate", value: "wf-1" },
+        ],
+      });
+      const values = (select(wrapper).props("options") as any[])
+        .filter((o) => !o.header)
+        .map((o) => o.value);
+      expect(values).toEqual(["wf:wf-1"]);
+    });
+
+    it("survives an ENTIRELY empty API response (backend down)", () => {
+      const wrapper = createWrapper({
+        destinationOptions: [undefined, undefined],
+        workflowOptions: [undefined],
+        isEnterprise: true,
+      });
+      const rows = (select(wrapper).props("options") as any[]).filter(
+        (o) => !o.header,
+      );
+      expect(rows).toEqual([]);
+    });
+
+    it("ignores nullish entries in the SELECTION as well", () => {
+      const wrapper = createWrapper({
+        destinations: [undefined, "slack", null] as any,
+        workflows: [null, "wf-1"] as any,
+        isEnterprise: true,
+      });
+      expect(select(wrapper).props("modelValue")).toEqual([
+        "dest:slack",
+        "wf:wf-1",
+      ]);
+    });
+
+    it("ignores non-string values coming back from the control", async () => {
+      const wrapper = createWrapper({ isEnterprise: true });
+      await select(wrapper).vm.$emit("update:modelValue", [
+        null,
+        "dest:slack",
+        undefined,
+        "wf:wf-1",
+      ]);
+      expect(wrapper.emitted("update:destinations")!.at(-1)).toEqual([
+        ["slack"],
+      ]);
+      expect(wrapper.emitted("update:workflows")!.at(-1)).toEqual([["wf-1"]]);
+    });
+  });
 });
