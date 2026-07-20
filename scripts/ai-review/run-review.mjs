@@ -12,7 +12,35 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const REVIEW_MARKER = "<!-- ai-code-review -->";
+// ─── Model provider selection ──────────────────────────────────────────────
+// The review runs against a single provider per invocation, chosen via env so the
+// same script can be launched once per provider (see .github/workflows/ai-code-review.yml,
+// which runs a glm + deepseek matrix for a side-by-side comparison). Everything defaults
+// to the original GLM-5.2 (Z.ai) setup, so an invocation with no REVIEW_* env set behaves
+// exactly as before.
+//
+// - REVIEW_PROVIDER_ID / REVIEW_MODEL_ID: opencode provider+model IDs (must match a
+//   provider/model registered in opencode.jsonc).
+// - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (GLM uses "max"; empty ⇒ omit).
+// - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
+// - REVIEW_AGENT_PREFIX: opencode agent name prefix; each reviewer is `<prefix>-<key>` and the
+//   coordinator is `<prefix>-coordinator`, all registered in opencode.jsonc.
+// - REVIEW_LABEL: short human label used in the posted comment header (e.g. "GLM-5.2").
+// - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
+//   the two providers post/update independent comments and never clobber each other.
+const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "zai";
+const MODEL_ID = process.env.REVIEW_MODEL_ID || "glm-5.2";
+const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "max";
+const API_KEY_ENV = process.env.REVIEW_API_KEY_ENV || "GLM_API_KEY";
+const AGENT_PREFIX = process.env.REVIEW_AGENT_PREFIX || "ai-review";
+const MODEL_LABEL = process.env.REVIEW_LABEL || "GLM-5.2";
+const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
+
+function apiKey() {
+  return process.env[API_KEY_ENV];
+}
+
+const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 20 * 60 * 1000;
@@ -33,56 +61,59 @@ const NOISE_GENERATED_MARKERS = ["@generated", "auto-generated", "DO NOT EDIT", 
 // Model/agent execution is delegated to `opencode serve` (see OpencodeServer below).
 // Each key here maps to an agent of the same name (`ai-review-<key>`) registered in
 // opencode.jsonc, all running GLM-5.2 at max reasoning effort with read-only repo tools.
+// opencodeAgent names are derived from AGENT_PREFIX so the same definitions drive both the
+// GLM (`ai-review-*`) and DeepSeek (`ai-review-deepseek-*`) agent sets in opencode.jsonc.
 const AGENTS = {
   security: {
     name: "Security Reviewer",
     promptFile: "agents/security.md",
-    opencodeAgent: "ai-review-security",
+    opencodeAgent: `${AGENT_PREFIX}-security`,
     fileFocus: f => /\.rs$|\.toml$|auth|authz|oauth|token|crypto|secret|password|unsafe/.test(f),
   },
   "code-quality": {
     name: "Code Quality Reviewer",
     promptFile: "agents/code-quality.md",
-    opencodeAgent: "ai-review-code-quality",
+    opencodeAgent: `${AGENT_PREFIX}-code-quality`,
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.js$/.test(f),
   },
   performance: {
     name: "Performance Reviewer",
     promptFile: "agents/performance.md",
-    opencodeAgent: "ai-review-performance",
+    opencodeAgent: `${AGENT_PREFIX}-performance`,
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.sql$/.test(f),
   },
   documentation: {
     name: "Documentation Reviewer",
     promptFile: "agents/documentation.md",
-    opencodeAgent: "ai-review-documentation",
+    opencodeAgent: `${AGENT_PREFIX}-documentation`,
     fileFocus: () => true,
   },
   release: {
     name: "Release Reviewer",
     promptFile: "agents/release.md",
-    opencodeAgent: "ai-review-release",
+    opencodeAgent: `${AGENT_PREFIX}-release`,
     fileFocus: f => /Cargo\.toml|package\.json|\.sql$|migration|Migration|\.yml$|Dockerfile|docker/.test(f),
   },
 };
 
 // ─── Risk tiers ────────────────────────────────────────────────────────────
+const COORDINATOR_AGENT = `${AGENT_PREFIX}-coordinator`;
 const RISK_TIERS = {
   trivial: {
     maxLines: 10,
     maxFiles: 20,
     agents: ["code-quality"],
-    coordinatorAgent: "ai-review-coordinator",
+    coordinatorAgent: COORDINATOR_AGENT,
   },
   lite: {
     maxLines: 100,
     maxFiles: 20,
     agents: ["code-quality", "documentation"],
-    coordinatorAgent: "ai-review-coordinator",
+    coordinatorAgent: COORDINATOR_AGENT,
   },
   full: {
     agents: ["security", "code-quality", "performance", "documentation", "release"],
-    coordinatorAgent: "ai-review-coordinator",
+    coordinatorAgent: COORDINATOR_AGENT,
   },
 };
 
@@ -496,8 +527,7 @@ class OpencodeServer {
     if (this.starting) return this.starting;
 
     this.starting = (async () => {
-      const apiKey = process.env.GLM_API_KEY;
-      if (!apiKey) throw new Error("GLM_API_KEY not set");
+      if (!apiKey()) throw new Error(`${API_KEY_ENV} not set`);
 
       const proc = spawn("opencode", ["serve", "--hostname", "127.0.0.1", "--port", "0"], {
         cwd: resolve(__dirname, "../.."),
@@ -578,9 +608,9 @@ function extractText(parts) {
 async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
     "gen_ai.operation.name": traceOptions.operationName || "chat",
-    "gen_ai.system": "zai",
-    "gen_ai.request.model": "glm-5.2",
-    "gen_ai.request.reasoning_effort": "max",
+    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.request.model": MODEL_ID,
+    "gen_ai.request.reasoning_effort": MODEL_VARIANT || "default",
     "ai.agent.key": traceOptions.agentKey,
     "ai.agent.name": traceOptions.agentName,
     "gen_ai.agent.name": traceOptions.agentName,
@@ -619,8 +649,8 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           agent: agentName,
-          model: { providerID: "zai", modelID: "glm-5.2" },
-          variant: "max",
+          model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
+          ...(MODEL_VARIANT ? { variant: MODEL_VARIANT } : {}),
           system: truncatedSystem,
           parts: [{ type: "text", text: truncatedUser }],
         }),
@@ -649,11 +679,11 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         "gen_ai.completion.0.content": text,
         "gen_ai.completion.0.content_length": text.length,
         "gen_ai.response.id": responseId,
-        "gen_ai.response.model": "glm-5.2",
+        "gen_ai.response.model": MODEL_ID,
       });
       TRACE.endSpan(llmSpan, {
         "gen_ai.response.id": responseId,
-        "gen_ai.response.model": "glm-5.2",
+        "gen_ai.response.model": MODEL_ID,
         "gen_ai.response.text_length": text.length,
       });
       return { text, responseId };
@@ -705,18 +735,17 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     "ai.agent.key": agentKey,
     "ai.agent.name": agentDef.name,
     "gen_ai.agent.name": agentDef.name,
-    "gen_ai.system": "zai",
-    "gen_ai.request.model": "glm-5.2",
+    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.request.model": MODEL_ID,
   }, parentSpan);
 
-  const hasGlm = Boolean(process.env.GLM_API_KEY);
-  if (!hasGlm) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — GLM_API_KEY not set`);
+  if (!apiKey()) {
+    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — ${API_KEY_ENV} not set`);
     TRACE.endSpan(reviewerSpan, {
       "review.skipped": true,
-      "review.error": "GLM_API_KEY not set",
+      "review.error": `${API_KEY_ENV} not set`,
     });
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: "GLM_API_KEY not set", genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `${API_KEY_ENV} not set`, genAIResponseId: "" };
   }
 
   const systemPrompt = readPrompt("shared-rules.md");
@@ -749,7 +778,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
   const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
 
-  console.log(`[${isoNow()}] Starting ${agentDef.name} (zai/glm-5.2, ${agentDef.opencodeAgent})`);
+  console.log(`[${isoNow()}] Starting ${agentDef.name} (${MODEL_SLUG}, ${agentDef.opencodeAgent})`);
   const start = Date.now();
 
   try {
@@ -830,6 +859,11 @@ function sanitizeReviewBody(body) {
     cleaned = REVIEW_MARKER + "\n" + cleaned.replace(REVIEW_MARKER, "");
   }
 
+  // Tag the review header with the model label so the GLM and DeepSeek comments are
+  // visually distinguishable on the PR. Matches the coordinator's "## AI Code Review"
+  // heading (and the fallback's) but not an already-labelled one, so re-runs stay idempotent.
+  cleaned = cleaned.replace(/^(#{1,3}\s*AI Code Review)(?!\s*\()(.*)$/m, `$1 (${MODEL_LABEL})$2`);
+
   return cleaned.trim();
 }
 
@@ -870,21 +904,21 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   ].join("\n");
 
   const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
-  const coordinatorAgent = tierConfig.coordinatorAgent || "ai-review-coordinator";
+  const coordinatorAgent = tierConfig.coordinatorAgent || COORDINATOR_AGENT;
   const coordinatorSpan = TRACE.startSpan("ai_review.coordinator", {
     "review.agent.key": "coordinator",
     "review.agent.name": "Coordinator",
     "ai.agent.key": "coordinator",
     "ai.agent.name": "Coordinator",
     "gen_ai.agent.name": "Coordinator",
-    "gen_ai.system": "zai",
-    "gen_ai.request.model": "glm-5.2",
+    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.request.model": MODEL_ID,
     "review.risk_tier": tier,
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
     "review.failed_agents": agentResults.filter(r => r.error).length,
   }, parentSpan);
 
-  console.log(`[${isoNow()}] Running coordinator (zai/glm-5.2, ${coordinatorAgent})`);
+  console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
 
   try {
     const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, AGENT_TIMEOUT_MS, {
@@ -1068,28 +1102,27 @@ async function main() {
     console.log(`[${isoNow()}] AI Code Review started for PR #${prNumber}`);
     console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
 
-    const hasGlm = Boolean(process.env.GLM_API_KEY);
-    if (!hasGlm) {
+    if (!apiKey()) {
       outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,
-        "review.skip_reason": "missing_glm_api_key",
+        "review.skip_reason": "missing_api_key",
       });
       // A missing key is a CI/secrets misconfiguration, not a "nothing to review" case —
       // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
       // dropping to zero can't slip by as a green check. Also post to the PR so it's
       // visible without digging into Actions logs.
-      const message = "GLM_API_KEY is not set. AI Code Review did not run for this PR — this is a CI misconfiguration, not a skip.";
+      const message = `${API_KEY_ENV} is not set. AI Code Review (${MODEL_LABEL}) did not run for this PR — this is a CI misconfiguration, not a skip.`;
       console.error(`[${isoNow()}] ${message}`);
       try {
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`GLM_API_KEY\` secret is provisioned.`);
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review (${MODEL_LABEL})\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`${API_KEY_ENV}\` secret is provisioned.`);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
       throw new Error(message);
     }
 
-    console.log(`[${isoNow()}] GLM (via opencode serve): configured`);
+    console.log(`[${isoNow()}] ${MODEL_SLUG} (via opencode serve): configured`);
 
     // 1. Get PR diff
     console.log(`[${isoNow()}] Fetching PR diff...`);

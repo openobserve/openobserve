@@ -3,6 +3,8 @@
   // - e2e-ci-* agents: used by .github/workflows/e2e-council.yml for CI test-generation, on DeepSeek.
   // - ai-review-* agents: used by scripts/ai-review/run-review.mjs (dispatched via `opencode serve`)
   //   for PR code review, on GLM-5.2 (Z.ai).
+  // - ai-review-deepseek-* agents: same PR-review flow on DeepSeek, run alongside the GLM set for a
+  //   one-week head-to-head comparison of review quality (see .github/workflows/ai-code-review.yml).
   // Docs: https://opencode.ai/docs/  — verify provider shape against current docs at build time.
   "$schema": "https://opencode.ai/config.json",
 
@@ -32,6 +34,22 @@
         "glm-5.2": {
           "name": "GLM-5.2",
           "limit": { "context": 1000000, "output": 131072 }
+        }
+      }
+    },
+    // Separate DeepSeek provider for PR review — distinct from the `deepseek` provider above so
+    // review usage/billing (DEEPSEEK_API_KEY) is isolated from the e2e council (DEEPSEEK_API_KEY_E2E).
+    "deepseek-review": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "DeepSeek (review)",
+      "options": {
+        "baseURL": "https://api.deepseek.com",
+        "apiKey": "{env:DEEPSEEK_API_KEY}"
+      },
+      "models": {
+        "deepseek-v4-pro": {
+          "name": "DeepSeek-V4-Pro",
+          "limit": { "context": 1048576, "output": 262144 }
         }
       }
     }
@@ -145,6 +163,65 @@
       "mode": "primary",
       "model": "zai/glm-5.2",
       "variant": "max",
+      "tools": {
+        "read": true, "glob": true, "grep": true,
+        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
+        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
+      }
+    },
+
+    // DeepSeek PR-review agents — identical prompt-assembly and tool allowlist to the GLM
+    // ai-review-* agents above, but on DeepSeek-V4-Pro. run-review.mjs targets this set via
+    // REVIEW_AGENT_PREFIX=ai-review-deepseek. DeepSeek has no "max" reasoning variant, so no
+    // `variant` is set here (and run-review.mjs omits it when REVIEW_MODEL_VARIANT is empty).
+    "ai-review-deepseek-security": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-v4-pro",
+      "tools": {
+        "read": true, "glob": true, "grep": true,
+        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
+        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
+      }
+    },
+    "ai-review-deepseek-code-quality": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-v4-pro",
+      "tools": {
+        "read": true, "glob": true, "grep": true,
+        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
+        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
+      }
+    },
+    "ai-review-deepseek-performance": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-v4-pro",
+      "tools": {
+        "read": true, "glob": true, "grep": true,
+        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
+        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
+      }
+    },
+    "ai-review-deepseek-documentation": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-v4-pro",
+      "tools": {
+        "read": true, "glob": true, "grep": true,
+        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
+        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
+      }
+    },
+    "ai-review-deepseek-release": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-v4-pro",
+      "tools": {
+        "read": true, "glob": true, "grep": true,
+        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
+        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
+      }
+    },
+    "ai-review-deepseek-coordinator": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-v4-pro",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
