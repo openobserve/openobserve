@@ -15,9 +15,8 @@
 
 use std::sync::Arc;
 
+use ::common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
 use infra::{coordinator::org_status as coordinator, db, errors, table::organizations};
-
-use crate::common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
 
 /// Update local cache and broadcast to cluster — used when the DB write was already done
 /// atomically via `set_status_if` (e.g. in `initiate_deletion`).

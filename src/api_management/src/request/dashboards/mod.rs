@@ -709,9 +709,9 @@ fn set_dashboard_owner_if_empty(
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
+    use openobserve_dashboards::DashboardError;
 
     use super::{get_folder, is_overwrite};
-    use crate::service::dashboards::DashboardError;
 
     fn status(err: DashboardError) -> StatusCode {
         Response::from(err).status()

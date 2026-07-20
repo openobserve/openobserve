@@ -606,8 +606,7 @@ pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response 
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
-
-    use crate::service::db::alerts::destinations::DestinationError;
+    use openobserve_alerts::repository::destinations::DestinationError;
 
     fn status(err: DestinationError) -> StatusCode {
         Response::from(err).status()

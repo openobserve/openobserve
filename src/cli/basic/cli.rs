@@ -245,7 +245,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             change_password: true,
                             old_password: None,
                             new_password: Some(cfg.auth.root_user_password.clone()),
-                            role: Some(crate::common::meta::user::UserRoleRequest {
+                            role: Some(common::meta::user::UserRoleRequest {
                                 role: config::meta::user::UserRole::Root.to_string(),
                                 custom: None,
                             }),
@@ -444,13 +444,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "import" => {
-            crate::service::bootstrap::init().await?;
-            crate::common::infra::cluster::register_and_keep_alive().await?;
+            openobserve_core::bootstrap::init().await?;
+            common::infra::cluster::register_and_keep_alive().await?;
             import::Import::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "export" => {
-            crate::service::bootstrap::init().await?;
-            crate::common::infra::cluster::register_and_keep_alive().await?;
+            openobserve_core::bootstrap::init().await?;
+            common::infra::cluster::register_and_keep_alive().await?;
             export::Export::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "recover-file-list" => {

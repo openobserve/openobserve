@@ -14,13 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use bytes::Bytes;
+use common::infra::config::KVS;
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{Error, Result},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-
-use crate::common::infra::config::KVS;
 
 /// Process KV messages from super cluster queue
 ///

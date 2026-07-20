@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use config::utils::time::now_micros;
 
-use crate::service::db::enrichment_table;
+use crate::db::enrichment_table;
 
 pub mod storage;
 
@@ -134,7 +134,7 @@ mod tests {
             }),
         ]
         .into_iter()
-        .map(|v| crate::service::db::enrichment_table::convert_to_vrl(&v))
+        .map(|v| crate::db::enrichment_table::convert_to_vrl(&v))
         .collect()
     }
 

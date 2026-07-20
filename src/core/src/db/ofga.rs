@@ -24,7 +24,7 @@ use o2_openfga::{
     model::{create_open_fga_store, read_ofga_model, write_auth_models},
 };
 
-use crate::service::db;
+use crate::db;
 pub const OFGA_KEY_PREFIX: &str = "/ofga/model";
 
 // Sets the ofga model using the ofga model.json, Returns a tuple (store id, boolean representing

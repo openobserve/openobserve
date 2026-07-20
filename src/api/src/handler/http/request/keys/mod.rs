@@ -92,7 +92,7 @@ pub async fn save(
         Err(e) => return MetaHttpResponse::bad_request(e),
     }
 
-    match crate::service::db::keys::add(CipherEntry {
+    match openobserve_core::db::keys::add(CipherEntry {
         org: org_id.to_string(),
         created_at: now_micros(),
         created_by: user_id.to_string(),
@@ -309,7 +309,7 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
         let (org_id, key_name) = path;
-        match crate::service::db::keys::remove(
+        match openobserve_core::db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
             &key_name,
@@ -394,7 +394,7 @@ pub async fn delete_bulk(
     let mut unsuccessful = Vec::with_capacity(body.ids.len());
     let mut err = None;
     for key_name in &body.ids {
-        match crate::service::db::keys::remove(
+        match openobserve_core::db::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
             key_name,
@@ -509,7 +509,7 @@ pub async fn update(
         Err(e) => return MetaHttpResponse::bad_request(e),
     }
 
-    match crate::service::db::keys::update(CipherEntry {
+    match openobserve_core::db::keys::update(CipherEntry {
         org: org_id.to_string(),
         created_at: now_micros(),
         created_by: user_id.to_string(),

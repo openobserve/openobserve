@@ -17,6 +17,10 @@ use std::io::Error;
 #[cfg(feature = "enterprise")]
 use std::time::{Duration, Instant};
 
+#[cfg(feature = "enterprise")]
+use ::common::infra::config::USER_ROLES_CACHE;
+#[cfg(feature = "cloud")]
+use ::common::meta::user::{InviteStatus, UserInvite, UserInviteList};
 use axum::{
     Json, http,
     response::{IntoResponse, Response},
@@ -36,10 +40,6 @@ use o2_openfga::{
 };
 
 use super::db::org_users::get_cached_user_org;
-#[cfg(feature = "enterprise")]
-use crate::common::infra::config::USER_ROLES_CACHE;
-#[cfg(feature = "cloud")]
-use crate::common::meta::user::{InviteStatus, UserInvite, UserInviteList};
 use crate::{
     common::{
         infra::config::{ORG_USERS, ROOT_USER, USERS_RUM_TOKEN},
@@ -274,7 +274,7 @@ pub async fn update_user(
 
     #[cfg(not(feature = "enterprise"))]
     if is_email_root {
-        user.role = Some(crate::common::meta::user::UserRoleRequest {
+        user.role = Some(::common::meta::user::UserRoleRequest {
             role: UserRole::Root.to_string(),
             custom: None,
         });
@@ -585,14 +585,8 @@ pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyh
         let role = UserRole::Admin;
 
         // Add user to the organization
-        crate::service::db::org_users::add(
-            org_id,
-            user_email,
-            role.clone(),
-            &token,
-            Some(rum_token),
-        )
-        .await?;
+        crate::db::org_users::add(org_id, user_email, role.clone(), &token, Some(rum_token))
+            .await?;
 
         // Update OFGA
         #[cfg(feature = "enterprise")]
@@ -804,7 +798,7 @@ pub async fn list_users(
         // This user does not have list users permission
         // Hence only return this specific user
         if let Some(user) = get_user(Some(org_id), _user_id).await {
-            let is_system = crate::service::organization::is_system_service_account(&user.email);
+            let is_system = crate::organization::is_system_service_account(&user.email);
             user_list.push(UserResponse {
                 email: user.email.clone(),
                 role: user.role.to_string(),
@@ -851,8 +845,7 @@ pub async fn list_users(
                 } else {
                     None
                 };
-                let is_system =
-                    crate::service::organization::is_system_service_account(&user.email);
+                let is_system = crate::organization::is_system_service_account(&user.email);
                 user_list.push(UserResponse {
                     email: user.email.clone(),
                     role: user.role.to_string(),
@@ -882,7 +875,7 @@ pub async fn list_users(
                 }
                 None => ("".to_string(), 0),
             };
-            let is_system = crate::service::organization::is_system_service_account(&user.email);
+            let is_system = crate::organization::is_system_service_account(&user.email);
             user_list.push(UserResponse {
                 email: user.email.clone(),
                 role,
@@ -980,7 +973,7 @@ pub async fn remove_user_from_org(
                     .organizations
                     .iter()
                     .any(|o| o.role == UserRole::SreAgent)
-                    || crate::service::organization::is_system_service_account(&user.email)
+                    || crate::organization::is_system_service_account(&user.email)
                 {
                     return Ok(MetaHttpResponse::forbidden(
                         "System service accounts cannot be deleted",
@@ -1341,6 +1334,7 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
 
 #[cfg(test)]
 mod tests {
+    use ::common::{infra::config::USERS, meta::user::get_default_user_role};
     use config::meta::user::{UserRole, UserType};
     use infra::{
         db::{self as infra_db, ORM_CLIENT, connect_to_orm},
@@ -1349,7 +1343,6 @@ mod tests {
     use tokio::sync::Mutex;
 
     use super::*;
-    use crate::common::{infra::config::USERS, meta::user::get_default_user_role};
 
     // Mutex to ensure test setup is serialized to prevent race conditions
     static TEST_SETUP_LOCK: tokio::sync::OnceCell<Mutex<()>> = tokio::sync::OnceCell::const_new();
@@ -1509,7 +1502,7 @@ mod tests {
             UserRequest {
                 email: "user@zo.dev".to_string(),
                 password: "pass#123".to_string(),
-                role: crate::common::meta::user::UserOrgRole {
+                role: ::common::meta::user::UserOrgRole {
                     base_role: UserRole::Admin,
                     custom_role: None,
                 },
@@ -1539,7 +1532,7 @@ mod tests {
                 last_name: Some("last_name".to_string()),
                 old_password: Some("pass".to_string()),
                 new_password: Some("new_pass".to_string()),
-                role: Some(crate::common::meta::user::UserRoleRequest {
+                role: Some(::common::meta::user::UserRoleRequest {
                     role: UserRole::Admin.to_string(),
                     custom: None,
                 }),
@@ -1561,7 +1554,7 @@ mod tests {
                 last_name: Some("last_name".to_string()),
                 old_password: None,
                 new_password: None,
-                role: Some(crate::common::meta::user::UserRoleRequest {
+                role: Some(::common::meta::user::UserRoleRequest {
                     role: UserRole::Admin.to_string(),
                     custom: None,
                 }),
@@ -1657,7 +1650,7 @@ mod tests {
         let exists = root_user_exists().await;
         assert!(!exists);
 
-        crate::common::infra::config::ROOT_USER.insert(
+        ::common::infra::config::ROOT_USER.insert(
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),

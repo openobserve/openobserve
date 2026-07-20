@@ -42,7 +42,7 @@ use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::search::{
+use crate::search::{
     SEARCH_SERVER, SearchResult,
     datafusion::{
         context::{SearchContextBuilder, register_table},

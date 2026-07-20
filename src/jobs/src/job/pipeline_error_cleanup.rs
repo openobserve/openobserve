@@ -15,8 +15,7 @@
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job, utils::time::now_micros};
 use infra::cluster::get_cached_online_ingester_nodes;
-
-use crate::service::db;
+use openobserve_core::db;
 
 /// Runs the periodic pipeline error cleanup job.
 ///

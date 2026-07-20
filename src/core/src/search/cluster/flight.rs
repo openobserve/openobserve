@@ -44,12 +44,12 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::SEARCH_SERVER,
+    crate::search::SEARCH_SERVER,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::{WorkGroup, admission},
 };
 
-use crate::service::{
+use crate::{
     db::enrichment_table,
     search::{
         SearchResult,
@@ -204,7 +204,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         .with_label_values(&[&req.org_id])
         .inc();
 
-    let _lock = crate::service::search::work_group::acquire_work_group_lock(
+    let _lock = crate::search::work_group::acquire_work_group_lock(
         trace_id,
         &req,
         &mut took_watch,
@@ -682,8 +682,7 @@ pub async fn get_file_id_lists(
         }
         // get file list
         let file_id_list =
-            crate::service::file_list::query_ids(trace_id, org_id, stream_type, &name, time_range)
-                .await?;
+            crate::file_list::query_ids(trace_id, org_id, stream_type, &name, time_range).await?;
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)

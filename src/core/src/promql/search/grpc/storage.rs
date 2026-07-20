@@ -38,7 +38,7 @@ use itertools::Itertools;
 use promql_parser::label::{MatchOp, Matchers};
 use tracing::Instrument;
 
-use crate::service::{
+use crate::{
     file_list,
     promql::search::grpc::Context,
     search::{

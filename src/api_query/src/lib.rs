@@ -18,7 +18,19 @@
 #![recursion_limit = "256"]
 
 pub use openobserve_api_common::extractors;
-pub use openobserve_core::{common, service};
+pub(crate) use openobserve_core as service;
+
+pub(crate) mod common {
+    pub mod meta {
+        pub use ::common::meta::*;
+        pub use openobserve_ingestion::types as ingestion;
+    }
+
+    pub mod utils {
+        pub use ::common::utils::*;
+        pub use openobserve_core::{auth, stream_utils as stream};
+    }
+}
 
 pub mod promql;
 pub mod search;

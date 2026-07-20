@@ -26,7 +26,7 @@ use config::{
 use infra::errors::Error;
 use proto::cluster_rpc;
 
-use crate::service::search::{
+use crate::search::{
     cache::cacher::get_ts_col_order_by, partition::aggregate::is_streaming_aggregate, sql::Sql,
 };
 
@@ -124,7 +124,7 @@ mod tests {
     use config::meta::stream::StreamType;
 
     use super::*;
-    use crate::service::search::sql::Sql;
+    use crate::search::sql::Sql;
 
     fn ob(col: &str, dir: OrderBy) -> (String, OrderBy) {
         (col.to_string(), dir)
@@ -175,7 +175,7 @@ mod tests {
         use hashbrown::HashMap;
         use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
 
-        use crate::service::search::sql::visitor::column::ColumnVisitor;
+        use crate::search::sql::visitor::column::ColumnVisitor;
 
         let mut stmt = Parser::parse_sql(&GenericDialect {}, sql_str)
             .unwrap()

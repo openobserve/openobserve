@@ -11,17 +11,28 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "common/enterprise",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "dep:vrl",
     "openobserve-core/enterprise",
 ]
-cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
+cloud = [
+    "enterprise",
+    "common/cloud",
+    "o2_enterprise/cloud",
+    "openobserve-core/cloud",
+]
 
 [dependencies]
+common.workspace = true
+openobserve-alerts.workspace = true
 openobserve-api-common.workspace = true
 openobserve-core.workspace = true
+openobserve-dashboards.workspace = true
+openobserve-ingestion.workspace = true
+openobserve-reports.workspace = true
 anyhow.workspace = true
 axum.workspace = true
 axum-extra.workspace = true

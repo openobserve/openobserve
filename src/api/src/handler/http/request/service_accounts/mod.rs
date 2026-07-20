@@ -214,11 +214,11 @@ pub async fn update(
 
     // Check if this is a system service account - prefer role-based check over email pattern
     // matching
-    if let Ok(user_record) = crate::service::db::org_users::get(&org_id, &email_id).await {
+    if let Ok(user_record) = openobserve_core::db::org_users::get(&org_id, &email_id).await {
         if user_record.role == UserRole::SreAgent {
             return MetaHttpResponse::forbidden("System service accounts cannot be modified");
         }
-    } else if crate::service::organization::is_system_service_account(&email_id) {
+    } else if openobserve_core::organization::is_system_service_account(&email_id) {
         // Fall back to email pattern matching if user record is not found
         return MetaHttpResponse::forbidden("System service accounts cannot be modified");
     }
@@ -261,7 +261,7 @@ pub async fn update(
             }
         }
 
-        return match crate::service::organization::update_service_account_passcode(
+        return match openobserve_core::organization::update_service_account_passcode(
             Some(&org_id),
             &email_id,
         )
@@ -410,7 +410,7 @@ pub async fn delete_bulk(
     let mut err = None;
 
     // Bulk fetch all users for the org to avoid N+1 queries
-    let org_users = crate::service::db::org_users::list_users_by_org(&org_id)
+    let org_users = openobserve_core::db::org_users::list_users_by_org(&org_id)
         .await
         .unwrap_or_default();
 
@@ -424,7 +424,7 @@ pub async fn delete_bulk(
     for email in req.ids {
         // Check if this is a system service account before attempting deletion
         let is_system_account = sre_agent_emails.contains(&email)
-            || crate::service::organization::is_system_service_account(&email);
+            || openobserve_core::organization::is_system_service_account(&email);
 
         if is_system_account {
             log::warn!(

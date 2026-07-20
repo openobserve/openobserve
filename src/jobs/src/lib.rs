@@ -17,8 +17,19 @@
 
 #![recursion_limit = "256"]
 
+pub(crate) use openobserve_core as service;
 #[cfg(feature = "enterprise")]
 pub use openobserve_core::cipher;
-pub use openobserve_core::{common, service};
+
+pub(crate) mod common {
+    pub mod infra {
+        pub use ::common::infra::*;
+    }
+
+    pub mod meta {
+        pub use ::common::meta::*;
+        pub use openobserve_ingestion::types as ingestion;
+    }
+}
 
 pub mod job;

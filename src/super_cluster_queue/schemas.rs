@@ -131,7 +131,7 @@ async fn stream_delete(msg: Message) -> Result<()> {
     let (org_id, stream_type, stream_name) = parse_key(&msg.key)?;
 
     if let Err(e) =
-        crate::service::stream::stream_delete_inner(&org_id, stream_type, &stream_name).await
+        openobserve_core::stream::stream_delete_inner(&org_id, stream_type, &stream_name).await
     {
         log::error!(
             "[SUPER_CLUSTER:sync] Failed to delete stream: {org_id}/{stream_type}/{stream_name}, error: {e}"

@@ -28,7 +28,7 @@ use config::{
 use infra::{client::grpc::make_grpc_search_client, cluster::get_node_by_uuid, errors::ErrorCodes};
 use proto::cluster_rpc::GetLicenseUsageResponse;
 
-use crate::service::search as SearchService;
+use crate::search as SearchService;
 
 pub async fn get_usage(
     sql: String,

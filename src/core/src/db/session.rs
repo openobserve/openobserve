@@ -15,12 +15,11 @@
 
 use std::sync::Arc;
 
+use ::common::infra::config::{USER_SESSIONS, USER_SESSIONS_EXPIRY};
 use bytes::Bytes;
 use infra::db::{delete_from_db_coordinator, put_into_db_coordinator};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-
-use crate::common::infra::config::{USER_SESSIONS, USER_SESSIONS_EXPIRY};
 
 // Key prefix for session events in coordinator
 pub const USER_SESSION_KEY: &str = "/user_sessions/";

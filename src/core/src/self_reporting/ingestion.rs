@@ -242,9 +242,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                 // do not skip self-reporting even if super org reporting fails
 
                 // Check if org has usage stream enabled
-                match crate::service::db::organization::get_org_setting_usage_stream_enabled(&org)
-                    .await
-                {
+                match crate::db::organization::get_org_setting_usage_stream_enabled(&org).await {
                     Ok(true) => {}
                     Ok(false) => continue, // self-report not enabled, so skip
                     Err(e) => {

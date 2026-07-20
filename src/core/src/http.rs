@@ -20,14 +20,14 @@ use axum::{
 };
 use infra::errors;
 
-#[cfg(feature = "enterprise")]
-use crate::service::{
-    llm_evaluations::eval_jobs::EvalJobError, providers::ProviderError,
-    ratelimit::rule::RatelimitError,
-};
 use crate::{
     common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
     service::{alerts::alert::AlertError, folders::FolderError},
+};
+#[cfg(feature = "enterprise")]
+use crate::{
+    llm_evaluations::eval_jobs::EvalJobError, providers::ProviderError,
+    ratelimit::rule::RatelimitError,
 };
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {

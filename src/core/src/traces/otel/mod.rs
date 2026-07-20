@@ -43,7 +43,7 @@
 //! # Usage
 //!
 //! ```rust,ignore
-//! use crate::service::traces::otel::OtelIngestionProcessor;
+//! use crate::traces::otel::OtelIngestionProcessor;
 //!
 //! let processor = OtelIngestionProcessor::new();
 //! let mut span_attributes = /* ... */;

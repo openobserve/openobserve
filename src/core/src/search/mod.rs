@@ -41,7 +41,7 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::partition::aggregate::prepare_streaming_aggregate,
+    crate::search::partition::aggregate::prepare_streaming_aggregate,
     config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM},
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{
@@ -232,7 +232,7 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
-                res = crate::service::search::streaming::order_search_results(res, None);
+                res = crate::search::streaming::order_search_results(res, None);
             }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();

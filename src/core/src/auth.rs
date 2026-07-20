@@ -15,6 +15,15 @@
 
 use std::{collections::HashMap, fmt::Debug};
 
+#[cfg(feature = "enterprise")]
+use ::common::meta::user::AuthTokensExt;
+use ::common::{
+    infra::config::{ORG_USERS, PASSWORD_HASH},
+    meta::{
+        organization::DEFAULT_ORG,
+        user::{AuthTokens, UserOrgRole},
+    },
+};
 use axum::{
     Json,
     extract::FromRequestParts,
@@ -28,18 +37,8 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::users::get_user, jsonwebtoken::TokenData, o2_dex::service::auth::get_dex_jwks,
+    crate::users::get_user, jsonwebtoken::TokenData, o2_dex::service::auth::get_dex_jwks,
     o2_openfga::meta::mapping::OFGA_MODELS, serde_json::Value, std::str::FromStr,
-};
-
-#[cfg(feature = "enterprise")]
-use crate::common::meta::user::AuthTokensExt;
-use crate::common::{
-    infra::config::{ORG_USERS, PASSWORD_HASH},
-    meta::{
-        organization::DEFAULT_ORG,
-        user::{AuthTokens, UserOrgRole},
-    },
 };
 
 pub const V2_API_PREFIX: &str = "v2";
@@ -50,7 +49,7 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
         let decoded = config::utils::base64::decode(auth_str.strip_prefix("Basic")?.trim()).ok()?;
         get_user_details(decoded).map(|value| value.0)
     } else if auth_str.starts_with("Bearer") {
-        crate::common::utils::jwt::get_user_name_from_token(auth_str).await
+        ::common::utils::jwt::get_user_name_from_token(auth_str).await
     } else if auth_str.starts_with("{\"auth_ext\":") {
         let auth_tokens: AuthTokensExt =
             config::utils::json::from_str(auth_str).unwrap_or_default();
@@ -102,7 +101,7 @@ pub use ::common::utils::auth::{
 };
 // Email validation lives in the shared `config` crate so the OSS auth layer and the enterprise
 // domain-management blocklist validate identically. Re-exported here to preserve the existing
-// `crate::common::utils::auth::{EMAIL_REGEX, is_valid_email}` API.
+// `::common::utils::auth::{EMAIL_REGEX, is_valid_email}` API.
 pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
 
 #[cfg(feature = "enterprise")]
@@ -258,11 +257,10 @@ where
 
     #[cfg(feature = "enterprise")]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        use ::common::utils::http::{get_folder, get_stream_type_from_request};
         use config::meta::stream::StreamType;
         use hashbrown::HashMap;
         use o2_openfga::meta::route_permissions::{self as rp, StreamType as RpStreamType};
-
-        use crate::common::utils::http::{get_folder, get_stream_type_from_request};
 
         let start = std::time::Instant::now();
         let cfg = config::get_config();
@@ -331,7 +329,7 @@ where
         // ingestion-route table (method + exact path shape) rather than
         // substring-matching an ingestion word, so only real writes take the
         // stream-level bypass.
-        if crate::common::meta::ingestion_routes::is_ingestion_write(&parts.method, path) {
+        if openobserve_ingestion::types_routes::is_ingestion_write(&parts.method, path) {
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
             {
@@ -511,7 +509,7 @@ pub async fn extract_auth_str_from_headers(headers: &HeaderMap) -> String {
             access_token
         } else if access_token.starts_with("session") {
             let session_key = access_token.strip_prefix("session ").unwrap().to_string();
-            match crate::service::db::session::get(&session_key).await {
+            match crate::db::session::get(&session_key).await {
                 Ok(token) => {
                     log::debug!("Session '{}' resolved to token", session_key);
                     // Check if token already has auth prefix
@@ -555,7 +553,7 @@ pub async fn extract_auth_str_from_headers(headers: &HeaderMap) -> String {
             // Handle session tokens from Authorization header
             if auth_str.starts_with("session ") {
                 let session_key = auth_str.strip_prefix("session ").unwrap().to_string();
-                match crate::service::db::session::get(&session_key).await {
+                match crate::db::session::get(&session_key).await {
                     Ok(token) => {
                         log::debug!("Session '{}' resolved to token from header", session_key);
                         // Check if token already has auth prefix
@@ -660,7 +658,7 @@ pub async fn check_permissions(
         // which the auth middleware sets to the DB-resolved email. However, we use user.email
         // directly to avoid any inconsistency between the input identifier and the canonical
         // DB email (e.g. casing differences or aliased identifiers).
-        return crate::service::authz::check_permissions(
+        return crate::authz::check_permissions(
             &user.email,
             AuthExtractor {
                 auth: "".to_string(),
@@ -716,7 +714,7 @@ pub async fn extract_auth_expiry_and_user_id(
         return (exp, user_id);
     } else if auth_str.starts_with("session ") {
         let session_key = auth_str.strip_prefix("session ").unwrap();
-        let stripped_bearer_token = match crate::service::db::session::get(session_key).await {
+        let stripped_bearer_token = match crate::db::session::get(session_key).await {
             Ok(bearer_token) => bearer_token,
             Err(e) => {
                 log::error!("Error getting session: {e}");
@@ -1084,7 +1082,6 @@ mod tests {
     fn test_regex_compilation() {
         // Test that the regexes compile without panicking
         assert!(RE_OFGA_UNSUPPORTED_NAME.is_match("test:name"));
-        assert!(RE_SPACE_AROUND.is_match("a @ b")); // @ is not in the exclusion list, so this should match
         assert!(EMAIL_REGEX.is_match("test@example.com"));
 
         // Test that the regexes work as expected

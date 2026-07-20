@@ -379,9 +379,8 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error
 
 #[cfg(feature = "enterprise")]
 mod super_cluster {
+    use ::common::meta::organization::Organization;
     use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-
-    use crate::common::meta::organization::Organization;
 
     pub async fn organization_add(
         key: &str,

@@ -28,8 +28,7 @@ use o2_enterprise::enterprise::{
     scheduled_jobs::StatusUpdateTuple,
     super_cluster::queue::{Message, MessageType},
 };
-
-use crate::service::db;
+use openobserve_core::db;
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
         MessageType::SchedulerPush => {
@@ -155,7 +154,7 @@ async fn update(msg: Message) -> Result<()> {
         }
         TriggerModule::DerivedStream => {
             let Ok((_, _, _, pipeline_id)) =
-                crate::service::alerts::scheduler::handlers::get_pipeline_info_from_module_key(
+                openobserve_core::alerts::scheduler::handlers::get_pipeline_info_from_module_key(
                     &trigger.module_key,
                 )
             else {

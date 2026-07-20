@@ -88,7 +88,7 @@ pub async fn handle_request(
     let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Logs);
     // Start retrieve associated pipeline and construct pipeline components
     let executable_pipelines =
-        crate::service::ingestion::get_stream_executable_pipelines(&stream_param).await;
+        crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
     let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::new();
     let mut original_options = Vec::new();
@@ -106,7 +106,7 @@ pub async fn handle_request(
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
     let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
-    crate::service::ingestion::get_uds_and_original_data_streams(
+    crate::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
         &mut streams_need_original_map,
@@ -268,7 +268,7 @@ pub async fn handle_request(
                     };
 
                     if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                        local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                        local_val = crate::ingestion::refactor_map(local_val, fields);
                     }
 
                     // add `_original` and '_record_id` if required by StreamSettings
@@ -279,7 +279,7 @@ pub async fn handle_request(
                     {
                         local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
 
-                        let record_id = crate::service::ingestion::generate_record_id(
+                        let record_id = crate::ingestion::generate_record_id(
                             org_id,
                             &stream_name,
                             &StreamType::Logs,
@@ -360,7 +360,7 @@ pub async fn handle_request(
 
                         if !user_defined_schema_map.contains_key(&destination_stream) {
                             // a new dynamically created stream. need to check the two maps again
-                            crate::service::ingestion::get_uds_and_original_data_streams(
+                            crate::ingestion::get_uds_and_original_data_streams(
                                 &[stream_params],
                                 &mut user_defined_schema_map,
                                 &mut streams_need_original_map,
@@ -380,8 +380,7 @@ pub async fn handle_request(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
-                                local_val =
-                                    crate::service::ingestion::refactor_map(local_val, fields);
+                                local_val = crate::ingestion::refactor_map(local_val, fields);
                             }
 
                             // add `_original` and '_record_id` if required by StreamSettings
@@ -396,7 +395,7 @@ pub async fn handle_request(
                                     original_options[idx].clone().unwrap().into(),
                                 );
 
-                                let record_id = crate::service::ingestion::generate_record_id(
+                                let record_id = crate::ingestion::generate_record_id(
                                     org_id,
                                     &destination_stream,
                                     &StreamType::Logs,
@@ -467,7 +466,7 @@ pub async fn handle_request(
                 };
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+                    local_val = crate::ingestion::refactor_map(local_val, fields);
                 }
 
                 if streams_need_original_map
@@ -477,7 +476,7 @@ pub async fn handle_request(
                 {
                     local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
 
-                    let record_id = crate::service::ingestion::generate_record_id(
+                    let record_id = crate::ingestion::generate_record_id(
                         org_id,
                         &stream_name,
                         &StreamType::Logs,
@@ -625,7 +624,7 @@ mod tests {
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     };
 
-    use crate::service::logs::otlp::handle_request;
+    use crate::logs::otlp::handle_request;
 
     #[tokio::test]
     async fn test_handle_logs_request() {

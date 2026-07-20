@@ -25,7 +25,7 @@ use config::{
     },
 };
 
-use crate::service::users;
+use crate::users;
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<Response, Error> {

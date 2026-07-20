@@ -127,7 +127,7 @@ pub async fn organizations(
         // them via the dedicated all_organizations endpoint instead. This matches
         // the blocked_orgs middleware, which also gates on is_blocked.
         #[cfg(feature = "cloud")]
-        if crate::service::db::org_status::is_blocked(&org.identifier) {
+        if openobserve_core::db::org_status::is_blocked(&org.identifier) {
             continue;
         }
         id += 1;
@@ -228,7 +228,7 @@ pub async fn all_organizations(
                 None
             }
         });
-        let settings = crate::service::db::organization::get_org_setting(&org.identifier)
+        let settings = openobserve_core::db::organization::get_org_setting(&org.identifier)
             .await
             .unwrap_or_default();
         let org = AllOrgListDetails {
@@ -250,7 +250,7 @@ pub async fn all_organizations(
             status: org.status.clone(),
             deleted_at: org.deleted_at,
             grace_period_days: if org.status == "pending_deletion" {
-                Some(crate::service::org_cleanup::grace_period_days())
+                Some(openobserve_core::org_cleanup::grace_period_days())
             } else {
                 None
             },
@@ -591,7 +591,7 @@ pub async fn extend_trial_period(
     Path(org_id): Path<String>,
     Json(req): Json<ExtendTrialPeriodRequest>,
 ) -> Response {
-    use crate::service::db::organization::ORG_KEY_PREFIX;
+    use openobserve_core::db::organization::ORG_KEY_PREFIX;
 
     let org = org_id;
     if org != "_meta" {
@@ -907,7 +907,7 @@ pub async fn enable_org_storage(
     let target_org_id = req.org_id;
 
     let mut org_settings =
-        match crate::service::db::organization::get_org_setting(&target_org_id).await {
+        match openobserve_core::db::organization::get_org_setting(&target_org_id).await {
             Ok(org) => org,
             Err(e) => {
                 return MetaHttpResponse::not_found(e.to_string());
@@ -919,7 +919,7 @@ pub async fn enable_org_storage(
     org_settings.org_storage_enabled = true;
 
     if let Err(e) =
-        crate::service::db::organization::set_org_setting(&target_org_id, &org_settings).await
+        openobserve_core::db::organization::set_org_setting(&target_org_id, &org_settings).await
     {
         return MetaHttpResponse::internal_error(format!(
             "error while saving settings for org {target_org_id} : {e}"
@@ -1294,14 +1294,14 @@ pub async fn initiate_org_deletion(
     // users (members of no org) and users whose role in *this* org is Admin.
     let allowed = is_root_user(&user_email.user_id)
         || matches!(
-            crate::service::users::get_user(Some(&org_id), &user_email.user_id).await,
+            openobserve_core::users::get_user(Some(&org_id), &user_email.user_id).await,
             Some(user) if user.role == UserRole::Admin
         );
     if !allowed {
         return MetaHttpResponse::forbidden("Not allowed");
     }
 
-    match crate::service::org_cleanup::initiate_deletion(&org_id, &user_email.user_id).await {
+    match openobserve_core::org_cleanup::initiate_deletion(&org_id, &user_email.user_id).await {
         Ok(()) => MetaHttpResponse::ok("Organization deletion initiated"),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -1320,7 +1320,7 @@ pub async fn resurrect_org_deletion(
     if meta_org != "_meta" {
         return MetaHttpResponse::forbidden("Not allowed");
     }
-    match crate::service::org_cleanup::resurrect_org(&target_org_id, &user_email.user_id).await {
+    match openobserve_core::org_cleanup::resurrect_org(&target_org_id, &user_email.user_id).await {
         Ok(()) => MetaHttpResponse::ok("Organization resurrected"),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -1397,7 +1397,7 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
         let cluster_name = cluster.get_cluster();
 
         // Fetch child nodes from this cluster
-        match crate::service::node::get_node_list(&trace_id, cluster).await {
+        match openobserve_core::node::get_node_list(&trace_id, cluster).await {
             Ok(cluster_nodes) => {
                 for node in cluster_nodes {
                     response.add_node(node.clone(), region.clone(), cluster_name.clone());
@@ -1468,7 +1468,7 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
         let cluster_name = cluster.get_cluster();
 
         // Fetch cluster info from this cluster node
-        match crate::service::cluster_info::get_super_cluster_info(&trace_id, cluster).await {
+        match openobserve_core::cluster_info::get_super_cluster_info(&trace_id, cluster).await {
             Ok(cluster_info_obj) => {
                 response.add_cluster_info(cluster_info_obj, cluster_name.clone(), region.clone());
             }

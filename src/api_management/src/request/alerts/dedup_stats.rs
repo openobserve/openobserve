@@ -56,7 +56,7 @@ pub struct DedupSummaryResponse {
 )]
 pub async fn get_dedup_summary(Path(org_id): Path<String>) -> Response {
     // Get all alerts for the organization
-    let alerts_data = match crate::service::db::alerts::alert::list(&org_id, None, None).await {
+    let alerts_data = match openobserve_alerts::repository::alert::list(&org_id, None, None).await {
         Ok(data) => data,
         Err(e) => {
             log::error!("Failed to list alerts for org {org_id}: {e}");
@@ -72,7 +72,7 @@ pub async fn get_dedup_summary(Path(org_id): Path<String>) -> Response {
 
     // Get current pending batches count from in-memory state
     #[cfg(feature = "enterprise")]
-    let pending_batches = crate::service::alerts::grouping::get_pending_batch_count(&org_id);
+    let pending_batches = openobserve_core::alerts::grouping::get_pending_batch_count(&org_id);
 
     #[cfg(not(feature = "enterprise"))]
     let pending_batches = 0;

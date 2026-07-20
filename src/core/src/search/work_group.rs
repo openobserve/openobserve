@@ -23,7 +23,7 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::SEARCH_SERVER, config::meta::search::SearchEventType, infra::dist_lock,
+    crate::search::SEARCH_SERVER, config::meta::search::SearchEventType, infra::dist_lock,
     infra::errors::ErrorCodes, o2_enterprise::enterprise::search::WorkGroup,
 };
 

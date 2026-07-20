@@ -445,7 +445,7 @@ pub async fn get_alert_history(
         }
         // If RBAC is enabled, check permissions
         else if o2_openfga::config::get_config().enabled {
-            let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
+            let user = match openobserve_core::users::get_user(Some(&org_id), user_id).await {
                 Some(user) => user,
                 None => {
                     return MetaHttpResponse::forbidden("User not found");

@@ -31,11 +31,11 @@ use serde::Serialize;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
-    crate::service::self_reporting::audit,
     config::utils::time::now_micros,
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
     o2_openfga::config::get_config as get_openfga_config,
+    openobserve_core::self_reporting::audit,
 };
 
 #[cfg(feature = "cloud")]
@@ -1083,8 +1083,9 @@ pub async fn decline_invitation(
     Headers(user_email): Headers<UserEmail>,
     Path(token): Path<String>,
 ) -> Response {
+    use openobserve_core::{db, organization};
+
     use super::super::auth::jwt;
-    use crate::service::{db, organization};
 
     let user_id = user_email.user_id.as_str();
 

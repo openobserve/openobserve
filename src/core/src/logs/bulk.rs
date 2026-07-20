@@ -52,7 +52,7 @@ pub async fn ingest(
     thread_id: usize,
     org_id: &str,
     body: Bytes,
-    user: crate::common::meta::ingestion::IngestUser,
+    user: openobserve_ingestion::types::IngestUser,
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
 
@@ -405,8 +405,9 @@ pub fn add_record_status(
 
 #[cfg(test)]
 mod tests {
+    use openobserve_ingestion::types::IngestUser;
+
     use super::*;
-    use crate::common::meta::ingestion::IngestUser;
 
     #[test]
     fn test_add_record_status() {

@@ -206,25 +206,26 @@ pub async fn list_pipelines(
     };
 
     // Fetch pipeline errors from DB
-    let pipeline_errors = match crate::service::db::pipeline_errors::list_by_org(&org_id).await {
-        Ok(errors) => errors
-            .into_iter()
-            .map(|error| {
-                (
-                    error.pipeline_id.clone(),
-                    crate::handler::http::models::pipelines::PipelineErrorInfo {
-                        last_error_timestamp: error.last_error_timestamp,
-                        error_summary: error.error_summary,
-                        node_errors: error.node_errors,
-                    },
-                )
-            })
-            .collect::<std::collections::HashMap<_, _>>(),
-        Err(e) => {
-            log::error!("[Pipeline] Failed to fetch pipeline errors: {}", e);
-            std::collections::HashMap::default() // Continue without errors if DB fetch fails
-        }
-    };
+    let pipeline_errors =
+        match openobserve_pipeline::repository::pipeline_errors::list_by_org(&org_id).await {
+            Ok(errors) => errors
+                .into_iter()
+                .map(|error| {
+                    (
+                        error.pipeline_id.clone(),
+                        crate::handler::http::models::pipelines::PipelineErrorInfo {
+                            last_error_timestamp: error.last_error_timestamp,
+                            error_summary: error.error_summary,
+                            node_errors: error.node_errors,
+                        },
+                    )
+                })
+                .collect::<std::collections::HashMap<_, _>>(),
+            Err(e) => {
+                log::error!("[Pipeline] Failed to fetch pipeline errors: {}", e);
+                std::collections::HashMap::default() // Continue without errors if DB fetch fails
+            }
+        };
 
     MetaHttpResponse::json(PipelineList::from(
         pipelines,
@@ -269,7 +270,7 @@ pub async fn get_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -
     let paused_at = if let Some(derived_stream) = meta_pipeline.get_derived_stream() {
         let module_key =
             derived_stream.get_scheduler_module_key(&meta_pipeline.name, &meta_pipeline.id);
-        match crate::service::db::scheduler::get(
+        match openobserve_scheduler::get(
             &meta_pipeline.org,
             config::meta::triggers::TriggerModule::DerivedStream,
             &module_key,
@@ -285,7 +286,9 @@ pub async fn get_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -
 
     // Get last error info
     let last_error =
-        match crate::service::db::pipeline_errors::get_by_pipeline_id(&pipeline_id).await {
+        match openobserve_pipeline::repository::pipeline_errors::get_by_pipeline_id(&pipeline_id)
+            .await
+        {
             Ok(Some(error)) => Some(crate::handler::http::models::pipelines::PipelineErrorInfo {
                 last_error_timestamp: error.last_error_timestamp,
                 error_summary: error.error_summary,
@@ -632,8 +635,7 @@ pub async fn enable_pipeline_bulk(
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
-
-    use crate::service::db::pipeline::PipelineError;
+    use openobserve_pipeline::repository::PipelineError;
 
     fn status(err: PipelineError) -> StatusCode {
         Response::from(err).status()

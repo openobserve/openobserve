@@ -15,13 +15,13 @@
 
 #[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
+#[cfg(feature = "enterprise")]
+use openobserve_core::{db, users};
 
 use super::validator::{AuthError, AuthValidationResult, RequestData};
 use crate::common::utils::auth::AuthExtractor;
 #[cfg(feature = "enterprise")]
 use crate::common::utils::jwt;
-#[cfg(feature = "enterprise")]
-use crate::service::{db, users};
 
 #[cfg(feature = "enterprise")]
 pub async fn token_validator(

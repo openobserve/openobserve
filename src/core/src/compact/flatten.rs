@@ -43,7 +43,7 @@ pub use openobserve_compactor::flatten::generate_flatten_file_key;
 use parking_lot::RwLock;
 use tokio::sync::{Semaphore, mpsc};
 
-use crate::service::db;
+use crate::db;
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 

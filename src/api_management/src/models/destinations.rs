@@ -22,10 +22,9 @@ use config::meta::destinations as meta_dest;
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::actions::action_manager::ActionEndpoint;
+use openobserve_alerts::repository::destinations::DestinationError;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use crate::service::db::alerts::destinations::DestinationError;
 
 impl From<meta_dest::Destination> for Destination {
     fn from(value: meta_dest::Destination) -> Self {

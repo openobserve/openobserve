@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "common/enterprise",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
@@ -21,6 +22,7 @@ enterprise = [
 ]
 cloud = [
     "enterprise",
+    "common/cloud",
     "o2_enterprise/cloud",
     "openobserve-api-management/cloud",
     "openobserve-api-query/cloud",
@@ -48,7 +50,13 @@ profiling = [
 ignored = ["tikv-jemalloc-sys"]
 
 [dependencies]
+common.workspace = true
+openobserve-alerts.workspace = true
+openobserve-compactor.workspace = true
 openobserve-core.workspace = true
+openobserve-ingestion.workspace = true
+openobserve-pipeline.workspace = true
+openobserve-scheduler.workspace = true
 openobserve-api-management.workspace = true
 openobserve-api-query.workspace = true
 openobserve-api-common.workspace = true
@@ -83,6 +91,7 @@ opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 prost.workspace = true
 proto.workspace = true
+search.workspace = true
 rand.workspace = true
 regex.workspace = true
 reqwest.workspace = true

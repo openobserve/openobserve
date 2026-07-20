@@ -481,7 +481,7 @@ pub async fn search(
     // result cache save changes Ends
 
     #[cfg(feature = "vectorscan")]
-    crate::service::search::cache::apply_regex_to_response(
+    crate::search::cache::apply_regex_to_response(
         &req,
         org_id,
         &stream_name,
@@ -548,9 +548,7 @@ pub async fn prepare_cache_response(
 
     // Parse SQL first to get metadata needed for normalization
     let query: SearchQuery = req.query.clone().into();
-    let sql = match crate::service::search::Sql::new(&query, org_id, stream_type, req.search_type)
-        .await
-    {
+    let sql = match crate::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {e}");
@@ -574,7 +572,7 @@ pub async fn prepare_cache_response(
             } else {
                 sql.time_range
             };
-        crate::service::search::sql::histogram::handle_histogram(
+        crate::search::sql::histogram::handle_histogram(
             &mut origin_sql,
             q_time_range,
             req.query.histogram_interval,
@@ -1222,22 +1220,18 @@ pub async fn apply_regex_to_response(
     let pattern_manager = get_pattern_manager().await?;
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
-    let sql =
-        match crate::service::search::sql::Sql::new(&query, org_id, stream_type, req.search_type)
-            .await
-        {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("Error parsing sql: {e}");
-                return Ok(());
-            }
-        };
+    let sql = match crate::search::sql::Sql::new(&query, org_id, stream_type, req.search_type).await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error parsing sql: {e}");
+            return Ok(());
+        }
+    };
 
     let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
-        crate::service::search::datafusion::plan::regex_projections::get_columns_from_projections(
-            sql,
-        )
-        .await?;
+        crate::search::datafusion::plan::regex_projections::get_columns_from_projections(sql)
+            .await?;
     if projections.is_empty() {
         return Ok(());
     }

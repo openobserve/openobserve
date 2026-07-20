@@ -36,7 +36,7 @@ use o2_enterprise::enterprise::actions::{
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::service::search::{
+use crate::search::{
     SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded,
 };
 
@@ -111,7 +111,7 @@ pub async fn search(
             let input_fn = query_fn.trim();
 
             let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
-            let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+            let mut runtime = ::common::utils::functions::init_vrl_runtime();
             let program = match openobserve_transform::compile_vrl_function(&query_fn, &sql.org_id)
             {
                 Ok(program) => {

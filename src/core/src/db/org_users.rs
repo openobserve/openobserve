@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use ::common::infra::config::{ORG_USERS, ROOT_USER, USERS, USERS_RUM_TOKEN};
 use bytes::Bytes;
 use config::meta::user::{User, UserRole};
 #[cfg(feature = "enterprise")]
@@ -24,10 +25,7 @@ use infra::{
     table::org_users::{self, OrgUserExpandedRecord, OrgUserRecord, UserOrgExpandedRecord},
 };
 
-use crate::common::{
-    infra::config::{ORG_USERS, ROOT_USER, USERS, USERS_RUM_TOKEN},
-    utils::auth::is_root_user,
-};
+use crate::auth::is_root_user;
 
 pub const ORG_USERS_KEY_PREFIX: &str = "/org_users/";
 

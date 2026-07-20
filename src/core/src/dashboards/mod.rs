@@ -69,7 +69,7 @@ async fn filter_permitted_dashboards(
             Ok(Some(user)) => user.role,
             _ => return Err(DashboardError::UserNotFound),
         };
-        let permitted = crate::service::authz::check_permissions(
+        let permitted = crate::authz::check_permissions(
             user_id,
             AuthExtractor {
                 org_id: org_id.to_string(),
@@ -91,7 +91,7 @@ async fn filter_permitted_dashboards(
         }
     }
 
-    let permitted_objects = crate::service::authz::list_objects_for_user(
+    let permitted_objects = crate::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",

@@ -29,7 +29,7 @@ use rayon::prelude::*;
 use vrl::prelude::NotNan;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::SEARCH_SERVER,
+    crate::search::SEARCH_SERVER,
     o2_enterprise::enterprise::{
         search::TaskStatus, super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY,
     },

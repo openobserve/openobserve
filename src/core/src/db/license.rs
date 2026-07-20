@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use infra::db::Event;
 
-use crate::service::db::get_coordinator;
+use crate::db::get_coordinator;
 
 pub const LICENSE_KEY_PREFIX: &str = "/license/";
 

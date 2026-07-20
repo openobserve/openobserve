@@ -27,7 +27,7 @@ use hashbrown::HashSet;
 use infra::{errors::Result, file_list as infra_file_list, storage};
 use rayon::slice::ParallelSliceMut;
 
-use crate::service::{
+use crate::{
     file_list_dump,
     search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };

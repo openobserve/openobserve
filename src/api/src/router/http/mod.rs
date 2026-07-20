@@ -50,7 +50,7 @@ static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 /// Returns a reference to the global HTTP client, initializing it if necessary.
 fn get_http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| {
-        crate::service::tls::reqwest_client_tls_config()
+        openobserve_core::tls::reqwest_client_tls_config()
             .expect("Failed to create HTTP client with TLS config")
     })
 }

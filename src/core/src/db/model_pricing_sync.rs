@@ -29,7 +29,7 @@ use config::meta::model_pricing::{
 use infra::table;
 use serde::{Deserialize, Serialize};
 
-use crate::service::github::GitHubDataService;
+use crate::github::GitHubDataService;
 
 /// Shared GitHub data service instance (reused by the cron and the built-in endpoint).
 pub static GITHUB_SERVICE: LazyLock<GitHubDataService> = LazyLock::new(GitHubDataService::new);

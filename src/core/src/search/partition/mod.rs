@@ -21,9 +21,7 @@ pub mod stream_files;
 use config::get_config;
 use openobserve_search_service::partition::PartitionSpec;
 
-use crate::service::search::partition::{
-    settings::PartitionSettings, sql_context::PartitionSqlContext,
-};
+use crate::search::partition::{settings::PartitionSettings, sql_context::PartitionSqlContext};
 
 pub mod settings {
     pub use openobserve_search_service::partition::PartitionSettings;

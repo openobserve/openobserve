@@ -567,7 +567,7 @@ async fn move_files(
         };
 
         // trigger an incremental merge of the current hour once enough files have piled up
-        crate::service::compact::incremental::incr_pending_file(
+        openobserve_compactor::incremental::incr_pending_file(
             &org_id,
             stream_type,
             &stream_name,
@@ -799,7 +799,7 @@ async fn merge_files(
     .await;
 
     // clear session data
-    crate::service::search::datafusion::storage::file_list::clear(&trace_id);
+    openobserve_core::search::datafusion::storage::file_list::clear(&trace_id);
 
     let buf = match merge_result {
         Ok(v) => v,
@@ -873,7 +873,7 @@ async fn merge_files(
         {
             // Get stream count for this type (cached, 5-min TTL — counts rarely change).
             let stream_count =
-                crate::service::db::schema::get_stream_count_cached(&org_id, stream_type).await;
+                openobserve_core::db::schema::get_stream_count_cached(&org_id, stream_type).await;
 
             // Get coverage deficit: how many known services are missing streams of this type.
             // Derived entirely from the in-memory cache — no DB I/O.
@@ -982,9 +982,9 @@ async fn queue_services_from_data_file(
 
     // Get semantic field groups upfront (before spawning tasks)
     let semantic_groups =
-        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
+        openobserve_core::db::system_settings::get_semantic_field_groups(org_id).await;
     let identity_config =
-        crate::service::db::system_settings::get_service_identity_config(org_id).await;
+        openobserve_core::db::system_settings::get_service_identity_config(org_id).await;
 
     // Create bounded channel for backpressure - drops records if consumer can't keep up
     // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)

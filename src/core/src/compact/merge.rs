@@ -53,7 +53,7 @@ use tokio::{
 };
 
 use super::worker::{MergeBatch, MergeSender};
-use crate::service::{
+use crate::{
     db, file_list,
     schema::generate_schema_for_defined_schema_fields,
     search::datafusion::{
@@ -853,7 +853,7 @@ pub async fn merge_files(
     };
 
     // clear session data
-    crate::service::search::datafusion::storage::file_list::clear(&trace_id);
+    crate::search::datafusion::storage::file_list::clear(&trace_id);
 
     let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
     let buf = match merge_result {

@@ -18,6 +18,10 @@ use std::{
     str::FromStr,
 };
 
+#[cfg(feature = "enterprise")]
+use ::common::utils::auth::check_permissions;
+#[cfg(feature = "enterprise")]
+use ::common::utils::http::get_or_create_trace_id;
 use async_trait::async_trait;
 #[cfg(feature = "enterprise")]
 use axum::http::HeaderMap;
@@ -62,10 +66,6 @@ use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use tracing::{Level, span};
 
-#[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
-#[cfg(feature = "enterprise")]
-use crate::common::utils::http::get_or_create_trace_id;
 use crate::{
     common::{
         infra::config::ORGANIZATIONS,
@@ -850,7 +850,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         let synthetic_row = synthetic_row.as_object().unwrap();
         let notify = std::slice::from_ref(synthetic_row);
 
-        match crate::service::alerts::incidents::correlate_alert_to_incident(
+        match crate::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
             notify,
@@ -928,7 +928,7 @@ pub async fn trigger_by_name(
         let synthetic_row = synthetic_row.as_object().unwrap();
         let notify = std::slice::from_ref(synthetic_row);
 
-        match crate::service::alerts::incidents::correlate_alert_to_incident(
+        match crate::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
             notify,
@@ -1267,7 +1267,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     } else {
         reqwest::Client::builder()
     };
-    let client = crate::common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = ::common::utils::ssrf_guard::build_safe_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
     let mut req = match endpoint.method {
         HTTPType::POST => client.post(url),
@@ -2185,7 +2185,7 @@ async fn permitted_alerts(
             Ok(Some(user)) => user.role,
             _ => return Err(AlertError::UserNotFound),
         };
-        let permitted = crate::service::authz::check_permissions(
+        let permitted = crate::authz::check_permissions(
             user_id,
             AuthExtractor {
                 org_id: org_id.to_string(),
@@ -2217,7 +2217,7 @@ async fn permitted_alerts(
     // to see the dashboard. This is used to check if the user has permission to see a specific
     // dashboard.
 
-    let permitted_objects = crate::service::authz::list_objects_for_user(
+    let permitted_objects = crate::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",
@@ -2235,7 +2235,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::service::alerts::{Condition, build_expr};
+    use crate::alerts::{Condition, build_expr};
 
     #[test]
     fn test_format_variable_value() {

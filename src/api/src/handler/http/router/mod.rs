@@ -32,7 +32,6 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::self_reporting::audit,
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
@@ -40,6 +39,7 @@ use {
         auditor::{AuditMessage, Protocol, ResponseMeta},
         config::get_config as get_o2_config,
     },
+    openobserve_core::self_reporting::audit,
 };
 
 use super::request::*;
@@ -316,7 +316,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .to_string()
             .ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || crate::common::meta::ingestion_routes::is_ingestion_write(
+            || openobserve_ingestion::types_routes::is_ingestion_write(
                 &http_method,
                 ingestion_path,
             ))

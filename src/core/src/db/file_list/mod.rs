@@ -115,7 +115,7 @@ pub async fn cache_stats() -> Result<()> {
     Ok(())
 }
 async fn single_cache_stats() -> Result<()> {
-    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+    let orgs = crate::db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         let ret = match infra::file_list::get_stream_stats(&org_id, None, None).await {
             Ok(v) => v,

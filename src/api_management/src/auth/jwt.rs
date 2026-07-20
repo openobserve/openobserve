@@ -825,7 +825,7 @@ async fn publish_org_not_found_error(org_id: &str, user_email: &str) {
         }),
     };
 
-    crate::service::self_reporting::publish_error(error_data).await;
+    openobserve_core::self_reporting::publish_error(error_data).await;
 }
 
 #[cfg(feature = "cloud")]
@@ -836,8 +836,7 @@ pub async fn check_and_add_to_org(
     use config::{ider, utils::json};
     use o2_enterprise::enterprise::cloud::OrgInviteStatus;
     use o2_openfga::authorizer::authz::save_org_tuples;
-
-    use crate::service::users::{add_admin_to_org, create_new_user};
+    use openobserve_core::users::{add_admin_to_org, create_new_user};
     let o2cfg = get_openfga_config();
 
     let mut is_new_user = false;
@@ -897,7 +896,7 @@ pub async fn check_and_add_to_org(
     }
     let org_users = org_users.map(|orgs| {
         orgs.into_iter()
-            .filter(|o| !crate::service::db::org_status::is_blocked(&o.org_id))
+            .filter(|o| !openobserve_core::db::org_status::is_blocked(&o.org_id))
             .collect::<Vec<_>>()
     });
 
@@ -1078,53 +1077,53 @@ async fn process_custom_claim_parsing(
     // Use String as compiled program type for Send compatibility
     let vrl_compile_fn = |function_content: &str| -> Result<String, anyhow::Error> {
         // Just validate that it compiles, but return the source for execution
-        crate::service::ingestion::compile_vrl_function(function_content, "_meta")
+        openobserve_core::ingestion::compile_vrl_function(function_content, "_meta")
             .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
         Ok(function_content.to_string())
     };
 
-    let vrl_execute_fn = |function_content: &String,
-                          claims: Value|
-     -> Result<Value, anyhow::Error> {
-        use vrl::compiler::{TargetValue, runtime::Runtime};
+    let vrl_execute_fn =
+        |function_content: &String, claims: Value| -> Result<Value, anyhow::Error> {
+            use vrl::compiler::{TargetValue, runtime::Runtime};
 
-        // Compile the VRL function
-        let vrl_config = crate::service::ingestion::compile_vrl_function(function_content, "_meta")
-            .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
+            // Compile the VRL function
+            let vrl_config =
+                openobserve_core::ingestion::compile_vrl_function(function_content, "_meta")
+                    .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
 
-        let mut runtime = Runtime::default();
-        let timezone = vrl::compiler::TimeZone::Local;
-        let mut target = TargetValue {
-            value: claims.into(),
-            metadata: vrl::value::Value::Object(Default::default()),
-            secrets: vrl::value::Secrets::new(),
-        };
+            let mut runtime = Runtime::default();
+            let timezone = vrl::compiler::TimeZone::Local;
+            let mut target = TargetValue {
+                value: claims.into(),
+                metadata: vrl::value::Value::Object(Default::default()),
+                secrets: vrl::value::Secrets::new(),
+            };
 
-        let result = match vrl::compiler::VrlRuntime::default() {
-            vrl::compiler::VrlRuntime::Ast => {
-                runtime.resolve(&mut target, &vrl_config.program, &timezone)
+            let result = match vrl::compiler::VrlRuntime::default() {
+                vrl::compiler::VrlRuntime::Ast => {
+                    runtime.resolve(&mut target, &vrl_config.program, &timezone)
+                }
+            };
+
+            match result {
+                Ok(res) => {
+                    let output: Value = res
+                        .try_into()
+                        .map_err(|e| anyhow::anyhow!("Failed to convert VRL result: {:?}", e))?;
+                    Ok(output)
+                }
+                Err(e) => Err(anyhow::anyhow!("VRL execution failed: {}", e)),
             }
         };
-
-        match result {
-            Ok(res) => {
-                let output: Value = res
-                    .try_into()
-                    .map_err(|e| anyhow::anyhow!("Failed to convert VRL result: {:?}", e))?;
-                Ok(output)
-            }
-            Err(e) => Err(anyhow::anyhow!("VRL execution failed: {}", e)),
-        }
-    };
 
     let js_execute_fn = |function_content: &str, claims: Value| -> Result<Value, anyhow::Error> {
         // Compile the JavaScript function
-        let js_config = crate::service::ingestion::compile_js_function(function_content, "_meta")
+        let js_config = openobserve_core::ingestion::compile_js_function(function_content, "_meta")
             .map_err(|e| anyhow::anyhow!("JavaScript compilation failed: {}", e))?;
 
         // Execute JavaScript with claims as input
         let (result, error) =
-            crate::service::ingestion::apply_js_fn(&js_config, claims, "_meta", &[String::new()]);
+            openobserve_core::ingestion::apply_js_fn(&js_config, claims, "_meta", &[String::new()]);
 
         if let Some(err) = error {
             return Err(anyhow::anyhow!("JavaScript execution failed: {}", err));
@@ -1158,7 +1157,7 @@ async fn process_custom_claim_parsing(
                     }),
                 };
 
-                crate::service::self_reporting::publish_error(error_data).await;
+                openobserve_core::self_reporting::publish_error(error_data).await;
             }) as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
         };
 

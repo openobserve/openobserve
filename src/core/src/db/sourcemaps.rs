@@ -28,7 +28,7 @@ use parquet::data_type::AsBytes;
 use serde::Serialize;
 use tokio::sync::RwLock;
 
-use crate::service::db;
+use crate::db;
 
 // DBKey to set sourcemaps keys
 pub const SOURCEMAP_PREFIX: &str = "/sourcemaps/";

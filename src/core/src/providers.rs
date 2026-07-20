@@ -13,13 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::ider;
-use infra::table;
-
-use crate::common::{
+use ::common::{
     meta::authz::Authz,
     utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
 };
+use config::ider;
+use infra::table;
 
 /// Errors that can occur when interacting with LLM providers.
 #[derive(Debug, thiserror::Error)]

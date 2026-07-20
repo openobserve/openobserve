@@ -332,12 +332,8 @@ pub(crate) async fn handle_diff_schema(
     };
 
     if is_new {
-        crate::common::utils::auth::set_ownership(
-            org_id,
-            stream_type.as_str(),
-            Authz::new(stream_name),
-        )
-        .await;
+        ::common::utils::auth::set_ownership(org_id, stream_type.as_str(), Authz::new(stream_name))
+            .await;
     }
 
     // check defined_schema_fields

@@ -22,8 +22,8 @@ use {
     crate::handler::http::request::search::utils::{
         StreamPermissionResourceType, check_stream_permissions,
     },
-    crate::service::search::streaming,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    openobserve_core::search::streaming,
     tokio::sync::mpsc,
 };
 
@@ -113,7 +113,7 @@ pub async fn extract_patterns(
         };
 
         // Create audit context
-        let audit_ctx = Some(crate::common::meta::search::AuditContext {
+        let audit_ctx = Some(::search::AuditContext {
             method: parts.method.to_string(),
             path: parts.uri.path().to_string(),
             query_params: parts.uri.query().unwrap_or("").to_string(),

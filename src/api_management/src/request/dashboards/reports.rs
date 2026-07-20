@@ -927,8 +927,7 @@ pub async fn move_reports(
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
-
-    use crate::service::dashboards::reports::ReportError;
+    use openobserve_reports::ReportError;
 
     fn status(err: ReportError) -> StatusCode {
         Response::from(err).status()
@@ -1064,7 +1063,7 @@ mod tests {
     // 500 Internal Server Error
     #[test]
     fn test_send_report_error_is_internal_server_error() {
-        use crate::service::dashboards::reports::SendReportError;
+        use openobserve_reports::SendReportError;
         assert_eq!(
             status(ReportError::SendReportError(SendReportError::NoDashboards)),
             StatusCode::INTERNAL_SERVER_ERROR

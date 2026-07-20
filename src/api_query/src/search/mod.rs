@@ -39,14 +39,14 @@ use config::{
 use error_utils::map_error_to_http_response;
 use hashbrown::HashMap;
 use http::HeaderMap;
+#[cfg(feature = "cloud")]
+use openobserve_core::organization::is_org_in_free_trial_period;
+#[cfg(feature = "enterprise")]
+use openobserve_core::search::sql::visitor::cipher_key::get_cipher_key_names;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::{StreamPermissionResourceType, check_stream_permissions};
 
-#[cfg(feature = "cloud")]
-use crate::service::organization::is_org_in_free_trial_period;
-#[cfg(feature = "enterprise")]
-use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -124,7 +124,7 @@ async fn can_use_distinct_stream(
 
     // all the fields used in the query sent must be in the distinct stream
     #[allow(deprecated)]
-    let query_fields: Vec<String> = match crate::service::search::sql::Sql::new(
+    let query_fields: Vec<String> = match openobserve_core::search::sql::Sql::new(
         &(query.clone().into()),
         org_id,
         stream_type,
@@ -318,7 +318,7 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
         {
-            if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+            if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(stream)) {
                 return (
                     StatusCode::TOO_MANY_REQUESTS,
                     Json(MetaHttpResponse::error(
@@ -337,7 +337,7 @@ pub async fn search(
     if is_ui_histogram {
         histogram_breakdown_field = if !is_multi_stream_search {
             if let Some(stream_name) = stream_names.first() {
-                crate::service::search::sql::histogram::resolve_histogram_breakdown_field(
+                openobserve_core::search::sql::histogram::resolve_histogram_breakdown_field(
                     &org_id,
                     stream_name,
                     stream_type,
@@ -351,7 +351,7 @@ pub async fn search(
         };
 
         // Convert the original query to a histogram query
-        match crate::service::search::sql::histogram::convert_to_histogram_query(
+        match openobserve_core::search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
             is_multi_stream_search,
@@ -455,7 +455,7 @@ pub async fn search(
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::service::authz::check_permissions(
+                    if !openobserve_core::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -602,7 +602,8 @@ pub async fn around_v1(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -724,7 +725,8 @@ pub async fn around_v2(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -828,7 +830,8 @@ pub async fn values(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -1566,7 +1569,7 @@ pub async fn search_partition(
             }
         };
         for stream in stream_names.iter() {
-            if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+            if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(stream)) {
                 return (
                     StatusCode::TOO_MANY_REQUESTS,
                     Json(MetaHttpResponse::error(
@@ -1979,7 +1982,7 @@ pub async fn result_schema(
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::service::authz::check_permissions(
+                    if !openobserve_core::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -2012,20 +2015,24 @@ pub async fn result_schema(
     }
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
-    let sql =
-        match crate::service::search::sql::Sql::new(&query, &org_id, stream_type, req.search_type)
-            .await
-        {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("Error parsing sql: {e}");
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
-                )
-                    .into_response();
-            }
-        };
+    let sql = match openobserve_core::search::sql::Sql::new(
+        &query,
+        &org_id,
+        stream_type,
+        req.search_type,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error parsing sql: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
+            )
+                .into_response();
+        }
+    };
 
     let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
@@ -2047,7 +2054,7 @@ pub async fn result_schema(
     {
         use std::collections::HashSet as StdHashSet;
 
-        use crate::service::db::organization::get_org_setting;
+        use openobserve_core::db::organization::get_org_setting;
 
         let field_alias_map = &res_schema.field_alias_map;
 

@@ -18,10 +18,11 @@
 pub mod cli;
 pub mod migration;
 
+pub(crate) use common;
 pub use openobserve_api::{handler, router};
+pub(crate) use openobserve_core as service;
 #[cfg(feature = "enterprise")]
 pub use openobserve_core::cipher;
-pub use openobserve_core::{common, service};
 pub use openobserve_jobs::job;
 
 #[cfg(feature = "enterprise")]

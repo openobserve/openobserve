@@ -15,8 +15,9 @@
 
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-
-use crate::service::db::enrichment_table::{ENRICHMENT_TABLE_META_STREAM_STATS_KEY, notify_update};
+use openobserve_core::db::enrichment_table::{
+    ENRICHMENT_TABLE_META_STREAM_STATS_KEY, notify_update,
+};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let db = infra::db::get_db().await;
@@ -63,7 +64,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 let org_id = key_parts[2];
                 let name = key_parts[3];
                 if let Err(e) =
-                    crate::service::enrichment::storage::database::delete(org_id, name).await
+                    openobserve_core::enrichment::storage::database::delete(org_id, name).await
                 {
                     log::error!("delete enrichment table db data error: {e:?}");
                 }

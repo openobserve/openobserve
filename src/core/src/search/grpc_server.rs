@@ -37,7 +37,7 @@ use {
     std::str::FromStr,
 };
 
-pub use crate::service::search::Searcher;
+pub use crate::search::Searcher;
 use crate::{common::meta::grpc::MetadataMap, service::search as SearchService};
 
 #[tonic::async_trait]
@@ -262,7 +262,7 @@ impl Search for Searcher {
         &self,
         req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
-        use crate::service::search as SearchService;
+        use crate::search as SearchService;
 
         let trace_id = req.into_inner().trace_id;
         if let Err(e) = SearchService::cancel_query("", &trace_id).await {

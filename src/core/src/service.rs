@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Private import prelude for composition code that has not yet moved to a domain crate.
+
 use config::meta::stream::StreamParams;
 pub use config::utils::schema::format_stream_name;
 use infra::errors::Result;
@@ -20,11 +22,9 @@ use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub use crate::{
-    alerts, auth, authz, bootstrap, cache, cluster_info, compact, dashboards, db, enrichment,
-    enrichment_table, file_downloader, file_list, file_list_dump, folders, functions, github, grpc,
-    http, ingestion, ingestion_tokens, ingestion_types, kv, logs, metadata, metrics, node,
-    org_cleanup, organization, pipeline, promql, runtime_metrics, schema, search, self_reporting,
-    session, short_url, sourcemaps, stream, stream_utils, synthetics, tantivy, tls, traces, users,
+    alerts, dashboards, db, enrichment, file_list, folders, http, ingestion, ingestion_tokens,
+    logs, metadata, metrics, organization, pipeline, schema, search, self_reporting, short_url,
+    stream, traces, users,
 };
 #[cfg(feature = "enterprise")]
 pub use crate::{

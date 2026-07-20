@@ -26,10 +26,10 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
+pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
 
 #[cfg(feature = "enterprise")]
 pub use crate::common::utils::auth::get_user_email_from_auth_str;
-pub use crate::service::authz::{check_permissions, list_objects_for_user};
 use crate::{
     common::{
         infra::config::ORG_INGESTION_TOKENS,
@@ -352,7 +352,7 @@ pub async fn validate_credentials(
             }
 
             // Cache miss — do DB lookup. find_enabled_token filters by enabled=true.
-            match crate::service::db::org_ingestion_tokens::find_enabled_token(
+            match openobserve_ingestion::repository::org_ingestion_tokens::find_enabled_token(
                 org_id,
                 user_password,
             )
@@ -794,7 +794,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
         path_columns[0]
     };
 
-    if crate::service::organization::get_org(org_id)
+    if openobserve_core::organization::get_org(org_id)
         .await
         .is_none()
     {
@@ -802,7 +802,7 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
             Err(AuthError::NotFound("Organization not found".to_string()))
         } else if is_root_user(user_id)
             && ingestion_routes::is_ingestion_write(method, path)
-            && crate::service::organization::check_and_create_org(org_id)
+            && openobserve_core::organization::check_and_create_org(org_id)
                 .await
                 .is_ok()
         {

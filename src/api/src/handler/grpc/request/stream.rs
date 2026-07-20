@@ -15,12 +15,11 @@
 
 use config::meta::stream::StreamType;
 use futures_util::future::try_join_all;
+use openobserve_core::db;
 use proto::cluster_rpc::{
     StreamStats, StreamStatsEntry, StreamStatsRequest, StreamStatsResponse, streams_server::Streams,
 };
 use tonic::{Request, Response, Status};
-
-use crate::service::db;
 
 const BATCH_DELAY_MS: u64 = 100;
 const MAX_CONCURRENT_ORGS: usize = 10;

@@ -247,7 +247,7 @@ pub async fn search_http2_stream(
     };
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(stream)) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 axum::Json(MetaHttpResponse::error(
@@ -308,7 +308,7 @@ pub async fn search_http2_stream(
     if is_ui_histogram {
         histogram_breakdown_field = if !is_multi_stream_search {
             if let Some(stream_name) = stream_names.first() {
-                crate::service::search::sql::histogram::resolve_histogram_breakdown_field(
+                openobserve_core::search::sql::histogram::resolve_histogram_breakdown_field(
                     &org_id,
                     stream_name,
                     stream_type,
@@ -322,7 +322,7 @@ pub async fn search_http2_stream(
         };
 
         // Convert the original query to a histogram query
-        match crate::service::search::sql::histogram::convert_to_histogram_query(
+        match openobserve_core::search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
             is_multi_stream_search,
@@ -788,7 +788,7 @@ pub async fn values_http2_stream(
     #[cfg(feature = "enterprise")]
     {
         if let Err(e) =
-            crate::service::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
+            openobserve_core::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
         {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -1018,7 +1018,7 @@ async fn get_sql(
     org_id: &str,
     stream_type: StreamType,
     search_type: Option<SearchEventType>,
-) -> Result<crate::service::search::sql::Sql, infra::errors::Error> {
-    crate::service::search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type)
+) -> Result<openobserve_core::search::sql::Sql, infra::errors::Error> {
+    openobserve_core::search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type)
         .await
 }

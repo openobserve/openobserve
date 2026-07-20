@@ -29,7 +29,7 @@ use config::{
 };
 use cron::Schedule;
 
-use crate::service::{alerts::QueryConditionExt, db};
+use crate::{alerts::QueryConditionExt, db};
 
 pub async fn save(
     mut derived_stream: DerivedStream,

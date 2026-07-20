@@ -597,7 +597,7 @@ impl ExecutablePipeline {
                 ..config::meta::self_reporting::usage::RequestStats::default()
             };
 
-            crate::service::self_reporting::report_request_usage_stats(
+            crate::self_reporting::report_request_usage_stats(
                 req_stats,
                 org_id,
                 &self.id,
@@ -916,7 +916,7 @@ async fn process_llm_evaluation_node(
     let job_id = params.job_id.as_deref();
     while let Some(item) = channels.receiver.recv().await {
         if let Some(mut ctx) =
-            crate::service::llm_evaluations::eval_jobs::executor_runtime::extract_context_from_span(
+            crate::llm_evaluations::eval_jobs::executor_runtime::extract_context_from_span(
                 &metadata.org_id,
                 job_id,
                 &item.record,
@@ -931,43 +931,42 @@ async fn process_llm_evaluation_node(
             ctx.sampled = Some(sampled);
 
             if !sampled {
-                let skipped_trace =
-                    crate::service::llm_evaluations::evaluator_trace::create_evaluator_trace(
-                        crate::service::llm_evaluations::evaluator_trace::EvaluatorTraceInput {
-                            org_id: ctx.org_id.clone(),
-                            evaluator_trace_id: ctx.evaluator_trace_id.clone(),
-                            target_span_id: ctx.span_id.clone(),
-                            target_trace_id: ctx.trace_id.clone(),
-                            target_stream: ctx.source_stream.clone(),
-                            target_stream_type: ctx.source_stream_type.clone(),
-                            target_agent_name: ctx.agent_name.clone(),
-                            target_agent_id: ctx.agent_id.clone(),
-                            scorer_id: None,
-                            scorer_version: None,
-                            scorer_type: None,
-                            job_id: ctx.job_id.clone(),
-                            score_config_id: None,
-                            score_config_version: None,
-                            eval_run_id: Some(eval_run_id),
-                            provider_id: None,
-                            provider_name: None,
-                            provider_type: None,
-                            model: None,
-                            latency_ms: 0,
-                            prompt_tokens: None,
-                            completion_tokens: None,
-                            total_tokens: None,
-                            sampling_rate: Some(params.sampling_rate),
-                            sampled: Some(false),
-                            status: config::meta::self_reporting::evaluator::status::SKIPPED
-                                .to_string(),
-                            error_kind: None,
-                            error_message: None,
-                            skip_reason: Some("sampling".to_string()),
-                            prompt: None,
-                            response: None,
-                        },
-                    );
+                let skipped_trace = crate::llm_evaluations::evaluator_trace::create_evaluator_trace(
+                    crate::llm_evaluations::evaluator_trace::EvaluatorTraceInput {
+                        org_id: ctx.org_id.clone(),
+                        evaluator_trace_id: ctx.evaluator_trace_id.clone(),
+                        target_span_id: ctx.span_id.clone(),
+                        target_trace_id: ctx.trace_id.clone(),
+                        target_stream: ctx.source_stream.clone(),
+                        target_stream_type: ctx.source_stream_type.clone(),
+                        target_agent_name: ctx.agent_name.clone(),
+                        target_agent_id: ctx.agent_id.clone(),
+                        scorer_id: None,
+                        scorer_version: None,
+                        scorer_type: None,
+                        job_id: ctx.job_id.clone(),
+                        score_config_id: None,
+                        score_config_version: None,
+                        eval_run_id: Some(eval_run_id),
+                        provider_id: None,
+                        provider_name: None,
+                        provider_type: None,
+                        model: None,
+                        latency_ms: 0,
+                        prompt_tokens: None,
+                        completion_tokens: None,
+                        total_tokens: None,
+                        sampling_rate: Some(params.sampling_rate),
+                        sampled: Some(false),
+                        status: config::meta::self_reporting::evaluator::status::SKIPPED
+                            .to_string(),
+                        error_kind: None,
+                        error_message: None,
+                        skip_reason: Some("sampling".to_string()),
+                        prompt: None,
+                        response: None,
+                    },
+                );
                 let observation = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::UnsampledObservation {
                     org_id: metadata.org_id.clone(),
                     evaluator_traces: vec![skipped_trace],
@@ -1056,9 +1055,7 @@ async fn process_remote_stream_node(
             };
         }
         if !record.is_null() && record.is_object() {
-            if let Err(e) =
-                crate::service::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts)
-            {
+            if let Err(e) = crate::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts) {
                 let err_msg = format!("DestinationNode error handling timestamp: {e}");
                 if let Err(send_err) = channels
                     .error_sender
@@ -1183,7 +1180,7 @@ async fn process_remote_stream_node(
                                 ..config::meta::self_reporting::usage::RequestStats::default()
                             };
 
-                            crate::service::self_reporting::report_request_usage_stats(
+                            crate::self_reporting::report_request_usage_stats(
                                 req_stats,
                                 &metadata.org_id,
                                 &remote_stream.destination_name,
@@ -1850,7 +1847,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
                             ..config::meta::self_reporting::usage::RequestStats::default()
                         };
 
-                        crate::service::self_reporting::report_request_usage_stats(
+                        crate::self_reporting::report_request_usage_stats(
                             req_stats,
                             &org_id,
                             &destination_name,
@@ -1949,7 +1946,7 @@ async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
         return Ok(trans.value().clone());
     }
     // get from database
-    crate::service::db::functions::get(org_id, fn_name).await
+    crate::db::functions::get(org_id, fn_name).await
 }
 
 fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
@@ -2412,7 +2409,7 @@ mod tests {
     // Tests for CompiledFunctionRuntime enum
     #[test]
     fn test_compiled_function_runtime_enum_js_variant() {
-        use crate::common::utils::js::JSRuntimeConfig;
+        use ::common::utils::js::JSRuntimeConfig;
 
         let js_config = JSRuntimeConfig {
             function: "function(row) { return row; }".to_string(),
@@ -2498,7 +2495,7 @@ mod tests {
 
     #[test]
     fn test_compiled_function_runtime_clone() {
-        use crate::common::utils::js::JSRuntimeConfig;
+        use ::common::utils::js::JSRuntimeConfig;
 
         let js_config = JSRuntimeConfig {
             function: "function(row) { return row; }".to_string(),

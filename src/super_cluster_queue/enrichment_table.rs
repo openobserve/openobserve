@@ -31,7 +31,7 @@ pub(crate) async fn process_file_list_delete(msg: Message) -> Result<()> {
     let org_id = key_parts[2];
     let stream_name = key_parts[4];
     let time_range: config::meta::stream::TimeRange = serde_json::from_slice(&msg.value.unwrap())?;
-    crate::service::compact::retention::delete_from_file_list(
+    openobserve_core::compact::retention::delete_from_file_list(
         org_id,
         StreamType::EnrichmentTables,
         stream_name,

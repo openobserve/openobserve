@@ -80,7 +80,7 @@ fn rule_extractor(
         let user_roles = if user_email.is_empty() {
             vec![]
         } else {
-            crate::service::users::get_user_roles(user_email.as_str(), Some(&org_id)).await
+            openobserve_core::users::get_user_roles(user_email.as_str(), Some(&org_id)).await
         };
         log::debug!("found user_roles: {:?}", user_roles);
         let openapi_path = openapi_path.unwrap_or(path);

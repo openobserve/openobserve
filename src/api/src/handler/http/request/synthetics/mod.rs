@@ -997,7 +997,7 @@ async fn process_ack(
     let resp = o2_enterprise::enterprise::synthetics::job_api::ack(req).await?;
 
     // Emit trigger usage record for synthetics telemetry.
-    crate::service::self_reporting::publish_triggers_usage(
+    openobserve_core::self_reporting::publish_triggers_usage(
         config::meta::self_reporting::usage::TriggerData {
             _timestamp: checked_at,
             org: resp.org_id.clone(),
@@ -1015,7 +1015,7 @@ async fn process_ack(
 
     // Notify once per run, not once per job ack.
     if resp.run_complete && !resp.destinations.is_empty() {
-        let notification = crate::service::synthetics::CheckNotification {
+        let notification = openobserve_core::synthetics::CheckNotification {
             org_id: resp.org_id.clone(),
             monitor_name: resp.synthetics_name.clone(),
             monitor_id: resp.synthetics_id.clone(),
@@ -1029,7 +1029,7 @@ async fn process_ack(
             checked_at,
         };
         tokio::spawn(async move {
-            crate::service::synthetics::notify_check_result(notification).await;
+            openobserve_core::synthetics::notify_check_result(notification).await;
         });
     }
     Ok(resp)

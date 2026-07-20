@@ -137,7 +137,7 @@ pub mod search_jobs {
     };
 }
 pub mod self_reporting;
-pub mod service;
+mod service;
 pub mod session;
 pub mod short_url {
     pub use common::short_url::*;
@@ -153,10 +153,9 @@ pub mod traces;
 pub mod trial_quota;
 pub mod users;
 
-/// Compatibility namespace for the common crate. Authentication and stream-query helpers remain
-/// available at their historical paths while their service-backed implementations live in the
-/// service layer.
-pub mod common {
+/// Private import namespace retained while core's remaining composition modules are migrated to
+/// their owning crates. It is intentionally not part of the public API.
+mod common {
     pub mod meta {
         pub use ::common::meta::*;
         pub use openobserve_ingestion::types as ingestion;
@@ -165,32 +164,29 @@ pub mod common {
         /// depend on the `search` crate.
         pub mod search {
             pub use ::search::{
-                AuditContext, CAPPED_RESULTS_MSG, CacheQueryRequest, CachedQueryResponse,
-                MultiCachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
-                SearchResultType, SortStrategy,
+                AuditContext, CachedQueryResponse, MultiCachedQueryResponse, QueryDelta,
+                SearchResultType,
             };
         }
     }
 
     pub mod infra {
-        pub use ::common::infra::{cluster, wal};
+        pub use ::common::infra::wal;
 
         pub mod config {
             pub use ::common::infra::config::*;
-            pub use common::short_url::SHORT_URLS;
             pub use openobserve_alerts::REALTIME_ALERT_TRIGGERS;
-            pub use openobserve_dashboards::DASHBOARD_ID_TO_ORG;
 
-            pub use crate::service::cache::STREAM_EXECUTABLE_PIPELINES;
+            pub use crate::cache::STREAM_EXECUTABLE_PIPELINES;
         }
 
         #[cfg(feature = "enterprise")]
-        pub use crate::service::ofga;
+        pub use crate::ofga;
     }
 
     pub mod utils {
         pub use ::common::utils::*;
 
-        pub use crate::service::{auth, stream_utils as stream};
+        pub use crate::{auth, stream_utils as stream};
     }
 }

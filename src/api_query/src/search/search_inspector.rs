@@ -238,7 +238,7 @@ pub async fn get_search_profile(
                     }
                 };
 
-                if !crate::service::authz::check_permissions(
+                if !openobserve_core::authz::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -272,7 +272,7 @@ pub async fn get_search_profile(
     }
 
     // run search with cache
-    let res = crate::service::search::cache::search(
+    let res = openobserve_core::search::cache::search(
         &trace_id,
         org_id,
         stream_type,
@@ -559,8 +559,9 @@ fn format_trace_id(trace_id: Option<String>) -> String {
 
 #[cfg(test)]
 mod tests {
+    use openobserve_core::search::inspector::SearchInspectorFields;
+
     use super::*;
-    use crate::service::search::inspector::SearchInspectorFields;
 
     #[test]
     fn test_format_trace_id_none_returns_empty() {

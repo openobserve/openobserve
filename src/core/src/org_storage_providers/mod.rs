@@ -19,7 +19,7 @@ use infra::table::org_storage_providers::{
 use object_store::ObjectStore;
 
 use super::db::org_storage_providers;
-use crate::service::org_storage_providers::utils::_merge_aws_role_arn;
+use crate::org_storage_providers::utils::_merge_aws_role_arn;
 mod aws_role_utils;
 mod checks;
 mod utils;

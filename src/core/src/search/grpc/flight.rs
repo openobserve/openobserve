@@ -54,7 +54,7 @@ use o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_fi
 use parking_lot::Mutex;
 use rayon::slice::ParallelSliceMut;
 
-use crate::service::{
+use crate::{
     db,
     search::{
         datafusion::{
@@ -692,15 +692,9 @@ async fn get_file_list_by_ids(
         .await
         .unwrap_or_default();
     let partition_keys = stream_settings.partition_keys;
-    let file_list = crate::service::file_list::query_by_ids(
-        trace_id,
-        org_id,
-        stream_type,
-        stream_name,
-        time_range,
-        ids,
-    )
-    .await?;
+    let file_list =
+        crate::file_list::query_by_ids(trace_id, org_id, stream_type, stream_name, time_range, ids)
+            .await?;
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
@@ -827,7 +821,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::service::search::{
+    use crate::search::{
         datafusion::{
             optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram,
             table_provider::empty_table::NewEmptyTable, udf::histogram_udf,

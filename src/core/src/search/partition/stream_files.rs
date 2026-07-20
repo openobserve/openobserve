@@ -70,7 +70,7 @@ pub async fn collect_stream_files(
         };
 
         if !use_single_partition && !use_stream_stats_for_partition {
-            let stream_files = crate::service::file_list::query_ids(
+            let stream_files = crate::file_list::query_ids(
                 trace_id,
                 org_id,
                 stream_type,

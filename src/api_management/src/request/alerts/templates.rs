@@ -382,8 +382,7 @@ pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
-
-    use crate::service::db::alerts::templates::TemplateError;
+    use openobserve_alerts::repository::templates::TemplateError;
 
     fn status(err: TemplateError) -> StatusCode {
         Response::from(err).status()

@@ -26,11 +26,11 @@ struct CoreStreamCatalog;
 #[async_trait]
 impl StreamCatalog for CoreStreamCatalog {
     async fn list_organizations(&self) -> Vec<String> {
-        crate::service::db::schema::list_organizations_from_cache().await
+        crate::db::schema::list_organizations_from_cache().await
     }
 
     async fn list_streams(&self, org_id: &str, stream_type: StreamType) -> Vec<String> {
-        crate::service::db::schema::list_streams_from_cache(org_id, stream_type).await
+        crate::db::schema::list_streams_from_cache(org_id, stream_type).await
     }
 }
 

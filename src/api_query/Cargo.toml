@@ -11,17 +11,22 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "common/enterprise",
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "openobserve-core/enterprise",
+    "openobserve-search-service/enterprise",
 ]
-cloud = ["enterprise", "openobserve-core/cloud"]
+cloud = ["enterprise", "common/cloud", "openobserve-core/cloud"]
 vectorscan = ["openobserve-core/vectorscan"]
 vortex = ["openobserve-core/vortex"]
 
 [dependencies]
+common.workspace = true
 openobserve-api-common.workspace = true
 openobserve-core.workspace = true
+openobserve-ingestion.workspace = true
+openobserve-search-service.workspace = true
 arrow-schema.workspace = true
 axum.workspace = true
 bytes.workspace = true

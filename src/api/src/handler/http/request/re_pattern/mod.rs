@@ -107,7 +107,7 @@ struct PatternTestResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct BuiltInPatternsResponse {
-    patterns: Vec<crate::service::github::adapters::BuiltInPatternResponse>,
+    patterns: Vec<openobserve_core::github::adapters::BuiltInPatternResponse>,
     last_updated: i64,
     source_url: String,
 }
@@ -165,7 +165,7 @@ pub async fn save(
             return MetaHttpResponse::bad_request(e);
         }
 
-        match crate::service::db::re_pattern::add(PatternEntry::new(
+        match openobserve_core::db::re_pattern::add(PatternEntry::new(
             &org_id,
             &req.name,
             &req.description,
@@ -335,7 +335,7 @@ pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
                 "Cannot delete pattern, associated with {pattern_streams:?}{extra}",
             ));
         }
-        match crate::service::db::re_pattern::remove(&id).await {
+        match openobserve_core::db::re_pattern::remove(&id).await {
             Ok(_) => {
                 remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
                 MetaHttpResponse::ok("Pattern removed successfully")
@@ -442,7 +442,7 @@ pub async fn delete_bulk(
         }
 
         for id in req.ids {
-            match crate::service::db::re_pattern::remove(&id).await {
+            match openobserve_core::db::re_pattern::remove(&id).await {
                 Ok(_) => {
                     remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
                     successful.push(id);
@@ -529,7 +529,7 @@ pub async fn update(
 
         // we can be fairly certain that in db we have proper json
 
-        match crate::service::db::re_pattern::update(&id, &req.pattern).await {
+        match openobserve_core::db::re_pattern::update(&id, &req.pattern).await {
             Ok(_) => MetaHttpResponse::ok("Pattern updated successfully"),
             Err(e) => MetaHttpResponse::bad_request(e),
         }
@@ -629,7 +629,7 @@ pub async fn get_built_in_patterns(
     Path(_org_id): Path<String>,
     Query(query): Query<BuiltInPatternsQuery>,
 ) -> Response {
-    use crate::service::github::{GitHubDataService, adapters::PyWhatAdapter};
+    use openobserve_core::github::{GitHubDataService, adapters::PyWhatAdapter};
 
     // Create GitHub service
     let github_service = GitHubDataService::new();

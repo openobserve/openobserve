@@ -20,13 +20,14 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::search::Request;
+#[cfg(feature = "cloud")]
+use openobserve_core::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use {
     crate::search::{
         query_manager::cancel_query_inner,
         utils::{StreamPermissionResourceType, check_stream_permissions},
     },
-    crate::service::search_jobs::{get_result, merge_response},
     crate::{
         common::{
             meta::http::HttpResponse as MetaHttpResponse,
@@ -49,13 +50,12 @@ use {
     },
     hashbrown::HashMap,
     infra::table::entity::search_jobs::Model as JobModel,
+    openobserve_search_service::jobs::{get_result, merge_response},
     tracing::Span,
 };
 
 #[cfg(feature = "enterprise")]
 use crate::search::error_utils::map_error_to_http_response;
-#[cfg(feature = "cloud")]
-use crate::service::organization::is_org_in_free_trial_period;
 use crate::{common::utils::auth::UserEmail, extractors::Headers};
 
 // 1. submit

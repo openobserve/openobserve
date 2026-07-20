@@ -36,16 +36,16 @@ use config::{
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use infra::errors;
+#[cfg(feature = "enterprise")]
+use openobserve_core::search::sql::visitor::cipher_key::get_cipher_key_names;
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 #[cfg(feature = "cloud")]
 use {
-    crate::service::organization::is_org_in_free_trial_period,
     axum::http::StatusCode as AxumStatusCode,
+    openobserve_core::organization::is_org_in_free_trial_period,
 };
 
-#[cfg(feature = "enterprise")]
-use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 #[cfg(feature = "enterprise")]
 use crate::{common::meta::search::AuditContext, service::self_reporting::audit};
 use crate::{
@@ -296,7 +296,7 @@ pub async fn search_multi(
                     get_user(Some(&org_id), user_id).await.unwrap();
                 let stream_type_str = stream_type.as_str();
 
-                if !crate::service::authz::check_permissions(
+                if !openobserve_core::authz::check_permissions(
                     user_id,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -340,7 +340,7 @@ pub async fn search_multi(
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::service::authz::check_permissions(
+                    if !openobserve_core::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -540,7 +540,7 @@ pub async fn search_multi(
 
         let apply_over_hits = RESULT_ARRAY.is_match(input_fn);
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-        let program = match crate::service::ingestion::compile_vrl_function(input_fn, &org_id) {
+        let program = match openobserve_core::ingestion::compile_vrl_function(input_fn, &org_id) {
             Ok(program) => {
                 let registry = program
                     .config
@@ -560,7 +560,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = openobserve_core::ingestion::apply_vrl_fn(
                         &mut runtime,
                         &VRLResultResolver {
                             program: program.program.clone(),
@@ -623,7 +623,7 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = openobserve_core::ingestion::apply_vrl_fn(
                                 &mut runtime,
                                 &VRLResultResolver {
                                     program: program.program.clone(),
@@ -1322,7 +1322,7 @@ pub async fn search_multi_stream(
 
             // Check permissions for each unique stream
             for stream_name in stream_names {
-                if !crate::service::authz::check_permissions(
+                if !openobserve_core::authz::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),

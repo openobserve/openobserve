@@ -32,7 +32,7 @@ use infra::{
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
 use tokio::sync::mpsc;
 
-use crate::service::db;
+use crate::db;
 
 pub mod deleted {
     pub use openobserve_compactor::deleted::*;

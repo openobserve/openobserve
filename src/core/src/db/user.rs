@@ -435,7 +435,7 @@ mod tests {
     use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::service::organization;
+    use crate::organization;
 
     #[tokio::test]
     async fn test_user() {

@@ -16,9 +16,8 @@
 use std::sync::Arc;
 
 use config::{cluster, get_config};
+use openobserve_core::compact::dump;
 use tokio::sync::{Mutex, mpsc};
-
-use crate::service::compact::dump;
 
 const DUMP_JOB_MIN_INTERVAL: i64 = 30;
 
@@ -68,7 +67,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 }
                             }
                         });
-                        if let Err(e) = crate::service::compact::dump::dump(&job).await {
+                        if let Err(e) = openobserve_core::compact::dump::dump(&job).await {
                             log::error!(
                                 "[FILE_LIST_DUMP:JOB:{thread_id}] dump for stream [{}/{}/{}] offset {}: error: {e}",
                                 job.org_id,
@@ -84,7 +83,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                             job.stream_type.as_str(),
                             job.stream_name
                         );
-                        crate::service::db::compact::stream::clear_running(&key);
+                        openobserve_compactor::repository::stream::clear_running(&key);
                     }
                 }
             }
@@ -104,7 +103,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         // sleep
         tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
         // run
-        if let Err(e) = crate::service::compact::dump::run(tx.clone()).await {
+        if let Err(e) = openobserve_core::compact::dump::run(tx.clone()).await {
             log::error!("[FILE_LIST_DUMP:JOB] error in running dump: {e}");
         }
     }

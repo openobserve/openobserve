@@ -60,7 +60,7 @@ pub struct InviteResponseItem {
 }
 
 async fn get_org_name(org_id: &str) -> String {
-    let info = crate::service::organization::get_org(org_id).await;
+    let info = openobserve_core::organization::get_org(org_id).await;
     info.map(|v| v.name).unwrap_or("".to_string())
 }
 
@@ -168,7 +168,7 @@ pub async fn invite(
         return HttpResponse::bad_request("billing group is not enabled for this org".to_string());
     }
 
-    let org_info = crate::service::organization::get_org(&req.org_id).await;
+    let org_info = openobserve_core::organization::get_org(&req.org_id).await;
     if org_info.is_none() {
         return HttpResponse::bad_request(format!("org with org_id {} does not exist", req.org_id));
     }

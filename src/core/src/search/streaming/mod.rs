@@ -48,8 +48,6 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use vector_enrichment::TableRegistry;
 
-#[cfg(feature = "enterprise")]
-use crate::service::{http::map_error_to_http_response, self_reporting::audit};
 use crate::{
     common::{
         meta::search::{AuditContext, SearchResultType},
@@ -63,6 +61,8 @@ use crate::{
         },
     },
 };
+#[cfg(feature = "enterprise")]
+use crate::{http::map_error_to_http_response, self_reporting::audit};
 
 pub mod cache;
 pub mod execution;
@@ -1171,7 +1171,7 @@ fn compute_vrl_responses(
         .unwrap_or_default();
 
     log::debug!("[trace_id {trace_id}] Compiling VRL function...");
-    let mut runtime = crate::common::utils::functions::init_vrl_runtime();
+    let mut runtime = ::common::utils::functions::init_vrl_runtime();
     let program = match openobserve_transform::compile_vrl_function(&input_fn, org_id) {
         Ok(program) => {
             let registry = program.config.get_custom::<TableRegistry>().unwrap();

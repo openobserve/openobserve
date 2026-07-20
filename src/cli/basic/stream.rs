@@ -19,8 +19,7 @@ use config::{
     utils::json,
 };
 use infra::schema::unwrap_stream_settings;
-
-use crate::service::db;
+use openobserve_core::db;
 
 /// Reset the `index_updated_at` field in stream settings.
 ///

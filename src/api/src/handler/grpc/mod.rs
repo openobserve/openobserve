@@ -23,8 +23,9 @@ pub use crate::common::meta::grpc::MetadataMap;
 
 #[cfg(test)]
 mod tests {
+    use openobserve_core::promql::MetricsQueryRequest;
+
     use super::*;
-    use crate::service::promql::MetricsQueryRequest;
 
     fn make_request() -> MetricsQueryRequest {
         MetricsQueryRequest {
