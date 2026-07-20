@@ -26,6 +26,7 @@ mod flatten_key;
 pub mod incremental;
 mod metadata;
 pub mod repository;
+pub mod retention;
 pub mod stats;
 pub mod worker;
 

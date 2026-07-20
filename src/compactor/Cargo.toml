@@ -31,6 +31,7 @@ o2_enterprise = { workspace = true, optional = true, default-features = false }
 openobserve-catalog.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
+rand.workspace = true
 rayon.workspace = true
 search.workspace = true
 tokio.workspace = true

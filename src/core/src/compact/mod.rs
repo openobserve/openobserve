@@ -41,14 +41,13 @@ pub mod incremental {
     pub use openobserve_compactor::incremental::*;
 }
 pub mod merge;
-pub mod retention;
 pub mod stats;
 pub mod worker;
 
 /// compactor retention run steps:
 pub async fn run_retention() -> Result<(), anyhow::Error> {
     // generate retention jobs first
-    if let Err(e) = retention::generate_jobs().await {
+    if let Err(e) = openobserve_compactor::retention::generate_jobs().await {
         log::error!("[COMPACTOR] generate retention job error: {e}");
     }
 
@@ -72,10 +71,10 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         }
 
         let ret = if retention.eq("all") {
-            retention::delete_all(org_id, stream_type, stream_name).await
+            openobserve_compactor::retention::delete_all(org_id, stream_type, stream_name).await
         } else {
             let date_range = retention.split(',').collect::<Vec<&str>>();
-            retention::delete_by_date(
+            openobserve_compactor::retention::delete_by_date(
                 org_id,
                 stream_type,
                 stream_name,

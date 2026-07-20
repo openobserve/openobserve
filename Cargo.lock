@@ -6810,6 +6810,7 @@ dependencies = [
  "openobserve-catalog",
  "parking_lot 0.12.5",
  "parquet",
+ "rand 0.10.1",
  "rayon",
  "search",
  "tokio",

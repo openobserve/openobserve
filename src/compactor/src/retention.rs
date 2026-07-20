@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
 use config::{
@@ -31,14 +34,75 @@ use config::{
 use infra::{
     cluster::{get_node_by_uuid, get_node_from_consistent_hash},
     file_list as infra_file_list,
+    schema::STREAM_SCHEMAS_LATEST,
     table::compactor_manual_jobs::Status as CompactorManualJobStatus,
 };
 use itertools::Itertools;
-use openobserve_compactor::file_list_dump::generate_dump_stream_name;
 
-use crate::{db, file_list};
+use crate::file_list_dump::generate_dump_stream_name;
 
-pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
+async fn list_organizations_from_cache() -> Vec<String> {
+    STREAM_SCHEMAS_LATEST
+        .read()
+        .await
+        .keys()
+        .filter_map(|key| key.split_once('/').map(|(org_id, _)| org_id.to_string()))
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
+    STREAM_SCHEMAS_LATEST
+        .read()
+        .await
+        .keys()
+        .filter_map(|key| {
+            let mut columns = key.split('/');
+            let current_org = columns.next()?;
+            let current_type = StreamType::from(columns.next()?);
+            let stream_name = columns.next()?;
+            (current_org == org_id && current_type == stream_type).then(|| stream_name.to_string())
+        })
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+async fn query_file_list(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_level: PartitionTimeLevel,
+    time_min: i64,
+    time_max: i64,
+) -> Result<Vec<FileKey>, anyhow::Error> {
+    let mut files = infra_file_list::query(
+        org_id,
+        stream_type,
+        stream_name,
+        time_level,
+        (time_min, time_max),
+        None,
+    )
+    .await?;
+    let dumped_files = crate::file_list_dump::query(
+        trace_id,
+        org_id,
+        stream_type,
+        stream_name,
+        (time_min, time_max),
+        &[],
+    )
+    .await?;
+    files.extend(dumped_files.iter().map(FileKey::from));
+    files.sort_unstable_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
+    Ok(files)
+}
+
+pub async fn generate_jobs() -> Result<(), anyhow::Error> {
     let cfg = get_config();
     // check data retention
     if cfg.compact.data_retention_days <= 0 {
@@ -69,13 +133,13 @@ pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     let now = config::utils::time::now();
     let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = list_organizations_from_cache().await;
     for org_id in orgs {
         for stream_type in ALL_STREAM_TYPES {
             if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Filelist {
                 continue; // skip data retention for enrichment tables and filelist
             }
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            let streams = list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -340,7 +404,7 @@ pub async fn generate_retention_job(
                 continue;
             }
 
-            let (_key, created) = db::compact::retention::delete_stream(
+            let (_key, created) = crate::repository::retention::delete_stream(
                 org_id,
                 stream_type,
                 stream_name,
@@ -363,14 +427,15 @@ pub async fn delete_all(
     stream_type: StreamType,
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
-    let node = db::compact::retention::get_stream(org_id, stream_type, stream_name, None).await;
+    let node =
+        crate::repository::retention::get_stream(org_id, stream_type, stream_name, None).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::warn!("[COMPACTOR] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
         return Ok(()); // not this node, just skip
     }
 
     // before start merging, set current node to lock the stream
-    db::compact::retention::process_stream(
+    crate::repository::retention::process_stream(
         org_id,
         stream_type,
         stream_name,
@@ -397,11 +462,12 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
-    openobserve_compactor::dump::delete_all(org_id, stream_type, stream_name).await?;
+    crate::dump::delete_all(org_id, stream_type, stream_name).await?;
     log::info!("deleted file list for: {org_id}/{stream_type}/{stream_name}/all");
 
     // mark delete done
-    db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, None).await?;
+    crate::repository::retention::delete_stream_done(org_id, stream_type, stream_name, None)
+        .await?;
     log::info!("deleted stream all: {org_id}/{stream_type}/{stream_name}");
 
     Ok(())
@@ -413,9 +479,13 @@ pub async fn delete_by_date(
     stream_name: &str,
     date_range: (&str, &str),
 ) -> Result<(), anyhow::Error> {
-    let node =
-        db::compact::retention::get_stream(org_id, stream_type, stream_name, Some(date_range))
-            .await;
+    let node = crate::repository::retention::get_stream(
+        org_id,
+        stream_type,
+        stream_name,
+        Some(date_range),
+    )
+    .await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::warn!(
             "[COMPACTOR] stream {org_id}/{stream_type}/{stream_name}/{date_range:?} is deleting by {node}"
@@ -424,7 +494,7 @@ pub async fn delete_by_date(
     }
 
     // before start merging, set current node to lock the stream
-    db::compact::retention::process_stream(
+    crate::repository::retention::process_stream(
         org_id,
         stream_type,
         stream_name,
@@ -488,7 +558,7 @@ pub async fn delete_by_date(
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-    openobserve_compactor::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range)
+    crate::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range)
         .await
         .map_err(|e| {
             log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");
@@ -513,8 +583,8 @@ pub async fn delete_by_date(
     }
 
     // update stream stats retention time
-    let stats_data_range = ("".to_string(), super::stats::get_yesterday_boundary());
-    if let Err(e) = super::stats::update_stats_from_file_list_for_stream(
+    let stats_data_range = ("".to_string(), crate::stats::get_yesterday_boundary());
+    if let Err(e) = crate::stats::update_stats_from_file_list_for_stream(
         org_id,
         stream_type,
         stream_name,
@@ -544,7 +614,7 @@ pub async fn delete_from_file_list(
         "delete_from_file_list-{}-{}-{}",
         task_id, time_range.0, time_range.1
     );
-    let files = file_list::query(
+    let files = query_file_list(
         &fake_trace_id,
         org_id,
         stream_type,
@@ -691,16 +761,21 @@ async fn handle_delete_by_date_done(
     date_range: (&str, &str),
 ) -> Result<(), anyhow::Error> {
     // mark delete done
-    db::compact::retention::delete_stream_done(org_id, stream_type, stream_name, Some(date_range))
-        .await
-        .map_err(|e| {
-            log::error!("[COMPACTOR] delete_by_date mark delete done failed: {e}");
-            e
-        })?;
+    crate::repository::retention::delete_stream_done(
+        org_id,
+        stream_type,
+        stream_name,
+        Some(date_range),
+    )
+    .await
+    .map_err(|e| {
+        log::error!("[COMPACTOR] delete_by_date mark delete done failed: {e}");
+        e
+    })?;
 
     // Check if the key is also present in the `compactor_manual_jobs` table
     // If it is, mark the job as completed
-    let mut jobs = db::compact::compactor_manual_jobs::list_jobs_by_key(
+    let mut jobs = crate::repository::compactor_manual_jobs::list_jobs_by_key(
         org_id,
         stream_type,
         stream_name,
@@ -715,7 +790,7 @@ async fn handle_delete_by_date_done(
 
     // Note: Manual job operations are isolated - any errors are logged and ignored
     // to prevent them from affecting the main compactor retention job
-    let _ = db::compact::compactor_manual_jobs::bulk_update_jobs(jobs)
+    let _ = crate::repository::compactor_manual_jobs::bulk_update_jobs(jobs)
         .await
         .map_err(|e| {
             log::error!("[COMPACTOR] delete_by_date bulk update manual job failed: {e}");
@@ -732,6 +807,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[ignore = "requires an initialized metadata database"]
     async fn test_generate_retention_job() {
         infra_file_list::create_table().await.unwrap();
         let org_id = "test";
@@ -746,6 +822,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires an initialized metadata database"]
     async fn test_delete_all() {
         infra_file_list::create_table().await.unwrap();
         let org_id = "test";
