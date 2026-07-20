@@ -27,21 +27,6 @@ use openobserve_mcp::{
     MCP_PROTOCOL_VERSION, MCPRequest, handle_mcp_request, handle_mcp_request_stream,
 };
 
-#[cfg(not(feature = "enterprise"))]
-/// Returns a 404 response for OAuth discovery in non-enterprise builds.
-fn oauth_only_in_enterprise() -> Response {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(
-            serde_json::to_string(&serde_json::json!({
-                "error": "OAuth discovery is only available in enterprise edition"
-            }))
-            .unwrap(),
-        ))
-        .unwrap()
-}
-
 /// MCP protocol version header name (MCP 2025-11-25)
 const MCP_PROTOCOL_VERSION_HEADER: &str = "MCP-Protocol-Version";
 
@@ -351,7 +336,16 @@ pub async fn oauth_authorization_server_metadata() -> Response {
     )
 )]
 pub async fn oauth_authorization_server_metadata() -> Response {
-    oauth_only_in_enterprise()
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "error": "OAuth discovery is only available in enterprise edition"
+            }))
+            .unwrap(),
+        ))
+        .unwrap()
 }
 
 #[cfg(test)]

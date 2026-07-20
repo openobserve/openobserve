@@ -728,7 +728,10 @@ async fn serve_http(haddr: SocketAddr, app: axum::Router) -> Result<(), anyhow::
             .serve(service)
             .await?;
     } else {
-        axum_server::bind(haddr).handle(handle).serve(service).await?;
+        axum_server::bind(haddr)
+            .handle(handle)
+            .serve(service)
+            .await?;
     }
 
     Ok(())
@@ -739,7 +742,11 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     let haddr = http_server_addr()?;
     log::info!(
         "Starting {} server at: {haddr}",
-        if cfg.http.tls_enabled { "HTTPS" } else { "HTTP" }
+        if cfg.http.tls_enabled {
+            "HTTPS"
+        } else {
+            "HTTP"
+        }
     );
 
     // Build the router
@@ -1330,12 +1337,16 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
 
     log::info!(
         "Starting Action Server {} server at: {haddr}",
-        if cfg.http.tls_enabled { "HTTPS" } else { "HTTP" }
+        if cfg.http.tls_enabled {
+            "HTTPS"
+        } else {
+            "HTTP"
+        }
     );
 
     // Build the router for action server
-    let app = apply_common_middlewares(create_action_server_router())
-        .layer(TraceLayer::new_for_http());
+    let app =
+        apply_common_middlewares(create_action_server_router()).layer(TraceLayer::new_for_http());
 
     serve_http(haddr, app).await?;
 
