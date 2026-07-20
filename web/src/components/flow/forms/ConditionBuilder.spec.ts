@@ -26,7 +26,7 @@ vi.mock("@/components/alerts/FilterGroup.vue", () => ({
   default: {
     name: "FilterGroup",
     template: '<div class="filter-group-stub" />',
-    props: ["streamFields", "group", "depth", "conditionInputWidth", "allowCustomColumns", "module"],
+    props: ["streamFields", "group", "depth", "conditionInputWidth", "allowCustomColumns", "module", "namePrefix", "indentRem"],
     emits: ["add-condition", "add-group", "remove-group"],
   },
 }));
@@ -124,6 +124,48 @@ describe("ConditionBuilder", () => {
     expect(
       wrapper.findComponent({ name: "FilterGroup" }).props("streamFields"),
     ).toEqual(fields);
+  });
+
+  // ── Prop plumbing down to FilterGroup ─────────────────────────────────────
+  // Both of these are load-bearing and fail SILENTLY when dropped, which is how
+  // #13277 killed custom columns: the select kept rendering, it just stopped
+  // being creatable. FilterGroup is stubbed here, so these pin the first hop
+  // only — the second hop (FilterGroup -> FilterCondition) is pinned in
+  // FilterGroup.spec, and the create behaviour itself in FilterCondition.spec.
+
+  it("renders FilterGroup in FORM MODE (name-prefix=conditions)", () => {
+    // Without the prefix, FilterCondition falls out of name-binding and no leaf
+    // value ever reaches the form — the whole builder silently stops working.
+    const wrapper = createWrapper();
+    expect(
+      wrapper.findComponent({ name: "FilterGroup" }).props("namePrefix"),
+    ).toBe("conditions");
+  });
+
+  it("passes allowCustomColumns through to FilterGroup", () => {
+    const wrapper = createWrapper({ allowCustomColumns: true });
+    expect(
+      wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns"),
+    ).toBe(true);
+  });
+
+  // Note the deliberate asymmetry: FilterGroup/FilterCondition default this to
+  // FALSE so alerts never get a creatable column select, but this flow-specific
+  // wrapper defaults it to TRUE — both of its consumers (pipeline + workflow
+  // Condition nodes) want custom columns, and the pipeline drawer's guidelines
+  // tell users to type one and press Enter.
+  it("defaults allowCustomColumns to true (flow nodes want custom columns)", () => {
+    const wrapper = createWrapper();
+    expect(
+      wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns"),
+    ).toBe(true);
+  });
+
+  it("still honours an explicit opt-out", () => {
+    const wrapper = createWrapper({ allowCustomColumns: false });
+    expect(
+      wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns"),
+    ).toBe(false);
   });
   // ── Ported from pipeline Condition.spec ───────────────────────────────────
   // These behaviours moved here when pipelines and workflows were put back on

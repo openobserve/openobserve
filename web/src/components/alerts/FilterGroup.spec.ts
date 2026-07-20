@@ -2252,6 +2252,69 @@ describe('FilterGroup.vue Form Mode (namePrefix + OForm)', () => {
   // would have caught any other inline margin-left too. `indent-rem` replaces
   // that; these pin both the default and the override so the CSS hack cannot
   // come back unnoticed.
+  // ── allowCustomColumns passthrough ──────────────────────────────────────────
+  // FilterGroup is the middle hop: ConditionBuilder -> FilterGroup ->
+  // FilterCondition. The prop is what makes the column select `creatable`, and
+  // dropping it fails SILENTLY (the select still renders, it just stops
+  // accepting new columns) — which is exactly how #13277 killed the affordance.
+  // Nested groups are covered too: FilterGroup recurses into itself, so the
+  // prop has to survive every level, not just the root.
+  describe("allowCustomColumns passthrough", () => {
+    const leaf = (id: string) => ({
+      filterType: "condition",
+      id,
+      column: "",
+      operator: "=",
+      value: "",
+      logicalOperator: "AND",
+    });
+
+    const mountWith = (allowCustomColumns?: boolean) =>
+      mount(FilterGroup, {
+        props: {
+          group: {
+            groupId: "root",
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [
+              leaf("c1"),
+              {
+                groupId: "nested",
+                filterType: "group",
+                logicalOperator: "AND",
+                conditions: [leaf("c2")],
+              },
+            ],
+          },
+          streamFields: [{ label: "Field 1", value: "field1" }],
+          depth: 0,
+          ...(allowCustomColumns === undefined ? {} : { allowCustomColumns }),
+        },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+          stubs: { FilterCondition: true },
+        },
+      });
+
+    it("reaches every FilterCondition, including ones in nested groups", () => {
+      const conditions = mountWith(true).findAllComponents({
+        name: "FilterCondition",
+      });
+      // root leaf + nested leaf
+      expect(conditions.length).toBeGreaterThanOrEqual(2);
+      conditions.forEach((c) =>
+        expect(c.props("allowCustomColumns")).toBe(true),
+      );
+    });
+
+    it("defaults to false so alerts never get a creatable column select", () => {
+      mountWith()
+        .findAllComponents({ name: "FilterCondition" })
+        .forEach((c) => expect(c.props("allowCustomColumns")).toBe(false));
+    });
+  });
+
   describe("indent-rem", () => {
     // Local props: `defaultProps` belongs to another describe block.
     const baseProps = {
