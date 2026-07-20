@@ -21,12 +21,12 @@ use o2_enterprise::enterprise::license::{
     LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
     ingestion_used, license_expired,
 };
+use openobserve_organization::license;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,
-    service::db::license,
 };
 
 #[derive(Serialize, Deserialize)]

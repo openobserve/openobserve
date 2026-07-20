@@ -17,6 +17,8 @@ pub mod authz;
 #[cfg(feature = "enterprise")]
 pub mod keys;
 #[cfg(feature = "enterprise")]
+pub mod license;
+#[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod org_cleanup;
 #[cfg(feature = "enterprise")]

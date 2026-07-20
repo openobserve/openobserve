@@ -97,7 +97,9 @@ pub mod kv {
     pub use common::kv::*;
 }
 #[cfg(feature = "enterprise")]
-pub mod license;
+pub mod license {
+    pub use openobserve_organization::license::*;
+}
 pub mod metas;
 pub mod metrics {
     pub use openobserve_ingestion::metrics::cluster::*;

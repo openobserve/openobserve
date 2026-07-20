@@ -1011,7 +1011,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
             LOCAL_NODE.is_router() || LOCAL_NODE.is_single_role(),
         )
         .await;
-        tokio::task::spawn(db::license::watch());
+        tokio::task::spawn(openobserve_organization::license::watch());
     }
 
     if !LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier() && !LOCAL_NODE.is_alert_manager() {
