@@ -20,6 +20,7 @@ use crate::db::metas;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     crate::alerts::install_runtime_services();
+    crate::ingestion::install_runtime_services();
 
     let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,

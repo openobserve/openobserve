@@ -160,7 +160,6 @@ mod common {
     pub mod infra {
         pub mod config {
             pub use ::common::infra::config::*;
-            pub use openobserve_alerts::REALTIME_ALERT_TRIGGERS;
         }
 
         #[cfg(feature = "enterprise")]
