@@ -23,7 +23,7 @@ use config::{
     get_config,
     meta::cluster::{Role, RoleGroup, get_internal_grpc_token},
     metrics,
-    utils::time::now_micros,
+    utils::time::{day_micros, now_micros},
 };
 use futures_util::StreamExt;
 use hashbrown::{HashMap, HashSet};
@@ -497,6 +497,19 @@ pub async fn queue_download(
         "[FILE_CACHE_DOWNLOAD:JOB] [trace_id {trace_id}] enqueue file: {file}, size: {size}, ts: {ts}"
     );
 
+    // files with data older than the cache max age are not worth caching: with
+    // time_lru they become the oldest bucket and are evicted first, so the
+    // download would be wasted work. Skip the queue and let the query read
+    // them directly from object storage.
+    if exceeds_cache_max_age(ts, cache_type) {
+        log::debug!(
+            "[FILE_CACHE_DOWNLOAD:JOB] [trace_id {trace_id}] skip file: {file}, data is older than the cache max age"
+        );
+        return Ok(());
+    }
+
+    let cfg = get_config();
+
     // skip if already queued or already being downloaded
     if !queued_files::try_add(&file) {
         return Ok(());
@@ -506,7 +519,6 @@ pub async fn queue_download(
         return Ok(());
     }
 
-    let cfg = get_config();
     if cfg.limit.file_download_enable_priority_queue
         && should_prioritize_file(ts, cfg.limit.file_download_priority_queue_window_secs)
     {
@@ -560,9 +572,61 @@ fn should_prioritize_file(ts: i64, window_secs: i64) -> bool {
     ts > now - window_micros
 }
 
+/// Returns true if the file's data is older than the cache max age and should
+/// not be downloaded into the cache.
+pub fn exceeds_cache_max_age(ts: i64, cache_type: file_data::CacheType) -> bool {
+    let cfg = get_config();
+    let max_age_days = match cache_type {
+        file_data::CacheType::Memory => cfg.memory_cache.max_age_days,
+        file_data::CacheType::Disk => cfg.disk_cache.max_age_days,
+        file_data::CacheType::None => 0,
+    };
+    exceeds_max_age(ts, max_age_days)
+}
+
+// if the file data is older than max_age_days, it should not be cached.
+// max_age_days == 0 means no limit, ts <= 0 means the timestamp is unknown.
+fn exceeds_max_age(ts: i64, max_age_days: i64) -> bool {
+    if max_age_days <= 0 || ts <= 0 {
+        return false;
+    }
+    ts < now_micros() - day_micros(max_age_days)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{FileInfo, PriorityDownloadQueue, file_data, processing_files, queued_files};
+    use config::utils::time::{day_micros, hour_micros, now_micros};
+
+    use super::{
+        FileInfo, PriorityDownloadQueue, exceeds_max_age, file_data, processing_files, queued_files,
+    };
+
+    #[test]
+    fn test_exceeds_max_age_disabled() {
+        // max_age_days == 0 means no limit, nothing is too old
+        let one_year_ago = now_micros() - day_micros(365);
+        assert!(!exceeds_max_age(one_year_ago, 0));
+        assert!(!exceeds_max_age(one_year_ago, -1));
+    }
+
+    #[test]
+    fn test_exceeds_max_age_unknown_ts() {
+        // unknown timestamp should not be skipped
+        assert!(!exceeds_max_age(0, 3));
+        assert!(!exceeds_max_age(-1, 3));
+    }
+
+    #[test]
+    fn test_exceeds_max_age_recent_file() {
+        let one_hour_ago = now_micros() - hour_micros(1);
+        assert!(!exceeds_max_age(one_hour_ago, 3));
+    }
+
+    #[test]
+    fn test_exceeds_max_age_old_file() {
+        let thirty_days_ago = now_micros() - day_micros(30);
+        assert!(exceeds_max_age(thirty_days_ago, 3));
+    }
 
     #[test]
     fn test_is_processing_false_initially() {
