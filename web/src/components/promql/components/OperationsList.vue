@@ -45,16 +45,16 @@
                     </OButton>
                   </template>
                   <div
-                    class="operations-list-dropdown p-4"
+                    class="operations-list-dropdown p-3"
                     :data-test="`promql-operation-${index}-menu`"
                   >
-                    <div style="width: 350px">
+                    <div class="w-86 [&_.o-input-label]:text-xs [&_.o-input-label]:font-normal">
                       <div class="font-medium">
                         {{ getStepSpec(element.id)?.name || element.id }}
                       </div>
                       <div
                         v-if="getStepSpec(element.id)?.documentation"
-                        class="text-xs text-text-muted mb-3"
+                        class="text-xs text-text-secondary mb-2"
                       >
                         {{ getStepSpec(element.id)?.documentation }}
                       </div>
@@ -72,7 +72,7 @@
                           v-model.number="element.params[paramIndex] as number"
                           type="number"
                           :label="param.name"
-                          class="showLabelOnTop mb-2"
+                          class="showLabelOnTop mb-1.5"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -82,7 +82,7 @@
                           v-model="element.params[paramIndex] as string"
                           :label="param.name"
                           :placeholder="param.placeholder"
-                          class="showLabelOnTop mb-2"
+                          class="showLabelOnTop mb-1.5"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -94,7 +94,7 @@
                           :label="param.name"
                           multiple
                           searchable
-                          class="operation-label-selector showLabelOnTop no-case mb-2"
+                          class="operation-label-selector showLabelOnTop no-case mb-1.5"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         >
                           <template #empty>
