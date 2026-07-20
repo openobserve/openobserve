@@ -2,7 +2,9 @@
   // OpenCode configuration for this repo's CI agents.
   // - e2e-ci-* agents: used by .github/workflows/e2e-council.yml for CI test-generation, on DeepSeek.
   // - ai-review-* agents: used by scripts/ai-review/run-review.mjs (dispatched via `opencode serve`)
-  //   for PR code review, on GLM-5.2 (Z.ai).
+  //   for PR code review. ONE shared set, run once per provider by the matrix in
+  //   .github/workflows/ai-code-review.yml (GLM-5.2 vs DeepSeek-V4-Pro head-to-head). The model is
+  //   supplied per-call by the runner, so the agents themselves are provider-agnostic.
   // Docs: https://opencode.ai/docs/  — verify provider shape against current docs at build time.
   "$schema": "https://opencode.ai/config.json",
 
@@ -32,6 +34,22 @@
         "glm-5.2": {
           "name": "GLM-5.2",
           "limit": { "context": 1000000, "output": 131072 }
+        }
+      }
+    },
+    // Separate DeepSeek provider for PR review — distinct from the `deepseek` provider above so
+    // review usage/billing (DEEPSEEK_API_KEY) is isolated from the e2e council (DEEPSEEK_API_KEY_E2E).
+    "deepseek-review": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "DeepSeek (review)",
+      "options": {
+        "baseURL": "https://api.deepseek.com",
+        "apiKey": "{env:DEEPSEEK_API_KEY}"
+      },
+      "models": {
+        "deepseek-v4-pro": {
+          "name": "DeepSeek-V4-Pro",
+          "limit": { "context": 1048576, "output": 262144 }
         }
       }
     }
@@ -82,6 +100,13 @@
     // (shared-rules.md + agents/<key>.md) and sent via the `system` override on
     // session.prompt, so no `prompt` is registered here.
     //
+    // ONE shared agent set drives every provider. run-review.mjs sends an explicit
+    // `model: {providerID, modelID}` (and `variant` when REVIEW_MODEL_VARIANT is set) on each
+    // session.prompt call, which overrides whatever is declared here — so the `model` below is
+    // only a default for local/manual `opencode` runs. Do NOT fork these into per-provider
+    // copies: identical agents are exactly what makes a model-vs-model comparison meaningful,
+    // and duplicated blocks drift.
+    //
     // Tool policy is an ALLOWLIST-by-negation, not just "no write/edit/bash": PR diff
     // content is untrusted (any external contributor can put prompt-injection text in a
     // diff) and is fed directly into these agents' prompts, with output auto-posted to the
@@ -94,7 +119,6 @@
     "ai-review-security": {
       "mode": "primary",
       "model": "zai/glm-5.2",
-      "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -104,7 +128,6 @@
     "ai-review-code-quality": {
       "mode": "primary",
       "model": "zai/glm-5.2",
-      "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -114,7 +137,6 @@
     "ai-review-performance": {
       "mode": "primary",
       "model": "zai/glm-5.2",
-      "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -124,7 +146,6 @@
     "ai-review-documentation": {
       "mode": "primary",
       "model": "zai/glm-5.2",
-      "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -134,7 +155,6 @@
     "ai-review-release": {
       "mode": "primary",
       "model": "zai/glm-5.2",
-      "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -144,7 +164,6 @@
     "ai-review-coordinator": {
       "mode": "primary",
       "model": "zai/glm-5.2",
-      "variant": "max",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
