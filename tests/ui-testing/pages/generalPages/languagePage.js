@@ -339,7 +339,7 @@ class LanguagePage {
    */
   async resetToEnglish(pm) {
     await this.navigateToHome();
-    await pm.homePage.changeLanguage('en-gb');
+    await pm.homePage.changeLanguage('en-us');
   }
 
   /**

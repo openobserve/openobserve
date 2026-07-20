@@ -18,7 +18,7 @@ import {
   ALERT_PAYLOAD_FIELDS,
   TRIGGER_META_VARS,
 } from "@/plugins/workflows/alertFields";
-import en from "@/locales/languages/en.json";
+import en from "@/locales/languages/en-US.json";
 
 /** Resolve a dotted i18n key against the en.json translation tree. */
 const resolveKey = (key: string): unknown =>

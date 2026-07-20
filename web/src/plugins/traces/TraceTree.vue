@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )
                   "
                   :data-test="`trace-tree-span-badge-collapse-btn-${(spans as any[])[virtualRow.index].spanId}`"
-                  :title="`Click to ${collapseMapping[(spans as any[])[virtualRow.index].spanId] ? 'expand' : 'collapse'}`"
+                  :title="collapseMapping[(spans as any[])[virtualRow.index].spanId] ? t('traces.traceTree.clickToExpand') : t('traces.traceTree.clickToCollapse')"
                 >
                   {{ getChildCount((spans as any[])[virtualRow.index]) }}
                   <div
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         name="error" size="sm"
                         class="text-[var(--o2-status-error-text)]! mr-1"
-                        title="Error Span"
+                        :title="t('traces.traceTree.errorSpan')"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
                       <span
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (spans as any[])[virtualRow.index],
                         ).text,
                       }"
-                      :title="`HTTP ${getHttpStatus((spans as any[])[virtualRow.index])}`"
+                      :title="t('traces.traceTree.httpStatus', { status: getHttpStatus((spans as any[])[virtualRow.index]) })"
                       :data-test="`trace-tree-span-http-status-${(spans as any[])[virtualRow.index].spanId}`"
                     >
                       {{ getHttpStatus((spans as any[])[virtualRow.index]) }}
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         color: 'var(--o2-text-secondary)',
                         whiteSpace: 'nowrap',
                       }"
-                      :title="`${getEventCount((spans as any[])[virtualRow.index])} span event${getEventCount((spans as any[])[virtualRow.index]) > 1 ? 's' : ''}`"
+                      :title="getEventCount((spans as any[])[virtualRow.index]) > 1 ? t('traces.traceTree.spanEvents', { count: getEventCount((spans as any[])[virtualRow.index]) }) : t('traces.traceTree.spanEvent', { count: getEventCount((spans as any[])[virtualRow.index]) })"
                       :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >
                       <OIcon name="event-note" size="xs" />

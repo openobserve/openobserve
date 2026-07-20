@@ -190,17 +190,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="logout_confirm"
     persistent
     size="xs"
-    title="Password Changed"
-    primary-button-label="Ok"
+    :title="t('iam.addUser.passwordChanged')"
+    :primary-button-label="t('iam.addUser.ok')"
     @click:primary="signout"
   >
     <div class="flex items-center gap-3">
       <div class="bg-[var(--o2-primary)] text-white inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0">
         <OIcon name="info" size="sm" />
       </div>
-      <span>As you've chosen to change your password, you'll be automatically
-        logged out.</span
-      >
+      <span>{{ t('iam.addUser.changePasswordLogoutMessage') }}</span>
     </div>
   </ODialog>
 </template>
@@ -598,7 +596,7 @@ export default defineComponent({
 
       if (props.userRole == "root") {
         organizationOptions.value.push({
-          label: "Other",
+          label: t("iam.addUser.other"),
           value: "other",
         });
       }

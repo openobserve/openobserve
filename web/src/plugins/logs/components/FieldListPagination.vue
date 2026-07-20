@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="pagesNumber > 1" class="flex items-center gap-1">
         <OTooltip
           data-test="logs-page-fields-list-pagination-tooltip"
-          :content="'Total Fields: ' + totalFieldsCount"
+          :content="t('logs.fieldListPagination.totalFields', { count: totalFieldsCount })"
           max-width="18.75rem"
           side="left"
           align="center"
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           :disabled="isFirstPage"
           @click="$emit('first-page')"
-          aria-label="First page"
+          :aria-label="t('logs.fieldListPagination.firstPage')"
         >
           <OIcon name="fast-rewind" size="xs" />
         </OButton>
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           :disabled="isLastPage"
           @click="$emit('last-page')"
-          aria-label="Last page"
+          :aria-label="t('logs.fieldListPagination.lastPage')"
         >
           <OIcon name="fast-forward" size="xs" />
         </OButton>

@@ -153,7 +153,7 @@ export default defineComponent({
             emit("refresh", updatedTab);
             emit("update:open", false);
 
-            showPositiveNotification("Tab updated successfully");
+            showPositiveNotification(t("dashboard.addTab.tabUpdatedSuccessfully"));
           }
           //else new tab
           else {
@@ -168,19 +168,23 @@ export default defineComponent({
             emit("refresh", newTab);
             emit("update:open", false);
 
-            showPositiveNotification("Tab added successfully");
+            showPositiveNotification(t("dashboard.addTab.tabAddedSuccessfully"));
           }
       } catch (error: any) {
           if (error?.response?.status === 409) {
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
+                (props.editMode
+                  ? t("dashboard.addTab.failedToUpdateTab")
+                  : t("dashboard.addTab.failedToAddTab")),
             );
           } else {
             showErrorNotification(
               error?.message ??
-                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
+                (props.editMode
+                  ? t("dashboard.addTab.failedToUpdateTab")
+                  : t("dashboard.addTab.failedToAddTab")),
               {
                 timeout: 2000,
               },

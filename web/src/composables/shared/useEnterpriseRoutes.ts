@@ -135,6 +135,23 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
+    // Inbound MCP server setup — lives under IAM as a credentialed-access
+    // surface, alongside Service Accounts / Ingestion Tokens. MCP is an AI
+    // feature, gated on ai_enabled like the rest of the app — but that gate is
+    // enforced by the sidebar item's reactive `visible` (isEnterprise &&
+    // ai_enabled), NOT here: `window.store` is unset at runtime, so a guard read
+    // is unreliable and must never fail-closed (it would bounce every click to
+    // Users). The route itself is already limited to the enterprise/cloud build.
+    routes[0].children.push({
+      path: "mcpServer",
+      name: "mcpServer",
+      meta: { title: "MCP Server" },
+      component: () => import("@/components/iam/McpServer.vue"),
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+
     routes.push({
       path: "synthetic",
       name: "synthetic",

@@ -404,9 +404,13 @@ const wrapperClasses = computed(() => [
       </span>
     </div>
 
-    <!-- Bottom row: helpText / error / counter -->
+    <!-- Bottom row: helpText / error / counter.
+         `effectiveError` is " " when the field is invalid but its message is
+         rendered elsewhere (OFormInput's #error slot). That carries no text, so
+         it must not open this row — an empty row still costs the parent's gap-1
+         and would grow the field on error, nudging anything aligned beside it. -->
     <div
-      v-if="effectiveError || helpText || maxlength"
+      v-if="(effectiveError && effectiveError.trim()) || helpText || maxlength"
       class="flex items-center justify-between gap-2"
     >
       <span

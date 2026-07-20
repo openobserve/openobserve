@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
+            <span class="o2-table-footer-title">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || t('iam.user.organizationMembers')) : t('iam.basicUsers') }}</span>
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="delete"
               @click="openBulkDeleteDialog"
             >
-              Delete
+              {{ t('iam.user.delete') }}
             </OButton>
           </template>
         </OTable>
@@ -519,7 +519,7 @@ export default defineComponent({
             variant: "error",
             message:
               err?.response?.data?.message ||
-              "Failed to load custom roles.",
+              t('iam.user.failedToLoadCustomRoles'),
           });
         }
       }
@@ -528,7 +528,7 @@ export default defineComponent({
     const getInvitedMembers = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading users...",
+        message: t('iam.user.pleaseWaitLoadingUsers'),
               timeout: 0,
 });
 
@@ -620,7 +620,7 @@ export default defineComponent({
     const getOrgMembers = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading users...",
+        message: t('iam.user.pleaseWaitLoadingUsers'),
               timeout: 0,
 });
 
@@ -753,7 +753,7 @@ export default defineComponent({
             dismiss();
             toast({
               variant: "error",
-              message: "Failed to load users: " + (err?.response?.data?.message || err?.message || "Unknown error"),
+              message: t('iam.user.failedToLoadUsers', { error: err?.response?.data?.message || err?.message || t('iam.user.unknownError') }),
               timeout: 5000,
             });
             reject(false);
@@ -991,7 +991,7 @@ export default defineComponent({
           await getOrgMembers();
         } catch (error) {
           toast({
-            message: "Failed to refresh user list",
+            message: t('iam.user.failedToRefreshUserList'),
             variant: "error",
           });
         }
@@ -1023,7 +1023,7 @@ export default defineComponent({
         updateUserActions();
         if (operationType == "created") {
           toast({
-            message: "User added successfully.",
+            message: t('iam.user.userAddedSuccess'),
             variant: "success",
           });
           // if (
@@ -1052,7 +1052,7 @@ export default defineComponent({
           // }
         } else {
           toast({
-            message: "User updated successfully.",
+            message: t('iam.user.userUpdatedSuccess'),
             variant: "success",
           });
           // usersState.users.forEach((member: any, key: number) => {
@@ -1085,7 +1085,7 @@ export default defineComponent({
         .then(async (res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: "User deleted successfully.",
+              message: t('iam.user.userDeletedSuccess'),
               variant: "success",
             });
             await getOrgMembers();
@@ -1095,7 +1095,7 @@ export default defineComponent({
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message: "Error while deleting user.",
+              message: t('iam.user.errorDeletingUser'),
               variant: "error",
             });
           }
@@ -1112,7 +1112,7 @@ export default defineComponent({
       confirmRevoke.value = false;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t('iam.user.pleaseWait'),
         timeout: 0,
       });
 
@@ -1121,7 +1121,7 @@ export default defineComponent({
         .then(async (res: any) => {
           dismiss();
           toast({
-            message: "Invitation revoked successfully.",
+            message: t('iam.user.invitationRevokedSuccess'),
             variant: "success",
           });
           await getOrgMembers();
@@ -1137,7 +1137,7 @@ export default defineComponent({
         .catch((err: any) => {
           dismiss();
           toast({
-            message: err?.response?.data?.message || "Error while revoking invitation.",
+            message: err?.response?.data?.message || t('iam.user.errorRevokingInvitation'),
             variant: "error",
           });
         });
@@ -1164,17 +1164,17 @@ export default defineComponent({
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
-            message: `Successfully deleted ${successful.length} user(s)`,
+            message: t('iam.user.deletedUsersSuccess', { count: successful.length }),
             variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
-            message: `Deleted ${successful.length} user(s), but ${unsuccessful.length} failed`,
+            message: t('iam.user.deletedUsersPartial', { count: successful.length, failed: unsuccessful.length }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: `Failed to delete ${unsuccessful.length} user(s)`,
+            message: t('iam.user.failedToDeleteUsers', { count: unsuccessful.length }),
             variant: "error",
           });
         }
@@ -1186,7 +1186,7 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
-            message: err.response?.data?.message || err?.message || "Error while deleting users",
+            message: err.response?.data?.message || err?.message || t('iam.user.errorDeletingUsers'),
             variant: "error",
           });
         }
@@ -1196,7 +1196,7 @@ export default defineComponent({
     const updateUserRole = (row: any) => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t('iam.user.pleaseWait'),
         timeout: 0,
       });
 
@@ -1212,7 +1212,7 @@ export default defineComponent({
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
-            const message = `Error while updating organization member`;
+            const message = t('iam.user.errorUpdatingOrgMember');
             toast({
               variant: "error",
               message: message,
@@ -1221,7 +1221,7 @@ export default defineComponent({
           } else {
             toast({
               variant: "success",
-              message: "Organization member updated successfully.",
+              message: t('iam.user.orgMemberUpdatedSuccess'),
             });
           }
           dismiss();

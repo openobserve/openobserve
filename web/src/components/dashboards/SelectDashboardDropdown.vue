@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="showAddDashboardDialog"
     size="sm"
-    title="New dashboard"
+    :title="t('dashboard.selectDashboardDropdown.newDashboard')"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"
     form-id="add-dashboard-form"

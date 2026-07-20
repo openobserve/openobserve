@@ -14,34 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, config } from "@vue/test-utils";
 import { nextTick } from "vue";
+import i18n from "@/locales";
 import VariableSettings from "./VariableSettings.vue";
 
-// Mock external dependencies
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: vi.fn((key: string) => {
-      const translations: Record<string, string> = {
-        "dashboard.queryValues": "Query Values",
-        "dashboard.constant": "Constant", 
-        "dashboard.textbox": "Textbox",
-        "dashboard.custom": "Custom",
-        "dashboard.newVariable": "New Variable",
-        "dashboard.name": "Name",
-        "dashboard.type": "Type", 
-        "dashboard.selectType": "Select Type",
-        "dashboard.actions": "Actions",
-        "dashboard.edit": "Edit",
-        "dashboard.delete": "Delete",
-        "dashboard.isMultiSelect": "Multi Select",
-        "dashboard.isSingleSelect": "Single Select"
-      };
-      return translations[key] || key;
-    })
-  })
-}));
+// Install the real app i18n so migrated keys resolve to their English text.
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
+// Mock external dependencies
 vi.mock("vuex", () => ({
   useStore: () => ({
     state: {

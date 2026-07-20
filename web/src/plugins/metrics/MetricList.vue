@@ -73,7 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <div class="flex items-center min-w-0">
                       <OFieldLabel :field="row" class="flex-1 min-w-0" />
-                      <div class="absolute h-full right-0 top-0 z-[5] bg-[#e8e8e8] px-[6px] invisible flex items-center group-hover:visible group-hover:opacity-100 dark:group-hover:bg-[#3f4143]">
+                      <!-- `bg-surface-subtle`, not a hex pair with a `dark:`
+                           override: the token already resolves in both themes,
+                           which is the whole point of having it. -->
+                      <div class="absolute h-full right-0 top-0 z-[5] bg-surface-subtle px-[0.375rem] invisible flex items-center group-hover:visible group-hover:opacity-100">
                         <OButton
                           icon-left="add"
                           :data-test="`metrics-list-add-${row.name}-label-btn`"
@@ -98,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :showing="
                               metricLabelValues[row.name]?.isLoading
                             "
-                            label="Fetching values..."
+                            :label="t('metrics.metricList.fetchingValues')"
                             size="xs"
                           />
                         </div>
@@ -110,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                           class="pl-3 py-1 text-sm font-medium"
                         >
-                          No values found
+                          {{ t('metrics.metricList.noValuesFound') }}
                         </div>
                         <div
                           v-for="value in metricLabelValues[row.name]
@@ -155,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   class="mr-1"
                                   size="icon-xs"
                                   variant="ghost"
-                                  title="Include Term"
+                                  :title="t('metrics.metricList.includeTerm')"
                                   @click="
                                     addValueToEditor(
                                       row.name,
@@ -170,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   class="mr-1"
                                   size="icon-xs"
                                   variant="ghost"
-                                  title="Exclude Term"
+                                  :title="t('metrics.metricList.excludeTerm')"
                                   @click="
                                     addValueToEditor(
                                       row.name,
@@ -373,7 +376,7 @@ export default defineComponent({
           .catch(() => {
             toast({
               variant: "error",
-              message: "Error while fetching field values",
+              message: t("metrics.metricList.errorFetchingFieldValues"),
             });
           })
           .finally(() => {

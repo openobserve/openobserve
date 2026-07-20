@@ -363,7 +363,7 @@ export class HomePage {
      * supported by ODropdown nesting). The data-test attribute is preserved
      * either on a q-item-section or directly on a menuitem (ODropdown),
      * so target the element with data-test and walk up to its clickable ancestor.
-     * @param {string} langCode - Language code (e.g., 'en-gb', 'de', 'es', 'fr', etc.)
+     * @param {string} langCode - Language code (e.g., 'en-us', 'de', 'es', 'fr', etc.)
      * @returns {Locator} - Playwright locator for the language option
      */
     getLanguageOption(langCode) {
@@ -405,7 +405,7 @@ export class HomePage {
     /**
      * Change the application language
      * @param {string} langCode - Language code to switch to
-     * Valid codes: 'en-gb', 'tr-turk', 'zh-cn', 'fr', 'es', 'de', 'it', 'ja', 'ko', 'nl', 'pt'
+     * Valid codes: 'en-us', 'tr-turk', 'zh-cn', 'fr', 'es', 'de', 'it', 'ja', 'ko', 'nl', 'pt'
      */
     async changeLanguage(langCode) {
         await this.openLanguageMenu();
@@ -451,7 +451,7 @@ export class HomePage {
 
     /**
      * Get locator for a specific language option (simple, direct locator)
-     * @param {string} langCode - Language code (e.g., 'en-gb', 'de', 'es', 'fr', etc.)
+     * @param {string} langCode - Language code (e.g., 'en-us', 'de', 'es', 'fr', etc.)
      * @returns {Locator} - Playwright locator for the language option
      */
     getLanguageOptionLocator(langCode) {
@@ -483,7 +483,7 @@ export class HomePage {
      * Available language codes mapped to their labels
      */
     static LANGUAGES = {
-        'en-gb': { label: 'English', menuText: 'Home' },
+        'en-us': { label: 'English', menuText: 'Home' },
         'de': { label: 'Deutsch', menuText: 'Startseite' },
         'es': { label: 'Español', menuText: 'Inicio' },
         'fr': { label: 'Français', menuText: 'Accueil' },

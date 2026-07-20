@@ -22,7 +22,7 @@ import * as cookies from "@/utils/cookies";
 
 // Mock the cookies module
 vi.mock("@/utils/cookies", () => ({
-  getLanguage: vi.fn(() => "en-gb"),
+  getLanguage: vi.fn(() => "en-us"),
   setLanguage: vi.fn(),
   getSidebarStatus: vi.fn(),
   setSidebarStatus: vi.fn(),
@@ -151,10 +151,10 @@ describe("Header Component", () => {
       slackIcon: {},
       zoBackendUrl: "http://localhost:5080",
       langList: [
-        { code: "en-gb", label: "English" },
+        { code: "en-us", label: "English" },
         { code: "fr", label: "Français" },
       ],
-      selectedLanguage: { code: "en-gb", label: "English" },
+      selectedLanguage: { code: "en-us", label: "English" },
       selectedOrg: { identifier: "test-org", label: "Test Organization" },
       userClickedOrg: { identifier: "test-org", label: "Test Organization" },
       // Header.vue migration replaced filteredOrganizations/searchQuery/rowsPerPage
@@ -916,16 +916,16 @@ describe("Header Component", () => {
 
     it("should display language selection menu", () => {
       expect(wrapper.props("langList")).toHaveLength(2);
-      expect(wrapper.props("langList")[0].code).toBe("en-gb");
+      expect(wrapper.props("langList")[0].code).toBe("en-us");
     });
 
     it("should have access to current language from cookies", () => {
-      // Verify that getLanguage can be called (it's mocked to return "en-gb")
+      // Verify that getLanguage can be called (it's mocked to return "en-us")
       const currentLang = cookies.getLanguage();
-      expect(currentLang).toBe("en-gb");
+      expect(currentLang).toBe("en-us");
 
       // Verify the selected language prop matches the cookie language
-      expect(wrapper.props("selectedLanguage").code).toBe("en-gb");
+      expect(wrapper.props("selectedLanguage").code).toBe("en-us");
     });
 
     it("should emit changeLanguage event with correct language data", () => {
@@ -949,7 +949,7 @@ describe("Header Component", () => {
 
     it("should emit changeLanguage for each language in langList", () => {
       const languages = [
-        { code: "en-gb", label: "English" },
+        { code: "en-us", label: "English" },
         { code: "fr", label: "Français" },
         { code: "de", label: "Deutsch" },
       ];

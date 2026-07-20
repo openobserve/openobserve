@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="chartData"
       :height="height"
       @error="onChartError"
+      @updated:data-zoom="$emit('zoom', $event)"
+      @domcontextmenu="$emit('contextmenu', $event)"
     />
   </div>
 </template>
@@ -44,6 +46,7 @@ import {
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import * as echarts from "echarts/core";
 import { toZonedTime } from "date-fns-tz";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
@@ -73,9 +76,25 @@ export default defineComponent({
       default: null,
     },
   },
-  emits: ["error"],
+  /**
+   * `zoom` carries ECharts' `{start, end}` (epoch ms) from a drag-select on the
+   * chart. The converter already builds the dataZoom toolbox for any time-series
+   * panel and ChartRenderer already arms the drag cursor — the gesture was live
+   * on cards all along, it just had no listener, so a drag zoomed and then
+   * silently restored. Forwarding it is the whole fix.
+   *
+   * Not emitted for the heatmap: its x-axis is categorical (one column per
+   * bucket), so the converter withholds the toolbox there anyway.
+   *
+   * `contextmenu` carries ChartRenderer's `{x, y, value}` from a right-click on a
+   * data point — the same event PanelSchemaRenderer turns into Create Alert.
+   * ChartRenderer only fires it for line/bar series, so a heatmap card is
+   * naturally excluded (a bucket count is not an alert threshold).
+   */
+  emits: ["error", "zoom", "contextmenu"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const chartPanelRef = ref(null);
     const chartData = ref<any>({ options: null });
 
@@ -285,7 +304,7 @@ export default defineComponent({
       } catch (error: any) {
         if (seq !== renderSeq) return;
         chartData.value = { options: null };
-        emit("error", error?.message ?? "Failed to render chart");
+        emit("error", error?.message ?? t("metrics.metricCardChart.failedToRenderChart"));
       }
     };
 

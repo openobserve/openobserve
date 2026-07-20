@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="log-detail-table-content"
         >
           <div v-if="rowData.length == 0" class="pt-3 max-w-[350px]">
-            No data available.
+            {{ t('logs.detailTable.noDataAvailable') }}
           </div>
           <OTable
             v-else
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="icon-xs"
                         variant="ghost"
                         class="log-json-field-dropdown-btn"
-                        aria-label="Add icon"
+                        :aria-label="t('logs.detailTable.addIcon')"
                       >
                         <OIcon :name="tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
                       </OButton>
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <img :src="getBtnLogo" width="14" height="14" alt="" />
                       </template>
-                      Send to AI Chat
+                      {{ t('logs.detailTable.sendToAiChat') }}
                     </ODropdownItem>
                     <ODropdownItem
                       v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
@@ -705,7 +705,7 @@ export default defineComponent({
 
     const copyContentToClipboard = (log: any) => {
       copyToClipboard(JSON.stringify(log), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: t("logs.detailTable.contentCopiedSuccessfully"),
         timeout: 1000,
       });
     };

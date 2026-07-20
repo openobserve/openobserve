@@ -20,6 +20,41 @@ import { computeTreeLayout } from "./computeTreeLayout";
 const N = (id: string, label = id) => ({ id, label });
 const E = (from: string, to: string) => ({ from, to });
 
+describe("computeTreeLayout — entry-edge roots (agent-graph regression)", () => {
+  it("treats a node reached only by the entry edge (from=null) as a root, so its subtree gets real depth", () => {
+    // The service-graph API emits a synthetic entry edge {from: null → entry}.
+    // Shape: (entry) → orchestrator → {Supervisor, Worker}; Worker → gpt-4o.
+    // Bug: the entry edge counted `orchestrator` as having an incoming parent,
+    // so roots was empty, BFS never ran, and EVERY node collapsed to depth 0 —
+    // which drew gpt-4o hanging off the wrong parent instead of under Worker.
+    const g = {
+      nodes: [
+        N("orchestrator"),
+        N("Supervisor"),
+        N("Worker"),
+        N("gpt-4o"),
+        N("run_query"),
+      ],
+      edges: [
+        { from: null, to: "orchestrator" },
+        E("orchestrator", "Supervisor"),
+        E("orchestrator", "Worker"),
+        E("Worker", "gpt-4o"),
+        E("Worker", "run_query"),
+      ],
+    };
+    const pos = computeTreeLayout(g as any);
+    // Depth increases down the real hierarchy — not all-flat.
+    expect(pos.get("Supervisor")!.x).toBeGreaterThan(pos.get("orchestrator")!.x);
+    expect(pos.get("Worker")!.x).toBeGreaterThan(pos.get("orchestrator")!.x);
+    // The model sits BEYOND its agent (Worker), i.e. it is Worker's child.
+    expect(pos.get("gpt-4o")!.x).toBeGreaterThan(pos.get("Worker")!.x);
+    expect(pos.get("run_query")!.x).toBeGreaterThan(pos.get("Worker")!.x);
+    // gpt-4o and Supervisor are NOT in the same column (the collapse symptom).
+    expect(pos.get("gpt-4o")!.x).not.toBe(pos.get("Supervisor")!.x);
+  });
+});
+
 describe("computeTreeLayout — columns (X by depth)", () => {
   it("places each depth level in its own column (root left, deps right)", () => {
     // root → a → dep

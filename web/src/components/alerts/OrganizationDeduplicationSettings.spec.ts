@@ -61,6 +61,10 @@ async function mountComp(props: Record<string, any> = {}) {
   });
 }
 
+// The component OWNS its <OForm> (Rule ③ owner pattern) — the single source of
+// truth is the TanStack form on the OForm instance. Drive behavior through it.
+const getForm = (w: any) => (w.findComponent({ name: "OForm" }).vm as any).form;
+
 describe("OrganizationDeduplicationSettings - rendering", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -97,7 +101,7 @@ describe("OrganizationDeduplicationSettings - rendering", () => {
   it("does not call service when config prop is provided", async () => {
     vi.clearAllMocks();
     const config = { enabled: true, alert_dedup_enabled: false, alert_fingerprint_groups: [] };
-    const w = await mountComp({ config });
+    await mountComp({ config });
     await flushPromises();
     expect(alertsService.getOrganizationDeduplicationConfig).not.toHaveBeenCalled();
   });
@@ -109,8 +113,8 @@ describe("OrganizationDeduplicationSettings - cross-alert checkbox visibility", 
   it("shows cross-alert checkbox when enabled=true", async () => {
     const w = await mountComp();
     await flushPromises();
-    (w.vm as any).localConfig.enabled = true;
-    await w.vm.$nextTick();
+    getForm(w).setFieldValue("enabled", true);
+    await flushPromises();
     expect(
       w.find('[data-test="organizationdeduplication-enable-cross-alert-checkbox"]').exists(),
     ).toBe(true);
@@ -119,21 +123,21 @@ describe("OrganizationDeduplicationSettings - cross-alert checkbox visibility", 
   it("hides cross-alert checkbox when enabled=false", async () => {
     const w = await mountComp();
     await flushPromises();
-    (w.vm as any).localConfig.enabled = false;
-    await w.vm.$nextTick();
+    getForm(w).setFieldValue("enabled", false);
+    await flushPromises();
     expect(
       w.find('[data-test="organizationdeduplication-enable-cross-alert-checkbox"]').exists(),
     ).toBe(false);
   });
 });
 
-describe("OrganizationDeduplicationSettings - saveSettings", () => {
+describe("OrganizationDeduplicationSettings - save (real OForm submit)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("calls setOrganizationDeduplicationConfig on save", async () => {
+  it("calls setOrganizationDeduplicationConfig on a valid submit", async () => {
     const w = await mountComp();
     await flushPromises();
-    await (w.vm as any).saveSettings();
+    await getForm(w).handleSubmit();
     await flushPromises();
     expect(alertsService.setOrganizationDeduplicationConfig).toHaveBeenCalledWith(
       "default",
@@ -141,95 +145,72 @@ describe("OrganizationDeduplicationSettings - saveSettings", () => {
     );
   });
 
-  it("emits saved after successful save", async () => {
+  it("emits saved after a successful save", async () => {
     const w = await mountComp();
     await flushPromises();
-    await (w.vm as any).saveSettings();
+    await getForm(w).handleSubmit();
     await flushPromises();
     expect(w.emitted("saved")).toBeTruthy();
   });
 
-  it("validates: blocks save when cross-alert enabled but no fingerprint groups", async () => {
+  it("blocks save when cross-alert enabled but no fingerprint groups (superRefine restore)", async () => {
     const w = await mountComp();
     await flushPromises();
-    (w.vm as any).localConfig.alert_dedup_enabled = true;
-    (w.vm as any).localConfig.alert_fingerprint_groups = [];
-    await (w.vm as any).saveSettings();
+    const form = getForm(w);
+    form.setFieldValue("enabled", true);
+    form.setFieldValue("alert_dedup_enabled", true);
+    form.setFieldValue("alert_fingerprint_groups", []);
     await flushPromises();
+    await form.handleSubmit();
+    await flushPromises();
+    expect(form.state.isValid).toBe(false);
     expect(alertsService.setOrganizationDeduplicationConfig).not.toHaveBeenCalled();
   });
 
   it("allows save when cross-alert enabled and fingerprint groups set", async () => {
     const w = await mountComp();
     await flushPromises();
-    (w.vm as any).localConfig.alert_dedup_enabled = true;
-    (w.vm as any).localConfig.alert_fingerprint_groups = ["group1"];
-    await (w.vm as any).saveSettings();
+    const form = getForm(w);
+    form.setFieldValue("enabled", true);
+    form.setFieldValue("alert_dedup_enabled", true);
+    form.setFieldValue("alert_fingerprint_groups", ["group1"]);
+    await flushPromises();
+    await form.handleSubmit();
     await flushPromises();
     expect(alertsService.setOrganizationDeduplicationConfig).toHaveBeenCalled();
-  });
-
-  it("sets saving to false after completion", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    await (w.vm as any).saveSettings();
-    await flushPromises();
-    expect((w.vm as any).saving).toBe(false);
   });
 });
 
 describe("OrganizationDeduplicationSettings - cancel", () => {
-  it("emits cancel when cancel button is clicked", async () => {
+  it("emits cancel when cancel is triggered", async () => {
     const w = await mountComp();
     await flushPromises();
-    // Trigger cancel emit directly (button uses @click="$emit('cancel')")
     await w.vm.$emit("cancel");
     expect(w.emitted("cancel")).toBeTruthy();
   });
 });
 
-describe("OrganizationDeduplicationSettings - toggleFingerprintGroup", () => {
+describe("OrganizationDeduplicationSettings - fingerprint groups", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("adds group to alert_fingerprint_groups when checked=true", async () => {
+  it("renders a checkbox per semantic group when cross-alert dedup is on", async () => {
     const w = await mountComp();
     await flushPromises();
-    (w.vm as any).localConfig.alert_fingerprint_groups = [];
-    (w.vm as any).toggleFingerprintGroup("group1", true);
-    expect((w.vm as any).localConfig.alert_fingerprint_groups).toContain("group1");
-  });
-
-  it("removes group from alert_fingerprint_groups when checked=false", async () => {
-    const w = await mountComp();
+    getForm(w).setFieldValue("alert_dedup_enabled", true);
     await flushPromises();
-    (w.vm as any).localConfig.alert_fingerprint_groups = ["group1", "group2"];
-    (w.vm as any).toggleFingerprintGroup("group1", false);
-    expect((w.vm as any).localConfig.alert_fingerprint_groups).not.toContain("group1");
-    expect((w.vm as any).localConfig.alert_fingerprint_groups).toContain("group2");
-  });
-
-  it("initializes alert_fingerprint_groups if undefined", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).localConfig.alert_fingerprint_groups = undefined;
-    (w.vm as any).toggleFingerprintGroup("group1", true);
-    expect((w.vm as any).localConfig.alert_fingerprint_groups).toContain("group1");
-  });
-
-  it("does not add duplicate group IDs", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    (w.vm as any).localConfig.alert_fingerprint_groups = ["group1"];
-    (w.vm as any).toggleFingerprintGroup("group1", true);
-    const groups = (w.vm as any).localConfig.alert_fingerprint_groups;
-    expect(groups.filter((g: string) => g === "group1")).toHaveLength(1);
+    expect(
+      w.find('[data-test="organizationdeduplication-fingerprint-group1-checkbox"]').exists(),
+    ).toBe(true);
+    expect(
+      w.find('[data-test="organizationdeduplication-fingerprint-group2-checkbox"]').exists(),
+    ).toBe(true);
   });
 });
 
-describe("OrganizationDeduplicationSettings - watcher", () => {
+describe("OrganizationDeduplicationSettings - external prop sync", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("syncs localConfig when config prop changes", async () => {
+  it("resets the form from the config prop when it changes", async () => {
     const w = await mountComp();
     await flushPromises();
     await w.setProps({
@@ -241,29 +222,34 @@ describe("OrganizationDeduplicationSettings - watcher", () => {
       },
     });
     await flushPromises();
-    expect((w.vm as any).localConfig.enabled).toBe(false);
-    expect((w.vm as any).localConfig.time_window_minutes).toBe(60);
+    const form = getForm(w);
+    expect(form.state.values.enabled).toBe(false);
+    expect(form.state.values.time_window_minutes).toBe(60);
   });
 });
 
-describe("OrganizationDeduplicationSettings - time_window sanitization", () => {
+describe("OrganizationDeduplicationSettings - time_window sanitization (payload parity)", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("saves null when time_window_minutes is empty string", async () => {
+  it("saves null when time_window_minutes is empty", async () => {
     const w = await mountComp();
     await flushPromises();
-    (w.vm as any).localConfig.time_window_minutes = "";
-    await (w.vm as any).saveSettings();
+    const form = getForm(w);
+    form.setFieldValue("time_window_minutes", "");
+    await flushPromises();
+    await form.handleSubmit();
     await flushPromises();
     const callArg = (alertsService.setOrganizationDeduplicationConfig as any).mock.calls[0][1];
     expect(callArg.time_window_minutes).toBeNull();
   });
 
-  it("saves number when time_window_minutes is valid", async () => {
+  it("saves the number when time_window_minutes is valid", async () => {
     const w = await mountComp();
     await flushPromises();
-    (w.vm as any).localConfig.time_window_minutes = 45;
-    await (w.vm as any).saveSettings();
+    const form = getForm(w);
+    form.setFieldValue("time_window_minutes", 45);
+    await flushPromises();
+    await form.handleSubmit();
     await flushPromises();
     const callArg = (alertsService.setOrganizationDeduplicationConfig as any).mock.calls[0][1];
     expect(callArg.time_window_minutes).toBe(45);

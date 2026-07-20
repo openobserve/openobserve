@@ -34,19 +34,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               data-test="service-graph-node-panel-view-related-btn"
             >
-              View Related
+              {{ t('traces.serviceGraphNodeSidePanel.viewRelated') }}
               <OIcon name="arrow-drop-down" size="sm" />
             </OButton>
           </template>
           <ODropdownItem
             @select="viewRelatedLogs"
             data-test="service-graph-node-panel-view-related-logs-btn"
-            >Logs</ODropdownItem
+            >{{ t('traces.serviceGraphNodeSidePanel.logs') }}</ODropdownItem
           >
           <ODropdownItem
             @select="viewRelatedTraces"
             data-test="service-graph-node-panel-view-related-traces-btn"
-            >Traces</ODropdownItem
+            >{{ t('traces.serviceGraphNodeSidePanel.traces') }}</ODropdownItem
           >
         </ODropdown>
       </div>
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <OIcon name="search" size="xs" />
               </template>
-              View Traces
+              {{ t('traces.serviceGraphNodeSidePanel.viewTraces') }}
             </OButton>
           </div>
           <div class="charts-wrapper py-0! min-h-[10.875rem] w-full">
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTab
                 name="operations"
-                label="Operations"
+                :label="t('traces.serviceGraphNodeSidePanel.operations')"
                 style="text-transform: capitalize"
                 data-test="service-graph-node-panel-tab-operations"
               />
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTab
                 v-if="!isInferred"
                 name="metrics"
-                label="Metrics"
+                :label="t('traces.serviceGraphNodeSidePanel.metrics')"
                 style="text-transform: capitalize"
                 data-test="service-graph-node-panel-tab-metrics"
               />
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
               >
-                No operations found
+                {{ t('traces.serviceGraphNodeSidePanel.noOperationsFound') }}
               </div>
               <div
                   v-else-if="recentOperations.length > 0 || loadingOperations"
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <OIcon name="search" size="xs" />
-                        <OTooltip content="View in Traces" />
+                        <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                       </OButton>
                     </template>
                     <template #empty>
@@ -332,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-xs italic py-2 text-center"
                         style="color: var(--o2-text-secondary)"
                       >
-                        No operations found
+                        {{ t('traces.serviceGraphNodeSidePanel.noOperationsFound') }}
                       </div>
                     </template>
                   </TenstackTable>
@@ -353,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-xs italic py-2 text-center"
                 style="color: var(--o2-text-secondary)"
               >
-                No {{ cfg.label.toLowerCase() }} data found
+                {{ t('traces.serviceGraphNodeSidePanel.noResourceDataFound', { resource: cfg.label.toLowerCase() }) }}
               </div>
               <div
                 v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
@@ -401,7 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       <OIcon name="search" size="xs" />
-                      <OTooltip content="View in Traces" />
+                      <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                     </OButton>
                   </template>
                   <template #cell-errors="{ item }">
@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-xs italic py-2 text-center"
                       style="color: var(--o2-text-secondary)"
                     >
-                      No {{ cfg.label.toLowerCase() }} data found
+                      {{ t('traces.serviceGraphNodeSidePanel.noResourceDataFound', { resource: cfg.label.toLowerCase() }) }}
                     </div>
                   </template>
                 </TenstackTable>
@@ -463,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-side-panel-metrics-loading"
               >
                 <OSpinner size="xs" />
-                <span>Loading metrics...</span>
+                <span>{{ t('traces.serviceGraphNodeSidePanel.loadingMetrics') }}</span>
               </div>
 
               <!-- Error state -->
@@ -479,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   data-test="service-graph-side-panel-metrics-retry-btn"
                   @click="fetchMetricsCorrelation(true)"
-                  >Retry</OButton
+                  >{{ t('traces.serviceGraphNodeSidePanel.retry') }}</OButton
                 >
               </div>
 
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="color: var(--o2-text-secondary)"
                 data-test="service-graph-side-panel-metrics-empty"
               >
-                No metrics available for this service.
+                {{ t('traces.serviceGraphNodeSidePanel.noMetricsAvailable') }}
               </div>
             </OTabPanel>
           </OTabPanels>
@@ -918,19 +918,89 @@ export default defineComponent({
       return escapeSingleQuotes(name);
     };
 
+    // Shared cache of stream schema field names — populated by resolveStreamSchema,
+    // consumed by serviceNameField (model column resolution), resolveWorkloadFields
+    // and inferredTabConfigs. Declared here (ahead of serviceNameField) so the
+    // computed can read it without a temporal-dead-zone error at mount.
+    const streamFieldSet = ref<Set<string>>(new Set());
+
     /**
-     * Returns the correct SQL field name for the service name column in WHERE clauses.
+     * Returns the SQL expression for the node's identity column, used in WHERE
+     * clauses (`{expr} = 'name'`). A node falls into one of three families, keyed
+     * by `service_type`:
      *
-     * Inferred services (those discovered from span attributes rather than instrumented
-     * SDKs) use `infer_service_name`, while regular instrumented services use `service_name`.
-     * The distinction is driven by `props.selectedNode.service_type`:
-     * - When `service_type` is set (e.g. "database", "queue", "rpc", "http"), the node
-     *   represents an inferred service → `infer_service_name`.
-     * - When `service_type` is absent, the node represents an instrumented service → `service_name`.
+     * - **Instrumented service** (`service_type` absent) → `service_name`.
+     * - **Inferred dependency** (`database`/`queue`/`rpc`/`external`) → discovered
+     *   from span peer attributes, keyed by `infer_service_name`.
+     * - **GenAI entity** (`agent`/`tool`/`model`) → derived from `gen_ai_*` columns.
+     *   `agent`/`tool` have a single column. `model` may land in either
+     *   `gen_ai_request_model` or `gen_ai_response_model` depending on the vendor
+     *   (Langfuse/OpenInference populate only response), so it resolves to a
+     *   COALESCE over whichever of the two the stream schema actually has —
+     *   referencing a missing column is a hard "field not found" error.
+     *
+     * All call sites use this only as `WHERE {expr} = '...'`, so a COALESCE(...)
+     * expression is valid everywhere it is interpolated.
      */
-    const serviceNameField = computed(() =>
-      props.selectedNode?.service_type ? "infer_service_name" : "service_name",
-    );
+    const GENAI_NAME_FIELD: Record<string, string> = {
+      agent: "gen_ai_agent_name",
+      tool: "gen_ai_tool_name",
+    };
+
+    // Depth of the parent-chain climb used to attribute a tool/model span to its
+    // OWNING agent. Must match the backend (processor.rs AGENT_INHERIT_DEPTH):
+    // the agent name usually lives on an ANCESTOR span (real Google ADK nests
+    // generate_content(agent)→chat→execute_tool), not on the tool/LLM span
+    // itself, so the caller shown in this panel must climb the same way the graph
+    // edge does — otherwise the panel says the app called the tool while the
+    // graph correctly says the agent did.
+    const AGENT_INHERIT_DEPTH = 4;
+
+    // The nearest-ancestor-agent-or-service caller expression + chained ancestor
+    // LEFT JOINs, aliased to child `c` (p1 on c, p2 on p1, …). Mirrors query-4.
+    const genAiCallerClimb = (streamName: string) => {
+      const parts = ["c.gen_ai_agent_name"];
+      for (let k = 1; k <= AGENT_INHERIT_DEPTH; k++)
+        parts.push(`p${k}.gen_ai_agent_name`);
+      parts.push("c.service_name");
+      const callerExpr = `COALESCE(${parts.join(", ")})`;
+      const joins = Array.from({ length: AGENT_INHERIT_DEPTH }, (_, i) => {
+        const k = i + 1;
+        const prev = k === 1 ? "c" : `p${k - 1}`;
+        return `LEFT JOIN "${streamName}" AS p${k} ON ${prev}.reference_parent_span_id = p${k}.span_id AND ${prev}.trace_id = p${k}.trace_id`;
+      }).join(" ");
+      return { callerExpr, joins };
+    };
+
+    /**
+     * The node's identity column expression, with every column prefixed by
+     * `alias` (e.g. `"c."` inside a self-join, `""` for a single-table query).
+     * The prefix is applied AT CONSTRUCTION from the known column names — callers
+     * never post-process the string, so there is no place for a column name to
+     * be missed. See `serviceNameField` for the family rules.
+     */
+    const identityField = (alias = ""): string => {
+      const st = props.selectedNode?.service_type;
+      if (!st) return `${alias}service_name`;
+      if (st === "model") {
+        // Prefer request.model, fall back to response.model; only include a
+        // column the schema has. If neither is known yet (schema unresolved),
+        // default to request.model — the query re-runs reactively once the
+        // schema fetch settles.
+        const fs = streamFieldSet.value;
+        const hasReq = fs.has("gen_ai_request_model");
+        const hasResp = fs.has("gen_ai_response_model");
+        if (hasReq && hasResp)
+          return `COALESCE(${alias}gen_ai_request_model, ${alias}gen_ai_response_model)`;
+        if (hasResp && !hasReq) return `${alias}gen_ai_response_model`;
+        return `${alias}gen_ai_request_model`;
+      }
+      return `${alias}${GENAI_NAME_FIELD[st] ?? "infer_service_name"}`;
+    };
+
+    // Single-table identity expression (unaliased) — used everywhere the query
+    // is a plain `FROM "{stream}"` with no join.
+    const serviceNameField = computed(() => identityField());
 
     const loadDashboard = () => {
       if (!props.selectedNode || props.streamFilter === "all") {
@@ -1061,10 +1131,13 @@ export default defineComponent({
           chips.push({
             key,
             type: "duration",
-            label: `Duration: ${formatTimeWithSuffix(f.start)} – ${formatTimeWithSuffix(f.end)}`,
+            label: t("traces.serviceGraphNodeSidePanel.durationRange", {
+              start: formatTimeWithSuffix(f.start),
+              end: formatTimeWithSuffix(f.end),
+            }),
           });
         } else if (f.panelTitle === "Errors") {
-          chips.push({ key, type: "error", label: "Status: Error" });
+          chips.push({ key, type: "error", label: t("traces.serviceGraphNodeSidePanel.statusError") });
         }
       });
       return chips;
@@ -1172,7 +1245,7 @@ export default defineComponent({
 
         const data = correlateResponse.data;
         if (!data) {
-          correlationError.value = "No correlated streams found.";
+          correlationError.value = t("traces.serviceGraphNodeSidePanel.noCorrelatedStreams");
           correlationData.value = null;
           return;
         }
@@ -1191,10 +1264,10 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status === 403) {
           correlationError.value =
-            "Service Discovery is an enterprise feature.";
+            t("traces.serviceGraphNodeSidePanel.enterpriseFeature");
         } else {
           correlationError.value =
-            err.message || "Failed to load service streams.";
+            err.message || t("traces.serviceGraphNodeSidePanel.failedToLoadStreams");
         }
         correlationData.value = null;
       } finally {
@@ -1341,10 +1414,10 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status === 403) {
           metricsCorrelationError.value =
-            "Service Discovery is an enterprise feature.";
+            t("traces.serviceGraphNodeSidePanel.enterpriseFeature");
         } else {
           metricsCorrelationError.value =
-            err.message || "Failed to load metrics.";
+            err.message || t("traces.serviceGraphNodeSidePanel.failedToLoadMetrics");
         }
         metricsCorrelationData.value = null;
       } finally {
@@ -1353,7 +1426,12 @@ export default defineComponent({
       }
     };
 
-    // Reload RED charts when node, time range, stream, or visibility changes
+    // Reload RED charts when node, time range, stream, visibility — or the
+    // resolved identity column — changes. `serviceNameField` is in the deps
+    // because for a model node it depends on the stream schema (request vs
+    // response model column); the schema fetch settles AFTER the first render,
+    // so without re-running here the charts fire once with the wrong/absent
+    // column and error with "field not found".
     watch(
       () =>
         [
@@ -1361,6 +1439,7 @@ export default defineComponent({
           props.timeRange,
           props.streamFilter,
           props.visible,
+          serviceNameField.value,
         ] as const,
       ([, , , visible]) => {
         if (visible && props.selectedNode) {
@@ -1393,9 +1472,6 @@ export default defineComponent({
     // IDs of alias entries the user has checked in the dropdown
     const selectedWorkloadFields = ref<string[]>([]);
 
-    // Shared cache of stream schema field names — populated by resolveStreamSchema,
-    // consumed by both resolveWorkloadFields and inferredTabConfigs.
-    const streamFieldSet = ref<Set<string>>(new Set());
     const schemaResolved = ref(false);
 
     /** Fetch the trace stream schema and populate streamFieldSet.
@@ -1592,7 +1668,7 @@ export default defineComponent({
       if (!props.selectedNode) {
         return {
           status: "unknown",
-          text: "Unknown",
+          text: t("traces.serviceGraphNodeSidePanel.unknown"),
         };
       }
 
@@ -1602,17 +1678,17 @@ export default defineComponent({
       if (errorRate > 10) {
         return {
           status: "critical",
-          text: "Critical",
+          text: t("traces.serviceGraphNodeSidePanel.critical"),
         };
       } else if (errorRate > 5) {
         return {
           status: "degraded",
-          text: "Degraded",
+          text: t("traces.serviceGraphNodeSidePanel.degraded"),
         };
       } else {
         return {
           status: "healthy",
-          text: "Healthy",
+          text: t("traces.serviceGraphNodeSidePanel.healthy"),
         };
       }
     });
@@ -1733,7 +1809,7 @@ export default defineComponent({
       {
         id: "requests",
         accessorFn: (row: any) => formatNumber(row.requests),
-        header: "Requests",
+        header: t("traces.serviceGraphNodeSidePanel.requests"),
         size: 100,
         enableSorting: true,
         meta: { sortable: true },
@@ -1741,7 +1817,7 @@ export default defineComponent({
       {
         id: "errors",
         accessorKey: "errors",
-        header: "Errors",
+        header: t("traces.serviceGraphNodeSidePanel.errors"),
         size: 80,
         enableSorting: true,
         meta: { slot: true, sortable: true },
@@ -1774,12 +1850,12 @@ export default defineComponent({
 
     // Computed: Operations table columns
     const operationsTableColumns = computed(() => {
-      const cols = buildEntityTableColumns("operation", "Operation");
+      const cols = buildEntityTableColumns("operation", t("traces.serviceGraphNodeSidePanel.operation"));
       if (isInferred.value) {
         cols.unshift({
           id: "caller",
           accessorKey: "caller",
-          header: "Caller",
+          header: t("traces.serviceGraphNodeSidePanel.caller"),
           size: 180,
           enableSorting: true,
           meta: { slot: false, sortable: true },
@@ -1814,14 +1890,33 @@ export default defineComponent({
       try {
         const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
+        const st = props.selectedNode?.service_type;
+        // A tool/model node's caller is its OWNING AGENT, which usually sits on an
+        // ancestor span — resolve it with the same parent-chain climb the graph
+        // edge uses (else the panel would show the host app as the caller, in
+        // conflict with the graph). Genuinely-inferred deps (database/queue/…)
+        // keep the raw service_name as caller. Instrumented services show none.
+        const isGenAiChild = st === "tool" || st === "model";
         const isInf = isInferred.value;
-        const selectCols = isInf
-          ? "service_name as caller_service, operation_name"
-          : "operation_name";
-        const groupCols = isInf
-          ? "service_name, operation_name"
-          : "operation_name";
-        const sql = `SELECT ${selectCols}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' GROUP BY ${groupCols}`;
+
+        const metrics = `count(*) as request_count, count(*) FILTER (WHERE ${isGenAiChild ? "c." : ""}span_status = 'ERROR') as error_count, approx_percentile_cont(${isGenAiChild ? "c." : ""}duration, 0.50) as p50_latency, approx_percentile_cont(${isGenAiChild ? "c." : ""}duration, 0.75) as p75_latency, approx_percentile_cont(${isGenAiChild ? "c." : ""}duration, 0.95) as p95_latency, approx_percentile_cont(${isGenAiChild ? "c." : ""}duration, 0.99) as p99_latency`;
+
+        let sql: string;
+        if (isGenAiChild) {
+          const { callerExpr, joins } = genAiCallerClimb(streamName);
+          // The identity field, built already aliased to the child table `c`
+          // (no post-processing of the expression string).
+          const childField = identityField("c.");
+          sql = `SELECT ${callerExpr} as caller_service, c.operation_name, ${metrics} FROM "${streamName}" AS c ${joins} WHERE ${childField} = '${serviceName}' GROUP BY ${callerExpr}, c.operation_name`;
+        } else {
+          const selectCols = isInf
+            ? "service_name as caller_service, operation_name"
+            : "operation_name";
+          const groupCols = isInf
+            ? "service_name, operation_name"
+            : "operation_name";
+          sql = `SELECT ${selectCols}, ${metrics} FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' GROUP BY ${groupCols}`;
+        }
 
         const response = await searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -1937,6 +2032,10 @@ export default defineComponent({
         props.selectedNode?.id,
         props.streamFilter,
         operationsViewMode.value,
+        // Re-fetch once the schema resolves the model column (request vs
+        // response) — otherwise a model node's operations query fires with the
+        // wrong column and returns "No operations found".
+        serviceNameField.value,
       ],
       () => {
         if (
@@ -2343,6 +2442,8 @@ export default defineComponent({
       serviceHealth,
       isAllStreamsSelected,
       isInferred,
+      serviceNameField,
+      streamFieldSet,
       formatNumber,
       getErrorRateClass,
       getLatencyClass,

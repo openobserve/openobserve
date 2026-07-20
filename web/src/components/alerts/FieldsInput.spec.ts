@@ -14,10 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { defineComponent } from "vue";
+import { z } from "zod";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import FieldsInput from "@/components/alerts/FieldsInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -266,5 +273,178 @@ describe("FieldsInput", () => {
 
       expect((wrapper.vm as any).triggerOperators).toContain("NotContains");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// form mode (opt-in via `name-prefix` inside a REAL <OForm>)
+// ---------------------------------------------------------------------------
+
+const conditionRowSchema = z.object({
+  column: z.string(),
+  operator: z.string(),
+  value: z.string(),
+});
+
+const conditionsHostSchema = z.object({
+  conditions: z.array(conditionRowSchema),
+});
+
+// Host renders a REAL <OForm> (schema + default-values) around FieldsInput —
+// form mode is driven purely by `name-prefix` + the injected form context.
+const FormHost = defineComponent({
+  components: { OForm, FieldsInput },
+  props: {
+    rows: { type: Array, default: () => [] },
+  },
+  setup(props) {
+    return {
+      hostSchema: conditionsHostSchema,
+      hostDefaults: { conditions: JSON.parse(JSON.stringify(props.rows)) },
+      streamFields,
+    };
+  },
+  template: `
+    <OForm :schema="hostSchema" :default-values="hostDefaults" @submit="() => {}">
+      <FieldsInput name-prefix="conditions" :stream-fields="streamFields" />
+    </OForm>
+  `,
+});
+
+function buildFormWrapper(rows: any[] = []): VueWrapper<any> {
+  return mount(FormHost, {
+    props: { rows },
+    global: { plugins: [i18n, store] },
+  });
+}
+
+const getForm = (w: VueWrapper<any>) => (w.findComponent(OForm).vm as any).form;
+
+/** RENDERED value-input model-values (OFormInput → OInput), in DOM order. */
+const renderedValues = (w: VueWrapper<any>) =>
+  w
+    .findAllComponents(OFormInput)
+    .filter((c) => /^conditions\[\d+\]\.value$/.test(String(c.props("name"))))
+    .map((c) => c.findComponent(OInput).props("modelValue"));
+
+/** RENDERED column-select model-values (OFormSelect → OSelect), in DOM order. */
+const renderedColumns = (w: VueWrapper<any>) =>
+  w
+    .findAllComponents(OFormSelect)
+    .filter((c) => /^conditions\[\d+\]\.column$/.test(String(c.props("name"))))
+    .map((c) => c.findComponent(OSelect).props("modelValue"));
+
+describe("FieldsInput — form mode (name-prefix inside a real <OForm>)", () => {
+  let wrapper: VueWrapper<any> | null = null;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  const threeRows = [
+    { column: "host", operator: "=", value: "v1" },
+    { column: "level", operator: "!=", value: "v2" },
+    { column: "message", operator: ">", value: "v3" },
+  ];
+
+  it("renders one row per form-state entry, carrying the bare-mode data-tests", () => {
+    wrapper = buildFormWrapper(threeRows);
+
+    expect(wrapper.find('[data-test="alert-conditions-text"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-conditions-2"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-conditions-3"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="alert-conditions-select-column"]')).toHaveLength(3);
+    expect(wrapper.findAll('[data-test="alert-conditions-operator-select"]')).toHaveLength(3);
+    expect(wrapper.findAll('[data-test="alert-conditions-value-input"]')).toHaveLength(3);
+    expect(wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]')).toHaveLength(3);
+    // inline add button only on the last row
+    expect(wrapper.findAll('[data-test="alert-conditions-add-condition-btn"]')).toHaveLength(1);
+  });
+
+  it("renders the row inputs from the form state (name=-owned, no props)", () => {
+    wrapper = buildFormWrapper(threeRows);
+
+    expect(renderedValues(wrapper)).toEqual(["v1", "v2", "v3"]);
+    expect(renderedColumns(wrapper)).toEqual(["host", "level", "message"]);
+  });
+
+  it("shows the empty-state Add Condition button and pushes a row into the form", async () => {
+    wrapper = buildFormWrapper([]);
+
+    expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="alert-conditions-add-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(getForm(wrapper).state.values.conditions).toEqual([
+      { column: "", operator: "=", value: "" },
+    ]);
+    expect(wrapper.find('[data-test="alert-conditions-1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-conditions-add-btn"]').exists()).toBe(false);
+  });
+
+  it("typing in a row's value input updates the form values", async () => {
+    wrapper = buildFormWrapper([threeRows[0]]);
+
+    await wrapper
+      .find('[data-test="alert-conditions-value-input"] input')
+      .setValue("changed");
+    await flushPromises();
+
+    expect(getForm(wrapper).state.values.conditions[0].value).toBe("changed");
+  });
+
+  it("the inline add button appends a row to the form array", async () => {
+    wrapper = buildFormWrapper([threeRows[0]]);
+
+    await wrapper.find('[data-test="alert-conditions-add-condition-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(getForm(wrapper).state.values.conditions).toHaveLength(2);
+    expect(wrapper.find('[data-test="alert-conditions-2"]').exists()).toBe(true);
+  });
+
+  it("does not emit bare-mode events in form mode (form owns the rows)", async () => {
+    wrapper = buildFormWrapper(threeRows);
+
+    await wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]')[0].trigger("click");
+    await wrapper.find('[data-test="alert-conditions-add-condition-btn"]').trigger("click");
+    await flushPromises();
+
+    const fieldsInput = wrapper.findComponent(FieldsInput);
+    expect(fieldsInput.emitted("add")).toBeUndefined();
+    expect(fieldsInput.emitted("remove")).toBeUndefined();
+    expect(fieldsInput.emitted("input:update")).toBeUndefined();
+  });
+
+  // 🔑 Rule ① gate — delete a NON-last row and assert the RENDERED inputs
+  // (OFormInput→OInput / OFormSelect→OSelect model-values), NOT just
+  // form.state.values: a stable-id :key bug leaves the data correct while the
+  // inputs render shifted/blank.
+  it("Rule ① — deleting a NON-last row keeps the RENDERED inputs in sync", async () => {
+    wrapper = buildFormWrapper(threeRows);
+
+    expect(renderedValues(wrapper)).toEqual(["v1", "v2", "v3"]);
+
+    const deleteBtns = wrapper.findAll('[data-test="alert-conditions-delete-condition-btn"]');
+    expect(deleteBtns).toHaveLength(3);
+    await deleteBtns[1].trigger("click"); // delete the MIDDLE row
+    await flushPromises();
+
+    // the RENDERED inputs must match the remaining rows, in order
+    expect(renderedValues(wrapper)).toEqual(["v1", "v3"]);
+    expect(renderedColumns(wrapper)).toEqual(["host", "message"]);
+    expect(wrapper.findAll('[data-test="alert-conditions-value-input"]')).toHaveLength(2);
+    expect(wrapper.find('[data-test="alert-conditions-3"]').exists()).toBe(false);
+
+    // and the form data agrees
+    expect(getForm(wrapper).state.values.conditions).toEqual([
+      { column: "host", operator: "=", value: "v1" },
+      { column: "message", operator: ">", value: "v3" },
+    ]);
   });
 });

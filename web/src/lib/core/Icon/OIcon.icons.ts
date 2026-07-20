@@ -127,7 +127,7 @@ import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
-import AutoAwesome from "~icons/material-symbols/wand-stars-outline";
+import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
 import Bookmark from "~icons/material-symbols/bookmark-outline";
 import Build from "~icons/material-symbols/build-outline";
@@ -336,11 +336,15 @@ import Tab from "~icons/material-symbols/tab-outline";
 import Web from "~icons/material-symbols/web";
 import SmartDisplay from "~icons/material-symbols/smart-display-outline";
 
+// Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
+import McpLogo from "./McpLogo.vue";
+
 import type { Component } from "vue";
 
 export const iconRegistry = {
   "alarm": Alarm,
   "add": Add,
+  "mcp": McpLogo,
   "arrow-back": ArrowBack,
   "arrow-back-ios-new": ArrowBackIosNew,
   "arrow-downward": ArrowDownward,

@@ -18,6 +18,7 @@ import { shallowMount } from "@vue/test-utils";
 import ImportDestination from "./ImportDestination.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
+import enMessages from "@/locales/languages/en-US.json";
 import { ref } from "vue";
 
 // ─── Service mocks ───────────────────────────────────────────────────────────
@@ -74,9 +75,12 @@ const mockStore = createStore({
   },
 });
 
+// Mount the REAL en.json messages (not a hand-written stub): the component's
+// user-facing strings are i18n keys, so a stub would make every t() fall back to
+// its raw key path and silently weaken the text assertions below.
 const mockI18n = createI18n({
   locale: "en",
-  messages: { en: { alert_destinations: { skip_tls_verify: "Skip TLS Verify" } } },
+  messages: { en: enMessages },
 });
 
 // ─── BaseImport stub ─────────────────────────────────────────────────────────
@@ -366,6 +370,35 @@ describe("ImportDestination", () => {
         1,
       );
       expect(result).toBe(true);
+    });
+  });
+
+  // ─── getCorrectionRequiredError — single source for the "required" rule ─────
+  describe("getCorrectionRequiredError (folded correction required rule)", () => {
+    it("returns 'Field is required!' for an empty/falsy correction value", () => {
+      expect(wrapper.vm.getCorrectionRequiredError("")).toBe("Field is required!");
+      expect(wrapper.vm.getCorrectionRequiredError(undefined)).toBe("Field is required!");
+      expect(wrapper.vm.getCorrectionRequiredError(null)).toBe("Field is required!");
+    });
+
+    it("returns an empty string once a correction value is supplied", () => {
+      expect(wrapper.vm.getCorrectionRequiredError("template1")).toBe("");
+      expect(wrapper.vm.getCorrectionRequiredError("action1")).toBe("");
+    });
+
+    it("validateDestinationInputs surfaces a template_name error for a missing template (single validation source)", async () => {
+      wrapper.vm.destinationErrorsToDisplay = [];
+      const result = await wrapper.vm.validateDestinationInputs(
+        { name: "no-tpl", type: "http", url: "https://x.com", method: "post", skip_tls_verify: false },
+        1,
+      );
+      expect(result).toBe(false);
+      const flatErrors = wrapper.vm.destinationErrorsToDisplay.flat();
+      expect(
+        flatErrors.some(
+          (e: any) => typeof e === "object" && e.field === "template_name",
+        ),
+      ).toBe(true);
     });
   });
 

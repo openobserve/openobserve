@@ -205,6 +205,24 @@ describe("useMetricsExplorerGrid", () => {
   const cardNamed = (grid: any, name: string) =>
     grid.cards.value.find((c: any) => c.name === name)!;
 
+  describe("the Scratchpad (favorites) narrows the grid when showFavoritesOnly is on", () => {
+    it("narrows sortedCards to the pinned scratchpad set (Workspace tab)", async () => {
+      const grid = await setup();
+      const names = grid.cards.value.map((c: any) => c.name);
+      expect(names.length).toBeGreaterThan(1);
+
+      grid.showFavoritesOnly.value = true;
+      grid.favorites.value = [names[0]]; // scratchpad pins the first
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toEqual([names[0]]);
+
+      // Pinning another metric adds it to the scratchpad view.
+      grid.favorites.value = [names[0], names[1]];
+      expect(grid.sortedCards.value.map((c: any) => c.name).sort()).toEqual(
+        [names[0], names[1]].sort(),
+      );
+    });
+  });
+
   describe("a metric hidden as no-data must not stay hidden across a range change", () => {
     it("forgets what was empty when the window changes", async () => {
       // The set is self-sealing: a card in it is filtered OUT of the grid, so it
@@ -302,6 +320,35 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.previews.value["http_requests_total"].status).toBe("done");
     });
   });
+  describe("a settled card is reused on re-request, not re-queried", () => {
+    it("fires no new query when a done card is re-requested (scroll-back / mode toggle)", async () => {
+      // The card unmounts and remounts when the Explore body is v-if'd out (e.g.
+      // flipping Explore↔Visualize) or scrolled out and back. The remount
+      // re-triggers requestPreview — but a card that already has a result must
+      // reuse it and hit NO backend, the way a dashboard panel does on revisit.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      const first = grid.requestPreview(card);
+      await flush();
+      expect(inFlight).toHaveLength(1);
+      inFlight[0].complete(SERIES);
+      await first;
+      expect(grid.previews.value["http_requests_total"].status).toBe("done");
+
+      const before = inFlight.length;
+      // Re-request (as a remount / scroll-back would) — no skipCache.
+      await grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBe(before); // no new query fired
+
+      // But a refresh (skipCache) still forces a real re-query.
+      grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(inFlight.length).toBe(before + 1);
+    });
+  });
+
   describe("a label can carry more than one matcher", () => {
     it("keeps both, and both reach the query", async () => {
       // `status=~"5.."` AND `status!="503"` is how you say the useful thing, and
@@ -626,13 +673,16 @@ describe("useMetricsExplorerGrid", () => {
         return i >= INITIAL_PAGE_SIZE && i < INITIAL_PAGE_SIZE + 24;
       };
 
-      // The first page renders unqueried, so a click asks for 12 more on top.
+      // The first page renders unqueried, so a click asks for PAGE_SIZE_INCREMENT
+      // more on top.
       expect(grid.pagedCards.value).toHaveLength(INITIAL_PAGE_SIZE);
       const target = INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT;
 
       const done = grid.showMore();
-      // Drive each look-ahead batch's queries as showMore pulls them.
-      for (let i = 0; i < 12; i++) {
+      // Drive each look-ahead batch's queries as showMore pulls them. A generous
+      // fixed number of flushes — this is the harness draining batches, not the
+      // increment, so it must not be tied to PAGE_SIZE_INCREMENT.
+      for (let i = 0; i < 24; i++) {
         await flush();
         // Mid-flight the budget is untouched: the look-ahead resolves BEFORE
         // the commit, so the grid grows once — not batch by batch — and the

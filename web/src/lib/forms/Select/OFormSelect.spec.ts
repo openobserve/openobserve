@@ -1,7 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
+import { z } from "zod";
 import OFormSelect from "./OFormSelect.vue";
 import OSelect from "./OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -87,6 +88,55 @@ describe("OFormSelect", () => {
     // The chevron is swapped for the spinner when loading.
     expect(wrapper.findComponent(OSelect).findComponent(OSpinner).exists()).toBe(
       true,
+    );
+  });
+
+  // Regression (the alerts "Select column" highlight): OFormSelect is the ONLY
+  // thing that can paint a name-bound select — it derives `:error` from the
+  // field's own errors and deliberately OMITS `error` from its props, so a
+  // parent-passed `:error` is swallowed. Any rule that needs to highlight a
+  // field must therefore live in the schema. Prove the chain end-to-end for a
+  // DEEPLY NESTED path (the alert column is
+  // `query_condition.aggregation.having.column`): a schema issue there must
+  // reach the underlying OSelect and render, and must stay hidden until submit.
+  it("paints the select from a schema issue at a nested path (submit-gated)", async () => {
+    const schema = z
+      .looseObject({
+        query_condition: z.looseObject({}).optional(),
+      })
+      .superRefine((val: any, ctx) => {
+        if (!val.query_condition?.aggregation?.having?.column) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "aggregation", "having", "column"],
+            message: "Column is required when using an aggregate function.",
+          });
+        }
+      });
+
+    wrapper = mount(OForm, {
+      props: {
+        schema,
+        defaultValues: {
+          query_condition: { aggregation: { having: { column: "" } } },
+        },
+      },
+      slots: {
+        default:
+          "<OFormSelect name=\"query_condition.aggregation.having.column\" :options=\"[{label:'f2',value:'field2'}]\" />",
+      },
+      global: { components: { OFormSelect } },
+    });
+
+    // Pre-submit: silent (revalidateLogic mode "submit").
+    expect(wrapper.findComponent(OSelect).props("error")).toBeFalsy();
+
+    await (wrapper.vm as any).submit();
+    await flushPromises();
+
+    expect(wrapper.findComponent(OSelect).props("error")).toBe(true);
+    expect(wrapper.text()).toContain(
+      "Column is required when using an aggregate function.",
     );
   });
 

@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @click="showTutorial"
               data-test="dashboard-panel-tutorial-btn"
-              >Dashboard Tutorial</OButton
+              >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
             >
             <OButton
               v-if="
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-data-view-query-inspector-btn"
               icon-left="info-outline"
             >
-              <OTooltip side="left" align="center" content="Query Inspector" shortcut-id="panelEditorQueryInspector" />
+              <OTooltip side="left" align="center" :content="t('dashboard.addPanel.queryInspector')" shortcut-id="panelEditorQueryInspector" />
             </OButton>
             <DateTimePickerDashboard
               v-if="selectedDate"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODropdownItem @select="runQuery(true)">
                     <div class="flex items-center gap-2">
                       <OIcon name="refresh" size="xs" />
-                      <span>Refresh Cache &amp; Apply</span>
+                      <span>{{ t("dashboard.addPanel.refreshCacheAndApply") }}</span>
                     </div>
                   </ODropdownItem>
                 </ODropdown>
@@ -1240,7 +1240,7 @@ export default defineComponent({
           dashboardData.data.title == null ||
           dashboardData.data.title.trim() == ""
         ) {
-          errors.push("Name of Panel is required");
+          errors.push(t("dashboard.addPanel.nameOfPanelRequired"));
         }
       }
 
@@ -1249,7 +1249,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("dashboard.addPanel.fixErrors"),
         );
       }
 
@@ -1266,7 +1266,7 @@ export default defineComponent({
         errorData.errors.length > 0
       ) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("dashboard.addPanel.fixErrors"),
         );
         return;
       }
@@ -1319,8 +1319,9 @@ export default defineComponent({
 
             if (errorMessageOnSave instanceof Error) {
               errorData.errors.push(
-                "Error saving panel configuration : " +
-                  errorMessageOnSave.message,
+                t("dashboard.addPanel.errorSavingPanelConfig", {
+                  message: errorMessageOnSave.message,
+                }),
               );
               return;
             }
@@ -1335,8 +1336,9 @@ export default defineComponent({
             );
             if (errorMessageOnSave instanceof Error) {
               errorData.errors.push(
-                "Error saving panel configuration : " +
-                  errorMessageOnSave.message,
+                t("dashboard.addPanel.errorSavingPanelConfig", {
+                  message: errorMessageOnSave.message,
+                }),
               );
               return;
             }
@@ -1395,8 +1397,9 @@ export default defineComponent({
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
-              "Error saving panel configuration  : " +
-                errorMessageOnSave.message,
+              t("dashboard.addPanel.errorSavingPanelConfig2", {
+                message: errorMessageOnSave.message,
+              }),
             );
             return;
           }
@@ -1426,15 +1429,15 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               (editMode.value
-                ? "Error while updating panel"
-                : "Error while creating panel"),
+                ? t("dashboard.addPanel.errorUpdatingPanel")
+                : t("dashboard.addPanel.errorCreatingPanel")),
           );
         } else {
           showErrorNotification(
             error?.message ??
               (editMode.value
-                ? "Error while updating panel"
-                : "Error while creating panel"),
+                ? t("dashboard.addPanel.errorUpdatingPanel")
+                : t("dashboard.addPanel.errorCreatingPanel")),
             {
               timeout: 2000,
             },
