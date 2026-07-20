@@ -31,8 +31,13 @@ const BASELINE = join(__dirname, "token-purity-baseline.json");
 const FILES = ["base.css", "semantic.css", "component.css", "dark.css"];
 
 // Selectors that may legitimately carry token definitions.
-const TOKEN_SELECTOR_RE =
-  /^(:root|html|\.dark|:root\.dark|\.dark :root|\[data-[a-z-]+=?[^\]]*\]|\.dark \[data-[a-z-]+=?[^\]]*\])(\s*,\s*(:root|html|\.dark|:root\.dark|\.dark :root|\[data-[a-z-]+=?[^\]]*\]|\.dark \[data-[a-z-]+=?[^\]]*\]))*$/;
+// `[data-…]` uses `[^\]]*` (not `[a-z-]+…[^\]]*`) so a single selector has one
+// unambiguous parse — the overlapping-quantifier form tripped CodeQL's ReDoS check.
+const TOKEN_SELECTOR =
+  "(?::root|html|\\.dark|:root\\.dark|\\.dark :root|\\[data-[^\\]]*\\]|\\.dark \\[data-[^\\]]*\\])";
+const TOKEN_SELECTOR_RE = new RegExp(
+  `^${TOKEN_SELECTOR}(?:\\s*,\\s*${TOKEN_SELECTOR})*$`,
+);
 
 // Declarations allowed alongside custom properties inside a token block.
 const ALLOWED_DECL_RE = /^(color-scheme|--[A-Za-z0-9_-]+)$/;

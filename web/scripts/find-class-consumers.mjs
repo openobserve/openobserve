@@ -63,9 +63,9 @@ function sectionOf(file, lines, lineIdx) {
   let section = "script";
   for (let i = 0; i <= lineIdx; i++) {
     const l = lines[i];
-    if (/^\s*<template[\s>]/.test(l)) section = "template";
-    else if (/^\s*<script[\s>]/.test(l)) section = "script";
-    else if (/^\s*<style[\s>]/.test(l)) section = "style";
+    if (/^\s*<template[\s>]/i.test(l)) section = "template";
+    else if (/^\s*<script[\s>]/i.test(l)) section = "script";
+    else if (/^\s*<style[\s>]/i.test(l)) section = "style";
   }
   return section;
 }
