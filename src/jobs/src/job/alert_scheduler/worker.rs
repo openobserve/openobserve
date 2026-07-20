@@ -15,14 +15,13 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
-use openobserve_core::{
-    alerts::scheduler::handlers::handle_triggers,
-    db::scheduler::{Trigger, TriggerModule, pull as scheduler_pull},
-};
+use openobserve_core::db::scheduler::{Trigger, TriggerModule, pull as scheduler_pull};
 use tokio::{
     sync::{Mutex, mpsc},
     time,
 };
+
+use super::handlers::handle_triggers;
 
 #[derive(Debug, Clone)]
 pub struct ScheduledJob {

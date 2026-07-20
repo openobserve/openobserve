@@ -154,7 +154,7 @@ async fn update(msg: Message) -> Result<()> {
         }
         TriggerModule::DerivedStream => {
             let Ok((_, _, _, pipeline_id)) =
-                openobserve_core::alerts::scheduler::handlers::get_pipeline_info_from_module_key(
+                openobserve_jobs::job::alert_scheduler::handlers::get_pipeline_info_from_module_key(
                     &trigger.module_key,
                 )
             else {

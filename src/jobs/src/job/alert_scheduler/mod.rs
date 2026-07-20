@@ -15,6 +15,7 @@
 
 use config::get_config;
 
+pub mod handlers;
 mod worker;
 
 pub async fn run() -> Result<(), anyhow::Error> {

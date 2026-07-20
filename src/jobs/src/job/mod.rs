@@ -32,7 +32,7 @@ use crate::{
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_manager;
-mod alert_scheduler;
+pub mod alert_scheduler;
 #[cfg(feature = "enterprise")]
 mod cipher;
 #[cfg(feature = "cloud")]
