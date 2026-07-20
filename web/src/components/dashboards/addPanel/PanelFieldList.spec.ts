@@ -929,6 +929,19 @@ describe("FieldList", () => {
   describe("edit mode loads the stream list for an ALREADY-set stream", () => {
     const currentQuery = () => mockReturn.dashboardPanelData.data.queries[0];
 
+    it("fetches immediately in metrics edit mode even when stream is blank", async () => {
+      currentQuery().fields.stream = "";
+      currentQuery().fields.stream_type = "metrics";
+
+      wrapper = mountComponent({
+        pageKey: "metrics",
+        props: { editMode: true },
+      });
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
+    });
+
     it("fetches when the stream is set before mount (the seeded-parent case)", async () => {
       // The parent seeded this before the field list ever mounted.
       currentQuery().fields.stream = "envoy_cluster_assignment_stale";
