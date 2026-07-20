@@ -273,6 +273,13 @@ jobs:
                 "alerts-form-validation.spec.js",
                 "anomaly-detection-form-validation.spec.js",
               ]
+          - testfolder: "Workflows"
+            browser: "chrome"
+            run_files:
+              [
+                "workflows-crud.spec.js",
+                "workflows-negative.spec.js",
+              ]
           - testfolder: "Dashboards-Core"
             browser: "chrome"
             run_files:
