@@ -89,7 +89,7 @@ const useEnvRoutes = () => {
           path: "llm-insights",
           name: "aiLLMInsights",
           component: AILLMInsightsPage,
-          meta: { title: "LLM Insights", keepAlive: false },
+          meta: { title: "Insights", keepAlive: false },
         },
         {
           path: "sessions",

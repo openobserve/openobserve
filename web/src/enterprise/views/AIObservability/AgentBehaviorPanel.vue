@@ -105,6 +105,8 @@ const props = defineProps<{
   startTime?: number;
   endTime?: number;
   sourceStream?: string;
+  /** When set (Agent mode), show only this agent's signals; empty = all agents. */
+  agentFilter?: string;
 }>();
 
 const { t } = useI18n();
@@ -132,9 +134,16 @@ const orgId = computed(
   () => store.state.selectedOrganization?.identifier as string,
 );
 
+/** Signals scoped to the selected agent (Agent mode) or all agents (Stream mode). */
+const scopedSignals = computed(() => {
+  const a = props.agentFilter?.trim();
+  if (!a) return signals.value;
+  return signals.value.filter((s) => (s.agent_name ?? "") === a);
+});
+
 /** Loop rows: rank (agent, tool) by calls-per-trace ratio. */
 const loopRows = computed(() =>
-  signals.value
+  scopedSignals.value
     .filter((s) => s.signal_type === "loop")
     .map((s) => ({
       // `agent` is the DISPLAY string (may be the "(unknown agent)" fallback);
@@ -156,7 +165,7 @@ const loopRows = computed(() =>
 
 /** Failure rows: per (agent, class) with count. */
 const failureRows = computed(() =>
-  signals.value
+  scopedSignals.value
     .filter((s) => s.signal_type === "failure")
     .map((s) => ({
       agent: s.agent_name ?? t("aiObservability.behavior.unknownAgent"),

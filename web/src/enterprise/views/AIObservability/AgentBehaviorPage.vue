@@ -56,10 +56,49 @@
       </template>
     </AppPageHeader>
 
-    <!-- Scope control — same Stream selector pattern as Agent Graph, so the AI
-         pages read as one product. -->
+    <!-- Scope control — same Stream/Agent pattern as Agent Graph, so the AI
+         pages read as one product. Stream tab shows every agent's signals for
+         the stream; Agent tab narrows to one discovered agent (and follows its
+         source_stream). -->
     <div class="flex items-center gap-3 px-4 py-2 border-b border-border-default">
+      <OToggleGroup
+        :model-value="filterMode"
+        type="single"
+        data-test="agent-behavior-filter-mode"
+        @update:model-value="onFilterModeChange"
+      >
+        <OToggleGroupItem value="agent" size="sm">{{
+          t("aiObservability.agentGraph.agent")
+        }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{
+          t("aiObservability.agentGraph.stream")
+        }}</OToggleGroupItem>
+      </OToggleGroup>
+
       <div
+        v-if="filterMode === 'agent'"
+        data-test="agent-behavior-agent-selector"
+        class="w-[14rem] flex-shrink-0"
+      >
+        <SkeletonBox
+          v-if="!agentsLoaded"
+          width="100%"
+          height="2.125rem"
+          rounded
+        />
+        <OSelect
+          v-else
+          v-model="activeAgentKey"
+          :label="t('aiObservability.agentGraph.agent')"
+          label-position="inside"
+          :options="agentSelectOptions"
+          labelKey="label"
+          valueKey="value"
+          class="w-full rounded"
+        />
+      </div>
+      <div
+        v-else
         data-test="agent-behavior-stream-selector"
         class="w-[14rem] flex-shrink-0"
       >
@@ -78,7 +117,8 @@
     <div class="flex-1 min-h-0 overflow-auto p-4">
       <AgentBehaviorPanel
         ref="panelRef"
-        :source-stream="activeStream"
+        :source-stream="effectiveStream"
+        :agent-filter="agentFilter"
         :start-time="timeRange.startTime"
         :end-time="timeRange.endTime"
       />
@@ -94,7 +134,14 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AgentBehaviorPanel from "./AgentBehaviorPanel.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import useStreams from "@/composables/useStreams";
+import { useStore } from "vuex";
+import genAiAgentMappingService, {
+  type GenAiAgentListItem,
+} from "@/services/gen-ai-agent-mapping.service";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {
   useAiDateRange,
@@ -105,6 +152,7 @@ defineOptions({ name: "AgentBehaviorPage" });
 
 const { t } = useI18n();
 const { getStreams } = useStreams();
+const store = useStore();
 
 const DEFAULT_RELATIVE = "15m";
 
@@ -112,11 +160,66 @@ const DEFAULT_RELATIVE = "15m";
 const { state: dateState } = useAiDateRange();
 
 const timeRange = ref({ startTime: 0, endTime: 0 });
+// Agent is the default scope: the page is about a specific agent's behaviour,
+// so it opens focused on one agent. Stream mode widens to every agent's signals.
+const filterMode = ref<"stream" | "agent">("agent");
 const availableStreams = ref<string[]>([]);
 const activeStream = ref<string>("");
 const dateTimeRef = ref<any>(null);
 const panelRef = ref<any>(null);
 const isRefreshing = ref(false);
+
+// Agent-mode selection — mirrors Agent Graph. Same stream-scoped identity so
+// same-named agents in different streams don't collide.
+const agents = ref<GenAiAgentListItem[]>([]);
+const agentsLoaded = ref(false);
+const activeAgentKey = ref<string>("");
+const agentKey = (a: GenAiAgentListItem) => `${a.source_stream}::${a.name}`;
+const agentSelectOptions = computed(() =>
+  agents.value.map((a) => ({
+    label: a.id ? `${a.name} (${a.id})` : a.name,
+    value: agentKey(a),
+  })),
+);
+const selectedAgent = computed<GenAiAgentListItem | null>(
+  () => agents.value.find((a) => agentKey(a) === activeAgentKey.value) ?? null,
+);
+
+// The stream the panel queries: the picked stream, or the selected agent's
+// source_stream (deriving stream from the agent is the point of Agent mode).
+const effectiveStream = computed(() =>
+  filterMode.value === "agent"
+    ? (selectedAgent.value?.source_stream ?? activeStream.value)
+    : activeStream.value,
+);
+// In Agent mode, narrow the panel to that one agent's name; Stream mode shows all.
+const agentFilter = computed(() =>
+  filterMode.value === "agent" ? (selectedAgent.value?.name ?? "") : "",
+);
+
+function onFilterModeChange(mode?: string | number | null) {
+  if (mode === "stream" || mode === "agent") filterMode.value = mode;
+  if (mode === "agent" && !agentsLoaded.value) loadAgents();
+}
+
+async function loadAgents() {
+  try {
+    const org = store.state.selectedOrganization?.identifier as string;
+    const res = await genAiAgentMappingService.listAgents(
+      org,
+      timeRange.value.startTime,
+      timeRange.value.endTime,
+    );
+    agents.value = res.agents ?? [];
+    if (!activeAgentKey.value && agents.value.length) {
+      activeAgentKey.value = agentKey(agents.value[0]);
+    }
+  } catch {
+    agents.value = [];
+  } finally {
+    agentsLoaded.value = true;
+  }
+}
 
 // Last-refresh + loading for the header's ORefreshButton — the panel stamps
 // `lastRunAt` when its fetch settles and exposes its own `loading`.
@@ -187,5 +290,8 @@ onMounted(async () => {
   } catch {
     availableStreams.value = [];
   }
+
+  // Agent is the default scope, so the agent list must be ready on first paint.
+  await loadAgents();
 });
 </script>

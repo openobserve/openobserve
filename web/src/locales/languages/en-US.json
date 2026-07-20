@@ -6550,7 +6550,7 @@
     "lLMInsightsDashboard": {
       "stream": "Stream",
       "agent": "Agent",
-      "failedToLoad": "Failed to load LLM Insights",
+      "failedToLoad": "Failed to load Insights",
       "retry": "Retry",
       "noAgentsInRange": "No Agents In This Range",
       "noAgentsDescription": "No GenAI agents were detected for the selected time window. Try a wider range, switch to the Stream tab, or configure agent mapping in settings.",
@@ -7401,8 +7401,8 @@
       "evaluate": "Evaluate"
     },
     "nav": {
-      "llmInsights": "LLM Insights",
-      "sessions": "LLM Sessions",
+      "llmInsights": "Insights",
+      "sessions": "Sessions",
       "agentGraph": "Agent Graph",
       "agentBehavior": "Agent Behavior",
       "quality": "Quality",

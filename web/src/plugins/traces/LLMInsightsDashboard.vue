@@ -28,21 +28,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="flex items-center justify-end gap-[0.5rem] px-4 py-[0.5rem]"
+      class="flex items-center gap-3 px-4 py-2 border-b border-border-default"
     >
-      <!-- Filter mode: view a whole Stream, or a single Agent. Sits directly
-           beside the picker so switching mode and choosing the value are one
-           motion. On the Agent tab the stream + trace filter are derived from
-           the agents API (agent.source_stream), so there's no separate agent
-           filter. -->
+      <!-- Scope control — left-aligned Stream/Agent bar directly under the
+           header, matching Agent Graph / Agent Behavior / Sessions so every AI
+           page places its scope selector the same way. Switching mode and
+           choosing the value are one motion. On the Agent tab the stream +
+           trace filter are derived from the agents API (agent.source_stream). -->
       <OToggleGroup
         :model-value="filterMode"
         type="single"
         data-test="llm-insights-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="stream" size="sm">{{ t('traces.lLMInsightsDashboard.stream') }}</OToggleGroupItem>
         <OToggleGroupItem value="agent" size="sm">{{ t('traces.lLMInsightsDashboard.agent') }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{ t('traces.lLMInsightsDashboard.stream') }}</OToggleGroupItem>
       </OToggleGroup>
 
       <!-- Picker: Stream tab → stream picker; Agent tab → agent picker. -->
@@ -368,14 +368,17 @@ const switching = ref(false);
 // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
 // whose source stream + trace filter both come from the agents API.
 const MODE_LS_KEY = "llmInsights_filterMode";
+// Default scope is "agent" — the AI module is agent-centric. Explicit choices
+// still win: a `?type=` URL param, then a saved localStorage preference; only
+// when neither is present do we fall back to the agent default.
 const filterMode = ref<"stream" | "agent">(
   urlType === "agent"
     ? "agent"
     : urlType === "stream"
       ? "stream"
-      : localStorage.getItem(MODE_LS_KEY) === "agent"
-        ? "agent"
-        : "stream",
+      : localStorage.getItem(MODE_LS_KEY) === "stream"
+        ? "stream"
+        : "agent",
 );
 // An agent name from the URL we still need to resolve to a concrete agent once
 // the agents list loads (the URL carries the readable name, not the internal

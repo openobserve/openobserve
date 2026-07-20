@@ -70,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="agent-graph-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="stream" size="sm">{{
-          t("aiObservability.agentGraph.stream")
-        }}</OToggleGroupItem>
         <OToggleGroupItem value="agent" size="sm">{{
           t("aiObservability.agentGraph.agent")
+        }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{
+          t("aiObservability.agentGraph.stream")
         }}</OToggleGroupItem>
       </OToggleGroup>
 
@@ -160,7 +160,9 @@ const ServiceGraph = defineAsyncComponent(
 
 const DEFAULT_RELATIVE = "15m";
 
-const filterMode = ref<"stream" | "agent">("stream");
+// Default scope is "agent" — the AI module is agent-centric (agents load on
+// mount, so the default is ready on first paint).
+const filterMode = ref<"stream" | "agent">("agent");
 const availableStreams = ref<string[]>([]);
 const activeStream = ref<string>("default");
 
