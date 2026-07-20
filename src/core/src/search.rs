@@ -131,7 +131,14 @@ impl openobserve_search_service::partition::PartitionRuntime for CoreSearchRunti
         stream_name: &str,
         time_range: (i64, i64),
     ) -> Result<Vec<infra::file_list::FileId>, Error> {
-        crate::file_list::query_ids(trace_id, org_id, stream_type, stream_name, time_range).await
+        openobserve_search_service::file_list::query_ids(
+            trace_id,
+            org_id,
+            stream_type,
+            stream_name,
+            time_range,
+        )
+        .await
     }
 
     async fn settings_max_query_range(
@@ -160,8 +167,15 @@ impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
         time_range: Option<(i64, i64)>,
         ids: &[i64],
     ) -> Result<Vec<config::meta::stream::FileKey>, Error> {
-        crate::file_list::query_by_ids(trace_id, org_id, stream_type, stream_name, time_range, ids)
-            .await
+        openobserve_search_service::file_list::query_by_ids(
+            trace_id,
+            org_id,
+            stream_type,
+            stream_name,
+            time_range,
+            ids,
+        )
+        .await
     }
 
     async fn query_file_keys(
@@ -174,7 +188,7 @@ impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
         time_min: i64,
         time_max: i64,
     ) -> Result<Vec<config::meta::stream::FileKey>, Error> {
-        crate::file_list::query(
+        openobserve_search_service::file_list::query(
             trace_id,
             org_id,
             stream_type,
@@ -190,7 +204,7 @@ impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
         &self,
         files: &[config::meta::stream::FileKey],
     ) -> Result<search::ScanStats, Error> {
-        crate::file_list::calculate_files_size(files).await
+        openobserve_search_service::file_list::calculate_files_size(files).await
     }
 
     async fn tantivy_index_updated_at(&self) -> i64 {
@@ -287,5 +301,46 @@ impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
                 ctx.dashboard_folder_id = Some(folder.folder_id);
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl openobserve_search_service::file_list::DumpReader for CoreSearchRuntime {
+    async fn query(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        range: (i64, i64),
+        ids: &[i64],
+    ) -> Result<Vec<infra::file_list::FileRecord>, Error> {
+        openobserve_compactor::file_list_dump::query(
+            trace_id,
+            org_id,
+            stream_type,
+            stream_name,
+            range,
+            ids,
+        )
+        .await
+    }
+
+    async fn query_ids(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        range: (i64, i64),
+    ) -> Result<Vec<infra::file_list::FileId>, Error> {
+        openobserve_compactor::file_list_dump::query_ids(
+            trace_id,
+            org_id,
+            stream_type,
+            stream_name,
+            range,
+        )
+        .await
     }
 }

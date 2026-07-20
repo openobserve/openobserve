@@ -31,8 +31,8 @@ pub mod dashboards;
 pub mod db;
 pub use openobserve_enrichment::{enrichment, enrichment_table};
 pub mod file_downloader;
-pub mod file_list;
 pub use openobserve_dashboards::folders;
+pub use openobserve_search_service::file_list;
 pub use openobserve_transform::management as functions;
 pub mod github;
 pub mod grpc {

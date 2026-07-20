@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::{Arc, OnceLock};
+
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -25,10 +27,44 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::{errors::Result, file_list as infra_file_list, storage};
-use openobserve_compactor::file_list_dump;
 use rayon::slice::ParallelSliceMut;
+use search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
 
-use crate::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
+#[async_trait::async_trait]
+pub trait DumpReader: Send + Sync + 'static {
+    async fn query(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        range: (i64, i64),
+        ids: &[i64],
+    ) -> Result<Vec<infra_file_list::FileRecord>>;
+
+    async fn query_ids(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        range: (i64, i64),
+    ) -> Result<Vec<infra_file_list::FileId>>;
+}
+
+static DUMP_READER: OnceLock<Arc<dyn DumpReader>> = OnceLock::new();
+
+pub fn install_dump_reader(reader: Arc<dyn DumpReader>) -> Result<(), &'static str> {
+    DUMP_READER
+        .set(reader)
+        .map_err(|_| "file-list dump reader is already installed")
+}
+
+fn dump_reader() -> Result<&'static Arc<dyn DumpReader>> {
+    DUMP_READER.get().ok_or_else(|| {
+        infra::errors::Error::Message("file-list dump reader is not installed".to_string())
+    })
+}
 
 #[tracing::instrument(
     name = "service::file_list::query",
@@ -53,15 +89,16 @@ pub async fn query(
         None,
     )
     .await?;
-    let dumped_files = file_list_dump::query(
-        trace_id,
-        org_id,
-        stream_type,
-        stream_name,
-        (time_min, time_max),
-        &[],
-    )
-    .await?;
+    let dumped_files = dump_reader()?
+        .query(
+            trace_id,
+            org_id,
+            stream_type,
+            stream_name,
+            (time_min, time_max),
+            &[],
+        )
+        .await?;
 
     files.extend(dumped_files.iter().map(|f| f.into()));
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
@@ -189,15 +226,16 @@ pub async fn query_by_ids(
     let ids_set = ids_set.difference(&db_ids).cloned().collect::<HashSet<_>>();
     if !ids_set.is_empty() {
         let ids: Vec<_> = ids_set.iter().cloned().collect();
-        let dumped_files = file_list_dump::query(
-            trace_id,
-            org_id,
-            stream_type,
-            stream_name,
-            time_range.unwrap_or_default(),
-            &ids,
-        )
-        .await?;
+        let dumped_files = dump_reader()?
+            .query(
+                trace_id,
+                org_id,
+                stream_type,
+                stream_name,
+                time_range.unwrap_or_default(),
+                &ids,
+            )
+            .await?;
         db_files.extend(
             dumped_files
                 .iter()
@@ -260,8 +298,9 @@ pub async fn query_ids(
 ) -> Result<Vec<infra_file_list::FileId>> {
     let mut files =
         infra_file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
-    let dumped_files =
-        file_list_dump::query_ids(trace_id, org_id, stream_type, stream_name, time_range).await?;
+    let dumped_files = dump_reader()?
+        .query_ids(trace_id, org_id, stream_type, stream_name, time_range)
+        .await?;
     files.extend(dumped_files);
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);

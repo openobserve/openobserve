@@ -22,6 +22,7 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     file_list as infra_file_list, table,
 };
+use openobserve_search_service::file_list;
 
 use crate::{
     cli::data::{
@@ -31,7 +32,7 @@ use crate::{
     },
     common::{infra::config::USERS, meta},
     migration,
-    service::{db, file_list, users},
+    service::{db, users},
 };
 
 /// Not to be confused with [`clap::arg`] macro, this is a custom macro that

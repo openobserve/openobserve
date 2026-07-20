@@ -30,6 +30,7 @@ use infra::errors::Error;
 pub mod cache;
 pub mod cardinality;
 pub mod cluster;
+pub mod file_list;
 pub mod grpc;
 pub mod grpc_search;
 pub mod grpc_server;
