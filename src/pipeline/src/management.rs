@@ -13,13 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use ::common::{
     meta::authz::Authz,
     utils::auth::{remove_ownership, set_ownership},
 };
-use async_trait::async_trait;
 use config::meta::{
     pipeline::{
         Pipeline, PipelineKind,
@@ -29,63 +26,8 @@ use config::meta::{
     stream::ListStreamParams,
     triggers::{Trigger, TriggerModule},
 };
-use openobserve_pipeline::{repository::PipelineError, service as pipeline};
 
-use super::db::{functions as db_functions, scheduler};
-
-struct CoreRecordSink;
-struct CoreRuntimeServices;
-
-#[async_trait]
-impl openobserve_pipeline::ports::RecordSink for CoreRecordSink {
-    async fn ingest(
-        &self,
-        request: proto::cluster_rpc::IngestionRequest,
-    ) -> anyhow::Result<proto::cluster_rpc::IngestionResponse> {
-        crate::ingestion::ingestion_service::ingest(request)
-            .await
-            .map_err(Into::into)
-    }
-}
-
-#[async_trait]
-impl openobserve_pipeline::ports::RuntimeServices for CoreRuntimeServices {
-    async fn get_transform(
-        &self,
-        org_id: &str,
-        name: &str,
-    ) -> anyhow::Result<config::meta::function::Transform> {
-        Ok(db_functions::get(org_id, name).await?)
-    }
-
-    async fn wait_for_geoip(&self) {
-        std::sync::LazyLock::force(&crate::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
-            .notified()
-            .await;
-    }
-
-    async fn publish_error(&self, error: config::meta::self_reporting::error::ErrorData) {
-        crate::self_reporting::publish_error(error).await;
-    }
-
-    async fn report_usage(&self, report: openobserve_pipeline::ports::UsageReport) {
-        crate::self_reporting::report_request_usage_stats(
-            report.stats,
-            &report.org_id,
-            &report.stream_name,
-            report.stream_type,
-            report.usage_type,
-            report.num_functions,
-            report.timestamp,
-        )
-        .await;
-    }
-}
-
-pub fn install_record_sink() {
-    let _ = openobserve_pipeline::ports::install_record_sink(Arc::new(CoreRecordSink));
-    let _ = openobserve_pipeline::ports::install_runtime_services(Arc::new(CoreRuntimeServices));
-}
+use crate::{repository::PipelineError, service as pipeline};
 
 /// Validates that no JavaScript functions are used in the pipeline.
 /// JavaScript functions are restricted from pipelines in ALL organizations (including _meta).
@@ -95,7 +37,7 @@ async fn validate_no_javascript_functions(pipeline: &Pipeline) -> Result<(), Pip
     for node in &pipeline.nodes {
         if let NodeData::Function(function_params) = &node.data {
             // Load the function to check its trans_type
-            let function = db_functions::get(&pipeline.org, &function_params.name)
+            let function = crate::ports::get_transform(&pipeline.org, &function_params.name)
                 .await
                 .map_err(|e| {
                     PipelineError::InvalidPipeline(format!(
@@ -147,13 +89,9 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         derived_stream.org_id = pipeline.org.clone();
         // save derived_stream to triggers table
-        if let Err(e) = openobserve_pipeline::derived_streams::save(
-            derived_stream.clone(),
-            &pipeline.name,
-            &pipeline.id,
-            true,
-        )
-        .await
+        if let Err(e) =
+            crate::derived_streams::save(derived_stream.clone(), &pipeline.name, &pipeline.id, true)
+                .await
         {
             return Err(PipelineError::InvalidDerivedStream(e.to_string()));
         }
@@ -218,7 +156,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
             PipelineSource::Scheduled(derived_stream) => {
                 if pipeline.source.is_realtime() {
                     // source changed, delete prev. trigger
-                    if let Err(error) = openobserve_pipeline::derived_streams::delete(
+                    if let Err(error) = crate::derived_streams::delete(
                         &derived_stream,
                         &existing_pipeline.name,
                         &existing_pipeline.id,
@@ -241,13 +179,9 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     // Save DerivedStream details if there's any
     if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
-        if let Err(e) = openobserve_pipeline::derived_streams::save(
-            derived_stream.clone(),
-            &pipeline.name,
-            &pipeline.id,
-            true,
-        )
-        .await
+        if let Err(e) =
+            crate::derived_streams::save(derived_stream.clone(), &pipeline.name, &pipeline.id, true)
+                .await
         {
             return Err(PipelineError::InvalidDerivedStream(e.to_string()));
         }
@@ -350,7 +284,7 @@ pub async fn get_user_pipeline(org_id: &str, pipeline_id: &str) -> Result<Pipeli
 #[tracing::instrument]
 pub async fn list_pipeline_triggers(org_id: &str) -> Result<Vec<Trigger>, PipelineError> {
     Ok(
-        scheduler::list_by_org(org_id, Some(TriggerModule::DerivedStream))
+        openobserve_scheduler::list_by_org(org_id, Some(TriggerModule::DerivedStream))
             .await
             .unwrap_or_default(),
     )
@@ -364,7 +298,7 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<ListStreamParams, P
 
 #[tracing::instrument]
 pub async fn enable_pipeline(
-    org_id: &str,
+    _org_id: &str,
     pipeline_id: &str,
     enable: bool,
     starts_from_now: bool,
@@ -379,14 +313,10 @@ pub async fn enable_pipeline(
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         if enable {
             if starts_from_now {
-                openobserve_pipeline::derived_streams::delete(
-                    derived_stream,
-                    &pipeline.name,
-                    pipeline_id,
-                )
-                .await
-                .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
-                openobserve_pipeline::derived_streams::save(
+                crate::derived_streams::delete(derived_stream, &pipeline.name, pipeline_id)
+                    .await
+                    .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
+                crate::derived_streams::save(
                     derived_stream.clone(),
                     &pipeline.name,
                     pipeline_id,
@@ -395,7 +325,7 @@ pub async fn enable_pipeline(
                 .await
                 .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
             } else {
-                openobserve_pipeline::derived_streams::save(
+                crate::derived_streams::save(
                     derived_stream.clone(),
                     &pipeline.name,
                     pipeline_id,
@@ -430,7 +360,7 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
 
     // delete DerivedStream details if there's any
     if let PipelineSource::Scheduled(derived_stream) = existing_pipeline.source
-        && let Err(error) = openobserve_pipeline::derived_streams::delete(
+        && let Err(error) = crate::derived_streams::delete(
             &derived_stream,
             &existing_pipeline.name,
             &existing_pipeline.id,
@@ -441,11 +371,8 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
     }
 
     // Delete all backfill jobs associated with this pipeline
-    if let Err(error) = openobserve_pipeline::backfill::delete_backfill_jobs_by_pipeline(
-        &existing_pipeline.org,
-        pipeline_id,
-    )
-    .await
+    if let Err(error) =
+        crate::backfill::delete_backfill_jobs_by_pipeline(&existing_pipeline.org, pipeline_id).await
     {
         log::error!(
             "[PIPELINE] Failed to delete backfill jobs for pipeline {}: {}",

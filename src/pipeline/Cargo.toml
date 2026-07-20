@@ -47,5 +47,6 @@ serde_json.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing.workspace = true
 utoipa.workspace = true
 vector-enrichment.workspace = true

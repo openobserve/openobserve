@@ -17,6 +17,7 @@ pub mod backfill;
 pub mod batch_execution;
 pub mod derived_streams;
 mod http;
+pub mod management;
 pub mod ports;
 pub mod repository;
 pub mod service;

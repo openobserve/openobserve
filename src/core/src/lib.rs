@@ -59,7 +59,12 @@ pub mod org_storage_providers;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;
-pub mod pipeline;
+pub mod pipeline {
+    pub use openobserve_pipeline::management::*;
+
+    pub use crate::pipeline_adapter::install_record_sink;
+}
+mod pipeline_adapter;
 pub use openobserve_search_service::promql;
 #[cfg(feature = "enterprise")]
 pub mod providers;
