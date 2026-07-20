@@ -65,6 +65,11 @@ const props = defineProps<{
   logoUrlDark?: string;
 }>();
 
+const emit = defineEmits<{
+  /** A step's action button was clicked; carries RichCardStepAction.id. */
+  (e: "step-action", actionId: string): void;
+}>();
+
 const store = useStore();
 const router = useRouter();
 const { getStreams } = useStreams();
@@ -263,8 +268,22 @@ const currentVariantNote = (step: RichCardStep) =>
 
 // ── step completion / active-step model ─────────────────────────────────────
 const copied = ref<Record<string, boolean>>({});
-const isStepDone = (step: RichCardStep) =>
-  step.completeOn === "copy" ? !!copied.value[step.id] : detected.value;
+// Steps whose action button has been triggered (completeOn: "action") — the
+// cloud-console flows have nothing to copy and nothing to detect, so the click
+// itself is the completion signal.
+const actioned = ref<Record<string, boolean>>({});
+const isStepDone = (step: RichCardStep) => {
+  if (step.completeOn === "copy") return !!copied.value[step.id];
+  if (step.completeOn === "action") return !!actioned.value[step.id];
+  return detected.value;
+};
+
+const onStepAction = (step: RichCardStep, index: number) => {
+  if (step.completeOn === "action")
+    actioned.value = { ...actioned.value, [step.id]: true };
+  emit("step-action", step.action!.id);
+  scrollToStep(index + 1);
+};
 
 // First not-done step is "active"; -1 once everything is done. OStepper's
 // model is 1-based step numbers (0 = none active, i.e. all done).
@@ -321,6 +340,31 @@ const inlineMd = (s: string) =>
     .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
     .replace(/`([^`]+)`/g, "<code>$1</code>");
 
+// Step notes additionally support in-card jump links: `[label](#advanced)` and
+// `[label](#troubleshooting)` render as anchors that OPEN the target accordion
+// and scroll to it — the sections sit below the detection status bar, so a
+// plain "see X below" leaves the user hunting. The href is a literal "#" and
+// the target comes from a fixed alternation, so authored content can't inject a
+// URL here (inlineMd has already escaped everything else).
+const JUMP_LINK_RE = /\[([^\]]+)\]\(#(advanced|troubleshooting)\)/g;
+const noteMd = (s: string) =>
+  inlineMd(s).replace(
+    JUMP_LINK_RE,
+    (_m, label, target) =>
+      `<a href="#" class="note-jump" data-jump="${target}">${label}</a>`,
+  );
+
+// Delegated so the anchors rendered by v-html above stay clickable.
+const onNoteClick = (e: MouseEvent) => {
+  const el = (e.target as HTMLElement)?.closest?.("[data-jump]") as
+    | HTMLElement
+    | null;
+  if (!el) return;
+  e.preventDefault();
+  if (el.dataset.jump === "advanced") openAdvanced();
+  else if (el.dataset.jump === "troubleshooting") openTroubleshooting();
+};
+
 const chipIcon = (kind: StepChipKind) =>
   ({ terminal: "", editor: "code", run: "play-arrow", traces: "timeline" })[
     kind
@@ -338,18 +382,28 @@ const hasInstallerAccordion = computed(
   () => !!(extras.value.installs?.length || extras.value.envVars?.length),
 );
 
-// "See All Troubleshooting" (from the fix box) opens the Troubleshooting
-// accordion (controlled via v-model) and scrolls it into view.
-const troubleshootingOpen = ref(false);
-const troubleshootingRef = ref<any>(null);
-const openTroubleshooting = () => {
-  troubleshootingOpen.value = true;
+// Open a bottom accordion (controlled via v-model) and scroll it into view —
+// used by the fix box's "See All Troubleshooting" and by step-note jump links.
+const scrollIntoViewSoon = (target: { $el?: HTMLElement } | null) =>
   nextTick(() =>
-    troubleshootingRef.value?.$el?.scrollIntoView({
+    target?.$el?.scrollIntoView({
       behavior: prefersReducedMotion() ? "auto" : "smooth",
       block: "start",
     }),
   );
+
+const troubleshootingOpen = ref(false);
+const troubleshootingRef = ref<any>(null);
+const openTroubleshooting = () => {
+  troubleshootingOpen.value = true;
+  scrollIntoViewSoon(troubleshootingRef.value);
+};
+
+const advancedOpen = ref(false);
+const advancedRef = ref<any>(null);
+const openAdvanced = () => {
+  advancedOpen.value = true;
+  scrollIntoViewSoon(advancedRef.value);
 };
 
 // ── confetti (canvas burst on connect) ───────────────────────────────────────
@@ -585,12 +639,44 @@ function fireConfetti() {
               </template>
             </OCodeBlock>
 
-            <p v-if="currentVariantNote(step)" class="step-note">
-              <OIcon name="info-outline" size="sm" /> {{ currentVariantNote(step) }}
+            <p
+              v-if="currentVariantNote(step)"
+              class="step-note"
+              @click="onNoteClick"
+            >
+              <OIcon name="info-outline" size="sm" />
+              <span v-html="noteMd(currentVariantNote(step) || '')"></span>
             </p>
-            <p v-if="step.note" class="step-note">
-              <OIcon name="info-outline" size="sm" /> {{ step.note }}
+            <p v-if="step.note" class="step-note" @click="onNoteClick">
+              <OIcon name="info-outline" size="sm" />
+              <span v-html="noteMd(step.note)"></span>
             </p>
+
+            <!-- Page-supplied controls for this step (region pickers, service
+                 checkboxes …). Lets a page own the interaction while inheriting
+                 the card's hero, stepper and chrome instead of rebuilding them. -->
+            <div
+              v-if="$slots[`step-${step.id}`]"
+              class="step-slot"
+              :data-test="`ai-step-slot-${step.id}`"
+            >
+              <slot :name="`step-${step.id}`" :step="step" />
+            </div>
+
+            <!-- Action button — for steps performed in a cloud console rather
+                 than by copying a command. -->
+            <div v-if="step.action" class="step-action">
+              <OButton
+                :variant="step.action.variant || 'primary'"
+                size="sm-action"
+                :icon-left="step.action.icon"
+                :disabled="step.action.disabled"
+                :data-test="`ai-step-action-${step.action.id}`"
+                @click="onStepAction(step, i)"
+              >
+                {{ step.action.label }}
+              </OButton>
+            </div>
 
             <div v-if="step.pills?.length" class="pill-list mt-2">
               <OTag
@@ -721,9 +807,39 @@ function fireConfetti() {
 
       <!-- Supplementary accordions (shared OCollapsible) -->
       <div
-        v-if="hasInstallerAccordion || extras.troubleshooting?.length"
+        v-if="hasInstallerAccordion || extras.advanced || extras.troubleshooting?.length"
         class="c-more"
       >
+        <!-- Alternative manual path (e.g. the raw Helm sequence) — collapsed, so
+             the stepped primary path above stays the obvious default. -->
+        <OCollapsible
+          v-if="extras.advanced"
+          ref="advancedRef"
+          v-model="advancedOpen"
+          :label="extras.advanced.label"
+          icon="settings"
+          class="acc-item"
+          data-test="ai-advanced-accordion"
+        >
+          <div class="acc-body">
+            <p
+              v-if="extras.advanced.description"
+              class="step-desc"
+              v-html="inlineMd(extras.advanced.description)"
+            ></p>
+            <OCodeBlock
+              :lang="extras.advanced.code.lang"
+              :chrome="extras.advanced.code.filename ? 'editor' : 'terminal'"
+              :filename="extras.advanced.code.filename"
+              :code="subStream(extras.advanced.code.raw) || ''"
+              :code-masked="subStream(extras.advanced.code.masked)"
+              data-test="ai-advanced-code"
+              reveal-tooltip="Reveal Token"
+              hide-tooltip="Hide Token"
+            />
+          </div>
+        </OCollapsible>
+
         <OCollapsible
           v-if="hasInstallerAccordion"
           label="What The Installer Does"
@@ -790,6 +906,18 @@ function fireConfetti() {
           rel="noopener noreferrer"
           >{{ content.provider.name }} →</a
         >
+        <!-- Secondary guides (e.g. GCP's Google Workspace page) — real anchors,
+             beside the primary doc link rather than buried in an accordion. -->
+        <template v-for="l in content.docLinks" :key="l.url">
+          <span class="pv-foot-sep" aria-hidden="true">·</span>
+          <a
+            :href="safeHttpUrl(l.url)"
+            target="_blank"
+            rel="noopener noreferrer"
+            :data-test="`ai-doc-link-${l.label.toLowerCase().replace(/\s+/g, '-')}`"
+            >{{ l.label }} →</a
+          >
+        </template>
         <span v-if="content.slackUrl" class="ml-auto"
           >Stuck?
           <a
@@ -970,6 +1098,14 @@ function fireConfetti() {
   margin: 0.625rem 0 0;
 }
 
+/* ---- page-supplied step content + action button ---- */
+.step-slot {
+  margin: 4px 0 14px;
+}
+.step-action {
+  margin-top: 14px;
+}
+
 /* ---- variant toggle (shared OToggleGroup) — only spacing + icon sizing here;
    the toggle's own visuals come from the design system. ---- */
 .variant-tabs {
@@ -989,6 +1125,16 @@ function fireConfetti() {
 .step-note :deep(svg) {
   flex: none;
   margin-top: 1px;
+}
+/* In-card jump link (see noteMd) — same treatment as the footer's doc link. */
+.step-note :deep(a.note-jump) {
+  color: var(--primary-ink);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.step-note :deep(a.note-jump:hover) {
+  text-decoration: underline;
 }
 .step-content-pad :deep(code),
 .step-desc :deep(code) {
@@ -1105,16 +1251,32 @@ function fireConfetti() {
   margin-top: 0.8125rem;
 }
 /* ---- accordions (OCollapsible) ---- */
+/* These sit at the very bottom of a long card, after the detection status bar.
+   OCollapsible's default trigger is borderless and background-less, which reads
+   as stray body text down there — give each one the same bordered panel as
+   .statusbar / .fixbox so it registers as a real, clickable section. */
 .c-more {
   margin-top: 0.875rem;
 }
+.acc-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  overflow: hidden;
+}
 .acc-item + .acc-item {
   margin-top: 0.5rem;
+}
+/* Roomier hit area than the component's default px-2 py-2 inside a panel. */
+.acc-item :deep(button) {
+  padding: 13px 16px;
+  border-radius: 0;
 }
 .acc-body {
   color: var(--text-2);
   font-size: var(--text-compact);
   line-height: 1.6;
+  padding: 0 16px 16px;
 }
 .acc-body :deep(code) {
   font-size: var(--text-2xs);
@@ -1177,6 +1339,10 @@ function fireConfetti() {
 }
 .pv-foot a:hover {
   text-decoration: underline;
+}
+.pv-foot-sep {
+  color: var(--text-3);
+  margin: 0 2px;
 }
 
 /* ---- confetti overlay ---- */

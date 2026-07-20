@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="rocket-launch"
             size="xl"
-            class="text-[var(--color-theme-accent)]"
+            class="text-text-link"
           />
           <div>
             <h6 class="text-xl! font-bold m-0 mb-2!">
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="AWS_REGIONS"
           valueKey="value"
           labelKey="label"
-          style="max-width: 320px"
+          class="max-w-xs"
           data-test="aws-region-select"
         />
       </div>
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-6">
           <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">
             Admin region
-            <span class="font-normal text-xs text-text-secondary"
+            <span class="font-normal text-xs text-text-muted"
               >(where the StackSet is managed)</span
             >
           </div>
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="AWS_REGIONS"
             valueKey="value"
             labelKey="label"
-            style="max-width: 320px"
+            class="max-w-xs"
             data-test="aws-admin-region-select"
           />
         </div>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div class="font-semibold text-sm" :class="stepLabelClass">
                 Target regions
-                <span class="font-normal text-xs text-text-secondary"
+                <span class="font-normal text-xs text-text-muted"
                   >(where stacks will be deployed)</span
                 >
               </div>

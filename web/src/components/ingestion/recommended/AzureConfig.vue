@@ -15,39 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="m-3 mt-1 max-w-215">
+  <div class="m-3 mt-1 max-w-4xl">
     <!-- Header -->
     <div class="flex items-start gap-4 mb-6">
-      <OIcon
-        name="cloud"
-        size="xl"
-        class="flex-shrink-0"
-      />
+      <OIcon name="cloud" size="xl" class="flex-shrink-0" />
       <div>
-        <div class="text-sm font-medium m-0 mb-1 text-text-heading">
-          Azure Activity Logs
+        <div
+          data-test="azure-config-page-title"
+          class="text-sm font-medium m-0 mb-1 text-text-heading"
+        >
+          {{ t("ingestion.azureSetup.activityLogsTitle") }}
         </div>
         <div class="text-sm m-0 text-text-secondary">
-          Stream Azure subscription activity logs to OpenObserve via Event Hub.
-          The ARM template sets up the Event Hub infrastructure — you then
-          configure Azure to export logs to it.
+          {{ t("ingestion.azureSetup.activityLogsDescription") }}
         </div>
       </div>
     </div>
 
     <!-- Step 1 -->
     <div
-      class="mb-4 p-4 rounded-default border-l-[3px] border-l-solid bg-surface-panel border-l-border-default"
+      class="mb-4 p-4 rounded-default border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
     >
-      <div
-        style="
-          display: grid;
-          grid-template-columns: 28px 1fr;
-          gap: 12px;
-          align-items: start;
-        "
-      >
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm shrink-0 bg-accent text-text-inverse">1</div>
+      <div class="flex gap-3 items-start">
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text">1</div>
         <div>
           <div class="font-semibold mb-1 text-text-heading">
             Deploy ARM Template
@@ -73,17 +63,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 2 -->
     <div
-      class="mb-4 p-4 rounded-default border-l-[3px] border-l-solid bg-surface-panel border-l-border-default"
+      class="mb-4 p-4 rounded-default border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
     >
-      <div
-        style="
-          display: grid;
-          grid-template-columns: 28px 1fr;
-          gap: 12px;
-          align-items: start;
-        "
-      >
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm shrink-0 bg-accent text-text-inverse">2</div>
+      <div class="flex gap-3 items-start">
+        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text">2</div>
         <div>
           <div class="font-semibold mb-1 text-text-heading">
             Configure Diagnostic Settings
@@ -131,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Categories -->
             <div class="mb-4">
               <div class="flex items-center justify-between mb-2">
-                <div class="text-xs font-semibold text-text-body">
+                <div class="text-xs font-semibold text-text-heading">
                   Log categories to enable
                 </div>
                 <div class="flex gap-2">
@@ -151,14 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
               </div>
-              <div
-                style="
-                  display: grid;
-                  grid-template-columns: repeat(4, 1fr);
-                  gap: 4px;
-                  width: 100%;
-                "
-              >
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-1 w-full">
                 <OCheckbox
                   v-for="cat in LOG_CATEGORIES"
                   :key="cat.value"
@@ -169,16 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div
-              style="
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 16px;
-                margin-bottom: 16px;
-              "
-            >
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <div class="text-xs mb-1 text-text-body">
+                <div class="text-xs mb-1 text-text-heading">
                   Resource Group
                 </div>
                 <OInput
@@ -189,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div>
-                <div class="text-xs mb-1 text-text-body">
+                <div class="text-xs mb-1 text-text-heading">
                   Deployment Name
                 </div>
                 <OInput
@@ -223,8 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Manual Configuration -->
     <div class="mt-6">
-      <div class="font-semibold text-sm mb-2 text-text-body">
-        Manual Configuration (for reference)
+      <div class="font-semibold text-sm mb-2 text-text-heading">
+        {{ t("ingestion.azureSetup.manualTitle") }}
       </div>
       <CopyContent :content="manualContent" />
     </div>
@@ -233,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -269,10 +239,12 @@ const activityLogsIntegration = azureIntegrations.find(
 
 export default defineComponent({
   name: "AzureConfig",
-  components: { CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput,
+  components: {
+    CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput,
     OIcon,
-},
+  },
   setup() {
+    const { t } = useI18n();
     const store = useStore();
 
     let endpoint: any = null;
@@ -345,6 +317,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       LOG_CATEGORIES,
       step2Mode,
