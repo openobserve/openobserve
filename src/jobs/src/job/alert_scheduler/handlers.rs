@@ -52,7 +52,7 @@ use openobserve_pipeline::{
 use proto::cluster_rpc;
 
 #[cfg(feature = "enterprise")]
-use crate::service::alerts::scheduler::query_optimization_recommendation::QueryOptimizerContext;
+use crate::job::query_optimization_recommendation::QueryOptimizerContext;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{

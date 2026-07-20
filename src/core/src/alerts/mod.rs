@@ -144,7 +144,6 @@ pub mod grouping {
 pub mod org_config {
     pub use openobserve_alerts::service::org_config::*;
 }
-pub mod scheduler;
 pub mod templates {
     pub use openobserve_alerts::service::templates::*;
 }

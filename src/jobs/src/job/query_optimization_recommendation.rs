@@ -22,7 +22,7 @@ use o2_enterprise::enterprise::recommendations::{
 };
 use proto::cluster_rpc::{IngestionData, IngestionRequest, IngestionResponse, IngestionType};
 
-use crate::{db::organization, ingestion::ingestion_service, search::search, stream::get_streams};
+use crate::service::{db::organization, ingestion::ingestion_service, stream::get_streams};
 
 #[derive(Clone)]
 pub struct QueryOptimizerContext;
@@ -61,9 +61,15 @@ impl QueryRecommendationEngine for QueryOptimizerContext {
     ) -> Pin<Box<dyn Future<Output = Result<config::meta::search::Response, anyhow::Error>> + Send>>
     {
         Box::pin(async move {
-            search("", &org_id, StreamType::Logs, None, &request)
-                .await
-                .map_err(Into::into)
+            openobserve_search_service::service::search(
+                "",
+                &org_id,
+                StreamType::Logs,
+                None,
+                &request,
+            )
+            .await
+            .map_err(Into::into)
         })
     }
 

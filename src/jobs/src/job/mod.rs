@@ -54,6 +54,8 @@ mod pipeline_error_cleanup;
 mod promql;
 mod promql_self_consume;
 #[cfg(feature = "enterprise")]
+pub mod query_optimization_recommendation;
+#[cfg(feature = "enterprise")]
 mod service_graph;
 mod session_cleanup;
 mod stats;
