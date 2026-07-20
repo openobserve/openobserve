@@ -559,8 +559,74 @@ pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
     cron_exp
 }
 
+// ---------------------------------------------------------------------------
+// Composite terms: a composite owns an ordered set of named terms. A term is
+// EITHER a reference to an existing alert (re-run over the composite's shared
+// window each tick — ReRun) OR an inline query stored on the composite. A
+// composite NEVER mutates, pauses, or reschedules anything it references — the
+// referenced alerts keep running on their own schedule, fully independent.
+// ---------------------------------------------------------------------------
+
+/// Validates a composite's terms BEFORE the composite row is written. For each
+/// reference term the referenced alert must exist, live in the composite's
+/// folder (RBAC v1), not itself be a composite (no nesting), and be a scheduled
+/// (not real-time) alert so its query can be re-run over a window. Inline terms
+/// must carry a query. Purely read-only: nothing referenced is modified.
+async fn validate_composite_terms<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    composite_folder: &str,
+    alert: &Alert,
+) -> Result<(), AlertError> {
+    let Some(spec) = alert.composite.as_ref() else {
+        return Ok(());
+    };
+    for term in &spec.terms {
+        match term.alert_id {
+            // Reference term (ReRun) — validate the referenced alert.
+            Some(rid) => {
+                let Some((folder, referenced)) =
+                    db::alerts::alert::get_by_id(conn, org_id, rid).await?
+                else {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "referenced alert {rid} not found"
+                    )));
+                };
+                if referenced.composite.is_some() {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "referenced alert '{}' is itself a composite; nesting is not allowed",
+                        referenced.name
+                    )));
+                }
+                if referenced.is_real_time {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "referenced alert '{}' is real-time; only scheduled alerts can be referenced",
+                        referenced.name
+                    )));
+                }
+                if folder.folder_id != composite_folder {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "referenced alert '{}' must be in the composite's folder",
+                        referenced.name
+                    )));
+                }
+            }
+            // Inline term — must carry its own query.
+            None => {
+                if term.query.is_none() {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "term '{}' has neither a referenced alert nor an inline query",
+                        term.name
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Creates a new alert in the specified folder.
-pub async fn create<C: TransactionTrait>(
+pub async fn create<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     folder_id: &str,
@@ -586,6 +652,12 @@ pub async fn create<C: TransactionTrait>(
         overwrite,
     )
     .await?;
+
+    // Validate composite terms BEFORE writing so a bad reference never leaves a
+    // partial state. Referenced alerts are never modified.
+    if alert.composite.is_some() {
+        validate_composite_terms(conn, org_id, folder_id, &alert).await?;
+    }
 
     let alert = db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite).await?;
 
@@ -698,7 +770,21 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
 
+    // Validate composite terms BEFORE writing (avoid partial state). Referenced
+    // alerts are never modified — the composite is fully non-invasive.
+    if alert.composite.is_some() {
+        let folder = match alert.id {
+            Some(id) => match db::alerts::alert::get_by_id(conn, org_id, id).await? {
+                Some((f, _)) => f.folder_id,
+                None => DEFAULT_FOLDER.to_string(),
+            },
+            None => DEFAULT_FOLDER.to_string(),
+        };
+        validate_composite_terms(conn, org_id, &folder, &alert).await?;
+    }
+
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+
     #[cfg(feature = "enterprise")]
     if let Some((curr_folder_id, dst_folder_id)) = _folder_info
         && get_openfga_config().enabled
@@ -840,18 +926,17 @@ pub async fn list_v2<C: ConnectionTrait>(
 }
 
 /// Deletes an alert by its KSUID primary key.
-pub async fn delete_by_id<C: ConnectionTrait>(
+pub async fn delete_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
-    if db::alerts::alert::get_by_id(conn, org_id, alert_id)
-        .await?
-        .is_none()
-    {
+    let Some((_folder, _alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Ok(());
     };
 
+    // Deleting a composite only removes the composite row — the alerts it
+    // referenced are independent and left untouched.
     let alert_id_str = alert_id.to_string();
     match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
         Ok(_) => {

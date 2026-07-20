@@ -61,8 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-col gap-1 border border-border-default rounded px-2 py-1.5"
         :data-test="`composite-preview-term-${tp.name}`"
       >
-        <div class="flex items-center gap-2">
-          <OTag type="default" :value="tp.name" class="uppercase" />
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="composite-term-chip">{{ tp.name }}</span>
+          <span v-if="tp.member_name" class="text-xs text-text-secondary">{{ tp.member_name }}</span>
           <OTag :variant="stateTagType(tp.state)" :value="tp.state" class="uppercase" />
         </div>
         <span class="text-xs text-text-secondary leading-relaxed">{{ termExplanation(tp) }}</span>
@@ -77,10 +78,36 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { cloneDeep } from "lodash-es";
 import { validateCompositeExpression } from "@/utils/alerts/compositeExpression";
-import { transformCompositeTermsForSave } from "@/utils/alerts/alertPayload";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+
+/** Transforms a scratch term's draft query into the back-end query shape. */
+const buildDraftQueryCondition = (draft: any): any => {
+  const qc = { ...(draft.query_condition || {}) };
+  const type = qc.type || "custom";
+  if (type === "custom") {
+    qc.conditions = { version: 2, conditions: qc.conditions };
+    qc.sql = "";
+    qc.promql = "";
+    qc.promql_condition = null;
+    if (!(qc.aggregation?.group_by || []).filter((g: string) => g?.trim()).length) {
+      qc.aggregation = null;
+    }
+  } else if (type === "sql") {
+    qc.conditions = null;
+    qc.promql = "";
+    qc.promql_condition = null;
+    qc.aggregation = null;
+  } else if (type === "promql") {
+    qc.conditions = null;
+    qc.sql = "";
+    qc.aggregation = null;
+  }
+  if (qc.vrl_function) qc.vrl_function = b64EncodeUnicode(String(qc.vrl_function).trim());
+  return qc;
+};
 
 export default defineComponent({
   name: "CompositePreview",
@@ -127,33 +154,19 @@ export default defineComponent({
       return expr;
     });
 
-    // Looks up the authored term (for its threshold) by name.
-    const termSpec = (name: string): any =>
-      (props.composite.terms || []).find((tm: any) => tm.name === name);
-
-    // Plain-English reason for a term's tri-state.
+    // Plain-English reason for a term's tri-state (the member alert owns the
+    // threshold, so we report the observed value + verdict).
     const termExplanation = (tp: any): string => {
       if (tp.state === "error") {
         return tp.error
           ? t("alerts.composite.termErrorReason", { error: tp.error })
           : t("alerts.composite.termErrorGeneric");
       }
-      const term = termSpec(tp.name);
-      const hasAgg =
-        (term?.query_condition?.aggregation?.group_by || []).filter(
-          (g: string) => g?.trim(),
-        ).length > 0;
-      const op = term?.operator ?? ">=";
-      const threshold = term?.threshold ?? 1;
-      const subject = hasAgg
-        ? t("alerts.composite.aggregateValue")
-        : t("alerts.composite.matchingRows");
       const verdict =
         tp.state === "true"
           ? t("alerts.composite.conditionMet")
           : t("alerts.composite.conditionNotMet");
-      // e.g. "8 matching rows  8 >= 1  → condition met"
-      return `${tp.value} ${subject} · ${tp.value} ${op} ${threshold} → ${verdict}`;
+      return `${tp.value} ${t("alerts.composite.matchingRows")} → ${verdict}`;
     };
 
     const runPreview = async () => {
@@ -169,14 +182,27 @@ export default defineComponent({
       previewLoading.value = true;
       previewError.value = null;
       try {
+        // Each term is either an existing member ref (alert_id) or an inline
+        // draft query for a not-yet-saved "New" term (R1.5).
+        const terms = props.composite.terms.map((tm: any) => {
+          if (tm.mode === "new") {
+            const draft = cloneDeep(tm.draft);
+            return {
+              name: tm.name,
+              stream_type: draft.stream_type,
+              stream_name: draft.stream_name,
+              query_condition: buildDraftQueryCondition(draft),
+              operator: draft.operator,
+              threshold: parseInt(draft.threshold),
+            };
+          }
+          return { name: tm.name, alert_id: tm.alert_id };
+        });
         const payload: any = {
-          is_real_time: false,
-          stream_type: "logs",
-          stream_name: "",
+          expression: props.composite.expression,
           trigger_condition: cloneDeep(props.triggerCondition),
-          composite: cloneDeep(props.composite),
+          terms,
         };
-        transformCompositeTermsForSave(payload);
         const res = await alertsService.preview_composite(
           store.state.selectedOrganization.identifier,
           payload,
@@ -206,3 +232,19 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* Exact-alias chip (no case/space transform, unlike OTag's humanised labels). */
+.composite-term-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: var(--o2-font-mono, ui-monospace, monospace);
+  background: color-mix(in srgb, var(--q-primary) 12%, transparent);
+  color: var(--q-primary);
+  white-space: nowrap;
+}
+</style>

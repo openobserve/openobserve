@@ -43,6 +43,7 @@ import {
   getUUID,
   getTimezoneOffset,
   b64DecodeUnicode,
+  b64EncodeUnicode,
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
@@ -1167,17 +1168,25 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         return false;
       }
       names.add(term.name);
-      const type = term.query_condition?.type || "custom";
-      if (type === "custom" && !term.stream_name) {
-        toast({ variant: "error", message: t("alerts.composite.termStreamRequired", { name: term.name }) });
-        return false;
-      }
-      if (type === "sql" && !term.query_condition?.sql?.trim()) {
-        toast({ variant: "error", message: t("alerts.composite.termSqlRequired", { name: term.name }) });
-        return false;
-      }
-      if (type === "promql" && !term.query_condition?.promql?.trim()) {
-        toast({ variant: "error", message: t("alerts.composite.termPromqlRequired", { name: term.name }) });
+      if (term.mode === "new") {
+        // Scratch term: must have a stream + a query.
+        const draft = term.draft || {};
+        const type = draft.query_condition?.type || "custom";
+        if (!draft.stream_name) {
+          toast({ variant: "error", message: t("alerts.composite.termStreamRequired", { name: term.name }) });
+          return false;
+        }
+        if (type === "sql" && !draft.query_condition?.sql?.trim()) {
+          toast({ variant: "error", message: t("alerts.composite.termSqlRequired", { name: term.name }) });
+          return false;
+        }
+        if (type === "promql" && !draft.query_condition?.promql?.trim()) {
+          toast({ variant: "error", message: t("alerts.composite.termPromqlRequired", { name: term.name }) });
+          return false;
+        }
+      } else if (!term.alert_id) {
+        // Existing term: must reference a member alert.
+        toast({ variant: "error", message: t("alerts.composite.termMemberRequired", { name: term.name }) });
         return false;
       }
     }
@@ -1336,69 +1345,62 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return retransformBEToFEUtil(data);
   };
 
-  // Normalizes a query_condition's `conditions` from any persisted back-end
-  // shape into the front-end builder group (mirrors the top-level edit-load
-  // rehydration). Used to rehydrate each composite term on edit.
-  const normalizeConditionsForLoad = (conditions: any): any => {
-    if (conditions?.version === "2" || conditions?.version === 2) {
-      return ensureIds(conditions.conditions);
-    }
-    if (
-      conditions &&
-      !Array.isArray(conditions) &&
-      Object.keys(conditions).length != 0
-    ) {
-      const version = detectConditionsVersion(conditions);
-      if (version === 0) return ensureIds(convertV0ToV2(conditions));
-      if (version === 1) {
-        if (conditions.and || conditions.or)
-          return ensureIds(convertV1BEToV2(conditions));
-        if (conditions.label && conditions.items)
-          return ensureIds(convertV1ToV2(conditions));
-        return ensureIds(conditions);
-      }
-      return ensureIds(conditions);
-    }
-    if (Array.isArray(conditions) && conditions.length > 0) {
-      return ensureIds(convertV0ToV2(conditions));
-    }
-    return {
-      filterType: "group",
-      logicalOperator: "AND",
-      conditions: [],
-      groupId: getUUID(),
-    };
-  };
 
-  // Rehydrates a composite alert's terms from the persisted back-end shape into
-  // the front-end form so the query builder renders the saved state. Inverse of
-  // `transformCompositeTermsForSave`.
+  // Rehydrates a composite alert's terms on edit-load. A term is either a
+  // reference to an existing alert (`alert_id`) or an inline query (`query`)
+  // stored on the composite. Reference terms show the picker; inline terms
+  // repopulate the query-builder draft so the user can edit them in place.
   const rehydrateCompositeTerms = (composite: any) => {
     if (!composite || !Array.isArray(composite.terms)) return;
     composite.terms.forEach((term: any) => {
-      const qc = term.query_condition || (term.query_condition = {});
-      if (!qc.type) qc.type = "custom";
-
-      // Conditions: back-end `{version, conditions}` → builder group.
-      qc.conditions = normalizeConditionsForLoad(qc.conditions);
-
-      // VRL: base64 → plain text for the editor.
-      if (qc.vrl_function) {
-        qc.vrl_function = smartDecodeVrlFunction(qc.vrl_function);
+      if (term.member_name === undefined) term.member_name = "";
+      // An inline term carries a `query`; a reference term carries `alert_id`.
+      if (term.query && !term.alert_id) {
+        term.mode = "new";
+        term.draft = draftFromInlineQuery(term.query);
+      } else if (term.mode === undefined) {
+        term.mode = "existing";
       }
-
-      // PromQL condition defaults (parity with the single-alert load path).
-      if (qc.promql_condition) {
-        if (!qc.promql_condition.column) qc.promql_condition.column = "value";
-        if (!qc.promql_condition.operator) qc.promql_condition.operator = ">=";
-        if (
-          qc.promql_condition.value === undefined ||
-          qc.promql_condition.value === null
-        ) {
-          qc.promql_condition.value = 1;
-        }
-      }
+      // Ensure a draft always exists so toggling Existing/New never crashes.
+      if (!term.draft) term.draft = draftFromInlineQuery(null);
     });
+  };
+
+  // Reconstructs a query-builder draft from a stored inline term query (the
+  // inverse of the payload's `buildInlineTermQuery`). `null` yields an empty
+  // draft (the shape `makeMemberDraft` produces).
+  const draftFromInlineQuery = (query: any): any => {
+    const q = query || {};
+    const beQc = q.query_condition || {};
+    const emptyGroup = {
+      filterType: "group",
+      logicalOperator: "AND",
+      groupId: "",
+      conditions: [],
+    };
+    return {
+      stream_type: q.stream_type || "logs",
+      stream_name: q.stream_name || "",
+      query_condition: {
+        // Unwrap the versioned conditions back to the FE group the builder edits.
+        conditions: beQc.conditions?.conditions || emptyGroup,
+        sql: beQc.sql || "",
+        promql: beQc.promql || "",
+        type: beQc.type || "custom",
+        aggregation: beQc.aggregation || {
+          group_by: [],
+          function: "avg",
+          having: { column: "", operator: ">=", value: 1 },
+        },
+        promql_condition: beQc.promql_condition || null,
+        vrl_function: beQc.vrl_function
+          ? b64DecodeUnicode(beQc.vrl_function)
+          : null,
+        multi_time_range: beQc.multi_time_range || [],
+      },
+      operator: q.operator || ">=",
+      threshold: q.threshold ?? 1,
+    };
   };
 
   // ── UI Update Methods ───────────────────────────────────────────────────

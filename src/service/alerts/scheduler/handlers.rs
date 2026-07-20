@@ -771,6 +771,18 @@ async fn handle_alert_triggers(
                 if let Some(err) = outcome.error_summary {
                     trigger_data_stream.error = Some(err);
                 }
+                // Record the per-term search trace_ids so this single composite
+                // trigger record can be correlated with the N term search-usage
+                // records (each term search has its own trace_id).
+                if !outcome.term_trace_ids.is_empty() {
+                    trigger_data_stream.composite_search_trace_ids = Some(
+                        outcome
+                            .term_trace_ids
+                            .iter()
+                            .map(|(name, tid)| format!("{name}={tid}"))
+                            .collect(),
+                    );
+                }
                 composite_on_term_sends = outcome.on_term_sends;
                 Ok(outcome.eval)
             }

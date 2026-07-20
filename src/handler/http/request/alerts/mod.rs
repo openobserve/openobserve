@@ -1475,51 +1475,104 @@ pub async fn generate_sql(
     }
 }
 
+/// Request body for the composite preview. Each term is either a reference to an
+/// existing member alert (`alert_id`) or an inline draft query for a not-yet-
+/// saved "New" term (Appendix R1.5).
+#[cfg(feature = "enterprise")]
+#[derive(serde::Deserialize)]
+pub struct CompositePreviewRequestBody {
+    #[serde(default)]
+    pub trigger_condition: config::meta::alerts::TriggerCondition,
+    #[serde(default)]
+    pub expression: String,
+    #[serde(default)]
+    pub terms: Vec<CompositePreviewTermBody>,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(serde::Deserialize)]
+pub struct CompositePreviewTermBody {
+    pub name: String,
+    /// Existing member: KSUID string. Empty/absent for inline ("New") terms.
+    #[serde(default)]
+    pub alert_id: String,
+    #[serde(default)]
+    pub stream_type: config::meta::stream::StreamType,
+    #[serde(default)]
+    pub stream_name: String,
+    #[serde(default)]
+    pub query_condition: config::meta::alerts::QueryCondition,
+    #[serde(default)]
+    pub operator: config::meta::alerts::Operator,
+    #[serde(default)]
+    pub threshold: i64,
+}
+
 /// PreviewCompositeAlert
 ///
-/// Evaluates a composite alert's terms over the current window WITHOUT saving or
+/// Evaluates a composite's terms over the current window WITHOUT saving or
 /// notifying, returning each term's tri-state (TRUE/FALSE/ERROR) + value and the
-/// evaluated composite result, so authors can preview before saving (§8.3).
+/// evaluated composite result. Terms can be existing member refs OR inline
+/// drafts for not-yet-saved "New" terms (§8.3, R1.5).
 #[cfg(feature = "enterprise")]
 pub async fn preview_composite(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(req_body): Json<CreateAlertRequestBody>,
+    Json(req_body): Json<CompositePreviewRequestBody>,
 ) -> Response {
-    let mut alert: MetaAlert = req_body.into();
-    alert.org_id = org_id.clone();
+    // RBAC v1 (Appendix R1.7): members are alerts in the composite's folder, so
+    // folder access = compose access. Per-member stream checks are a follow-up.
+    let _ = &user_email;
 
-    let Some(spec) = alert.composite.as_ref() else {
-        return MetaHttpResponse::bad_request("not a composite alert");
-    };
-
-    // Enforce stream permissions for each Custom-query term (SQL/PromQL terms
-    // are authorized by the search layer when their query runs). §8.2.
-    for term in &spec.terms {
-        if term.query_condition.query_type == config::meta::alerts::QueryType::Custom
-            && let Some(stream) = term.stream_name.as_deref()
-            && let Some(resp) = check_stream_permissions(
-                stream,
-                &org_id,
-                &user_email.user_id,
-                &term.stream_type,
-                StreamPermissionResourceType::Search,
-            )
-            .await
-        {
-            return resp;
-        }
+    if req_body.terms.is_empty() {
+        return MetaHttpResponse::bad_request("composite preview requires at least one term");
     }
 
-    // Preview over the alert's own period ending now.
+    // Build the resolver specs (parse existing alert_ids; inline otherwise).
+    let mut specs = Vec::with_capacity(req_body.terms.len());
+    for t in req_body.terms {
+        let alert_id = if t.alert_id.trim().is_empty() {
+            None
+        } else {
+            match Ksuid::from_str(t.alert_id.trim()) {
+                Ok(id) => Some(id),
+                Err(_) => {
+                    return MetaHttpResponse::bad_request(format!(
+                        "invalid alert_id for term '{}'",
+                        t.name
+                    ));
+                }
+            }
+        };
+        specs.push(crate::service::alerts::composite::PreviewTermSpec {
+            name: t.name,
+            alert_id,
+            stream_type: t.stream_type,
+            stream_name: t.stream_name,
+            query_condition: t.query_condition,
+            operator: t.operator,
+            threshold: t.threshold,
+        });
+    }
+
+    let resolved = match crate::service::alerts::composite::resolve_preview_terms(&org_id, specs)
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => return MetaHttpResponse::bad_request(format!("Composite preview failed: {e}")),
+    };
+
+    // Preview over the composite's own period ending now.
     let end = chrono::Utc::now().timestamp_micros();
-    let period_minutes = alert.trigger_condition.period.max(1);
+    let period_minutes = req_body.trigger_condition.period.max(1);
     let start = end - period_minutes * 60 * 1_000_000;
     let trace_id = config::ider::generate_trace_id();
 
     match crate::service::alerts::composite::preview_composite(
         &org_id,
-        &alert,
+        resolved,
+        req_body.expression,
+        period_minutes,
         (Some(start), end),
         Some(trace_id),
     )

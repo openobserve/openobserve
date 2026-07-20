@@ -139,51 +139,64 @@ export const getAlertPayload = (
 };
 
 /**
- * Normalizes a composite alert's terms for the back-end payload:
- *  - coerces the per-term threshold to an int;
- *  - wraps each Custom term's conditions as `{ version: 2, conditions }` (the
- *    same shape the single-alert path uses), clearing them for SQL/PromQL;
- *  - drops aggregation when no group-by is set;
- *  - base64-encodes each term's VRL function;
- *  - strips the query fields not used by the term's query type.
- *
- * Mutates `payload.composite` in place. No-op when the alert is not composite.
+ * Transforms a "new" term's query-builder draft into the back-end query shape
+ * (matches a normal alert's `query_condition`).
+ */
+const buildInlineTermQuery = (draft: any): any => {
+  const qc = { ...(draft.query_condition || {}) };
+  const type = qc.type || "custom";
+  if (type === "custom") {
+    qc.conditions = { version: 2, conditions: qc.conditions };
+    qc.sql = "";
+    qc.promql = "";
+    qc.promql_condition = null;
+    if (!(qc.aggregation?.group_by || []).filter((g: string) => g?.trim()).length) {
+      qc.aggregation = null;
+    }
+  } else if (type === "sql") {
+    qc.conditions = null;
+    qc.promql = "";
+    qc.promql_condition = null;
+    qc.aggregation = null;
+  } else if (type === "promql") {
+    qc.conditions = null;
+    qc.sql = "";
+    qc.aggregation = null;
+  }
+  if (qc.vrl_function) qc.vrl_function = b64EncodeUnicode(String(qc.vrl_function).trim());
+  return qc;
+};
+
+/**
+ * Normalizes a composite alert's terms for the back-end payload. A composite is
+ * non-invasive: it never creates or modifies other alerts. A term is either:
+ *  - a reference to an existing alert `{ name, alert_id }` (re-run each tick), or
+ *  - an inline query `{ name, query: { stream_type, stream_name,
+ *    query_condition, operator, threshold } }` stored on the composite itself.
+ * Strips UI-only fields (e.g. `member_name`, `draft`). Mutates
+ * `payload.composite` in place; no-op when the alert is not composite.
  */
 export const transformCompositeTermsForSave = (payload: any): void => {
   if (!payload?.composite?.terms) return;
-
-  payload.composite.terms.forEach((term: any) => {
-    const qc = term.query_condition || (term.query_condition = {});
-    const type = qc.type || "custom";
-
-    term.threshold = parseInt(term.threshold as any);
-
-    if (type === "custom") {
-      qc.conditions = {
-        version: 2,
-        conditions: qc.conditions,
+  payload.composite.terms = payload.composite.terms.map((term: any) => {
+    const base = {
+      name: term.name,
+      ...(term.row_template ? { row_template: term.row_template } : {}),
+    };
+    if (term.mode === "new") {
+      const draft = term.draft || {};
+      return {
+        ...base,
+        query: {
+          stream_type: draft.stream_type,
+          stream_name: draft.stream_name,
+          query_condition: buildInlineTermQuery(draft),
+          operator: draft.operator,
+          threshold: parseInt(draft.threshold),
+        },
       };
-      qc.sql = "";
-      qc.promql = "";
-      qc.promql_condition = null;
-      // Drop aggregation unless a group-by is actually set.
-      if (!(qc.aggregation?.group_by || []).filter((g: string) => g?.trim()).length) {
-        qc.aggregation = null;
-      }
-    } else if (type === "sql") {
-      qc.conditions = null;
-      qc.promql = "";
-      qc.promql_condition = null;
-      qc.aggregation = null;
-    } else if (type === "promql") {
-      qc.conditions = null;
-      qc.sql = "";
-      qc.aggregation = null;
     }
-
-    if (qc.vrl_function) {
-      qc.vrl_function = b64EncodeUnicode(String(qc.vrl_function).trim());
-    }
+    return { ...base, alert_id: term.alert_id };
   });
 };
 
