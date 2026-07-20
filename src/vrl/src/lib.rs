@@ -17,14 +17,22 @@
 //! and VRL compilation. This crate deliberately has no dependency on core or
 //! the search engine so both can consume the same runtime state.
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::LazyLock,
+};
 
 use config::{
     DEFAULT_ORG, RwHashMap,
-    meta::function::{Transform, VRLCompilerConfig, VRLRuntimeConfig},
+    meta::{
+        function::{Transform, VRLCompilerConfig, VRLResultResolver, VRLRuntimeConfig},
+        stream::StreamType,
+    },
+    metrics,
+    utils::json::Value,
 };
 use vector_enrichment::{Table, TableRegistry};
-use vrl::compiler::{CompilationResult, runtime::Runtime};
+use vrl::compiler::{CompilationResult, TargetValueRef, runtime::Runtime};
 
 pub mod enrichment;
 
@@ -124,6 +132,78 @@ pub fn compile_vrl_function(
         Err(error) => Err(std::io::Error::other(
             vrl::diagnostic::Formatter::new(source, error).to_string(),
         )),
+    }
+}
+
+/// Execute a compiled VRL program against one record.
+///
+/// This lives in the transform crate so ingestion and query services share the
+/// exact same runtime behavior without depending on each other.
+pub fn apply_vrl_fn(
+    runtime: &mut Runtime,
+    vrl_runtime: &VRLResultResolver,
+    row: Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (Value, Option<String>) {
+    const TRANSFORM_FAILED: &str = "document_failed_transform";
+
+    let mut metadata = vrl::value::Value::from(BTreeMap::new());
+    metadata.insert("org_id", vrl::value::Value::from(org_id.to_string()));
+    metadata.insert(
+        "stream_name",
+        vrl::value::Value::from(stream_name[0].clone()),
+    );
+    let mut target = TargetValueRef {
+        value: &mut vrl::value::Value::from(&row),
+        metadata: &mut metadata,
+        secrets: &mut vrl::value::Secrets::new(),
+    };
+
+    target
+        .secrets
+        .insert(stream_name[0].clone(), stream_name[0].clone());
+
+    let timezone = vrl::compiler::TimeZone::Local;
+    let result = match vrl::compiler::VrlRuntime::default() {
+        vrl::compiler::VrlRuntime::Ast => {
+            runtime.resolve(&mut target, &vrl_runtime.program, &timezone)
+        }
+    };
+    match result {
+        Ok(res) => match res.try_into() {
+            Ok(val) => (val, None),
+            Err(err) => {
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.as_str(),
+                        &format!("{stream_name:?}"),
+                        TRANSFORM_FAILED,
+                    ])
+                    .inc();
+                log::debug!(
+                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
+                );
+                let clean_err = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
+                (row, Some(clean_err))
+            }
+        },
+        Err(err) => {
+            metrics::INGEST_ERRORS
+                .with_label_values(&[
+                    org_id,
+                    StreamType::Logs.as_str(),
+                    &format!("{stream_name:?}"),
+                    TRANSFORM_FAILED,
+                ])
+                .inc();
+            log::debug!(
+                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
+            );
+            let clean_err = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
+            (row, Some(clean_err))
+        }
     }
 }
 

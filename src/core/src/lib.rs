@@ -67,9 +67,10 @@ pub mod providers;
 pub mod ratelimit;
 pub mod runtime_metrics;
 pub mod schema;
-pub mod search;
+pub use ::search::service as search;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
+mod search_runtime;
 pub mod self_reporting;
 pub mod service;
 pub mod session;

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! OpenObserve query engine and application-level search service.
+
 pub mod bloom_pruner;
 #[cfg(feature = "enterprise")]
 pub mod cipher;
@@ -21,6 +23,7 @@ pub mod enrichment;
 pub mod file_cache;
 pub mod index;
 pub mod inspector;
+pub mod service;
 pub mod sql;
 pub mod tantivy;
 pub mod types;

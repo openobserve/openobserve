@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 async-trait.workspace = true
 config.workspace = true
+log.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true
 
