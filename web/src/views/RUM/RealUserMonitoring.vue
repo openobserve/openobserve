@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AppPageHeader
         v-if="showTabs"
         :title="t('rum.title')"
+        :subtitle="t('rum.subtitle')"
         icon="devices"
         tabs-below
         class="shrink-0"

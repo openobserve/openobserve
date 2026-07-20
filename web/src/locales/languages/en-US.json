@@ -862,6 +862,7 @@
   },
   "rum": {
     "title": "Real User Monitoring",
+    "subtitle": "Monitor real-user sessions, errors, and frontend performance",
     "issueColumn": "Issue",
     "trendColumn": "Trend",
     "usersColumn": "Users",
@@ -931,6 +932,7 @@
     "getStartedTitle": "Get Started with Real User Monitoring",
     "getStartedLabel": "Get Started",
     "performanceSummaryLabel": "Performance Summary",
+    "performanceSummarySubtitle": "Core Web Vitals, page load, and API performance for your frontend",
     "webVitalsLabel": "Web Vitals",
     "errorLabel": "Errors",
     "sessionLabel": "Sessions",

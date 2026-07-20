@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :key="store.state.selectedOrganization.identifier"
     data-test="rum-performance-page"
     :title="t('rum.performanceSummaryLabel')"
+    :subtitle="t('rum.performanceSummarySubtitle')"
     title-data-test="rum-performance-title"
     icon="speed"
     bleed
