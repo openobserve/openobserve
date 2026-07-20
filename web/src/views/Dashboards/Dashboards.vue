@@ -197,9 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     isFavorite(row.id) ? 'favorite' : 'favorite-border'
                   "
                   :class="
-                    isFavorite(row.id)
-                      ? 'text-favorite shrink-0'
-                      : 'text-text-secondary shrink-0'
+                    isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'
                   "
                   :title="
                     isFavorite(row.id)
