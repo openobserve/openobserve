@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="mb-4">
       <OSearchInput
         v-model="searchQuery"
-        placeholder="Search Azure services..."
+        :placeholder="t('ingestion.azureSetup.searchPlaceholder')"
         clearable
         class="max-w-md"
         data-test="azure-integration-search"
@@ -30,34 +30,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabs
         v-model="activeCategory"
         dense
-        class="text-gray-400"
         data-test="azure-integration-category-tabs"
       >
-        <OTab name="all" label="All Services" />
-        <OTab name="logs" label="Logs" />
-        <OTab name="compute" label="Compute" />
-        <OTab name="storage" label="Storage" />
-        <OTab name="security" label="Security" />
-        <OTab name="networking" label="Networking" />
+        <OTab name="all" :label="t('ingestion.azureSetup.categoryAll')" />
+        <OTab name="logs" :label="t('ingestion.azureSetup.categoryLogs')" />
+        <OTab name="compute" :label="t('ingestion.azureSetup.categoryCompute')" />
+        <OTab name="storage" :label="t('ingestion.azureSetup.categoryStorage')" />
+        <OTab name="security" :label="t('ingestion.azureSetup.categorySecurity')" />
+        <OTab name="networking" :label="t('ingestion.azureSetup.categoryNetworking')" />
       </OTabs>
     </div>
 
     <div
       v-if="filteredIntegrations.length === 0"
-      class="text-center py-12 text-[#666] dark:text-[#999]"
+      class="text-center py-12 text-text-secondary"
     >
-      <OIcon name="search-off" class="mb-2" style="width: 3rem; height: 3rem;" />
-      <div class="text-base">No integrations found matching your search</div>
+      <OIcon name="search-off" class="mb-2 w-12 h-12" />
+      <div class="text-base">{{ t("ingestion.azureSetup.noResults") }}</div>
     </div>
 
-    <div class="flex gap-3" v-else>
-      <div
+    <div
+      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+      v-else
+    >
+      <AzureIntegrationTile
         v-for="integration in filteredIntegrations"
         :key="integration.id"
-        class="w-full col-sm-6 col-md-4 col-lg-3"
-      >
-        <AzureIntegrationTile :integration="integration" />
-      </div>
+        :integration="integration"
+      />
     </div>
   </div>
 </template>
@@ -67,6 +67,7 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue'
 import { defineComponent, ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { azureIntegrations } from "@/utils/azureIntegrations";
 import AzureIntegrationTile from "./AzureIntegrationTile.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -80,6 +81,7 @@ export default defineComponent({
     OIcon,
 },
   setup() {
+    const { t } = useI18n();
     const searchQuery = ref("");
     const activeCategory = ref("all");
 
@@ -111,6 +113,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       searchQuery,
       activeCategory,
       filteredIntegrations,

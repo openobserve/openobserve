@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCard class="h-full flex flex-col transition-all duration-200 rounded-lg hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]">
     <OCardSection class="pb-2">
       <div class="flex items-start justify-between mb-2">
-        <div class="font-semibold text-base leading-[1.4]" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
+        <div class="font-semibold text-base leading-snug text-text-heading">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip content="View Documentation" />
         </OButton>
       </div>
-      <div class="text-sm mb-3 leading-normal min-h-[3em]" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+      <div class="text-sm mb-3 leading-normal min-h-[3em] text-text-secondary">
         {{ integration.description }}
       </div>
     </OCardSection>
