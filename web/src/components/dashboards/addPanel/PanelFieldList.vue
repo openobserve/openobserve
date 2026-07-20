@@ -634,7 +634,10 @@ if (isEditPanel) {
     let loaded = false;
     let stopEditInitialLoad: (() => void) | undefined;
     const onStream = (streamName: string) => {
-      if (!streamName || loaded) return;
+      if (loaded) return;
+      // Metrics visualize starts blank by design; load the metric stream list
+      // immediately so the stream dropdown is selectable without a preseeded stream.
+      if (!streamName && dashboardPanelDataPageKey !== "metrics") return;
       loaded = true;
       // Undefined on the immediate pass — `watch` has not returned yet, so the
       // handle does not exist. `loaded` is what stops a second run; this is only

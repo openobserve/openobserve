@@ -1,14 +1,22 @@
 /**
  * Language Translation Coverage Tests
  *
- * Tests translation coverage for all supported languages.
- * Runs in parallel for faster execution.
+ * Tests translation coverage for all supported languages. Runs in parallel.
  */
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-// Configure parallel execution within this file
+// Keep the 10 language cases running in parallel (fast, fits the shard timeout).
+// The OOM cascade seen in run 29481437880 (a worker browser process killed →
+// "Target page, context or browser has been closed" across 8 cases) is addressed
+// WITHOUT serialising: the crawl (languagePage.js) now navigates with
+// `waitUntil:'domcontentloaded'` + a bounded settle instead of waiting up to 10–30s
+// for `networkidle` on chart/websocket-heavy pages. That cuts each heavy page's
+// live-at-peak-memory dwell from ~10s to ~3s (so 5 concurrent crawls are far less
+// likely to spike memory simultaneously) and makes each crawl ~3–4× faster. The
+// fail-fast on a closed page/context (languagePage.js / landingPage.spec.js) stays
+// as defence-in-depth so any residual crash surfaces at its true origin.
 test.describe.configure({ mode: 'parallel' });
 
 const languages = [

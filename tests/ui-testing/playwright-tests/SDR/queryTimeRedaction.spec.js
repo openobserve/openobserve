@@ -125,7 +125,7 @@ test.describe("Query Time Redaction - Combined Test", { tag: '@enterprise' }, ()
 
       // Verify pattern was created
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      const exists = await pm.sdrPatternsPage.checkPatternExists(patternConfig.name);
+      const exists = await pm.sdrPatternsPage.waitForPatternCreated(patternConfig.name); // backend-consistent create gate (API source of truth)
       expect(exists).toBeTruthy();
       testLogger.info(`✓ Created and verified pattern: ${patternConfig.name}`);
     }
