@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      
       @click.self="handleCloseAddVariable"
     >
-      <div class="add-variable-drawer-panel px-6 pt-4 w-225 h-screen shadow-[-2px_0_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] overflow-hidden rounded-none! bg-surface-base">
+      <div class="add-variable-drawer-panel pl-2 pt-2 w-180 h-screen border-l border-border-default shadow-[-2px_0_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] overflow-hidden rounded-none! bg-surface-base">
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"
