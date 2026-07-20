@@ -39,6 +39,16 @@
      rows etc. share it — change it here and every accent hover/active surface moves. */
   --color-surface-accent-hover:  var(--color-primary-50);
   --color-surface-accent-active: var(--color-primary-100);
+  /* Soft-tinted icon chips — a pale accent square holding a coloured glyph
+     (Home resource/explore rows, KPI-card icons, section headers). Registered
+     as semantic tokens so the pale light-mode fill flips to a dark accent tint
+     in dark.css instead of staying light on the dark canvas. */
+  --color-icon-chip-primary-bg:   var(--color-primary-50);
+  --color-icon-chip-primary-text: var(--color-primary-600);
+  --color-icon-chip-success-bg:   var(--color-success-50);
+  --color-icon-chip-success-text: var(--color-success-600);
+  --color-icon-chip-warning-bg:   var(--color-warning-50);
+  --color-icon-chip-warning-text: var(--color-warning-700);
   /* App chrome (top bar + side rail + the gutter behind the content card) — a
      barely-tinted near-white, just a whisper of brand hue so the white content
      card floats on a calm backdrop. A strong tint reads as "too bright". */
@@ -90,6 +100,12 @@
   --color-surface-subtle-hover: var(--color-surface-subtle-hover);
   --color-surface-accent-hover:  var(--color-surface-accent-hover);
   --color-surface-accent-active: var(--color-surface-accent-active);
+  --color-icon-chip-primary-bg:   var(--color-icon-chip-primary-bg);
+  --color-icon-chip-primary-text: var(--color-icon-chip-primary-text);
+  --color-icon-chip-success-bg:   var(--color-icon-chip-success-bg);
+  --color-icon-chip-success-text: var(--color-icon-chip-success-text);
+  --color-icon-chip-warning-bg:   var(--color-icon-chip-warning-bg);
+  --color-icon-chip-warning-text: var(--color-icon-chip-warning-text);
   --color-surface-chrome:        var(--color-surface-chrome);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2">
           <span
-            class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-primary-50 text-primary-600"
+            class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
             aria-hidden="true"
           >
             <OIcon name="window" size="sm" />
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="window"
           icon-size="md"
           label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-primary-50 text-primary-600"
+          icon-class="bg-icon-chip-primary-bg text-icon-chip-primary-text"
         >
           <template #value>
             <span
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="bar-chart"
           icon-size="md"
           label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-primary-50 text-primary-600"
+          icon-class="bg-icon-chip-primary-bg text-icon-chip-primary-text"
         >
           <template #value>
             <span
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="download"
           icon-size="md"
           label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-warning-50 text-warning-700"
+          icon-class="bg-icon-chip-warning-bg text-icon-chip-warning-text"
         >
           <template #value>
             <span
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="compress"
           icon-size="md"
           label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-success-50 text-success-600"
+          icon-class="bg-icon-chip-success-bg text-icon-chip-success-text"
         >
           <template #value>
             <span
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="save"
           icon-size="md"
           label-class="text-sm font-medium text-text-secondary"
-          icon-class="bg-warning-50 text-warning-700"
+          icon-class="bg-icon-chip-warning-bg text-icon-chip-warning-text"
         >
           <template #value>
             <span
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="{ name: 'functionList', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
                 data-test="home-usage-tab-functions-card"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-primary-50 text-primary-600" aria-hidden="true">
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
                   <OIcon name="function" size="sm" />
                 </span>
                 <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("home.functionTitle") }}</span>
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="{ name: 'dashboards', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
                 data-test="home-usage-tab-dashboards-card"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-warning-50 text-warning-700" aria-hidden="true">
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
                   <OIcon name="dashboard" size="sm" />
                 </span>
                 <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("home.dashboardTitle") }}</span>
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="{ name: 'logs', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
                 data-test="home-usage-tab-explore-logs"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-success-50 text-success-600" aria-hidden="true">
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text" aria-hidden="true">
                   <OIcon name="search" size="sm" />
                 </span>
                 <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.search") }}</span>
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="{ name: 'traces', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
                 data-test="home-usage-tab-explore-traces"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-primary-50 text-primary-600" aria-hidden="true">
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
                   <OIcon name="account-tree" size="sm" />
                 </span>
                 <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.traces") }}</span>
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="{ name: 'metrics', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
                 data-test="home-usage-tab-explore-metrics"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-success-50 text-success-600" aria-hidden="true">
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text" aria-hidden="true">
                   <OIcon name="bar-chart" size="sm" />
                 </span>
                 <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.metrics") }}</span>
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="{ name: 'RUM', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
                 data-test="home-usage-tab-explore-rum"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-primary-50 text-primary-600" aria-hidden="true">
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
                   <OIcon name="devices" size="sm" />
                 </span>
                 <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.rum") }}</span>
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="{ name: 'incidentList', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
                 data-test="home-usage-tab-explore-incidents"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-warning-50 text-warning-700" aria-hidden="true">
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
                   <OIcon name="notifications-active" size="sm" />
                 </span>
                 <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.incidents") }}</span>
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :to="{ name: 'reports', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
                 data-test="home-usage-tab-explore-reports"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-warning-50 text-warning-700" aria-hidden="true">
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
                   <OIcon name="description" size="sm" />
                 </span>
                 <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.report") }}</span>
@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex justify-between items-center gap-2">
             <span class="text-sm font-semibold text-text-heading flex items-center gap-2">
-              <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-warning-50 text-warning-700" aria-hidden="true">
+              <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
                 <OIcon name="shield-alert-outline" size="md" />
               </span>
               {{ t("home.alertTitle") }}
@@ -342,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex justify-between items-center gap-2">
             <span class="text-sm font-semibold text-text-heading flex items-center gap-2">
-              <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-primary-50 text-primary-600" aria-hidden="true">
+              <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
                 <OIcon name="lan" size="md" />
               </span>
               {{ t("home.pipelineTitle") }}

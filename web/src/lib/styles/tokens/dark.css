@@ -687,6 +687,16 @@
   --color-service-health-healthy: #73D13D;
   --color-service-health-warning: #FFA940;
 
+  /* Soft-tinted icon chips — dark accent tint (mirrors the badge-soft
+     treatment) so a chip reads as a faint coloured square, not a bright
+     light block on the dark canvas. */
+  --color-icon-chip-primary-bg:   color-mix(in srgb, var(--color-primary-400) 15%, transparent);
+  --color-icon-chip-primary-text: var(--color-primary-300);
+  --color-icon-chip-success-bg:   color-mix(in srgb, var(--color-success-500) 15%, transparent);
+  --color-icon-chip-success-text: var(--color-success-400);
+  --color-icon-chip-warning-bg:   color-mix(in srgb, var(--color-warning-400) 15%, transparent);
+  --color-icon-chip-warning-text: var(--color-warning-400);
+
   /* Misc dark overrides. */
   --color-cancel-query-bg: #7A3838;
   --color-highlight-bg: #747474;
