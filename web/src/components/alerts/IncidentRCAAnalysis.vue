@@ -164,7 +164,12 @@ export default defineComponent({
   color: var(--rca-text-secondary);
 }
 
-.dark :deep(.rca-report-content) {
+/* `.dark` lives on <html>, which never carries this component's scope id, so
+   `.dark :deep(.rca-report-content)` would compile to `.dark[data-v] .rca-report-content`
+   and never match — dark mode would silently fall back to the light blue-50 washes.
+   Anchoring on `.rca-content` (a real element in this template, and a descendant of
+   html.dark) puts the scope id where it belongs: `.dark .rca-content[data-v] .rca-report-content`. */
+.dark .rca-content :deep(.rca-report-content) {
   /* Only the entries whose dark value differs from what the aliased token flips
      to on its own: the info-blue washes go neutral/deep-blue, accents brighten. */
   --rca-bg-primary: var(--color-surface-panel);
