@@ -597,7 +597,7 @@ pub async fn cache_status() -> impl IntoResponse {
 
     #[cfg(feature = "enterprise")]
     let (total_count, expired_count) =
-        openobserve_core::search::cardinality::get_cache_stats().await;
+        openobserve_search_service::cardinality::get_cache_stats().await;
     #[cfg(not(feature = "enterprise"))]
     let (total_count, expired_count) = (0, 0);
     stats.insert(

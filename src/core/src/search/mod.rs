@@ -34,6 +34,11 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
+use openobserve_search_service::partition::{
+    calculate_partition_settings_for_context, cpu_cores::estimated_secs,
+    generate_partitions_for_context, sql_context::PartitionSqlContext,
+    stream_files::collect_stream_files,
+};
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::SearchQuery;
 use sql::Sql;
@@ -41,7 +46,6 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::search::partition::aggregate::prepare_streaming_aggregate,
     config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM},
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{
@@ -55,22 +59,13 @@ use {
 use super::self_reporting::report_request_usage_stats;
 use crate::{
     common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
-    service::search::{
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        partition::{
-            cpu_cores::estimated_secs, generate_partitions, settings::calculate_partition_settings,
-            sql_context::PartitionSqlContext, stream_files::collect_stream_files,
-        },
-    },
+    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
-#[cfg(feature = "enterprise")]
-pub mod cardinality;
 pub mod cluster;
 pub mod grpc;
 pub mod grpc_search;
 pub mod grpc_server;
-pub mod partition;
 mod searcher;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
@@ -181,6 +176,30 @@ impl openobserve_search_service::streaming::StreamingRuntime for CoreSearchRunti
     #[cfg(feature = "enterprise")]
     async fn audit(&self, message: o2_enterprise::enterprise::common::auditor::AuditMessage) {
         crate::self_reporting::audit(message).await;
+    }
+}
+
+#[async_trait::async_trait]
+impl openobserve_search_service::partition::PartitionRuntime for CoreSearchRuntime {
+    async fn query_file_ids(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<infra::file_list::FileId>, Error> {
+        crate::file_list::query_ids(trace_id, org_id, stream_type, stream_name, time_range).await
+    }
+
+    async fn settings_max_query_range(
+        &self,
+        stream_max_query_range: i64,
+        org_id: &str,
+        user_id: Option<&str>,
+    ) -> i64 {
+        crate::stream_utils::get_settings_max_query_range(stream_max_query_range, org_id, user_id)
+            .await
     }
 }
 
@@ -710,7 +729,7 @@ pub async fn search_partition(
 
     let ctx = PartitionSqlContext::new(req, org_id, stream_type).await?;
 
-    let stream_files = collect_stream_files(trace_id, user_id, &ctx).await?;
+    let stream_files = collect_stream_files(&CoreSearchRuntime, trace_id, user_id, &ctx).await?;
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
@@ -763,7 +782,14 @@ pub async fn search_partition(
     #[cfg(feature = "enterprise")]
     {
         let (streaming_aggs, streaming_id, cache_strategy) =
-            prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
+            openobserve_search_service::partition::aggregate::prepare_streaming_aggregate(
+                &CoreSearchRuntime,
+                trace_id,
+                req,
+                &ctx,
+                use_cache,
+            )
+            .await?;
         resp.streaming_output = streaming_aggs;
         resp.streaming_aggs = streaming_aggs;
         resp.streaming_id = streaming_id;
@@ -774,7 +800,7 @@ pub async fn search_partition(
         }
     }
 
-    let partition_settings = calculate_partition_settings(
+    let partition_settings = calculate_partition_settings_for_context(
         trace_id,
         total_secs,
         &ctx,
@@ -782,7 +808,7 @@ pub async fn search_partition(
         stream_files.max_query_range,
     );
 
-    resp.partitions = generate_partitions(&ctx, &partition_settings);
+    resp.partitions = generate_partitions_for_context(&ctx, &partition_settings);
     Ok(resp)
 }
 

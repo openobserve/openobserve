@@ -13,14 +13,44 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod aggregate;
+pub mod cpu_cores;
 mod histogram;
 mod regular_partition;
 pub mod settings;
+pub mod sql_context;
+pub mod stream_files;
 
-use config::meta::sql::OrderBy;
+use config::{
+    get_config,
+    meta::{sql::OrderBy, stream::StreamType},
+};
 use histogram::generate_partitions_aligned_with_histogram_interval;
+use infra::{errors::Error, file_list::FileId};
 use regular_partition::generate_partitions_with_mini_partition;
 pub use settings::{PartitionSettings, PartitionSettingsInput, calculate_partition_settings};
+
+use self::sql_context::PartitionSqlContext;
+use crate::cache::CacheRuntime;
+
+#[async_trait::async_trait]
+pub trait PartitionRuntime: CacheRuntime {
+    async fn query_file_ids(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<FileId>, Error>;
+
+    async fn settings_max_query_range(
+        &self,
+        stream_max_query_range: i64,
+        org_id: &str,
+        user_id: Option<&str>,
+    ) -> i64;
+}
 
 pub struct PartitionSpec {
     pub start_time: i64,
@@ -54,4 +84,45 @@ pub fn generate_partitions(
             mini_partition_duration_secs,
         )
     }
+}
+
+pub fn calculate_partition_settings_for_context(
+    trace_id: &str,
+    total_secs: usize,
+    ctx: &PartitionSqlContext,
+    skip_max_query_range: bool,
+    max_query_range: i64,
+) -> PartitionSettings {
+    let input = PartitionSettingsInput {
+        start_time: ctx.sql.time_range.0,
+        end_time: ctx.sql.time_range.1,
+        histogram_interval: ctx.sql.histogram_interval,
+        is_complex_query: ctx.is_complex_query,
+        has_ts_column: ctx.ts_column.is_some(),
+    };
+    calculate_partition_settings(
+        trace_id,
+        total_secs,
+        &input,
+        skip_max_query_range,
+        max_query_range,
+    )
+}
+
+pub fn generate_partitions_for_context(
+    ctx: &PartitionSqlContext,
+    partition_settings: &PartitionSettings,
+) -> Vec<[i64; 2]> {
+    let spec = PartitionSpec {
+        start_time: ctx.sql.time_range.0,
+        end_time: ctx.sql.time_range.1,
+        histogram_interval: ctx.sql.histogram_interval,
+        is_complex_query: ctx.is_complex_query,
+        order_by: ctx.sql_order_by,
+    };
+    generate_partitions(
+        &spec,
+        partition_settings,
+        get_config().limit.search_mini_partition_duration_secs,
+    )
 }

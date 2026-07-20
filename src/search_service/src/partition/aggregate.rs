@@ -15,7 +15,7 @@
 
 #[cfg(feature = "enterprise")]
 use {
-    crate::search::partition::sql_context::PartitionSqlContext,
+    super::{PartitionRuntime, sql_context::PartitionSqlContext},
     config::meta::search::SearchPartitionRequest,
     config::utils::sql::is_simple_aggregate_query,
     config::{
@@ -62,12 +62,16 @@ pub fn is_streaming_aggregate(_sql: &str, _ts_column: Option<&str>) -> bool {
 ///
 /// Returns `(streaming_aggs, streaming_id, partition_strategy)`.
 #[cfg(feature = "enterprise")]
-pub async fn prepare_streaming_aggregate(
+pub async fn prepare_streaming_aggregate<R>(
+    runtime: &R,
     trace_id: &str,
     req: &SearchPartitionRequest,
     ctx: &PartitionSqlContext,
     use_cache: bool,
-) -> Result<(bool, Option<String>, Option<StreamingAggsPartitionStrategy>), Error> {
+) -> Result<(bool, Option<String>, Option<StreamingAggsPartitionStrategy>), Error>
+where
+    R: PartitionRuntime + Send + Sync,
+{
     let org_id = &ctx.sql.org_id;
     let stream_type = ctx.sql.stream_type;
     let streaming_id = if req.streaming_output && ctx.is_streaming_aggregate {
@@ -81,8 +85,9 @@ pub async fn prepare_streaming_aggregate(
 
         // check cardinality for group by fields
         let group_by_fields =
-            crate::search::sql::visitor::group_by::get_group_by_fields(&ctx.sql).await?;
-        let cardinality_map = crate::search::cardinality::check_cardinality(
+            ::search::sql::visitor::group_by::get_group_by_fields(&ctx.sql).await?;
+        let cardinality_map = crate::cardinality::check_cardinality(
+            runtime,
             org_id,
             stream_type,
             &stream_name,

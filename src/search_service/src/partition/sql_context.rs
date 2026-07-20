@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ::search::sql::Sql;
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{
@@ -24,10 +25,10 @@ use config::{
     },
 };
 use infra::errors::Error;
-use openobserve_search_service::cache::cacher::get_ts_col_order_by;
 use proto::cluster_rpc;
 
-use crate::search::{partition::aggregate::is_streaming_aggregate, sql::Sql};
+use super::aggregate::is_streaming_aggregate;
+use crate::cache::cacher::get_ts_col_order_by;
 
 /// SQL-derived context for a search partition request.
 ///
@@ -120,10 +121,10 @@ impl PartitionSqlContext {
 
 #[cfg(test)]
 mod tests {
+    use ::search::sql::Sql;
     use config::meta::stream::StreamType;
 
     use super::*;
-    use crate::search::sql::Sql;
 
     fn ob(col: &str, dir: OrderBy) -> (String, OrderBy) {
         (col.to_string(), dir)
@@ -171,10 +172,9 @@ mod tests {
     // ORDER BY extraction (pre_visit_query doesn't touch schemas).
     fn parse_order_by(sql_str: &str) -> Vec<(String, OrderBy)> {
         use ::datafusion::common::TableReference;
+        use ::search::sql::visitor::column::ColumnVisitor;
         use hashbrown::HashMap;
         use sqlparser::{ast::VisitMut, dialect::GenericDialect, parser::Parser};
-
-        use crate::search::sql::visitor::column::ColumnVisitor;
 
         let mut stmt = Parser::parse_sql(&GenericDialect {}, sql_str)
             .unwrap()

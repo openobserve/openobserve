@@ -19,7 +19,7 @@ use config::{RwHashMap, meta::stream::StreamType, utils::time::now_micros};
 use hashbrown::HashMap;
 use infra::errors::{Error, Result};
 
-use crate::search as searchService;
+use crate::cache::CacheRuntime;
 
 /// This module is used to check the cardinality for one or multiple fields in a stream.
 ///
@@ -33,8 +33,7 @@ use crate::search as searchService;
 /// ### Single Field
 /// ```rust
 /// use config::meta::stream::StreamType;
-///
-/// use crate::search::cardinality::check_cardinality;
+/// use openobserve_search_service::cardinality::check_cardinality;
 ///
 /// let cardinality =
 ///     check_cardinality("my_org", StreamType::Logs, "my_stream", "field_name").await?;
@@ -44,8 +43,7 @@ use crate::search as searchService;
 /// ### Multiple Fields (Recommended for efficiency)
 /// ```rust
 /// use config::meta::stream::StreamType;
-///
-/// use crate::search::cardinality::check_cardinality;
+/// use openobserve_search_service::cardinality::check_cardinality;
 ///
 /// let fields = vec!["field1", "field2", "field3"];
 /// let results = check_cardinality("my_org", StreamType::Logs, "my_stream", &fields).await?;
@@ -121,13 +119,17 @@ fn is_cache_expired(entry: &CardinalityCacheEntry) -> bool {
 }
 
 /// Check cardinality for multiple fields at once
-pub async fn check_cardinality(
+pub async fn check_cardinality<R>(
+    runtime: &R,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     field_names: &[String],
     query_time: i64,
-) -> Result<HashMap<String, f64>> {
+) -> Result<HashMap<String, f64>>
+where
+    R: CacheRuntime + Send + Sync,
+{
     if field_names.is_empty() {
         return Ok(HashMap::new());
     }
@@ -162,6 +164,7 @@ pub async fn check_cardinality(
     // Calculate cardinality for fields not in cache
     if !fields_to_calculate.is_empty() {
         match get_cardinality(
+            runtime,
             org_id,
             stream_type,
             stream_name,
@@ -232,13 +235,17 @@ async fn get_cardinality_from_cache(
     }
 }
 
-async fn get_cardinality(
+async fn get_cardinality<R>(
+    runtime: &R,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     field_names: &[String],
     query_time: i64,
-) -> Result<HashMap<String, f64>> {
+) -> Result<HashMap<String, f64>>
+where
+    R: CacheRuntime + Send + Sync,
+{
     if field_names.is_empty() {
         return Ok(HashMap::new());
     }
@@ -298,7 +305,9 @@ async fn get_cardinality(
     };
 
     let trace_id = config::ider::generate_trace_id();
-    let resp = searchService::search(&trace_id, org_id, stream_type, None, &req).await?;
+    let resp = runtime
+        .execute_search(&trace_id, org_id, stream_type, None, &req)
+        .await?;
 
     let mut results = HashMap::new();
 
@@ -349,9 +358,49 @@ pub async fn get_cache_stats() -> (usize, usize) {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::StreamType;
+    use config::meta::{search, self_reporting::usage::RequestStats, stream::StreamType};
 
     use super::*;
+
+    #[derive(Clone, Copy)]
+    struct TestRuntime;
+
+    #[async_trait::async_trait]
+    impl CacheRuntime for TestRuntime {
+        async fn execute_search(
+            &self,
+            _trace_id: &str,
+            _org_id: &str,
+            _stream_type: StreamType,
+            _user_id: Option<String>,
+            _req: &search::Request,
+        ) -> Result<search::Response> {
+            Err(Error::Message(
+                "search is not configured in this test".into(),
+            ))
+        }
+
+        fn report_search_metrics(
+            &self,
+            _start: std::time::Instant,
+            _org_id: &str,
+            _stream_type: StreamType,
+            _search_type: &str,
+            _search_group: &str,
+        ) {
+        }
+
+        async fn report_search_usage(
+            &self,
+            _stats: RequestStats,
+            _org_id: &str,
+            _stream_name: &str,
+            _stream_type: StreamType,
+            _num_functions: u16,
+            _timestamp: i64,
+        ) {
+        }
+    }
 
     #[test]
     fn test_generate_cache_key() {
@@ -571,7 +620,8 @@ mod tests {
         // schema)
 
         // Test that we get cached values for field1 and field2
-        let results = check_cardinality(org_id, stream_type, stream_name, &fields, 0).await;
+        let results =
+            check_cardinality(&TestRuntime, org_id, stream_type, stream_name, &fields, 0).await;
 
         // We expect this to work even if some fields fail, returning cached values for field1 and
         // field2
@@ -580,8 +630,10 @@ mod tests {
                 // Check that we got the cached values
                 assert_eq!(results.get(&field1), Some(&100.0));
                 assert_eq!(results.get(&field2), Some(&200.0));
-                // field3 should have value 0 due to calculation failure
-                assert_eq!(results.get(&field3), None);
+                // Depending on whether a test schema is already present, the unknown field is
+                // either omitted during schema validation or falls back to zero after execution
+                // fails.
+                assert!(results.get(&field3).is_none_or(|value| *value == 0.0));
             }
             Err(_) => {
                 // This is also acceptable since we don't have a real schema setup
@@ -599,6 +651,7 @@ mod tests {
         // Test edge case with empty field list
         let rt = tokio::runtime::Runtime::new().unwrap();
         let result = rt.block_on(check_cardinality(
+            &TestRuntime,
             "test_org",
             StreamType::Logs,
             "test_stream",

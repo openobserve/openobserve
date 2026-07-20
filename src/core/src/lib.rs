@@ -172,6 +172,6 @@ mod common {
     pub mod utils {
         pub use ::common::utils::*;
 
-        pub use crate::{auth, stream_utils as stream};
+        pub use crate::auth;
     }
 }

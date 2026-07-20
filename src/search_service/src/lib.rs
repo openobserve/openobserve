@@ -19,6 +19,7 @@
 //! stays in `openobserve-core` and is injected through narrow ports.
 
 pub mod cache;
+pub mod cardinality;
 #[cfg(feature = "enterprise")]
 pub mod jobs;
 pub mod partition;
