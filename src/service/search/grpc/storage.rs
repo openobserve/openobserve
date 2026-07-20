@@ -175,6 +175,7 @@ pub async fn search(
                     &f.key,
                     f.meta.compressed_size,
                     f.meta.max_ts,
+                    f.meta.records,
                 )
             })
             .collect_vec(),
@@ -288,7 +289,7 @@ pub async fn search(
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 pub async fn cache_files(
     trace_id: &str,
-    files: &[(i64, &String, &String, i64, i64)],
+    files: &[(i64, &String, &String, i64, i64, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> (file_data::CacheType, u64, u64) {
@@ -297,7 +298,7 @@ pub async fn cache_files(
     let (mut cache_hits, mut cache_misses) = (0, 0);
 
     let start = std::time::Instant::now();
-    for (_id, _account, file, _size, max_ts) in files.iter() {
+    for (_id, _account, file, _size, max_ts, _records) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -371,8 +372,8 @@ pub async fn cache_files(
     let trace_id = trace_id.to_string();
     let files = files
         .iter()
-        .filter_map(|(id, account, file, size, ts)| {
-            if cached_files.contains(&file) {
+        .filter_map(|(id, account, file, size, ts, records)| {
+            if cached_files.contains(file) || !crate::job::should_download(*records) {
                 None
             } else {
                 Some((*id, account.to_string(), file.to_string(), *size, *ts))
@@ -453,7 +454,16 @@ pub async fn tantivy_search(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, f)| (f.id, &f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
+            .map(|(ttv_file, f)| {
+                (
+                    f.id,
+                    &f.account,
+                    ttv_file,
+                    f.meta.index_size,
+                    f.meta.max_ts,
+                    f.meta.records,
+                )
+            })
             .collect_vec(),
         &mut scan_stats,
         "index",

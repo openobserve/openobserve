@@ -553,6 +553,16 @@ pub async fn queue_download(
     Ok(())
 }
 
+/// Returns true when a file contains enough records to be worth downloading
+/// into the cache.
+pub fn should_download(records: i64) -> bool {
+    has_minimum_records(records, get_config().limit.file_download_min_records)
+}
+
+fn has_minimum_records(records: i64, min_records: i64) -> bool {
+    records >= min_records
+}
+
 // if the file timestamp is in the past window, it should be prioritized
 fn should_prioritize_file(ts: i64, window_secs: i64) -> bool {
     let window_micros = window_secs * 1_000_000;
@@ -562,7 +572,18 @@ fn should_prioritize_file(ts: i64, window_secs: i64) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{FileInfo, PriorityDownloadQueue, file_data, processing_files, queued_files};
+    use super::{
+        FileInfo, PriorityDownloadQueue, file_data, has_minimum_records, processing_files,
+        queued_files,
+    };
+
+    #[test]
+    fn test_has_minimum_records() {
+        assert!(!has_minimum_records(99, 100));
+        assert!(has_minimum_records(100, 100));
+        assert!(has_minimum_records(101, 100));
+        assert!(has_minimum_records(0, 0));
+    }
 
     #[test]
     fn test_is_processing_false_initially() {

@@ -64,6 +64,9 @@ impl Event for Eventer {
 
             // Collect files to download
             for item in put_items.iter() {
+                if !crate::job::should_download(item.meta.records) {
+                    continue;
+                }
                 // cache parquet
                 if cfg.cache_latest_files.cache_parquet {
                     files_to_download.push((
