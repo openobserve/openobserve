@@ -221,6 +221,38 @@ describe("useMetricsExplorerGrid", () => {
         [names[0], names[1]].sort(),
       );
     });
+
+    it("ignores prefix/suffix/type facets in Workspace — its panel is hidden there", async () => {
+      // The facet panel is Explore-only. A selection left in the URL from an
+      // Explore session used to keep filtering the pinned set with no visible
+      // control to clear it — emptying Favorites for no discernible reason.
+      const grid = await setup();
+      const pinned = grid.cards.value[0].name;
+
+      // A facet selection that matches NOTHING — in Explore it empties the grid.
+      grid.selectedPrefixes.value = new Set(["__no_such_prefix__"]);
+      grid.showFavoritesOnly.value = false;
+      expect(grid.sortedCards.value).toHaveLength(0);
+
+      // Workspace: the pinned metric survives the (hidden) facet selection.
+      grid.showFavoritesOnly.value = true;
+      grid.favorites.value = [pinned];
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toEqual([pinned]);
+
+      // Type and suffix selections are ignored the same way.
+      grid.selectedTypes.value = new Set(["__no_such_type__"]);
+      grid.selectedSuffixes.value = new Set(["__no_such_suffix__"]);
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toEqual([pinned]);
+    });
+
+    it("still applies prefix/suffix/type in Explore mode", async () => {
+      // The fix must not leak into Explore: a facet that matches nothing there
+      // still empties the grid.
+      const grid = await setup();
+      grid.showFavoritesOnly.value = false;
+      grid.selectedTypes.value = new Set(["__no_such_type__"]);
+      expect(grid.sortedCards.value).toHaveLength(0);
+    });
   });
 
   describe("a metric hidden as no-data must not stay hidden across a range change", () => {
