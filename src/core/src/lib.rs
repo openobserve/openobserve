@@ -33,7 +33,6 @@ pub mod file_downloader;
 pub use openobserve_dashboards::folders;
 pub use openobserve_search_service::file_list;
 pub use openobserve_transform::management as functions;
-pub mod github;
 pub mod grpc {
     pub use openobserve_ingestion::internal::get_ingester_channel;
 }

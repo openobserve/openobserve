@@ -14,5 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod model_pricing;
+pub mod model_pricing_sync;
 pub mod org_ingestion_tokens;
 pub mod service_graph;

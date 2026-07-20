@@ -17,6 +17,7 @@
 
 #![recursion_limit = "256"]
 
+pub mod github;
 pub mod infra;
 pub mod kv;
 pub mod meta;

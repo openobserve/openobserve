@@ -107,7 +107,7 @@ struct PatternTestResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct BuiltInPatternsResponse {
-    patterns: Vec<openobserve_core::github::adapters::BuiltInPatternResponse>,
+    patterns: Vec<::common::github::adapters::BuiltInPatternResponse>,
     last_updated: i64,
     source_url: String,
 }
@@ -629,7 +629,7 @@ pub async fn get_built_in_patterns(
     Path(_org_id): Path<String>,
     Query(query): Query<BuiltInPatternsQuery>,
 ) -> Response {
-    use openobserve_core::github::{GitHubDataService, adapters::PyWhatAdapter};
+    use ::common::github::{GitHubDataService, adapters::PyWhatAdapter};
 
     // Create GitHub service
     let github_service = GitHubDataService::new();

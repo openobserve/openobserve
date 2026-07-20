@@ -102,7 +102,6 @@ pub mod metrics;
 pub mod model_pricing {
     pub use openobserve_ingestion::repository::model_pricing::*;
 }
-pub mod model_pricing_sync;
 pub mod org_ingestion_tokens {
     pub use openobserve_ingestion::repository::org_ingestion_tokens::*;
 }

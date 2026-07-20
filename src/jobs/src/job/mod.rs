@@ -546,7 +546,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // Sync built-in model pricing from GitHub (initial + periodic)
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
-                if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                if let Err(e) =
+                    openobserve_ingestion::repository::model_pricing_sync::sync_built_in_from_github(
+                        false,
+                    )
+                    .await
+                {
                     log::error!("[model_pricing] initial built-in sync failed: {e}");
                 }
             });
@@ -556,7 +561,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 );
                 loop {
                     tokio::time::sleep(interval).await;
-                    if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                    if let Err(e) = openobserve_ingestion::repository::model_pricing_sync::sync_built_in_from_github(false).await {
                         log::error!("[model_pricing] periodic built-in sync failed: {e}");
                     }
                 }
