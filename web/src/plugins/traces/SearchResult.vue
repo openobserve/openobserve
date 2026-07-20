@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         ref="sectionHeaderRef"
         data-test="traces-section-header"
-        class="flex items-center px-[0.4rem]! h-9 shrink-0 border-b border-[rgba(0,0,0,0.07)]"
+        class="flex items-center px-[0.4rem]! h-9 shrink-0 border-b border-border-default"
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
