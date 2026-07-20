@@ -129,39 +129,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="associate-function-definition-section"
           class="mt-4 mb-4"
         >
-          <!-- Dark styling is bound to the app theme (store.state.theme), NOT
-               dark: — the dark: variant follows the OS prefers-color-scheme
-               here (no @custom-variant dark), which flips this card dark in the
-               app's light mode. -->
+          <!-- No `isDark` branching: every colour below is a --color-* token,
+               which already resolves per theme. (The old comment here claimed
+               `dark:` follows the OS prefers-color-scheme — that is stale;
+               tailwind.css binds it to the app's `.dark` class via
+               `@custom-variant dark`.) The header's two-stop gradient is now a
+               flat token surface — a gradient can't be expressed in tokens, and
+               the flat fill matches the rest of the app's card headers. -->
           <OCard
-            class="function-definition-card border rounded-lg overflow-hidden"
-            :class="isDark
-              ? 'border-[#2d3748] bg-[#1a202c] shadow-[0_4px_12px_rgba(0,0,0,0.4)]'
-              : 'border-[#e1e5e9] shadow-[0_2px_4px_rgba(0,0,0,0.05)]'"
+            class="function-definition-card border border-border-default bg-surface-base rounded-lg overflow-hidden shadow-[0_0.125rem_0.25rem_color-mix(in_srgb,var(--color-black)_5%,transparent)]"
           >
             <OCardSection
               role="header"
-              class="border-b"
-              :class="isDark
-                ? 'bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b-[#4a5568]'
-                : 'bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] border-b-[#e2e8f0]'"
+              class="border-b border-b-border-default bg-surface-subtle"
             >
-              <div
-                class="text-base font-semibold"
-                :class="isDark ? 'text-white' : 'text-[#2d3748]'"
-              >
+              <div class="text-base font-semibold text-text-heading">
                 {{ t("function.function_definition") }}
               </div>
             </OCardSection>
             <OSeparator />
             <OCardSection class="p-0">
               <div
-                class="function-code-container max-h-[250px] overflow-y-auto relative"
-                :class="isDark ? 'bg-[#0d1117] border border-[#21262d]' : 'bg-[#fafbfc]'"
+                class="function-code-container max-h-[15.625rem] overflow-y-auto relative bg-surface-subtle border border-border-default"
               >
                 <pre
-                  class="function-code bg-transparent m-0 p-4 text-[13px] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text"
-                  :class="isDark ? 'text-[#f7fafc]' : 'text-[#2d3748]'"
+                  class="font-mono bg-transparent m-0 p-4 text-[0.8125rem] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text text-text-code"
                 >{{ selectedDefinition }}</pre>
               </div>
             </OCardSection>
@@ -175,22 +167,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('flow.function.flatten')"
             data-test="associate-function-after-flattening-toggle"
           />
-          <div class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2">
-            <div class="text-sm text-[#2d3748]">
+          <!-- Same theme-aware Note Container tokens the workflow Condition note
+               uses (component.css: --color-note-*), so the two match and both
+               work in dark mode — the old #f9f290/#2d3748 were light-only. -->
+          <div class="bg-(--color-note-bg) text-(--color-note-text) w-full rounded-md p-3 flex flex-col gap-2">
+            <div class="text-sm">
               {{ t("flow.function.guidelinesTitle") }}
             </div>
-            <div class="flex flex-col gap-1 text-sm text-[#2d3748]">
+            <div class="flex flex-col gap-1 text-sm">
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
-                  <span class="font-bold text-[#007bff]">{{ t("flow.function.rbf") }}</span>
+                  <span class="font-bold text-(--color-note-highlight)">{{ t("flow.function.rbf") }}</span>
                   {{ t("flow.function.rbfDesc") }}
                 </span>
               </div>
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
                 <span>
-                  <span class="font-bold text-[#007bff]">{{ t("flow.function.raf") }}</span>
+                  <span class="font-bold text-(--color-note-highlight)">{{ t("flow.function.raf") }}</span>
                   {{ t("flow.function.rafDesc") }}
                 </span>
               </div>
@@ -272,9 +267,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const store = useStore();
-
-// App theme (not dark:, which follows the OS here — see the preview markup).
-const isDark = computed(() => store.state.theme === "dark");
 
 const loading = ref(false);
 const functionOptions = ref<string[]>([]);
@@ -385,7 +377,12 @@ defineExpose({ submit, createNewFunction, form });
 </script>
 
 <style scoped>
-/* Hide AddFunction's own title/back/fullscreen chrome inside the drawer. */
+/* Only AddFunction's own chrome is suppressed here — :deep() reaches a child
+   component's internals, which utilities cannot.
+   The `.function-code` font-family became the `font-mono` utility, and the
+   ::-webkit-scrollbar rules were DELETED: component.css already styles
+   scrollbars globally from tokens WITH `.dark` variants, so these light-only
+   hex rules were duplicating it and overriding the themed version in dark. */
 .flow-add-function :deep(.add-function-back-btn),
 .flow-add-function :deep(.add-function-fullscreen-btn),
 .flow-add-function :deep(.add-function-title) {
@@ -394,25 +391,5 @@ defineExpose({ submit, createNewFunction, form });
 .flow-add-function :deep(.add-function-name-input) {
   width: 100%;
   margin-left: 0 !important;
-}
-
-.function-code {
-  font-family: JetBrains Mono, Fira Code, Monaco, Menlo, Ubuntu Mono, monospace;
-}
-.function-code::selection {
-  background-color: #bee3f8;
-}
-.function-code-container::-webkit-scrollbar {
-  width: 6px;
-}
-.function-code-container::-webkit-scrollbar-track {
-  background: #f7fafc;
-}
-.function-code-container::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 3px;
-}
-.function-code-container::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
 }
 </style>
