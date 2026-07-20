@@ -18,8 +18,7 @@ use infra::table::org_storage_providers::{
 };
 use object_store::ObjectStore;
 
-use super::db::org_storage_providers;
-use crate::org_storage_providers::utils::_merge_aws_role_arn;
+use crate::{org_storage_providers::utils::_merge_aws_role_arn, repository::org_storage_providers};
 mod aws_role_utils;
 mod checks;
 mod utils;
@@ -137,7 +136,7 @@ pub async fn set_storage(
 
     test_provider(&provider).await?;
 
-    super::db::org_storage_providers::add(provider_data.clone()).await?;
+    org_storage_providers::add(provider_data.clone()).await?;
 
     infra::table::org_storage_providers::update_cache(org_id, provider_data);
     infra::storage::add_account(org_id, provider).await;

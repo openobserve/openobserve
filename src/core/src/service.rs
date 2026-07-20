@@ -20,7 +20,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub use crate::db;
 #[cfg(feature = "enterprise")]
-pub use crate::{org_storage_providers, ratelimit, search_jobs};
+pub use crate::{ratelimit, search_jobs};
 /// Setup tracing with a trace ID
 /// This function should be called when the parent span is already active (entered) in the tracing
 /// context. It will use the current active span as parent, maintaining the span hierarchy.

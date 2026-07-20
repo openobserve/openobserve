@@ -19,7 +19,6 @@ use hashbrown::HashMap;
 use infra::{
     coordinator::get_coordinator, db::Event, table::org_storage_providers::OrgStorageProvider,
 };
-use parquet::data_type::AsBytes;
 use tokio::sync::RwLock;
 
 use crate::db;
@@ -106,7 +105,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     log::error!("watch_org_storage_providers : missing value for put");
                     continue;
                 };
-                let Ok(entry) = serde_json::from_slice::<OrgStorageProvider>(item_v.as_bytes())
+                let Ok(entry) = serde_json::from_slice::<OrgStorageProvider>(item_v.as_ref())
                 else {
                     log::error!("watch_org_storage_providers : invalid json value for put");
                     continue;

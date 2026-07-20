@@ -17,6 +17,8 @@ pub mod authz;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod org_cleanup;
+#[cfg(feature = "enterprise")]
+pub mod org_storage_providers;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
 pub mod organization;

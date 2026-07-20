@@ -91,7 +91,7 @@ pub async fn save(
 
     // don't let org which already have set the storage use this route,
     // they can use PUT route for updating credentials
-    match openobserve_core::org_storage_providers::get_redacted_config(&org_id).await {
+    match openobserve_organization::org_storage_providers::get_redacted_config(&org_id).await {
         Err(e) => {
             log::error!("error getting org storage config for org {org_id} : {e}");
             return HttpResponse::internal_error(e);
@@ -104,7 +104,7 @@ pub async fn save(
         Ok(None) => {}
     }
 
-    let validated_data = match openobserve_core::org_storage_providers::enforce_checks(
+    let validated_data = match openobserve_organization::org_storage_providers::enforce_checks(
         req.provider,
         req.data.to_string(),
     ) {
@@ -124,7 +124,7 @@ pub async fn save(
         data: validated_data,
     };
 
-    match openobserve_core::org_storage_providers::set_storage(&org_id, provider).await {
+    match openobserve_organization::org_storage_providers::set_storage(&org_id, provider).await {
         Ok(_) => {
             log::info!("successfully set org-level storage for org {org_id}");
             HttpResponse::created("successfully setup storage")
@@ -162,7 +162,7 @@ pub async fn save(
     )
 )]
 pub async fn get(Path(org_id): Path<String>) -> Response {
-    match openobserve_core::org_storage_providers::get_redacted_config(&org_id).await {
+    match openobserve_organization::org_storage_providers::get_redacted_config(&org_id).await {
         Ok(Some(v)) => {
             let data_json: serde_json::Value = serde_json::from_str(&v.data).unwrap();
             HttpResponse::json(GetOrgStorageResponse {
@@ -237,23 +237,25 @@ pub async fn update(
         }
     }
 
-    let mut existing = match openobserve_core::db::org_storage_providers::get_for_org(&org_id).await
-    {
-        Ok(Some(v)) => v,
-        Ok(None) => {
-            return HttpResponse::bad_request("org level storage is not set, cannot edit it");
-        }
-        Err(e) => {
-            log::error!("error in getting redacted storage config for org : {org_id}");
-            return HttpResponse::internal_error(e);
-        }
-    };
+    let mut existing =
+        match openobserve_organization::repository::org_storage_providers::get_for_org(&org_id)
+            .await
+        {
+            Ok(Some(v)) => v,
+            Ok(None) => {
+                return HttpResponse::bad_request("org level storage is not set, cannot edit it");
+            }
+            Err(e) => {
+                log::error!("error in getting redacted storage config for org : {org_id}");
+                return HttpResponse::internal_error(e);
+            }
+        };
 
     if existing.provider_type != req.provider {
         return HttpResponse::bad_request("cannot change provider type after initial setup");
     }
 
-    let new_creds = match openobserve_core::org_storage_providers::merge_configs(
+    let new_creds = match openobserve_organization::org_storage_providers::merge_configs(
         existing.provider_type,
         &existing.data,
         &req.data.to_string(),
@@ -264,18 +266,20 @@ pub async fn update(
         }
     };
 
-    let validated_data =
-        match openobserve_core::org_storage_providers::enforce_checks(req.provider, new_creds) {
-            Ok(v) => v,
-            Err(e) => {
-                return HttpResponse::bad_request(e);
-            }
-        };
+    let validated_data = match openobserve_organization::org_storage_providers::enforce_checks(
+        req.provider,
+        new_creds,
+    ) {
+        Ok(v) => v,
+        Err(e) => {
+            return HttpResponse::bad_request(e);
+        }
+    };
 
     existing.data = validated_data;
     existing.updated_at = chrono::Utc::now().timestamp_micros();
 
-    match openobserve_core::org_storage_providers::set_storage(&org_id, existing).await {
+    match openobserve_organization::org_storage_providers::set_storage(&org_id, existing).await {
         Ok(_) => {
             log::info!("successfully updated org-level storage credentials for org {org_id}");
             HttpResponse::created("successfully updated storage credentials")

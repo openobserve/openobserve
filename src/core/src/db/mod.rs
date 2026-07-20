@@ -109,7 +109,9 @@ pub mod org_status {
     pub use openobserve_organization::status::*;
 }
 #[cfg(feature = "enterprise")]
-pub mod org_storage_providers;
+pub mod org_storage_providers {
+    pub use openobserve_organization::repository::org_storage_providers::*;
+}
 pub mod org_users {
     pub use openobserve_organization::repository::org_users::*;
 }

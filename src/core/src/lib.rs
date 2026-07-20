@@ -49,12 +49,11 @@ pub use openobserve_ingestion::{logs, metadata, metrics};
 pub mod node;
 #[cfg(feature = "enterprise")]
 pub use openobserve_organization::ofga;
-pub use openobserve_organization::org_cleanup;
 #[cfg(feature = "enterprise")]
-pub mod org_storage_providers;
+pub use openobserve_organization::org_storage_providers;
 #[cfg(feature = "cloud")]
 pub use openobserve_organization::org_usage;
-pub use openobserve_organization::organization;
+pub use openobserve_organization::{org_cleanup, organization};
 pub mod pipeline {
     pub use openobserve_pipeline::management::*;
 
