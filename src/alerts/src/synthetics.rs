@@ -51,7 +51,7 @@ pub async fn notify_check_result(n: CheckNotification) {
     use config::meta::destinations::{DestinationType, Module};
 
     for dest_name in &n.destinations {
-        match crate::alerts::destinations::get_with_template(&n.org_id, dest_name).await {
+        match crate::service::destinations::get_with_template(&n.org_id, dest_name).await {
             Ok((dest, _tpl)) => {
                 let Module::Alert {
                     destination_type, ..

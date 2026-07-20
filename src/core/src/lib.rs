@@ -139,7 +139,6 @@ pub mod short_url {
 }
 pub use openobserve_catalog::stream;
 pub use openobserve_search_service::{sourcemaps, stream_utils};
-pub mod synthetics;
 pub mod tls;
 pub use openobserve_ingestion::traces;
 #[cfg(feature = "cloud")]

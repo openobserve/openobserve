@@ -1015,7 +1015,7 @@ async fn process_ack(
 
     // Notify once per run, not once per job ack.
     if resp.run_complete && !resp.destinations.is_empty() {
-        let notification = openobserve_core::synthetics::CheckNotification {
+        let notification = openobserve_alerts::synthetics::CheckNotification {
             org_id: resp.org_id.clone(),
             monitor_name: resp.synthetics_name.clone(),
             monitor_id: resp.synthetics_id.clone(),
@@ -1029,7 +1029,7 @@ async fn process_ack(
             checked_at,
         };
         tokio::spawn(async move {
-            openobserve_core::synthetics::notify_check_result(notification).await;
+            openobserve_alerts::synthetics::notify_check_result(notification).await;
         });
     }
     Ok(resp)

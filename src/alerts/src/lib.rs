@@ -25,6 +25,7 @@ mod http;
 pub mod ports;
 pub mod repository;
 pub mod service;
+pub mod synthetics;
 
 /// Realtime alert triggers are domain state and therefore live with alerts.
 pub static REALTIME_ALERT_TRIGGERS: LazyLock<RwAHashMap<String, Trigger>> =
