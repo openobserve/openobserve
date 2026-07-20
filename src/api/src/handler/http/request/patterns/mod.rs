@@ -23,7 +23,7 @@ use {
         StreamPermissionResourceType, check_stream_permissions,
     },
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
-    openobserve_core::search::streaming,
+    openobserve_search_service::streaming,
     tokio::sync::mpsc,
 };
 
@@ -196,6 +196,7 @@ pub async fn extract_patterns(
         let trace_id_clone = trace_id.clone();
         tokio::spawn(async move {
             streaming::process_search_stream_request(
+                openobserve_core::search::CoreSearchRuntime,
                 org_id,
                 user_id,
                 trace_id_clone,

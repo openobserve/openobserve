@@ -72,7 +72,6 @@ pub mod grpc_search;
 pub mod grpc_server;
 pub mod partition;
 mod searcher;
-pub mod streaming;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
 pub mod work_group;
@@ -140,6 +139,16 @@ impl openobserve_search_service::cache::CacheRuntime for CoreSearchRuntime {
 
 #[async_trait::async_trait]
 impl openobserve_search_service::streaming::StreamingRuntime for CoreSearchRuntime {
+    async fn max_query_range(
+        &self,
+        stream_names: &[String],
+        org_id: &str,
+        user_id: &str,
+        stream_type: StreamType,
+    ) -> i64 {
+        crate::stream_utils::get_max_query_range(stream_names, org_id, user_id, stream_type).await
+    }
+
     async fn search_partition(
         &self,
         trace_id: &str,
@@ -160,6 +169,18 @@ impl openobserve_search_service::streaming::StreamingRuntime for CoreSearchRunti
             use_cache,
         )
         .await
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn search_error_status(&self, error: &Error) -> u16 {
+        crate::http::map_error_to_http_response(error, None)
+            .status()
+            .as_u16()
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn audit(&self, message: o2_enterprise::enterprise::common::auditor::AuditMessage) {
+        crate::self_reporting::audit(message).await;
     }
 }
 
@@ -314,7 +335,8 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
-                res = crate::search::streaming::order_search_results(res, None);
+                res =
+                    openobserve_search_service::streaming::sorting::order_search_results(res, None);
             }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();

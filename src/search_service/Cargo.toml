@@ -36,10 +36,12 @@ prost.workspace = true
 proto.workspace = true
 search.workspace = true
 serde_json.workspace = true
+sqlparser.workspace = true
 svix-ksuid.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
+tracing-opentelemetry.workspace = true
 vector-enrichment.workspace = true
 
 [dev-dependencies]

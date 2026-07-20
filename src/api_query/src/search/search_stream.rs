@@ -38,6 +38,7 @@ use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, ResponseMeta},
     config::get_config as get_o2_config,
 };
+use openobserve_search_service::streaming::process_search_stream_request;
 use tokio::sync::mpsc;
 use tracing::Span;
 
@@ -69,9 +70,7 @@ use crate::{
         build_search_request_per_field, error_utils::map_error_to_http_response,
         utils::SearchStreamGuard,
     },
-    service::search::{
-        streaming::process_search_stream_request, utils::is_permissable_function_error,
-    },
+    service::search::utils::is_permissable_function_error,
 };
 
 /// Search HTTP2 streaming endpoint
@@ -556,6 +555,7 @@ pub async fn search_http2_stream(
 
     // Spawn the search task in a separate task
     tokio::spawn(process_search_stream_request(
+        openobserve_core::search::CoreSearchRuntime,
         org_id.clone(),
         user_id,
         trace_id.clone(),
@@ -948,6 +948,7 @@ pub async fn values_http2_stream(
 
     // Spawn the search task to process the request
     tokio::spawn(process_search_stream_request(
+        openobserve_core::search::CoreSearchRuntime,
         org_id.clone(),
         user_id,
         trace_id.clone(),

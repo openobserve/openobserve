@@ -155,12 +155,6 @@ mod common {
     pub mod meta {
         pub use ::common::meta::*;
         pub use openobserve_ingestion::types as ingestion;
-
-        /// Lives here rather than in the `common` crate so that `common` does not
-        /// depend on the `search` crate.
-        pub mod search {
-            pub use ::search::{AuditContext, SearchResultType};
-        }
     }
 
     pub mod infra {

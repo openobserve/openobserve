@@ -20,6 +20,13 @@
 
 use std::{collections::HashMap, ops::ControlFlow, time::Instant};
 
+use ::search::{
+    AuditContext, SearchResultType,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    sql::visitor::histogram_interval::{
+        HistogramIntervalVisitor, validate_and_adjust_histogram_interval,
+    },
+};
 use config::{
     cluster::LOCAL_NODE,
     meta::{
@@ -42,46 +49,25 @@ use o2_enterprise::enterprise::{
     },
     log_patterns::{PatternAccumulator, PatternExtractionConfig},
 };
-use openobserve_search_service::cache as search_cache;
 use sqlparser::ast::VisitMut;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use vector_enrichment::TableRegistry;
 
-use crate::{
-    common::{
-        meta::search::{AuditContext, SearchResultType},
-        utils::stream::get_max_query_range,
-    },
-    service::search::{
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        sql::visitor::histogram_interval::{
-            HistogramIntervalVisitor, validate_and_adjust_histogram_interval,
-        },
-    },
-};
 #[cfg(feature = "enterprise")]
-use crate::{http::map_error_to_http_response, self_reporting::audit};
-
-pub mod sorting {
-    pub use openobserve_search_service::streaming::sorting::*;
-}
-pub mod utils {
-    pub use openobserve_search_service::streaming::utils::*;
-}
-
-#[cfg(feature = "enterprise")]
-use openobserve_search_service::streaming::cache::write_partial_results_to_cache;
-use openobserve_search_service::streaming::{
+use super::cache::write_partial_results_to_cache;
+use super::{
+    StreamingRuntime,
     cache::{handle_cache_responses_and_deltas, write_results_to_cache},
     execution::do_partitioned_search,
 };
-pub use sorting::order_search_results;
+use crate::cache as search_cache;
 
 /// Main function to process search stream requests
 #[allow(clippy::too_many_arguments)]
-pub async fn process_search_stream_request(
+pub async fn process_search_stream_request<R>(
+    runtime: R,
     org_id: String,
     user_id: String,
     trace_id: String,
@@ -96,7 +82,9 @@ pub async fn process_search_stream_request(
     _audit_ctx: Option<AuditContext>,
     is_multi_stream_search: bool,
     extract_patterns: bool,
-) {
+) where
+    R: StreamingRuntime + Clone + Send + Sync + 'static,
+{
     let root_span = tracing::info_span!("service::search::search_stream_h2");
     let _ = root_span.set_parent(search_span.context());
     let _guard = root_span.enter();
@@ -253,7 +241,9 @@ pub async fn process_search_stream_request(
 
     req.query.query_fn = query_fn.clone();
 
-    let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await; // hours
+    let max_query_range = runtime
+        .max_query_range(&stream_names, &org_id, &user_id, stream_type)
+        .await; // hours
 
     // HACK: always search from the first partition, this is because to support pagination in http2
     // streaming we need context of no of hits per partition, which currently is not available.
@@ -282,29 +272,30 @@ pub async fn process_search_stream_request(
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
-                    let resp = map_error_to_http_response(&e, None).status().into();
+                    let resp = runtime.search_error_status(&e);
                     if audit_enabled {
                         // Using spawn to handle the async call
-                        audit(AuditMessage {
-                            user_email: user_id,
-                            org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Http,
-                            response_meta: ResponseMeta {
-                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
-                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
-                                http_query_params: _audit_ctx
-                                    .as_ref()
-                                    .unwrap()
-                                    .query_params
-                                    .to_string(),
-                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
-                                http_response_code: resp,
-                                error_msg: Some(e.to_string()),
-                                trace_id: Some(trace_id.to_string()),
-                            },
-                        })
-                        .await;
+                        runtime
+                            .audit(AuditMessage {
+                                user_email: user_id,
+                                org_id,
+                                _timestamp: chrono::Utc::now().timestamp(),
+                                protocol: Protocol::Http,
+                                response_meta: ResponseMeta {
+                                    http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                    http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                    http_query_params: _audit_ctx
+                                        .as_ref()
+                                        .unwrap()
+                                        .query_params
+                                        .to_string(),
+                                    http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
+                                    http_response_code: resp,
+                                    error_msg: Some(e.to_string()),
+                                    trace_id: Some(trace_id.to_string()),
+                                },
+                            })
+                            .await;
                     }
                 }
 
@@ -360,7 +351,7 @@ pub async fn process_search_stream_request(
             let size = req.query.size;
             // Step 1(a): handle cache responses & query the deltas
             if let Err(e) = handle_cache_responses_and_deltas(
-                &crate::search::CoreSearchRuntime,
+                &runtime,
                 &mut req,
                 size,
                 &trace_id,
@@ -388,29 +379,30 @@ pub async fn process_search_stream_request(
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
-                    let resp = map_error_to_http_response(&e, None).status().into();
+                    let resp = runtime.search_error_status(&e);
                     if audit_enabled {
                         // Using spawn to handle the async call
-                        audit(AuditMessage {
-                            user_email: user_id,
-                            org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Http,
-                            response_meta: ResponseMeta {
-                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
-                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
-                                http_query_params: _audit_ctx
-                                    .as_ref()
-                                    .unwrap()
-                                    .query_params
-                                    .to_string(),
-                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
-                                http_response_code: resp,
-                                error_msg: Some(e.to_string()),
-                                trace_id: Some(trace_id.to_string()),
-                            },
-                        })
-                        .await;
+                        runtime
+                            .audit(AuditMessage {
+                                user_email: user_id,
+                                org_id,
+                                _timestamp: chrono::Utc::now().timestamp(),
+                                protocol: Protocol::Http,
+                                response_meta: ResponseMeta {
+                                    http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                    http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                    http_query_params: _audit_ctx
+                                        .as_ref()
+                                        .unwrap()
+                                        .query_params
+                                        .to_string(),
+                                    http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
+                                    http_response_code: resp,
+                                    error_msg: Some(e.to_string()),
+                                    trace_id: Some(trace_id.to_string()),
+                                },
+                            })
+                            .await;
                     }
                 }
 
@@ -443,7 +435,7 @@ pub async fn process_search_stream_request(
 
             let size = req.query.size;
             if let Err(e) = do_partitioned_search(
-                &crate::search::CoreSearchRuntime,
+                &runtime,
                 &mut req,
                 &trace_id,
                 &org_id,
@@ -468,29 +460,30 @@ pub async fn process_search_stream_request(
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
-                    let resp = map_error_to_http_response(&e, None).status().into();
+                    let resp = runtime.search_error_status(&e);
                     if audit_enabled {
                         // Using spawn to handle the async call
-                        audit(AuditMessage {
-                            user_email: user_id,
-                            org_id,
-                            _timestamp: chrono::Utc::now().timestamp(),
-                            protocol: Protocol::Http,
-                            response_meta: ResponseMeta {
-                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
-                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
-                                http_query_params: _audit_ctx
-                                    .as_ref()
-                                    .unwrap()
-                                    .query_params
-                                    .to_string(),
-                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
-                                http_response_code: resp,
-                                error_msg: Some(e.to_string()),
-                                trace_id: Some(trace_id.to_string()),
-                            },
-                        })
-                        .await;
+                        runtime
+                            .audit(AuditMessage {
+                                user_email: user_id,
+                                org_id,
+                                _timestamp: chrono::Utc::now().timestamp(),
+                                protocol: Protocol::Http,
+                                response_meta: ResponseMeta {
+                                    http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                    http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                    http_query_params: _audit_ctx
+                                        .as_ref()
+                                        .unwrap()
+                                        .query_params
+                                        .to_string(),
+                                    http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
+                                    http_response_code: resp,
+                                    error_msg: Some(e.to_string()),
+                                    trace_id: Some(trace_id.to_string()),
+                                },
+                            })
+                            .await;
                     }
                 }
 
@@ -541,29 +534,30 @@ pub async fn process_search_stream_request(
             // send audit response first
             #[cfg(feature = "enterprise")]
             {
-                let resp = map_error_to_http_response(&e, None).status().into();
+                let resp = runtime.search_error_status(&e);
                 if audit_enabled {
                     // Using spawn to handle the async call
-                    audit(AuditMessage {
-                        user_email: user_id,
-                        org_id,
-                        _timestamp: chrono::Utc::now().timestamp(),
-                        protocol: Protocol::Http,
-                        response_meta: ResponseMeta {
-                            http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
-                            http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
-                            http_query_params: _audit_ctx
-                                .as_ref()
-                                .unwrap()
-                                .query_params
-                                .to_string(),
-                            http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
-                            http_response_code: resp,
-                            error_msg: Some(e.to_string()),
-                            trace_id: Some(trace_id.to_string()),
-                        },
-                    })
-                    .await;
+                    runtime
+                        .audit(AuditMessage {
+                            user_email: user_id,
+                            org_id,
+                            _timestamp: chrono::Utc::now().timestamp(),
+                            protocol: Protocol::Http,
+                            response_meta: ResponseMeta {
+                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                http_query_params: _audit_ctx
+                                    .as_ref()
+                                    .unwrap()
+                                    .query_params
+                                    .to_string(),
+                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
+                                http_response_code: resp,
+                                error_msg: Some(e.to_string()),
+                                trace_id: Some(trace_id.to_string()),
+                            },
+                        })
+                        .await;
                 }
             }
 
@@ -578,7 +572,7 @@ pub async fn process_search_stream_request(
         // Step 4: Search without cache for req with from > 0
         let size = req.query.size;
         if let Err(e) = do_partitioned_search(
-            &crate::search::CoreSearchRuntime,
+            &runtime,
             &mut req,
             &trace_id,
             &org_id,
@@ -603,29 +597,30 @@ pub async fn process_search_stream_request(
             // send audit response first
             #[cfg(feature = "enterprise")]
             {
-                let resp = map_error_to_http_response(&e, None).status().into();
+                let resp = runtime.search_error_status(&e);
                 if audit_enabled {
                     // Using spawn to handle the async call
-                    audit(AuditMessage {
-                        user_email: user_id,
-                        org_id,
-                        _timestamp: chrono::Utc::now().timestamp(),
-                        protocol: Protocol::Http,
-                        response_meta: ResponseMeta {
-                            http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
-                            http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
-                            http_query_params: _audit_ctx
-                                .as_ref()
-                                .unwrap()
-                                .query_params
-                                .to_string(),
-                            http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
-                            http_response_code: resp,
-                            error_msg: Some(e.to_string()),
-                            trace_id: Some(trace_id.to_string()),
-                        },
-                    })
-                    .await;
+                    runtime
+                        .audit(AuditMessage {
+                            user_email: user_id,
+                            org_id,
+                            _timestamp: chrono::Utc::now().timestamp(),
+                            protocol: Protocol::Http,
+                            response_meta: ResponseMeta {
+                                http_method: _audit_ctx.as_ref().unwrap().method.to_string(),
+                                http_path: _audit_ctx.as_ref().unwrap().path.to_string(),
+                                http_query_params: _audit_ctx
+                                    .as_ref()
+                                    .unwrap()
+                                    .query_params
+                                    .to_string(),
+                                http_body: _audit_ctx.as_ref().unwrap().body.to_string(),
+                                http_response_code: resp,
+                                error_msg: Some(e.to_string()),
+                                trace_id: Some(trace_id.to_string()),
+                            },
+                        })
+                        .await;
                 }
             }
 
@@ -688,22 +683,23 @@ pub async fn process_search_stream_request(
             && let Some(audit_ctx) = _audit_ctx.as_ref()
         {
             // Using spawn to handle the async call
-            audit(AuditMessage {
-                user_email: user_id,
-                org_id,
-                _timestamp: chrono::Utc::now().timestamp(),
-                protocol: Protocol::Http,
-                response_meta: ResponseMeta {
-                    http_method: audit_ctx.method.to_string(),
-                    http_path: audit_ctx.path.to_string(),
-                    http_query_params: audit_ctx.query_params.to_string(),
-                    http_body: audit_ctx.body.to_string(),
-                    http_response_code: 200,
-                    error_msg: None,
-                    trace_id: Some(trace_id.to_string()),
-                },
-            })
-            .await;
+            runtime
+                .audit(AuditMessage {
+                    user_email: user_id,
+                    org_id,
+                    _timestamp: chrono::Utc::now().timestamp(),
+                    protocol: Protocol::Http,
+                    response_meta: ResponseMeta {
+                        http_method: audit_ctx.method.to_string(),
+                        http_path: audit_ctx.path.to_string(),
+                        http_query_params: audit_ctx.query_params.to_string(),
+                        http_body: audit_ctx.body.to_string(),
+                        http_response_code: 200,
+                        error_msg: None,
+                        trace_id: Some(trace_id.to_string()),
+                    },
+                })
+                .await;
         }
     }
 
@@ -798,7 +794,8 @@ pub async fn process_search_stream_request(
 /// Multi-stream search processing function that handles multiple independent queries
 /// and streams results as they become available from each query
 #[allow(clippy::too_many_arguments)]
-pub async fn process_search_stream_request_multi(
+pub async fn process_search_stream_request_multi<R>(
+    runtime: R,
     org_id: String,
     user_id: String,
     trace_id: String,
@@ -817,7 +814,9 @@ pub async fn process_search_stream_request_multi(
     needs_post_vrl: bool,
     // Top-level VRL function for post-hoc application. Only used when needs_post_vrl=true.
     query_fn: Option<String>,
-) {
+) where
+    R: StreamingRuntime + Clone + Send + Sync + 'static,
+{
     let root_span = tracing::info_span!("service::search::search_multi_stream_h2");
     let _ = root_span.set_parent(search_span.context());
     let _guard = root_span.enter();
@@ -855,6 +854,7 @@ pub async fn process_search_stream_request_multi(
         let sender_clone = sender.clone();
         let search_span_clone = search_span.clone();
         let progress_tx_clone = progress_tx.clone();
+        let runtime_clone = runtime.clone();
 
         // Clone search context for each query
         let query_search_type = search_type;
@@ -896,6 +896,7 @@ pub async fn process_search_stream_request_multi(
 
             // Launch the individual search stream request
             let search_task = process_search_stream_request(
+                runtime_clone,
                 org_id_clone.clone(),
                 user_id_clone.clone(),
                 query_trace_id.clone(),
@@ -1097,22 +1098,23 @@ pub async fn process_search_stream_request_multi(
     if let Some(audit_ctx) = _audit_ctx
         && get_o2_config().common.audit_enabled
     {
-        audit(AuditMessage {
-            user_email: user_id,
-            org_id,
-            _timestamp: chrono::Utc::now().timestamp(),
-            protocol: Protocol::Http,
-            response_meta: ResponseMeta {
-                http_method: audit_ctx.method.to_string(),
-                http_path: audit_ctx.path.to_string(),
-                http_query_params: audit_ctx.query_params.to_string(),
-                http_body: audit_ctx.body.to_string(),
-                http_response_code: 200,
-                error_msg: None,
-                trace_id: Some(trace_id.to_string()),
-            },
-        })
-        .await;
+        runtime
+            .audit(AuditMessage {
+                user_email: user_id,
+                org_id,
+                _timestamp: chrono::Utc::now().timestamp(),
+                protocol: Protocol::Http,
+                response_meta: ResponseMeta {
+                    http_method: audit_ctx.method.to_string(),
+                    http_path: audit_ctx.path.to_string(),
+                    http_query_params: audit_ctx.query_params.to_string(),
+                    http_body: audit_ctx.body.to_string(),
+                    http_response_code: 200,
+                    error_msg: None,
+                    trace_id: Some(trace_id.to_string()),
+                },
+            })
+            .await;
     }
 
     // Send completion signal

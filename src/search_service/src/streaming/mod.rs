@@ -15,6 +15,7 @@
 
 pub mod cache;
 pub mod execution;
+mod service;
 pub mod sorting;
 pub mod utils;
 
@@ -23,12 +24,21 @@ use config::meta::{
     stream::StreamType,
 };
 use infra::errors::Error;
+pub use service::{process_search_stream_request, process_search_stream_request_multi};
 
 use crate::cache::CacheRuntime;
 
 /// Application capability required by streaming execution to plan query partitions.
 #[async_trait::async_trait]
 pub trait StreamingRuntime: CacheRuntime {
+    async fn max_query_range(
+        &self,
+        stream_names: &[String],
+        org_id: &str,
+        user_id: &str,
+        stream_type: StreamType,
+    ) -> i64;
+
     async fn search_partition(
         &self,
         trace_id: &str,
@@ -39,4 +49,10 @@ pub trait StreamingRuntime: CacheRuntime {
         skip_max_query_range: bool,
         use_cache: bool,
     ) -> Result<SearchPartitionResponse, Error>;
+
+    #[cfg(feature = "enterprise")]
+    fn search_error_status(&self, error: &Error) -> u16;
+
+    #[cfg(feature = "enterprise")]
+    async fn audit(&self, message: o2_enterprise::enterprise::common::auditor::AuditMessage);
 }

@@ -7097,10 +7097,12 @@ dependencies = [
  "proto",
  "search",
  "serde_json",
+ "sqlparser",
  "svix-ksuid",
  "tokio",
  "tonic",
  "tracing",
+ "tracing-opentelemetry",
 ]
 
 [[package]]
