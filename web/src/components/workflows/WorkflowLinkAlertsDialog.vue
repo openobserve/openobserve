@@ -200,9 +200,16 @@ const loadAlerts = async () => {
   loading.value = true;
   loadError.value = false;
   try {
+    // The leading 0, 0 are `page_num` / `page_size`. They are NOT a cap: the v2
+    // helper accepts them for signature-compatibility with the v1 `list()` but
+    // never puts them in the URL (see services/alerts.ts — it builds
+    // `?sort_by&desc&name` plus optional folder/substring/type only), and
+    // /api/v2/{org}/alerts returns EVERY match when `page_size` is absent. They
+    // are passed as 0 rather than a plausible-looking page size so this does not
+    // read as a silent 1000-row truncation — the picker does see every alert.
     const res = await alertsService.listByFolderId(
-      1,
-      1000,
+      0,
+      0,
       "name",
       false,
       "",

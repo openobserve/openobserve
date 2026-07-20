@@ -157,15 +157,22 @@ describe("WorkflowLinkAlertsDialog", () => {
   describe("loading alerts", () => {
     it("lists every alert across folders in one v2 call", async () => {
       await mountDialog();
+      // page_num/page_size are 0 because the v2 helper ignores them (it never
+      // puts them in the URL) and the endpoint returns ALL matches when
+      // page_size is absent. Pinned so nobody reintroduces a plausible-looking
+      // page size here, which would read as a silent truncation of the picker.
       expect(mockList).toHaveBeenCalledWith(
-        1,
-        1000,
+        0,
+        0,
         "name",
         false,
         "",
         "default",
         "",
       );
+      // The 7th arg is the folder id: empty = every folder, not just "default".
+      expect(mockList.mock.calls[0][6]).toBe("");
+      expect(mockList).toHaveBeenCalledTimes(1);
     });
 
     it("drops anomaly-detection alerts (they use a separate update path)", async () => {
