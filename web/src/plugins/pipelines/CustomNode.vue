@@ -78,6 +78,12 @@ const getNodeErrorInfo = computed(() => {
     Array.isArray(nodeError.errors) &&
     nodeError.errors.length > 0
   ) {
+    // Relies on the API returning `errors` as a flat array of message strings.
+    // `NodeErrors.errors` is `HashSet<(String, Option<Value>)>` server-side and is
+    // persisted as JSON, so pre-upgrade rows and tuple rows would BOTH reach us
+    // raw — a bare join() renders those as "msg,[object Object]". The backend
+    // normalizes `node_errors` on read so this stays a single shape; if that ever
+    // stops being true, normalize here (map entry => Array.isArray(e) ? e[0] : e).
     const errorText = nodeError.errors.join("\n\n");
     if (nodeError.error_count > nodeError.errors.length) {
       return `${errorText}\n\n... and ${nodeError.error_count - nodeError.errors.length} more errors`;
