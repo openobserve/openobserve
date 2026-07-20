@@ -302,12 +302,23 @@ kubectl get pods -n openobserve-collector`,
         },
         {
           q: "Can I see a working example?",
-          // inlineMd renders **bold** and `code` only — link syntax would show
-          // as literal text, so URLs are written out.
-          a: "Yes — `github.com/openobserve/hotcommerce` is a sample application wired up end to end. The full annotation reference lives in the OpenTelemetry operator docs at `github.com/open-telemetry/opentelemetry-operator`.",
+          // inlineMd renders **bold** and `code` only, so both references are
+          // real links in the footer (docLinks) rather than text here.
+          a: "Yes — **HOT commerce** is a sample application wired up end to end, and the **OpenTelemetry Operator** docs carry the full annotation reference. Both are linked at the bottom of this page.",
         },
       ],
     },
     docUrl: "https://github.com/openobserve/openobserve-helm-chart",
+    // Both links the page carried before the migration, restored as anchors.
+    docLinks: [
+      {
+        label: "HOT Commerce Example",
+        url: "https://github.com/openobserve/hotcommerce",
+      },
+      {
+        label: "OpenTelemetry Operator",
+        url: "https://github.com/open-telemetry/opentelemetry-operator",
+      },
+    ],
   };
 }

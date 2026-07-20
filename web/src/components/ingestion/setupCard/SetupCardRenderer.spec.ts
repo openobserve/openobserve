@@ -123,6 +123,50 @@ describe("SetupCardRenderer — advanced section", () => {
   });
 });
 
+describe("SetupCardRenderer — footer doc links", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  it("renders every docLink as a real anchor beside the primary doc", () => {
+    wrapper = mountCard({
+      ...CONTENT,
+      docUrl: "https://example.com/main",
+      docLinks: [
+        { label: "Second Guide", url: "https://example.com/second" },
+        { label: "Third Guide", url: "https://example.com/third" },
+      ],
+    });
+    const hrefs = wrapper
+      .findAll(".pv-foot a")
+      .map((a) => a.attributes("href"));
+    expect(hrefs).toEqual([
+      "https://example.com/main",
+      "https://example.com/second",
+      "https://example.com/third",
+    ]);
+    expect(wrapper.find('[data-test="ai-doc-link-second-guide"]').text()).toBe(
+      "Second Guide →",
+    );
+  });
+
+  it("renders only the primary link when there are no docLinks", () => {
+    wrapper = mountCard({ ...CONTENT, docUrl: "https://example.com/main" });
+    expect(wrapper.findAll(".pv-foot a")).toHaveLength(1);
+  });
+
+  it("refuses unsafe doc link hrefs", () => {
+    wrapper = mountCard({
+      ...CONTENT,
+      docLinks: [{ label: "Evil", url: "javascript:alert(1)" }],
+    });
+    const evil = wrapper.find('[data-test="ai-doc-link-evil"]');
+    expect(evil.attributes("href")).toBe("#");
+  });
+});
+
 describe("SetupCardRenderer — step-note jump links", () => {
   let wrapper: VueWrapper<any>;
 

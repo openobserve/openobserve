@@ -230,6 +230,17 @@ describe("kubernetesCard builder", () => {
     expect(card.detect.filter.trim()).not.toBe("");
   });
 
+  it("keeps the example and operator references as real anchors", async () => {
+    // Both were <a> tags on the pre-migration page; they must not degrade into
+    // unclickable text inside the troubleshooting accordion.
+    const card = await buildCard();
+    const urls = (card.docLinks ?? []).map((l) => l.url);
+    expect(urls).toContain("https://github.com/openobserve/hotcommerce");
+    expect(urls).toContain(
+      "https://github.com/open-telemetry/opentelemetry-operator",
+    );
+  });
+
   it("carries troubleshooting guidance without markdown link syntax", async () => {
     const ts = (await buildCard()).extras!.troubleshooting!;
     expect(ts.length).toBeGreaterThan(0);

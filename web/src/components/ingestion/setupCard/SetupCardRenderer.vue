@@ -64,6 +64,11 @@ const props = defineProps<{
   logoUrlDark?: string;
 }>();
 
+const emit = defineEmits<{
+  /** A step's action button was clicked; carries RichCardStepAction.id. */
+  (e: "step-action", actionId: string): void;
+}>();
+
 const store = useStore();
 const router = useRouter();
 const { getStreams } = useStreams();
@@ -262,8 +267,22 @@ const currentVariantNote = (step: RichCardStep) =>
 
 // ── step completion / active-step model ─────────────────────────────────────
 const copied = ref<Record<string, boolean>>({});
-const isStepDone = (step: RichCardStep) =>
-  step.completeOn === "copy" ? !!copied.value[step.id] : detected.value;
+// Steps whose action button has been triggered (completeOn: "action") — the
+// cloud-console flows have nothing to copy and nothing to detect, so the click
+// itself is the completion signal.
+const actioned = ref<Record<string, boolean>>({});
+const isStepDone = (step: RichCardStep) => {
+  if (step.completeOn === "copy") return !!copied.value[step.id];
+  if (step.completeOn === "action") return !!actioned.value[step.id];
+  return detected.value;
+};
+
+const onStepAction = (step: RichCardStep, index: number) => {
+  if (step.completeOn === "action")
+    actioned.value = { ...actioned.value, [step.id]: true };
+  emit("step-action", step.action!.id);
+  scrollToStep(index + 1);
+};
 
 // First not-done step is "active"; -1 once everything is done. OStepper's
 // model is 1-based step numbers (0 = none active, i.e. all done).
@@ -632,6 +651,32 @@ function fireConfetti() {
               <span v-html="noteMd(step.note)"></span>
             </p>
 
+            <!-- Page-supplied controls for this step (region pickers, service
+                 checkboxes …). Lets a page own the interaction while inheriting
+                 the card's hero, stepper and chrome instead of rebuilding them. -->
+            <div
+              v-if="$slots[`step-${step.id}`]"
+              class="step-slot"
+              :data-test="`ai-step-slot-${step.id}`"
+            >
+              <slot :name="`step-${step.id}`" :step="step" />
+            </div>
+
+            <!-- Action button — for steps performed in a cloud console rather
+                 than by copying a command. -->
+            <div v-if="step.action" class="step-action">
+              <OButton
+                :variant="step.action.variant || 'primary'"
+                size="sm-action"
+                :icon-left="step.action.icon"
+                :disabled="step.action.disabled"
+                :data-test="`ai-step-action-${step.action.id}`"
+                @click="onStepAction(step, i)"
+              >
+                {{ step.action.label }}
+              </OButton>
+            </div>
+
             <div v-if="step.pills?.length" class="pill-list mt-2">
               <OTag
                 v-for="p in step.pills"
@@ -860,6 +905,18 @@ function fireConfetti() {
           rel="noopener noreferrer"
           >{{ content.provider.name }} →</a
         >
+        <!-- Secondary guides (e.g. GCP's Google Workspace page) — real anchors,
+             beside the primary doc link rather than buried in an accordion. -->
+        <template v-for="l in content.docLinks" :key="l.url">
+          <span class="pv-foot-sep" aria-hidden="true">·</span>
+          <a
+            :href="safeHttpUrl(l.url)"
+            target="_blank"
+            rel="noopener noreferrer"
+            :data-test="`ai-doc-link-${l.label.toLowerCase().replace(/\s+/g, '-')}`"
+            >{{ l.label }} →</a
+          >
+        </template>
         <span v-if="content.slackUrl" class="ml-auto"
           >Stuck?
           <a
@@ -1052,6 +1109,14 @@ function fireConfetti() {
   font-size: 12.5px;
   line-height: 1.5;
   margin: 10px 0 0;
+}
+
+/* ---- page-supplied step content + action button ---- */
+.step-slot {
+  margin: 4px 0 14px;
+}
+.step-action {
+  margin-top: 14px;
 }
 
 /* ---- variant toggle (shared OToggleGroup) — only spacing + icon sizing here;
@@ -1287,6 +1352,10 @@ function fireConfetti() {
 }
 .pv-foot a:hover {
   text-decoration: underline;
+}
+.pv-foot-sep {
+  color: var(--text-3);
+  margin: 0 2px;
 }
 
 /* ---- confetti overlay ---- */

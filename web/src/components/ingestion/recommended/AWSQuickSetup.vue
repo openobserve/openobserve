@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="rocket-launch"
             size="xl"
-            class="text-[var(--q-primary)]"
+            class="text-text-link"
           />
           <div>
             <h6 class="text-xl! font-bold m-0 mb-2!">
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="AWS_REGIONS"
           valueKey="value"
           labelKey="label"
-          style="max-width: 320px"
+          class="max-w-xs"
           data-test="aws-region-select"
         />
       </div>
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-6">
           <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">
             Admin region
-            <span class="font-normal text-xs text-[#888]"
+            <span class="font-normal text-xs text-text-muted"
               >(where the StackSet is managed)</span
             >
           </div>
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="AWS_REGIONS"
             valueKey="value"
             labelKey="label"
-            style="max-width: 320px"
+            class="max-w-xs"
             data-test="aws-admin-region-select"
           />
         </div>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">
                 Target regions
-                <span class="font-normal text-xs text-[#888]"
+                <span class="font-normal text-xs text-text-muted"
                   >(where stacks will be deployed)</span
                 >
               </div>
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <span
           v-if="enabledServices.length === 0"
-          class="text-sm text-red-500"
+          class="text-sm text-status-error-text"
         >
           Select at least one service
         </span>
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="
             deploymentMode === 'stackset' && targetRegions.length === 0
           "
-          class="text-sm text-red-500"
+          class="text-sm text-status-error-text"
         >
           Select at least one target region
         </span>
@@ -311,14 +311,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               The StackSets console doesn't support URL pre-fill. Enter these
               values as you go through the wizard.
             </p>
-            <div class="flex flex-col gap-[6px]">
+            <div class="flex flex-col gap-1.5">
               <div
                 v-for="param in stackSetParams"
                 :key="param.key"
-                class="flex items-center gap-3 py-[6px] px-[10px] rounded text-[0.8rem] font-mono"
+                class="flex items-center gap-3 py-1.5 px-2.5 rounded text-xs font-mono"
                 :class="paramRowClass"
               >
-                <div class="min-w-[240px] font-semibold shrink-0" :class="paramKeyClass">{{ param.key }}</div>
+                <div class="min-w-60 font-semibold shrink-0" :class="paramKeyClass">{{ param.key }}</div>
                 <div class="flex items-center gap-1 flex-1 overflow-hidden">
                   <span class="overflow-hidden text-ellipsis whitespace-nowrap flex-1" :class="paramValTextClass">{{ param.value }}</span>
                   <OButton
@@ -399,37 +399,19 @@ export default defineComponent({
     const showTargetRegions = ref(false);
     const showServices = ref(false);
 
-    const quickInstallBgClass = computed(() => {
-      return store.state.theme === 'dark'
-        ? 'bg-gray-800 border border-gray-700'
-        : 'bg-blue-50 border border-blue-200';
-    });
-
-    const descriptionClass = computed(() => {
-      return store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700';
-    });
-
-    // dark: variants do not generate CSS in this setup, so dark-mode colors
-    // are resolved here against store.state.theme (same pattern as quickInstallBgClass).
-    const isDark = computed(() => store.state.theme === 'dark');
-    const stepLabelClass = computed(() =>
-      isDark.value ? 'text-[#d0d0d0]' : 'text-[#333]');
-    const hintTextClass = computed(() =>
-      isDark.value ? 'text-[#b0b0b0]' : 'text-[#666]');
-    const collapsibleHeaderClass = computed(() =>
-      isDark.value
-        ? 'bg-[rgba(255,255,255,0.06)] border border-[#404040] hover:bg-[rgba(255,255,255,0.09)]'
-        : 'bg-[#f0f4ff] border border-[#d0d9f0] hover:bg-[#e8eeff]');
-    const paramHelperClass = computed(() =>
-      isDark.value ? 'bg-[rgba(255,255,255,0.05)]' : 'bg-[#f5f5f5]');
-    const paramRowClass = computed(() =>
-      isDark.value
-        ? 'bg-[rgba(255,255,255,0.03)] border border-[#404040]'
-        : 'bg-white border border-(--o2-border)');
-    const paramKeyClass = computed(() =>
-      isDark.value ? 'text-[#ccc]' : 'text-[#333]');
-    const paramValTextClass = computed(() =>
-      isDark.value ? 'text-[#aaa]' : 'text-[#555]');
+    // Design tokens resolve per-theme on their own, so none of these branch on
+    // store.state.theme any more — they were eight computeds returning hardcoded
+    // hex/palette colors (plus a banned --o2-border) for exactly that reason.
+    const quickInstallBgClass = "bg-status-info-bg border border-border-default";
+    const descriptionClass = "text-text-secondary";
+    const stepLabelClass = "text-text-heading";
+    const hintTextClass = "text-text-secondary";
+    const collapsibleHeaderClass =
+      "bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover";
+    const paramHelperClass = "bg-surface-subtle";
+    const paramRowClass = "bg-surface-base border border-border-default";
+    const paramKeyClass = "text-text-heading";
+    const paramValTextClass = "text-text-secondary";
 
     let endpoint: any = null;
     try {
