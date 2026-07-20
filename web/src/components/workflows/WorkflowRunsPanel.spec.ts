@@ -55,7 +55,12 @@ const OTableStub = {
     "width",
   ],
   emits: ["row-click"],
-  template: `<div class="o-table" @click="$emit('row-click', { run_id: 'r-clicked' })" />`,
+  // Renders the #empty slot when there are no rows, like the real OTable —
+  // without this the empty/error branch is never mounted and assertions on it
+  // silently pass against nothing.
+  template: `<div class="o-table" @click="$emit('row-click', { run_id: 'r-clicked' })">
+    <slot name="empty" v-if="!data || data.length === 0" />
+  </div>`,
 };
 const stub = (name: string, props: string[] = []) => ({
   name,
@@ -84,6 +89,7 @@ const globalCfg = {
       "okLabel",
     ]),
     NoData: stub("NoData"),
+    OEmptyState: stub("OEmptyState", ["preset", "filtered"]),
   },
 };
 
@@ -154,6 +160,74 @@ describe("WorkflowRunsPanel", () => {
       mountPanel({ workflowId: "" });
       await flushPromises();
       expect(mockList).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── duration formatting (i18n) ─────────────────────────────────────────────
+  // The h/m/s suffixes used to be concatenated in JS. They now go through t(),
+  // so a locale can relabel/reorder them; these pin the rendered output.
+  describe("formatDuration", () => {
+    const fmt = (w: any, us: number) => (w.vm as any).formatDuration(us);
+
+    it("renders each magnitude via i18n", async () => {
+      const w = mountPanel();
+      await flushPromises();
+      expect(fmt(w, 0)).toBe("0s");
+      expect(fmt(w, -5)).toBe("0s");
+      expect(fmt(w, 45 * 1_000_000)).toBe("45s");
+      expect(fmt(w, (5 * 60 + 30) * 1_000_000)).toBe("5m 30s");
+      expect(fmt(w, (2 * 3600 + 5 * 60) * 1_000_000)).toBe("2h 5m");
+    });
+
+    it("does not leak a raw i18n key when a locale lookup is used", async () => {
+      const w = mountPanel();
+      await flushPromises();
+      expect(fmt(w, 90 * 1_000_000)).not.toContain("workflow.history");
+    });
+  });
+
+  // ── error state vs empty state ─────────────────────────────────────────────
+  // A failed fetch used to fall through to <NoData />, so "request failed" and
+  // "never run" were indistinguishable and there was no retry affordance.
+  describe("load error is distinct from empty", () => {
+    const emptyState = (w: any) => w.findComponent({ name: "OEmptyState" });
+
+    it("shows the retryable error state when the fetch fails", async () => {
+      mockList.mockRejectedValueOnce({ response: { status: 500 } });
+      const w = mountPanel();
+      await flushPromises();
+      expect(emptyState(w).exists()).toBe(true);
+      expect(emptyState(w).props("preset")).toBe("load-error");
+      expect(w.findComponent({ name: "NoData" }).exists()).toBe(false);
+    });
+
+    it("shows the plain empty state when the fetch succeeds with no runs", async () => {
+      mockList.mockResolvedValueOnce({ data: [] });
+      const w = mountPanel();
+      await flushPromises();
+      expect(w.findComponent({ name: "NoData" }).exists()).toBe(true);
+      expect(emptyState(w).exists()).toBe(false);
+    });
+
+    it("treats 403 as empty, not an error — retrying cannot help", async () => {
+      mockList.mockRejectedValueOnce({ response: { status: 403 } });
+      const w = mountPanel();
+      await flushPromises();
+      expect(emptyState(w).exists()).toBe(false);
+      expect(w.findComponent({ name: "NoData" }).exists()).toBe(true);
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("clears the error once a later fetch succeeds", async () => {
+      mockList.mockRejectedValueOnce({ response: { status: 500 } });
+      const w = mountPanel();
+      await flushPromises();
+      expect(emptyState(w).exists()).toBe(true);
+
+      mockList.mockResolvedValueOnce({ data: [] });
+      await w.find('[data-test="workflow-runs-refresh"]').trigger("click");
+      await flushPromises();
+      expect(emptyState(w).exists()).toBe(false);
     });
   });
 });
