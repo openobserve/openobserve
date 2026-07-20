@@ -1115,8 +1115,9 @@ mod tests {
             let duration = start.elapsed();
             assert_eq!(bulk_res.items.len(), 1000);
 
-            // Should complete within reasonable time (less than 1 second for 1000 records)
-            assert!(duration.as_secs() < 1);
+            // Keep a generous guard because this unit test runs alongside hundreds of CPU-heavy
+            // OTEL tests in debug builds; it is a regression sentinel, not a benchmark.
+            assert!(duration.as_secs() < 5);
 
             // Check distribution of errors vs successes
             let errors: usize = bulk_res

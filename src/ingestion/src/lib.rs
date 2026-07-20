@@ -20,4 +20,5 @@ pub mod ports;
 pub mod repository;
 pub mod service;
 pub mod tokens;
+pub mod traces;
 pub mod types;

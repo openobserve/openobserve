@@ -393,7 +393,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 /// Watch for model pricing changes from other cluster nodes and update the local cache.
 /// Called once at startup from `job/mod.rs` (spawned as a background task).
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let cluster_coordinator = super::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(WATCHER_PREFIX).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("[model_pricing] start watching");
@@ -406,20 +406,20 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            super::Event::Put(ev) => {
+            infra::db::Event::Put(ev) => {
                 // Key format: /model_pricing/{org_id}/{model_id}
                 if let Some(org_id) = parse_org_from_key(&ev.key) {
                     reload_org(org_id).await;
                     log::debug!("[model_pricing] reloaded cache for org '{org_id}' (put)");
                 }
             }
-            super::Event::Delete(ev) => {
+            infra::db::Event::Delete(ev) => {
                 if let Some(org_id) = parse_org_from_key(&ev.key) {
                     reload_org(org_id).await;
                     log::debug!("[model_pricing] reloaded cache for org '{org_id}' (delete)");
                 }
             }
-            super::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
     Ok(())

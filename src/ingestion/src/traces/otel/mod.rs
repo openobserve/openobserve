@@ -112,14 +112,12 @@ pub use processor::OtelIngestionProcessor;
 mod tests {
     use std::collections::HashMap;
 
+    use common::meta::traces::Event;
     use config::utils::json;
 
     use super::*;
-    use crate::{
-        common::meta::traces::Event,
-        service::traces::otel::attributes::{
-            GenAiAttributes, GenAiExtensions, O2Attributes, OtelAttributes,
-        },
+    use crate::traces::otel::attributes::{
+        GenAiAttributes, GenAiExtensions, O2Attributes, OtelAttributes,
     };
 
     /// Test that simulates the complete OpenObserve traces ingestion flow

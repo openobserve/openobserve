@@ -28,6 +28,13 @@ pub struct DistinctValue {
     pub value: Map<String, Value>,
 }
 
+pub struct TraceListValue {
+    pub timestamp: i64,
+    pub stream_name: String,
+    pub service_name: String,
+    pub trace_id: String,
+}
+
 #[async_trait]
 pub trait RuntimeServices: Send + Sync + 'static {
     fn publish_trigger_usage(&self, trigger: TriggerData);
@@ -70,6 +77,27 @@ pub trait RuntimeServices: Send + Sync + 'static {
 
     async fn ingestion_log_enabled(&self) -> bool;
 
+    async fn write_trace_list(
+        &self,
+        org_id: &str,
+        values: Vec<TraceListValue>,
+    ) -> infra::errors::Result<()>;
+
+    async fn ensure_gen_ai_fields_in_schema(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+    ) -> anyhow::Result<()>;
+
+    async fn set_stream_is_llm(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        is_llm_stream: bool,
+    ) -> anyhow::Result<()>;
+
     async fn merge_schema(
         &self,
         org_id: &str,
@@ -105,7 +133,8 @@ pub trait RuntimeServices: Send + Sync + 'static {
         &self,
         org_id: &str,
         stream_name: &str,
-        user_email: &str,
+        stream_type: StreamType,
+        user_email: Option<&str>,
     ) -> infra::errors::Result<()>;
 
     #[cfg(feature = "cloud")]
@@ -212,6 +241,34 @@ pub async fn ingestion_log_enabled() -> bool {
     }
 }
 
+pub async fn write_trace_list(
+    org_id: &str,
+    values: Vec<TraceListValue>,
+) -> infra::errors::Result<()> {
+    runtime_services()?.write_trace_list(org_id, values).await
+}
+
+pub async fn ensure_gen_ai_fields_in_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> anyhow::Result<()> {
+    runtime_services()?
+        .ensure_gen_ai_fields_in_schema(org_id, stream_name, stream_type)
+        .await
+}
+
+pub async fn set_stream_is_llm(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    is_llm_stream: bool,
+) -> anyhow::Result<()> {
+    runtime_services()?
+        .set_stream_is_llm(org_id, stream_name, stream_type, is_llm_stream)
+        .await
+}
+
 pub async fn merge_schema(
     org_id: &str,
     stream_name: &str,
@@ -255,10 +312,11 @@ pub async fn set_prom_cluster_info(cluster_name: &str, members: &[String]) -> an
 pub async fn report_stream_created_if_new(
     org_id: &str,
     stream_name: &str,
-    user_email: &str,
+    stream_type: StreamType,
+    user_email: Option<&str>,
 ) -> infra::errors::Result<()> {
     runtime_services()?
-        .report_stream_created_if_new(org_id, stream_name, user_email)
+        .report_stream_created_if_new(org_id, stream_name, stream_type, user_email)
         .await
 }
 

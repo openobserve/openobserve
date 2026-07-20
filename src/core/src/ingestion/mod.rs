@@ -18,7 +18,10 @@ use config::{
     },
 };
 use infra::schema::SchemaCache;
-use openobserve_ingestion::{ports::DistinctValue, types::StreamSchemaChk};
+use openobserve_ingestion::{
+    ports::{DistinctValue, TraceListValue},
+    types::StreamSchemaChk,
+};
 use serde_json::{Map, Value};
 
 pub mod grpc {
@@ -131,6 +134,46 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
             .unwrap_or(false)
     }
 
+    async fn write_trace_list(
+        &self,
+        org_id: &str,
+        values: Vec<TraceListValue>,
+    ) -> infra::errors::Result<()> {
+        use crate::metadata::{MetadataItem, MetadataType, trace_list_index::TraceListItem};
+
+        let values = values
+            .into_iter()
+            .map(|value| {
+                MetadataItem::TraceListIndexer(TraceListItem {
+                    _timestamp: value.timestamp,
+                    stream_name: value.stream_name,
+                    service_name: value.service_name,
+                    trace_id: value.trace_id,
+                })
+            })
+            .collect();
+        crate::metadata::write(org_id, MetadataType::TraceListIndexer, values).await
+    }
+
+    async fn ensure_gen_ai_fields_in_schema(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+    ) -> anyhow::Result<()> {
+        crate::db::schema::ensure_gen_ai_fields_in_schema(org_id, stream_name, stream_type).await
+    }
+
+    async fn set_stream_is_llm(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        is_llm_stream: bool,
+    ) -> anyhow::Result<()> {
+        crate::db::schema::set_stream_is_llm(org_id, stream_name, stream_type, is_llm_stream).await
+    }
+
     async fn merge_schema(
         &self,
         org_id: &str,
@@ -174,9 +217,10 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         &self,
         org_id: &str,
         stream_name: &str,
-        user_email: &str,
+        stream_type: StreamType,
+        user_email: Option<&str>,
     ) -> infra::errors::Result<()> {
-        if crate::stream::get_stream(org_id, stream_name, StreamType::Logs)
+        if crate::stream::get_stream(org_id, stream_name, stream_type)
             .await
             .is_some()
         {
@@ -193,7 +237,7 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
                 org_id: org.identifier.clone(),
                 org_name: org.name.clone(),
                 org_type: org.org_type.clone(),
-                user: Some(user_email.to_string()),
+                user: user_email.map(str::to_string),
                 event: crate::self_reporting::cloud_events::EventType::StreamCreated,
                 subscription_type: None,
                 stream_name: Some(stream_name.to_string()),

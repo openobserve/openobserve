@@ -39,6 +39,7 @@ bytes.workspace = true
 chrono.workspace = true
 common.workspace = true
 config.workspace = true
+dashmap.workspace = true
 flate2.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
@@ -57,13 +58,17 @@ openobserve-transform.workspace = true
 proto.workspace = true
 promql-parser.workspace = true
 prost.workspace = true
+regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snap.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+tiktoken-rs.workspace = true
+url.workspace = true
 utoipa.workspace = true
 
 [dev-dependencies]
 arrow-schema.workspace = true
+http.workspace = true
 prost-wkt-types.workspace = true

@@ -209,7 +209,13 @@ async fn write_logs_by_stream(
 
         // For cloud, emit an event when a user creates a new stream.
         #[cfg(feature = "cloud")]
-        ports::report_stream_created_if_new(org_id, &stream_name, user_email).await?;
+        ports::report_stream_created_if_new(
+            org_id,
+            &stream_name,
+            StreamType::Logs,
+            Some(user_email),
+        )
+        .await?;
 
         // write json data by stream
         let mut req_stats = write_logs(

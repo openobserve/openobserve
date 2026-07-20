@@ -17,15 +17,13 @@
 
 use std::collections::HashMap;
 
+use common::meta::traces::Event;
 use config::utils::json;
 use serde_json::Map;
 
-use crate::{
-    common::meta::traces::Event,
-    service::traces::otel::attributes::{
-        FrameworkAttributes, GenAiAttributes, GenAiEventNames, LangfuseAttributes,
-        VercelAiSdkAttributes,
-    },
+use crate::traces::otel::attributes::{
+    FrameworkAttributes, GenAiAttributes, GenAiEventNames, LangfuseAttributes,
+    VercelAiSdkAttributes,
 };
 
 const MAX_INDEX: usize = 100;
