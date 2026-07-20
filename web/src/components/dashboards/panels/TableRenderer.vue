@@ -323,9 +323,13 @@ export default defineComponent({
   border-radius: 0;
 }
 
-/* Dashboard table cells should not use the monospace font from tenstack-table.scss */
+/* Dashboard table cells should not use the monospace font from tenstack-table.scss.
+   Use tabular-nums so digits render at a fixed width — this keeps numeric and
+   timestamp columns aligned to a consistent width without switching text
+   columns to a monospace font. */
 .table-wrapper td {
   font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Pivot table styles */
