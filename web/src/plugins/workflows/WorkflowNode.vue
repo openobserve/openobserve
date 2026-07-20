@@ -374,7 +374,7 @@ const openResult = () => {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 2px dashed var(--o2-border-strong, #d9dce4);
+  border: 2px dashed var(--color-border-strong);
   background: #fff;
   color: var(--color-grey-500);
   display: grid;
