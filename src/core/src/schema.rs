@@ -19,19 +19,16 @@ use std::{
 };
 
 use anyhow::Result;
+use common::utils::schema_fields::{
+    check_schema_for_defined_schema_fields, generate_schema_for_defined_schema_fields,
+};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
     SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
-    meta::{
-        promql::{
-            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
-            VALUE_LABEL,
-        },
-        stream::StreamType,
-    },
+    meta::{promql::METADATA_LABEL, stream::StreamType},
     metrics,
     utils::{
         json,
@@ -477,96 +474,6 @@ pub(crate) async fn handle_diff_schema(
 // Generate filtered schema for UDS (User Defined Schema)
 // if defined_schema_fields is not empty, and schema fields greater than defined_schema_fields + 10,
 // then we will use defined_schema_fields
-pub fn generate_schema_for_defined_schema_fields(
-    stream_type: StreamType,
-    schema: &SchemaCache,
-    fields: &[String],
-    need_original: bool,
-    index_original_data: bool,
-    index_all_values: bool,
-) -> SchemaCache {
-    if fields.is_empty() || schema.fields_map().len() < fields.len() + 10 {
-        return schema.clone();
-    }
-
-    let cfg = get_config();
-    let mut fields =
-        check_schema_for_defined_schema_fields(stream_type, schema.schema(), fields.to_vec());
-    fields.insert(TIMESTAMP_COL_NAME.to_string());
-    fields.insert(cfg.common.column_all.to_string());
-    if need_original || index_original_data {
-        fields.insert(ID_COL_NAME.to_string());
-        fields.insert(ORIGINAL_DATA_COL_NAME.to_string());
-    }
-    if index_all_values {
-        fields.insert(ALL_VALUES_COL_NAME.to_string());
-    }
-
-    let mut new_fields = Vec::with_capacity(fields.len());
-    for field in fields {
-        if let Some(f) = schema.fields_map().get(&field) {
-            new_fields.push(schema.schema().fields()[*f].clone());
-        }
-    }
-
-    // sort the fields by name to make sure the order is consistent
-    new_fields.sort_by(|a, b| a.name().cmp(b.name()));
-
-    SchemaCache::new(Schema::new_with_metadata(
-        new_fields,
-        schema.schema().metadata().clone(),
-    ))
-}
-
-pub fn check_schema_for_defined_schema_fields(
-    stream_type: StreamType,
-    schema: &Schema,
-    fields: Vec<String>,
-) -> HashSet<String> {
-    let mut fields: HashSet<String> = fields.into_iter().collect();
-    match stream_type {
-        StreamType::Logs => {}
-        StreamType::Metrics => {
-            fields.insert(NAME_LABEL.to_string());
-            fields.insert(HASH_LABEL.to_string());
-            fields.insert(BUCKET_LABEL.to_string());
-            fields.insert(QUANTILE_LABEL.to_string());
-            fields.insert(EXEMPLARS_LABEL.to_string());
-            fields.insert(VALUE_LABEL.to_string());
-            fields.insert("trace_id".to_string());
-            fields.insert("span_id".to_string());
-        }
-        StreamType::Traces => {
-            fields.insert("service_name".to_string());
-            fields.insert("operation_name".to_string());
-            fields.insert("trace_id".to_string());
-            fields.insert("span_id".to_string());
-            fields.insert("span_kind".to_string());
-            fields.insert("span_status".to_string());
-            fields.insert("reference_parent_span_id".to_string());
-            fields.insert("reference_parent_trace_id".to_string());
-            fields.insert("reference_ref_type".to_string());
-            fields.insert("start_time".to_string());
-            fields.insert("end_time".to_string());
-            fields.insert("duration".to_string());
-            fields.insert("events".to_string());
-            // Automatically include all OTEL Gen-AI and LLM evaluation fields from the schema
-            for field in schema.fields() {
-                let name = field.name();
-                if name.starts_with("gen_ai_")
-                    || name.starts_with("llm_")
-                    || name == "user_id"
-                    || name == "session_id"
-                {
-                    fields.insert(name.to_string());
-                }
-            }
-        }
-        _ => {}
-    }
-    fields
-}
-
 pub fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, Vec<Field>) {
     let mut is_schema_changed = false;
     let mut field_datatype_delta: Vec<Field> = vec![];
@@ -653,6 +560,7 @@ pub async fn stream_schema_exists(
 mod tests {
     use std::str::FromStr;
 
+    use config::meta::promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL};
     use datafusion::arrow::datatypes::DataType;
 
     use super::*;

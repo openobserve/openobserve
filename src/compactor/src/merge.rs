@@ -16,8 +16,10 @@
 use std::sync::Arc;
 
 use ::datafusion::{arrow::datatypes::Schema, error::DataFusionError};
+use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
+use common::utils::schema_fields::generate_schema_for_defined_schema_fields;
 use config::{
     FileFormat,
     cluster::LOCAL_NODE,
@@ -47,21 +49,70 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
-use openobserve_compactor::tantivy::create_tantivy_index;
+use search::datafusion::{
+    exec::TableBuilder,
+    merge::{self, MergeParquetResult},
+};
 use tokio::{
     sync::{Semaphore, mpsc},
     task::JoinHandle,
 };
 
-use super::worker::{MergeBatch, MergeSender};
 use crate::{
-    db, file_list,
-    schema::generate_schema_for_defined_schema_fields,
-    search::datafusion::{
-        exec::TableBuilder,
-        merge::{self, MergeParquetResult},
-    },
+    tantivy::create_tantivy_index,
+    worker::{MergeBatch, MergeExecutor, MergeSender},
 };
+
+#[async_trait]
+pub trait FileListBroadcaster: Send + Sync + 'static {
+    async fn broadcast(&self, events: &[FileKey]) -> Result<(), anyhow::Error>;
+}
+
+pub struct MergeService {
+    broadcaster: Arc<dyn FileListBroadcaster>,
+}
+
+impl MergeService {
+    pub fn new(broadcaster: Arc<dyn FileListBroadcaster>) -> Self {
+        Self { broadcaster }
+    }
+}
+
+#[async_trait]
+impl MergeExecutor for MergeService {
+    async fn merge_by_stream(
+        &self,
+        worker_tx: mpsc::Sender<(MergeSender, MergeBatch)>,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        job_id: i64,
+        offset: i64,
+    ) -> Result<(), anyhow::Error> {
+        merge_by_stream(
+            worker_tx,
+            org_id,
+            stream_type,
+            stream_name,
+            job_id,
+            offset,
+            self.broadcaster.clone(),
+        )
+        .await
+    }
+
+    async fn merge_files(
+        &self,
+        thread_id: usize,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        prefix: &str,
+        files: &[FileKey],
+    ) -> Result<(Vec<FileKey>, Vec<FileKey>), anyhow::Error> {
+        merge_files(thread_id, org_id, stream_type, stream_name, prefix, files).await
+    }
+}
 
 /// Generate merging job by stream
 /// 1. get offset from db
@@ -73,7 +124,8 @@ pub async fn generate_job_by_stream(
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
     // get last compacted offset
-    let (mut offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+    let (mut offset, node) =
+        crate::repository::files::get_offset(org_id, stream_type, stream_name).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(()); // other node is processing
     }
@@ -82,14 +134,15 @@ pub async fn generate_job_by_stream(
         let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
-        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+        let (offset, node) =
+            crate::repository::files::get_offset(org_id, stream_type, stream_name).await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
             dist_lock::unlock(&locker).await?;
             return Ok(()); // other node is processing
         }
         // set to current node
-        let ret = db::compact::files::set_offset(
+        let ret = crate::repository::files::set_offset(
             org_id,
             stream_type,
             stream_name,
@@ -113,7 +166,7 @@ pub async fn generate_job_by_stream(
 
     // format to hour with zero minutes, seconds
     let offset = offset - offset % hour_micros(1);
-    if !super::is_past_hour(offset) {
+    if !crate::is_past_hour(offset) {
         return Ok(()); // the time is future, just wait
     }
 
@@ -130,7 +183,7 @@ pub async fn generate_job_by_stream(
 
     // write new offset
     let offset = offset + hour_micros(1);
-    db::compact::files::set_offset(
+    crate::repository::files::set_offset(
         org_id,
         stream_type,
         stream_name,
@@ -152,7 +205,8 @@ pub async fn generate_old_data_job_by_stream(
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
     // get last compacted offset
-    let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+    let (offset, node) =
+        crate::repository::files::get_offset(org_id, stream_type, stream_name).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(()); // other node is processing
     }
@@ -161,14 +215,15 @@ pub async fn generate_old_data_job_by_stream(
         let lock_key = format!("/compact/merge/{org_id}/{stream_type}/{stream_name}");
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
-        let (offset, node) = db::compact::files::get_offset(org_id, stream_type, stream_name).await;
+        let (offset, node) =
+            crate::repository::files::get_offset(org_id, stream_type, stream_name).await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
             dist_lock::unlock(&locker).await?;
             return Ok(()); // other node is processing
         }
         // set to current node
-        let ret = db::compact::files::set_offset(
+        let ret = crate::repository::files::set_offset(
             org_id,
             stream_type,
             stream_name,
@@ -255,7 +310,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     assert!(stream_type == StreamType::Metrics);
     // get last compacted offset
     let (mut offset, node) =
-        db::compact::downsampling::get_offset(org_id, stream_type, stream_name, rule).await;
+        crate::repository::downsampling::get_offset(org_id, stream_type, stream_name, rule).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(()); // other node is processing
     }
@@ -268,14 +323,15 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
         let locker = dist_lock::lock(&lock_key, 0).await?;
         // check the working node again, maybe other node locked it first
         let (offset, node) =
-            db::compact::downsampling::get_offset(org_id, stream_type, stream_name, rule).await;
+            crate::repository::downsampling::get_offset(org_id, stream_type, stream_name, rule)
+                .await;
         if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some()
         {
             dist_lock::unlock(&locker).await?;
             return Ok(()); // other node is processing
         }
         // set to current node
-        let ret = db::compact::downsampling::set_offset(
+        let ret = crate::repository::downsampling::set_offset(
             org_id,
             stream_type,
             stream_name,
@@ -340,7 +396,7 @@ pub async fn generate_downsampling_job_by_stream_and_rule(
     let offset = offset + day_micros(1);
     // format to day with zero hour, minutes, seconds
     let offset = offset - offset % day_micros(1);
-    db::compact::downsampling::set_offset(
+    crate::repository::downsampling::set_offset(
         org_id,
         stream_type,
         stream_name,
@@ -370,6 +426,7 @@ pub async fn merge_by_stream(
     stream_name: &str,
     job_id: i64,
     offset: i64,
+    broadcaster: Arc<dyn FileListBroadcaster>,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let start = std::time::Instant::now();
@@ -393,7 +450,7 @@ pub async fn merge_by_stream(
     // only seal full-size groups and carry the remainder, so each file is merged into a
     // sealed output exactly once. The scheduled hour-end pass seals whatever is left.
     let offset = offset - offset % hour_micros(1);
-    let is_incremental = !super::is_past_hour(offset);
+    let is_incremental = !crate::is_past_hour(offset);
 
     // check offset
     let partition_time_level = get_partition_time_level(stream_type);
@@ -409,10 +466,14 @@ pub async fn merge_by_stream(
             offset_time.format("%Y/%m/%d/%H").to_string(),
         )
     };
-    let files =
-        file_list::query_for_merge(org_id, stream_type, stream_name, &date_start, &date_end)
-            .await
-            .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
+    let files = infra_file_list::query_for_merge(
+        org_id,
+        stream_type,
+        stream_name,
+        (date_start.clone(), date_end.clone()),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("query file list failed: {e}"))?;
 
     log::debug!(
         "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] date range: [{date_start},{date_end}], files: {}",
@@ -444,6 +505,7 @@ pub async fn merge_by_stream(
         let stream_name = stream_name.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
+        let broadcaster = broadcaster.clone();
         let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
@@ -594,7 +656,9 @@ pub async fn merge_by_stream(
                 events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
-                if let Err(e) = write_file_list(&org_id, stream_type, &events).await {
+                if let Err(e) =
+                    write_file_list(&org_id, stream_type, &events, broadcaster.as_ref()).await
+                {
                     log::error!("[COMPACTOR] write file list failed: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
@@ -853,7 +917,7 @@ pub async fn merge_files(
     };
 
     // clear session data
-    crate::search::datafusion::storage::file_list::clear(&trace_id);
+    search::datafusion::storage::file_list::clear(&trace_id);
 
     let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
     let buf = match merge_result {
@@ -1036,6 +1100,7 @@ async fn write_file_list(
     org_id: &str,
     stream_type: StreamType,
     events: &[FileKey],
+    broadcaster: &dyn FileListBroadcaster,
 ) -> Result<(), anyhow::Error> {
     if events.is_empty() {
         return Ok(());
@@ -1080,7 +1145,7 @@ async fn write_file_list(
     // handle dump_stats for file_list type streams
     if success && stream_type == StreamType::Filelist && cfg.compact.file_list_dump_enabled {
         let (deleted_files, new_files): (Vec<_>, Vec<_>) = events.iter().partition(|e| e.deleted);
-        openobserve_compactor::dump::handle_dump_stats_on_merge(&deleted_files, &new_files).await;
+        crate::dump::handle_dump_stats_on_merge(&deleted_files, &new_files).await;
     }
 
     if success {
@@ -1094,7 +1159,7 @@ async fn write_file_list(
                     event.id = *id;
                 }
             }
-            if let Err(e) = db::file_list::broadcast::send(&events).await {
+            if let Err(e) = broadcaster.broadcast(&events).await {
                 log::error!("[COMPACTOR] send broadcast for file_list failed: {e}");
             }
         }
@@ -1149,9 +1214,14 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                     {
                         // delete file from file list
                         log::error!("[COMPACT] found invalid file: {file_name}, will delete it");
-                        if let Err(e) =
-                            file_list::delete_parquet_file(&file_account, &file_name, true).await
-                        {
+                        let deleted_file = FileKey::new(
+                            0,
+                            file_account.clone(),
+                            file_name.clone(),
+                            Default::default(),
+                            true,
+                        );
+                        if let Err(e) = infra_file_list::batch_process(&[deleted_file]).await {
                             log::error!("[COMPACT] delete from file_list err: {e}");
                         }
                         Some(file_name)

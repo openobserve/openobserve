@@ -20,4 +20,5 @@ pub mod http;
 pub use openobserve_transform::js;
 pub mod jwt;
 pub mod redirect_response;
+pub mod schema_fields;
 pub mod ssrf_guard;

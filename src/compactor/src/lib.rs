@@ -24,6 +24,7 @@ pub mod file_list_dump;
 pub mod flatten;
 mod flatten_key;
 pub mod incremental;
+pub mod merge;
 mod metadata;
 pub mod repository;
 pub mod retention;

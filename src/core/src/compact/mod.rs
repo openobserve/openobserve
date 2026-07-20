@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
+use chrono::{Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     COMPACT_OLD_DATA_STREAM_SET,
     cluster::LOCAL_NODE,
@@ -40,9 +40,7 @@ pub mod deleted {
 pub mod incremental {
     pub use openobserve_compactor::incremental::*;
 }
-pub mod merge;
 pub mod stats;
-pub mod worker;
 
 /// compactor retention run steps:
 pub async fn run_retention() -> Result<(), anyhow::Error> {
@@ -159,8 +157,12 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
 
                 match job_type {
                     CompactionJobType::Current => {
-                        if let Err(e) =
-                            merge::generate_job_by_stream(&org_id, stream_type, &stream_name).await
+                        if let Err(e) = openobserve_compactor::merge::generate_job_by_stream(
+                            &org_id,
+                            stream_type,
+                            &stream_name,
+                        )
+                        .await
                         {
                             log::error!(
                                 "[COMPACTOR] generate_job_by_stream [{org_id}/{stream_type}/{stream_name}] error: {e}"
@@ -173,12 +175,13 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                         {
                             continue;
                         }
-                        if let Err(e) = merge::generate_old_data_job_by_stream(
-                            &org_id,
-                            stream_type,
-                            &stream_name,
-                        )
-                        .await
+                        if let Err(e) =
+                            openobserve_compactor::merge::generate_old_data_job_by_stream(
+                                &org_id,
+                                stream_type,
+                                &stream_name,
+                            )
+                            .await
                         {
                             log::error!(
                                 "[COMPACTOR] generate_old_data_job_by_stream [{org_id}/{stream_type}/{stream_name}] error: {e}"
@@ -251,13 +254,14 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                     continue;
                 }
 
-                if let Err(e) = merge::generate_downsampling_job_by_stream_and_rule(
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    (rule.offset, rule.step),
-                )
-                .await
+                if let Err(e) =
+                    openobserve_compactor::merge::generate_downsampling_job_by_stream_and_rule(
+                        &org_id,
+                        stream_type,
+                        &stream_name,
+                        (rule.offset, rule.step),
+                    )
+                    .await
                 {
                     log::error!(
                         "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{org_id}/{stream_type}/{stream_name}] rule: {rule:?} error: {e}"
@@ -271,7 +275,9 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
 }
 
 /// compactor merging
-pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), anyhow::Error> {
+pub async fn run_merge(
+    job_tx: mpsc::Sender<openobserve_compactor::worker::MergeJob>,
+) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let jobs = infra_file_list::get_pending_jobs(
         &LOCAL_NODE.uuid,
@@ -340,7 +346,7 @@ pub async fn run_merge(job_tx: mpsc::Sender<worker::MergeJob>) -> Result<(), any
             }
         }
         // collect the merge jobs
-        merge_jobs.push(worker::MergeJob {
+        merge_jobs.push(openobserve_compactor::worker::MergeJob {
             org_id,
             stream_type,
             stream_name,
@@ -449,31 +455,4 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
-}
-
-pub(crate) fn is_past_hour(offset: i64) -> bool {
-    let time_now: DateTime<Utc> = Utc::now();
-    let time_now_hour = Utc
-        .with_ymd_and_hms(
-            time_now.year(),
-            time_now.month(),
-            time_now.day(),
-            time_now.hour(),
-            0,
-            0,
-        )
-        .unwrap()
-        .timestamp_micros();
-    // must wait for at least 3 * max_file_retention_time
-    // -- first period: the last hour local file upload to storage, write file list
-    // -- second period, the last hour file list upload to storage
-    // -- third period, we can do the merge, so, at least 3 times of
-    // max_file_retention_time
-    offset < time_now_hour
-        && time_now.timestamp_micros() - offset
-            > Duration::try_seconds(get_config().limit.max_file_retention_time as i64)
-                .unwrap()
-                .num_microseconds()
-                .unwrap()
-                * 3
 }

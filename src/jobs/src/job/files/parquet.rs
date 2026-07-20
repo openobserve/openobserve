@@ -22,6 +22,7 @@ use std::{
 use arrow_schema::Schema;
 use bytes::Bytes;
 use chrono::{Duration, Utc};
+use common::utils::schema_fields::generate_schema_for_defined_schema_fields;
 use config::{
     FxIndexMap, cluster, get_config,
     meta::{
@@ -68,7 +69,6 @@ use crate::{
     common::infra::wal,
     service::{
         db,
-        schema::generate_schema_for_defined_schema_fields,
         search::datafusion::{
             exec::TableBuilder,
             merge::{self, MergeParquetResult},

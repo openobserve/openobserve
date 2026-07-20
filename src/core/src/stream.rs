@@ -455,7 +455,7 @@ pub async fn save_stream_settings(
     // check for user defined schema
     if !settings.defined_schema_fields.is_empty() {
         // check fields with stream type
-        let fields = super::schema::check_schema_for_defined_schema_fields(
+        let fields = common::utils::schema_fields::check_schema_for_defined_schema_fields(
             stream_type,
             &schema,
             settings.defined_schema_fields.to_vec(),
