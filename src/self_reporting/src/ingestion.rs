@@ -13,13 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 #[cfg(feature = "cloud")]
 use config::meta::self_reporting::usage::{DATA_RETENTION_USAGE_STREAM, DataRetentionUsageData};
 use config::{
-    META_ORG_ID,
-    cluster::LOCAL_NODE,
-    get_config,
+    META_ORG_ID, get_config,
     meta::{
         search::SearchEventType,
         self_reporting::{
@@ -31,13 +29,9 @@ use config::{
     utils::json,
 };
 use hashbrown::{HashMap, hash_map::Entry};
-use proto::cluster_rpc;
+#[cfg(test)]
+use openobserve_ingestion::types::{IngestUser, IngestionRequest, SystemJobType};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
-
-use crate::{
-    common::meta::ingestion::{self, IngestUser, SystemJobType},
-    service,
-};
 
 pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {
@@ -56,16 +50,11 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     .search_event_context
                     .as_ref()
                     .map(|ctx| (&ctx.dashboard_id, &ctx.dashboard_name))
-                && let Ok((folder, dashboard)) =
-                    service::dashboards::get_folder_and_dashboard(&usage_data.org_id, dashboard_id)
-                        .await
+                && let Some((dashboard_name, folder_name, folder_id)) =
+                    crate::dashboard_context(&usage_data.org_id, dashboard_id).await
                 && let Some(ctx) = usage_data.search_event_context.as_mut()
             {
-                ctx.enrich_for_dashboard(
-                    dashboard.title().unwrap().to_string(),
-                    folder.name,
-                    folder.folder_id,
-                )
+                ctx.enrich_for_dashboard(dashboard_name, folder_name, folder_id)
             };
             search_events.push(usage_data.clone());
             continue;
@@ -242,7 +231,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                 // do not skip self-reporting even if super org reporting fails
 
                 // Check if org has usage stream enabled
-                match crate::db::organization::get_org_setting_usage_stream_enabled(&org).await {
+                match crate::usage_stream_enabled(&org).await {
                     Ok(true) => {}
                     Ok(false) => continue, // self-report not enabled, so skip
                     Err(e) => {
@@ -277,73 +266,7 @@ pub(super) async fn ingest_reporting_data(
         return Ok(());
     }
 
-    if LOCAL_NODE.is_ingester() {
-        // ingest directly for ingester node
-        let (org_id, stream_name): (String, String) = (
-            stream_params.org_id.into(),
-            stream_params.stream_name.into(),
-        );
-        let bytes = bytes::Bytes::from(json::to_string(&reporting_data_json).unwrap());
-        let req = ingestion::IngestionRequest::Usage(bytes);
-        match service::logs::ingest::ingest(
-            0,
-            &org_id,
-            &stream_name,
-            req,
-            IngestUser::SystemJob(SystemJobType::SelfReporting),
-            None,
-            false,
-        )
-        .await
-        {
-            Ok(resp) if resp.code == 200 => {
-                log::debug!(
-                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
-                );
-                Ok(())
-            }
-            error => {
-                let err =
-                    error.map_or_else(|e| e.to_string(), |resp| resp.error.unwrap_or_default());
-                log::error!(
-                    "[SELF-REPORTING] ReportingData errored while ingesting to stream {org_id}/{stream_name}. Error: {err}"
-                );
-                Err(anyhow!("{err}"))
-            }
-        }
-    } else {
-        // call gRPC ingestion service
-        let (org_id, stream_name, stream_type): (String, String, String) = (
-            stream_params.org_id.into(),
-            stream_params.stream_name.into(),
-            stream_params.stream_type.to_string(),
-        );
-
-        let req = cluster_rpc::IngestionRequest {
-            org_id: org_id.clone(),
-            stream_name: stream_name.clone(),
-            stream_type,
-            data: Some(cluster_rpc::IngestionData::from(reporting_data_json)),
-            ingestion_type: Some(cluster_rpc::IngestionType::Usage.into()),
-            metadata: None,
-        };
-
-        match service::ingestion::ingestion_service::ingest(req).await {
-            Ok(resp) if resp.status_code == 200 => {
-                log::debug!(
-                    "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"
-                );
-                Ok(())
-            }
-            error => {
-                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
-                log::error!(
-                    "[SELF-REPORTING] ReportingData errored while ingesting to stream {org_id}/{stream_name}. Error: {err}"
-                );
-                Err(anyhow!("{err}"))
-            }
-        }
-    }
+    crate::ingest_values(reporting_data_json, stream_params).await
 }
 
 #[cfg(feature = "cloud")]
@@ -941,7 +864,7 @@ mod tests {
         let bytes = bytes::Bytes::from(json::to_string(&report_data).unwrap());
 
         // This is the critical line: ingest_reporting_data creates Usage, NOT JSON
-        let req = ingestion::IngestionRequest::Usage(bytes);
+        let req = IngestionRequest::Usage(bytes);
         assert!(
             !req.should_report_usage(),
             "Usage ingestion request must not trigger usage reporting (circular reporting prevention)"
@@ -978,7 +901,7 @@ mod tests {
 
         // Both the _meta org ingestion and per-org ingestion use the same
         // ingest_reporting_data() which creates IngestionRequest::Usage
-        let req = ingestion::IngestionRequest::Usage(bytes);
+        let req = IngestionRequest::Usage(bytes);
         assert!(
             !req.should_report_usage(),
             "Per-org usage ingestion must not trigger usage reporting (circular reporting prevention)"

@@ -5,7 +5,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -13,197 +13,614 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
-use async_trait::async_trait;
-use config::meta::self_reporting::{
-    ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
-};
-use tokio::{
-    sync::{Mutex, mpsc},
-    time::{self, Duration},
+use std::{
+    sync::{Arc, OnceLock},
+    time::Duration,
 };
 
-/// Persistence boundary for batches produced by the self-reporting queue.
-///
-/// Implementations live in integration crates so queue processing does not
-/// depend on ingestion, schema, or database services.
-#[async_trait]
-pub trait BatchSink: Send + Sync + 'static {
-    async fn write(&self, worker_id: usize, batch: Vec<ReportingData>);
+use arrow_schema::Schema;
+use chrono::{DateTime, Datelike, Timelike};
+#[cfg(feature = "enterprise")]
+use config::META_ORG_ID;
+#[cfg(feature = "enterprise")]
+use config::spawn_pausable_job;
+use config::{
+    SIZE_IN_MB,
+    cluster::LOCAL_NODE,
+    get_config,
+    meta::{
+        self_reporting::{
+            EnqueueError, ReportingData,
+            error::ErrorData,
+            usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
+        },
+        stream::StreamType,
+    },
+    metrics,
+};
+#[cfg(feature = "enterprise")]
+pub use o2_enterprise::enterprise::common::auditor;
+#[cfg(feature = "enterprise")]
+use proto::cluster_rpc;
+use tokio::sync::oneshot;
+
+pub mod batch;
+#[cfg(feature = "cloud")]
+pub mod cloud_events;
+#[cfg(feature = "enterprise")]
+mod evaluator_schema;
+mod ingestion;
+#[cfg(feature = "enterprise")]
+mod llm_scores_schema;
+mod queues;
+pub mod search;
+mod triggers_schema;
+mod usage_schema;
+
+pub use batch::{BatchSink, create_reporting_queue};
+
+pub type PipelineErrors = Vec<(
+    String,
+    String,
+    String,
+    i64,
+    config::meta::self_reporting::error::PipelineError,
+)>;
+
+#[async_trait::async_trait]
+pub trait Runtime: Send + Sync {
+    async fn ingest_values(
+        &self,
+        values: Vec<config::utils::json::Value>,
+        stream: config::meta::stream::StreamParams,
+    ) -> anyhow::Result<()>;
+
+    #[cfg(feature = "enterprise")]
+    async fn ingest_request(
+        &self,
+        request: proto::cluster_rpc::IngestionRequest,
+    ) -> infra::errors::Result<proto::cluster_rpc::IngestionResponse>;
+
+    async fn dashboard_context(
+        &self,
+        org_id: &str,
+        dashboard_id: &str,
+    ) -> Option<(String, String, String)>;
+
+    async fn usage_stream_enabled(&self, org_id: &str) -> infra::errors::Result<bool>;
+
+    async fn merge_schema(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        schema: &Schema,
+        min_ts: Option<i64>,
+    ) -> anyhow::Result<()>;
+
+    async fn batch_upsert_pipeline_errors(
+        &self,
+        errors: PipelineErrors,
+    ) -> infra::errors::Result<()>;
+
+    #[cfg(feature = "cloud")]
+    async fn org_in_free_trial(&self, org_id: &str) -> anyhow::Result<bool>;
 }
 
-/// Creates a bounded reporting queue and starts its batch workers.
-pub fn create_reporting_queue(
-    publish_interval: u64,
-    batch_size: usize,
-    worker_count: usize,
-    sink: Arc<dyn BatchSink>,
-) -> ReportingQueue {
-    let timeout = Duration::from_secs(publish_interval);
-    let channel_capacity = batch_size * std::cmp::max(2, worker_count);
-    let (msg_sender, msg_receiver) = mpsc::channel::<ReportingMessage>(channel_capacity);
-    let msg_receiver = Arc::new(Mutex::new(msg_receiver));
+static RUNTIME: OnceLock<Arc<dyn Runtime>> = OnceLock::new();
 
-    for worker_id in 0..worker_count {
-        tokio::task::spawn(run_worker(
-            worker_id,
-            Arc::clone(&msg_receiver),
-            batch_size,
-            timeout,
-            Arc::clone(&sink),
-        ));
+pub fn install_runtime(runtime: Arc<dyn Runtime>) -> Result<(), &'static str> {
+    RUNTIME
+        .set(runtime)
+        .map_err(|_| "self-reporting runtime is already installed")
+}
+
+fn runtime() -> anyhow::Result<&'static Arc<dyn Runtime>> {
+    RUNTIME
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("self-reporting runtime is not installed"))
+}
+
+async fn ingest_values(
+    values: Vec<config::utils::json::Value>,
+    stream: config::meta::stream::StreamParams,
+) -> anyhow::Result<()> {
+    runtime()?.ingest_values(values, stream).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn ingest_request(
+    request: proto::cluster_rpc::IngestionRequest,
+) -> infra::errors::Result<proto::cluster_rpc::IngestionResponse> {
+    let runtime = RUNTIME.get().ok_or_else(|| {
+        infra::errors::Error::Message("self-reporting runtime is not installed".to_string())
+    })?;
+    runtime.ingest_request(request).await
+}
+
+async fn dashboard_context(org_id: &str, dashboard_id: &str) -> Option<(String, String, String)> {
+    match RUNTIME.get() {
+        Some(runtime) => runtime.dashboard_context(org_id, dashboard_id).await,
+        None => None,
     }
-
-    ReportingQueue::new(msg_sender)
 }
 
-async fn run_worker(
-    worker_id: usize,
-    msg_receiver: Arc<Mutex<mpsc::Receiver<ReportingMessage>>>,
-    batch_size: usize,
-    timeout: Duration,
-    sink: Arc<dyn BatchSink>,
-) {
-    log::debug!("[SELF-REPORTING] worker_{worker_id} starts waiting for reporting messages");
-    let mut reporting_runner = ReportingRunner::new(batch_size, timeout);
-    let mut interval = time::interval(timeout);
+async fn usage_stream_enabled(org_id: &str) -> infra::errors::Result<bool> {
+    let runtime = RUNTIME.get().ok_or_else(|| {
+        infra::errors::Error::Message("self-reporting runtime is not installed".to_string())
+    })?;
+    runtime.usage_stream_enabled(org_id).await
+}
 
-    loop {
-        let mut msg_receiver = msg_receiver.lock().await;
-        tokio::select! {
-            msg = msg_receiver.recv() => {
-                match msg {
-                    Some(ReportingMessage::Start(start_sender)) => {
-                        log::debug!("[SELF-REPORTING] worker_{worker_id} received starting ping");
-                        start_sender.send(()).ok();
-                    }
-                    Some(ReportingMessage::Shutdown(res_sender)) => {
-                        log::debug!("[SELF-REPORTING] worker_{worker_id} received shutdown ping");
-                        flush(worker_id, &mut reporting_runner, sink.as_ref()).await;
-                        res_sender.send(()).ok();
-                        break;
-                    }
-                    Some(ReportingMessage::Data(reporting_data)) => {
-                        reporting_runner.push(reporting_data);
-                        update_queue_depth_metric_for_runner(&reporting_runner);
-                        if reporting_runner.should_process() {
-                            flush(worker_id, &mut reporting_runner, sink.as_ref()).await;
-                        }
-                    }
-                    None => break,
-                }
-            }
-            _ = interval.tick() => {
-                if reporting_runner.should_process() {
-                    flush(worker_id, &mut reporting_runner, sink.as_ref()).await;
-                }
-            }
+async fn merge_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    schema: &Schema,
+    min_ts: Option<i64>,
+) -> anyhow::Result<()> {
+    runtime()?
+        .merge_schema(org_id, stream_name, stream_type, schema, min_ts)
+        .await
+}
+
+async fn batch_upsert_pipeline_errors(errors: PipelineErrors) -> infra::errors::Result<()> {
+    let runtime = RUNTIME.get().ok_or_else(|| {
+        infra::errors::Error::Message("self-reporting runtime is not installed".to_string())
+    })?;
+    runtime.batch_upsert_pipeline_errors(errors).await
+}
+
+#[cfg(feature = "cloud")]
+async fn org_in_free_trial(org_id: &str) -> anyhow::Result<bool> {
+    runtime()?.org_in_free_trial(org_id).await
+}
+
+#[cfg(feature = "enterprise")]
+pub use evaluator_schema::ensure_evaluator_stream_initialized;
+#[cfg(feature = "cloud")]
+pub use ingestion::ingest_data_retention_usages;
+#[cfg(feature = "enterprise")]
+pub use llm_scores_schema::ensure_llm_scores_stream_initialized;
+
+pub async fn run() {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            return;
         }
     }
-}
 
-async fn flush(worker_id: usize, runner: &mut ReportingRunner, sink: &dyn BatchSink) {
-    if runner.pending.is_empty() {
+    // Force initialization usage queue
+    let (usage_start_sender, usage_start_receiver) = oneshot::channel();
+    if let Err(e) = queues::USAGE_QUEUE.start(usage_start_sender).await {
+        log::error!("[SELF-REPORTING] Failed to initialize usage queue: {e}");
         return;
     }
 
-    let batch = runner.take_batch();
-    update_queue_depth_metrics(&batch);
-    sink.write(worker_id, batch).await;
+    if let Err(e) = usage_start_receiver.await {
+        log::error!("[SELF-REPORTING] Usage queue initialization failed: {e}");
+        return;
+    }
+
+    // Force initialization error queue
+    let (error_start_sender, error_start_receiver) = oneshot::channel();
+    if let Err(e) = queues::ERROR_QUEUE.start(error_start_sender).await {
+        log::error!("[SELF-REPORTING] Failed to initialize error queue: {e}");
+        return;
+    }
+
+    if let Err(e) = error_start_receiver.await {
+        log::error!("[SELF-REPORTING] Error queue initialization failed: {e}");
+        return;
+    }
+
+    log::debug!("[SELF-REPORTING] successfully initialized reporting queues");
 }
 
-fn update_queue_depth_metric_for_runner(runner: &ReportingRunner) {
-    let (usage_count, error_count) = count_data_types(&runner.pending);
-    config::metrics::SELF_REPORTING_QUEUE_DEPTH
-        .with_label_values(&["usage"])
-        .set(usage_count);
-    config::metrics::SELF_REPORTING_QUEUE_DEPTH
-        .with_label_values(&["error"])
-        .set(error_count);
-}
+pub async fn report_request_usage_stats(
+    stats: RequestStats,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    usage_type: UsageType,
+    num_functions: u16,
+    timestamp: i64,
+) {
+    let event: UsageEvent = usage_type.into();
+    if matches!(event, UsageEvent::Ingestion) {
+        metrics::INGEST_RECORDS
+            .with_label_values(&[org_id, stream_type.as_str()])
+            .inc_by(stats.records as u64);
+        metrics::INGEST_BYTES
+            .with_label_values(&[org_id, stream_type.as_str()])
+            .inc_by((stats.size * SIZE_IN_MB) as u64);
+    }
 
-fn update_queue_depth_metrics(batch: &[ReportingData]) {
-    let (usage_count, error_count) = count_data_types(batch);
-    config::metrics::SELF_REPORTING_QUEUE_DEPTH
-        .with_label_values(&["usage"])
-        .sub(usage_count);
-    config::metrics::SELF_REPORTING_QUEUE_DEPTH
-        .with_label_values(&["error"])
-        .sub(error_count);
-}
+    #[cfg(not(feature = "enterprise"))]
+    if !get_config().common.usage_enabled {
+        return;
+    }
 
-fn count_data_types(batch: &[ReportingData]) -> (i64, i64) {
-    batch
-        .iter()
-        .fold((0, 0), |(usage, error), data| match data {
-            ReportingData::Usage(_) | ReportingData::Trigger(_) => (usage + 1, error),
-            ReportingData::Error(_) => (usage, error + 1),
-        })
-}
+    let now = DateTime::from_timestamp_micros(timestamp).unwrap();
+    let request_body = stats.request_body.unwrap_or(usage_type.to_string());
+    let user_email = stats.user_email.unwrap_or("".to_owned());
 
-#[cfg(test)]
-mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    let mut usage = vec![];
 
-    use config::meta::self_reporting::{
-        ReportingData,
-        usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+    if num_functions > 0 {
+        usage.push(UsageData {
+            _timestamp: timestamp,
+            event: UsageEvent::Functions,
+            day: now.day(),
+            hour: now.hour(),
+            month: now.month(),
+            year: now.year(),
+            event_time_hour: format!(
+                "{:04}{:02}{:02}{:02}",
+                now.year(),
+                now.month(),
+                now.day(),
+                now.hour()
+            ),
+            org_id: org_id.to_owned(),
+            request_body: request_body.to_owned(),
+            function: None,
+            size: stats.size,
+            scan_files: stats.scan_files,
+            unit: "MB".to_owned(),
+            user_email: user_email.to_owned(),
+            response_time: stats.response_time,
+            num_records: stats.records * num_functions as i64,
+            dropped_records: stats.dropped_records,
+            stream_type,
+            stream_name: stream_name.to_owned(),
+            min_ts: None,
+            max_ts: None,
+            cached_ratio: None,
+            compressed_size: None,
+            search_type: stats.search_type,
+            search_event_context: stats.search_event_context.clone(),
+            trace_id: None,
+            took_wait_in_queue: stats.took_wait_in_queue,
+            result_cache_ratio: None,
+            is_partial: stats.is_partial,
+            work_group: None,
+            node_name: stats.node_name.clone(),
+            dashboard_info: stats.dashboard_info.clone(),
+            peak_memory_usage: stats.peak_memory_usage,
+        });
     };
-    use tokio::sync::oneshot;
 
-    use super::*;
+    usage.push(UsageData {
+        _timestamp: timestamp,
+        event,
+        day: now.day(),
+        hour: now.hour(),
+        month: now.month(),
+        year: now.year(),
+        event_time_hour: format!(
+            "{:04}{:02}{:02}{:02}",
+            now.year(),
+            now.month(),
+            now.day(),
+            now.hour()
+        ),
+        org_id: org_id.to_owned(),
+        request_body: request_body.to_owned(),
+        size: if matches!(
+            event,
+            UsageEvent::NewIncident | UsageEvent::IncidentReAnalysis
+        ) {
+            stats.records as f64
+        } else {
+            stats.size
+        },
+        scan_files: stats.scan_files,
+        unit: if matches!(
+            event,
+            UsageEvent::NewIncident | UsageEvent::IncidentReAnalysis
+        ) {
+            "Count".to_owned()
+        } else {
+            "MB".to_owned()
+        },
+        user_email,
+        response_time: stats.response_time,
+        function: stats.function,
+        num_records: stats.records,
+        dropped_records: stats.dropped_records,
+        stream_type,
+        stream_name: stream_name.to_owned(),
+        min_ts: stats.min_ts,
+        max_ts: stats.max_ts,
+        cached_ratio: stats.cached_ratio,
+        compressed_size: None,
+        search_type: stats.search_type,
+        search_event_context: stats.search_event_context.clone(),
+        trace_id: stats.trace_id,
+        took_wait_in_queue: stats.took_wait_in_queue,
+        result_cache_ratio: stats.result_cache_ratio,
+        is_partial: stats.is_partial,
+        work_group: stats.work_group,
+        node_name: stats.node_name,
+        dashboard_info: stats.dashboard_info,
+        peak_memory_usage: stats.peak_memory_usage,
+    });
+    if !usage.is_empty() {
+        report_usage(usage);
+    }
+}
 
-    struct CountingSink(AtomicUsize);
+/// Public entry point for publishing usage data from other services
+/// (e.g. AI credits billing). Enqueues UsageData records for background
+/// ingestion into the _usage stream.
+pub fn report_usage(usages: Vec<UsageData>) {
+    tokio::spawn(publish_usage(usages));
+}
 
-    #[async_trait]
-    impl BatchSink for CountingSink {
-        async fn write(&self, _worker_id: usize, batch: Vec<ReportingData>) {
-            self.0.fetch_add(batch.len(), Ordering::SeqCst);
+async fn publish_usage(usages: Vec<UsageData>) {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            return;
         }
     }
 
-    fn trigger() -> ReportingData {
-        ReportingData::Trigger(Box::new(TriggerData {
-            _timestamp: 1,
-            org: "test-org".to_string(),
-            module: TriggerDataType::Report,
-            key: "test-key".to_string(),
-            next_run_at: 1,
-            is_realtime: false,
-            is_silenced: false,
-            status: TriggerDataStatus::Completed,
-            start_time: 1,
-            end_time: 1,
-            retries: 0,
-            skipped_alerts_count: None,
-            error: None,
-            success_response: None,
-            is_partial: None,
-            delay_in_secs: None,
-            evaluation_took_in_secs: None,
-            source_node: None,
-            query_took: None,
-            scheduler_trace_id: None,
-            time_in_queue_ms: None,
-            dedup_enabled: None,
-            dedup_suppressed: None,
-            dedup_count: None,
-            grouped: None,
-            group_size: None,
-        }))
+    for usage in usages {
+        if let Err(e) = queues::USAGE_QUEUE
+            .enqueue(ReportingData::Usage(Box::new(usage)))
+            .await
+        {
+            log::error!(
+                "[SELF-REPORTING] Failed to send usage data to background ingesting job: {e}"
+            );
+        }
+    }
+}
+
+pub fn publish_triggers_usage(trigger: TriggerData) {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            log::debug!(
+                "[SELF-REPORTING] Skipping trigger usage publish - usage reporting disabled"
+            );
+            return;
+        }
     }
 
-    #[tokio::test]
-    async fn flushes_pending_data_through_sink_on_shutdown() {
-        let sink = Arc::new(CountingSink(AtomicUsize::new(0)));
-        let queue = create_reporting_queue(60, 10, 1, sink.clone());
-        queue.enqueue(trigger()).await.unwrap();
+    log::debug!(
+        "[SELF-REPORTING] Publishing trigger usage: org={}, module={:?}, key={}, status={:?}",
+        trigger.org,
+        trigger.module,
+        trigger.key,
+        trigger.status
+    );
 
-        let (shutdown_sender, shutdown_receiver) = oneshot::channel();
-        queue.shutdown(shutdown_sender).await.unwrap();
-        shutdown_receiver.await.unwrap();
+    // Use non-blocking try_enqueue to prevent scheduler blocking
+    match queues::USAGE_QUEUE.try_enqueue(ReportingData::Trigger(Box::new(trigger))) {
+        Ok(()) => {
+            log::debug!(
+                "[SELF-REPORTING] Successfully queued trigger usage data to be ingested (non-blocking)"
+            )
+        }
+        Err(tokio::sync::mpsc::error::TrySendError::Full(msg)) => {
+            // Queue is full - system is overloaded, drop the trigger data
+            let dropped_info = match msg {
+                config::meta::self_reporting::ReportingMessage::Data(ReportingData::Trigger(t)) => {
+                    Some((t.org.clone(), t.key.clone()))
+                }
+                _ => None,
+            };
 
-        assert_eq!(sink.0.load(Ordering::SeqCst), 1);
+            if let Some((org, key)) = dropped_info {
+                log::warn!(
+                    "[SELF-REPORTING] Usage queue full, dropping trigger data for org={}, key={}. \
+                     System is overloaded. Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE.",
+                    org,
+                    key
+                );
+            } else {
+                log::warn!(
+                    "[SELF-REPORTING] Usage queue full, dropping trigger data. \
+                     System is overloaded. Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE."
+                );
+            }
+
+            // Increment dropped triggers metric
+            metrics::SELF_REPORTING_DROPPED_TRIGGERS
+                .with_label_values(&["usage"])
+                .inc();
+        }
+        Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+            log::error!(
+                "[SELF-REPORTING] Usage queue closed, cannot send trigger data. \
+                 Self-reporting service may have shut down."
+            );
+        }
     }
+}
+
+pub async fn publish_error(error_data: ErrorData) {
+    let cfg = get_config();
+    #[cfg(not(feature = "enterprise"))]
+    {
+        if !cfg.common.usage_enabled {
+            log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
+            return;
+        }
+    }
+
+    // Important data - use shorter timeout than usage to prevent indefinite blocking
+    let timeout_duration = Duration::from_secs(cfg.common.error_publish_timeout_secs);
+
+    // Extract org for logging
+    let org = error_data.stream_params.org_id.clone();
+    let error_source = match &error_data.error_source {
+        config::meta::self_reporting::error::ErrorSource::Alert => "Alert",
+        config::meta::self_reporting::error::ErrorSource::Dashboard => "Dashboard",
+        config::meta::self_reporting::error::ErrorSource::Function(_) => "Function",
+        config::meta::self_reporting::error::ErrorSource::Ingestion => "Ingestion",
+        config::meta::self_reporting::error::ErrorSource::Pipeline(_) => "Pipeline",
+        config::meta::self_reporting::error::ErrorSource::Search => "Search",
+        config::meta::self_reporting::error::ErrorSource::Other => "Other",
+        config::meta::self_reporting::error::ErrorSource::SsoClaimParser(_) => "SsoClaimParser",
+        config::meta::self_reporting::error::ErrorSource::OrgStorage(_) => "OrgStorage",
+    };
+
+    log::debug!(
+        "[SELF-REPORTING] Publishing error data: org={}, source={}, timeout={:?}",
+        org,
+        error_source,
+        timeout_duration
+    );
+
+    let start = std::time::Instant::now();
+    match queues::ERROR_QUEUE
+        .enqueue_with_timeout(ReportingData::Error(Box::new(error_data)), timeout_duration)
+        .await
+    {
+        Ok(()) => {
+            let elapsed = start.elapsed();
+            log::debug!(
+                "[SELF-REPORTING] Successfully queued error data to be ingested (took {:?}, timeout-based)",
+                elapsed
+            );
+        }
+        Err(EnqueueError::Timeout) => {
+            log::warn!(
+                "[SELF-REPORTING] Timeout ({:?}) queueing error data for org={}, source={}. \
+                 System overloaded, error reporting degraded. \
+                 Consider increasing ZO_USAGE_REPORTING_THREAD_NUM or ZO_USAGE_BATCH_SIZE.",
+                timeout_duration,
+                org,
+                error_source
+            );
+            metrics::SELF_REPORTING_TIMEOUT_ERRORS
+                .with_label_values(&["error"])
+                .inc();
+        }
+        Err(EnqueueError::SendFailed(e)) => {
+            log::error!(
+                "[SELF-REPORTING] Failed to send error data for org={}, source={}: {e}",
+                org,
+                error_source
+            );
+        }
+    }
+}
+
+pub async fn flush() {
+    // flush audit data
+    #[cfg(feature = "enterprise")]
+    flush_audit().await;
+
+    let cfg = get_config();
+
+    #[cfg(feature = "enterprise")]
+    let usage_enabled = true;
+    #[cfg(not(feature = "enterprise"))]
+    let usage_enabled = cfg.common.usage_enabled;
+
+    // only ingester and querier nodes report usage
+    if !usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
+        return;
+    }
+
+    // shutdown usage_queuer
+    for _ in 0..cfg.limit.usage_reporting_thread_num {
+        let (res_sender, res_receiver) = oneshot::channel();
+        if let Err(e) = queues::USAGE_QUEUE.shutdown(res_sender).await {
+            log::error!("[SELF-REPORTING] Error shutting down USAGE_QUEUER: {e}");
+        }
+        // wait for flush ingestion job
+        res_receiver.await.ok();
+
+        let (error_sender, error_receiver) = oneshot::channel();
+        if let Err(e) = queues::ERROR_QUEUE.shutdown(error_sender).await {
+            log::error!("[SELF-REPORTING] Error shutting down ERROR_QUEUE: {e}");
+        }
+        // wait for flush ingestion job
+        error_receiver.await.ok();
+    }
+}
+
+// Cron job to frequently publish auditted events
+#[cfg(feature = "enterprise")]
+pub fn run_audit_publish() -> Option<tokio::task::JoinHandle<()>> {
+    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
+    if !o2cfg.common.audit_enabled {
+        return None;
+    }
+
+    Some(spawn_pausable_job!(
+        "audit_publish",
+        o2cfg.common.audit_publish_interval,
+        {
+            log::debug!("Audit ingestion loop running");
+            o2_enterprise::enterprise::common::auditor::publish_existing_audits(
+                META_ORG_ID,
+                publish_audit,
+            )
+            .await;
+        },
+        pause_if: o2cfg.common.audit_publish_interval == 0 || !o2_enterprise::enterprise::common::config::get_config().common.audit_enabled
+    ))
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn audit(msg: auditor::AuditMessage) {
+    auditor::audit(META_ORG_ID, msg, publish_audit).await;
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn flush_audit() {
+    auditor::flush_audit(META_ORG_ID, publish_audit).await;
+}
+
+#[cfg(feature = "enterprise")]
+async fn publish_audit(
+    req: cluster_rpc::IngestionRequest,
+) -> Result<cluster_rpc::IngestionResponse, anyhow::Error> {
+    crate::ingest_request(req)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
+}
+
+#[inline]
+pub fn http_report_metrics(
+    start: std::time::Instant,
+    org_id: &str,
+    stream_type: StreamType,
+    code: &str,
+    uri: &str,
+    search_type: &str,
+    search_group: &str,
+) {
+    let time = start.elapsed().as_secs_f64();
+    let uri = format!("/api/org/{uri}");
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            uri.as_str(),
+            code,
+            org_id,
+            stream_type.as_str(),
+            search_type,
+            search_group,
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            uri.as_str(),
+            code,
+            org_id,
+            stream_type.as_str(),
+            search_type,
+            search_group,
+        ])
+        .inc();
 }

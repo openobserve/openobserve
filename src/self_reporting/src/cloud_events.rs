@@ -6,8 +6,6 @@ use proto::cluster_rpc;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::ingestion::ingestion_service;
-
 const CLOUD_EVENT_STREAM: &str = "cloud_events";
 
 #[derive(Serialize, Deserialize, Debug, Hash)]
@@ -116,7 +114,7 @@ async fn _inner_flush() {
             metadata: None,
         };
 
-        match ingestion_service::ingest(req).await {
+        match crate::ingest_request(req).await {
             Ok(_) => {}
             Err(e) => {
                 log::error!("error in reporting cloud events :{e}");

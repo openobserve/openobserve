@@ -132,7 +132,8 @@ pub mod search_jobs {
         delete_jobs, delete_org_result_files, delete_result, get_result, merge_response,
     };
 }
-pub mod self_reporting;
+pub use openobserve_self_reporting as self_reporting;
+mod self_reporting_adapter;
 mod service;
 pub mod session;
 pub mod short_url {
@@ -153,7 +154,6 @@ pub mod users;
 mod common {
     pub mod meta {
         pub use ::common::meta::*;
-        pub use openobserve_ingestion::types as ingestion;
     }
 
     pub mod infra {

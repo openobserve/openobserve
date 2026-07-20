@@ -30,6 +30,7 @@ enterprise = [
     "openobserve-dashboards/enterprise",
     "openobserve-reports/enterprise",
     "openobserve-search-service/enterprise",
+    "openobserve-self-reporting/enterprise",
 ]
 cloud = [
     "infra/cloud",
@@ -37,6 +38,7 @@ cloud = [
     "o2_enterprise/cloud",
     "common/cloud",
     "openobserve-alerts/cloud",
+    "openobserve-self-reporting/cloud",
 ]
 vectorscan = [
     "o2_enterprise/vectorscan",

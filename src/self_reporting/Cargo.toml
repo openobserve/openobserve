@@ -10,9 +10,33 @@ path = "src/lib.rs"
 
 [features]
 default = []
+enterprise = [
+    "config/enterprise",
+    "dep:o2_enterprise",
+    "openobserve-search-service/enterprise",
+]
+cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-search-service/cloud"]
 
 [dependencies]
+anyhow.workspace = true
+arrow-schema.workspace = true
 async-trait.workspace = true
+bytes.workspace = true
+chrono.workspace = true
 config.workspace = true
+dashmap.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
 log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+openobserve-search-service.workspace = true
+proto.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
+tonic.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+openobserve-ingestion.workspace = true

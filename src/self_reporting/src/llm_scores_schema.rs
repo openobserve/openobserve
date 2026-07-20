@@ -69,7 +69,7 @@ async fn initialize_llm_scores_stream_schema(org_id: &str) -> Result<()> {
         return Ok(());
     }
 
-    match crate::db::schema::merge(
+    match crate::merge_schema(
         org_id,
         stream_name,
         stream_type,

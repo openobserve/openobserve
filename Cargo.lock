@@ -7195,10 +7195,26 @@ dependencies = [
 name = "openobserve-self-reporting"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "arrow-schema",
  "async-trait",
+ "bytes",
+ "chrono",
  "config",
+ "dashmap",
+ "hashbrown 0.16.1",
+ "infra",
  "log",
+ "o2_enterprise",
+ "openobserve-ingestion",
+ "openobserve-search-service",
+ "proto",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
  "tokio",
+ "tonic",
+ "url",
 ]
 
 [[package]]

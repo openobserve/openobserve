@@ -29,9 +29,6 @@ use config::{
 };
 use hashbrown::HashMap;
 
-#[cfg(feature = "cloud")]
-use crate::organization;
-
 pub(super) static USAGE_QUEUE: Lazy<Arc<ReportingQueue>> =
     Lazy::new(|| Arc::new(initialize_usage_queue()));
 
@@ -49,7 +46,7 @@ fn create_reporting_queue(
     batch_size: usize,
     thread_num: usize,
 ) -> ReportingQueue {
-    openobserve_self_reporting::create_reporting_queue(
+    crate::batch::create_reporting_queue(
         publish_interval,
         batch_size,
         thread_num,
@@ -60,7 +57,7 @@ fn create_reporting_queue(
 struct CoreReportingSink;
 
 #[async_trait]
-impl openobserve_self_reporting::BatchSink for CoreReportingSink {
+impl crate::batch::BatchSink for CoreReportingSink {
     async fn write(&self, worker_id: usize, batch: Vec<ReportingData>) {
         ingest_buffered_data(worker_id, batch).await;
     }
@@ -205,7 +202,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             if let Ok(trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
                 let org_id = &trigger.org;
                 #[cfg(feature = "cloud")]
-                match organization::is_org_in_free_trial_period(org_id).await {
+                match crate::org_in_free_trial(org_id).await {
                     Ok(ongoing) => {
                         if !ongoing {
                             continue;
@@ -273,7 +270,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                 "[SELF-REPORTING] thread_{thread_id} batch upserting {} pipeline errors to DB",
                 pipeline_errors.len()
             );
-            if let Err(e) = crate::db::pipeline_errors::batch_upsert(pipeline_errors).await {
+            if let Err(e) = crate::batch_upsert_pipeline_errors(pipeline_errors).await {
                 log::error!(
                     "[SELF-REPORTING] thread_{thread_id} failed to batch upsert pipeline errors to DB: {e}"
                 );
