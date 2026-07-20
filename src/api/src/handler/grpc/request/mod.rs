@@ -18,6 +18,6 @@ pub mod ingest;
 pub mod logs;
 pub mod metrics;
 pub mod query_cache;
-pub use openobserve_core::search::grpc_server as search;
+pub use openobserve_search_service::grpc_server as search;
 pub mod stream;
 pub mod traces;

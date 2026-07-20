@@ -56,10 +56,10 @@ use openobserve::{
     job, migration, router,
 };
 use openobserve_core::{
-    bootstrap, cluster_info::ClusterInfoService, db, metadata, node::NodeService,
-    search::SEARCH_SERVER, self_reporting,
+    bootstrap, cluster_info::ClusterInfoService, db, metadata, node::NodeService, self_reporting,
 };
 use openobserve_scheduler::TriggerModule::QueryRecommendations;
+use openobserve_search_service::SEARCH_SERVER;
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
 use opentelemetry_proto::tonic::collector::{
@@ -117,6 +117,11 @@ async fn main() -> Result<(), anyhow::Error> {
     if cli::cli().await? {
         return Ok(());
     }
+
+    openobserve_search_service::install_grpc_runtime(std::sync::Arc::new(
+        openobserve_core::search::CoreSearchRuntime,
+    ))
+    .map_err(anyhow::Error::msg)?;
 
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()

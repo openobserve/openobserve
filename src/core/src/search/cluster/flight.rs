@@ -44,9 +44,9 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::search::SEARCH_SERVER,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::{WorkGroup, admission},
+    openobserve_search_service::SEARCH_SERVER,
 };
 
 use crate::{
@@ -204,7 +204,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         .with_label_values(&[&req.org_id])
         .inc();
 
-    let _lock = crate::search::work_group::acquire_work_group_lock(
+    let _lock = openobserve_search_service::work_group::acquire_work_group_lock(
         trace_id,
         &req,
         &mut took_watch,

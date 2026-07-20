@@ -18,11 +18,78 @@
 //! The DataFusion query engine remains in `search`; application composition
 //! stays in `openobserve-core` and is injected through narrow ports.
 
+use std::sync::{Arc, LazyLock, OnceLock};
+
+use config::meta::{search, stream::StreamType};
+use infra::errors::Error;
+
 pub mod cache;
 pub mod cardinality;
+pub mod grpc_server;
 #[cfg(feature = "enterprise")]
 pub mod jobs;
 pub mod partition;
 pub mod promql;
 pub mod repository;
+mod searcher;
 pub mod streaming;
+pub mod work_group;
+
+pub use searcher::Searcher;
+
+pub static SEARCH_SERVER: LazyLock<Searcher> = LazyLock::new(Searcher::new);
+
+#[async_trait::async_trait]
+pub trait GrpcRuntime: Send + Sync {
+    async fn cached_search(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        user_id: Option<String>,
+        req: &search::Request,
+    ) -> Result<search::Response, Error>;
+
+    async fn search_multi(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        user_id: Option<String>,
+        req: &search::MultiStreamRequest,
+    ) -> Result<search::Response, Error>;
+
+    async fn search_partition(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        user_id: Option<&str>,
+        stream_type: StreamType,
+        req: &search::SearchPartitionRequest,
+        skip_max_query_range: bool,
+        use_cache: bool,
+    ) -> Result<search::SearchPartitionResponse, Error>;
+
+    async fn cancel_query(
+        &self,
+        org_id: &str,
+        trace_id: &str,
+    ) -> Result<search::CancelQueryResponse, Error>;
+
+    #[cfg(feature = "enterprise")]
+    async fn enrich_query_status(&self, status: &mut [proto::cluster_rpc::QueryStatus]);
+}
+
+static GRPC_RUNTIME: OnceLock<Arc<dyn GrpcRuntime>> = OnceLock::new();
+
+pub fn install_grpc_runtime(runtime: Arc<dyn GrpcRuntime>) -> Result<(), &'static str> {
+    GRPC_RUNTIME
+        .set(runtime)
+        .map_err(|_| "search gRPC runtime is already installed")
+}
+
+fn grpc_runtime() -> Result<&'static Arc<dyn GrpcRuntime>, tonic::Status> {
+    GRPC_RUNTIME
+        .get()
+        .ok_or_else(|| tonic::Status::failed_precondition("search gRPC runtime is not installed"))
+}

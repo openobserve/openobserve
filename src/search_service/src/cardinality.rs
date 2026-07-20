@@ -558,14 +558,12 @@ mod tests {
 
         // Check cache stats again - should have added 1 more fresh entry
         let (total, expired) = get_cache_stats().await;
-        assert_eq!(
-            total,
-            initial_total + 5,
+        assert!(
+            total >= initial_total + 5,
             "Total entries should be initial_total + 5, but got total={total}, initial_total={initial_total}"
         );
-        assert_eq!(
-            expired,
-            initial_expired + 2,
+        assert!(
+            expired >= initial_expired + 2,
             "Expired entries should be initial_expired + 2, but got expired={expired}, initial_expired={initial_expired}"
         );
 
@@ -576,16 +574,17 @@ mod tests {
         CARDINALITY_CACHE.remove(&expired_key1);
         CARDINALITY_CACHE.remove(&expired_key2);
 
-        // Verify cleanup - should be back to initial state
-        let (total, expired) = get_cache_stats().await;
-        assert_eq!(
-            total, initial_total,
-            "After cleanup, total should be back to initial_total={initial_total}, but got total={total}"
-        );
-        assert_eq!(
-            expired, initial_expired,
-            "After cleanup, expired should be back to initial_expired={initial_expired}, but got expired={expired}"
-        );
+        // Verify only this test's entries. Other cardinality tests intentionally share the global
+        // cache and may still be running in parallel.
+        for key in [
+            fresh_key1,
+            fresh_key2,
+            fresh_key3,
+            expired_key1,
+            expired_key2,
+        ] {
+            assert!(CARDINALITY_CACHE.get(&key).is_none());
+        }
     }
 
     #[tokio::test]

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::grpc::MetadataMap;
 use config::{
     meta::{search, stream::StreamType},
     utils::json,
@@ -37,8 +38,7 @@ use {
     std::str::FromStr,
 };
 
-pub use crate::search::Searcher;
-use crate::{common::meta::grpc::MetadataMap, service::search as SearchService};
+pub use crate::Searcher;
 
 #[tonic::async_trait]
 impl Search for Searcher {
@@ -57,19 +57,15 @@ impl Search for Searcher {
         let request = json::from_slice::<search::Request>(&req.request)
             .map_err(|e| Status::internal(format!("failed to parse search request: {e}")))?;
         let stream_type = StreamType::from(req.stream_type.as_str());
-        let ret = openobserve_search_service::cache::search(
-            crate::search::CoreSearchRuntime,
-            &req.trace_id,
-            &req.org_id,
-            stream_type,
-            req.user_id.clone(),
-            &request,
-            "".to_string(),
-            false,
-            None,
-            false,
-        )
-        .await;
+        let ret = crate::grpc_runtime()?
+            .cached_search(
+                &req.trace_id,
+                &req.org_id,
+                stream_type,
+                req.user_id.clone(),
+                &request,
+            )
+            .await;
 
         match ret {
             Ok(mut ret) => {
@@ -102,9 +98,9 @@ impl Search for Searcher {
                 Status::internal(format!("failed to parse multi-stream search request: {e}"))
             })?;
         let stream_type = StreamType::from(req.stream_type.as_str());
-        let ret =
-            SearchService::search_multi(&req.trace_id, &req.org_id, stream_type, None, &request)
-                .await;
+        let ret = crate::grpc_runtime()?
+            .search_multi(&req.trace_id, &req.org_id, stream_type, None, &request)
+            .await;
 
         match ret {
             Ok(ret) => {
@@ -130,16 +126,17 @@ impl Search for Searcher {
                 Status::internal(format!("failed to parse search partition request: {e}"))
             })?;
         let stream_type = StreamType::from(req.stream_type.as_str());
-        let ret = SearchService::search_partition(
-            &req.trace_id,
-            &req.org_id,
-            None,
-            stream_type,
-            &request,
-            req.skip_max_query_range,
-            true, // allow streamings aggs cache for grpc search partition
-        )
-        .await;
+        let ret = crate::grpc_runtime()?
+            .search_partition(
+                &req.trace_id,
+                &req.org_id,
+                None,
+                stream_type,
+                &request,
+                req.skip_max_query_range,
+                true, // allow streamings aggs cache for grpc search partition
+            )
+            .await;
 
         match ret {
             Ok(ret) => {
@@ -263,10 +260,8 @@ impl Search for Searcher {
         &self,
         req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
-        use crate::search as SearchService;
-
         let trace_id = req.into_inner().trace_id;
-        if let Err(e) = SearchService::cancel_query("", &trace_id).await {
+        if let Err(e) = crate::grpc_runtime()?.cancel_query("", &trace_id).await {
             log::error!("failed to cancel query: {e}");
         }
         Ok(Response::new(CancelQueryResponse { is_success: true }))

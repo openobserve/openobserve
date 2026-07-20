@@ -228,6 +228,7 @@ openobserve-compactor.workspace = true
 openobserve-core.workspace = true
 openobserve-ingestion.workspace = true
 openobserve-jobs.workspace = true
+openobserve-search-service.workspace = true
 openobserve-scheduler.workspace = true
 
 [dev-dependencies]

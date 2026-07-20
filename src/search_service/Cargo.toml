@@ -30,6 +30,7 @@ itertools.workspace = true
 log.workspace = true
 hashbrown.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
+opentelemetry.workspace = true
 openobserve-transform.workspace = true
 promql.workspace = true
 prost.workspace = true

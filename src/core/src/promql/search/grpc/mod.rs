@@ -100,7 +100,7 @@ impl TableProvider for StorageProvider {
         trace_id: &str,
     ) -> datafusion::error::Result<Option<tokio::sync::oneshot::Receiver<()>>> {
         let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        if crate::search::SEARCH_SERVER
+        if openobserve_search_service::SEARCH_SERVER
             .insert_sender(trace_id, abort_sender, true)
             .await
             .is_err()

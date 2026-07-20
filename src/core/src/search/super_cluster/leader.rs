@@ -37,13 +37,14 @@ use infra::{
 };
 use itertools::Itertools;
 use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
+use openobserve_search_service::SEARCH_SERVER;
 use parking_lot::Mutex;
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::search::{
-    SEARCH_SERVER, SearchResult,
+    SearchResult,
     datafusion::{
         context::{SearchContextBuilder, register_table},
         optimizer::{

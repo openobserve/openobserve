@@ -31,6 +31,7 @@ use datafusion::{
 use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
+use openobserve_search_service::work_group::DeferredLock;
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
@@ -38,7 +39,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
-    openobserve_core::search::SEARCH_SERVER,
+    openobserve_search_service::SEARCH_SERVER,
 };
 
 use crate::{
@@ -55,7 +56,6 @@ use crate::{
     service::search::{
         grpc::flight as grpcFlight,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        work_group::DeferredLock,
     },
 };
 

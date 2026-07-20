@@ -21,13 +21,12 @@ use infra::{
     errors::{Error, Result},
     file_list::FileId,
 };
+use search::utils::AsyncDefer;
 #[cfg(feature = "enterprise")]
 use {
-    crate::search::SEARCH_SERVER, config::meta::search::SearchEventType, infra::dist_lock,
+    crate::SEARCH_SERVER, config::meta::search::SearchEventType, infra::dist_lock,
     infra::errors::ErrorCodes, o2_enterprise::enterprise::search::WorkGroup,
 };
-
-use super::utils::AsyncDefer;
 
 /// Guard that automatically releases work group lock when dropped
 pub struct DeferredLock {

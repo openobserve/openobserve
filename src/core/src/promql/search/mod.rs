@@ -44,9 +44,9 @@ use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 #[cfg(feature = "enterprise")]
 use {
-    crate::search::SEARCH_SERVER,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::{TaskStatus, WorkGroup},
+    openobserve_search_service::SEARCH_SERVER,
 };
 
 use crate::{
@@ -144,7 +144,7 @@ pub async fn search(
 
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
-    let _lock = crate::search::work_group::check_work_group(
+    let _lock = openobserve_search_service::work_group::check_work_group(
         trace_id,
         &req.org_id,
         timeout,
@@ -156,7 +156,7 @@ pub async fn search(
 
     // Enterprise: Always use Short workgroup for metrics queries
     #[cfg(feature = "enterprise")]
-    let _lock = crate::search::work_group::check_work_group(
+    let _lock = openobserve_search_service::work_group::check_work_group(
         trace_id,
         &req.org_id,
         Some(user_email),

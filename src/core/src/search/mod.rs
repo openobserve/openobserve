@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use arrow_schema::{DataType, Field, Schema};
@@ -34,6 +34,8 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
+#[cfg(feature = "enterprise")]
+use openobserve_search_service::SEARCH_SERVER;
 use openobserve_search_service::partition::{
     calculate_partition_settings_for_context, cpu_cores::estimated_secs,
     generate_partitions_for_context, sql_context::PartitionSqlContext,
@@ -65,14 +67,10 @@ use crate::{
 pub mod cluster;
 pub mod grpc;
 pub mod grpc_search;
-pub mod grpc_server;
-mod searcher;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
-pub mod work_group;
 
 pub use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
-pub use searcher::Searcher;
 
 /// Core's composition adapter for cache-owned search orchestration.
 #[derive(Clone, Copy, Debug, Default)]
@@ -203,12 +201,101 @@ impl openobserve_search_service::partition::PartitionRuntime for CoreSearchRunti
     }
 }
 
+#[async_trait::async_trait]
+impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
+    async fn cached_search(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        user_id: Option<String>,
+        req: &search::Request,
+    ) -> Result<search::Response, Error> {
+        openobserve_search_service::cache::search(
+            *self,
+            trace_id,
+            org_id,
+            stream_type,
+            user_id,
+            req,
+            String::new(),
+            false,
+            None,
+            false,
+        )
+        .await
+    }
+
+    async fn search_multi(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        user_id: Option<String>,
+        req: &search::MultiStreamRequest,
+    ) -> Result<search::Response, Error> {
+        crate::search::search_multi(trace_id, org_id, stream_type, user_id, req).await
+    }
+
+    async fn search_partition(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        user_id: Option<&str>,
+        stream_type: StreamType,
+        req: &search::SearchPartitionRequest,
+        skip_max_query_range: bool,
+        use_cache: bool,
+    ) -> Result<search::SearchPartitionResponse, Error> {
+        crate::search::search_partition(
+            trace_id,
+            org_id,
+            user_id,
+            stream_type,
+            req,
+            skip_max_query_range,
+            use_cache,
+        )
+        .await
+    }
+
+    async fn cancel_query(
+        &self,
+        _org_id: &str,
+        trace_id: &str,
+    ) -> Result<search::CancelQueryResponse, Error> {
+        #[cfg(feature = "enterprise")]
+        return crate::search::cancel_query(_org_id, trace_id).await;
+
+        #[cfg(not(feature = "enterprise"))]
+        Ok(search::CancelQueryResponse {
+            trace_id: trace_id.to_string(),
+            is_success: false,
+        })
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn enrich_query_status(&self, status: &mut [proto::cluster_rpc::QueryStatus]) {
+        for query_status in status {
+            if let Some(ref mut ctx) = query_status.search_event_context
+                && matches!(query_status.search_type.as_deref(), Some("dashboards"))
+                && let Some(dashboard_id) = &ctx.dashboard_id
+                && ctx.dashboard_name.is_none()
+                && let Some(org_id) = &query_status.org_id
+                && let Ok((folder, dashboard)) =
+                    crate::dashboards::get_folder_and_dashboard(org_id, dashboard_id).await
+            {
+                ctx.dashboard_name = Some(dashboard.title().unwrap_or("").to_string());
+                ctx.dashboard_folder_name = Some(folder.name);
+                ctx.dashboard_folder_id = Some(folder.folder_id);
+            }
+        }
+    }
+}
+
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
 type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
-
-// search manager
-pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 
 // Please note: `query_fn` which is the vrl needs to be base64::decoded
 // when using this search

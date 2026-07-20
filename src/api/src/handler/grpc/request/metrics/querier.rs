@@ -24,7 +24,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
-use {o2_enterprise::enterprise::search::TaskStatus, openobserve_core::search::SEARCH_SERVER};
+use {o2_enterprise::enterprise::search::TaskStatus, openobserve_search_service::SEARCH_SERVER};
 
 use crate::{
     handler::grpc::{

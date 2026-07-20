@@ -23,14 +23,12 @@ use flight::{common::PreCustomMessage, encoder::FlightDataEncoder};
 use futures::{Stream, StreamExt};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+use openobserve_search_service::work_group::DeferredLock;
 use tokio::{sync::mpsc, task::JoinSet};
 use tracing::info_span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    handler::grpc::flight::{clear_session_data, partition_encoder::PartitionEncoderStream},
-    service::search::work_group::DeferredLock,
-};
+use crate::handler::grpc::flight::{clear_session_data, partition_encoder::PartitionEncoderStream};
 
 pub struct FlightEncoderStreamBuilder {
     options: IpcWriteOptions,

@@ -35,12 +35,12 @@ use infra::{
     errors::{Error, Result},
     file_list::FileId,
 };
+use openobserve_search_service::{SEARCH_SERVER, work_group::DeferredLock};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     db::enrichment_table,
     search::{
-        SEARCH_SERVER,
         cluster::flight::{get_online_querier_nodes, partition_file_list},
         datafusion::{
             distributed_plan::{
@@ -53,7 +53,6 @@ use crate::{
             optimizer::physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,
         },
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        work_group::DeferredLock,
     },
 };
 
@@ -209,7 +208,7 @@ pub async fn search(
     );
 
     // check work group
-    let _lock = crate::search::work_group::acquire_work_group_lock(
+    let _lock = openobserve_search_service::work_group::acquire_work_group_lock(
         &trace_id,
         &req,
         &mut took_watch,
