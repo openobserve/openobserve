@@ -882,9 +882,15 @@ pub async fn job_resolve(Json(body): Json<serde_json::Value>) -> Response {
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
 )]
-pub async fn job_lease(Json(body): Json<serde_json::Value>) -> Response {
+pub async fn job_lease(
+    headers: axum::http::HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let Some(org_id) = probe_token_org(&headers).await else {
+            return MetaHttpResponse::unauthorized("invalid probe token");
+        };
         let req = match serde_json::from_value::<
             o2_enterprise::enterprise::synthetics::job_api::LeaseRequest,
         >(body)
@@ -894,18 +900,22 @@ pub async fn job_lease(Json(body): Json<serde_json::Value>) -> Response {
                 return MetaHttpResponse::bad_request(e.to_string());
             }
         };
-        match o2_enterprise::enterprise::synthetics::job_api::lease(req).await {
+        match o2_enterprise::enterprise::synthetics::job_api::lease(req, &org_id).await {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
+                let msg = e.to_string();
+                if msg.starts_with("forbidden") {
+                    return MetaHttpResponse::forbidden(msg);
+                }
                 tracing::error!("[synthetics] job_lease: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
                     .into_response()
             }
         }
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = body;
+        let _ = (headers, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
