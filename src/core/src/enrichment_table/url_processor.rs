@@ -1754,7 +1754,7 @@ async fn save_enrichment_batch(
     };
 
     use crate::service::{
-        db, format_stream_name,
+        format_stream_name,
         schema::{check_for_schema, stream_schema_exists},
     };
 
@@ -1765,7 +1765,7 @@ async fn save_enrichment_batch(
     }
 
     // Check if we are allowed to ingest
-    if db::compact::retention::is_deleting_stream(
+    if openobserve_catalog::retention::is_deleting_stream(
         org_id,
         StreamType::EnrichmentTables,
         &stream_name,

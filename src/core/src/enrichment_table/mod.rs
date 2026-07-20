@@ -80,7 +80,7 @@ pub async fn save_enrichment_data(
     }
 
     // check if we are allowed to ingest
-    if db::compact::retention::is_deleting_stream(
+    if openobserve_catalog::retention::is_deleting_stream(
         org_id,
         StreamType::EnrichmentTables,
         &stream_name,

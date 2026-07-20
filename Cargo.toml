@@ -240,7 +240,10 @@ members = [
     "src/api_common",
     "src/common",
     "src/core",
-    "src/vrl",
+    "src/scheduler",
+    "src/self_reporting",
+    "src/catalog",
+    "src/transform",
     "src/search",
     "src/promql",
     "src/jobs",
@@ -272,8 +275,11 @@ flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
+openobserve-scheduler = { path = "src/scheduler" }
+openobserve-self-reporting = { path = "src/self_reporting" }
+openobserve-catalog = { path = "src/catalog" }
 common = { path = "src/common" }
-openobserve-vrl = { path = "src/vrl" }
+openobserve-transform = { path = "src/transform" }
 search = { path = "src/search" }
 promql = { path = "src/promql" }
 openobserve-api = { path = "src/api" }

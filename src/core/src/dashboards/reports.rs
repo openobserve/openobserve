@@ -155,7 +155,7 @@ pub async fn save(
     if report.frequency.frequency_type == ReportFrequencyType::Cron {
         let now = chrono::Utc::now().second();
         report.frequency.cron =
-            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
+            openobserve_scheduler::update_cron_expression(&report.frequency.cron, now);
         // Check if the cron expression is valid
         if let Err(e) = Schedule::from_str(&report.frequency.cron) {
             return Err(ReportError::ParseCronError(e));
@@ -428,7 +428,7 @@ pub async fn update_by_id(
     if report.frequency.frequency_type == ReportFrequencyType::Cron {
         let now = chrono::Utc::now().second();
         report.frequency.cron =
-            super::super::alerts::alert::update_cron_expression(&report.frequency.cron, now);
+            openobserve_scheduler::update_cron_expression(&report.frequency.cron, now);
         if let Err(e) = Schedule::from_str(&report.frequency.cron) {
             return Err(ReportError::ParseCronError(e));
         }

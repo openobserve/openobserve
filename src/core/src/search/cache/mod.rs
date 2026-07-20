@@ -1084,7 +1084,7 @@ pub fn apply_vrl_to_response(
             input_fn = RESULT_ARRAY_SKIP_VRL.replace(&input_fn, "").to_string();
         }
         let mut runtime = init_vrl_runtime();
-        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+        let program = match openobserve_transform::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
                     .config
@@ -1103,7 +1103,7 @@ pub fn apply_vrl_to_response(
         match program {
             Some(program) => {
                 if apply_over_hits {
-                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = openobserve_transform::apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -1131,7 +1131,7 @@ pub fn apply_vrl_to_response(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = openobserve_transform::apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),

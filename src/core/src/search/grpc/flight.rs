@@ -132,7 +132,8 @@ pub async fn search(
     let stream_type = stream.get_stream_type(stream_type);
 
     // check if we are allowed to search
-    if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
+    if openobserve_catalog::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None)
+    {
         return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(format!(
             "stream [{stream_name}] is being deleted"
         ))));

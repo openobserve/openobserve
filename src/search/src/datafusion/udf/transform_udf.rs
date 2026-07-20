@@ -26,7 +26,7 @@ use datafusion::{
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
 };
-use openobserve_vrl::{QUERY_FUNCTIONS, compile_vrl_function};
+use openobserve_transform::{QUERY_FUNCTIONS, compile_vrl_function};
 use vector_enrichment::TableRegistry;
 use vrl::compiler::{TargetValueRef, VrlRuntime, runtime::Runtime};
 

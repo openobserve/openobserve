@@ -389,7 +389,7 @@ pub async fn save_stream_settings(
 ) -> Result<HttpResponse, Error> {
     let cfg = config::get_config();
     // check if we are allowed to ingest
-    if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
+    if openobserve_catalog::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
         return Ok((
             http::StatusCode::BAD_REQUEST,
             [(

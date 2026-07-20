@@ -598,7 +598,7 @@ pub async fn handle_otlp_request(
         }
 
         // check if we are allowed to ingest
-        if db::compact::retention::is_deleting_stream(
+        if openobserve_catalog::retention::is_deleting_stream(
             org_id,
             StreamType::Metrics,
             &stream_name,

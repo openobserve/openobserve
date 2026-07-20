@@ -42,16 +42,18 @@ use config::{
 use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
+use openobserve_transform::{
+    JSRuntimeConfig, apply_js_fn, apply_vrl_fn, compile_js_function, compile_vrl_function,
+};
 use proto::cluster_rpc;
 #[cfg(feature = "enterprise")]
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 
 use crate::{
-    common::{infra::config::QUERY_FUNCTIONS, utils::js::JSRuntimeConfig},
+    common::infra::config::QUERY_FUNCTIONS,
     service::{
         alerts::{ConditionExt, ConditionGroupExt},
-        ingestion::{apply_js_fn, apply_vrl_fn, compile_js_function, compile_vrl_function},
         self_reporting::publish_error,
     },
 };
@@ -1226,7 +1228,7 @@ async fn process_function_node(
         metadata.pipeline_name,
         metadata.node_idx
     );
-    let mut vrl_runtime_state = crate::service::ingestion::init_functions_runtime();
+    let mut vrl_runtime_state = openobserve_transform::init_vrl_runtime();
     let stream_name = metadata.stream_name.unwrap_or("pipeline".to_string());
     let mut result_array_records = Vec::new();
     while let Some(pipeline_item) = channels.receiver.recv().await {
@@ -2432,7 +2434,7 @@ mod tests {
 
     #[test]
     fn test_compiled_function_runtime_enum_vrl_variant() {
-        use crate::service::ingestion::compile_vrl_function;
+        use openobserve_transform::compile_vrl_function;
 
         // Use actual VRL compilation to get a valid program
         let vrl_code = ". = {}";
@@ -2461,7 +2463,7 @@ mod tests {
 
     #[test]
     fn test_compiled_function_runtime_result_array_flags() {
-        use crate::{common::utils::js::JSRuntimeConfig, service::ingestion::compile_vrl_function};
+        use openobserve_transform::{JSRuntimeConfig, compile_vrl_function};
 
         let js_config = JSRuntimeConfig {
             function: "function(rows) { return rows; }".to_string(),
@@ -2589,7 +2591,7 @@ mod tests {
     // Test error handling for JS functions
     #[test]
     fn test_js_compilation_error_handling() {
-        use crate::service::ingestion::compile_js_function;
+        use openobserve_transform::compile_js_function;
 
         // Test invalid JS function
         let invalid_js = "this is not valid javascript {{{";
@@ -2601,7 +2603,7 @@ mod tests {
 
     #[test]
     fn test_js_execution_with_simple_record() {
-        use crate::service::ingestion::{apply_js_fn, compile_js_function};
+        use openobserve_transform::{apply_js_fn, compile_js_function};
 
         // Compile a simple JS function (operates directly on 'row' variable)
         let js_code = r#"

@@ -1,16 +1,18 @@
 [package]
-name = "openobserve-vrl"
+name = "openobserve-self-reporting"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
 
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+
 [dependencies]
 async-trait.workspace = true
 config.workspace = true
-vector-enrichment.workspace = true
-vrl.workspace = true
-
-[dev-dependencies]
-serde_json.workspace = true
+log.workspace = true
 tokio.workspace = true

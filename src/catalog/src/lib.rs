@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Compatibility re-export for local file-list state owned by stream catalog.
+//! Shared stream, schema, and file lifecycle state.
+//!
+//! Application services may query this state, while compaction and metadata workers update it.
+//! The crate deliberately does not depend on `openobserve-core` or application service crates.
 
-pub use openobserve_catalog::file_list::local::*;
+pub mod file_list;
+pub mod retention;

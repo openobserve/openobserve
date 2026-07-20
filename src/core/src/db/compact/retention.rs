@@ -13,30 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::sync::Arc;
 
-use config::{
-    RwHashMap,
-    meta::stream::StreamType,
-    utils::time::{hour_micros, now_micros},
-};
+use config::meta::stream::StreamType;
+pub use openobserve_catalog::retention::{is_deleting_stream, key as mk_key};
+use openobserve_catalog::retention::{mark_deleting, try_mark_deleting, unmark_deleting};
 
 use crate::service::db;
-
-static CACHE: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
-
-#[inline]
-pub fn mk_key(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    date_range: Option<(&str, &str)>,
-) -> String {
-    match date_range {
-        None => format!("{org_id}/{stream_type}/{stream_name}/all"),
-        Some((start, end)) => format!("{org_id}/{stream_type}/{stream_name}/{start},{end}"),
-    }
-}
 
 // delete data from stream
 // if date_range is empty, delete all data
@@ -52,13 +35,10 @@ pub async fn delete_stream(
     let db_key = format!("/compact/delete/{key}");
 
     // write in cache
-    if let Some(v) = CACHE.get(&key)
-        && v.value() + hour_micros(1) > now_micros()
-    {
+    if !try_mark_deleting(&key) {
         return Ok((db_key, false)); // already in cache, don't create same task in one hour
     }
 
-    CACHE.insert(key.clone(), now_micros());
     // only watch if deleting all data
     let need_watch = if date_range.is_none() {
         db::NEED_WATCH
@@ -103,16 +83,6 @@ pub async fn get_stream(
     }
 }
 
-// check if stream is deleting from cache
-pub fn is_deleting_stream(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    date_range: Option<(&str, &str)>,
-) -> bool {
-    CACHE.contains_key(&mk_key(org_id, stream_type, stream_name, date_range))
-}
-
 pub async fn delete_stream_done(
     org_id: &str,
     stream_type: StreamType,
@@ -129,7 +99,7 @@ pub async fn delete_stream_done(
     db::delete_if_exists(&format!("/compact/delete/{key}"), false, need_watch).await?;
 
     // remove in cache
-    CACHE.remove(&key);
+    unmark_deleting(&key);
 
     Ok(())
 }
@@ -162,11 +132,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                CACHE.insert(item_key.to_string(), now_micros());
+                mark_deleting(item_key);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                CACHE.remove(item_key);
+                unmark_deleting(item_key);
             }
             db::Event::Empty => {}
         }
@@ -179,7 +149,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (item_key, _) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        CACHE.insert(item_key.to_string(), now_micros());
+        mark_deleting(item_key);
     }
     Ok(())
 }

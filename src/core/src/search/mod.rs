@@ -458,7 +458,7 @@ pub async fn search_multi(
 
         let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
         let mut runtime = init_vrl_runtime();
-        let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
+        let program = match openobserve_transform::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program
                     .config
@@ -478,7 +478,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = openobserve_transform::apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -518,7 +518,7 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = openobserve_transform::apply_vrl_fn(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),

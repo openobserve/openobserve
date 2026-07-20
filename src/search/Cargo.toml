@@ -40,7 +40,7 @@ log.workspace = true
 md5.workspace = true
 memchr.workspace = true
 object_store.workspace = true
-openobserve-vrl.workspace = true
+openobserve-transform.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 opentelemetry.workspace = true
 parking_lot.workspace = true

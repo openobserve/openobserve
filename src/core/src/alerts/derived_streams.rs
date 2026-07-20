@@ -105,7 +105,7 @@ pub async fn save(
     // 2. update the frequency
     if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
         let now = chrono::Utc::now().second();
-        derived_stream.trigger_condition.cron = super::super::alerts::alert::update_cron_expression(
+        derived_stream.trigger_condition.cron = openobserve_scheduler::update_cron_expression(
             &derived_stream.trigger_condition.cron,
             now,
         );

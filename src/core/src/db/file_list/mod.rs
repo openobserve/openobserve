@@ -13,13 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::LazyLock as Lazy};
-
-use config::{
-    RwHashMap, RwHashSet,
-    meta::stream::{FileKey, FileMeta},
-};
-use dashmap::{DashMap, DashSet};
+use config::meta::stream::{FileKey, FileMeta};
 use infra::errors::Result;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
@@ -29,20 +23,7 @@ use o2_enterprise::enterprise::{
 pub mod broadcast;
 pub mod local;
 
-pub static DEDUPLICATE_FILES: Lazy<RwHashSet<String>> =
-    Lazy::new(|| DashSet::with_capacity_and_hasher(1024, Default::default()));
-
-pub static DELETED_FILES: Lazy<RwHashMap<String, FileMeta>> =
-    Lazy::new(|| DashMap::with_capacity_and_hasher(64, Default::default()));
-
-pub static BLOCKED_ORGS: Lazy<HashSet<String>> = Lazy::new(|| {
-    config::get_config()
-        .compact
-        .blocked_orgs
-        .split(',')
-        .map(|x| x.to_string())
-        .collect()
-});
+pub use openobserve_catalog::file_list::{BLOCKED_ORGS, DEDUPLICATE_FILES, DELETED_FILES};
 
 pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
     let mut file_data = FileKey::new(

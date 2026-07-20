@@ -13,6 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub use openobserve_vrl::{
+pub use openobserve_transform::{
     get_all_transform_keys, get_enrichment_tables, get_vrl_compiler_config, init_vrl_runtime,
 };

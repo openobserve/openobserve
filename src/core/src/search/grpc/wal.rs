@@ -568,7 +568,7 @@ async fn get_file_list(
     }
 
     // filter by pending delete
-    let mut files = crate::service::db::file_list::local::filter_by_pending_delete(files).await;
+    let mut files = openobserve_catalog::file_list::local::filter_by_pending_delete(files).await;
     if files.is_empty() {
         return Ok(vec![]);
     }

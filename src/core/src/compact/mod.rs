@@ -103,7 +103,8 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // check backlist
-        if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
+        if !openobserve_catalog::file_list::BLOCKED_ORGS.is_empty()
+            && openobserve_catalog::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }
@@ -197,7 +198,8 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         // check backlist
-        if !db::file_list::BLOCKED_ORGS.is_empty() && db::file_list::BLOCKED_ORGS.contains(&org_id)
+        if !openobserve_catalog::file_list::BLOCKED_ORGS.is_empty()
+            && openobserve_catalog::file_list::BLOCKED_ORGS.contains(&org_id)
         {
             continue;
         }

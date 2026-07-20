@@ -28,6 +28,7 @@ use config::{
     },
     utils::json::Value,
 };
+use openobserve_transform::{apply_js_fn, apply_vrl_fn, compile_js_function, compile_vrl_function};
 
 use crate::{
     common::{
@@ -38,7 +39,7 @@ use crate::{
         },
         utils::auth::{remove_ownership, set_ownership},
     },
-    service::{db, http::map_error_to_http_response, ingestion::compile_vrl_function},
+    service::{db, http::map_error_to_http_response},
 };
 
 const FN_SUCCESS: &str = "Function saved successfully";
@@ -90,9 +91,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             }
             1 => {
                 // JS function
-                if let Err(e) =
-                    crate::service::ingestion::compile_js_function(func.function.as_str(), &org_id)
-                {
+                if let Err(e) = compile_js_function(func.function.as_str(), &org_id) {
                     return Ok(MetaHttpResponse::bad_request(e));
                 }
             }
@@ -186,7 +185,7 @@ async fn test_run_vrl_function(
 
     let mut transformed_events = vec![];
     if apply_over_hits {
-        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+        let (ret_val, err) = apply_vrl_fn(
             &mut runtime,
             &VRLResultResolver {
                 program: program.clone(),
@@ -222,7 +221,7 @@ async fn test_run_vrl_function(
             });
     } else {
         events.into_iter().for_each(|event| {
-            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+            let (ret_val, err) = apply_vrl_fn(
                 &mut runtime,
                 &config::meta::function::VRLResultResolver {
                     program: program.clone(),
@@ -263,7 +262,7 @@ async fn test_run_js_function(
     let apply_over_array = RESULT_ARRAY.is_match(&function);
 
     // Compile the JS function
-    let js_config = match crate::service::ingestion::compile_js_function(&function, org_id) {
+    let js_config = match compile_js_function(&function, org_id) {
         Ok(config) => config,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));
@@ -274,12 +273,8 @@ async fn test_run_js_function(
 
     if apply_over_array {
         // #ResultArray# mode: apply function once over entire array
-        let (ret_val, err) = crate::service::ingestion::apply_js_fn(
-            &js_config,
-            Value::Array(events),
-            org_id,
-            &[String::new()],
-        );
+        let (ret_val, err) =
+            apply_js_fn(&js_config, Value::Array(events), org_id, &[String::new()]);
 
         if let Some(err) = err {
             transformed_events.push(VRLResult::new(&err, Value::Null));
@@ -306,12 +301,7 @@ async fn test_run_js_function(
     } else {
         // Normal mode: apply function to each event
         for event in events {
-            let (ret_val, err) = crate::service::ingestion::apply_js_fn(
-                &js_config,
-                event.clone(),
-                org_id,
-                &[String::new()],
-            );
+            let (ret_val, err) = apply_js_fn(&js_config, event.clone(), org_id, &[String::new()]);
 
             if let Some(err) = err {
                 transformed_events.push(VRLResult::new(&err, event));
@@ -382,7 +372,7 @@ pub async fn update_function(
         }
         1 => {
             // JS function
-            if let Err(e) = crate::service::ingestion::compile_js_function(&func.function, org_id) {
+            if let Err(e) = compile_js_function(&func.function, org_id) {
                 return Ok(MetaHttpResponse::bad_request(e));
             }
         }

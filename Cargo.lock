@@ -2120,13 +2120,12 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
- "openobserve-vrl",
+ "openobserve-transform",
  "opentelemetry",
  "parking_lot 0.12.5",
  "prost 0.14.3",
  "regex",
  "reqwest 0.13.2",
- "rquickjs",
  "segment",
  "serde",
  "serde_json",
@@ -6725,6 +6724,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-catalog"
+version = "0.1.0"
+dependencies = [
+ "config",
+ "dashmap",
+ "hashbrown 0.16.1",
+ "infra",
+ "ingester",
+ "tokio",
+]
+
+[[package]]
 name = "openobserve-core"
 version = "0.1.0"
 dependencies = [
@@ -6773,7 +6784,10 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "object_store",
- "openobserve-vrl",
+ "openobserve-catalog",
+ "openobserve-scheduler",
+ "openobserve-self-reporting",
+ "openobserve-transform",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -6838,7 +6852,7 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "openobserve-core",
- "openobserve-vrl",
+ "openobserve-transform",
  "prometheus",
  "proto",
  "regex",
@@ -6851,12 +6865,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "openobserve-vrl"
+name = "openobserve-scheduler"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "config",
+ "infra",
+ "o2_enterprise",
+ "tokio",
+]
+
+[[package]]
+name = "openobserve-self-reporting"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "config",
+ "log",
+ "tokio",
+]
+
+[[package]]
+name = "openobserve-transform"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "config",
  "enrichment",
+ "log",
+ "o2_enterprise",
+ "regex",
+ "rquickjs",
  "serde_json",
  "tokio",
  "vrl",
@@ -9262,7 +9301,7 @@ dependencies = [
  "memchr",
  "o2_enterprise",
  "object_store",
- "openobserve-vrl",
+ "openobserve-transform",
  "opentelemetry",
  "parking_lot 0.12.5",
  "parquet",

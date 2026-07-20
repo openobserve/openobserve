@@ -20,6 +20,8 @@ enterprise = [
     "config/enterprise",
     "promql/enterprise",
     "search/enterprise",
+    "openobserve-transform/enterprise",
+    "openobserve-scheduler/enterprise",
 ]
 cloud = [
     "infra/cloud",
@@ -37,7 +39,10 @@ vortex = [
 
 [dependencies]
 common.workspace = true
-openobserve-vrl.workspace = true
+openobserve-transform.workspace = true
+openobserve-scheduler.workspace = true
+openobserve-self-reporting.workspace = true
+openobserve-catalog.workspace = true
 promql.workspace = true
 search.workspace = true
 axum.workspace = true

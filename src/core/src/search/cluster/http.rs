@@ -112,19 +112,19 @@ pub async fn search(
 
             let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
             let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-            let program =
-                match crate::service::ingestion::compile_vrl_function(&query_fn, &sql.org_id) {
-                    Ok(program) => {
-                        let registry = program.config.get_custom::<TableRegistry>().unwrap();
-                        registry.finish_load();
-                        Some(program)
-                    }
-                    Err(err) => {
-                        log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
-                        result.function_error = vec![err.to_string()];
-                        None
-                    }
-                };
+            let program = match openobserve_transform::compile_vrl_function(&query_fn, &sql.org_id)
+            {
+                Ok(program) => {
+                    let registry = program.config.get_custom::<TableRegistry>().unwrap();
+                    registry.finish_load();
+                    Some(program)
+                }
+                Err(err) => {
+                    log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
+                    result.function_error = vec![err.to_string()];
+                    None
+                }
+            };
             let stream_names = sql
                 .stream_names
                 .iter()
@@ -133,7 +133,7 @@ pub async fn search(
             match program {
                 Some(program) => {
                     if apply_over_hits {
-                        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                        let (ret_val, err) = openobserve_transform::apply_vrl_fn(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
@@ -171,7 +171,7 @@ pub async fn search(
                             .into_iter()
                             .filter(|v| !v.is_empty())
                             .filter_map(|hit| {
-                                let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                                let (ret_val, err) = openobserve_transform::apply_vrl_fn(
                                     &mut runtime,
                                     &VRLResultResolver {
                                         program: program.program.clone(),

@@ -13,22 +13,32 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Shared ownership for OpenObserve transform definitions, enrichment tables,
-//! and VRL compilation. This crate deliberately has no dependency on core or
+//! Shared ownership for OpenObserve JS/VRL transform definitions, enrichment tables,
+//! and compilation. This crate deliberately has no dependency on core or
 //! the search engine so both can consume the same runtime state.
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::LazyLock,
+};
 
 use config::{
     DEFAULT_ORG, RwHashMap,
-    meta::function::{Transform, VRLCompilerConfig, VRLRuntimeConfig},
+    meta::{
+        function::{Transform, VRLCompilerConfig, VRLResultResolver, VRLRuntimeConfig},
+        stream::StreamType,
+    },
+    metrics,
+    utils::json::Value,
 };
 use vector_enrichment::{Table, TableRegistry};
-use vrl::compiler::{CompilationResult, runtime::Runtime};
+use vrl::compiler::{CompilationResult, TargetValueRef, runtime::Runtime};
 
 pub mod enrichment;
+pub mod js;
 
 use enrichment::ENRICHMENT_TABLES;
+pub use js::{JSRuntimeConfig, apply_js_fn, compile_js_function, init_js_runtime};
 
 /// Query and ingestion transform definitions, keyed by `org_id/function_name`.
 pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
@@ -127,6 +137,73 @@ pub fn compile_vrl_function(
     }
 }
 
+/// Error label used by ingestion metrics when a JavaScript or VRL transform fails.
+pub const TRANSFORM_FAILED: &str = "document_failed_transform";
+
+/// Apply a previously compiled VRL transform and preserve the original row on failure.
+pub fn apply_vrl_fn(
+    runtime: &mut Runtime,
+    vrl_runtime: &VRLResultResolver,
+    row: Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (Value, Option<String>) {
+    let mut metadata = vrl::value::Value::from(BTreeMap::new());
+    metadata.insert("org_id", vrl::value::Value::from(org_id.to_string()));
+    metadata.insert(
+        "stream_name",
+        vrl::value::Value::from(stream_name[0].clone()),
+    );
+    let mut target = TargetValueRef {
+        value: &mut vrl::value::Value::from(&row),
+        metadata: &mut metadata,
+        secrets: &mut vrl::value::Secrets::new(),
+    };
+
+    target
+        .secrets
+        .insert(stream_name[0].clone(), stream_name[0].clone());
+
+    let timezone = vrl::compiler::TimeZone::Local;
+    let result = match vrl::compiler::VrlRuntime::default() {
+        vrl::compiler::VrlRuntime::Ast => {
+            runtime.resolve(&mut target, &vrl_runtime.program, &timezone)
+        }
+    };
+    match result {
+        Ok(res) => match res.try_into() {
+            Ok(val) => (val, None),
+            Err(err) => {
+                record_transform_error(org_id, stream_name);
+                log::debug!(
+                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
+                );
+                let clean_err = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
+                (row, Some(clean_err))
+            }
+        },
+        Err(err) => {
+            record_transform_error(org_id, stream_name);
+            log::debug!(
+                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
+            );
+            let clean_err = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
+            (row, Some(clean_err))
+        }
+    }
+}
+
+fn record_transform_error(org_id: &str, stream_name: &[String]) {
+    metrics::INGEST_ERRORS
+        .with_label_values(&[
+            org_id,
+            StreamType::Logs.as_str(),
+            &format!("{stream_name:?}"),
+            TRANSFORM_FAILED,
+        ])
+        .inc();
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -205,5 +282,27 @@ mod tests {
             Err(error) => error,
         };
         assert_eq!(error.to_string(), "get_env_var is not supported");
+    }
+
+    #[test]
+    fn applies_compiled_vrl_without_ingestion_service() {
+        let compiled = compile_vrl_function(".message = upcase!(.message)\n.", "default").unwrap();
+        let resolver = VRLResultResolver {
+            program: compiled.program,
+            fields: compiled.fields,
+        };
+        let mut runtime = init_vrl_runtime();
+        let stream = vec!["logs".to_string()];
+
+        let (value, error) = apply_vrl_fn(
+            &mut runtime,
+            &resolver,
+            config::utils::json::json!({"message": "hello"}),
+            "default",
+            &stream,
+        );
+
+        assert!(error.is_none());
+        assert_eq!(value["message"], "HELLO");
     }
 }

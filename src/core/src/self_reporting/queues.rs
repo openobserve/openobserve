@@ -15,11 +15,12 @@
 
 use std::sync::{Arc, LazyLock as Lazy};
 
+use async_trait::async_trait;
 use config::{
     META_ORG_ID, get_config,
     meta::{
         self_reporting::{
-            ReportingData, ReportingMessage, ReportingQueue, ReportingRunner,
+            ReportingData, ReportingQueue,
             usage::{ERROR_STREAM, TRIGGERS_STREAM, TriggerData},
         },
         stream::{StreamParams, StreamType},
@@ -27,10 +28,6 @@ use config::{
     utils::json,
 };
 use hashbrown::HashMap;
-use tokio::{
-    sync::{Mutex, mpsc},
-    time,
-};
 
 #[cfg(feature = "cloud")]
 use crate::service::organization;
@@ -52,23 +49,21 @@ fn create_reporting_queue(
     batch_size: usize,
     thread_num: usize,
 ) -> ReportingQueue {
-    let timeout = time::Duration::from_secs(publish_interval);
+    openobserve_self_reporting::create_reporting_queue(
+        publish_interval,
+        batch_size,
+        thread_num,
+        Arc::new(CoreReportingSink),
+    )
+}
 
-    let (msg_sender, msg_receiver) =
-        mpsc::channel::<ReportingMessage>(batch_size * std::cmp::max(2, thread_num));
-    let msg_receiver = Arc::new(Mutex::new(msg_receiver));
+struct CoreReportingSink;
 
-    for thread_id in 0..thread_num {
-        let msg_receiver = msg_receiver.clone();
-        tokio::task::spawn(self_reporting_ingest_job(
-            thread_id,
-            msg_receiver,
-            batch_size,
-            timeout,
-        ));
+#[async_trait]
+impl openobserve_self_reporting::BatchSink for CoreReportingSink {
+    async fn write(&self, worker_id: usize, batch: Vec<ReportingData>) {
+        ingest_buffered_data(worker_id, batch).await;
     }
-
-    ReportingQueue::new(msg_sender)
 }
 
 fn initialize_usage_queue() -> ReportingQueue {
@@ -107,102 +102,6 @@ fn initialize_error_queue() -> ReportingQueue {
         cfg.common.usage_batch_size,
         cfg.limit.usage_reporting_thread_num,
     )
-}
-
-async fn self_reporting_ingest_job(
-    thread_id: usize,
-    msg_receiver: Arc<Mutex<mpsc::Receiver<ReportingMessage>>>,
-    batch_size: usize,
-    timeout: time::Duration,
-) {
-    log::debug!("[SELF-REPORTING] thread_{thread_id} starts waiting for reporting messages");
-    let mut reporting_runner = ReportingRunner::new(batch_size, timeout);
-    let mut interval = time::interval(timeout);
-
-    loop {
-        let mut msg_receiver = msg_receiver.lock().await;
-        tokio::select! {
-            msg = msg_receiver.recv() => {
-                match msg {
-                    Some(ReportingMessage::Start(start_sender)) => {
-                        log::debug!("[SELF-REPORTING] thread_{thread_id} received starting ping");
-                        start_sender.send(()).ok();
-                    }
-                    Some(ReportingMessage::Shutdown(res_sender)) => {
-                        log::debug!("[SELF-REPORTING] thread_{thread_id} received shutdown ping");
-                        // process any remaining data before shutting down
-                        if !reporting_runner.pending.is_empty() {
-                            let buffered = reporting_runner.take_batch();
-                            update_queue_depth_metrics(&buffered);
-                            ingest_buffered_data(thread_id, buffered).await;
-                        }
-                        res_sender.send(()).ok();
-                        break;
-                    }
-                    Some(ReportingMessage::Data(reporting_data)) => {
-                        reporting_runner.push(reporting_data);
-                        // Update queue depth metric after adding data
-                        update_queue_depth_metric_for_runner(&reporting_runner);
-
-                        if reporting_runner.should_process() {
-                            let buffered = reporting_runner.take_batch();
-                            update_queue_depth_metrics(&buffered);
-                            ingest_buffered_data(thread_id, buffered).await;
-                        }
-                    }
-                    None => break, // channel closed
-                }
-            }
-            _ = interval.tick() => {
-                if reporting_runner.should_process() {
-                    let buffered = reporting_runner.take_batch();
-                    update_queue_depth_metrics(&buffered);
-                    ingest_buffered_data(thread_id, buffered).await;
-                }
-            }
-        }
-    }
-}
-
-/// Update queue depth metrics based on pending data in the runner
-fn update_queue_depth_metric_for_runner(runner: &ReportingRunner) {
-    let mut usage_count = 0;
-    let mut error_count = 0;
-
-    for data in &runner.pending {
-        match data {
-            ReportingData::Usage(_) | ReportingData::Trigger(_) => usage_count += 1,
-            ReportingData::Error(_) => error_count += 1,
-        }
-    }
-
-    config::metrics::SELF_REPORTING_QUEUE_DEPTH
-        .with_label_values(&["usage"])
-        .set(usage_count);
-    config::metrics::SELF_REPORTING_QUEUE_DEPTH
-        .with_label_values(&["error"])
-        .set(error_count);
-}
-
-/// Update queue depth metrics after taking a batch (decrement)
-fn update_queue_depth_metrics(batch: &[ReportingData]) {
-    let mut usage_count = 0;
-    let mut error_count = 0;
-
-    for data in batch {
-        match data {
-            ReportingData::Usage(_) | ReportingData::Trigger(_) => usage_count += 1,
-            ReportingData::Error(_) => error_count += 1,
-        }
-    }
-
-    // Decrement the gauge by the batch size
-    config::metrics::SELF_REPORTING_QUEUE_DEPTH
-        .with_label_values(&["usage"])
-        .sub(usage_count);
-    config::metrics::SELF_REPORTING_QUEUE_DEPTH
-        .with_label_values(&["error"])
-        .sub(error_count);
 }
 
 async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
@@ -388,13 +287,14 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
 mod tests {
     use config::meta::{
         self_reporting::{
+            ReportingMessage, ReportingRunner,
             error::ErrorData,
             usage::{TriggerData, TriggerDataStatus, TriggerDataType, UsageData, UsageEvent},
         },
         stream::{StreamParams, StreamType},
     };
     use tokio::{
-        sync::oneshot,
+        sync::{mpsc, oneshot},
         time::{self, Duration},
     };
 

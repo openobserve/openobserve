@@ -28,8 +28,11 @@ exceptions = [
     { name = "openobserve-api-query", allow = ["AGPL-3.0"] },
     { name = "common", allow = ["AGPL-3.0"] },
     { name = "openobserve-core", allow = ["AGPL-3.0"] },
+    { name = "openobserve-catalog", allow = ["AGPL-3.0"] },
     { name = "openobserve-jobs", allow = ["AGPL-3.0"] },
-    { name = "openobserve-vrl", allow = ["AGPL-3.0"] },
+    { name = "openobserve-scheduler", allow = ["AGPL-3.0"] },
+    { name = "openobserve-self-reporting", allow = ["AGPL-3.0"] },
+    { name = "openobserve-transform", allow = ["AGPL-3.0"] },
     { name = "search", allow = ["AGPL-3.0"] },
     { name = "promql", allow = ["AGPL-3.0"] },
     # Empty dependency-resolution stubs for the private enterprise crates.

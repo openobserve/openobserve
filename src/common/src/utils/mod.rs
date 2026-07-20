@@ -15,7 +15,7 @@
 
 pub mod functions;
 pub mod http;
-pub mod js;
+pub use openobserve_transform::js;
 pub mod jwt;
 pub mod redirect_response;
 pub mod ssrf_guard;

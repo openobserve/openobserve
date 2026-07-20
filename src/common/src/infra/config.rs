@@ -32,7 +32,7 @@ use config::{
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
-pub use openobserve_vrl::{QUERY_FUNCTIONS, enrichment::ENRICHMENT_TABLES};
+pub use openobserve_transform::{QUERY_FUNCTIONS, enrichment::ENRICHMENT_TABLES};
 
 use crate::meta::{
     maxmind::MaxmindClient,

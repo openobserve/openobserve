@@ -19,7 +19,7 @@ enterprise = [
 cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
 
 [dependencies]
-openobserve-vrl.workspace = true
+openobserve-transform.workspace = true
 axum.workspace = true
 http.workspace = true
 http-body-util.workspace = true
@@ -40,7 +40,6 @@ parking_lot.workspace = true
 prost.workspace = true
 regex.workspace = true
 reqwest.workspace = true
-rquickjs.workspace = true
 segment.workspace = true
 serde.workspace = true
 serde_json.workspace = true

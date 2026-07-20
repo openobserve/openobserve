@@ -461,15 +461,7 @@ async fn prepare_alert(
     Ok(())
 }
 
-pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
-    let mut cron_exp = cron_exp.trim().to_owned();
-    if cron_exp.starts_with("*") {
-        let (_, rest) = cron_exp.split_once("*").unwrap();
-        let rest = rest.trim();
-        cron_exp = format!("{now} {rest}");
-    }
-    cron_exp
-}
+pub use openobserve_scheduler::update_cron_expression;
 
 /// Creates a new alert in the specified folder.
 pub async fn create<C: TransactionTrait>(

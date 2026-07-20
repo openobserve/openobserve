@@ -39,7 +39,7 @@ use promql_parser::label::{MatchOp, Matchers};
 use tracing::Instrument;
 
 use crate::service::{
-    db, file_list,
+    file_list,
     promql::search::grpc::Context,
     search::{
         datafusion::exec::register_metrics_table,
@@ -64,7 +64,12 @@ pub(crate) async fn create_context(
     let enter_span = tracing::span::Span::current();
 
     // check if we are allowed to search
-    if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
+    if openobserve_catalog::retention::is_deleting_stream(
+        org_id,
+        StreamType::Metrics,
+        stream_name,
+        None,
+    ) {
         log::error!("stream [{stream_name}] is being deleted");
         return Ok(None);
     }

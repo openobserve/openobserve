@@ -1,0 +1,20 @@
+[package]
+name = "openobserve-catalog"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+
+[dependencies]
+config.workspace = true
+dashmap.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+ingester.workspace = true
+tokio.workspace = true

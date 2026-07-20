@@ -33,7 +33,7 @@ hashbrown.workspace = true
 infra.workspace = true
 ingester.workspace = true
 log.workspace = true
-openobserve-vrl.workspace = true
+openobserve-transform.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
