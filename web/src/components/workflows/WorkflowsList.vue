@@ -192,12 +192,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom>
-              <div
-                class="flex w-full justify-between items-center h-[48px]"
-              >
-                <div
-                  class="o2-table-footer-title flex items-center w-[200px] mr-md"
-                >
+              <!-- h-12 = 3rem (was h-[48px]) and w-50 = 12.5rem (was w-[200px]):
+                   exact rem equivalents on Tailwind's scale, so the footer is
+                   unchanged. `mr-md` was dropped — it is a Quasar-style class
+                   this repo does not generate, so it never applied. -->
+              <div class="flex w-full justify-between items-center h-12">
+                <div class="o2-table-footer-title flex items-center w-50">
                   {{ resultTotal }} {{ t("workflow.header") }}
                 </div>
               </div>
