@@ -2351,7 +2351,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       });
       return request;
     }
-    return undefined;
   };
 
   // useOForm's onSubmit handler (wired at form creation). Runs after the schema
