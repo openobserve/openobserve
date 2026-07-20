@@ -4,7 +4,7 @@ description: >-
   Authoring guardrails for building ANY new frontend UI in the OpenObserve web
   app (web/) — new views, pages, panels, dialogs, feature components, or edits
   to existing ones. Enforce six house rules the moment you write Vue/template
-  markup: (1) use AppPageHeader for every page/module header, (2) build UI from
+  markup: (1) use OPageHeader for every page/module header, (2) build UI from
   O2 library components in web/src/lib — never bare HTML controls when an O2
   equivalent exists, (3) no hardcoded px anywhere — including inside
   Tailwind class arbitrary values ([320px]) — size with rem/%/vh/vw or Tailwind's
@@ -65,7 +65,7 @@ The always-true laws. Each is stated here in brief; the full **what / why / how 
 code** for all six is in [references/house-rules.md](references/house-rules.md) —
 read it once, it is the backbone of everything below.
 
-1. **Every page/module header is `AppPageHeader`** — never a hand-rolled
+1. **Every page/module header is `OPageHeader`** — never a hand-rolled
    `<div class="header">…<h1>` or a `q-toolbar`. One header contract keeps the
    title in the same place across list → detail → edit.
 2. **Build from O2 components in `web/src/lib`** — never a bare HTML control
@@ -148,8 +148,8 @@ and each domain has its own reference below.
 | Decision | The rule | Detail |
 | --- | --- | --- |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
-| **Whole-page layout** | **Every routed view is a `PageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
-| **Content inset** | `PageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `PageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
+| **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
+| **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
 | **Tab strips** | an `OTabs` strip needs **no** horizontal wrapper padding — the first tab's label self-aligns to the `px-page-edge` grid, so it lines up with the `OContent` body below it. Put the strip's bottom divider on the strip (`border-b`) and give it no `px-*`; wrapping a tab strip in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
 | **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` with `:filtered` | [page-recipes](references/page-recipes.md) |
 | **Data fetching** | view → domain service (`src/services`, via the `http.ts` wrapper) → Vuex (shared/cached) or local `ref` (ephemeral); never call `http`/axios from a component | [conventions](references/conventions.md) |
@@ -180,7 +180,7 @@ don't guess a name.
 Run this in your head before writing template markup, and again before
 considering the UI done:
 
-- [ ] Page/module header is `AppPageHeader` (not a hand-built header bar).
+- [ ] Page/module header is `OPageHeader` (not a hand-built header bar).
 - [ ] Every interactive control is an O2 component if one exists in
       `web/src/lib` — no bare HTML controls or third-party primitives with an O2 equivalent.
 - [ ] A self-contained/repeated UI element with no matching component was
@@ -190,7 +190,7 @@ considering the UI done:
 - [ ] Tabular data uses `OTable` with `OTableColumnDef[]` columns; server mode
       only for backend-paginated data.
 - [ ] Listing page uses the **full-height flush skeleton** (root
-      `flex flex-col h-full p-0`, header `shrink-0 border-b` — AppPageHeader bakes
+      `flex flex-col h-full p-0`, header `shrink-0 border-b` — OPageHeader bakes
       in its own `px-page-edge`, never add a `px-*`, table wrapper
       `card-container flex-1 min-h-0 overflow-hidden`, `OTable :frame="false"`) —
       not a `p-6` padded container; table runs flush.
@@ -262,7 +262,7 @@ not the call site":
   "No component fits?" section of [references/conventions.md](references/conventions.md).
 - Missing O2 variant → add the variant to the component source, then use it.
 - Missing token → register it in the token CSS (rule 5), then use it.
-- `AppPageHeader` can't express the header → change `AppPageHeader`, not the page.
+- `OPageHeader` can't express the header → change `OPageHeader`, not the page.
 
 If you genuinely believe a rule shouldn't apply to a specific case, say so
 explicitly and explain why, rather than silently introducing a `px`, a hex, or a

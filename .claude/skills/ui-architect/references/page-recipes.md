@@ -7,7 +7,7 @@ feel like one product.
 
 ## Table of contents
 
-- [Every page = AppPageHeader + body](#every-page--apppageheader--body)
+- [Every page = OPageHeader + body](#every-page--apppageheader--body)
 - [Where a new page goes in navigation](#where-a-new-page-goes-in-navigation)
 - [The listing-page skeleton (flush table, fixed height)](#the-listing-page-skeleton-flush-table-fixed-height)
 - [Recipe: listing / table page](#recipe-listing--table-page)
@@ -20,9 +20,9 @@ feel like one product.
 
 ---
 
-## Every page = AppPageHeader + body
+## Every page = OPageHeader + body
 
-Any routed view is: an `AppPageHeader` (rule 1) on top, then the page body below
+Any routed view is: an `OPageHeader` (rule 1) on top, then the page body below
 it, all inside a **full-height flex column** so the header stays put and only the
 body scrolls.
 
@@ -33,7 +33,7 @@ body scrolls.
   **do** give it horizontal padding and a bottom divider so the header aligns with
   the app frame while the table below runs flush (see the skeleton next).
 - The subtitle/description is the **`subtitle`** prop (there is **no**
-  `description` prop on `AppPageHeader`).
+  `description` prop on `OPageHeader`).
 
 ---
 
@@ -61,7 +61,7 @@ while the header aligns with the app frame:
   <!-- page root: full height, NO page padding -->
   <div class="flex flex-col h-full p-0">
     <!-- header: shrink-0, its OWN horizontal padding + bottom divider -->
-    <AppPageHeader
+    <OPageHeader
       :title="t('channels.title')"
       icon="notifications"
       :subtitle="t('channels.subtitle')"
@@ -72,7 +72,7 @@ while the header aligns with the app frame:
           {{ t("channels.new") }}
         </OButton>
       </template>
-    </AppPageHeader>
+    </OPageHeader>
 
     <!-- table wrapper: fills remaining height, scrolls internally, NO padding -->
     <div class="card-container flex-1 min-h-0 overflow-hidden">
@@ -89,21 +89,21 @@ Why each class matters — these are load-bearing, not decoration:
   chain: the header never scrolls, the table body does. `min-h-0` is what lets the
   flex child shrink below its content so the inner scroll area works — omit it and
   the whole page scrolls instead of the table.
-- **Header self-insets** (`AppPageHeader` bakes in `px-page-edge`, the single
+- **Header self-insets** (`OPageHeader` bakes in `px-page-edge`, the single
   `--spacing-page-edge` grid line) **+ `border-b border-border-default`**, table
   wrapper **no horizontal padding** → the table is **flush** (rows touch the
   content-area edges) but its first-column inset (also `--spacing-page-edge`)
   lands on the *same* grid line as the header title. **Never add a `px-*` to
-  `AppPageHeader`** — it owns its inset; a consumer `px-4` would fight the baked
+  `OPageHeader`** — it owns its inset; a consumer `px-4` would fight the baked
   `px-page-edge` and knock the header 4px off the table. Don't add page padding and
   don't wrap the table in a padded box — that inset breaks the flush alignment.
 - **`card-container`** is the existing app class that gives the table area its
   surface background; reuse it, don't invent a `bg-*`/border box (that would
   double-frame the borderless table).
 - **`:frame="false"`** on `OTable` keeps it borderless (its default) — the app
-  frame provides the single content card. If PageLayout wraps the view instead,
+  frame provides the single content card. If OPageLayout wraps the view instead,
   its `#header` wrapper is just `shrink-0 border-b border-border-default` — the
-  `AppPageHeader` inside still supplies the `px-page-edge` inset, so don't re-add
+  `OPageHeader` inside still supplies the `px-page-edge` inset, so don't re-add
   it via `header-class`.
 
 > Reserve `p-6`/`gap-6` page containers for **form / detail** views (constrained
@@ -113,7 +113,7 @@ Why each class matters — these are load-bearing, not decoration:
 
 ## Recipe: listing / table page
 
-A listing page is `AppPageHeader` + an `OTable` that **always** carries three
+A listing page is `OPageHeader` + an `OTable` that **always** carries three
 toolbar affordances: a **search** box, a **refresh** button, and a
 **column-visibility (show/hide columns) toggle**. These are the default standard
 for every list — don't ship a listing page without them.
@@ -305,7 +305,7 @@ blocks:
 A detail or create/edit screen that is the page's *primary* task (not a small
 form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 
-- `AppPageHeader` with a **back** target (`:back="{ label, to }"`) so the leading
+- `OPageHeader` with a **back** target (`:back="{ label, to }"`) so the leading
   icon tile becomes a Back button, and the title reflects the item.
 - Body = the form, built with `OForm` + a colocated Zod schema (see
   [forms-validation.md](forms-validation.md)). Save/Cancel follow the standard
@@ -318,11 +318,11 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 ## Listing-page checklist
 
 - [ ] Full-height flex skeleton: root `flex flex-col h-full p-0`, header
-      `shrink-0 border-b border-border-default` (AppPageHeader self-insets with
+      `shrink-0 border-b border-border-default` (OPageHeader self-insets with
       `px-page-edge` — no `px-*` on it), table wrapper
       `card-container flex-1 min-h-0 overflow-hidden` — **no page padding**, table
       runs **flush**.
-- [ ] `AppPageHeader` on top (description via **`subtitle`** prop); primary
+- [ ] `OPageHeader` on top (description via **`subtitle`** prop); primary
       **New** action in `#actions`.
 - [ ] `OTable :frame="false"`; filters + **search** in `#toolbar`
       (`:show-global-filter="false"`), or the built-in global filter for a

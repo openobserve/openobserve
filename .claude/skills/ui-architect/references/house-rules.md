@@ -8,20 +8,20 @@ Each rule below states **what**, **why**, and **how**. The "why" matters: these
 aren't arbitrary — each one exists because breaking it produces a specific,
 recurring class of bug or drift in this codebase.
 
-### 1. Every page/module header is `AppPageHeader`
+### 1. Every page/module header is `OPageHeader`
 
 **What.** The top of any routed view or module screen (title + icon + actions,
-optionally tabs/breadcrumb/back) is rendered by `AppPageHeader`, never a
+optionally tabs/breadcrumb/back) is rendered by `OPageHeader`, never a
 hand-rolled `<div class="header">…<h1>…` or a bespoke `q-toolbar`.
 
 ```vue
 <script setup lang="ts">
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 </script>
 
 <template>
-  <AppPageHeader
+  <OPageHeader
     :title="t('dashboard.header')"
     icon="dashboard"
     :subtitle="t('dashboard.subtitle')"
@@ -31,11 +31,11 @@ import OButton from "@/lib/core/Button/OButton.vue";
         {{ t("dashboard.add") }}
       </OButton>
     </template>
-  </AppPageHeader>
+  </OPageHeader>
 </template>
 ```
 
-**Why.** `AppPageHeader` encodes a single header contract used app-wide: row 1 is
+**Why.** `OPageHeader` encodes a single header contract used app-wide: row 1 is
 a fixed-height band (icon tile + `<h1>` + right-aligned actions); row 2 shows
 **exactly one** of peer tabs, an ancestor breadcrumb, or a plain tagline. Every
 hand-built header silently re-litigates title font size, icon tile geometry,
@@ -44,8 +44,8 @@ keeps the title's X/Y position identical as a user navigates list → detail →
 edit, which is the whole point.
 
 **How.**
-- The component is `AppPageHeader`, at
-  `web/src/components/common/AppPageHeader.vue`. Its full API — props, slots, and
+- The component is `OPageHeader`, at
+  `web/src/lib/core/PageHeader/OPageHeader.vue`. Its full API — props, slots, and
   the one-row-content contract — is documented in this rule (below), so you can
   use it correctly without opening the file.
 - Props: `title`, `subtitle`, `icon` (an `IconName` from
@@ -56,9 +56,9 @@ edit, which is the whole point.
   `back`.
 - Put page actions in `#actions` using O2 components. Do not add your own
   `border-b`, height, or padding around it — the header owns its own chrome.
-- **Do not** style `AppPageHeader` from the outside with utility classes or a
+- **Do not** style `OPageHeader` from the outside with utility classes or a
   wrapper trying to change its internals. If it can't express what a page needs,
-  that's a change to `AppPageHeader` itself, not a per-page override.
+  that's a change to `OPageHeader` itself, not a per-page override.
 
 ### 2. Build from O2 components in `web/src/lib`
 

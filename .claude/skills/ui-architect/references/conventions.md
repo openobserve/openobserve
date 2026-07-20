@@ -12,7 +12,7 @@ screen on the same rhythm: `gap-2` = 0.5rem, `gap-4` = 1rem, `gap-5` = 1.25rem,
 ### Listing Pages (OTable, Lists, Grids)
 
 A listing/table page is **full-bleed**, not a padded card: root `flex flex-col
-h-full p-0`, the `AppPageHeader` owns the padding — it **bakes in `px-page-edge`
+h-full p-0`, the `OPageHeader` owns the padding — it **bakes in `px-page-edge`
 itself**, so the consumer adds only `shrink-0 border-b` (never a `px-*`), and
 the table wrapper runs flush (`card-container flex-1 min-h-0 overflow-hidden`
 around `<OTable :frame="false">`). **Reserve `p-6`/`gap-6` for form/detail
@@ -176,9 +176,9 @@ differently on every screen.
 Lay out a whole page from a recipe, not from scratch — full recipes in
 [references/page-recipes.md](page-recipes.md). The essentials:
 
-- **Every page** = `AppPageHeader` on top (primary New/Add action in `#actions`).
+- **Every page** = `OPageHeader` on top (primary New/Add action in `#actions`).
 - **A listing/table page is full-bleed**, laid out as a full-height flex column
-  where the **header carries the padding** (baked into `AppPageHeader` as
+  where the **header carries the padding** (baked into `OPageHeader` as
   `px-page-edge`) and the **table runs flush** to the content edges — root
   `flex flex-col h-full p-0`, header
   `shrink-0 border-b border-border-default` (no `px-*` — the header self-insets), table wrapper
