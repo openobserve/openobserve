@@ -69,7 +69,9 @@ use crate::{
 
 pub mod cacher;
 pub mod multi;
-pub mod result_utils;
+pub mod result_utils {
+    pub use openobserve_search_service::cache::result_utils::*;
+}
 
 // Define cache version
 const CACHE_VERSION: &str = "v3";

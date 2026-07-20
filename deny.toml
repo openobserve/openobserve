@@ -32,6 +32,7 @@ exceptions = [
     { name = "openobserve-compactor", allow = ["AGPL-3.0"] },
     { name = "openobserve-dashboards", allow = ["AGPL-3.0"] },
     { name = "openobserve-reports", allow = ["AGPL-3.0"] },
+    { name = "openobserve-search-service", allow = ["AGPL-3.0"] },
     { name = "openobserve-jobs", allow = ["AGPL-3.0"] },
     { name = "openobserve-scheduler", allow = ["AGPL-3.0"] },
     { name = "openobserve-self-reporting", allow = ["AGPL-3.0"] },

@@ -249,6 +249,7 @@ members = [
     "src/search",
     "src/promql",
     "src/reports",
+    "src/search_service",
     "src/jobs",
     "src/config",
     "src/infra",
@@ -284,6 +285,7 @@ openobserve-catalog = { path = "src/catalog" }
 openobserve-compactor = { path = "src/compactor" }
 openobserve-dashboards = { path = "src/dashboards" }
 openobserve-reports = { path = "src/reports" }
+openobserve-search-service = { path = "src/search_service" }
 common = { path = "src/common" }
 openobserve-transform = { path = "src/transform" }
 search = { path = "src/search" }

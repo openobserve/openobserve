@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use async_trait::async_trait;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
     meta::{
@@ -37,10 +38,32 @@ use o2_enterprise::enterprise::{
 };
 use tokio::sync::mpsc;
 
-use crate::service::{
-    db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*},
-    search::grpc_search::{grpc_search, grpc_search_partition},
+use crate::repository::search_job::{
+    search_job_partitions::*, search_job_results::*, search_jobs::*,
 };
+
+#[async_trait]
+pub trait SearchExecutor: Send + Sync {
+    async fn search(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        user_id: Option<String>,
+        req: &search::Request,
+        role_group: Option<RoleGroup>,
+    ) -> Result<search::Response, Error>;
+
+    async fn search_partition(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        req: &SearchPartitionRequest,
+        role_group: Option<RoleGroup>,
+        skip_max_query_range: bool,
+    ) -> Result<search::SearchPartitionResponse, Error>;
+}
 
 // 1. get the oldest job from `search_jobs` table
 // 2. check if the job is previous running (get error then retry, be cancel then retry) (case 1) or
@@ -49,7 +72,7 @@ use crate::service::{
 // 3. get all partition jobs from `search_job_partitions` table
 // 4. after run on partition, write result to s3
 // 6. when all partition is done, write data to s3, then update `search_jobs` table
-pub async fn run(id: i64) -> Result<(), anyhow::Error> {
+pub async fn run(id: i64, executor: &dyn SearchExecutor) -> Result<(), anyhow::Error> {
     // 1. get the oldest job from `search_jobs` table, and set status to running
     let job = match get_job().await? {
         Some(job) => job,
@@ -86,7 +109,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     // 3. check if the job is previous running (get error then retry, be cancel then retry) (case 1)
     //    or do not have previous run (case 2)
     if job.partition_num.is_none() {
-        let res = handle_search_partition(&job).await;
+        let res = handle_search_partition(&job, executor).await;
         if let Err(e) = res {
             set_job_error_message(&job.id, &job.trace_id, &e.to_string()).await?;
             log::error!(
@@ -113,7 +136,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
         for partition_job in partition_jobs.iter() {
             // check if the job is still running
             check_status(id, &job.id, &job.org_id).await?;
-            let res = run_partition_job(id, &job, partition_job, req.clone(), need).await;
+            let res = run_partition_job(id, &job, partition_job, req.clone(), need, executor).await;
             let total = match res {
                 Ok(total) => total,
                 Err(e) => {
@@ -159,19 +182,23 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
 
 // 1. call search_partition to get all time range
 // 2. write to database
-async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
+async fn handle_search_partition(
+    job: &Job,
+    executor: &dyn SearchExecutor,
+) -> Result<(), anyhow::Error> {
     let stream_type = StreamType::from(job.stream_type.as_str());
     let req: search::Request = json::from_str(&job.payload)?;
     let partition_req = SearchPartitionRequest::from(&req);
-    let res = grpc_search_partition(
-        &job.trace_id,
-        &job.org_id,
-        stream_type,
-        &partition_req,
-        Some(RoleGroup::Interactive),
-        true,
-    )
-    .await?;
+    let res = executor
+        .search_partition(
+            &job.trace_id,
+            &job.org_id,
+            stream_type,
+            &partition_req,
+            Some(RoleGroup::Interactive),
+            true,
+        )
+        .await?;
 
     submit_partitions(&job.id, res.partitions.as_slice()).await?;
 
@@ -191,6 +218,7 @@ async fn run_partition_job(
     partition_job: &PartitionJob,
     req: search::Request,
     need: i64,
+    executor: &dyn SearchExecutor,
 ) -> Result<i64, anyhow::Error> {
     log::info!(
         "[SEARCH JOB {id}] running job_id: {}, partition id: {}",
@@ -212,15 +240,16 @@ async fn run_partition_job(
 
     // 3. run the query
     let stream_type = StreamType::from(job.stream_type.as_str());
-    let res = grpc_search(
-        &job.trace_id,
-        &job.org_id,
-        stream_type,
-        Some(job.user_id.clone()),
-        &req,
-        Some(RoleGroup::Interactive),
-    )
-    .await;
+    let res = executor
+        .search(
+            &job.trace_id,
+            &job.org_id,
+            stream_type,
+            Some(job.user_id.clone()),
+            &req,
+            Some(RoleGroup::Interactive),
+        )
+        .await;
     if let Err(e) = res {
         set_partition_job_error_message(&job.id, partition_id, &e.to_string()).await?;
         return Err(e.into());

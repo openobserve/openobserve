@@ -15,19 +15,44 @@
 
 pub mod aggregate;
 pub mod cpu_cores;
-pub mod histogram;
-pub mod regular_partition;
-pub mod settings;
 pub mod sql_context;
 pub mod stream_files;
 
 use config::get_config;
+use openobserve_search_service::partition::PartitionSpec;
 
 use crate::service::search::partition::{
-    histogram::generate_partitions_aligned_with_histogram_interval,
-    regular_partition::generate_partitions_with_mini_partition, settings::PartitionSettings,
-    sql_context::PartitionSqlContext,
+    settings::PartitionSettings, sql_context::PartitionSqlContext,
 };
+
+pub mod settings {
+    pub use openobserve_search_service::partition::PartitionSettings;
+
+    use super::sql_context::PartitionSqlContext;
+
+    pub fn calculate_partition_settings(
+        trace_id: &str,
+        total_secs: usize,
+        ctx: &PartitionSqlContext,
+        skip_max_query_range: bool,
+        max_query_range: i64,
+    ) -> PartitionSettings {
+        let input = openobserve_search_service::partition::PartitionSettingsInput {
+            start_time: ctx.sql.time_range.0,
+            end_time: ctx.sql.time_range.1,
+            histogram_interval: ctx.sql.histogram_interval,
+            is_complex_query: ctx.is_complex_query,
+            has_ts_column: ctx.ts_column.is_some(),
+        };
+        openobserve_search_service::partition::calculate_partition_settings(
+            trace_id,
+            total_secs,
+            &input,
+            skip_max_query_range,
+            max_query_range,
+        )
+    }
+}
 
 /// Generate partitions for a time range derived from the SQL context.
 ///
@@ -37,25 +62,16 @@ pub fn generate_partitions(
     ctx: &PartitionSqlContext,
     partition_settings: &PartitionSettings,
 ) -> Vec<[i64; 2]> {
-    let (start_time, end_time) = ctx.sql.time_range;
-    let order_by = ctx.sql_order_by;
-    let step = partition_settings.step;
-    let min_step = partition_settings.min_step;
-
-    if ctx.sql.histogram_interval.is_some() {
-        generate_partitions_aligned_with_histogram_interval(
-            start_time, end_time, step, order_by, min_step,
-        )
-    } else if ctx.is_complex_query {
-        vec![[start_time, end_time]]
-    } else {
-        let mini_partition_duration_secs = get_config().limit.search_mini_partition_duration_secs;
-        generate_partitions_with_mini_partition(
-            start_time,
-            end_time,
-            step,
-            order_by,
-            mini_partition_duration_secs,
-        )
-    }
+    let spec = PartitionSpec {
+        start_time: ctx.sql.time_range.0,
+        end_time: ctx.sql.time_range.1,
+        histogram_interval: ctx.sql.histogram_interval,
+        is_complex_query: ctx.is_complex_query,
+        order_by: ctx.sql_order_by,
+    };
+    openobserve_search_service::partition::generate_partitions(
+        &spec,
+        partition_settings,
+        get_config().limit.search_mini_partition_duration_secs,
+    )
 }

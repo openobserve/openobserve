@@ -6806,6 +6806,7 @@ dependencies = [
  "openobserve-dashboards",
  "openobserve-reports",
  "openobserve-scheduler",
+ "openobserve-search-service",
  "openobserve-self-reporting",
  "openobserve-transform",
  "opentelemetry",
@@ -6941,6 +6942,25 @@ dependencies = [
  "infra",
  "o2_enterprise",
  "tokio",
+]
+
+[[package]]
+name = "openobserve-search-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "config",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "proto",
+ "search",
+ "serde_json",
+ "tokio",
+ "tonic",
+ "tracing",
 ]
 
 [[package]]

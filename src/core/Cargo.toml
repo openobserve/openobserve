@@ -25,6 +25,7 @@ enterprise = [
     "openobserve-compactor/enterprise",
     "openobserve-dashboards/enterprise",
     "openobserve-reports/enterprise",
+    "openobserve-search-service/enterprise",
 ]
 cloud = [
     "infra/cloud",
@@ -47,6 +48,7 @@ openobserve-scheduler.workspace = true
 openobserve-compactor.workspace = true
 openobserve-dashboards.workspace = true
 openobserve-reports.workspace = true
+openobserve-search-service.workspace = true
 openobserve-self-reporting.workspace = true
 openobserve-catalog.workspace = true
 promql.workspace = true

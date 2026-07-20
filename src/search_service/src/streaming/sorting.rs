@@ -20,8 +20,7 @@ use config::{
     utils::json::Value,
 };
 use log;
-
-use crate::common::meta::search::SortStrategy;
+use search::SortStrategy;
 
 /// Determines and applies sorting to search results
 pub fn order_search_results(

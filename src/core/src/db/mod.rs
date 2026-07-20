@@ -83,7 +83,17 @@ pub mod scheduler {
     pub use openobserve_scheduler::*;
 }
 pub mod schema;
-pub mod search_job;
+pub mod search_job {
+    pub mod search_job_partitions {
+        pub use openobserve_search_service::repository::search_job::search_job_partitions::*;
+    }
+    pub mod search_job_results {
+        pub use openobserve_search_service::repository::search_job::search_job_results::*;
+    }
+    pub mod search_jobs {
+        pub use openobserve_search_service::repository::search_job::search_jobs::*;
+    }
+}
 #[cfg(feature = "enterprise")]
 pub mod service_graph;
 pub mod session;

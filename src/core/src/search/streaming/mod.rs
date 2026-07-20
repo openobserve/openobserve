@@ -66,8 +66,12 @@ use crate::{
 
 pub mod cache;
 pub mod execution;
-pub mod sorting;
-pub mod utils;
+pub mod sorting {
+    pub use openobserve_search_service::streaming::sorting::*;
+}
+pub mod utils {
+    pub use openobserve_search_service::streaming::utils::*;
+}
 
 // Re-export commonly used functions for easier access
 #[cfg(feature = "enterprise")]
