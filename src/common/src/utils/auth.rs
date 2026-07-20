@@ -45,6 +45,19 @@ pub fn is_ofga_unsupported(name: &str) -> bool {
     RE_OFGA_UNSUPPORTED_NAME.is_match(name)
 }
 
+/// Returns whether an object is visible under an optional OpenFGA object list.
+pub fn is_ofga_object_visible(
+    org_id: &str,
+    object_type: &str,
+    object_id: &str,
+    permitted_objects: Option<&[String]>,
+) -> bool {
+    permitted_objects.is_none_or(|objects| {
+        objects.contains(&format!("{object_type}:{object_id}"))
+            || objects.contains(&format!("{object_type}:_all_{org_id}"))
+    })
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
     if o2_openfga::config::get_config().enabled {

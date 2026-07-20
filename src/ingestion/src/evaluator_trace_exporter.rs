@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use o2_enterprise::enterprise::llm_evaluations::evaluator_trace::{
+    EvaluatorTrace, create_evaluator_trace_request,
+};
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient;
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
-
-use crate::llm_evaluations::evaluator_trace::{EvaluatorTrace, create_evaluator_trace_request};
 
 #[derive(Debug, Default)]
 pub struct EvaluatorTraceExporter;

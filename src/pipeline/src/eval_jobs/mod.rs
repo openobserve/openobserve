@@ -29,6 +29,7 @@ use config::ider;
 use infra::table;
 
 pub mod reconciler;
+#[cfg(feature = "enterprise")]
 pub use o2_enterprise::enterprise::llm_evaluations::eval_jobs::executor_runtime;
 
 /// Errors that can occur when interacting with online eval jobs.

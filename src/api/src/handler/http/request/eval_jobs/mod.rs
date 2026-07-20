@@ -17,8 +17,9 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+use openobserve_pipeline::eval_jobs;
 #[cfg(test)]
-use openobserve_core::llm_evaluations::eval_jobs::EvalJobError;
+use openobserve_pipeline::eval_jobs::EvalJobError;
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::UserEmail;
@@ -30,7 +31,6 @@ use crate::{
         EvalJobRequestBody, EvalJobResponseBody, EvalJobStatusActionResponseBody,
         ListEvalJobsQuery, ListEvalJobsResponseBody,
     },
-    service::llm_evaluations::eval_jobs,
 };
 
 /// ListEvalJobs

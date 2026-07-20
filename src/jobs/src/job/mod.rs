@@ -674,7 +674,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             "[Pipeline]: LLM evaluation node {node_idx} failed to ensure _evaluator stream initialized for {org_id}: {e}"
                         );
                     }
-                    openobserve_core::llm_evaluations::evaluator_trace_exporter::EvaluatorTraceExporter::export(
+                    openobserve_ingestion::evaluator_trace_exporter::EvaluatorTraceExporter::export(
                         &org_id,
                         traces,
                         node_idx,

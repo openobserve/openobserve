@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, response::Response};
+use o2_enterprise::enterprise::llm_evaluations::score_configs::{self, ScoreConfigError};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::UserEmail;
@@ -28,7 +29,6 @@ use crate::{
         ListScoreConfigVersionsResponseBody, ListScoreConfigsResponseBody, ScoreConfigRequestBody,
         ScoreConfigResponseBody, ScoreConfigUpdateRequestBody,
     },
-    service::llm_evaluations::score_configs::{self, ScoreConfigError},
 };
 
 fn score_config_error_response(value: ScoreConfigError) -> Response {

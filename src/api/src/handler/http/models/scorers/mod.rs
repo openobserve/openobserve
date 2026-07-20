@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use infra::table::scorers::ScorerType;
-use openobserve_core::llm_evaluations::scorers::schema_derivation::ExtraMetadataField;
+use o2_enterprise::enterprise::llm_evaluations::scorers::schema_derivation::ExtraMetadataField;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;

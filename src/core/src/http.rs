@@ -19,13 +19,12 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use infra::errors;
+#[cfg(feature = "enterprise")]
+use openobserve_pipeline::eval_jobs::EvalJobError;
 
 use crate::common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
 #[cfg(feature = "enterprise")]
-use crate::{
-    llm_evaluations::eval_jobs::EvalJobError, providers::ProviderError,
-    ratelimit::rule::RatelimitError,
-};
+use crate::{providers::ProviderError, ratelimit::rule::RatelimitError};
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
     match err {

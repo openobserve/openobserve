@@ -17,6 +17,11 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+use o2_enterprise::enterprise::llm_evaluations::scorers::{
+    llm_judge::ScoreConfigInfo,
+    registry::{self as scorers, ScorerError},
+    schema_derivation::derive_output_schema,
+};
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::UserEmail;
@@ -31,11 +36,6 @@ use crate::{
         ListScorerVersionsResponseBody, ListScorersQuery, ListScorersResponseBody,
         LlmJudgeOutputSchemaRequestBody, LlmJudgeOutputSchemaResponseBody, ScorerRequestBody,
         ScorerResponseBody, ScorerTestRequestBody, ScorerTestResponseBody, ScorerUpdateRequestBody,
-    },
-    service::llm_evaluations::scorers::{
-        llm_judge::ScoreConfigInfo,
-        registry::{self as scorers, ScorerError},
-        schema_derivation::derive_output_schema,
     },
 };
 
@@ -463,7 +463,7 @@ async fn run_scorer_test(
     match &scorer.scorer_type {
         infra::table::scorers::ScorerType::LlmJudge => {
             let prepared =
-                openobserve_core::llm_evaluations::prepared_scorers::PreparedLlmJudgeScorer::prepare_with_score_config_info(
+                o2_enterprise::enterprise::llm_evaluations::prepared_scorers::PreparedLlmJudgeScorer::prepare_with_score_config_info(
                     org_id,
                     &scorer,
                     score_config_info,
@@ -505,7 +505,7 @@ async fn run_scorer_test(
         }
         infra::table::scorers::ScorerType::Remote => {
             let remote_cfg =
-                openobserve_core::llm_evaluations::prepared_scorers::PreparedRemoteScorer::prepare(
+                o2_enterprise::enterprise::llm_evaluations::prepared_scorers::PreparedRemoteScorer::prepare(
                     org_id, &scorer,
                 )
                 .await

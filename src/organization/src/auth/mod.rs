@@ -94,26 +94,13 @@ pub fn resolve_write_method(method: &str, path_columns: &[&str]) -> String {
 }
 
 pub use ::common::utils::auth::{
-    RE_OFGA_UNSUPPORTED_NAME, into_ofga_supported_format, is_ofga_unsupported, remove_ownership,
-    set_ownership,
+    RE_OFGA_UNSUPPORTED_NAME, into_ofga_supported_format, is_ofga_object_visible,
+    is_ofga_unsupported, remove_ownership, set_ownership,
 };
 // Email validation lives in the shared `config` crate so the OSS auth layer and the enterprise
 // domain-management blocklist validate identically. Re-exported here to preserve the existing
 // `::common::utils::auth::{EMAIL_REGEX, is_valid_email}` API.
 pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
-#[cfg(feature = "enterprise")]
-pub fn is_ofga_object_visible(
-    org_id: &str,
-    object_type: &str,
-    object_id: &str,
-    permitted_objects: Option<&[String]>,
-) -> bool {
-    permitted_objects.is_none_or(|permitted_objects| {
-        permitted_objects.contains(&format!("{object_type}:{object_id}"))
-            || permitted_objects.contains(&format!("{object_type}:_all_{org_id}"))
-    })
-}
-
 fn deserialize_trimmed<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: serde::Deserializer<'de>,
