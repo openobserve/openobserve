@@ -18,14 +18,14 @@
 //! (`histogram_quantile` etc.) works on them unchanged.
 //!
 //! Known limitations, inherited from classic semantics:
-//! - `sum by (le)` is only sound across series sharing a bucket layout. Each native
-//!   series carries `le`s only for its own value range, so quantiles aggregated
-//!   across series with different ranges understate the cumulative tail. Per-series
-//!   quantiles, homogeneous-group aggregations and `_count`/`_sum` rates are exact.
-//! - quantiles interpolate linearly within a bucket, like every classic histogram.
-//!   Prometheus >= 3.0 interpolates native buckets exponentially, so its results can
-//!   differ by up to the bucket width (~6% at schema 0, less at finer schemas, more
-//!   after downscaling). This is an approximate fallback, not a native-fidelity one.
+//! - `sum by (le)` is only sound across series sharing a bucket layout. Each native series carries
+//!   `le`s only for its own value range, so quantiles aggregated across series with different
+//!   ranges understate the cumulative tail. Per-series quantiles, homogeneous-group aggregations
+//!   and `_count`/`_sum` rates are exact.
+//! - quantiles interpolate linearly within a bucket, like every classic histogram. Prometheus >=
+//!   3.0 interpolates native buckets exponentially, so its results can differ by up to the bucket
+//!   width (~6% at schema 0, less at finer schemas, more after downscaling). This is an approximate
+//!   fallback, not a native-fidelity one.
 
 use proto::prometheus_rpc;
 
@@ -88,8 +88,7 @@ fn expand_with_bucket_limit(
     // every emitted `le` label becomes a series, so merge adjacent buckets (halving
     // resolution) until the sample's le count fits the cardinality budget
     let mut schema = hp.schema;
-    while le_estimate(&pos, &neg, zero_count) > max_buckets.max(3)
-        && schema > MIN_DOWNSCALE_SCHEMA
+    while le_estimate(&pos, &neg, zero_count) > max_buckets.max(3) && schema > MIN_DOWNSCALE_SCHEMA
     {
         schema -= 1;
         pos = downscale(pos);

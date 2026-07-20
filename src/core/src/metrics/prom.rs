@@ -1207,11 +1207,7 @@ fn buffer_metric_record(
 
 /// Looks up the current leader state and runs leader election for this replica.
 /// Requests without a replica label are always accepted.
-async fn run_ha_election(
-    cluster_name: &str,
-    replica_label: &str,
-    election_interval: i64,
-) -> bool {
+async fn run_ha_election(cluster_name: &str, replica_label: &str, election_interval: i64) -> bool {
     if replica_label.is_empty() {
         return true;
     }
