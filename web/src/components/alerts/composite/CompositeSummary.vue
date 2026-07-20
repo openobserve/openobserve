@@ -45,8 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="`sum-${term.name}`"
             class="flex items-start gap-1.5"
           >
-            <span class="summary-chip uppercase shrink-0">{{ term.name }}</span>
-            <span class="text-text-secondary leading-relaxed break-all">{{ termSummary(term) }}</span>
+            <span class="summary-chip shrink-0">{{ term.name }}</span>
+            <span
+              class="leading-relaxed break-all"
+              :class="termSummary(term).muted ? 'text-text-secondary italic opacity-70' : 'text-text-secondary'"
+            >{{ termSummary(term).text }}</span>
           </div>
         </div>
       </div>
@@ -82,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="`sum-onterm-${name}`"
         class="flex items-start gap-2 pl-6"
       >
-        <span class="text-text-secondary">{{ t("alerts.composite.term") }} <span class="summary-chip uppercase">{{ name }}</span> →</span>
+        <span class="text-text-secondary">{{ t("alerts.composite.term") }} <span class="summary-chip">{{ name }}</span> →</span>
         <span class="break-all">{{ dests.join(", ") }}</span>
       </div>
 
@@ -135,20 +138,24 @@ export default defineComponent({
       }),
     );
 
-    // One-line description of a term's query + threshold.
-    const termSummary = (term: any): string => {
-      const type = (term.query_condition?.type || "custom").toUpperCase();
-      const stream = term.stream_name
-        ? `${term.stream_type}/${term.stream_name}`
-        : term.stream_type;
-      const hasAgg =
-        (term.query_condition?.aggregation?.group_by || []).filter((g: string) =>
-          g?.trim(),
-        ).length > 0;
-      const threshold = hasAgg
-        ? t("alerts.composite.aggregateThreshold")
-        : `${t("alerts.composite.thresholdShort")} ${term.operator} ${term.threshold}`;
-      return `${stream} · ${type} · ${threshold}`;
+    // One-line description of a term. Avoid echoing the alias back: only show
+    // the member alert name when it differs from the alias, otherwise a muted
+    // descriptor. New (scratch) terms describe their draft stream.
+    const termSummary = (term: any): { text: string; muted: boolean } => {
+      if (term.mode === "new") {
+        const d = term.draft || {};
+        return d.stream_name
+          ? { text: `${d.stream_type} / ${d.stream_name}`, muted: false }
+          : { text: t("alerts.composite.newMemberShort"), muted: true };
+      }
+      const member = term.member_name || "";
+      if (member && member.toLowerCase() !== (term.name || "").toLowerCase()) {
+        return { text: member, muted: false };
+      }
+      return {
+        text: member ? t("alerts.composite.existingAlert") : "—",
+        muted: true,
+      };
     };
 
     const onCompositeDests = computed<string[]>(

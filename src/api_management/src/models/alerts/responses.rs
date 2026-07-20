@@ -70,6 +70,13 @@ pub struct ListAlertsResponseBodyItem {
     /// Last error message from training or detection. Only present for `anomaly_detection` items.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
+    /// True if this alert is a composite (evaluates a boolean expression over
+    /// named terms). Referenced alerts run independently and are unaffected.
+    #[serde(default)]
+    pub is_composite: bool,
+    /// Number of terms a composite evaluates. `None` for non-composite alerts.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub composite_term_count: Option<u32>,
 }
 
 /// HTTP response body for `EnableAlert` endpoint.
@@ -137,6 +144,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             last_trained_at: None,
             status: None,
             last_error: None,
+            is_composite: alert.composite.is_some(),
+            composite_term_count: alert.composite.as_ref().map(|c| c.terms.len() as u32),
         })
     }
 }
@@ -211,6 +220,8 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .and_then(|e| e.as_str())
             .filter(|s| !s.is_empty())
             .map(String::from),
+        is_composite: false,
+        composite_term_count: None,
     })
 }
 
@@ -284,6 +295,8 @@ mod tests {
             last_trained_at: None,
             status: None,
             last_error: None,
+            is_composite: false,
+            composite_term_count: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();

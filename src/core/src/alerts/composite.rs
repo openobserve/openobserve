@@ -29,11 +29,10 @@ use std::{collections::HashMap, time::Duration};
 
 use config::meta::{
     alerts::{
-        QueryCondition, TriggerCondition, TriggerEvalResults, alert::Alert,
+        TriggerCondition, TriggerEvalResults, alert::Alert,
         composite::{MAX_TERMS, OnErrorPolicy},
     },
     search::SearchEventType,
-    stream::StreamType,
 };
 use futures::stream::{self, StreamExt};
 use o2_enterprise::enterprise::alerts::composite::{self, TermState};
@@ -41,14 +40,22 @@ use serde_json::{Map, Value, json};
 
 use super::{QueryConditionExt, composite_template::COMPOSITE_CONTEXT_KEY};
 
-/// Fully-owned inputs for evaluating a single term, snapshotted from the spec so
-/// the async fan-out captures no borrow of the parent `Alert`.
-struct TermInput {
-    name: String,
-    synth_tc: TriggerCondition,
-    query_condition: QueryCondition,
-    stream_name: Option<String>,
-    stream_type: StreamType,
+/// A term resolved to something evaluable: either a runnable query (sourced from
+/// a member alert, or from an inline preview draft) or a pre-resolved error
+/// (deleted/disabled member). `member_name` is display-only.
+pub struct ResolvedTerm {
+    pub name: String,
+    pub member_name: Option<String>,
+    pub query: Result<ResolvedQuery, String>,
+}
+
+/// The runnable query behind a resolved term.
+pub struct ResolvedQuery {
+    pub stream_type: config::meta::stream::StreamType,
+    pub stream_name: String,
+    pub query_condition: config::meta::alerts::QueryCondition,
+    pub operator: config::meta::alerts::Operator,
+    pub threshold: i64,
 }
 
 /// Per-tick time budget for the whole term fan-out. Must be below the
@@ -81,6 +88,10 @@ pub struct CompositeSchedulerOutcome {
     /// scheduler sends these on the fire path so they share the composite's
     /// silence window (a silenced composite's tick never runs).
     pub on_term_sends: Vec<OnTermSend>,
+    /// `(term_name, search_trace_id)` for each term, so the composite's single
+    /// trigger reporting record can be correlated with the N term search-usage
+    /// records (each term search has its own trace_id — §search-registry).
+    pub term_trace_ids: Vec<(String, String)>,
 }
 
 /// The reduced per-term evaluation, kept for building the notification context.
@@ -93,6 +104,8 @@ struct TermsEvaluation {
     errors: HashMap<String, String>,
     /// The raw rows returned by each firing term, for `{a.rows[N].field}`.
     rows: HashMap<String, Vec<Map<String, Value>>>,
+    /// The member alert's name per term, for `{a.name}` (Appendix R1.8).
+    names: HashMap<String, String>,
     end_time: i64,
     query_took: Option<i64>,
 }
@@ -110,15 +123,23 @@ pub async fn evaluate_composite_for_scheduler(
     window: (Option<i64>, i64),
     trace_id: Option<String>,
 ) -> Result<CompositeSchedulerOutcome, anyhow::Error> {
-    let (terms, ast) = run_terms(org_id, alert, window, trace_id).await?;
+    let resolved = resolve_scheduler_terms(org_id, alert).await?;
+    let period = alert.trigger_condition.period;
 
-    // Snapshot the notification config before mutating `alert.destinations`.
-    let (on_composite, on_error) = {
+    // Snapshot the notification config + expression before mutating `alert`.
+    let (on_composite, on_error, expression) = {
         let spec = alert.composite.as_ref().ok_or_else(|| {
             anyhow::anyhow!("evaluate_composite_for_scheduler on non-composite alert")
         })?;
-        (spec.notify.on_composite.clone(), spec.on_error)
+        (
+            spec.notify.on_composite.clone(),
+            spec.on_error,
+            spec.expression.clone(),
+        )
     };
+
+    let (terms, ast, term_trace_ids) =
+        eval_resolved_terms(org_id, resolved, &expression, period, window, trace_id).await?;
 
     let result = composite::eval(&ast, &terms.states);
 
@@ -152,13 +173,18 @@ pub async fn evaluate_composite_for_scheduler(
         },
         error_summary,
         on_term_sends,
+        term_trace_ids,
     })
 }
 
 /// The tri-state result of previewing a single term (no notification / no save).
 #[derive(Debug, serde::Serialize)]
 pub struct CompositeTermPreview {
+    /// The term label (expression identifier / alias).
     pub name: String,
+    /// The member alert's name, for display.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub member_name: Option<String>,
     /// `"true" | "false" | "error"`.
     pub state: String,
     /// The scalar `{a.value}` — aggregate value or row count.
@@ -178,117 +204,267 @@ pub struct CompositePreviewResult {
     pub terms: Vec<CompositeTermPreview>,
 }
 
-/// Previews a composite alert over the given window WITHOUT firing notifications
-/// or persisting anything: runs each term, computes the tri-states + Kleene
-/// result, and returns them for the authoring UI (§8.3).
+/// Previews a composite over the given window WITHOUT firing notifications or
+/// persisting anything: evaluates each already-resolved term (member ref OR an
+/// inline draft for not-yet-saved "New" terms), computes the tri-states + Kleene
+/// result, and returns them for the authoring UI (§8.3, R1.5).
 pub async fn preview_composite(
     org_id: &str,
-    alert: &Alert,
+    resolved: Vec<ResolvedTerm>,
+    expression: String,
+    period: i64,
     window: (Option<i64>, i64),
     trace_id: Option<String>,
 ) -> Result<CompositePreviewResult, anyhow::Error> {
-    let (terms, ast) = run_terms(org_id, alert, window, trace_id).await?;
+    // Capture the display metadata before the resolved terms are consumed.
+    let term_meta: Vec<(String, Option<String>)> = resolved
+        .iter()
+        .map(|r| (r.name.clone(), r.member_name.clone()))
+        .collect();
+
+    let (terms, ast, _tids) =
+        eval_resolved_terms(org_id, resolved, &expression, period, window, trace_id).await?;
     let result = composite::eval(&ast, &terms.states);
 
-    let spec = alert
-        .composite
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("preview_composite on non-composite alert"))?;
-
-    let term_previews = spec
-        .terms
-        .iter()
-        .map(|term| {
-            let name = &term.name;
-            let st = terms.states.get(name).copied().unwrap_or(TermState::Error);
-            let count = terms.row_counts.get(name).copied().unwrap_or(0);
+    let term_previews = term_meta
+        .into_iter()
+        .map(|(name, member_name)| {
+            let st = terms.states.get(&name).copied().unwrap_or(TermState::Error);
+            let count = terms.row_counts.get(&name).copied().unwrap_or(0);
             CompositeTermPreview {
-                name: name.clone(),
+                member_name: terms.names.get(&name).cloned().or(member_name),
                 state: state_str(st).to_string(),
                 value: terms
                     .values
-                    .get(name)
+                    .get(&name)
                     .cloned()
                     .unwrap_or_else(|| count.to_string()),
                 count,
-                error: terms.errors.get(name).cloned(),
+                error: terms.errors.get(&name).cloned(),
+                name,
             }
         })
         .collect();
 
     Ok(CompositePreviewResult {
         result: state_str(result).to_string(),
-        expression: spec.expression.clone(),
+        expression,
         terms: term_previews,
     })
 }
 
-/// Runs every term of a composite concurrently (bounded fan-out + per-tick time
-/// budget, §4.1) and reduces the results into tri-states, returning the reduced
-/// evaluation and the parsed expression AST. Shared by the scheduler and the
-/// preview paths; borrows `alert` immutably and mutates nothing.
-async fn run_terms(
+/// Resolves each of a composite's terms to a runnable query. A reference term
+/// loads the referenced alert and re-runs its CURRENT query over the composite's
+/// shared window (ReRun) — the referenced alert is never modified. An inline
+/// term uses its own stored query. A deleted/disabled reference resolves to a
+/// pre-resolved error (never a silent FALSE). The scheduler path.
+async fn resolve_scheduler_terms(
     org_id: &str,
     alert: &Alert,
+) -> Result<Vec<ResolvedTerm>, anyhow::Error> {
+    let spec = alert
+        .composite
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("resolve_scheduler_terms on non-composite alert"))?;
+    let client = infra::db::ORM_CLIENT
+        .get_or_init(infra::db::connect_to_orm)
+        .await;
+    let mut resolved = Vec::with_capacity(spec.terms.len());
+    for term in &spec.terms {
+        let (member_name, query) = match term.alert_id {
+            // Reference term (ReRun): re-run the referenced alert's live query.
+            Some(rid) => {
+                match crate::service::db::alerts::alert::get_by_id(client, org_id, rid).await {
+                    Ok(Some((_folder, referenced))) => {
+                        let name = Some(referenced.name.clone());
+                        if !referenced.enabled {
+                            (
+                                name,
+                                Err(format!("referenced alert '{}' is disabled", referenced.name)),
+                            )
+                        } else {
+                            (
+                                name,
+                                Ok(ResolvedQuery {
+                                    stream_type: referenced.stream_type,
+                                    stream_name: referenced.stream_name,
+                                    query_condition: referenced.query_condition,
+                                    operator: referenced.trigger_condition.operator,
+                                    threshold: referenced.trigger_condition.threshold,
+                                }),
+                            )
+                        }
+                    }
+                    Ok(None) => (
+                        None,
+                        Err(format!("referenced alert {rid} not found (deleted?)")),
+                    ),
+                    Err(e) => (None, Err(format!("failed to load referenced alert: {e}"))),
+                }
+            }
+            // Inline term: use the query stored on the composite.
+            None => match &term.query {
+                Some(q) => (
+                    None,
+                    Ok(ResolvedQuery {
+                        stream_type: q.stream_type,
+                        stream_name: q.stream_name.clone(),
+                        query_condition: q.query_condition.clone(),
+                        operator: q.operator,
+                        threshold: q.threshold,
+                    }),
+                ),
+                None => (
+                    None,
+                    Err(format!("term '{}' has no query", term.name)),
+                ),
+            },
+        };
+        resolved.push(ResolvedTerm {
+            name: term.name.clone(),
+            member_name,
+            query,
+        });
+    }
+    Ok(resolved)
+}
+
+/// A preview term as submitted by the authoring UI: either a reference to an
+/// existing member alert (`alert_id`) or an inline draft query for a not-yet-
+/// saved "New" term (R1.5).
+pub struct PreviewTermSpec {
+    pub name: String,
+    pub alert_id: Option<svix_ksuid::Ksuid>,
+    pub stream_type: config::meta::stream::StreamType,
+    pub stream_name: String,
+    pub query_condition: config::meta::alerts::QueryCondition,
+    pub operator: config::meta::alerts::Operator,
+    pub threshold: i64,
+}
+
+/// Resolves preview terms: existing terms load the member alert; inline ("New")
+/// terms use their draft query directly, so authors can preview before saving.
+pub async fn resolve_preview_terms(
+    org_id: &str,
+    specs: Vec<PreviewTermSpec>,
+) -> Result<Vec<ResolvedTerm>, anyhow::Error> {
+    let client = infra::db::ORM_CLIENT
+        .get_or_init(infra::db::connect_to_orm)
+        .await;
+    let mut resolved = Vec::with_capacity(specs.len());
+    for spec in specs {
+        let (member_name, query) = if let Some(aid) = spec.alert_id {
+            match crate::service::db::alerts::alert::get_by_id(client, org_id, aid).await {
+                Ok(Some((_folder, member))) => {
+                    let name = Some(member.name.clone());
+                    if !member.enabled {
+                        (name, Err(format!("member alert '{}' is disabled", member.name)))
+                    } else {
+                        (
+                            name,
+                            Ok(ResolvedQuery {
+                                stream_type: member.stream_type,
+                                stream_name: member.stream_name,
+                                query_condition: member.query_condition,
+                                operator: member.trigger_condition.operator,
+                                threshold: member.trigger_condition.threshold,
+                            }),
+                        )
+                    }
+                }
+                Ok(None) => (None, Err(format!("member alert {aid} not found"))),
+                Err(e) => (None, Err(format!("failed to load member alert: {e}"))),
+            }
+        } else {
+            // Inline draft (New term).
+            (
+                None,
+                Ok(ResolvedQuery {
+                    stream_type: spec.stream_type,
+                    stream_name: spec.stream_name,
+                    query_condition: spec.query_condition,
+                    operator: spec.operator,
+                    threshold: spec.threshold,
+                }),
+            )
+        };
+        resolved.push(ResolvedTerm {
+            name: spec.name,
+            member_name,
+            query,
+        });
+    }
+    Ok(resolved)
+}
+
+/// Evaluates already-resolved terms concurrently (bounded fan-out + per-tick
+/// time budget, §4.1) and reduces the results into tri-states. Shared by the
+/// scheduler and preview paths — the difference is only in how terms are
+/// resolved (member ref vs inline preview draft).
+#[allow(clippy::type_complexity)]
+async fn eval_resolved_terms(
+    org_id: &str,
+    resolved: Vec<ResolvedTerm>,
+    expression: &str,
+    period: i64,
     window: (Option<i64>, i64),
     trace_id: Option<String>,
-) -> Result<(TermsEvaluation, composite::Expr), anyhow::Error> {
-    let period = alert.trigger_condition.period;
+) -> Result<(TermsEvaluation, composite::Expr, Vec<(String, String)>), anyhow::Error> {
     let (start_time, end_time) = window;
 
-    // Snapshot fully-owned per-term inputs up front so no borrow of `alert`
-    // (via `spec`) is held across an `.await` — the scheduler runs this inside a
-    // spawned task, which requires the future to own its captures.
-    let (expression, term_inputs) = {
-        let spec = alert
-            .composite
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("run_terms on non-composite alert"))?;
-        let inputs: Vec<TermInput> = spec
-            .terms
-            .iter()
-            .map(|term| TermInput {
-                name: term.name.clone(),
-                synth_tc: TriggerCondition {
-                    operator: term.operator,
-                    threshold: term.threshold,
-                    period,
-                    ..Default::default()
-                },
-                query_condition: term.query_condition.clone(),
-                stream_name: term.stream_name.clone(),
-                stream_type: term.stream_type,
-            })
-            .collect();
-        (spec.expression.clone(), inputs)
-    };
-
     // Re-parse the (save-time-validated) expression into the eval AST.
-    let ast = composite::parse(&expression)
+    let ast = composite::parse(expression)
         .map_err(|e| anyhow::anyhow!("invalid composite expression: {e}"))?;
 
-    // Evaluate each term concurrently with a bounded fan-out (§4.1). Each term
-    // reuses the standalone single-alert evaluator with a synthesized trigger
-    // condition carrying ONLY {operator, threshold, period} — the parent's
-    // shared window wins via `start_time`.
-    let term_futures = term_inputs.into_iter().map(|input| {
+    // Each term runs an INDEPENDENT search, so it MUST have its own trace_id.
+    // Concurrent searches sharing one trace_id collide in the search registry,
+    // which cancels the duplicates → code 20009 "Search query was cancelled".
+    let term_trace_ids: Vec<(String, String)> = resolved
+        .iter()
+        .map(|r| (r.name.clone(), config::ider::generate_trace_id()))
+        .collect();
+    if let Some(parent) = trace_id.as_deref() {
+        log::debug!(
+            "[composite] trigger trace_id {parent}: term searches {}",
+            term_trace_ids
+                .iter()
+                .map(|(n, t)| format!("{n}={t}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
+    // Evaluate each term concurrently. A term that failed to resolve (deleted/
+    // disabled member) is a pre-resolved Err → ERROR tri-state (never a silent
+    // FALSE). The composite's shared window wins via `start_time`.
+    let term_futures = resolved.into_iter().enumerate().map(|(idx, r)| {
         let org_id = org_id.to_string();
-        let trace_id = trace_id.clone();
+        let term_trace_id = Some(term_trace_ids[idx].1.clone());
         async move {
-            let res = input
-                .query_condition
-                .evaluate_scheduled(
-                    &org_id,
-                    input.stream_name.as_deref(),
-                    input.stream_type,
-                    &input.synth_tc,
-                    (start_time, end_time),
-                    Some(SearchEventType::Alerts),
-                    None,
-                    trace_id,
-                )
-                .await;
-            (input.name, res)
+            let res: Result<TriggerEvalResults, anyhow::Error> = match r.query {
+                Err(msg) => Err(anyhow::anyhow!(msg)),
+                Ok(q) => {
+                    let synth_tc = TriggerCondition {
+                        operator: q.operator,
+                        threshold: q.threshold,
+                        period,
+                        ..Default::default()
+                    };
+                    q.query_condition
+                        .evaluate_scheduled(
+                            &org_id,
+                            Some(&q.stream_name),
+                            q.stream_type,
+                            &synth_tc,
+                            (start_time, end_time),
+                            Some(SearchEventType::Alerts),
+                            None,
+                            term_trace_id,
+                        )
+                        .await
+                }
+            };
+            (r.name, r.member_name, res)
         }
     });
 
@@ -304,8 +480,6 @@ async fn run_terms(
         Ok(results) => reduce_term_results(results, end_time),
         Err(_) => {
             // Budget exceeded → whole composite is ERROR (never a partial fire).
-            // Empty states → every referenced term reads as ERROR under Kleene,
-            // so the whole expression evaluates to ERROR.
             TermsEvaluation {
                 states: HashMap::new(),
                 row_counts: HashMap::new(),
@@ -315,13 +489,14 @@ async fn run_terms(
                     format!("composite evaluation exceeded {COMPOSITE_EVAL_TIMEOUT_SECS}s budget"),
                 )]),
                 rows: HashMap::new(),
+                names: HashMap::new(),
                 end_time,
                 query_took: None,
             }
         }
     };
 
-    Ok((terms, ast))
+    Ok((terms, ast, term_trace_ids))
 }
 
 /// Collects the per-term `on_term` notifications for TRUE terms that have
@@ -352,7 +527,7 @@ fn build_on_term_sends(
 
 /// Reduces raw per-term evaluation results into tri-states + bookkeeping.
 fn reduce_term_results(
-    results: Vec<(String, Result<TriggerEvalResults, anyhow::Error>)>,
+    results: Vec<(String, Option<String>, Result<TriggerEvalResults, anyhow::Error>)>,
     default_end_time: i64,
 ) -> TermsEvaluation {
     let mut states = HashMap::new();
@@ -360,10 +535,14 @@ fn reduce_term_results(
     let mut values = HashMap::new();
     let mut errors = HashMap::new();
     let mut term_rows: HashMap<String, Vec<Map<String, Value>>> = HashMap::new();
+    let mut names = HashMap::new();
     let mut end_time = default_end_time;
     let mut query_took: Option<i64> = None;
 
-    for (name, res) in results {
+    for (name, member_name, res) in results {
+        if let Some(mn) = member_name {
+            names.insert(name.clone(), mn);
+        }
         match res {
             Ok(r) => {
                 if let Some(took) = r.query_took {
@@ -402,6 +581,7 @@ fn reduce_term_results(
         values,
         errors,
         rows: term_rows,
+        names,
         end_time,
         query_took,
     }
@@ -468,6 +648,8 @@ fn build_context_rows(
                 "state": state_str(st),
                 "error": terms.errors.get(name).cloned(),
                 "rows": rows,
+                // The member alert's name, for `{a.name}` (R1.8).
+                "name": terms.names.get(name).cloned(),
             });
             term_scopes.insert(name.clone(), scope);
         }
@@ -502,9 +684,8 @@ fn summarize_errors(errors: &HashMap<String, String>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::alerts::composite::{
-        CompositeNotify, CompositeSpec, CompositeTerm, TermSource,
-    };
+    use config::meta::alerts::composite::{CompositeNotify, CompositeSpec, CompositeTerm};
+    use svix_ksuid::KsuidLike;
 
     use super::*;
 
@@ -519,6 +700,7 @@ mod tests {
             values: HashMap::from([("a".to_string(), "5".to_string())]),
             errors: HashMap::from([("b".to_string(), "boom".to_string())]),
             rows,
+            names: HashMap::from([("a".to_string(), "checkout errors".to_string())]),
             end_time: 100,
             query_took: Some(10),
         }
@@ -527,12 +709,8 @@ mod tests {
     fn composite_alert() -> Alert {
         let term = |name: &str| CompositeTerm {
             name: name.to_string(),
-            stream_type: config::meta::stream::StreamType::Logs,
-            stream_name: Some("default".to_string()),
-            query_condition: Default::default(),
-            operator: config::meta::alerts::Operator::GreaterThanEquals,
-            threshold: 1,
-            source: TermSource::Inline,
+            alert_id: Some(svix_ksuid::Ksuid::new(None, None)),
+            query: None,
             row_template: None,
         };
         let mut alert = Alert::default();
@@ -605,6 +783,7 @@ mod tests {
         let results = vec![
             (
                 "a".to_string(),
+                Some("member a".to_string()),
                 Ok(TriggerEvalResults {
                     data: Some(vec![serde_json::Map::new(), serde_json::Map::new()]),
                     end_time: 200,
@@ -613,6 +792,7 @@ mod tests {
             ),
             (
                 "b".to_string(),
+                Some("member b".to_string()),
                 Ok(TriggerEvalResults {
                     data: None,
                     end_time: 150,
@@ -621,11 +801,13 @@ mod tests {
             ),
             (
                 "c".to_string(),
+                None,
                 Err(anyhow::anyhow!("query failed")),
             ),
         ];
         let te = reduce_term_results(results, 100);
         assert_eq!(te.states["a"], TermState::True);
+        assert_eq!(te.names["a"], "member a");
         assert_eq!(te.row_counts["a"], 2);
         assert_eq!(te.states["b"], TermState::False);
         assert_eq!(te.states["c"], TermState::Error);

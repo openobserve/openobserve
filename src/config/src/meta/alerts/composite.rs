@@ -33,9 +33,6 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
-use super::{Operator, QueryCondition};
-use crate::meta::stream::StreamType;
-
 /// Maximum number of terms a single composite may own. Enforced at save-time
 /// validation (not at eval). Bounds per-tick query fan-out (§4.1/§7).
 pub const MAX_TERMS: usize = 10;
@@ -56,86 +53,60 @@ pub struct CompositeSpec {
     pub on_error: OnErrorPolicy,
 }
 
-/// A single term of a composite alert. A term is exactly a standalone alert's
-/// condition pair: a query plus its own threshold, evaluating to a tri-state.
+/// A single term of a composite alert. A term is one of two shapes, and the
+/// composite never mutates or pauses anything it points at:
+///
+///  - a **reference** to an existing alert (`alert_id` set): each tick the
+///    composite re-runs that alert's current query over its own shared window
+///    (ReRun, §10.6.2). The referenced alert keeps running on its own schedule
+///    and is completely unaffected by the composite. It must live in the
+///    composite's folder (RBAC v1).
+///  - an **inline** query (`query` set): a query defined directly on the
+///    composite with no separate alert row. It exists only as part of this
+///    composite.
+///
+/// Exactly one of `alert_id` / `query` is set (validated at save-time).
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct CompositeTerm {
-    /// Term identifier, `[a-z0-9_]`, unique within the composite. Referenced by
-    /// the expression and by namespaced template variables (`{name.value}`).
+    /// Term label, `[A-Za-z0-9_]`, unique within the composite. Referenced by
+    /// the expression and by namespaced template variables (`{A.value}`).
     pub name: String,
 
-    /// The stream type this term queries. A composite's terms may hit different
-    /// streams, so each term carries its own.
-    #[serde(default)]
-    pub stream_type: StreamType,
-
-    /// Required for Custom terms (else `evaluate_scheduled` no-ops → silent
-    /// FALSE); SQL/PromQL terms derive the stream from the query.
+    /// Reference to an existing alert this term evaluates (ReRun). Mutually
+    /// exclusive with `query`. The referenced alert is never modified or paused.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_name: Option<String>,
+    #[schema(value_type = Option<String>)]
+    pub alert_id: Option<Ksuid>,
 
-    /// The term's query. Custom | SQL | PromQL — any mode. The pass/fail lives
-    /// where a single alert's does:
-    ///  - Custom/count term: `conditions` + the `operator`/`threshold` below.
-    ///  - Aggregate term: `aggregation` (the threshold is inside the SQL HAVING,
-    ///    NOT in `operator`/`threshold`).
-    pub query_condition: QueryCondition,
-
-    /// Count-path threshold operator (mirrors a single alert's
-    /// `TriggerCondition.operator`). Ignored for aggregate terms.
-    #[serde(default)]
-    pub operator: Operator,
-
-    /// Count-path threshold. Compared to the row count. Ignored for aggregate
-    /// terms (their threshold is inside the HAVING).
-    #[serde(default)]
-    pub threshold: i64,
-
-    /// How this term's definition is sourced. Phase 1 ships only `Inline`; the
-    /// enum is the forward-compat hinge to composable entities (§10.5).
-    #[serde(default)]
-    pub source: TermSource,
+    /// Inline query defined directly on the composite (no separate alert row).
+    /// Set when `alert_id` is `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<CompositeTermQuery>,
 
     /// Optional per-term `{name.rows[..]}` rendering template.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub row_template: Option<String>,
 }
 
-/// How a term's definition is sourced. Phase 1 ships only [`TermSource::Inline`];
-/// `RefCopy` and `RefLive` are the incremental path to composable entities
-/// (§10.5 / §10.6). Designed in from day one to avoid a Phase-2 rewrite.
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum TermSource {
-    /// Phase 1. Query + threshold live inline on the [`CompositeTerm`].
-    #[default]
-    Inline,
-    /// Phase 2. Materialized by COPYING an existing alert's query+threshold at
-    /// save time. Drifts if the source is retuned; no runtime dependency.
-    RefCopy {
-        #[schema(value_type = String)]
-        alert_id: Ksuid,
-    },
-    /// Phase 2/3. A LIVE reference to a real alert with an explicit eval mode.
-    RefLive {
-        #[schema(value_type = String)]
-        alert_id: Ksuid,
-        #[serde(default)]
-        mode: RefLiveMode,
-    },
+impl CompositeTerm {
+    /// True if this term references an existing alert (ReRun) rather than an
+    /// inline query.
+    pub fn is_reference(&self) -> bool {
+        self.alert_id.is_some()
+    }
 }
 
-/// Evaluation mode for a [`TermSource::RefLive`] term (§10.6).
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema, PartialEq, Eq, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum RefLiveMode {
-    /// Re-run the source's current query over the shared window. Safe default
-    /// (Phase 2): inline cost/correctness, recovers G1.
-    #[default]
-    ReRun,
-    /// Read the source alert's last computed scheduler result; issues 0 queries.
-    /// Powerful (Phase 3): recovers G1+G3+G4 but re-imports staleness hardening.
-    ReadLast,
+/// An inline query owned by a composite term: everything needed to run the term
+/// over the composite's shared window, without a separate alert row.
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct CompositeTermQuery {
+    pub stream_type: crate::meta::stream::StreamType,
+    pub stream_name: String,
+    pub query_condition: super::QueryCondition,
+    /// Threshold comparison operator for this term.
+    pub operator: super::Operator,
+    /// Threshold value compared against the term's query result.
+    pub threshold: i64,
 }
 
 /// Notification routing for a composite alert.
@@ -180,8 +151,6 @@ mod tests {
 
     #[test]
     fn test_defaults() {
-        assert_eq!(TermSource::default(), TermSource::Inline);
-        assert_eq!(RefLiveMode::default(), RefLiveMode::ReRun);
         assert_eq!(OnErrorPolicy::default(), OnErrorPolicy::Suppress);
     }
 
@@ -199,52 +168,53 @@ mod tests {
     }
 
     #[test]
-    fn test_term_source_roundtrip() {
-        // Inline serializes as a bare string.
-        let inline = serde_json::to_value(TermSource::Inline).unwrap();
-        assert_eq!(inline, serde_json::json!("inline"));
-
-        // Data-carrying variants round-trip.
+    fn test_term_reference_roundtrip() {
         let id: Ksuid = Ksuid::new(None, None);
-        let live = TermSource::RefLive {
-            alert_id: id,
-            mode: RefLiveMode::ReadLast,
+        let term = CompositeTerm {
+            name: "A".to_string(),
+            alert_id: Some(id),
+            query: None,
+            row_template: None,
         };
-        let s = serde_json::to_string(&live).unwrap();
-        let back: TermSource = serde_json::from_str(&s).unwrap();
-        assert_eq!(live, back);
+        let s = serde_json::to_string(&term).unwrap();
+        let back: CompositeTerm = serde_json::from_str(&s).unwrap();
+        assert_eq!(term, back);
+        assert_eq!(back.alert_id, Some(id));
+        assert!(back.is_reference());
     }
 
     #[test]
-    fn test_ref_live_mode_defaults_when_absent() {
-        // A ref_live without an explicit mode defaults to ReRun.
-        let id: Ksuid = Ksuid::new(None, None);
-        let json = format!(r#"{{"ref_live":{{"alert_id":"{id}"}}}}"#);
-        let parsed: TermSource = serde_json::from_str(&json).unwrap();
-        match parsed {
-            TermSource::RefLive { mode, .. } => assert_eq!(mode, RefLiveMode::ReRun),
-            _ => panic!("expected ref_live"),
-        }
+    fn test_inline_term_roundtrip() {
+        // An inline term deserializes without an alert_id.
+        let json = r#"{
+            "name": "A",
+            "query": {
+                "stream_type": "logs",
+                "stream_name": "default",
+                "query_condition": { "type": "custom" },
+                "operator": ">=",
+                "threshold": 1
+            }
+        }"#;
+        let term: CompositeTerm = serde_json::from_str(json).unwrap();
+        assert!(!term.is_reference());
+        assert_eq!(term.query.as_ref().unwrap().threshold, 1);
     }
 
     #[test]
     fn test_term_lookup() {
         let spec = CompositeSpec {
             terms: vec![CompositeTerm {
-                name: "a".to_string(),
-                stream_type: StreamType::Logs,
-                stream_name: Some("default".to_string()),
-                query_condition: QueryCondition::default(),
-                operator: Operator::GreaterThanEquals,
-                threshold: 100,
-                source: TermSource::Inline,
+                name: "A".to_string(),
+                alert_id: Some(Ksuid::new(None, None)),
+                query: None,
                 row_template: None,
             }],
-            expression: "a".to_string(),
+            expression: "A".to_string(),
             notify: CompositeNotify::default(),
             on_error: OnErrorPolicy::Suppress,
         };
-        assert!(spec.term("a").is_some());
-        assert!(spec.term("b").is_none());
+        assert!(spec.term("A").is_some());
+        assert!(spec.term("B").is_none());
     }
 }

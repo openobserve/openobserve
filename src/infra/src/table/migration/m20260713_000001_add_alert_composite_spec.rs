@@ -13,14 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Adds the nullable `composite_spec` JSON column to the alerts table.
+//! Adds the composite-alert column to the alerts table:
+//!  - `composite_spec` (JSON, nullable): when present, holds the JSONB
+//!    serialization of a `CompositeSpec` and marks the alert as a composite.
 //!
-//! When present, the column holds the JSONB serialization of a `CompositeSpec`
-//! and marks the alert as a composite alert. Legacy rows are `NULL` (ordinary
-//! single-query alerts), so the migration is backward compatible.
-//!
-//! Note: The column exists in all builds but the composite evaluation logic is
-//! only available in the enterprise edition.
+//! A composite never mutates the alerts it references, so no back-reference is
+//! stored on referenced alerts. Legacy rows are `NULL` (ordinary single-query
+//! alerts), so the migration is backward compatible. The column exists in all
+//! builds but the composite evaluation logic is only available in the
+//! enterprise edition.
 
 use sea_orm_migration::prelude::*;
 

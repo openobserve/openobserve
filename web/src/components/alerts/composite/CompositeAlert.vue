@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="sm"
           icon-left="add"
-          :disabled="composite.terms.length >= MAX_TERMS || beingUpdated"
+          :disabled="composite.terms.length >= MAX_TERMS"
           data-test="composite-add-term-btn"
           @click="addTerm"
         >
@@ -66,13 +66,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <CompositeTermCard
         v-for="(term, idx) in composite.terms"
-        :key="term.name"
+        :key="idx"
         :term="term"
-        :streamTypes="streamTypes"
-        :triggerCondition="triggerCondition"
+        :memberOptions="memberOptions"
+        :loadingMembers="loadingMembers"
         :canRemove="composite.terms.length > 2"
         :beingUpdated="beingUpdated"
         @remove="removeTerm(idx)"
+        @open-member="openMember"
       />
     </div>
 
@@ -89,23 +90,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-sm"
         :class="expressionResult.valid ? '' : 'field-error'"
       />
-      <!-- Term chips (available identifiers) -->
+      <!-- Term chips (exact aliases; click to insert into the expression) -->
       <div class="flex items-center gap-1.5 flex-wrap">
         <span class="text-xs text-text-secondary">{{ t("alerts.composite.availableTerms") }}:</span>
-        <OTag
+        <span
           v-for="term in composite.terms"
           :key="term.name"
-          type="default"
-          :value="term.name"
-          class="cursor-pointer"
+          class="composite-term-chip cursor-pointer"
+          :data-test="`composite-expr-chip-${term.name}`"
           @click="insertTerm(term.name)"
-        />
+        >{{ term.name || "—" }}</span>
       </div>
       <div
         v-if="!expressionResult.valid && composite.expression"
-        class="text-xs text-negative"
+        class="flex items-center gap-1 text-[13px] font-medium text-negative"
         data-test="composite-expression-error"
       >
+        <OIcon name="error-outline" size="xs" />
         {{ expressionResult.error }}
       </div>
     </div>
@@ -185,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="`onterm-${term.name}`"
           class="flex items-center gap-2 flex-wrap"
         >
-          <OTag type="default" :value="term.name" class="uppercase" />
+          <span class="composite-term-chip">{{ term.name }}</span>
           <OSelect
             :model-value="composite.notify.on_term[term.name] || []"
             :options="destinations"
@@ -214,10 +215,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, nextTick } from "vue";
+import { defineComponent, computed, ref, nextTick, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import CompositeTermCard from "@/components/alerts/composite/CompositeTermCard.vue";
 import { validateCompositeExpression } from "@/utils/alerts/compositeExpression";
+import alertsService from "@/services/alerts";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -229,9 +233,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 /** Keep in sync with `MAX_TERMS` in the back-end (config composite.rs). */
 const MAX_TERMS = 10;
 
-/** Builds a fresh inline term with the given name. */
-export const makeCompositeTerm = (name: string) => ({
-  name,
+/** The query-builder draft used when creating a member from scratch ("New").
+ * Non-query fields (destinations, schedule, name, folder) are inherited from the
+ * composite at save time — the user only fills the query + threshold. */
+export const makeMemberDraft = () => ({
   stream_type: "logs",
   stream_name: "",
   query_condition: {
@@ -255,8 +260,20 @@ export const makeCompositeTerm = (name: string) => ({
   },
   operator: ">=",
   threshold: 1,
-  source: "inline",
-  row_template: null,
+});
+
+/**
+ * A composite term: an alias + one of two sources. In `existing` mode the user
+ * picks an alert the composite re-runs each tick (the referenced alert is never
+ * modified or paused). In `new` mode they build a query (`draft`) stored inline
+ * on the composite — no separate alert is created.
+ */
+export const makeCompositeTerm = (name: string) => ({
+  name, // alias / expression identifier ([A-Za-z0-9_])
+  mode: "existing", // "existing" | "new"
+  alert_id: "", // referenced alert id (existing mode)
+  member_name: "", // display name of the referenced alert
+  draft: makeMemberDraft(), // inline query (new mode)
 });
 
 /** The default composite spec attached when switching to composite mode. */
@@ -286,9 +303,15 @@ export default defineComponent({
       type: Array as () => string[],
       default: () => [],
     },
-    streamTypes: {
-      type: Array as () => string[],
-      default: () => ["logs", "metrics", "traces"],
+    /** The composite's folder id — members must come from this folder (R1.7). */
+    folderId: {
+      type: String,
+      default: "default",
+    },
+    /** The composite alert's own id (edit mode) — excluded from member options. */
+    selfId: {
+      type: String,
+      default: "",
     },
     beingUpdated: {
       type: Boolean,
@@ -303,8 +326,84 @@ export default defineComponent({
   emits: ["refresh:destinations", "update:infoDismissed"],
   setup(props) {
     const { t } = useI18n();
+    const store = useStore();
+    const router = useRouter();
 
     const termsListRef = ref<HTMLElement | null>(null);
+
+    // Open a member alert's edit form in a new tab (deep-link into the alert
+    // list, which loads the alert by id when action=update).
+    const openMember = (alertId: string) => {
+      if (!alertId) return;
+      const href = router.resolve({
+        name: "alertList",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          action: "update",
+          alert_id: alertId,
+          folder: props.folderId || "default",
+        },
+      }).href;
+      window.open(href, "_blank");
+    };
+
+    // Alerts in the composite's folder eligible to be referenced: scheduled and
+    // not themselves a composite (no nesting). Referenced alerts keep running
+    // independently — referencing one has no effect on it.
+    const memberOptions = ref<
+      Array<{
+        label: string;
+        value: string;
+        queryType: string;
+        operator: string;
+        threshold: any;
+      }>
+    >([]);
+    const loadingMembers = ref(false);
+    const loadMembers = async () => {
+      loadingMembers.value = true;
+      try {
+        const res: any = await alertsService.listByFolderId(
+          1,
+          1000,
+          "name",
+          false,
+          "",
+          store.state.selectedOrganization.identifier,
+          props.folderId || "default",
+          "",
+          "scheduled",
+        );
+        const list = res?.data?.list || res?.data || [];
+        memberOptions.value = list
+          .filter(
+            (a: any) =>
+              !a.is_composite &&
+              !a.composite &&
+              (a.alert_id || a.id) !== props.selfId,
+          )
+          .map((a: any) => ({
+            label: a.name,
+            value: a.alert_id || a.id,
+            queryType: (a.condition?.type || "custom").toUpperCase(),
+            operator: a.trigger_condition?.operator || ">=",
+            threshold: a.trigger_condition?.threshold ?? 1,
+          }));
+        // Backfill member_name on existing terms so cards/summary show the name
+        // even on edit-load (before the user re-picks).
+        const byId: Record<string, string> = {};
+        memberOptions.value.forEach((o) => (byId[o.value] = o.label));
+        props.composite.terms.forEach((tm: any) => {
+          if (tm.alert_id && !tm.member_name && byId[tm.alert_id]) {
+            tm.member_name = byId[tm.alert_id];
+          }
+        });
+      } catch {
+        memberOptions.value = [];
+      } finally {
+        loadingMembers.value = false;
+      }
+    };
 
     const onErrorOptions = computed(() => [
       { label: t("alerts.composite.onErrorSuppress"), value: "suppress" },
@@ -330,7 +429,9 @@ export default defineComponent({
 
     const addTerm = () => {
       if (props.composite.terms.length >= MAX_TERMS) return;
-      props.composite.terms.push(makeCompositeTerm(nextTermName()));
+      // Mark as added this session so its Existing/New toggle stays editable in
+      // update mode (already-saved terms stay locked — see CompositeTermCard).
+      props.composite.terms.push({ ...makeCompositeTerm(nextTermName()), _isNew: true });
       // Move focus to the new term so the author sees where it was added.
       nextTick(() => {
         const cards = termsListRef.value?.querySelectorAll(".composite-term-card");
@@ -367,10 +468,21 @@ export default defineComponent({
       props.composite.expression = expr ? `${expr} ${name}` : name;
     };
 
+    onMounted(loadMembers);
+    watch(
+      () => props.folderId,
+      (val, old) => {
+        if (val && val !== old) loadMembers();
+      },
+    );
+
     return {
       t,
       MAX_TERMS,
       termsListRef,
+      memberOptions,
+      loadingMembers,
+      openMember,
       onErrorOptions,
       expressionResult,
       addTerm,
@@ -381,3 +493,19 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* Exact-alias chip (no case/space transform, unlike OTag's humanised labels). */
+.composite-term-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  font-family: var(--o2-font-mono, ui-monospace, monospace);
+  background: color-mix(in srgb, var(--q-primary) 12%, transparent);
+  color: var(--q-primary);
+  white-space: nowrap;
+}
+</style>
