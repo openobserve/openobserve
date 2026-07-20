@@ -2256,4 +2256,54 @@ describe('FilterGroup.vue Form Mode (namePrefix + OForm)', () => {
     expect(wrapper.findAllComponents(OSelect).length).toBeGreaterThan(0);
     expect(wrapper.findComponent(OInput).exists()).toBe(true);
   });
+
+  // ── nesting indent ──────────────────────────────────────────────────────────
+  // The per-level indent is a COMPUTED inline style. The flow drawer used to
+  // shrink it from outside with `[style*="margin-left"] { margin-left: 10px
+  // !important }` — an attribute selector reaching into this component, which
+  // would have caught any other inline margin-left too. `indent-rem` replaces
+  // that; these pin both the default and the override so the CSS hack cannot
+  // come back unnoticed.
+  describe("indent-rem", () => {
+    // Local props: `defaultProps` belongs to another describe block.
+    const baseProps = {
+      group: {
+        groupId: "g1",
+        logicalOperator: "AND",
+        filterType: "group",
+        conditions: [],
+      },
+      streamFields: [{ label: "Field 1", value: "field1" }],
+      depth: 0,
+    };
+
+    const mountAt = (props: Record<string, any> = {}) =>
+      mount(FilterGroup, {
+        props: { ...baseProps, ...props },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+          stubs: { FilterCondition: true },
+        },
+      });
+
+    const marginOf = (w: any) =>
+      (w.find(".el-border").attributes("style") || "").match(
+        /margin-left:\s*([^;]+)/,
+      )?.[1];
+
+    it("defaults to 1.25rem per level", () => {
+      expect(marginOf(mountAt({ depth: 0 }))).toBe("0rem");
+      expect(marginOf(mountAt({ depth: 2 }))).toBe("2.5rem");
+    });
+
+    it("uses the caller's indent when given", () => {
+      expect(marginOf(mountAt({ depth: 2, indentRem: 0.625 }))).toBe("1.25rem");
+    });
+
+    it("still scales with depth under a custom indent", () => {
+      expect(marginOf(mountAt({ depth: 0, indentRem: 0.625 }))).toBe("0rem");
+      expect(marginOf(mountAt({ depth: 3, indentRem: 0.625 }))).toBe("1.875rem");
+    });
+  });
 });
