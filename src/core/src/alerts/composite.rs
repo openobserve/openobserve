@@ -29,7 +29,8 @@ use std::{collections::HashMap, time::Duration};
 
 use config::meta::{
     alerts::{
-        TriggerCondition, TriggerEvalResults, alert::Alert,
+        TriggerCondition, TriggerEvalResults,
+        alert::Alert,
         composite::{MAX_TERMS, OnErrorPolicy},
     },
     search::SearchEventType,
@@ -280,7 +281,10 @@ async fn resolve_scheduler_terms(
                         if !referenced.enabled {
                             (
                                 name,
-                                Err(format!("referenced alert '{}' is disabled", referenced.name)),
+                                Err(format!(
+                                    "referenced alert '{}' is disabled",
+                                    referenced.name
+                                )),
                             )
                         } else {
                             (
@@ -314,10 +318,7 @@ async fn resolve_scheduler_terms(
                         threshold: q.threshold,
                     }),
                 ),
-                None => (
-                    None,
-                    Err(format!("term '{}' has no query", term.name)),
-                ),
+                None => (None, Err(format!("term '{}' has no query", term.name))),
             },
         };
         resolved.push(ResolvedTerm {
@@ -358,7 +359,10 @@ pub async fn resolve_preview_terms(
                 Ok(Some((_folder, member))) => {
                     let name = Some(member.name.clone());
                     if !member.enabled {
-                        (name, Err(format!("member alert '{}' is disabled", member.name)))
+                        (
+                            name,
+                            Err(format!("member alert '{}' is disabled", member.name)),
+                        )
                     } else {
                         (
                             name,
@@ -527,7 +531,11 @@ fn build_on_term_sends(
 
 /// Reduces raw per-term evaluation results into tri-states + bookkeeping.
 fn reduce_term_results(
-    results: Vec<(String, Option<String>, Result<TriggerEvalResults, anyhow::Error>)>,
+    results: Vec<(
+        String,
+        Option<String>,
+        Result<TriggerEvalResults, anyhow::Error>,
+    )>,
     default_end_time: i64,
 ) -> TermsEvaluation {
     let mut states = HashMap::new();
@@ -799,11 +807,7 @@ mod tests {
                     query_took: Some(3),
                 }),
             ),
-            (
-                "c".to_string(),
-                None,
-                Err(anyhow::anyhow!("query failed")),
-            ),
+            ("c".to_string(), None, Err(anyhow::anyhow!("query failed"))),
         ];
         let te = reduce_term_results(results, 100);
         assert_eq!(te.states["a"], TermState::True);
