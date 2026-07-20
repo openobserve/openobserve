@@ -402,6 +402,21 @@ export class PipelinesPage {
     }
 
     async selectStream() {
+        // Opening the pipeline editor is an SPA route change; the VueFlow canvas and
+        // NodeSidebar mount asynchronously and, under concurrent full-suite CI load,
+        // occasionally miss the first render — a bare click then dead-waits the full
+        // 45s action timeout (the pipeline-core:56 hard fail plus the pipeline-dynamic /
+        // pipelines flakes all resolved to pipelinesPage.js:405). selectStream is always
+        // the first node placement on a blank canvas, so re-loading the editor once to
+        // recover a missed mount is safe (no unsaved nodes to lose).
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            if (await this.streamButton.isVisible({ timeout: 20000 }).catch(() => false)) {
+                break;
+            }
+            await this.page.reload();
+            await this.page.waitForLoadState('domcontentloaded').catch(() => {});
+        }
+        await this.streamButton.waitFor({ state: 'visible', timeout: 20000 });
         await this.streamButton.click();
     }
 
