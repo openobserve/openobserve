@@ -131,33 +131,6 @@ pub trait StreamRuntime: Send + Sync + 'static {
         schema: &Schema,
         min_ts: i64,
     ) -> anyhow::Result<()>;
-
-    #[cfg(feature = "vectorscan")]
-    fn pattern_associations(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-    ) -> Vec<config::meta::stream::PatternAssociation>;
-
-    #[cfg(feature = "vectorscan")]
-    async fn process_pattern_association_changes(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        update: config::meta::stream::UpdateSettingsWrapper<
-            config::meta::stream::PatternAssociation,
-        >,
-    ) -> anyhow::Result<()>;
-
-    #[cfg(feature = "vectorscan")]
-    async fn remove_pattern_associations(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-    ) -> anyhow::Result<()>;
 }
 
 static STREAM_RUNTIME: OnceLock<Arc<dyn StreamRuntime>> = OnceLock::new();
@@ -344,9 +317,9 @@ pub fn stream_res(
     // manager. So instead we do it in best-effort-way, where if it is already initialized,
     // we get the patterns, otherwise report them as empty
     #[cfg(feature = "vectorscan")]
-    let pattern_associations = STREAM_RUNTIME
+    let pattern_associations = o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER
         .get()
-        .map(|runtime| runtime.pattern_associations(_org_id, stream_name, stream_type))
+        .map(|manager| manager.get_associations(_org_id, stream_type, stream_name))
         .unwrap_or_default();
     let is_derived = unwrap_stream_is_derived(&schema);
 
@@ -1071,14 +1044,13 @@ pub async fn update_stream_settings(
 
     #[cfg(feature = "vectorscan")]
     {
-        if let Err(e) = stream_runtime_io()?
-            .process_pattern_association_changes(
-                org_id,
-                stream_name,
-                stream_type,
-                new_settings.pattern_associations,
-            )
-            .await
+        if let Err(e) = crate::re_pattern::process_association_changes(
+            org_id,
+            stream_name,
+            stream_type,
+            new_settings.pattern_associations,
+        )
+        .await
         {
             return Ok(MetaHttpResponse::internal_error(format!(
                 "Internal server error while updating pattern associations {e}",
@@ -1234,9 +1206,12 @@ pub async fn stream_delete_inner(
 ) -> Result<(), anyhow::Error> {
     #[cfg(feature = "vectorscan")]
     {
-        stream_runtime()?
-            .remove_pattern_associations(org_id, stream_name, stream_type)
-            .await?;
+        crate::re_pattern::remove_stream_associations_after_deletion(
+            org_id,
+            stream_name,
+            stream_type,
+        )
+        .await?;
     }
 
     // delete stream schema cache

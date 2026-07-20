@@ -264,54 +264,6 @@ impl openobserve_catalog::stream::StreamRuntime for CoreStreamRuntime {
         .await?;
         Ok(())
     }
-
-    #[cfg(feature = "vectorscan")]
-    fn pattern_associations(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: config::meta::stream::StreamType,
-    ) -> Vec<config::meta::stream::PatternAssociation> {
-        match o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER.get() {
-            Some(manager) => manager.get_associations(org_id, stream_type, stream_name),
-            None => vec![],
-        }
-    }
-
-    #[cfg(feature = "vectorscan")]
-    async fn process_pattern_association_changes(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: config::meta::stream::StreamType,
-        update: config::meta::stream::UpdateSettingsWrapper<
-            config::meta::stream::PatternAssociation,
-        >,
-    ) -> anyhow::Result<()> {
-        crate::db::re_pattern::process_association_changes(
-            org_id,
-            stream_name,
-            stream_type,
-            update,
-        )
-        .await?;
-        Ok(())
-    }
-
-    #[cfg(feature = "vectorscan")]
-    async fn remove_pattern_associations(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: config::meta::stream::StreamType,
-    ) -> anyhow::Result<()> {
-        crate::db::re_pattern::remove_stream_associations_after_deletion(
-            org_id,
-            stream_name,
-            stream_type,
-        )
-        .await
-    }
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {

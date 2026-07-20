@@ -19,6 +19,8 @@
 //! The crate deliberately does not depend on `openobserve-core` or application service crates.
 
 pub mod file_list;
+#[cfg(feature = "vectorscan")]
+pub mod re_pattern;
 pub mod retention;
 pub mod schema;
 pub mod stream;

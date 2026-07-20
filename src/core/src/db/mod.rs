@@ -122,7 +122,9 @@ pub mod pipeline_errors {
     pub use openobserve_pipeline::repository::pipeline_errors::*;
 }
 #[cfg(feature = "vectorscan")]
-pub mod re_pattern;
+pub mod re_pattern {
+    pub use openobserve_catalog::re_pattern::*;
+}
 pub mod saved_view {
     pub use openobserve_organization::repository::saved_view::*;
 }

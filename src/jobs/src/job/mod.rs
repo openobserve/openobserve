@@ -951,8 +951,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "vectorscan")]
     {
-        tokio::task::spawn(db::re_pattern::watch_patterns());
-        tokio::task::spawn(db::re_pattern::watch_pattern_associations());
+        tokio::task::spawn(openobserve_catalog::re_pattern::watch_patterns());
+        tokio::task::spawn(openobserve_catalog::re_pattern::watch_pattern_associations());
         // we do this call here so the pattern manager gets init-ed at the very start instead at
         // first use helpful for stream settings case, where if not already init-ed, it
         // returns empty array for associations because it is a sync fn and cannot init
