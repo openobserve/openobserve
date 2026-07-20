@@ -31,7 +31,7 @@ use crate::{
     },
     common::{infra::config::USERS, meta},
     migration,
-    service::{compact, db, file_list, users},
+    service::{db, file_list, users},
 };
 
 /// Not to be confused with [`clap::arg`] macro, this is a custom macro that
@@ -290,7 +290,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     // load stream list
                     db::schema::cache().await?;
                     // update stats from file list
-                    compact::stats::update_stats_from_file_list()
+                    openobserve_compactor::stats::update_stats_from_file_list()
                         .await
                         .expect("file list remote calculate stats failed");
                 }

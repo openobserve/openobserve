@@ -18,6 +18,7 @@
 //! Merge/search orchestration remains in the composition layer until its
 //! schema and query dependencies are expressed as explicit ports.
 
+mod catalog;
 pub mod deleted;
 pub mod dump;
 pub mod file_list_dump;
@@ -28,6 +29,7 @@ pub mod merge;
 mod metadata;
 pub mod repository;
 pub mod retention;
+pub mod service;
 pub mod stats;
 pub mod tantivy;
 pub mod worker;

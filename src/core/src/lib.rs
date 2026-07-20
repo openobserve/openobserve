@@ -27,7 +27,6 @@ pub mod auth;
 pub mod authz;
 pub mod bootstrap;
 pub mod cluster_info;
-pub mod compact;
 pub mod dashboards;
 pub mod db;
 pub mod enrichment;

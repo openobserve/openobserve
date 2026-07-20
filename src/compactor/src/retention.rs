@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf};
 
 use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
 use config::{
@@ -34,40 +31,11 @@ use config::{
 use infra::{
     cluster::{get_node_by_uuid, get_node_from_consistent_hash},
     file_list as infra_file_list,
-    schema::STREAM_SCHEMAS_LATEST,
     table::compactor_manual_jobs::Status as CompactorManualJobStatus,
 };
 use itertools::Itertools;
 
 use crate::file_list_dump::generate_dump_stream_name;
-
-async fn list_organizations_from_cache() -> Vec<String> {
-    STREAM_SCHEMAS_LATEST
-        .read()
-        .await
-        .keys()
-        .filter_map(|key| key.split_once('/').map(|(org_id, _)| org_id.to_string()))
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect()
-}
-
-async fn list_streams_from_cache(org_id: &str, stream_type: StreamType) -> Vec<String> {
-    STREAM_SCHEMAS_LATEST
-        .read()
-        .await
-        .keys()
-        .filter_map(|key| {
-            let mut columns = key.split('/');
-            let current_org = columns.next()?;
-            let current_type = StreamType::from(columns.next()?);
-            let stream_name = columns.next()?;
-            (current_org == org_id && current_type == stream_type).then(|| stream_name.to_string())
-        })
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect()
-}
 
 async fn query_file_list(
     trace_id: &str,
@@ -133,13 +101,13 @@ pub async fn generate_jobs() -> Result<(), anyhow::Error> {
     let now = config::utils::time::now();
     let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
-    let orgs = list_organizations_from_cache().await;
+    let orgs = crate::catalog::list_organizations().await;
     for org_id in orgs {
         for stream_type in ALL_STREAM_TYPES {
             if stream_type == StreamType::EnrichmentTables || stream_type == StreamType::Filelist {
                 continue; // skip data retention for enrichment tables and filelist
             }
-            let streams = list_streams_from_cache(&org_id, stream_type).await;
+            let streams = crate::catalog::list_streams(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await

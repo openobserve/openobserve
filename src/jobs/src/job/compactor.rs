@@ -24,9 +24,9 @@ use infra::cluster::get_node_by_uuid;
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use openobserve_compactor::{
     merge::{FileListBroadcaster, MergeService},
+    service as compact,
     worker::{JobScheduler, MergeExecutor, MergeWorker},
 };
-use openobserve_core::compact;
 const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/compact/enrichment_table";
 
 struct CoreFileListBroadcaster;

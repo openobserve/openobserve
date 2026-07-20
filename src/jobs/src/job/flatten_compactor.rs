@@ -15,28 +15,9 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use config::{
-    cluster::LOCAL_NODE,
-    get_config,
-    meta::stream::{FileKey, StreamType},
-    spawn_pausable_job,
-};
-use openobserve_compactor::flatten::{self, StreamCatalog};
+use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey, spawn_pausable_job};
+use openobserve_compactor::flatten;
 use tokio::sync::{Mutex, mpsc};
-
-struct CoreStreamCatalog;
-
-#[async_trait]
-impl StreamCatalog for CoreStreamCatalog {
-    async fn list_organizations(&self) -> Vec<String> {
-        crate::service::db::schema::list_organizations_from_cache().await
-    }
-
-    async fn list_streams(&self, org_id: &str, stream_type: StreamType) -> Vec<String> {
-        crate::service::db::schema::list_streams_from_cache(org_id, stream_type).await
-    }
-}
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_flatten_compactor() {
@@ -80,7 +61,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         get_config().compact.interval,
         {
             log::debug!("[COMPACTOR] Running parquet file data flatten");
-            let ret = flatten::run_generate(&CoreStreamCatalog, tx.clone()).await;
+            let ret = flatten::run_generate(tx.clone()).await;
             if ret.is_err() {
                 log::error!(
                     "[COMPACTOR] run parquet file data flatten error: {}",

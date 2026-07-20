@@ -6501,6 +6501,7 @@ dependencies = [
  "object_store",
  "openobserve-alerts",
  "openobserve-api",
+ "openobserve-compactor",
  "openobserve-core",
  "openobserve-ingestion",
  "openobserve-jobs",

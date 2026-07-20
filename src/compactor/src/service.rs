@@ -32,25 +32,15 @@ use infra::{
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
 use tokio::sync::mpsc;
 
-use crate::db;
-
-pub mod deleted {
-    pub use openobserve_compactor::deleted::*;
-}
-pub mod incremental {
-    pub use openobserve_compactor::incremental::*;
-}
-pub mod stats;
-
 /// compactor retention run steps:
 pub async fn run_retention() -> Result<(), anyhow::Error> {
     // generate retention jobs first
-    if let Err(e) = openobserve_compactor::retention::generate_jobs().await {
+    if let Err(e) = crate::retention::generate_jobs().await {
         log::error!("[COMPACTOR] generate retention job error: {e}");
     }
 
     // then run the jobs to delete the data
-    let jobs = db::compact::retention::list().await?;
+    let jobs = crate::repository::retention::list().await?;
     for job in jobs {
         let columns = job.split('/').collect::<Vec<&str>>();
         let org_id = columns[0];
@@ -69,10 +59,10 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         }
 
         let ret = if retention.eq("all") {
-            openobserve_compactor::retention::delete_all(org_id, stream_type, stream_name).await
+            crate::retention::delete_all(org_id, stream_type, stream_name).await
         } else {
             let date_range = retention.split(',').collect::<Vec<&str>>();
-            openobserve_compactor::retention::delete_by_date(
+            crate::retention::delete_by_date(
                 org_id,
                 stream_type,
                 stream_name,
@@ -99,7 +89,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
 
 /// Generate job for compactor
 pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = crate::catalog::list_organizations().await;
     for org_id in orgs {
         // check backlist
         if !openobserve_catalog::file_list::BLOCKED_ORGS.is_empty()
@@ -108,7 +98,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
             continue;
         }
         for stream_type in ALL_STREAM_TYPES {
-            let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+            let streams = crate::catalog::list_streams(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -119,7 +109,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                     // This needs to be done in the case when there is a new node in the cluster
                     // This will change the node that holds the stream
                     // In case this node holds the stream, we release it for the designated node
-                    if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
+                    if let Some((offset, _)) = crate::repository::files::get_offset_from_cache(
                         &org_id,
                         stream_type,
                         &stream_name,
@@ -127,7 +117,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                     .await
                     {
                         // release the stream
-                        db::compact::files::set_offset(
+                        crate::repository::files::set_offset(
                             &org_id,
                             stream_type,
                             &stream_name,
@@ -140,7 +130,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                 }
 
                 // check if we are allowed to merge or just skip
-                if db::compact::retention::is_deleting_stream(
+                if crate::repository::retention::is_deleting_stream(
                     &org_id,
                     stream_type,
                     &stream_name,
@@ -157,12 +147,9 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
 
                 match job_type {
                     CompactionJobType::Current => {
-                        if let Err(e) = openobserve_compactor::merge::generate_job_by_stream(
-                            &org_id,
-                            stream_type,
-                            &stream_name,
-                        )
-                        .await
+                        if let Err(e) =
+                            crate::merge::generate_job_by_stream(&org_id, stream_type, &stream_name)
+                                .await
                         {
                             log::error!(
                                 "[COMPACTOR] generate_job_by_stream [{org_id}/{stream_type}/{stream_name}] error: {e}"
@@ -175,13 +162,12 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
                         {
                             continue;
                         }
-                        if let Err(e) =
-                            openobserve_compactor::merge::generate_old_data_job_by_stream(
-                                &org_id,
-                                stream_type,
-                                &stream_name,
-                            )
-                            .await
+                        if let Err(e) = crate::merge::generate_old_data_job_by_stream(
+                            &org_id,
+                            stream_type,
+                            &stream_name,
+                        )
+                        .await
                         {
                             log::error!(
                                 "[COMPACTOR] generate_old_data_job_by_stream [{org_id}/{stream_type}/{stream_name}] error: {e}"
@@ -199,7 +185,7 @@ pub async fn run_generate_job(job_type: CompactionJobType) -> Result<(), anyhow:
 /// Generate downsampling job for Metrics
 #[cfg(feature = "enterprise")]
 pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = crate::catalog::list_organizations().await;
     for org_id in orgs {
         // check backlist
         if !openobserve_catalog::file_list::BLOCKED_ORGS.is_empty()
@@ -208,7 +194,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
             continue;
         }
         let stream_type = StreamType::Metrics;
-        let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
+        let streams = crate::catalog::list_streams(&org_id, stream_type).await;
         for stream_name in streams {
             let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
@@ -219,16 +205,17 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
             for rule in downsampling_rules {
                 if LOCAL_NODE.name.ne(&node_name) {
                     // Check if this node holds the stream
-                    if let Some((offset, _)) = db::compact::downsampling::get_offset_from_cache(
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                        (rule.offset, rule.step),
-                    )
-                    .await
+                    if let Some((offset, _)) =
+                        crate::repository::downsampling::get_offset_from_cache(
+                            &org_id,
+                            stream_type,
+                            &stream_name,
+                            (rule.offset, rule.step),
+                        )
+                        .await
                     {
                         // release the stream
-                        db::compact::downsampling::set_offset(
+                        crate::repository::downsampling::set_offset(
                             &org_id,
                             stream_type,
                             &stream_name,
@@ -242,7 +229,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                 }
 
                 // check if we are allowed to merge or just skip
-                if db::compact::retention::is_deleting_stream(
+                if crate::repository::retention::is_deleting_stream(
                     &org_id,
                     stream_type,
                     &stream_name,
@@ -254,14 +241,13 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
                     continue;
                 }
 
-                if let Err(e) =
-                    openobserve_compactor::merge::generate_downsampling_job_by_stream_and_rule(
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                        (rule.offset, rule.step),
-                    )
-                    .await
+                if let Err(e) = crate::merge::generate_downsampling_job_by_stream_and_rule(
+                    &org_id,
+                    stream_type,
+                    &stream_name,
+                    (rule.offset, rule.step),
+                )
+                .await
                 {
                     log::error!(
                         "[DOWNSAMPLING] generate_downsampling_job_by_stream_and_rule [{org_id}/{stream_type}/{stream_name}] rule: {rule:?} error: {e}"
@@ -275,9 +261,7 @@ pub async fn run_generate_downsampling_job() -> Result<(), anyhow::Error> {
 }
 
 /// compactor merging
-pub async fn run_merge(
-    job_tx: mpsc::Sender<openobserve_compactor::worker::MergeJob>,
-) -> Result<(), anyhow::Error> {
+pub async fn run_merge(job_tx: mpsc::Sender<crate::worker::MergeJob>) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let jobs = infra_file_list::get_pending_jobs(
         &LOCAL_NODE.uuid,
@@ -321,7 +305,12 @@ pub async fn run_merge(
             continue;
         }
         // check if we are allowed to merge or just skip
-        if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
+        if crate::repository::retention::is_deleting_stream(
+            &org_id,
+            stream_type,
+            &stream_name,
+            None,
+        ) {
             need_done_ids.push(job.id); // the data will be deleted by retention, just skip
             continue;
         }
@@ -338,15 +327,15 @@ pub async fn run_merge(
             }
 
             // check if already running a job for this stream
-            if db::compact::stream::is_running(&job.stream) {
+            if crate::repository::stream::is_running(&job.stream) {
                 need_release_ids.push(job.id); // another job is running
                 continue;
             } else {
-                db::compact::stream::set_running(&job.stream);
+                crate::repository::stream::set_running(&job.stream);
             }
         }
         // collect the merge jobs
-        merge_jobs.push(openobserve_compactor::worker::MergeJob {
+        merge_jobs.push(crate::worker::MergeJob {
             org_id,
             stream_type,
             stream_name,
@@ -426,10 +415,10 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         )
         .unwrap();
     let time_max = time_max.timestamp_micros();
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let orgs = crate::catalog::list_organizations().await;
     for org_id in orgs {
         loop {
-            match deleted::delete(&org_id, time_max).await {
+            match crate::deleted::delete(&org_id, time_max).await {
                 Ok(affected) => {
                     if affected == 0 {
                         break;
@@ -445,7 +434,7 @@ pub async fn run_delay_deletion() -> Result<(), anyhow::Error> {
         }
 
         // update offset
-        db::compact::organization::set_offset(
+        crate::repository::organization::set_offset(
             &org_id,
             "file_list_deleted",
             time_max,

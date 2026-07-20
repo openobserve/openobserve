@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use async_trait::async_trait;
 use config::{
     cluster::LOCAL_NODE,
     meta::stream::{ALL_STREAM_TYPES, StreamType},
@@ -24,15 +23,7 @@ use infra::{cluster::get_node_by_uuid, dist_lock, file_list as infra_file_list};
 
 use crate::repository;
 
-/// Read-only stream catalog needed by the statistics scan. The concrete cache
-/// remains outside this crate until schema ownership moves to catalog.
-#[async_trait]
-pub trait StreamCatalog: Send + Sync {
-    async fn list_organizations(&self) -> Vec<String>;
-    async fn list_streams(&self, org_id: &str, stream_type: StreamType) -> Vec<String>;
-}
-
-pub async fn update_stats_from_file_list(catalog: &dyn StreamCatalog) -> Result<(), anyhow::Error> {
+pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     let latest_updated_at = infra_file_list::get_max_update_at()
         .await
         .map_err(|e| anyhow::anyhow!("get latest update_at error: {:?}", e))?;
@@ -84,14 +75,14 @@ pub async fn update_stats_from_file_list(catalog: &dyn StreamCatalog) -> Result<
 
     let iter = [(new_data_range, true), (old_data_range, false)];
 
-    let orgs = catalog.list_organizations().await;
+    let orgs = crate::catalog::list_organizations().await;
     let mut total_streams = 0;
     for org_id in orgs {
         for stream_type in ALL_STREAM_TYPES {
             if stream_type == StreamType::Index || stream_type == StreamType::Filelist {
                 continue;
             }
-            let streams = catalog.list_streams(&org_id, stream_type).await;
+            let streams = crate::catalog::list_streams(&org_id, stream_type).await;
             total_streams += streams.len();
             let stream_type_str = stream_type.to_string();
             for stream_name in streams {

@@ -19,7 +19,6 @@ use arrow::array::{
     ArrayBuilder, ArrayRef, RecordBatch, StringArray, StringBuilder, make_builder, new_null_array,
 };
 use arrow_schema::{DataType, Field, Schema};
-use async_trait::async_trait;
 use config::{
     FileFormat, FxIndexMap,
     cluster::LOCAL_NODE,
@@ -46,18 +45,9 @@ pub use crate::flatten_key::generate_flatten_file_key;
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
-#[async_trait]
-pub trait StreamCatalog: Send + Sync {
-    async fn list_organizations(&self) -> Vec<String>;
-    async fn list_streams(&self, org_id: &str, stream_type: StreamType) -> Vec<String>;
-}
-
-pub async fn run_generate(
-    catalog: &dyn StreamCatalog,
-    worker_tx: mpsc::Sender<FileKey>,
-) -> Result<(), anyhow::Error> {
+pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
     let semaphore = std::sync::Arc::new(Semaphore::new(get_config().limit.file_merge_thread_num));
-    let orgs = catalog.list_organizations().await;
+    let orgs = crate::catalog::list_organizations().await;
     let stream_types = [StreamType::Logs];
     for org_id in orgs {
         // check backlist
@@ -67,7 +57,7 @@ pub async fn run_generate(
             continue;
         }
         for stream_type in stream_types {
-            let streams = catalog.list_streams(&org_id, stream_type).await;
+            let streams = crate::catalog::list_streams(&org_id, stream_type).await;
             let mut tasks = Vec::with_capacity(streams.len());
             for stream_name in streams {
                 // check if this stream need flatten
