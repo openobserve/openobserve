@@ -129,6 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("metrics.explorer.refresh") }}
         </OButton>
+        <ShareButton
+          v-if="shareUrl"
+          :url="shareUrl"
+          variant="outline"
+          size="icon-toolbar"
+          data-test="metrics-explorer-share-btn"
+        />
       </div>
     </div>
 
@@ -580,7 +587,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import { isEqual } from "lodash-es";
+import { isEqual, debounce } from "lodash-es";
 
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
@@ -597,6 +604,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
+import ShareButton from "@/components/common/ShareButton.vue";
 import MetricCard from "./MetricCard.vue";
 import MetricsVisualize from "./MetricsVisualize.vue";
 import AddToDashboard from "../AddToDashboard.vue";
@@ -609,6 +617,11 @@ import useMetricsExplorerGrid, {
   type LabelFilter,
 } from "@/composables/metrics/useMetricsExplorerGrid";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
+import {
+  getMetricsConfig,
+  encodeMetricsConfig,
+  decodeMetricsConfig,
+} from "@/composables/metrics/metricsUrlState";
 import { PANEL_RATE_WINDOW } from "@/utils/metrics/metricDefaults";
 import { BADGE_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import {
@@ -664,6 +677,7 @@ export default defineComponent({
     OTooltip,
     OToggleGroup,
     OToggleGroupItem,
+    ShareButton,
     MetricCard,
     MetricsVisualize,
     AddToDashboard,
@@ -1156,6 +1170,22 @@ export default defineComponent({
       return c ? { startTime: c.startTime, endTime: c.endTime } : {};
     });
 
+    const visualizeBlob = computed(() => {
+      const pd = visualizeRef.value?.dashboardPanelData;
+      if (!pd?.data?.queries?.[0]?.query) return "";
+      return encodeMetricsConfig(getMetricsConfig(pd));
+    });
+
+    const shareUrl = computed(() => {
+      void route.fullPath; // reactive dep on the URL
+      if (mode.value !== "visualize") return window.location.href;
+      const url = new URL(window.location.href);
+      const blob = visualizeBlob.value;
+      if (blob) url.searchParams.set("metrics_data", blob);
+      else url.searchParams.delete("metrics_data");
+      return url.href;
+    });
+
     const onSelect = (card: MetricCardModel) => {
       // Resolved for a PANEL, not for the card: the rate window goes over as
       // `$__rate_interval` rather than the concrete window the card charted, so
@@ -1206,6 +1236,16 @@ export default defineComponent({
       if (f.sortBy) grid.sortBy.value = f.sortBy;
       if (f.viewMode) grid.viewMode.value = f.viewMode;
       if (f.mode) mode.value = f.mode;
+
+      // Rehydrate the built chart on refresh / a shared Visualize link: decode
+      // the URL blob into a seed so MetricsVisualize opens on it (its own mount
+      // consumes `visualizeSeed`, exactly as a card drill-in does) instead of a
+      // blank canvas. Only in Visualize — the blob is meaningless to the grid.
+      if (f.mode === "visualize" && q.metrics_data) {
+        const blob = decodeMetricsConfig(q.metrics_data);
+        if (blob?.data) visualizeSeed.value = blob.data;
+      }
+
       if (f.labelFilters) {
         grid.labelFilters.value = f.labelFilters;
         // Without membership data the chips fail open and narrow nothing.
@@ -1319,6 +1359,22 @@ export default defineComponent({
         refreshInterval.value,
       ],
       syncUrlState,
+    );
+
+    const syncVisualizeUrl = () => {
+      if (route.name !== "metrics") return;
+      const blob = mode.value === "visualize" ? visualizeBlob.value : "";
+      if (String(blob) === String(route.query.metrics_data ?? "")) return;
+
+      const query: Record<string, any> = { ...route.query };
+      if (blob) query.metrics_data = blob;
+      else delete query.metrics_data;
+      router.replace({ query }).catch(() => {});
+    };
+    const debouncedSyncVisualizeUrl = debounce(syncVisualizeUrl, 300);
+    watch(
+      () => [mode.value, mode.value === "visualize" ? visualizeBlob.value : ""],
+      debouncedSyncVisualizeUrl,
     );
 
     // URL -> state, for the navigations the mount-time apply cannot see:
@@ -1716,6 +1772,7 @@ export default defineComponent({
       visualizeSeed,
       visualizeRef,
       visualizeDateTime,
+      shareUrl,
       onDateChange,
       onRefreshTick,
       onCardVisible,
