@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 164,
+    "rawProjectRamp": 150,
     "rawVarInComponent": 615,
     "arbZ": 40,
     "darkMechanism": 20,
@@ -550,9 +550,6 @@
     "views/OverviewTab.vue": {
       "rawProjectRamp": 14,
       "arbZ": 1
-    },
-    "views/UsageTab.vue": {
-      "rawProjectRamp": 14
     },
     "views/synthetics/CreateBrowserTest.vue": {
       "rawProjectRamp": 3
