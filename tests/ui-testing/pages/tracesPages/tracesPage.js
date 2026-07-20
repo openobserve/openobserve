@@ -1153,7 +1153,12 @@ export class TracesPage {
       .first();
     if (await errorRow.isVisible({ timeout: 5000 }).catch(() => false)) {
       await errorRow.click();
-      await this.page.waitForTimeout(2000);
+      // Wait for the trace-details panel to actually open instead of a blind 2s.
+      // Under CI load the details tree can take longer to render, and the caller
+      // immediately asserts on it — a fixed wait raced the render and flaked.
+      await this.page.locator(this.traceDetailsTree)
+        .waitFor({ state: 'visible', timeout: 15000 })
+        .catch(() => {});
       return true;
     }
     return false;
@@ -1803,6 +1808,31 @@ export class TracesPage {
    */
   async isErrorOnlyToggleVisible() {
     return await this.page.locator(this.errorOnlyToggle).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Deterministically wait for the error-count badge (which doubles as the
+   * error-only toggle) to appear. The badge renders only when the current search
+   * returns at least one error span (SearchResult.vue: v-if errorCount>0), so
+   * freshly-ingested error traces may not show on the first search due to backend
+   * indexing latency. Re-run the search until the badge appears. Used by tests
+   * that ingest guaranteed error traces in beforeAll — this converts a
+   * data/timing dependency into a bounded wait for backend processing.
+   * @param {number} [maxAttempts=8]
+   * @returns {Promise<boolean>} true once the badge is visible
+   */
+  async waitForErrorBadgeAfterSearch(maxAttempts = 8) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await this.setupTraceSearch();
+      await this.waitForTraceSearchResults();
+      if (await this.isErrorOnlyToggleVisible()) {
+        return true;
+      }
+      // Give the backend a moment to index the just-ingested error traces
+      // before re-running the search.
+      await this.page.waitForTimeout(3000);
+    }
+    return false;
   }
 
   /**
