@@ -53,6 +53,13 @@ const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
 /// with `le="inf"` carrying the total count -- the invariants `histogram_quantile`
 /// relies on. Returns nothing for unsupported schemas.
 pub fn expand_native_histogram(hp: &prometheus_rpc::Histogram) -> Vec<ClassicHistogramRecord> {
+    expand_with_bucket_limit(hp, config::get_config().prom.native_histogram_max_buckets)
+}
+
+fn expand_with_bucket_limit(
+    hp: &prometheus_rpc::Histogram,
+    max_buckets: usize,
+) -> Vec<ClassicHistogramRecord> {
     if !SCHEMA_RANGE.contains(&hp.schema) {
         log::warn!(
             "[METRICS:PROM] dropping native histogram with unsupported schema {}",
@@ -79,15 +86,28 @@ pub fn expand_native_histogram(hp: &prometheus_rpc::Histogram) -> Vec<ClassicHis
         None => 0.0,
     };
 
-    // bucket index `idx` covers `(base^(idx-1), base^idx]` on the positive side and its
-    // mirror `[-base^idx, -base^(idx-1))` on the negative side
-    let base = 2f64.powf(2f64.powi(-hp.schema));
-    let mut buckets: Vec<(f64, f64, f64)> = Vec::new(); // (lower, upper, count)
-    for (idx, c) in span_buckets(&hp.positive_spans, &hp.positive_deltas, &hp.positive_counts) {
-        buckets.push((bucket_bound(base, idx - 1), bucket_bound(base, idx), c));
+    let mut pos = span_buckets(&hp.positive_spans, &hp.positive_deltas, &hp.positive_counts);
+    let mut neg = span_buckets(&hp.negative_spans, &hp.negative_deltas, &hp.negative_counts);
+
+    // Every populated bucket becomes a distinct `le` series, so a high-resolution
+    // sample is downscaled -- adjacent bucket pairs merged, halving the resolution --
+    // until it fits the cardinality budget. No observations are lost.
+    let mut schema = hp.schema;
+    while pos.len() + neg.len() > max_buckets.max(1) && schema > *SCHEMA_RANGE.start() {
+        schema -= 1;
+        pos = downscale(pos);
+        neg = downscale(neg);
     }
-    for (idx, c) in span_buckets(&hp.negative_spans, &hp.negative_deltas, &hp.negative_counts) {
-        buckets.push((-bucket_bound(base, idx), -bucket_bound(base, idx - 1), c));
+
+    // bucket index `idx` covers `(base^(idx-1), base^idx]` on the positive side and its
+    // mirror `[-base^idx, -base^(idx-1))` on the negative side, where
+    // `base = 2^(2^-schema)`
+    let mut buckets: Vec<(f64, f64, f64)> = Vec::new(); // (lower, upper, count)
+    for &(idx, c) in &pos {
+        buckets.push((bucket_bound(schema, idx - 1), bucket_bound(schema, idx), c));
+    }
+    for &(idx, c) in &neg {
+        buckets.push((-bucket_bound(schema, idx), -bucket_bound(schema, idx - 1), c));
     }
     if zero_count > 0.0 {
         buckets.push((-hp.zero_threshold, hp.zero_threshold, zero_count));
@@ -124,12 +144,30 @@ pub fn expand_native_histogram(hp: &prometheus_rpc::Histogram) -> Vec<ClassicHis
     recs
 }
 
-/// Upper bound of native bucket `idx`, clamped to the finite range: the algebraic bound
-/// of the last representable bucket overflows f64, and letting it become infinity would
-/// collide with the dedicated `le="inf"` bucket.
-fn bucket_bound(base: f64, idx: i64) -> f64 {
-    let bound = base.powi(idx.clamp(i32::MIN as i64, i32::MAX as i64) as i32);
+/// Upper bound of native bucket `idx`: `2^(idx * 2^-schema)`, computed through `exp2`
+/// so that bounds landing on powers of two are exact (`le="8"`, not
+/// `"7.999999999999995"` as iterated multiplication yields) and bounds shared between
+/// schemas produce identical `le` strings. Clamped to the finite range: the algebraic
+/// bound of the last representable bucket overflows f64, and letting it become
+/// infinity would collide with the dedicated `le="inf"` bucket.
+fn bucket_bound(schema: i32, idx: i64) -> f64 {
+    let bound = ((idx as f64) * 2f64.powi(-schema)).exp2();
     bound.clamp(f64::MIN_POSITIVE, f64::MAX)
+}
+
+/// Halving the schema merges each pair of adjacent buckets: native bucket `idx` at
+/// schema `s` maps to bucket `ceil(idx / 2)` at schema `s - 1`. Input and output are
+/// ascending in `idx`.
+fn downscale(buckets: Vec<(i64, f64)>) -> Vec<(i64, f64)> {
+    let mut out: Vec<(i64, f64)> = Vec::with_capacity(buckets.len() / 2 + 1);
+    for (idx, c) in buckets {
+        let merged_idx = (idx + 1).div_euclid(2);
+        match out.last_mut() {
+            Some((last_idx, last_c)) if *last_idx == merged_idx => *last_c += c,
+            _ => out.push((merged_idx, c)),
+        }
+    }
+    out
 }
 
 /// Decodes a native histogram's sparse bucket layout -- spans plus either integer deltas
@@ -433,9 +471,62 @@ mod tests {
             buckets.iter().map(|(_, c)| *c).collect::<Vec<_>>(),
             vec![0.0, 5.0, 8.0, 8.0]
         );
-        let base = 2f64.powf(2f64.powi(-8));
-        assert_eq!(buckets[1].0, base.powi(250));
-        assert_eq!(buckets[2].0, base.powi(251));
+        assert_eq!(buckets[1].0, (250f64 / 256f64).exp2());
+        assert_eq!(buckets[2].0, (251f64 / 256f64).exp2());
+    }
+
+    /// Bounds landing on powers of two must be exact -- iterated multiplication
+    /// (`base.powi`) yields `7.999999999999995`-style `le` labels, which are both ugly
+    /// and misaligned with the grid of other schemas. Also asserts cross-schema grid
+    /// alignment: the same boundary reached at different schemas gets the same `le`.
+    #[test]
+    fn test_bucket_bounds_are_exact_and_schema_aligned() {
+        assert_eq!(bucket_bound(2, 12), 8.0); // 2^(12/4)
+        assert_eq!(bucket_bound(2, -16), 0.0625); // 2^(-16/4)
+        assert_eq!(bucket_bound(0, 3), 8.0);
+        assert_eq!(bucket_bound(-1, 2), 16.0); // 2^(2*2)
+        assert_eq!(bucket_bound(2, 12).to_string(), "8");
+        // shared boundary across schemas: schema 2 idx 4 == schema 1 idx 2 == schema 0 idx 1
+        assert_eq!(bucket_bound(2, 4), bucket_bound(0, 1));
+        assert_eq!(bucket_bound(2, 4), 2.0);
+    }
+
+    /// Over-limit samples are downscaled, not truncated: adjacent bucket pairs merge
+    /// (schema - 1) until the populated-bucket count fits, preserving every
+    /// observation at coarser resolution.
+    #[test]
+    fn test_expand_native_histogram_downscales_to_bucket_limit() {
+        let hp = prometheus_rpc::Histogram {
+            schema: 2, // base = 2^(1/4)
+            count: Some(prometheus_rpc::histogram::Count::CountInt(36)),
+            positive_spans: vec![prometheus_rpc::BucketSpan {
+                offset: 1,
+                length: 8, // idx 1..=8, counts 1..=8
+            }],
+            positive_deltas: vec![1, 1, 1, 1, 1, 1, 1, 1],
+            ..native_histogram_base()
+        };
+
+        // no limit pressure: 8 buckets stay at schema 2
+        let full = expand_with_bucket_limit(&hp, 64);
+        assert_eq!(bucket_records(&full).len(), 10); // 8 uppers + 1 lower marker + inf
+
+        // limit 4: one halving (schema 1) merges idx pairs {1,2},{3,4},{5,6},{7,8}
+        let scaled = expand_with_bucket_limit(&hp, 4);
+        assert_bucket_invariants(&scaled);
+        assert_eq!(
+            bucket_records(&scaled),
+            vec![
+                (1.0, 0.0),            // lower marker: schema 1 idx 0 bound
+                (0.5f64.exp2(), 3.0),  // (1, sqrt2]:   1+2
+                (2.0, 10.0),           // (sqrt2, 2]:   3+4
+                (1.5f64.exp2(), 21.0), // (2, 2sqrt2]:  5+6
+                (4.0, 36.0),           // (2sqrt2, 4]:  7+8
+                (f64::INFINITY, 36.0),
+            ]
+        );
+        // total observations survive downscaling
+        assert_eq!(scalar_record(&scaled, "_count"), 36.0);
     }
 
     /// schema -4 is the coarsest (base = 2^16): a wide zero bucket can overlap the
