@@ -35,29 +35,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </p>
 
     <div
-      class="schema-tree border border-border-default bg-surface-subtle rounded-lg p-3 overflow-x-auto"
+      class="text-xs leading-[1.9] border border-border-default bg-surface-subtle rounded-lg p-3 overflow-x-auto"
       data-test="workflow-trigger-structure"
     >
-      <div class="schema-line"><span class="schema-punct">{</span></div>
+      <div class="whitespace-pre"><span class="text-text-secondary">{</span></div>
 
       <!-- meta: expandable object -->
+      <!-- Kept as a native <button>: this is a disclosure toggle, not an
+           action/CTA. OButton would need every one of its variant styles
+           unset to sit inline in the tree, and nesting button semantics is
+           worse for a11y than the reset below. -->
       <button
         type="button"
-        class="schema-line schema-row pl-3"
+        class="whitespace-pre flex items-center w-full text-left rounded-sm hover:bg-surface-subtle-hover cursor-pointer border-0 bg-transparent font-[inherit] pl-3"
+        :aria-expanded="metaOpen"
         data-test="workflow-trigger-meta-toggle"
         @click="metaOpen = !metaOpen"
       >
         <OIcon
           name="chevron-right"
           size="xs"
-          class="schema-chevron"
-          :class="{ 'schema-chevron--open': metaOpen }"
+          class="shrink-0 mr-1 text-text-secondary transition-transform duration-150"
+          :class="metaOpen ? 'rotate-90' : ''"
         />
-        <span class="schema-key">meta</span><span class="schema-punct">: </span>
-        <template v-if="metaOpen"><span class="schema-punct">{</span></template>
+        <span class="text-blue-600 dark:text-blue-400 font-semibold">meta</span><span class="text-text-secondary">: </span>
+        <template v-if="metaOpen"><span class="text-text-secondary">{</span></template>
         <template v-else>
-          <span class="schema-punct">{…}</span>
-          <span class="schema-muted ml-1">{{ metaVars.length }} keys</span>
+          <span class="text-text-secondary">{…}</span>
+          <span class="text-text-secondary ml-1">{{ t("workflow.node.triggerMetaKeys", { count: metaVars.length }) }}</span>
         </template>
       </button>
 
@@ -65,56 +70,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="v in metaVars"
           :key="v.ref"
-          class="schema-line schema-row schema-leaf pl-8"
+          class="whitespace-pre flex items-center w-full text-left rounded-sm hover:bg-surface-subtle-hover cursor-default pl-8"
           :title="t(v.descKey)"
           :data-test="`workflow-trigger-field-${metaKey(v)}`"
         >
-          <span class="schema-key">{{ metaKey(v) }}</span><span class="schema-punct">: </span><span
-            :class="v.enumValues ? 'schema-enum' : 'schema-type'"
+          <span class="text-blue-600 dark:text-blue-400 font-semibold">{{ metaKey(v) }}</span><span class="text-text-secondary">: </span><span
+            :data-kind="v.enumValues ? 'enum' : 'type'"
+            :class="v.enumValues ? 'text-amber-700 dark:text-amber-400' : 'text-(--color-cyan-700) dark:text-(--color-teal-400)'"
             >{{ displayType(v) }}</span
           >
         </div>
-        <div class="schema-line pl-3"><span class="schema-punct">}</span></div>
+        <div class="whitespace-pre pl-3"><span class="text-text-secondary">}</span></div>
       </template>
 
       <!-- data: expandable array of dynamic objects -->
       <button
         type="button"
-        class="schema-line schema-row pl-3"
+        class="whitespace-pre flex items-center w-full text-left rounded-sm hover:bg-surface-subtle-hover cursor-pointer border-0 bg-transparent font-[inherit] pl-3"
+        :aria-expanded="dataOpen"
         data-test="workflow-trigger-data-toggle"
         @click="dataOpen = !dataOpen"
       >
         <OIcon
           name="chevron-right"
           size="xs"
-          class="schema-chevron"
-          :class="{ 'schema-chevron--open': dataOpen }"
+          class="shrink-0 mr-1 text-text-secondary transition-transform duration-150"
+          :class="dataOpen ? 'rotate-90' : ''"
         />
-        <span class="schema-key">data</span><span class="schema-punct">: </span
-        ><span class="schema-type">Array&lt;object&gt;</span>
+        <span class="text-blue-600 dark:text-blue-400 font-semibold">data</span><span class="text-text-secondary">: </span
+        ><span class="text-(--color-cyan-700) dark:text-(--color-teal-400)">Array&lt;object&gt;</span>
       </button>
       <template v-if="dataOpen">
-        <div class="schema-line pl-8"><span class="schema-punct">[</span></div>
-        <div class="schema-line pl-12"><span class="schema-punct">{</span></div>
+        <div class="whitespace-pre pl-8"><span class="text-text-secondary">[</span></div>
+        <div class="whitespace-pre pl-12"><span class="text-text-secondary">{</span></div>
         <div
           v-for="ex in dataExample"
           :key="ex.key"
-          class="schema-line pl-16"
+          class="whitespace-pre pl-16"
         >
-          <span class="schema-key">{{ ex.key }}</span><span class="schema-punct">: </span><span
-            :class="ex.kind === 'string' ? 'schema-enum' : 'schema-type'"
+          <span class="text-blue-600 dark:text-blue-400 font-semibold">{{ ex.key }}</span><span class="text-text-secondary">: </span><span
+            :data-kind="ex.kind === 'string' ? 'enum' : 'type'"
+            :class="ex.kind === 'string' ? 'text-amber-700 dark:text-amber-400' : 'text-(--color-cyan-700) dark:text-(--color-teal-400)'"
             >{{ ex.value }}</span
-          ><span class="schema-punct">,</span>
+          ><span class="text-text-secondary">,</span>
         </div>
-        <div class="schema-line pl-16"><span class="schema-muted">…</span></div>
-        <div class="schema-line pl-12"><span class="schema-punct">}</span></div>
-        <div class="schema-line pl-8"><span class="schema-punct">]</span></div>
-        <div class="schema-note schema-leaf pl-8 schema-muted italic">
+        <div class="whitespace-pre pl-16"><span class="text-text-secondary">…</span></div>
+        <div class="whitespace-pre pl-12"><span class="text-text-secondary">}</span></div>
+        <div class="whitespace-pre pl-8"><span class="text-text-secondary">]</span></div>
+        <div
+          data-test="workflow-trigger-note"
+          class="whitespace-normal leading-normal py-0.5 text-text-secondary pl-8 italic"
+        >
           {{ t("workflow.node.triggerDataExampleNote") }}
         </div>
       </template>
 
-      <div class="schema-line"><span class="schema-punct">}</span></div>
+      <div class="whitespace-pre"><span class="text-text-secondary">}</span></div>
     </div>
   </div>
 </template>
@@ -170,79 +181,3 @@ defineExpose({ submit });
   (--color-blue/cyan/teal/amber-*) — the primitives are fixed, so the .dark rules
   pick a lighter shade for the dark surface. No --o2-* / hex literals.
 -->
-<style scoped>
-.schema-tree {
-  font-size: 0.75rem;
-  line-height: 1.9;
-  /* background comes from the themed `bg-surface-subtle` class */
-}
-
-.schema-line {
-  white-space: pre;
-}
-
-/* Descriptive note lines wrap instead of forcing horizontal scroll. */
-.schema-note {
-  white-space: normal;
-  line-height: 1.5;
-  padding-top: 0.125rem;
-  padding-bottom: 0.125rem;
-}
-
-/* Interactive rows (expand toggles + hoverable leaves). */
-.schema-row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  border: none;
-  background: transparent;
-  text-align: left;
-  border-radius: 0.25rem;
-  font: inherit;
-}
-button.schema-row {
-  cursor: pointer;
-}
-.schema-leaf {
-  cursor: default;
-}
-.schema-row:hover {
-  background: var(--color-surface-subtle-hover);
-}
-
-.schema-chevron {
-  flex-shrink: 0;
-  margin-right: 0.25rem;
-  color: var(--color-text-secondary);
-  transition: transform 0.15s ease;
-}
-.schema-chevron--open {
-  transform: rotate(90deg);
-}
-
-.schema-key {
-  color: var(--color-blue-600);
-  font-weight: 600;
-}
-.schema-type {
-  color: var(--color-cyan-700);
-}
-.schema-enum {
-  color: var(--color-amber-700);
-}
-.schema-punct,
-.schema-muted {
-  color: var(--color-text-secondary);
-}
-
-/* Dark surface — lighter shades of the same families read better. */
-.dark .schema-key {
-  color: var(--color-blue-400);
-}
-.dark .schema-type {
-  color: var(--color-teal-400);
-}
-.dark .schema-enum {
-  color: var(--color-amber-400);
-}
-</style>

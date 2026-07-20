@@ -2244,6 +2244,7 @@
       "triggerAlertsError": "Unable To Load Alerts",
       "triggerNote": "This Workflow Runs When Any Of The Selected Alerts Fires.",
       "triggerPayloadIntro": "When a linked alert fires, every downstream step receives this payload.",
+      "triggerMetaKeys": "{count} keys",
       "triggerStructureTitle": "Payload Structure",
       "triggerStructureHint": "Hover A Field For Details",
       "triggerDetailHint": "Hover Or Focus A Field Above To See Its Type And Meaning.",

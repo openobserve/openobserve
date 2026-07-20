@@ -115,9 +115,10 @@ describe("WorkflowAlertTrigger", () => {
         '[data-test="workflow-trigger-field-alert_type"]',
       );
       expect(row.text()).toContain('"realtime" | "scheduled"');
-      // enum values get the enum token class, not the plain type class
-      expect(row.find(".schema-enum").exists()).toBe(true);
-      expect(row.find(".schema-type").exists()).toBe(false);
+      // Asserted via data-kind, not the colour class: the styling moved to
+      // utilities, and pinning utility classes makes every restyle a test edit.
+      expect(row.find('[data-kind="enum"]').exists()).toBe(true);
+      expect(row.find('[data-kind="type"]').exists()).toBe(false);
     });
 
     it("shows each field's translated description as a native title", () => {
@@ -138,12 +139,14 @@ describe("WorkflowAlertTrigger", () => {
       expect(
         wrapper.find('[data-test="workflow-trigger-field-org_id"]').exists(),
       ).toBe(true);
+      // aria-expanded is the semantic state of a disclosure toggle — more
+      // meaningful than the chevron's rotation class, and it also pins the a11y
+      // attribute so it cannot be dropped in a restyle.
       expect(
         wrapper
           .find('[data-test="workflow-trigger-meta-toggle"]')
-          .find(".schema-chevron--open")
-          .exists(),
-      ).toBe(true);
+          .attributes("aria-expanded"),
+      ).toBe("true");
     });
 
     it("collapses to a `{…}` summary with the key count on click", async () => {
@@ -158,7 +161,9 @@ describe("WorkflowAlertTrigger", () => {
       const toggle = wrapper.find('[data-test="workflow-trigger-meta-toggle"]');
       expect(toggle.text()).toContain("{…}");
       expect(toggle.text()).toContain(`${TRIGGER_META_VARS.length} keys`);
-      expect(toggle.find(".schema-chevron--open").exists()).toBe(false);
+      // aria-expanded, not the chevron class: asserting the ABSENCE of a class
+      // that no longer exists would pass vacuously and guard nothing.
+      expect(toggle.attributes("aria-expanded")).toBe("false");
     });
 
     it("re-expands on a second click", async () => {
@@ -188,7 +193,7 @@ describe("WorkflowAlertTrigger", () => {
 
     it("renders the dynamic-columns note when expanded", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find(".schema-note").exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-trigger-note"]').exists()).toBe(true);
     });
 
     it("hides the example row + note when collapsed", async () => {
@@ -201,7 +206,7 @@ describe("WorkflowAlertTrigger", () => {
       ).text();
       expect(text).not.toContain("_timestamp");
       expect(text).not.toContain('"test message for openobserve"');
-      expect(wrapper.find(".schema-note").exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-trigger-note"]').exists()).toBe(false);
     });
 
     it("always shows `data: Array<object>` on the toggle", () => {
