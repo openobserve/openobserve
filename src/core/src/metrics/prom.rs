@@ -82,7 +82,6 @@ pub async fn remote_write(
     let cfg = get_config();
     let dedup_enabled = cfg.common.metrics_dedup_enabled;
     let election_interval = cfg.limit.metrics_leader_election_interval * 1000000;
-    let mut last_received: i64 = 0;
     let mut has_entry = false;
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
@@ -303,65 +302,6 @@ pub async fn remote_write(
         // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
         // before the loop to avoid repeated async queries
 
-        // HA leader election runs on the first timeseries carrying any data --
-        // checking `samples` alone would never elect for a histogram-only request
-        if first_line
-            && dedup_enabled
-            && !cluster_name.is_empty()
-            && (!event.samples.is_empty() || !event.histograms.is_empty())
-        {
-            let lock = METRIC_CLUSTER_LEADER.read().await;
-            match lock.get(&cluster_name) {
-                Some(leader) => {
-                    last_received = leader.last_received;
-                    has_entry = true;
-                }
-                None => {
-                    has_entry = false;
-                }
-            }
-            drop(lock);
-            let accept_record = if !replica_label.is_empty() {
-                prom_ha_handler(
-                    has_entry,
-                    &cluster_name,
-                    &replica_label,
-                    last_received,
-                    election_interval,
-                )
-                .await
-            } else {
-                true
-            };
-            has_entry = true;
-            first_line = false;
-            if !accept_record {
-                // do not accept any entries for request
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/prometheus/api/v1/write",
-                        "200",
-                        org_id,
-                        StreamType::Metrics.as_str(),
-                        "",
-                        "",
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/prometheus/api/v1/write",
-                        "200",
-                        org_id,
-                        StreamType::Metrics.as_str(),
-                        "",
-                        "",
-                    ])
-                    .inc();
-                return Ok(());
-            }
-        }
-
         // parse samples
         let sample_start = std::time::Instant::now();
         for sample in event.samples {
@@ -371,6 +311,19 @@ pub async fn remote_write(
             let Some(sample_val) = super::sanitize_metric_value(sample.value) else {
                 continue;
             };
+
+            // HA election runs at the first record that will actually be written, so a
+            // replica sending only unusable data cannot retain leadership
+            if first_line && dedup_enabled && !cluster_name.is_empty() {
+                first_line = false;
+                has_entry = true;
+                if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
+                    // do not accept any entries for this request
+                    observe_rejected_request(org_id, &start);
+                    return Ok(());
+                }
+            }
+
             let metric = Metric {
                 labels: &labels,
                 value: sample_val,
@@ -399,8 +352,24 @@ pub async fn remote_write(
         // records so existing PromQL works on them unchanged
         for hp in &event.histograms {
             sample_count += 1;
+            let records = expand_native_histogram(hp);
+            if records.is_empty() {
+                // unsupported schema or stale marker: nothing will be written
+                continue;
+            }
+
+            // same first-writable-record election as the samples loop
+            if first_line && dedup_enabled && !cluster_name.is_empty() {
+                first_line = false;
+                has_entry = true;
+                if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
+                    observe_rejected_request(org_id, &start);
+                    return Ok(());
+                }
+            }
+
             let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
-            for (suffix, le, value) in expand_native_histogram(hp) {
+            for (suffix, le, value) in records {
                 let Some(value) = super::sanitize_metric_value(value) else {
                     continue;
                 };
@@ -1234,6 +1203,55 @@ fn buffer_metric_record(
             .or_default()
             .push((local_val, timestamp));
     }
+}
+
+/// Looks up the current leader state and runs leader election for this replica.
+/// Requests without a replica label are always accepted.
+async fn run_ha_election(
+    cluster_name: &str,
+    replica_label: &str,
+    election_interval: i64,
+) -> bool {
+    if replica_label.is_empty() {
+        return true;
+    }
+    let (has_entry, last_received) = match METRIC_CLUSTER_LEADER.read().await.get(cluster_name) {
+        Some(leader) => (true, leader.last_received),
+        None => (false, 0),
+    };
+    prom_ha_handler(
+        has_entry,
+        cluster_name,
+        replica_label,
+        last_received,
+        election_interval,
+    )
+    .await
+}
+
+/// Records the request metrics for a write rejected by HA election.
+fn observe_rejected_request(org_id: &str, start: &std::time::Instant) {
+    let time = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/prometheus/api/v1/write",
+            "200",
+            org_id,
+            StreamType::Metrics.as_str(),
+            "",
+            "",
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/prometheus/api/v1/write",
+            "200",
+            org_id,
+            StreamType::Metrics.as_str(),
+            "",
+            "",
+        ])
+        .inc();
 }
 
 async fn prom_ha_handler(

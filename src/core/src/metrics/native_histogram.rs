@@ -17,11 +17,15 @@
 //! `_count`, `_sum` and cumulative `le` `_bucket` records, so existing PromQL
 //! (`histogram_quantile` etc.) works on them unchanged.
 //!
-//! Known limitation, inherited from classic semantics: `sum by (le)` is only sound
-//! across series sharing a bucket layout. Each native series carries `le`s only for
-//! its own value range, so quantiles aggregated across series with different ranges
-//! understate the cumulative tail. Per-series quantiles, homogeneous-group
-//! aggregations and `_count`/`_sum` rates are exact.
+//! Known limitations, inherited from classic semantics:
+//! - `sum by (le)` is only sound across series sharing a bucket layout. Each native
+//!   series carries `le`s only for its own value range, so quantiles aggregated
+//!   across series with different ranges understate the cumulative tail. Per-series
+//!   quantiles, homogeneous-group aggregations and `_count`/`_sum` rates are exact.
+//! - quantiles interpolate linearly within a bucket, like every classic histogram.
+//!   Prometheus >= 3.0 interpolates native buckets exponentially, so its results can
+//!   differ by up to the bucket width (~6% at schema 0, less at finer schemas, more
+//!   after downscaling). This is an approximate fallback, not a native-fidelity one.
 
 use proto::prometheus_rpc;
 
@@ -31,6 +35,11 @@ pub const CLASSIC_HISTOGRAM_SUFFIXES: [&str; 3] = ["_bucket", "_count", "_sum"];
 /// Exponential schemas (`base = 2^(2^-schema)`). Anything outside -- notably NHCB,
 /// schema -53 -- cannot be converted: our wire type does not decode `custom_values`.
 const SCHEMA_RANGE: std::ops::RangeInclusive<i32> = -4..=8;
+
+/// Downscaling may merge below the native schema floor -- the emitted `le` bounds are
+/// plain classic bounds, not required to form a valid native schema. At -10
+/// (base 2^1024) one bucket spans all of f64, so the loop always terminates.
+const MIN_DOWNSCALE_SCHEMA: i32 = -10;
 
 /// The `__name__` suffix, the `le` label (`None` for `_count`/`_sum`), and the value.
 pub type ClassicHistogramRecord = (&'static str, Option<String>, f64);
@@ -76,10 +85,12 @@ fn expand_with_bucket_limit(
     let mut pos = span_buckets(&hp.positive_spans, &hp.positive_deltas, &hp.positive_counts);
     let mut neg = span_buckets(&hp.negative_spans, &hp.negative_deltas, &hp.negative_counts);
 
-    // every populated bucket becomes a `le` series, so merge adjacent buckets
-    // (halving resolution) until the sample fits the cardinality budget
+    // every emitted `le` label becomes a series, so merge adjacent buckets (halving
+    // resolution) until the sample's le count fits the cardinality budget
     let mut schema = hp.schema;
-    while pos.len() + neg.len() > max_buckets.max(1) && schema > *SCHEMA_RANGE.start() {
+    while le_estimate(&pos, &neg, zero_count) > max_buckets.max(3)
+        && schema > MIN_DOWNSCALE_SCHEMA
+    {
         schema -= 1;
         pos = downscale(pos);
         neg = downscale(neg);
@@ -159,6 +170,22 @@ fn push_le_point(points: &mut Vec<(String, f64)>, le: String, cumulative: f64) {
 fn bucket_bound(schema: i32, idx: i64) -> f64 {
     let bound = ((idx as f64) * 2f64.powi(-schema)).exp2();
     bound.clamp(f64::MIN_POSITIVE, f64::MAX)
+}
+
+/// Upper bound on the `le` labels a sample will emit: each populated bucket gets an
+/// upper record, each contiguous run a lower-bound gap marker, plus the zero bucket's
+/// two bounds and `inf`.
+fn le_estimate(pos: &[(i64, f64)], neg: &[(i64, f64)], zero_count: f64) -> usize {
+    let side = |b: &[(i64, f64)]| {
+        let runs = b
+            .iter()
+            .zip(b.iter().skip(1))
+            .filter(|((a, _), (b, _))| *b != a + 1)
+            .count()
+            + usize::from(!b.is_empty());
+        b.len() + runs
+    };
+    side(pos) + side(neg) + if zero_count > 0.0 { 2 } else { 0 } + 1
 }
 
 /// Merges adjacent bucket pairs: `idx` at schema `s` maps to `ceil(idx / 2)` at
@@ -530,22 +557,68 @@ mod tests {
         let full = expand_with_bucket_limit(&hp, 64);
         assert_eq!(bucket_records(&full).len(), 10); // 8 uppers + 1 lower marker + inf
 
-        // limit 4: one halving (schema 1) merges idx pairs {1,2},{3,4},{5,6},{7,8}
+        // limit 4 le labels: two halvings land on schema 0
         let scaled = expand_with_bucket_limit(&hp, 4);
         assert_bucket_invariants(&scaled);
         assert_eq!(
             bucket_records(&scaled),
             vec![
-                (1.0, 0.0),    // lower marker: schema 1 idx 0 bound
-                (1.414, 3.0),  // (1, sqrt2]:   1+2
-                (2.0, 10.0),   // (sqrt2, 2]:   3+4
-                (2.828, 21.0), // (2, 2sqrt2]:  5+6
-                (4.0, 36.0),   // (2sqrt2, 4]:  7+8
+                (1.0, 0.0),  // lower marker
+                (2.0, 10.0), // (1, 2]: 1+2+3+4
+                (4.0, 36.0), // (2, 4]: 5+6+7+8
                 (f64::INFINITY, 36.0),
             ]
         );
         // total observations survive downscaling
         assert_eq!(scalar_record(&scaled, "_count"), 36.0);
+    }
+
+    /// The limit counts emitted `le` labels, not populated buckets: isolated buckets
+    /// each add a gap marker, so 4 populated buckets can mean 9 labels.
+    #[test]
+    fn test_expand_native_histogram_limit_counts_le_labels_not_buckets() {
+        let hp = prometheus_rpc::Histogram {
+            schema: 3,
+            count: Some(prometheus_rpc::histogram::Count::CountInt(4)),
+            positive_spans: (0..4)
+                .map(|i| prometheus_rpc::BucketSpan {
+                    offset: if i == 0 { 0 } else { 1 },
+                    length: 1,
+                })
+                .collect(),
+            positive_deltas: vec![1, 0, 0, 0], // idx 0, 2, 4, 6: count 1 each
+            ..native_histogram_base()
+        };
+
+        // 4 buckets + 4 markers + inf = 9 labels > 8: one halving makes them
+        // contiguous (idx 0..=3 at schema 2), 6 labels
+        let recs = expand_with_bucket_limit(&hp, 8);
+        assert_bucket_invariants(&recs);
+        assert_eq!(bucket_records(&recs).len(), 6);
+        assert_eq!(scalar_record(&recs, "_count"), 4.0);
+    }
+
+    /// A schema -4 sample over the limit keeps merging below the native schema floor
+    /// instead of silently exceeding the cap.
+    #[test]
+    fn test_expand_native_histogram_downscales_below_native_schema_floor() {
+        let hp = prometheus_rpc::Histogram {
+            schema: -4,
+            count: Some(prometheus_rpc::histogram::Count::CountInt(6)),
+            positive_spans: (0..6)
+                .map(|i| prometheus_rpc::BucketSpan {
+                    offset: if i == 0 { 0 } else { 1 },
+                    length: 1,
+                })
+                .collect(),
+            positive_deltas: vec![1, 0, 0, 0, 0, 0], // idx 0,2,4,6,8,10
+            ..native_histogram_base()
+        };
+        let recs = expand_with_bucket_limit(&hp, 5);
+        assert_bucket_invariants(&recs);
+        assert!(bucket_records(&recs).len() <= 5);
+        assert_eq!(scalar_record(&recs, "_count"), 6.0);
+        assert_eq!(bucket_records(&recs).last().unwrap().1, 6.0);
     }
 
     /// A wide zero bucket overlapping the first bucket's lower bound must not emit a
