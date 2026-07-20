@@ -56,7 +56,9 @@ mod service_graph;
 mod session_cleanup;
 mod stats;
 
-pub use file_downloader::{download_from_node, exceeds_cache_max_age, queue_download, should_download};
+pub use file_downloader::{
+    download_from_node, exceeds_cache_max_age, queue_download, should_download,
+};
 pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
 
 #[cfg(feature = "enterprise")]

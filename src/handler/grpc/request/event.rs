@@ -69,10 +69,7 @@ impl Event for Eventer {
                 }
                 // files with data older than the cache max age should not be
                 // cached, e.g. merged files from compaction of old partitions
-                if crate::job::exceeds_cache_max_age(
-                    item.meta.max_ts,
-                    CacheType::Disk,
-                ) {
+                if crate::job::exceeds_cache_max_age(item.meta.max_ts, CacheType::Disk) {
                     continue;
                 }
                 // cache parquet
