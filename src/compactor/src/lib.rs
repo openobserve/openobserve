@@ -19,6 +19,7 @@
 //! schema and query dependencies are expressed as explicit ports.
 
 mod catalog;
+pub mod cluster_info;
 pub mod deleted;
 pub mod dump;
 pub mod file_list_dump;

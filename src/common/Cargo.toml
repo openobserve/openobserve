@@ -40,6 +40,7 @@ o2_openfga = { workspace = true, optional = true }
 opentelemetry.workspace = true
 parking_lot.workspace = true
 prost.workspace = true
+proto.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rustls.workspace = true

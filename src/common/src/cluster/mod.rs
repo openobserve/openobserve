@@ -5,7 +5,7 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// This program is distributed in the hope that it will be useful,
+// This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU Affero General Public License for more details.
@@ -13,19 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Shared application types, infrastructure helpers, and utilities.
+//! Cluster RPC services and cross-cluster client helpers.
 
-#![recursion_limit = "256"]
-
-pub mod cluster;
-pub mod github;
-pub mod infra;
-pub mod kv;
-pub mod meta;
-pub mod metadata;
-pub mod short_url;
-pub mod system_settings;
-pub mod tls;
-pub mod utils;
-
-pub(crate) static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!("../ua_regex/regexes.yaml");
+pub mod node;

@@ -26,7 +26,7 @@ use std::{
 };
 
 use arrow_flight::flight_service_server::FlightServiceServer;
-use common::{infra::cluster, meta};
+use common::{cluster::node::NodeService, infra::cluster, meta};
 use config::{
     META_ORG_ID,
     cluster::LOCAL_NODE,
@@ -55,9 +55,8 @@ use openobserve::{
     },
     job, migration, router,
 };
-use openobserve_core::{
-    bootstrap, cluster_info::ClusterInfoService, db, metadata, node::NodeService, self_reporting,
-};
+use openobserve_compactor::cluster_info::ClusterInfoService;
+use openobserve_core::{bootstrap, db, metadata, self_reporting};
 use openobserve_scheduler::TriggerModule::QueryRecommendations;
 use openobserve_search_service::SEARCH_SERVER;
 use opentelemetry::{KeyValue, global, trace::TracerProvider};

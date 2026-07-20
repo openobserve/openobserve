@@ -22,7 +22,6 @@ pub mod alerts;
 pub use openobserve_alerts::anomaly_detection;
 pub use openobserve_organization::{auth, authz};
 pub mod bootstrap;
-pub mod cluster_info;
 pub mod dashboards;
 pub mod db;
 pub use openobserve_dashboards::folders;
@@ -42,7 +41,6 @@ pub mod ingestion_types {
 }
 pub use ::common::kv;
 pub use openobserve_ingestion::{logs, metadata, metrics};
-pub mod node;
 #[cfg(feature = "enterprise")]
 pub use openobserve_organization::ofga;
 #[cfg(feature = "enterprise")]

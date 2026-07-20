@@ -34,10 +34,12 @@ o2_enterprise = { workspace = true, optional = true, default-features = false }
 openobserve-catalog.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
+proto.workspace = true
 rand.workspace = true
 rayon.workspace = true
 search.workspace = true
 tantivy.workspace = true
 tantivy_utils.workspace = true
 tokio.workspace = true
+tonic.workspace = true
 vortex = { workspace = true, optional = true }

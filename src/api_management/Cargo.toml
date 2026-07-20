@@ -31,6 +31,7 @@ cloud = [
 common.workspace = true
 openobserve-alerts.workspace = true
 openobserve-api-common.workspace = true
+openobserve-compactor.workspace = true
 openobserve-core.workspace = true
 openobserve-dashboards.workspace = true
 openobserve-ingestion.workspace = true
