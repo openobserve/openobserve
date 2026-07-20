@@ -152,15 +152,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 )
               "
               :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-              class="invisible flex items-center absolute right-2 top-0 px-2 column-actions"
+              class="invisible flex items-center absolute right-2 top-0 h-full pl-3 bg-table-header-bg column-actions"
             >
               <OIcon
                 v-if="(header.column.columnDef.meta as any).closable"
                 :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
                 name="close"
-                class="m-0 mt-0.5! close-icon cursor-pointer text-icon-color"
+                class="close-icon cursor-pointer text-icon-color hover:text-text-heading transition-colors"
                 :title="t('common.close')"
-                size="sm"
+                size="xs"
                 @click.stop="closeColumn(header.column.columnDef)"
               />
             </div>
@@ -1309,10 +1309,6 @@ defineExpose({
 
 .logs-table th {
   text-align: left;
-}
-
-.logs-table th .column-actions {
-  background: var(--color-log-table-header-bg);
 }
 
 /* !important is load-bearing: it outranks the `invisible` utility the actions
