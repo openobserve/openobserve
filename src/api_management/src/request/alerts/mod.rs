@@ -28,7 +28,10 @@ use config::meta::{
 };
 use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
-use openobserve_alerts::service::alert::{self, AlertError};
+use openobserve_alerts::{
+    evaluation::build_sql,
+    service::alert::{self, AlertError},
+};
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
@@ -59,7 +62,7 @@ use crate::{
         BulkDeleteRequest, BulkDeleteResponse,
         dashboards::{get_folder, is_overwrite},
     },
-    service::{alerts::build_sql, db::scheduler},
+    service::db::scheduler,
 };
 
 pub mod dedup_stats;

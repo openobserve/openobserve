@@ -52,6 +52,31 @@ pub trait RuntimeServices: Send + Sync + 'static {
         conditions: &AlertConditionParams,
     ) -> anyhow::Result<String>;
 
+    async fn promql_search(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        query: String,
+        start: i64,
+        end: i64,
+        step: i64,
+        is_super_cluster: bool,
+    ) -> anyhow::Result<config::meta::promql::value::Value>;
+
+    async fn setup_tracing_with_trace_id(
+        &self,
+        trace_id: &str,
+        span: tracing::Span,
+    ) -> tracing::Span;
+
+    fn report_search_metrics(
+        &self,
+        start: std::time::Instant,
+        org_id: &str,
+        stream_type: StreamType,
+        search_type: &str,
+    );
+
     #[cfg(feature = "enterprise")]
     async fn route_incident(
         &self,
@@ -138,6 +163,39 @@ pub async fn build_sql(
             conditions,
         )
         .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn promql_search(
+    trace_id: &str,
+    org_id: &str,
+    query: String,
+    start: i64,
+    end: i64,
+    step: i64,
+    is_super_cluster: bool,
+) -> anyhow::Result<config::meta::promql::value::Value> {
+    runtime_services()?
+        .promql_search(trace_id, org_id, query, start, end, step, is_super_cluster)
+        .await
+}
+
+pub async fn setup_tracing_with_trace_id(trace_id: &str, span: tracing::Span) -> tracing::Span {
+    match runtime_services() {
+        Ok(runtime) => runtime.setup_tracing_with_trace_id(trace_id, span).await,
+        Err(_) => span,
+    }
+}
+
+pub fn report_search_metrics(
+    start: std::time::Instant,
+    org_id: &str,
+    stream_type: StreamType,
+    search_type: &str,
+) {
+    if let Ok(runtime) = runtime_services() {
+        runtime.report_search_metrics(start, org_id, stream_type, search_type);
+    }
 }
 
 #[cfg(feature = "enterprise")]

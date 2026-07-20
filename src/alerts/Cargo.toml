@@ -16,8 +16,14 @@ enterprise = [
     "common/enterprise",
     "config/enterprise",
     "openobserve-scheduler/enterprise",
+    "openobserve-search-service/enterprise",
 ]
-cloud = ["enterprise", "o2_enterprise/cloud", "common/cloud"]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "common/cloud",
+    "openobserve-search-service/cloud",
+]
 
 [dependencies]
 anyhow.workspace = true
@@ -37,9 +43,12 @@ log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
 openobserve-scheduler.workspace = true
+openobserve-search-service.workspace = true
+promql.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 sea-orm.workspace = true
+search.workspace = true
 serde_json.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true

@@ -28,8 +28,9 @@ use config::{
     utils::sql::is_timestamp_selected,
 };
 use cron::Schedule;
+use openobserve_alerts::evaluation::QueryConditionExt;
 
-use crate::{alerts::QueryConditionExt, db};
+use crate::db;
 
 pub async fn save(
     mut derived_stream: DerivedStream,
