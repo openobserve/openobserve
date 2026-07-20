@@ -157,6 +157,19 @@ export interface RichCardExtras {
   fixBody?: string;
   /** Highlight language for the fix snippet (e.g. "bash"). Default "python". */
   fixLang?: string;
+  /**
+   * An alternative, manual path to the same result — e.g. the raw Helm sequence
+   * behind Kubernetes' one-line installer. Rendered as a collapsed section below
+   * the steps, so the primary path stays the obvious default. Its code goes
+   * through the same live substitution as the steps ({stream} and step inputs).
+   */
+  advanced?: {
+    /** Accordion label, e.g. "Advanced Installation (Manual Steps)". */
+    label: string;
+    /** Optional paragraph above the code (inline markdown: **bold**, `code`). */
+    description?: string;
+    code: RichCardCode;
+  };
   troubleshooting?: { q: string; a: string }[];
 }
 
