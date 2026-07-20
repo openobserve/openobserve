@@ -175,7 +175,7 @@ const useRoutes = () => {
         title: "Metrics",
       },
       beforeEnter(to: any, from: any, next: any) {
-        if (hasMetricsEditorParams(to.query)) {
+        if (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize") {
           routeGuard(to, from, () =>
             next({
               name: "metricsEditor",

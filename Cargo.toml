@@ -224,6 +224,7 @@ sourcemap.workspace = true
 openobserve-api.workspace = true
 openobserve-core.workspace = true
 openobserve-jobs.workspace = true
+openobserve-mcp.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true
@@ -244,6 +245,7 @@ members = [
     "src/search",
     "src/promql",
     "src/jobs",
+    "src/mcp",
     "src/config",
     "src/infra",
     "src/ingester",
@@ -281,6 +283,7 @@ openobserve-api-management = { path = "src/api_management" }
 openobserve-api-query = { path = "src/api_query" }
 openobserve-api-common = { path = "src/api_common" }
 openobserve-jobs = { path = "src/jobs" }
+openobserve-mcp = { path = "src/mcp" }
 o2_dex = { path = "src/enterprise/o2_dex" }
 o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
 o2_openfga = { path = "src/enterprise/o2_openfga" }
@@ -312,6 +315,7 @@ multer = "3.1"
 pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
 promql-parser = { version = "0.6", git = "https://github.com/openobserve/promql-parser", branch = "openobserve" }
 rcgen = "0.14.4"
+rmcp-openapi = { version = "0.23.2", git = "https://github.com/openobserve/rmcp-openapi", branch = "v0.23.2-feat" }
 rust-embed-for-web = "11.4.1"
 sourcemap = "9.3.2"
 tikv-jemalloc-ctl = { version = "0.6", features = [

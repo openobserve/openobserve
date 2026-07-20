@@ -147,6 +147,16 @@ export const makeCreateReportSchema = (
       title: z.string().optional().default(""),
       emails: z.string().optional().default(""),
       message: z.string().optional().default(""),
+
+      // ── Dashboard variables (form-owned key/value rows) ──────────────────
+      // Merged into dashboards[0].variables at save. The BEFORE baseline had NO
+      // validation here (VariablesInput was component-owned + unvalidated), so
+      // these rows stay unconstrained — the field exists only so the form owns
+      // the value (VariablesInput now renders in form mode, name-prefix="variables").
+      variables: z
+        .array(z.object({ key: z.string(), value: z.string() }))
+        .optional()
+        .default([]),
     })
     .superRefine((val, ctx) => {
       const addIssue = (path: (string | number)[], message: string) =>
@@ -290,4 +300,5 @@ export const createReportDefaults = (): CreateReportForm => ({
   title: "",
   emails: "",
   message: "",
+  variables: [],
 });
