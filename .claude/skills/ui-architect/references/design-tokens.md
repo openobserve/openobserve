@@ -99,12 +99,37 @@ None of the above is advisory. Every PR runs, as **required** gating steps:
   un-justified `<style>`, …). Zero-tolerance categories fail on the **first** occurrence;
   ratcheted categories can **only shrink** — and strict mode leaves **no headroom**, so a
   new raw token fails even in a file that still carries old debt. You cannot "use up" slack.
-- `lint:tokens` — every `var(--x)` must resolve to a defined token (no silent voids).
+- `lint:tokens` — every `var(--x)` must resolve to a defined token (no silent voids),
+  and **any** `--o2-*` used as a CSS custom property fails, fallback or not.
 - `lint:token-purity` — the token files stay pure (no class defs leaking in).
-- `stylelint` — `color-no-hex` and the dark-selector rules at **error** severity.
+- `lint:styles` (stylelint) — `color-no-hex` in `.vue` styles, the `.dark`-only
+  dark-selector rule, banned `var(--o2-*)` / retired `var(--color-text-primary/-caption)`
+  values, and **literal font stacks** (`font-family` must be `var(--font-sans)` /
+  `var(--font-mono)` — the design script's `literalFontFamily` category counts the
+  same thing in class arbitrary values), all at **error** severity.
 
 If a rule blocks you, fix the cause (use the utility, register the token, pick the tier) —
 raising the baseline is not the move.
+
+**The counters scan raw text — comments included.** A `16px` / `#fff` /
+`var(--color-*)` mentioned in a `<style>`-block comment, or a banned class pattern
+(`bg-gray-400`, `tw:`, `w-[320px]`, a retired alias) quoted verbatim in a
+template/JS comment, counts as debt exactly like real code and can fail
+`lint:design:strict`. Describe values in comments in `rem` or plain words instead
+of quoting the banned form.
+
+**The ratchet cuts both ways — improving also needs a baseline update.** In
+`--strict` mode the baseline must *equal* reality, so a PR that *reduces* debt
+(migrates a `var()`, deletes a debt-carrying file or `<style>` block) fails CI with
+"baseline is STALE". That failure is expected and good — lock the win in:
+
+```bash
+cd web && node scripts/check-design-consistency.mjs --baseline
+# commit the tightened scripts/design-debt-baseline.json with your change
+```
+
+Never hand-edit the baseline, and never re-baseline to *absorb a regression* — only
+to record an improvement (CI's regression check fails first if counts went up).
 
 ## The token files
 
@@ -114,7 +139,7 @@ Plain CSS, Tailwind v4, **no SCSS**. They live in
 | File | Holds |
 | --- | --- |
 | `base.css` | raw palette primitives (`--color-grey-*`, `--color-primary-*`, radius, shadow) + `@font-face` — the only place literal hex lives |
-| `semantic.css` | semantic/intent `--color-*` tokens, light `:root` (e.g. `--color-text-primary`, `--color-surface-base`, `--color-border-default`) |
+| `semantic.css` | semantic/intent `--color-*` tokens, light `:root` (e.g. `--color-text-heading`, `--color-surface-base`, `--color-border-default`) |
 | `component.css` | per-component `--color-*` tokens (e.g. `--color-button-primary`) |
 | `dark.css` | **all** dark-mode overrides, under `.dark` |
 
@@ -176,10 +201,10 @@ Most legacy tokens map to a same-meaning modern token — the heuristic is simpl
 | Legacy `--o2-*` | Modern `--color-*` |
 | --- | --- |
 | `--o2-text-heading` | `--color-text-heading` |
-| `--o2-text-primary` / `--o2-text-4` | `--color-text-primary` |
+| `--o2-text-primary` / `--o2-text-4` | `--color-text-heading` |
 | `--o2-text-body` | `--color-text-body` |
 | `--o2-text-secondary` / `--o2-text-2` | `--color-text-secondary` |
-| `--o2-text-caption` / `--o2-text-1` | `--color-text-caption` |
+| `--o2-text-caption` / `--o2-text-1` | `--color-text-secondary` |
 | `--o2-text-label` / `--o2-text-3` | `--color-text-label` |
 | `--o2-text-muted` | `--color-text-muted` |
 | `--o2-text-placeholder` | `--color-text-placeholder` |
@@ -199,7 +224,9 @@ Most legacy tokens map to a same-meaning modern token — the heuristic is simpl
 | `--o2-secondary-btn-bg` / `-text` / `-border` | `--color-button-secondary` / `-foreground` / `-border` |
 | `--o2-hover-accent` / `--o2-interactive-hover` | `--color-interactive-hover-bg` |
 
-**Authoritative source (always in-tree):** the token files themselves define both
+**Authoritative source (always in-tree):** the codemod's machine map is
+`web/scripts/o2-token-map.json` (`migrate` key — this is what the CI failure message
+points at), and the token files themselves define both
 vocabularies — `semantic.css` (light `--o2-*` and `--color-*` values) and
 `dark.css` (dark values). If a legacy token isn't in the table above, grep those
 files for its value and find the `--color-*` token that carries the same value:

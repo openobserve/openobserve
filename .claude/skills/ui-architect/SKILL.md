@@ -128,10 +128,17 @@ read it once, it is the backbone of everything below.
 
    > **All of §3–§5 are CI-enforced and FAIL the build** — `lint:design:strict`
    > (hardcoded hex/px, arbitrary radius, retired aliases, raw palette/ramp, raw
-   > `var()`, un-justified `<style>`), `lint:tokens`, `lint:token-purity`, and
-   > stylelint run on every PR. The strict ratchet leaves **no headroom**: a bypass
-   > count can only shrink, so new raw-token usage fails even in a file that still
-   > carries old debt. Fix the cause; don't try to raise the baseline.
+   > `var()`, un-justified `<style>`, literal font stacks), `lint:tokens`,
+   > `lint:token-purity`, and `lint:styles` (stylelint) run on every PR. The strict
+   > ratchet leaves **no headroom**: a bypass count can only shrink, so new
+   > raw-token usage fails even in a file that still carries old debt. The
+   > counters scan **raw text, comments included** — a `16px` or `#fff` in a
+   > `<style>`-block comment, or a banned class quoted verbatim in a template/JS
+   > comment, counts as debt; word comments in rem/plain English instead. Fix the
+   > cause; don't try to raise the baseline. The flip side: a PR that *reduces*
+   > debt fails strict mode with "baseline is STALE" until you lock the win in —
+   > `cd web && node scripts/check-design-consistency.mjs --baseline` and commit
+   > the tightened `scripts/design-debt-baseline.json` with your change.
 6. **No hardcoded user-facing text** — every label, title, placeholder, tooltip,
    empty-state, toast, and validation message comes from `useI18n()`'s `t()`, with
    keys added to `web/src/locales/languages/en-US.json` (other locales follow from

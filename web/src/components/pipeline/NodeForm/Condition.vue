@@ -785,7 +785,7 @@ const deleteRoute = () => {
 /* Force the root group box to span the full drawer width (FilterGroup defaults to w-fit).
    Also drop its `mt-4`: as the first element in the drawer body it has no preceding
    label to space from, and that margin collapses to the body's content edge, adding a
-   16px gap on top of the drawer's own 12px inset. Root box only (`>`) — nested groups
+   1rem gap on top of the drawer's own 0.75rem inset. Root box only (`>`) — nested groups
    and alerts' FilterGroup keep their mt-4. */
 .pipeline-filter-group-wrapper > :deep(.filter-group-box) {
   width: 100% !important;
