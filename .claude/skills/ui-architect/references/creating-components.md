@@ -153,7 +153,8 @@ Two-way binding uses the standard `modelValue` prop + `update:modelValue` emit (
 (Full token guide, registration steps, and the `--o2-*` → `--color-*` map:
 [design-tokens.md](design-tokens.md).)
 
-- **Colors: only the modern `--color-*` tokens.** Reach them through token utilities (`bg-surface-panel`, `text-text-primary`, `bg-button-primary`) or `var(--color-*)` in a CSS file. The legacy `--o2-*` vocabulary is **banned** — never use it, never define it, and never add a `.body--dark` block.
+- **Colors: only the modern `--color-*` tokens.** Reach them through token utilities (`bg-surface-panel`, `text-text-heading`, `bg-button-primary`) or `var(--color-*)` in a CSS file / component-token block (never a raw `var()` in the `.vue` template — see next bullet). The legacy `--o2-*` vocabulary is **banned** — never use it, never define it, and never add a `.body--dark` block. Retired aliases `text-text-primary`/`-caption` → `text-text-heading`/`-secondary`.
+- **Corner radius: `rounded-default` (controls) / `rounded-surface` (card/panel surfaces) / `rounded-full`** — never `rounded-[..]` or the retired `rounded-{sm,md,lg,xl}`. A reusable card/panel component rounds with `rounded-surface`.
 - **No hardcoded px anywhere** — including inside Tailwind arbitrary values. `w-[320px]` is banned. Use the rem-based scale (`w-80`, `h-10`, `px-4`) or `rem` / `%` / `vh` / `vw`. `1px` hairline borders are the only exception.
 - **No `var(--*)` in `.vue` templates** and **no hex in components** — go through token utilities.
 
@@ -211,7 +212,7 @@ Model the new `OFormX` on `web/src/lib/forms/Input/OFormInput.vue`. Never mirror
 
 Ordered, but lightweight. **No code before analysis.**
 
-1. **Analysis** — confirm the component doesn't already exist in `lib/`; if you're replacing a Quasar element, grep every usage/prop/slot/variant across `web/src/` and list them. The goal: enumerate every real visual pattern so the variant set covers them all.
+1. **Analysis** — confirm the component doesn't already exist in `lib/`; if you're replacing an existing element, grep every usage/prop/slot/variant across `web/src/` and list them. The goal: enumerate every real visual pattern so the variant set covers them all.
 2. **Design** — from the analysis, define the minimal `variant`/`size`/state prop set (§5), scope the full family (§3), and write the `.types.ts` contract first. Every observed visual pattern must map to a named variant or be an intentionally dropped prop.
 3. **Implement** — write the `.vue` with token utilities and the computed variant map; register any new tokens (§7); reach for `reka-ui` on ARIA-complex behavior (§4). Add a `data-test` (`<module>-<file>-<descriptor>`, kebab-case) to every interactive/key element.
 4. **Test** — write the `.spec.ts` (§10).
