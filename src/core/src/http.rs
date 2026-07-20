@@ -15,7 +15,7 @@
 
 use axum::{
     Json,
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
 use infra::errors;
@@ -38,20 +38,41 @@ use crate::{
     },
 };
 
+/// Build a `HeaderValue` for the `X-Error-Message` header from an arbitrary
+/// error string.
+///
+/// Error strings are derived from user-controlled input (org/stream names,
+/// query params, request bodies) and may contain bytes that are illegal in an
+/// HTTP header value, e.g. control characters. If such a value were handed to
+/// axum directly it would fail the whole response with a `500 failed to parse
+/// header value`, masking the real error status/body. To avoid that we strip
+/// any byte that is not a valid header-value character (visible ASCII plus
+/// space/tab), guaranteeing the header can always be constructed.
+fn error_header_value(msg: &str) -> HeaderValue {
+    let sanitized: Vec<u8> = msg
+        .bytes()
+        .filter(|&b| b == b'\t' || (0x20..=0x7e).contains(&b))
+        .collect();
+    // `from_maybe_shared` on the sanitized bytes cannot fail, but fall back to
+    // an empty value just in case rather than panicking.
+    HeaderValue::from_maybe_shared(bytes::Bytes::from(sanitized))
+        .unwrap_or_else(|_| HeaderValue::from_static(""))
+}
+
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
     match err {
         errors::Error::ErrorCode(code) => match code {
             errors::ErrorCodes::SearchCancelQuery(_) | errors::ErrorCodes::RatelimitExceeded(_) => {
                 (
                     StatusCode::TOO_MANY_REQUESTS,
-                    [(ERROR_HEADER, code.to_json())],
+                    [(ERROR_HEADER, error_header_value(&code.to_json()))],
                     Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
                 )
                     .into_response()
             }
             errors::ErrorCodes::SearchTimeout(_) => (
                 StatusCode::REQUEST_TIMEOUT,
-                [(ERROR_HEADER, code.to_json())],
+                [(ERROR_HEADER, error_header_value(&code.to_json()))],
                 Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
             )
                 .into_response(),
@@ -65,21 +86,21 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             | errors::ErrorCodes::SearchStreamNotFound(_)
             | errors::ErrorCodes::SearchHistogramNotAvailable(_) => (
                 StatusCode::BAD_REQUEST,
-                [(ERROR_HEADER, code.to_json())],
+                [(ERROR_HEADER, error_header_value(&code.to_json()))],
                 Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
             )
                 .into_response(),
             errors::ErrorCodes::ServerInternalError(_)
             | errors::ErrorCodes::SearchParquetFileNotFound => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, code.to_json())],
+                [(ERROR_HEADER, error_header_value(&code.to_json()))],
                 Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
             )
                 .into_response(),
         },
         errors::Error::ResourceError(_) => (
             StatusCode::SERVICE_UNAVAILABLE,
-            [(ERROR_HEADER, err.to_string())],
+            [(ERROR_HEADER, error_header_value(&err.to_string()))],
             Json(MetaHttpResponse::error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 err,
@@ -90,13 +111,13 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
         // request body, so surface it as 400 rather than a 500 server error.
         errors::Error::SerdeJsonError(_) => (
             StatusCode::BAD_REQUEST,
-            [(ERROR_HEADER, err.to_string())],
+            [(ERROR_HEADER, error_header_value(&err.to_string()))],
             Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
         _ => (
             StatusCode::BAD_REQUEST,
-            [(ERROR_HEADER, err.to_string())],
+            [(ERROR_HEADER, error_header_value(&err.to_string()))],
             Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
@@ -343,5 +364,36 @@ impl From<RatelimitError> for Response {
             RatelimitError::NotFound(_) => MetaHttpResponse::not_found(value),
             error => MetaHttpResponse::bad_request(error),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_header_value_plain_ascii() {
+        let v = error_header_value("stream not found");
+        assert_eq!(v.to_str().unwrap(), "stream not found");
+    }
+
+    #[test]
+    fn test_error_header_value_strips_control_chars() {
+        // Error messages can embed user-controlled bytes such as the C1 control
+        // character U+009D. Without sanitizing, building the header would fail
+        // and turn the real error into a `500 failed to parse header value`.
+        let msg = "org -\u{9d}n not found\n\t";
+        let v = error_header_value(msg);
+        // U+009D is encoded as 0xC2 0x9D in UTF-8; both bytes are stripped, the
+        // trailing newline is dropped, the tab is kept.
+        assert_eq!(v.to_str().unwrap(), "org -n not found\t");
+        // The header value must be constructible and contain no invalid bytes.
+        assert!(v.as_bytes().iter().all(|&b| b == b'\t' || (0x20..=0x7e).contains(&b)));
+    }
+
+    #[test]
+    fn test_error_header_value_empty() {
+        let v = error_header_value("");
+        assert_eq!(v.to_str().unwrap(), "");
     }
 }
