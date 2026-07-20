@@ -876,4 +876,38 @@ describe("MetricsExplorer wiring", () => {
       });
     });
   });
+
+  /**
+   * The "No metrics match" empty state offers one action card per remedy, gated
+   * on that remedy actually being able to change the result. Favorites ignores
+   * prefix/suffix/type, so "Clear prefix/suffix/type" must not appear there.
+   */
+  describe("empty-state remedies gate on what would actually help", () => {
+    const actionIds = (wrapper: any) =>
+      (wrapper.vm as any).noMatchActions.map((a: any) => a.id);
+
+    it("offers Clear prefix/suffix/type in Explore when a facet is selected", () => {
+      const wrapper = mountExplorer();
+      grid.showFavoritesOnly.value = false;
+      grid.selectedPrefixes.value = new Set(["envoy_cluster"]);
+
+      expect(actionIds(wrapper)).toContain("clear-facets");
+
+      grid.selectedPrefixes.value = new Set(); // reset shared mock
+    });
+
+    it("hides Clear prefix/suffix/type in Favorites — those facets are ignored there", () => {
+      const wrapper = mountExplorer();
+      grid.showFavoritesOnly.value = true;
+      grid.selectedPrefixes.value = new Set(["envoy_cluster"]);
+
+      const ids = actionIds(wrapper);
+      expect(ids).not.toContain("clear-facets");
+      // The favorites-specific remedy is still offered.
+      expect(ids).toContain("clear-favorites");
+
+      grid.showFavoritesOnly.value = false; // reset shared mock
+      grid.selectedPrefixes.value = new Set();
+    });
+  });
 });

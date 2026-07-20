@@ -413,6 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <section
           ref="scrollRef"
           class="flex-1 min-w-0 overflow-y-auto p-3"
+          :class="gridVisible ? '' : 'flex flex-col items-center justify-center'"
           data-test="metrics-explorer-scroll"
         >
         <div v-if="grid.loading.value" class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80">
@@ -420,29 +421,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>{{ t("metrics.explorer.loading") }}</span>
         </div>
 
-        <div v-else-if="grid.loadError.value" class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80">
-          <OIcon name="error-outline" size="lg" class="text-error-600" />
-          <span>{{ grid.loadError.value }}</span>
-          <OButton
-            variant="primary"
-            size="sm"
-            data-test="metrics-explorer-reload"
-            @click="grid.loadStreams(true)"
-            >{{ t("metrics.explorer.retry") }}</OButton
-          >
-        </div>
+        <OEmptyState
+          v-else-if="grid.loadError.value"
+          size="block"
+          preset="load-error"
+          :description="grid.loadError.value"
+          data-test="metrics-explorer-load-error"
+          @action="grid.loadStreams(true)"
+        />
 
-        <div v-else-if="!grid.cards.value.length" class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80">
-          <OIcon name="show-chart" size="lg" />
-          <span>{{ t("metrics.explorer.noMetrics") }}</span>
-          <a
-            class="text-primary underline"
-            href="https://openobserve.ai/docs/user-guide/metrics/"
-            target="_blank"
-            rel="noopener"
-            >{{ t("metrics.explorer.learnIngest") }}</a
-          >
-        </div>
+        <!-- Zero metrics in the org — a "set up ingestion" state, not a filter
+             miss. Keeps the metrics-specific heading and the docs link. -->
+        <OEmptyState
+          v-else-if="!grid.cards.value.length"
+          size="block"
+          preset="no-streams"
+          :title="t('metrics.explorer.noMetrics')"
+          :action-label="t('metrics.explorer.learnIngest')"
+          data-test="metrics-explorer-no-metrics"
+          @action="openIngestDocs"
+        />
 
         <!-- FAVOURITES with none added yet — the reason is not "filters hid
              everything", so show the right guidance (add one in Explore) and NO
@@ -450,7 +448,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OEmptyState
           v-else-if="isWorkspace && !grid.favorites.value.length"
           size="block"
-          preset="no-data"
+          variant="create"
+          illustration="board"
           :title="t('metrics.explorer.workspace.emptyScratchpadTitle')"
           :description="t('metrics.explorer.workspace.emptyScratchpadDesc')"
           data-test="metrics-workspace-empty-grid"
@@ -710,6 +709,18 @@ export default defineComponent({
     // prefix of the full sorted set, so colours stay stable as pages are added.
     const visibleCards = computed(() => grid.pagedCards.value);
 
+    // Whether the body is rendering the virtualized grid vs a state placeholder
+    // (loading / error / empty). The grid must stay top-aligned for the
+    // virtualizer; every placeholder is centered in the scroll area instead.
+    // `visibleCards.length > 0` implies not-loading, not-errored, and — in
+    // Workspace — that favorites matched, so it's exactly the grid's own branch.
+    const gridVisible = computed(
+      () =>
+        !grid.loading.value &&
+        !grid.loadError.value &&
+        visibleCards.value.length > 0,
+    );
+
     // Just the count. It used to append "· N no-data hidden", but the checkbox
     // sitting right beside it already says the no-data cards are hidden — the
     // suffix restated the control next to it and wrapped onto two lines doing
@@ -943,12 +954,19 @@ export default defineComponent({
       grid.hideEmptyPanels.value = false;
     };
 
-    /** The hint, with the hidden-count sentence in front when it applies. */
-    const noMatchDescription = computed(() =>
-      grid.emptyHiddenCount.value
-        ? `${noDataHiddenLabel.value} ${t("metrics.explorer.noMatchHint")}`
-        : t("metrics.explorer.noMatchHint"),
-    );
+    /**
+     * The hint, with the hidden-count sentence in front when it applies. In
+     * Favorites the prefix/suffix facets are ignored, so the hint there must not
+     * name them (it would point at a remedy that changes nothing).
+     */
+    const noMatchDescription = computed(() => {
+      const hint = grid.showFavoritesOnly.value
+        ? t("metrics.explorer.noMatchHintFavorites")
+        : t("metrics.explorer.noMatchHint");
+      return grid.emptyHiddenCount.value
+        ? `${noDataHiddenLabel.value} ${hint}`
+        : hint;
+    });
 
     /**
      * One card per remedy the hint names — gated on its cause, so a card is
@@ -973,10 +991,13 @@ export default defineComponent({
           descriptionKey: "metrics.explorer.emptyActions.clearLabelsDesc",
         });
       }
+      // Favorites ignores prefix/suffix/type (their panel is Explore-only), so
+      // clearing them would not change the result — don't offer it there.
       if (
-        grid.selectedPrefixes.value.size ||
-        grid.selectedSuffixes.value.size ||
-        grid.selectedTypes.value.size
+        !grid.showFavoritesOnly.value &&
+        (grid.selectedPrefixes.value.size ||
+          grid.selectedSuffixes.value.size ||
+          grid.selectedTypes.value.size)
       ) {
         actions.push({
           id: "clear-facets",
@@ -1009,6 +1030,14 @@ export default defineComponent({
       });
       return actions;
     });
+
+    const openIngestDocs = () => {
+      window.open(
+        "https://openobserve.ai/docs/user-guide/metrics/",
+        "_blank",
+        "noopener",
+      );
+    };
 
     const onEmptyStateAction = (id?: string) => {
       switch (id) {
@@ -1727,6 +1756,7 @@ export default defineComponent({
       virtualizer,
       onDataScope,
       visibleCards,
+      gridVisible,
       resultCountLabel,
       rails,
       selectRail,
@@ -1754,6 +1784,7 @@ export default defineComponent({
       noMatchDescription,
       noMatchActions,
       onEmptyStateAction,
+      openIngestDocs,
       showMoreLabel,
       badgeLabels: BADGE_LABELS,
       queriesFor,
