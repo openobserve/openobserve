@@ -381,11 +381,11 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
 
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::{
-        action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
-        destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
-        incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
-        re_pattern_stream_map, reports, search_queue, service_streams, short_urls, system_settings,
-        templates, timed_annotations, trial_quota_usage,
+        action_scripts, alert_incidents, alert_occurrences, backfill_jobs, compactor_manual_jobs,
+        dashboards, destinations, distinct_values, enrichment_table_urls, enrichment_tables,
+        folders, incident_events, kv_store, org_ingestion_tokens, org_storage_providers,
+        re_pattern, re_pattern_stream_map, reports, search_queue, service_streams, short_urls,
+        system_settings, templates, timed_annotations, trial_quota_usage,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -394,6 +394,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     alert_incidents::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_incidents: {e}"))?;
+    alert_occurrences::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_occurrences: {e}"))?;
     incident_events::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/incident_events: {e}"))?;
