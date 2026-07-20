@@ -20,7 +20,7 @@
         <div class="w-85 shrink-0 overflow-y-auto py-5 pr-5 pl-6 flex flex-col gap-5">
           <!-- Model Name -->
           <div class="flex flex-col gap-1.5">
-            <label class="text-compact font-semibold text-text-label"
+            <label class="text-compact font-semibold text-text-heading"
               >{{ t("modelPricing.modelNameInput") }}
               <span class="text-status-error-text">*</span></label
             >

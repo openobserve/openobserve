@@ -49,7 +49,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.nameLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
@@ -64,7 +64,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.descriptionLabel") }}
             </label>
             <OFormTextarea
@@ -77,7 +77,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </label>
@@ -127,7 +127,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.providerLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>
@@ -185,7 +185,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">{{ t("onlineEvals.scorer.modelLabel") }}</label>
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.scorer.modelLabel") }}</label>
             <OFormInput
               name="model"
               :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
@@ -195,7 +195,7 @@
           </div>
 
           <div class="mb-3 flex flex-col gap-3.5">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.promptLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>
@@ -331,7 +331,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.remoteUrlLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>
@@ -354,7 +354,7 @@
 
           <div class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteTimeoutLabel") }}
               </label>
               <OFormInput
@@ -366,7 +366,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteRetriesLabel") }}
               </label>
               <OFormInput
@@ -378,7 +378,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteBackoffLabel") }}
               </label>
               <OFormSelect
@@ -400,7 +400,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.remoteAuthLabel") }}
             </label>
             <!-- Clearable so a user can return to "no auth": the auth-type
@@ -421,7 +421,7 @@
           </div>
 
           <div v-if="formValues.authType === 'bearer'" class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>
@@ -439,7 +439,7 @@
 
           <div v-if="formValues.authType === 'basic'" class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.usernameLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </label>
@@ -451,7 +451,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.passwordLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </label>
@@ -470,7 +470,7 @@
 
           <div v-if="formValues.authType === 'api_key'" class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.headerNameLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </label>
@@ -482,7 +482,7 @@
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </label>
@@ -571,7 +571,7 @@
           </div>
 
           <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.scorer.requestBodyLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </label>

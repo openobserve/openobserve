@@ -40,7 +40,7 @@
 
         <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
@@ -58,7 +58,7 @@
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.provider.typeLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
@@ -74,7 +74,7 @@
         </div>
 
         <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-text-label mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
+          <div class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
           <OFormInput
             name="endpoint"
             :placeholder="endpointPlaceholder"
@@ -85,7 +85,7 @@
 
         <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-label mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
               <span class="text-status-error-text ml-0.5">*</span>
             </div>
@@ -98,7 +98,7 @@
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-label mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
+            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
             <OFormInput
               name="availableModels"
               :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
@@ -123,7 +123,7 @@
         </div>
 
         <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-text-label mb-1">
+          <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
             {{ t("onlineEvals.provider.apiKeyLabel") }}
             <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
           </div>

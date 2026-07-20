@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-alert-stream-type-select-dropdown"
             :options="streamTypes"
             :searchable="false"
-            class="stream-type-select w-37.5 @max-[900px]/stream-config:w-27.5 @max-[600px]/stream-config:w-17.5"
+            class="stream-type-select w-37.5! @max-[900px]/stream-config:w-27.5! @max-[600px]/stream-config:w-17.5!"
             :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="onStreamTypeChange"
           />
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-alert-stream-name-select-dropdown"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="stream-name-select w-40 @max-[900px]/stream-config:w-30 @max-[750px]/stream-config:w-27.5 @max-[600px]/stream-config:w-20"
+            class="stream-name-select w-40! @max-[900px]/stream-config:w-30! @max-[750px]/stream-config:w-27.5! @max-[600px]/stream-config:w-20!"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="updateStreamFields($event)"
           />
