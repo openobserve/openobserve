@@ -18,13 +18,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
 use infra::errors;
-#[cfg(feature = "enterprise")]
-use openobserve_pipeline::eval_jobs::EvalJobError;
-#[cfg(feature = "enterprise")]
-use openobserve_pipeline::providers::ProviderError;
-
-use crate::common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
     match err {
@@ -88,48 +83,5 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
-    }
-}
-
-#[cfg(feature = "enterprise")]
-impl From<EvalJobError> for Response {
-    fn from(value: EvalJobError) -> Self {
-        match value {
-            EvalJobError::InfraError(err) => {
-                log::error!("[EvalJob] internal error: {err}");
-                MetaHttpResponse::internal_error("Internal server error")
-            }
-            EvalJobError::NotFound => MetaHttpResponse::not_found(value),
-            EvalJobError::ReconcilerError(err) => {
-                log::error!("[EvalJob] reconciler error: {err}");
-                MetaHttpResponse::internal_error("Internal server error")
-            }
-            EvalJobError::InvalidStatus(_) | EvalJobError::InvalidStatusTransition { .. } => {
-                MetaHttpResponse::bad_request(value)
-            }
-        }
-    }
-}
-
-#[cfg(feature = "enterprise")]
-impl From<ProviderError> for Response {
-    fn from(value: ProviderError) -> Self {
-        match value {
-            ProviderError::InfraError(err) => {
-                log::error!("[Provider] internal error: {err}");
-                MetaHttpResponse::internal_error("Internal server error")
-            }
-            ProviderError::MissingName => {
-                MetaHttpResponse::bad_request("Provider name cannot be empty")
-            }
-            ProviderError::ProviderNameAlreadyExists => MetaHttpResponse::bad_request(
-                "Provider with this name already exists in this organization",
-            ),
-            ProviderError::NotFound => MetaHttpResponse::not_found("Provider not found"),
-            ProviderError::InvalidConfig(err) => MetaHttpResponse::bad_request(err),
-            ProviderError::ProviderInUse(scorers) => MetaHttpResponse::conflict(format!(
-                "Provider is used by active scorers: {scorers}. Unlink or replace the provider before deleting it."
-            )),
-        }
     }
 }

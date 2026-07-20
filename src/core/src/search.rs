@@ -116,7 +116,7 @@ impl openobserve_search_service::streaming::StreamingRuntime for CoreSearchRunti
 
     #[cfg(feature = "enterprise")]
     fn search_error_status(&self, error: &Error) -> u16 {
-        crate::http::map_error_to_http_response(error, None)
+        openobserve_search_service::http::map_error_to_http_response(error, None)
             .status()
             .as_u16()
     }

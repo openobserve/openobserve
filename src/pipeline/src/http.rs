@@ -16,7 +16,7 @@
 use axum::response::Response;
 use common::meta::http::HttpResponse;
 
-use crate::repository::PipelineError;
+use crate::{eval_jobs::EvalJobError, providers::ProviderError, repository::PipelineError};
 
 impl From<PipelineError> for Response {
     fn from(value: PipelineError) -> Self {
@@ -25,6 +25,47 @@ impl From<PipelineError> for Response {
             PipelineError::NotFound(_) => HttpResponse::not_found(value),
             PipelineError::Modified(_) => HttpResponse::conflict(value),
             error => HttpResponse::bad_request(error),
+        }
+    }
+}
+
+impl From<EvalJobError> for Response {
+    fn from(value: EvalJobError) -> Self {
+        match value {
+            EvalJobError::InfraError(error) => {
+                log::error!("[EvalJob] internal error: {error}");
+                HttpResponse::internal_error("Internal server error")
+            }
+            EvalJobError::NotFound => HttpResponse::not_found(value),
+            EvalJobError::ReconcilerError(error) => {
+                log::error!("[EvalJob] reconciler error: {error}");
+                HttpResponse::internal_error("Internal server error")
+            }
+            EvalJobError::InvalidStatus(_) | EvalJobError::InvalidStatusTransition { .. } => {
+                HttpResponse::bad_request(value)
+            }
+        }
+    }
+}
+
+impl From<ProviderError> for Response {
+    fn from(value: ProviderError) -> Self {
+        match value {
+            ProviderError::InfraError(error) => {
+                log::error!("[Provider] internal error: {error}");
+                HttpResponse::internal_error("Internal server error")
+            }
+            ProviderError::MissingName => {
+                HttpResponse::bad_request("Provider name cannot be empty")
+            }
+            ProviderError::ProviderNameAlreadyExists => HttpResponse::bad_request(
+                "Provider with this name already exists in this organization",
+            ),
+            ProviderError::NotFound => HttpResponse::not_found("Provider not found"),
+            ProviderError::InvalidConfig(error) => HttpResponse::bad_request(error),
+            ProviderError::ProviderInUse(scorers) => HttpResponse::conflict(format!(
+                "Provider is used by active scorers: {scorers}. Unlink or replace the provider before deleting it."
+            )),
         }
     }
 }

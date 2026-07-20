@@ -36,6 +36,7 @@ pub mod file_list;
 pub mod grpc;
 pub mod grpc_search;
 pub mod grpc_server;
+pub mod http;
 #[cfg(feature = "enterprise")]
 pub mod jobs;
 pub mod partition;

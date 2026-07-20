@@ -31,7 +31,6 @@ pub use openobserve_transform::management as functions;
 pub mod grpc {
     pub use openobserve_ingestion::internal::get_ingester_channel;
 }
-pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens {
     pub use openobserve_ingestion::tokens::*;
@@ -136,11 +135,3 @@ pub use openobserve_organization::users;
 pub use openobserve_search_service::{sourcemaps, stream_utils};
 mod organization_adapter;
 mod transform_adapter;
-
-/// Private import namespace retained while core's remaining composition modules are migrated to
-/// their owning crates. It is intentionally not part of the public API.
-mod common {
-    pub mod meta {
-        pub use ::common::meta::*;
-    }
-}
