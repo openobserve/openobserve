@@ -22,24 +22,6 @@ import {
   getUTCTimestampFromZonedTimestamp,
 } from "@/utils/dashboard/dateTimeUtils";
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    date: {
-      subtractFromDate: vi.fn((dateInput: any, subtractObj: any) => {
-        const result = new Date(dateInput);
-        if (subtractObj.seconds) result.setSeconds(result.getSeconds() - subtractObj.seconds);
-        if (subtractObj.minutes) result.setMinutes(result.getMinutes() - subtractObj.minutes);
-        if (subtractObj.hours) result.setHours(result.getHours() - subtractObj.hours);
-        if (subtractObj.days) result.setDate(result.getDate() - subtractObj.days);
-        if (subtractObj.months) result.setMonth(result.getMonth() - subtractObj.months);
-        return result;
-      }),
-    },
-  };
-});
-
 describe("dateTimeUtils", () => {
   describe("formatDate", () => {
     it("formats a date correctly", () => {

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       data-test="trace-header-operation-name"
     >
-      Operation Name
+      {{ t('traces.traceHeader.operationName') }}
       <div
         class="bg-(--o2-primary) inline-flex items-center justify-center w-5 h-5 rounded-full absolute -right-2.5 -top-0.5 z-10 cursor-col-resize"
         @mousedown="handleMouseDown"
@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
@@ -126,8 +127,10 @@ export default defineComponent({
 
   setup() {
     const store = useStore();
+    const { t } = useI18n();
     return {
       store,
+      t,
     };
   },
 });

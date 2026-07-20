@@ -198,6 +198,10 @@ class FunctionsPage {
     // then click the per-row edit button using its stable data-test.
     const functionRow = this.getRowByName(name);
     const editButton = functionRow.locator(this.rowEditButtonSelector);
+    // After a cross-org (_meta) navigation the functions list can take a while
+    // to stream in — wait for the row's edit button before clicking so a slow
+    // list render doesn't fail the click.
+    await editButton.waitFor({ state: 'visible', timeout: 30000 });
     await editButton.click();
     await this.page.waitForTimeout(1000);
   }

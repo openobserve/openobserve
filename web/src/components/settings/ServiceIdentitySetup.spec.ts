@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
+import enLocaleFull from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
@@ -57,9 +58,9 @@ vi.mock("@/components/dashboards/panels/CustomChartRenderer.vue", () => ({
   },
 }));
 
-vi.mock("@/components/alerts/TagInput.vue", () => ({
+vi.mock("@/lib/forms/TagInput/OTagInput.vue", () => ({
   default: {
-    name: "TagInput",
+    name: "OTagInput",
     template:
       '<div data-test="tag-input" :data-model-value="JSON.stringify(modelValue)" />',
     props: ["modelValue", "placeholder", "label"],
@@ -73,44 +74,49 @@ import serviceStreamsService from "@/services/service_streams";
 // ─── Test setup ──────────────────────────────────────────────────────────────
 
 
+// This spec asserts on these specific correlation strings, so they must win
+// over the real app locale.
+const inlineOverrides = {
+  settings: {
+    correlation: {
+      serviceNameNotDetected: "Service name not detected",
+      serviceNameExpandedHelp: "Configure service name fields",
+      serviceNameConfiguredNotSeen: "Configured but not seen",
+      distinguishByLabel: "Distinguish By",
+      distinguishByHelp: "Fields used to distinguish services",
+      addField: "Add Field",
+      addGroup: "Add Group",
+      addGroupTooltip: "Add a new identity group",
+      addFieldTooltip: "Add a field to this group",
+      selectField: "Select field",
+      saveIdentityConfig: "Save Configuration",
+      customizeFieldMappings: "Customize Field Mappings",
+      fieldMappingDialogHelp: "Map fields to service names",
+      fieldMappingPlaceholder: "Enter field names",
+      foundInLogs: "Found in Logs",
+      foundInTraces: "Found in Traces",
+      foundInMetrics: "Found in Metrics",
+      autoSuggestedBanner: "Auto suggested",
+      identityConfigSaved: "Configuration saved",
+      identityConfigSaveFailed: "Failed to save configuration",
+      identityConfigNoSets: "Configure at least one identity set",
+      loadRecommendationsFailed: "Failed to load recommendations",
+    },
+  },
+  common: {
+    cancel: "Cancel",
+    save: "Save",
+  },
+};
+
+// Base = full app locale (so all migrated t() keys resolve); then the inline
+// overrides above win for the keys this spec asserts on.
 const i18n = createI18n({
   legacy: false,
   locale: "en",
-  messages: {
-    en: {
-      settings: {
-        correlation: {
-          serviceNameNotDetected: "Service name not detected",
-          serviceNameExpandedHelp: "Configure service name fields",
-          serviceNameConfiguredNotSeen: "Configured but not seen",
-          distinguishByLabel: "Distinguish By",
-          distinguishByHelp: "Fields used to distinguish services",
-          addField: "Add Field",
-          addGroup: "Add Group",
-          addGroupTooltip: "Add a new identity group",
-          addFieldTooltip: "Add a field to this group",
-          selectField: "Select field",
-          saveIdentityConfig: "Save Configuration",
-          customizeFieldMappings: "Customize Field Mappings",
-          fieldMappingDialogHelp: "Map fields to service names",
-          fieldMappingPlaceholder: "Enter field names",
-          foundInLogs: "Found in Logs",
-          foundInTraces: "Found in Traces",
-          foundInMetrics: "Found in Metrics",
-          autoSuggestedBanner: "Auto suggested",
-          identityConfigSaved: "Configuration saved",
-          identityConfigSaveFailed: "Failed to save configuration",
-          identityConfigNoSets: "Configure at least one identity set",
-          loadRecommendationsFailed: "Failed to load recommendations",
-        },
-      },
-      common: {
-        cancel: "Cancel",
-        save: "Save",
-      },
-    },
-  },
+  messages: { en: enLocaleFull },
 });
+i18n.global.mergeLocaleMessage("en", inlineOverrides);
 
 // ODialog stub mirrors the migrated API: open/title/size + primary/secondary/
 // neutral button props, default/header/footer/trigger slots, and emits
@@ -531,7 +537,7 @@ describe("ServiceIdentitySetup", () => {
       // Drive the TagInput → editable list update through the v-model pipeline
       const tagInput = wrapper.find('[data-test="tag-input"]');
       expect(tagInput.exists()).toBe(true);
-      await tagInput.findComponent({ name: "TagInput" }).vm.$emit(
+      await tagInput.findComponent({ name: "OTagInput" }).vm.$emit(
         "update:modelValue",
         ["service.name", "k8s.deployment"],
       );

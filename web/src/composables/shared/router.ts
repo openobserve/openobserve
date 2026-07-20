@@ -26,10 +26,13 @@ import About from "@/views/About.vue";
 import MemberSubscription from "@/views/MemberSubscription.vue";
 import Error404 from "@/views/Error404.vue";
 import ShortUrl from "@/views/ShortUrl.vue";
+import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
+const AppMetricsExplorer = () =>
+  import("@/plugins/metrics/explorer/MetricsExplorer.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
@@ -157,8 +160,40 @@ const useRoutes = () => {
       },
     },
     {
+      // The zero-query browse grid.
+      //
+      // Back-compat: a `/metrics` URL carrying editor-specific params (the
+      // `metrics_data` blob, or anything in METRICS_PARAMS) is a deep link
+      // created before the explorer existed — a shared chart, a link from logs
+      // or an alert. Those redirect to the editor with query and hash intact,
+      // so every existing link keeps working.
       path: "metrics",
       name: "metrics",
+      component: AppMetricsExplorer,
+      meta: {
+        keepAlive: false,
+        title: "Metrics",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        if (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize") {
+          routeGuard(to, from, () =>
+            next({
+              name: "metricsEditor",
+              query: to.query,
+              hash: to.hash,
+              replace: true,
+            }),
+          );
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Stays registered in BOTH flag states, so editor bookmarks created while
+      // the explorer was enabled survive a rollback.
+      path: "metrics/editor",
+      name: "metricsEditor",
       component: AppMetrics,
       meta: {
         keepAlive: true,

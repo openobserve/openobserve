@@ -38,6 +38,7 @@ import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
+import { parseSearchError } from "@/utils/query/searchError";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -512,21 +513,26 @@ export const usePanelDataLoader = (
 
     switch (type) {
       case "promql": {
-        const errorDetailValue = error?.response?.data?.error || error?.message;
-        const trimmedErrorMessage =
-          errorDetailValue?.length > 300
-            ? errorDetailValue.slice(0, 300) + " ..."
-            : errorDetailValue;
-
-        const errorCode =
-          error?.response?.status ||
-          error?.status ||
-          error?.response?.data?.code ||
-          "";
+        // A PromQL failure comes back as the backend's internal envelope
+        // ("Error during planning: ErrorCode# {...}") rather than a sentence.
+        // Shown raw, that is what a user reads on a broken panel; the sentence
+        // they need is buried in the middle of it. parseSearchError digs it out
+        // and truncates, so this branch no longer has to.
+        // No `""` fallback. `parseSearchError` guarantees a non-empty message —
+        // "a card or panel that failed has to say *something*" — and passing ""
+        // is precisely what defeats it: an error whose body carries no `error`,
+        // no `message` and no `error.message` (a bare network failure, a 502 with
+        // an empty body) fell through to the fallback and rendered as a BLANK
+        // error, which reads as a second bug on top of the first.
+        const parsed = parseSearchError(error);
 
         state.errorDetail = {
-          message: trimmedErrorMessage,
-          code: errorCode,
+          message: parsed.message,
+          // No `?? error.response.status` fallback: `parseSearchError` already folds
+          // the HTTP status into `code` (searchError.ts), so the fallbacks were
+          // unreachable — and code that cannot run is code that lies about what the
+          // function above it does.
+          code: parsed.code ?? "",
         };
         break;
       }

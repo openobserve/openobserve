@@ -192,6 +192,46 @@ export const emptyStatePresets = {
     ],
   },
 
+  // --- no synthetic monitors -------------------------------------------------
+  "no-synthetic-monitors": {
+    illustration: "browser-check",
+    variant: "create",
+    titleKey: "emptyState.noMonitors.title",
+    descriptionKey: "emptyState.noMonitors.description",
+    actions: [
+      {
+        id: "create-browser",
+        icon: "open-in-browser",
+        titleKey: "synthetics.newCheck.browser",
+        descriptionKey: "synthetics.newCheck.browserDesc",
+      },
+      {
+        id: "create-http",
+        icon: "network-check",
+        titleKey: "synthetics.newCheck.http",
+        descriptionKey: "synthetics.newCheck.httpDesc",
+      },
+      {
+        id: "create-tcp",
+        icon: "bolt",
+        titleKey: "synthetics.newCheck.tcp",
+        descriptionKey: "synthetics.newCheck.tcpDesc",
+      },
+      {
+        id: "create-tls",
+        icon: "shield",
+        titleKey: "synthetics.newCheck.tls",
+        descriptionKey: "synthetics.newCheck.tlsDesc",
+      },
+      {
+        id: "create-ssh",
+        icon: "keyboard",
+        titleKey: "synthetics.newCheck.ssh",
+        descriptionKey: "synthetics.newCheck.sshDesc",
+      },
+    ],
+  },
+
   // --- all caught up -------------------------------------------------------
   "no-alerts": {
     illustration: "alert",
@@ -601,6 +641,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-model-pricing": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noModelPricing.title",
+    descriptionKey: "emptyState.noModelPricing.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noModelPricing.action",
+        descriptionKey: "emptyState.noModelPricing.actionDesc",
+      },
+    ],
+  },
 
   // LLM Insights dashboard — single empty-state shape (used for all three
   // "no data" cases: no LLM streams in the org, the active stream has no
@@ -737,4 +791,6 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-eval-jobs": "emptyState.nouns.evalJobs",
   "no-score-configs": "emptyState.nouns.scoreConfigs",
   "no-pipeline-history": "emptyState.nouns.pipelineHistory",
+  "no-synthetic-monitors": "emptyState.nouns.monitors",
+  "no-model-pricing": "emptyState.nouns.modelPricing",
 };

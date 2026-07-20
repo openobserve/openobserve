@@ -67,11 +67,6 @@ describe('MemberSubscription.vue', () => {
     // Push to the route
     router.push('/member-subscription' + routeHash);
 
-    const mockNotify = vi.fn();
-    const mockQuasar = {
-      notify: mockNotify,
-    };
-
     const wrapperInstance = mount(MemberSubscription, {
       global: {
         plugins: [
@@ -79,7 +74,6 @@ describe('MemberSubscription.vue', () => {
           router,
         ],
         mocks: {
-          $q: mockQuasar,
           $route: createMockRoute(routeHash),
           $router: {
             resolve: vi.fn().mockReturnValue({ href: '/organizations' }),

@@ -151,6 +151,12 @@ describe("AddRole", () => {
       expect(getNameInput(wrapper).attributes("maxlength")).toBe("100");
     });
 
+    it("shows the start-from presets", () => {
+      expect(
+        wrapper.find('[data-test="add-role-start-from-section"]').exists(),
+      ).toBe(true);
+    });
+
     it("keeps Save enabled (R3 — no disabled gate)", () => {
       const saveBtn = wrapper.find('[data-test="o-dialog-primary-btn"]');
       expect(saveBtn.attributes("disabled")).toBeUndefined();

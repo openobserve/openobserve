@@ -26,7 +26,7 @@ withDefaults(defineProps<{ count?: number }>(), { count: 4 });
 // Same chrome as the real `.kpi-card` (SessionDetails.vue) — scoped styles
 // don't pierce into child components, so the skeleton carries its own copy.
 .kpi-card-skeleton {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-default);
 }
 </style>

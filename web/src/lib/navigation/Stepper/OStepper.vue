@@ -128,7 +128,7 @@ function triggerClasses(step: StepRegistration): string {
       v-if="isHorizontal"
       role="list"
       aria-label="Steps"
-      class="flex items-start w-full mb-6"
+      class="sticky top-0 z-10 flex items-start w-full pb-2 bg-[var(--o2-primary-background)]!"
     >
       <template v-for="(step, index) in sortedSteps" :key="step.name">
         <!-- Step trigger (indicator circle + title) -->

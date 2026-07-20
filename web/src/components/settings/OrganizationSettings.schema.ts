@@ -6,7 +6,7 @@
 // crossLinks composite (CrossLinkManager) has no OForm* equivalent so it stays
 // bare and is merged at submit (declared optional here for documentation).
 //
-// Restores the Quasar BEFORE rule (truthy→Zod inversion):
+// Restores the original BEFORE rule (truthy→Zod inversion):
 //   `!!v ? isValidTraceField || 'Use alphanumeric…' : nameRequired`
 //   → required (min 1) + regex(/^[a-zA-Z0-9+=,.@_-]+$/).
 //

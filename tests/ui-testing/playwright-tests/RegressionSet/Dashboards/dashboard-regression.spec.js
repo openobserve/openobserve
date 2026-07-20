@@ -349,7 +349,7 @@ test.describe(
         await pm.dashboardSetting.addTabAndWait(secondTabName);
         await pm.dashboardSetting.closeSettingDashboard();
         await safeWaitForHidden(page, '[data-test="dashboard-settings-dialog"]', { timeout: 5000 });
-        await page.waitForTimeout(400); // Quasar backdrop fade-out animation
+        await page.waitForTimeout(400); // backdrop fade-out animation
         await safeWaitForNetworkIdle(page, { timeout: 3000 });
         testLogger.info(`Second tab '${secondTabName}' added`);
 

@@ -160,8 +160,6 @@ export interface SelectSlots {
   "before-options"?: () => unknown;
   /** Icon content inside the trigger on the left — matches OButton's `#icon-left` pattern */
   "icon-left"?: () => unknown;
-  /** Icon content inside the trigger on the right — matches OButton's `#icon-right` pattern */
-  "icon-right"?: () => unknown;
   /**
    * Tooltip content rendered inside an info icon in the label area.
    * Provide a `<q-tooltip>` element as the slot content.

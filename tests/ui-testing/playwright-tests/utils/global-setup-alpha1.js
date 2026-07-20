@@ -385,22 +385,26 @@ async function switchOrgViaDropdown(page, targetOrgId) {
 
   // Open dropdown → search-filter → click menu item
   // (search-input + menu-item-label is more reliable than role=option matching)
-  const dropdown = page.locator('[data-test="navbar-organizations-select"]');
+  // Post-UX-revamp: the org selector opens via a dedicated trigger button
+  // ([data-test="navbar-organizations-select-trigger"]); the old inline
+  // 'arrow_drop_down' text no longer exists (now an SVG icon).
+  const dropdown = page.locator('[data-test="navbar-organizations-select-trigger"]');
   await dropdown.waitFor({ state: 'visible', timeout: 15000 });
-  await dropdown.getByText('arrow_drop_down').click({ force: true });
+  await dropdown.click();
   await page.waitForTimeout(1500);
 
-  const searchInput = page.locator('[data-test="organization-search-input"]');
+  // Post-UX-revamp: data-test moved to the OSearchInput wrapper <div>;
+  // the real editable element is the nested native <input>.
+  const searchInput = page.locator('[data-test="organization-search-input"] input');
   await searchInput.waitFor({ state: 'visible', timeout: 10000 });
   await searchInput.fill(target.name);
   await page.waitForTimeout(1500);
 
-  // Filter menu items by exact org name (regex anchors prevent partial matches
-  // — e.g. an org "Foo" would otherwise also match a row containing "Foo Bar")
-  const escapedName = target.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Post-UX-revamp: each org row carries its identifier on a
+  // data-test-org-identifier attribute — match that exactly instead of
+  // parsing "name | id" row text (whose format changed in the revamp).
   const menuItem = page
-    .locator('[data-test="organization-menu-item-label-item-label"]')
-    .filter({ hasText: new RegExp(`^\\s*${escapedName}\\s*\\|`) })
+    .locator(`[data-test-org-identifier="${targetOrgId}"]`)
     .first();
   await menuItem.waitFor({ state: 'visible', timeout: 5000 });
   await menuItem.click();
@@ -491,9 +495,12 @@ async function performGlobalIngestion(page) {
     return;
   }
 
+  // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
+  // tests that used to rely on a shared 'auto_playwright_stream' now self-ingest their
+  // own unique per-run streams, so we no longer pre-create (or wait on) that stream —
+  // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
   const streams = [
     { name: 'e2e_automate', data: logsdata },
-    { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
   ];
 
   for (const stream of streams) {
@@ -535,12 +542,11 @@ async function performGlobalIngestion(page) {
 
       if (streamsResult.ok) {
         const hasE2e = streamsResult.names.includes('e2e_automate');
-        const hasAuto = streamsResult.names.includes('auto_playwright_stream');
-        if (hasE2e && hasAuto) {
-          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+        if (hasE2e) {
+          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
           break;
         }
-        testLogger.debug(`[alpha1] Streams not yet indexed (e2e_automate=${hasE2e}, auto_playwright_stream=${hasAuto}), waiting...`);
+        testLogger.debug(`[alpha1] e2e_automate not yet indexed, waiting...`);
       } else {
         testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
       }
@@ -634,9 +640,12 @@ async function performGlobalIngestionWithFetch() {
     return;
   }
 
+  // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
+  // tests that used to rely on a shared 'auto_playwright_stream' now self-ingest their
+  // own unique per-run streams, so we no longer pre-create (or wait on) that stream —
+  // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
   const streams = [
     { name: 'e2e_automate', data: logsdata },
-    { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
   ];
 
   for (const stream of streams) {
@@ -669,8 +678,8 @@ async function performGlobalIngestionWithFetch() {
       if (r.ok) {
         const data = await r.json();
         const names = (data.list || []).map(s => s.name);
-        if (names.includes('e2e_automate') && names.includes('auto_playwright_stream')) {
-          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+        if (names.includes('e2e_automate')) {
+          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
           return;
         }
       }

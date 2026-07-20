@@ -83,15 +83,20 @@ test.describe('Cipher Keys — AddCipherKey empty form validation', {
     testLogger.info('Name max-length error correctly shown');
   });
 
-  test('should keep Save button disabled on step 1 when not updating', {
+  test('should keep Save button enabled on step 1 and block an invalid submit', {
     tag: ['@cipher-keys-form-validation', '@P0', '@smoke'],
   }, async ({ page }) => {
-    testLogger.info('Testing Save button disabled state on step 1 (create mode)');
+    testLogger.info('Testing Save button enabled state on step 1 (create mode)');
 
-    // Save is disabled when step === 1 and isUpdatingCipherKey === false
-    await pm.cipherKeysFormValidation.assertSaveButtonDisabled();
+    // R3: Save is never disabled to gate validity (it was step-gated before the
+    // form migration). The Zod schema gates the submit instead, so clicking Save
+    // on an empty form must surface the field error rather than silently do
+    // nothing — that error is the feedback the old disabled button withheld.
+    await pm.cipherKeysFormValidation.assertSaveButtonEnabled();
+    await pm.cipherKeysFormValidation.clickSave();
+    await pm.cipherKeysFormValidation.assertNameErrorVisible();
 
-    testLogger.info('Save button correctly disabled on step 1 in create mode');
+    testLogger.info('Save enabled on step 1; invalid submit blocked with errors');
   });
 });
 

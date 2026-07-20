@@ -2,9 +2,11 @@
 //
 // RUM Source Maps — upload form validation E2E tests
 //
-// Covers:
-//   1. No file selected   → toast error "Please select a ZIP file to upload"
-//   2. Wrong file type    → toast error "Only ZIP files are allowed"
+// Covers (after the OForm+zod migration, all field validation is INLINE via the
+// schema — the file "required" / "only .zip" rules moved from manual toasts to
+// the inline dropzone error; only the success/server-error paths use toasts):
+//   1. No file selected   → inline file error "Please select a ZIP file to upload"
+//   2. Wrong file type    → inline file error "Only ZIP files are allowed"
 //   3. No version filled  → versionError shown after clicking Upload
 //   4. No service filled  → serviceError shown after clicking Upload
 //   5. Valid inputs       → upload succeeds (toast success + navigation away)
@@ -90,9 +92,9 @@ test.describe('RUM Source Maps upload form validation', () => {
     await page.close();
   });
 
-  // ── Test 1: No file selected → toast error ──────────────────────────────────
+  // ── Test 1: No file selected → inline file error ────────────────────────────
 
-  test('should show file required toast error when Upload is clicked with no file selected', {
+  test('should show file required error when Upload is clicked with no file selected', {
     tag: ['@rum-form-validation', '@P0', '@smoke']
   }, async ({ page }) => {
     testLogger.info('Testing no-file-selected error on Upload click');
@@ -102,27 +104,32 @@ test.describe('RUM Source Maps upload form validation', () => {
     await pm.rumFormValidation.fillVersion('1.0.0');
     await pm.rumFormValidation.clickUpload();
 
-    await expect(pm.rumFormValidation.getToastErrorLocator()).toBeVisible({ timeout: 5000 });
-    const toastText = await pm.rumFormValidation.getToastMessageLocator().textContent();
-    expect(toastText).toContain('Please select a ZIP file to upload');
+    // OForm+zod: the missing-file rule surfaces INLINE on the dropzone (not a toast).
+    await expect(pm.rumFormValidation.getFileErrorLocator()).toBeVisible({ timeout: 5000 });
+    await expect(pm.rumFormValidation.getFileErrorLocator()).toContainText('Please select a ZIP file to upload');
 
-    testLogger.info('No-file error toast correctly shown');
+    testLogger.info('No-file inline error correctly shown');
   });
 
-  // ── Test 2: Wrong file type → toast error ───────────────────────────────────
+  // ── Test 2: Wrong file type → inline file error ─────────────────────────────
 
-  test('should show format error toast when a non-ZIP file is attached', {
+  test('should show format error when a non-ZIP file is attached', {
     tag: ['@rum-form-validation', '@P0', '@smoke']
   }, async ({ page }) => {
     testLogger.info('Testing wrong file type validation');
 
+    // Fill service + version so the file field is the only invalid one.
+    await pm.rumFormValidation.fillService('test-service-fv');
+    await pm.rumFormValidation.fillVersion('1.0.0');
     await pm.rumFormValidation.attachFile(tempTxtPath);
+    // OForm+zod uses submit-then-change timing, so the `.zip` rule fires on
+    // submit — attaching alone does not surface the error.
+    await pm.rumFormValidation.clickUpload();
 
-    await expect(pm.rumFormValidation.getToastErrorLocator()).toBeVisible({ timeout: 5000 });
-    const toastText = await pm.rumFormValidation.getToastMessageLocator().textContent();
-    expect(toastText).toContain('Only ZIP files are allowed');
+    await expect(pm.rumFormValidation.getFileErrorLocator()).toBeVisible({ timeout: 5000 });
+    await expect(pm.rumFormValidation.getFileErrorLocator()).toContainText('Only ZIP files are allowed');
 
-    testLogger.info('Wrong file type error toast correctly shown');
+    testLogger.info('Wrong file type inline error correctly shown');
   });
 
   // ── Test 3: No version → version required field error ──────────────────────
@@ -168,9 +175,9 @@ test.describe('RUM Source Maps upload form validation', () => {
   }, async ({ page }) => {
     testLogger.info('Testing that an empty submit reports every required field, not just the first');
 
-    // Submit with nothing filled — Service/Version inline errors and the ZIP
-    // file toast must all appear in the same pass (validation no longer stops at
-    // the first missing field).
+    // Submit with nothing filled — Service/Version and the ZIP file errors must
+    // all appear inline in the same pass (validation no longer stops at the first
+    // missing field, and the file error is no longer a toast).
     await pm.rumFormValidation.clickUpload();
 
     await expect(pm.rumFormValidation.getServiceErrorLocator()).toBeVisible({ timeout: 5000 });
@@ -179,9 +186,8 @@ test.describe('RUM Source Maps upload form validation', () => {
     await expect(pm.rumFormValidation.getVersionErrorLocator()).toBeVisible({ timeout: 5000 });
     await expect(pm.rumFormValidation.getVersionErrorLocator()).toContainText('Version is required');
 
-    await expect(pm.rumFormValidation.getToastErrorLocator()).toBeVisible({ timeout: 5000 });
-    const toastText = await pm.rumFormValidation.getToastMessageLocator().textContent();
-    expect(toastText).toContain('Please select a ZIP file to upload');
+    await expect(pm.rumFormValidation.getFileErrorLocator()).toBeVisible({ timeout: 5000 });
+    await expect(pm.rumFormValidation.getFileErrorLocator()).toContainText('Please select a ZIP file to upload');
 
     testLogger.info('All required errors (service, version, file) shown together on empty submit');
   });

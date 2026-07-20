@@ -1,5 +1,7 @@
 import { toZonedTime } from "date-fns-tz";
 import { computeTreeLayout } from "./computeTreeLayout";
+import { resolveModelVendorLogo } from "./modelVendorLogo";
+import { cssToken } from "@/utils/theme";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -240,6 +242,10 @@ export const convertServiceGraphToTree = (
   layoutType: string = "horizontal",
   isDarkMode: boolean = true,
   canvasHeight: number = 700,
+  // When true (Agent Graph page only), agents get the accent treatment:
+  // indigo disc tint + glyph, larger symbol, and the radar-ping halo. On the
+  // regular Service Graph tab this is false and agents render like any node.
+  agentHighlight: boolean = false,
 ) => {
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
@@ -259,8 +265,17 @@ export const convertServiceGraphToTree = (
     incomingEdgesMap.get(edge.to)!.push(edge);
   });
 
-  // Find all root nodes (nodes with no incoming edges)
-  const nodesWithIncoming = new Set(graphData.edges.map((e: any) => e.to));
+  // Find all root nodes (nodes with no *real* incoming edge). The synthetic
+  // entry edge {from: null → entry service} must be excluded — otherwise the
+  // entry node looks parented, rootNodes comes back empty, buildTree never
+  // starts from it, and the whole hierarchy is built via the arbitrary-order
+  // fallback below, mis-placing children (e.g. an agent's model drawn under the
+  // wrong parent). Mirrors the same guard in computeTreeLayout.
+  const nodesWithIncoming = new Set(
+    graphData.edges
+      .filter((e: any) => e.from != null)
+      .map((e: any) => e.to),
+  );
   const rootNodes = graphData.nodes.filter(
     (n: any) => !nodesWithIncoming.has(n.id),
   );
@@ -320,11 +335,17 @@ export const convertServiceGraphToTree = (
 
   const green = isDarkMode ? "#10b981" : "#52c41a";
 
-  // Node color: same absolute thresholds as Graph View so color matches tooltip error rate
+  // Node color: same absolute thresholds as Graph View so color matches tooltip
+  // error rate. Dark-mode values resolve from the semantic token layer (exact
+  // token matches); the light-mode values are the legacy Ant palette with no
+  // exact token, so they stay as literals until the palette is unified.
   const getNodeColor = (errRate: number): string => {
-    if (errRate > 10) return isDarkMode ? "#ef4444" : "#f5222d"; // Red — critical
-    if (errRate > 5) return isDarkMode ? "#f97316" : "#fa8c16"; // Orange — warning
-    if (errRate > 1) return isDarkMode ? "#fbbf24" : "#faad14"; // Yellow — degraded
+    if (errRate > 10)
+      return isDarkMode ? cssToken("--color-error-500", "#ef4444") : "#f5222d"; // Red — critical
+    if (errRate > 5)
+      return isDarkMode ? cssToken("--color-orange-500", "#f97316") : "#fa8c16"; // Orange — warning
+    if (errRate > 1)
+      return isDarkMode ? cssToken("--color-amber-400", "#fbbf24") : "#faad14"; // Yellow — degraded
     return green;
   };
 
@@ -383,19 +404,34 @@ export const convertServiceGraphToTree = (
     // Tree edges are always neutral gray — color belongs on node borders only
     const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
 
+    // Agent accent treatment (tint/size/ping) applies only when the Agent
+    // Graph page asks for it. Elsewhere an un-highlighted agent must render as a
+    // plain node, so we DOWNGRADE its kind to null before the icon builder —
+    // passing the raw "agent" type would re-trigger the accent regardless.
+    const isAgentNode = node.service_type === "agent" && agentHighlight;
+    const iconServiceType =
+      node.service_type === "agent" && !agentHighlight ? null : node.service_type;
+
     // Reuse the same SVG icon as graph view (circle + service-type icon)
     const iconDataUrl = getServiceIconSvg(
       node.id,
       isDarkMode,
       borderColor,
-      node.service_type,
+      iconServiceType,
     );
 
     return {
       name: node.label || node.id,
       value: totalRequests,
       symbol: iconDataUrl,
-      symbolSize: nodeSymbolSize, // Auto-shrunk to fit (see sizing block); uniform so ECharts spaces nodes consistently
+      // Highlighted agents are the subject of the Agent Graph — render them
+      // ~30% larger so they read as the primary entities. Their symbol uses a
+      // padded 104-wide viewBox (vs 56) to give the radar-ping halo room to
+      // expand, so the disc occupies a smaller fraction of the box; the 104/56
+      // factor cancels that out and the ×1.3 on top is the visual emphasis.
+      symbolSize: isAgentNode
+        ? Math.round(nodeSymbolSize * 1.3 * (104 / 56))
+        : nodeSymbolSize,
       lineStyle: {
         color: edgeColor,
         width: 2,
@@ -404,6 +440,9 @@ export const convertServiceGraphToTree = (
         color: isDarkMode ? "#1a1f2e" : "#ffffff",
         borderColor: borderColor,
         borderWidth: 4,
+        // Neutral drop shadow for every node. Agents no longer carry a static
+        // indigo glow — their emphasis is the animated radar-ping halo baked
+        // into the symbol (highlighted mode only).
         shadowBlur: 10,
         shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
         shadowOffsetX: 0,
@@ -820,6 +859,15 @@ const KIND_ICON_SVG: Record<string, string> = {
     `<circle cx="12" cy="12" r="10"/>` +
     `<line x1="2" y1="12" x2="22" y2="12"/>` +
     `<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>`,
+  // GenAI entity kinds (agent-graph feature). Bot / wrench / chip.
+  agent:
+    `<rect x="3" y="11" width="18" height="10" rx="2"/>` +
+    `<circle cx="12" cy="5" r="2"/><path d="M12 7v4"/>` +
+    `<line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>`,
+  tool: `<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.8 2.8-2.1-2.1 2.8-2.8z"/>`,
+  model:
+    `<rect x="6" y="6" width="12" height="12" rx="1"/>` +
+    `<path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>`,
 };
 
 /**
@@ -1086,8 +1134,27 @@ export function getServiceIconDataUrl(
   borderColor: string,
   serviceType?: string | null,
 ): string {
-  const iconColor = isDark ? "#e4e7eb" : "#374151";
-  const bgColor = isDark ? "#1a1f2e" : "#ffffff";
+  // Agents are the SUBJECT of the agent graph, so they get an accent treatment
+  // that makes them the primary read WITHOUT touching the health border
+  // (green/amber/red) — the icon disc is washed with an indigo tint and the
+  // glyph is drawn in indigo. Indigo is deliberately outside the health palette
+  // and distinct from the tool/model kind colours. Every other kind keeps the
+  // neutral disc + gray glyph.
+  const isAgent = serviceType === "agent";
+  // Agent accent = indigo design tokens (deliberately outside the health
+  // palette). Resolved from the token layer at runtime because the value is
+  // baked into an SVG data-URI where `var(--…)` can't be used.
+  const AGENT_ACCENT = isDark
+    ? cssToken("--color-indigo-300", "#a5b4fc")
+    : cssToken("--color-indigo-500", "#6366f1");
+  const iconColor = isAgent ? AGENT_ACCENT : isDark ? "#e4e7eb" : "#374151";
+  const bgColor = isAgent
+    ? isDark
+      ? cssToken("--color-indigo-900", "#312e81") // dark indigo disc wash
+      : cssToken("--color-indigo-50", "#eef2ff") // light indigo wash
+    : isDark
+      ? "#1a1f2e"
+      : "#ffffff";
 
   // Normalize: lowercase and collapse hyphens/underscores to spaces so
   // "load-generator" and "load_generator" both match /load/ or /generator/.
@@ -1099,14 +1166,80 @@ export function getServiceIconDataUrl(
   const matched = SERVICE_ICON_RULES.find(({ regex }) => regex.test(n));
   const icon = authoritative ?? (matched ? matched.svg : SERVER_ICON_SVG);
 
-  // 56×56 viewBox: circle r=24 centered at (28,28); icon 24×24 translated to (16,16)
+  // Agent nodes get an animated "radar ping" halo: concentric rings that expand
+  // out from the disc and fade — the "getting encircled" effect that makes
+  // agents the living focal point of the graph. We bake it into the node's own
+  // symbol SVG (rather than an ECharts `graphic` overlay) so it is ALWAYS
+  // centered on the node and pans/zooms with it — the overlay approach drifted
+  // because `graphic` lives outside the roam-transformed series group. The graph
+  // uses the SVG renderer (render-type="svg"), so SMIL <animate> runs natively.
+  //
+  // Geometry: agents use a padded viewBox (-24..80, 104 wide) so a ring can
+  // expand to r≈46 without clipping while the disc stays r=24 at centre (52,52).
+  // Non-agents keep the tight 56×56 box (disc r=24 at 28,28). Because the disc's
+  // fraction of the box differs, the agent symbolSize is bumped ×~1.86 at the
+  // call sites so the disc renders at the same pixel size as its neighbours.
+  const cx = isAgent ? 52 : 28;
+  const cy = isAgent ? 52 : 28;
+  const viewBox = isAgent ? "0 0 104 104" : "0 0 56 56";
+  const iconTx = isAgent ? 40 : 16; // icon 24×24 top-left so it centres on disc
+
+  // Two staggered rings → a continuous ripple rather than a single strobe.
+  // stroke is the indigo agent accent; opacity + radius animate in lockstep.
+  const pingRings = isAgent
+    ? [0, 1]
+        .map((k) => {
+          const begin = `${k * 1.3}s`;
+          return (
+            `<circle cx="${cx}" cy="${cy}" r="24" fill="none" ` +
+            `stroke="${AGENT_ACCENT}" stroke-width="2.5" opacity="0">` +
+            `<animate attributeName="r" values="24;46" dur="2.6s" ` +
+            `begin="${begin}" repeatCount="indefinite" ` +
+            `calcMode="spline" keySplines="0.25 0.1 0.25 1" keyTimes="0;1"/>` +
+            `<animate attributeName="opacity" values="0.55;0" dur="2.6s" ` +
+            `begin="${begin}" repeatCount="indefinite"/>` +
+            `<animate attributeName="stroke-width" values="2.5;0.5" dur="2.6s" ` +
+            `begin="${begin}" repeatCount="indefinite"/>` +
+            `</circle>`
+          );
+        })
+        .join("")
+    : "";
+
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">` +
-    `<circle cx="28" cy="28" r="24" fill="${bgColor}" stroke="${borderColor}" stroke-width="4"/>` +
-    `<g transform="translate(16,16)" fill="none" stroke="${iconColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">` +
+    pingRings +
+    `<circle cx="${cx}" cy="${cy}" r="24" fill="${bgColor}" stroke="${borderColor}" stroke-width="4"/>` +
+    `<g transform="translate(${iconTx},${iconTx})" fill="none" stroke="${iconColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">` +
     icon +
     `</g></svg>`;
 
+  return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`;
+}
+
+/**
+ * Compose a vendor brand logo into the SAME 56×56 circle+border frame the chip
+ * icons use, so a model node with a logo is visually identical in size to every
+ * other node. Without the frame the raw logo fills the whole ECharts symbol box
+ * (~2.3× the glyph area) and drops the border — making e.g. the Anthropic mark
+ * look oversized next to its neighbours. The logo is embedded via <image> in the
+ * same 24×24 inset region as the icons, preserveAspectRatio-contained.
+ */
+function getModelLogoDataUrl(logoUrl: string, borderColor: string): string {
+  // Brand marks are drawn on a WHITE inner disc regardless of theme: vendor
+  // logos are authored for a light ground (many are a dark/mono mark on
+  // transparent), so on a dark node background they'd vanish. The white disc
+  // guarantees contrast for every vendor, light or dark theme.
+  // The logo fills a 34×34 region centered in the 56 box (was 20×20 — too
+  // small next to the stroked chip icons), clipped to the disc so square PNGs
+  // don't spill past the circle.
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">` +
+    `<defs><clipPath id="c"><circle cx="28" cy="28" r="22"/></clipPath></defs>` +
+    `<circle cx="28" cy="28" r="24" fill="#ffffff" stroke="${borderColor}" stroke-width="4"/>` +
+    `<image href="${logoUrl}" x="11" y="11" width="34" height="34" ` +
+    `preserveAspectRatio="xMidYMid meet" clip-path="url(#c)"/>` +
+    `</svg>`;
   return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`;
 }
 
@@ -1116,6 +1249,18 @@ function getServiceIconSvg(
   borderColor: string,
   serviceType?: string | null,
 ): string {
+  // Model nodes: prefer the provider's brand logo (OpenAI / Anthropic / Gemini
+  // …) so the provider mix reads at a glance, composed into the same frame as
+  // every other node. Falls through to the chip icon for unknown models.
+  if (serviceType === "model") {
+    // Always the light-ground logo variant: the frame draws it on a white disc
+    // (see getModelLogoDataUrl), so the mark designed for light backgrounds is
+    // the correct one regardless of the app theme.
+    const vendorLogo = resolveModelVendorLogo(name, false);
+    if (vendorLogo) {
+      return `image://${getModelLogoDataUrl(vendorLogo, borderColor)}`;
+    }
+  }
   return `image://${getServiceIconDataUrl(name, isDark, borderColor, serviceType)}`;
 }
 
@@ -1157,6 +1302,9 @@ export const convertServiceGraphToNetwork = (
   selectedNodeId?: string,
   canvasWidth: number = 1200,
   canvasHeight: number = 700,
+  // Agent accent treatment (tint/size/ping) — Agent Graph page only. See
+  // convertServiceGraphToTree for the rationale.
+  agentHighlight: boolean = false,
 ) => {
   // Graph view supports 'force' (organic) and 'layered' (directed left→right,
   // dependencies pinned as terminal leaves). Tree layouts ('horizontal',
@@ -1210,14 +1358,16 @@ export const convertServiceGraphToNetwork = (
   });
 
   // Layered ranks: rank 0 = no inbound edge; rank = 1 + max(pred ranks).
-  // Inferred deps (service_type present) are pinned to the max rank so they are
-  // always terminal downstream leaves. The `seen` guard breaks cycles.
+  // The `seen` guard breaks cycles.
   const rank = new Map<string, number>();
   if (normalizedLayoutType === "layered") {
     const preds = new Map<string, string[]>();
     validNodes.forEach((n: any) => preds.set(n.id, []));
     graphData.edges.forEach((e: any) => {
-      if (preds.has(e.to)) preds.get(e.to)!.push(e.from);
+      // Skip the entry edge (from == null): it is not a real predecessor, and
+      // counting it would push the true root (the app) to rank 1+, cascading a
+      // wrong depth onto the whole chain.
+      if (e.from != null && preds.has(e.to)) preds.get(e.to)!.push(e.from);
     });
     const visit = (id: string, seen: Set<string>): number => {
       if (rank.has(id)) return rank.get(id)!;
@@ -1229,9 +1379,23 @@ export const convertServiceGraphToNetwork = (
       return r;
     };
     validNodes.forEach((n: any) => visit(n.id, new Set()));
+    // Pin genuine terminal dependencies (databases, queues, external services
+    // with no downstream) to the max rank so they line up as a clean right-hand
+    // leaf column. A node is terminal iff it has NO outgoing edge. We must NOT
+    // pin by "has a service_type" — the root app and agents also carry a
+    // service_type, and pinning them flattened the service→agent→model chain,
+    // dropping a model like gpt-4o into the agent's own column so its edge
+    // looked like it came from the parent app. Out-degree is the right signal:
+    // agents/services that call downstream keep their real BFS depth.
+    const hasOutgoing = new Set<string>();
+    graphData.edges.forEach((e: any) => {
+      if (e.from != null) hasOutgoing.add(e.from);
+    });
     const maxRank = Math.max(0, ...Array.from(rank.values()));
     validNodes.forEach((n: any) => {
-      if (n.service_type) rank.set(n.id, maxRank); // deps are terminal leaves
+      if (n.service_type && !hasOutgoing.has(n.id)) {
+        rank.set(n.id, maxRank); // terminal (leaf) inferred dependency
+      }
     });
   }
 
@@ -1262,16 +1426,19 @@ export const convertServiceGraphToNetwork = (
     const errorRate =
       metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
 
-    // Border color based on error rate (theme-aware)
+    // Border color based on error rate (theme-aware). Dark-mode red/orange/yellow
+    // resolve from the semantic token layer (exact matches); the healthy green
+    // and all light-mode values are the legacy Ant palette with no exact token.
     let borderColor: string;
     if (isDarkMode) {
       // Dark mode colors
       borderColor = "#10b981"; // Green (healthy)
       if (errorRate > 10)
-        borderColor = "#ef4444"; // Red (critical)
+        borderColor = cssToken("--color-error-500", "#ef4444"); // Red (critical)
       else if (errorRate > 5)
-        borderColor = "#f97316"; // Orange (warning)
-      else if (errorRate > 1) borderColor = "#fbbf24"; // Yellow (degraded)
+        borderColor = cssToken("--color-orange-500", "#f97316"); // Orange (warning)
+      else if (errorRate > 1)
+        borderColor = cssToken("--color-amber-400", "#fbbf24"); // Yellow (degraded)
     } else {
       // Light mode colors
       borderColor = "#52c41a"; // Green (healthy)
@@ -1283,17 +1450,32 @@ export const convertServiceGraphToNetwork = (
     }
 
     // Node size: scales with request volume like DataDog (70–110 px range)
-    const symbolSize = Math.max(
+    const baseSymbolSize = Math.max(
       70,
       Math.min(110, Math.log10(metrics.requests + 1) * 28),
     );
+    // Agent accent treatment (tint/size/ping) applies only when the Agent
+    // Graph page asks for it; elsewhere an un-highlighted agent renders like any
+    // other node — downgrade its kind to null so the icon builder skips the
+    // accent (passing raw "agent" would re-trigger it).
+    const isAgentNode = node.service_type === "agent" && agentHighlight;
+    const iconServiceType =
+      node.service_type === "agent" && !agentHighlight ? null : node.service_type;
+
+    // Highlighted agents render ~30% larger so they read as the primary
+    // entities. The 104/56 factor compensates for the agent symbol's padded
+    // viewBox (see getServiceIconDataUrl) so the disc stays ≈1.3× a neighbour
+    // while its radar-ping halo has room to expand.
+    const symbolSize = isAgentNode
+      ? Math.round(baseSymbolSize * 1.3 * (104 / 56))
+      : baseSymbolSize;
 
     // SVG symbol: circle with health-colored border + service-type icon
     const iconDataUrl = getServiceIconSvg(
       node.id,
       isDarkMode,
       borderColor,
-      node.service_type,
+      iconServiceType,
     );
 
     // Use cached position if available
@@ -1308,7 +1490,9 @@ export const convertServiceGraphToNetwork = (
       errors: metrics.errors,
       symbol: iconDataUrl,
       symbolSize,
-      // itemStyle opacity is needed for emphasis.focus adjacency dimming to work on images
+      // itemStyle opacity is needed for emphasis.focus adjacency dimming to work
+      // on images. Agents no longer carry a static indigo glow — their emphasis
+      // is the animated radar-ping halo baked into the symbol (highlight mode).
       itemStyle: { opacity: 1 },
       label: { show: true },
       emphasis: {

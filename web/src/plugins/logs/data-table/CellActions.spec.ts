@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { mount } from "@vue/test-utils";
+import { mount, config } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import i18n from "@/locales";
 import CellActions from "./CellActions.vue";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // ── Mock Vuex ──────────────────────────────────────────────────────────────────
 const mockStore = {

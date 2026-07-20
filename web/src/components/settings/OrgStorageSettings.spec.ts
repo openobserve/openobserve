@@ -21,20 +21,9 @@ import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
 
-const { mockGetStorage, mockNotify } = vi.hoisted(() => ({
+const { mockGetStorage } = vi.hoisted(() => ({
   mockGetStorage: vi.fn(),
-  mockNotify: vi.fn(() => vi.fn()),
 }));
-
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
 
 vi.mock("@/services/org_storage", () => ({
   default: {

@@ -71,8 +71,8 @@ pub struct ProcessedBatch {
     pub bytes_entries: Vec<Vec<u8>>,
     /// Arrow RecordBatch entries for Memtable writing
     pub batch_entries: Vec<Arc<entry::RecordBatchEntry>>,
-    /// Total JSON size for rotation check
-    pub entries_json_size: usize,
+    /// Total serialized WAL bytes for rotation check
+    pub entries_wal_size: usize,
     /// Total Arrow size for rotation check
     pub entries_arrow_size: usize,
 }
@@ -84,7 +84,7 @@ impl ProcessedBatch {
             entries: Vec::new(),
             bytes_entries: Vec::new(),
             batch_entries: Vec::new(),
-            entries_json_size: 0,
+            entries_wal_size: 0,
             entries_arrow_size: 0,
         }
     }

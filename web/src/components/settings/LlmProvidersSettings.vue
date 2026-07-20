@@ -12,7 +12,7 @@
     <template v-else>
       <AppPageHeader
         icon="smart-toy"
-        :subtitle="'LLM providers for online evaluations'"
+        :subtitle="t('settings.llmProvidersSettings.subtitle')"
         class="shrink-0 px-4 border-b border-border-default"
       >
         <template #title>

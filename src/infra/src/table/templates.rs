@@ -158,6 +158,17 @@ async fn list_models(
         .await
 }
 
+/// Deletes all templates belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use svix_ksuid::KsuidLike;

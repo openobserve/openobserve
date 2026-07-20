@@ -8,17 +8,6 @@ import searchService from "@/services/search";
 import { nextTick, ref } from 'vue';
 import useStreams from "@/composables/useStreams";
 
-// Mock useQuasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn(() => ({ dismiss: vi.fn() }))
-    }))
-  };
-});
-
 // Mock the jstransform service
 vi.mock("@/services/jstransform", () => ({
   default: {
@@ -119,8 +108,6 @@ describe("TestFunction Component", () => {
     useStreams.mockImplementation(() => ({
       getStreams: mockGetStreams
     }));
-
-    // Install Quasar
 
     // Mount component
     wrapper = mount(TestFunction, {

@@ -16,7 +16,6 @@
 import { vi } from "vitest";
 import axios from "axios";
 import { toast } from "@/lib/feedback/Toast/useToast";
- // ✅ Ensure Quasar  works in mock
 
 vi.mock("@/services/http.ts", () => ({
   default: () => {

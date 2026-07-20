@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-else class="flex flex-col full-height">
-      <DashboardHeader title="Variables">
+      <DashboardHeader :title="t('dashboard.variableSettingsPage.variables')">
         <template #right>
           <div class="flex gap-2">
             <!-- show variables dependencies if variables exist -->
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'tabs'"
               >
-                {{ row.tabs?.length || 0 }} Tabs
+                {{ t('dashboard.variableSettingsPage.tabsCount', { n: row.tabs?.length || 0 }) }}
               </OTag>
               <OTag
                 type="variableScope"
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'panels'"
               >
-                {{ row.panels?.length || 0 }} Panels
+                {{ t('dashboard.variableSettingsPage.panelsCount', { n: row.panels?.length || 0 }) }}
               </OTag>
 
               <OTooltip
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
         />
-        <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" title="Variables Dependency Graph">
+        <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" :title="t('dashboard.variableSettingsPage.variablesDependencyGraph')">
           <div style="height: 60vh">
             <VariablesDependenciesGraph
               :variablesList="dashboardVariablesList"
@@ -296,7 +296,7 @@ export default defineComponent({
       },
       {
         id: "scope",
-        header: "Scope",
+        header: t("dashboard.variableSettingsPage.scope"),
         size: COL.status,
         meta: { align: "left" },
       },
@@ -367,7 +367,7 @@ export default defineComponent({
       const tab = dashboardVariableData.data.tabs?.find(
         (t: any) => t.tabId === tabId,
       );
-      return tab ? tab.name : "Deleted Tab";
+      return tab ? tab.name : t("dashboard.variableSettingsPage.deletedTab");
     };
 
     // Function to get panel name by ID
@@ -379,7 +379,7 @@ export default defineComponent({
           return `${tab.name} > ${panel.title || panel.id}`;
         }
       }
-      return "Deleted Panel";
+      return t("dashboard.variableSettingsPage.deletedPanel");
     };
 
     const handleDragEnd = async () => {
@@ -396,7 +396,7 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        showPositiveNotification("Dashboard updated successfully.", {
+        showPositiveNotification(t("dashboard.variableSettingsPage.dashboardUpdatedSuccessfully"), {
           timeout: 2000,
         });
 
@@ -406,10 +406,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Variable reorder failed",
+              t("dashboard.variableSettingsPage.variableReorderFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Variable reorder failed");
+          showErrorNotification(error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"));
         }
         await getDashboardData();
       }
@@ -512,7 +512,7 @@ export default defineComponent({
           emit("save");
         }
 
-        showPositiveNotification("Variable deleted successfully", {
+        showPositiveNotification(t("dashboard.variableSettingsPage.variableDeletedSuccessfully"), {
           timeout: 2000,
         });
       } catch (error: any) {
@@ -520,10 +520,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Variable deletion failed",
+              t("dashboard.variableSettingsPage.variableDeletionFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Variable deletion failed", {
+          showErrorNotification(error?.message ?? t("dashboard.variableSettingsPage.variableDeletionFailed"), {
             timeout: 2000,
           });
         }

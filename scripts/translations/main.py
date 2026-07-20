@@ -3,28 +3,28 @@
 """
 Translation Generator for OpenObserve.
 
-Generates translation files from en.json using AWS Translate. Only newly added
-or modified English strings are translated; already-translated, unchanged text is
-never re-sent to AWS (see translator.py for the change-detection model).
+Generates translation files from en-US.json using DeepSeek (an LLM) via its
+OpenAI-compatible API. Only newly added or modified English strings are
+translated; already-translated, unchanged text is never re-sent (see
+translator.py for the change-detection model).
 
 Usage:
-    python main.py                 # translate all supported languages
-    python main.py fr es de        # translate specific languages
-    python main.py --force         # bypass the safety cap (large/intentional run)
+    python main.py                    # translate all supported languages
+    python main.py fr-FR es-ES de-DE  # translate specific languages (filename stems)
 
 Environment:
-    TRANSLATION_MAX_KEYS   Max keys allowed per run before aborting (default 5000).
-                           Guards against accidental mass re-translation.
+    DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
+    DEEPSEEK_MODEL     Model id (default "deepseek-v4-flash").
+    TRANSLATION_BATCH_SIZE  Strings per API call (default 50).
 """
 
 import json
-import os
 import sys
 
 from translator import (
     build_locale,
     build_state,
-    count_pending,
+    collect_pending_leaves,
     get_language_file_path,
     get_supported_languages,
     load_json,
@@ -32,6 +32,7 @@ from translator import (
     load_state,
     new_counters,
     save_state,
+    translate_pending,
 )
 
 
@@ -39,7 +40,8 @@ def main():
     supported = get_supported_languages()
 
     args = sys.argv[1:]
-    force = "--force" in args
+    # `--force` is accepted for backward compatibility but is now a no-op: there
+    # is no safety cap to bypass.
     requested = [a for a in args if not a.startswith("--")]
 
     if requested:
@@ -57,39 +59,22 @@ def main():
 
     source = load_source()
     if not source:
-        print("ERROR: en.json source is empty or missing.")
+        print("ERROR: en-US.json source is empty or missing.")
         sys.exit(1)
 
     state = load_state()
     full_run = set(locales) == set(supported)
 
-    # Safety cap: never silently translate a huge batch (e.g. an en.json refactor
-    # that renames many keys). Abort and require --force for intentional large runs.
-    max_keys = int(os.environ.get("TRANSLATION_MAX_KEYS", "5000"))
-    pending = count_pending(source, state, locales)
-    print(f"Pending translations across {len(locales)} language(s): {pending}")
-
-    if pending == 0:
-        print("Nothing to translate — all targets are up to date.")
-        return
-
-    if pending > max_keys and not force:
-        print(
-            f"ERROR: {pending} pending translations exceeds the safety cap "
-            f"({max_keys}). Re-run with --force or raise TRANSLATION_MAX_KEYS "
-            f"if this is intentional."
-        )
-        sys.exit(2)
-
-    print(f"Starting translation for: {', '.join(locales)}")
-    print("-" * 60)
-
     counters = new_counters()
     locale_targets = {}
     for locale in locales:
-        print(f"\nTranslating: {locale}")
         existing = load_json(get_language_file_path(locale), {})
-        target = build_locale(source, existing, state, locale, counters)
+        pending = collect_pending_leaves(source, existing, state)
+        print(f"\nTranslating: {locale} ({len(pending)} strings pending)")
+
+        translated = translate_pending(pending, locale) if pending else {}
+
+        target = build_locale(source, existing, state, translated, counters)
         with open(get_language_file_path(locale), "w", encoding="utf-8") as f:
             f.write(json.dumps(target, indent=2, ensure_ascii=False) + "\n")
         locale_targets[locale] = target

@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 alt=""
               />
             </template>
-            <span class="chip-label">Service</span>
+            <span class="chip-label">{{ t('traces.traceDetailsSidebar.service') }}</span>
             <span
               class="chip-value"
               data-test="trace-details-sidebar-header-toolbar-service-name"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
-            <span class="chip-label">Duration</span>
+            <span class="chip-label">{{ t('traces.traceDetailsSidebar.duration') }}</span>
             <span class="chip-value">{{ getDuration }}</span>
           </OTag>
 
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
-            <span class="chip-label">Start</span>
+            <span class="chip-label">{{ t('traces.traceDetailsSidebar.start') }}</span>
             <span class="chip-value">{{ getStartTime }}</span>
           </OTag>
 
@@ -135,11 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="spanHttpResendCount"
             type="metricChip"
             class="toolbar-chip resend-chip mr-[0.325rem]"
-            :title="`Request resent ${spanHttpResendCount} time(s)`"
+            :title="t('traces.traceDetailsSidebar.requestResent', { count: spanHttpResendCount })"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
-            <span class="chip-label">Resends</span>
+            <span class="chip-label">{{ t('traces.traceDetailsSidebar.resends') }}</span>
             <span class="chip-value">{{ spanHttpResendCount }}</span>
           </OTag>
         </div>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="metricChip"
             clickable
             class="toolbar-chip span-id-chip mr-[0.325rem]"
-            :title="`Span ID: ${span.span_id}`"
+            :title="t('traces.traceDetailsSidebar.spanIdTitle', { id: span.span_id })"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
@@ -215,10 +215,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               type="metricChip"
               class="llm-chip token-chip input-token-chip"
-              title="Input Tokens"
+              :title="t('traces.traceDetailsSidebar.inputTokens')"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
-              <span class="chip-label">In</span>
+              <span class="chip-label">{{ t('traces.traceDetailsSidebar.in') }}</span>
               <span class="chip-value">{{ llmMetrics.usage.input }}</span>
             </OTag>
 
@@ -226,10 +226,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               type="metricChip"
               class="llm-chip token-chip output-token-chip"
-              title="Output Tokens"
+              :title="t('traces.traceDetailsSidebar.outputTokens')"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
-              <span class="chip-label">Out</span>
+              <span class="chip-label">{{ t('traces.traceDetailsSidebar.out') }}</span>
               <span class="chip-value">{{ llmMetrics.usage.output }}</span>
             </OTag>
           </div>
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="metricChip"
             icon="attach-money"
             class="llm-chip cost-chip"
-            title="Total Cost"
+            :title="t('traces.traceDetailsSidebar.totalCost')"
           >
             <span class="chip-value font-bold"
               >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTab
           v-if="isLLMSpan"
           name="preview"
-          label="Preview"
+          :label="t('traces.traceDetailsSidebar.preview')"
           style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-preview"
                     class="font-normal!"
@@ -365,13 +365,13 @@ class="h-full overflow-y-auto">
                 <div
                   class="section-label font-bold mb-1 flex items-center justify-between"
                 >
-                  <div>Input</div>
+                  <div>{{ t('traces.traceDetailsSidebar.input') }}</div>
                   <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
                       :title="
-                        isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+                        isFullscreen ? t('traces.traceDetailsSidebar.exitFullscreen') : t('traces.traceDetailsSidebar.enterFullscreen')
                       "
                       @click="toggleFullscreen"
                     >
@@ -383,7 +383,7 @@ class="h-full overflow-y-auto">
                     <OButton
                       variant="outline"
                       size="icon"
-                      title="Copy input"
+                      :title="t('traces.traceDetailsSidebar.copyInput')"
                       @click="copyContent(span.gen_ai_input_messages, 'input')"
                       :disabled="!hasContent(span.gen_ai_input_messages)"
                     >
@@ -397,7 +397,7 @@ class="h-full overflow-y-auto">
                     <OCollapsible
                       v-model="sysInstrOpen"
                       icon="settings"
-                      label="System Instructions"
+                      :label="t('traces.traceDetailsSidebar.systemInstructions')"
                     >
                       <div class="p-2 bg-[var(--o2-code-bg)]">
                         <LLMContentRenderer
@@ -413,8 +413,8 @@ class="h-full overflow-y-auto">
                     v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
                     class="no-data-message"
                   >
-                    No data available
-                  </div>
+                    {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
+</div>
                   <LLMContentRenderer
                     v-if="hasContent(span.gen_ai_input_messages)"
                     :content="span.gen_ai_input_messages"
@@ -432,13 +432,13 @@ class="h-full overflow-y-auto">
                 <div
                   class="section-label font-bold mb-1 flex items-center justify-between"
                 >
-                  <div>Output</div>
+                  <div>{{ t('traces.traceDetailsSidebar.output') }}</div>
                   <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
                       :title="
-                        isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'
+                        isFullscreen ? t('traces.traceDetailsSidebar.exitFullscreen') : t('traces.traceDetailsSidebar.enterFullscreen')
                       "
                       @click="toggleFullscreen"
                     >
@@ -450,7 +450,7 @@ class="h-full overflow-y-auto">
                     <OButton
                       variant="outline"
                       size="icon"
-                      title="Copy output"
+                      :title="t('traces.traceDetailsSidebar.copyOutput')"
                       @click="copyContent(span.gen_ai_output_messages, 'output')"
                       :disabled="!hasContent(span.gen_ai_output_messages)"
                     >
@@ -463,8 +463,8 @@ class="h-full overflow-y-auto">
                     v-if="!hasContent(span.gen_ai_output_messages)"
                     class="no-data-message"
                   >
-                    No data available
-                  </div>
+                    {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
+</div>
                   <LLMContentRenderer
                     v-else
                     :content="span.gen_ai_output_messages"
@@ -482,7 +482,7 @@ class="h-full overflow-y-auto">
             <OCollapsible
               v-if="span.llm_request_parameters"
               v-model="modelParamsOpen"
-              label="Model Parameters"
+              :label="t('traces.traceDetailsSidebar.modelParameters')"
               class="mt-3"
             >
               <pre class="model-params-json p-2">{{
@@ -513,7 +513,7 @@ class="h-5! text-[0.75rem]!">
                 <template #icon-left
                   ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
-                Table
+                {{ t('traces.traceDetailsSidebar.table') }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -681,7 +681,7 @@ class="h-5! text-[0.75rem]!">
             "
             data-test="trace-details-sidebar-no-events"
           >
-            No events present for this span
+            {{ t('traces.traceDetailsSidebar.noEvents') }}
           </div>
         </OTabPanel>
         <OTabPanel name="error" class="h-full">
@@ -754,7 +754,7 @@ class="h-5! text-[0.75rem]!">
             "
             data-test="trace-details-sidebar-no-links"
           >
-            No links present for this span
+            {{ t('traces.traceDetailsSidebar.noLinks') }}
           </div>
         </OTabPanel>
 
@@ -1198,7 +1198,7 @@ export default defineComponent({
       {
         accessorKey: "field",
         id: "field",
-        header: "Field",
+        header: t("traces.traceDetailsSidebar.field"),
         size: 200,
         meta: {
           headerClass:
@@ -1210,7 +1210,7 @@ export default defineComponent({
       {
         accessorKey: "value",
         id: "value",
-        header: "Value",
+        header: t("traces.traceDetailsSidebar.value"),
         size: 400,
         meta: {
           slot: true,
@@ -1386,7 +1386,7 @@ export default defineComponent({
         cols.push({
           accessorKey: tsCol,
           id: tsCol,
-          header: "Timestamp",
+          header: t("traces.traceDetailsSidebar.timestamp"),
           size: eventsColSizes.value[tsCol] ?? 220,
           accessorFn: (row: any) =>
             timestampToTimezoneDate(
@@ -1570,7 +1570,7 @@ export default defineComponent({
 
     const copySpanId = () => {
       copyToClipboard(props.span?.span_id || "", {
-        successMessage: "Span ID copied to clipboard",
+        successMessage: t("traces.traceDetailsSidebar.spanIdCopied"),
       });
     };
 
@@ -1579,7 +1579,7 @@ export default defineComponent({
       const attributesText = JSON.stringify(attributes, null, 2);
 
       copyToClipboard(attributesText, {
-        successMessage: "Attributes copied to clipboard",
+        successMessage: t("traces.traceDetailsSidebar.attributesCopied"),
       });
     };
 
@@ -1755,7 +1755,7 @@ export default defineComponent({
       // Gate correlation feature behind enterprise check to avoid 403 errors
       if (config.isEnterprise !== "true") {
         correlationError.value =
-          "Correlation feature requires enterprise license";
+          t("traces.traceDetailsSidebar.enterpriseLicenseRequired");
         return;
       }
 
@@ -1763,7 +1763,7 @@ export default defineComponent({
         console.warn(
           "[TraceDetailsSidebar] Cannot load correlation: missing span or stream name",
         );
-        correlationError.value = "Missing span or stream name";
+        correlationError.value = t("traces.traceDetailsSidebar.missingSpanOrStream");
         return;
       }
 
@@ -1932,13 +1932,13 @@ export default defineComponent({
 
         // Copy to clipboard
         copyToClipboard(textToCopy, {
-          successMessage: `${type.charAt(0).toUpperCase() + type.slice(1)} copied to clipboard`,
-          errorMessage: "Failed to copy to clipboard",
+          successMessage: t("traces.traceDetailsSidebar.copiedToClipboard", { type: type.charAt(0).toUpperCase() + type.slice(1) }),
+          errorMessage: t("traces.traceDetailsSidebar.failedToCopyClipboard"),
         });
       } catch (error) {
         toast({
           variant: "error",
-          message: "Failed to copy content",
+          message: t("traces.traceDetailsSidebar.failedToCopyContent"),
         });
       }
     };
@@ -2075,7 +2075,7 @@ export default defineComponent({
 
     const copyContentToClipboard = (log: any) => {
       copyToClipboard(JSON.stringify(log), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: t("traces.traceDetailsSidebar.contentCopied"),
         timeout: 1000,
       });
     };
@@ -2178,7 +2178,7 @@ export default defineComponent({
   padding: 0.375rem 0.2rem !important;
 }
 
-.traces-correlated-logs-container .logs-table-container .container {
+.traces-correlated-logs-container .logs-table-container .o2-scroll-container {
   height: 100% !important;
 }
 
@@ -2199,8 +2199,8 @@ export default defineComponent({
 
 .trace-detail-tab-table th,
 .trace-detail-tab-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--color-table-row-divider);
+  border-right: 1px solid var(--color-table-row-divider);
   text-align: left;
   padding: 8px !important;
   font-size: 13px;
@@ -2260,9 +2260,9 @@ export default defineComponent({
 }
 
 .trace-detail-tab-table table.q-table {
-  background: rgba(240, 240, 245, 0.8);
+  background: var(--color-surface-base);
   backdrop-filter: blur(0.625rem);
-  border: 0.125rem solid rgba(100, 100, 120, 0.5);
+  border: 0.125rem solid var(--color-table-header-border);
 }
 
 .table-header .table-head-chip {
@@ -2769,8 +2769,8 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
 
 .body--dark .trace-detail-tab-table th,
 .body--dark .trace-detail-tab-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--color-table-row-divider);
+  border-right: 1px solid var(--color-table-row-divider);
 }
 
 /* Light theme support for glassmorphic tables */
@@ -2781,8 +2781,8 @@ body.body--dark .trace-details-toolbar-container .provider-badge {
 
 .body--light .trace-detail-tab-table th,
 .body--light .trace-detail-tab-table td {
-  border-bottom: 1px solid rgba(100, 100, 120, 0.2);
-  border-right: 1px solid rgba(100, 100, 120, 0.3);
+  border-bottom: 1px solid var(--color-table-row-divider);
+  border-right: 1px solid var(--color-table-row-divider);
 }
 
 .trace-detail-tab-table th {

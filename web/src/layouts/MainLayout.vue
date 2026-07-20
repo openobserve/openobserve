@@ -161,6 +161,7 @@ import {
   invalidateLoginData,
   getDueDays,
   trialPeriodAllowedPath,
+  emptyDataAllowedPaths,
 } from "../utils/zincutils";
 
 import {
@@ -349,6 +350,16 @@ export default defineComponent({
       );
     });
 
+    // Backend `/config` flag `synthetics_enabled` — controlled by enterprise
+    // `O2_SYNTHETICS_ENABLED`. Reactive so the menu picks it up regardless of
+    // whether the config response arrived before or after mount.
+    const isSyntheticsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.synthetics_enabled)
+      );
+    });
+
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";
     if (
@@ -434,7 +445,7 @@ export default defineComponent({
     const langList = [
       {
         label: "English",
-        code: "en-gb",
+        code: "en-us",
       },
       {
         label: "Türkçe",
@@ -479,6 +490,18 @@ export default defineComponent({
       {
         label: "Português",
         code: "pt",
+      },
+      {
+        label: "Русский",
+        code: "ru",
+      },
+      {
+        label: "Polski",
+        code: "pl",
+      },
+      {
+        label: "Tiếng Việt",
+        code: "vi",
       },
     ];
 
@@ -614,9 +637,47 @@ export default defineComponent({
     // ever flips at runtime), keep the menu in sync.
     watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
+    const updateSyntheticMenu = () => {
+      const existingIndex = linksList.value.findIndex(
+        (l: any) => l.name === "synthetic",
+      );
+
+      if (!isSyntheticsEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+
+      const incidentIndex = linksList.value.findIndex(
+        (l: any) => l.name === "incidentList",
+      );
+      const alertIndex = linksList.value.findIndex(
+        (l: any) => l.name === "alertList",
+      );
+      const insertAt =
+        incidentIndex !== -1
+          ? incidentIndex + 1
+          : alertIndex !== -1
+            ? alertIndex + 1
+            : linksList.value.length;
+
+      linksList.value.splice(insertAt, 0, {
+        title: t("menu.synthetic"),
+        icon: "radar",
+        link: "/synthetic",
+        name: "synthetic",
+      });
+    };
+
+    // Keep the menu in sync if /config resolves after mount.
+    watch(isSyntheticsEnabled, () => updateSyntheticMenu(), {
+      immediate: false,
+    });
+
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateSyntheticMenu();
       updateAIObservabilityMenu();
 
       const disableMenus = new Set(
@@ -647,6 +708,7 @@ export default defineComponent({
         link: "/reports",
         name: "reports",
       });
+      filterMenus();
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.
@@ -717,10 +779,16 @@ export default defineComponent({
         });
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
-          // IAM is org-setup, not data consumption — don't bounce out
-          // of IAM screens just because no streams exist yet.
+          // IAM is org-setup, not data consumption — don't bounce out of IAM
+          // screens just because no streams exist yet. General Settings is exempt
+          // because it hosts the Danger Zone: switching to an empty org must still
+          // leave the admin able to delete it. Mirrors the routeGuard exemptions —
+          // General only, not the rest of the Settings tree.
           const currentPath = router.currentRoute.value.path || "";
-          if (currentPath.indexOf("/iam") !== -1) {
+          if (
+            currentPath.indexOf("/iam") !== -1 ||
+            emptyDataAllowedPaths.indexOf(currentPath.replace(/\/$/, "")) !== -1
+          ) {
             return;
           }
           toast({
@@ -746,6 +814,33 @@ export default defineComponent({
         let tempDefaultOrg = {};
         let localOrgFlag = false;
         const url = new URL(window.location.href);
+
+        // If the org the user is currently on (URL or stored) is no longer in the
+        // available list, it is being deleted (the backend hides deleting orgs from
+        // this list). Warn the user, then fall through to default-org selection and
+        // redirect home so the stale org_identifier query param is dropped.
+        const intendedOrgId =
+          customOrganization ||
+          (useLocalOrganization()?.value?.identifier ?? "");
+        const orgs = store.state.organizations || [];
+        if (
+          intendedOrgId &&
+          orgs.length > 0 &&
+          !orgs.some((o: any) => o.identifier === intendedOrgId)
+        ) {
+          toast({
+            variant: "warning",
+            message: t("organization.orgBeingDeletedSwitching"),
+          });
+          // Clear stale selection so the logic below picks the default org.
+          customOrganization = "";
+          useLocalOrganization("");
+          selectedOrg.value = {};
+          store.dispatch("setSelectedOrganization", {});
+          if (router.currentRoute.value.query.org_identifier) {
+            router.replace({ path: "/", query: {} });
+          }
+        }
         if (store.state.organizations?.length > 0) {
           const localOrg: any = useLocalOrganization();
           if (

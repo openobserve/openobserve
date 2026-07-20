@@ -173,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
+                      class="h-full"
                       data-test="logs-search-no-events-found-text"
                     >
                       <LogsNoEventsState
@@ -304,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="search-history-empty__icon" style="width: 100px; height: 100px;" />
             </div>
             <div class="text-3xl font-semibold search-history-empty__title">
-              Search history is not enabled.
+              {{ t("logs.index.searchHistoryNotEnabled") }}
             </div>
             <div
               class="search-history-empty__info mt-2 flex items-center justify-center"
@@ -312,8 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="info" class="mr-1"
 size="md" />
               <span class="text-xl font-semibold text-center">
-                Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
-                reporting.</span
+                {{ t("logs.index.enableUsageReporting") }}</span
               >
             </div>
 
@@ -987,7 +987,7 @@ export default defineComponent({
           const selectedStreams = searchObj.data.stream.selectedStream;
           if (!selectedStreams?.length) {
             searchObj.loading = false;
-            showErrorNotification("Please select a stream to extract patterns");
+            showErrorNotification(t("logs.index.selectStreamToExtractPatterns"));
             return;
           }
           streamName = selectedStreams[0];
@@ -1011,7 +1011,7 @@ export default defineComponent({
       } catch (error) {
         console.error("[Index] Error extracting patterns:", error);
         searchObj.loading = false;
-        showErrorNotification("Error extracting patterns. Please try again.");
+        showErrorNotification(t("logs.index.errorExtractingPatterns"));
       }
     };
 
@@ -1792,7 +1792,7 @@ export default defineComponent({
           dashboardData.data.title == null ||
           dashboardData.data.title.trim() == ""
         ) {
-          errors.push("Name of Panel is required");
+          errors.push(t("logs.index.nameOfPanelRequired"));
         }
       }
 
@@ -1801,7 +1801,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("logs.index.errorsFixAndTryAgain"),
         );
         return false;
       }
@@ -2033,7 +2033,7 @@ export default defineComponent({
               isSimpleSelectAllQuery(logsPageQuery)
             ) {
               showErrorNotification(
-                "Select * query is not supported for visualization",
+                t("logs.index.selectStarNotSupportedForVisualization"),
               );
               return;
             }
@@ -2266,7 +2266,7 @@ export default defineComponent({
 
           // show error notification
           showErrorNotification(
-            err.message ?? "Error in updating visualization",
+            err.message ?? t("logs.index.errorUpdatingVisualization"),
           );
           return;
         }
@@ -2540,7 +2540,7 @@ export default defineComponent({
             isSimpleSelectAllQuery(logsPageQuery)
           ) {
             showErrorNotification(
-              "Select * query is not supported for visualization",
+              t("logs.index.selectStarNotSupportedForVisualization"),
             );
             return;
           }
@@ -2561,7 +2561,7 @@ export default defineComponent({
 
           // show error notification
           showErrorNotification(
-            err.message ?? "Error in updating visualization",
+            err.message ?? t("logs.index.errorUpdatingVisualization"),
           );
           return;
         }
@@ -2622,7 +2622,7 @@ export default defineComponent({
           !buildDashboardPanelData.data.queries[0]?.query?.trim()
         ) {
           showErrorNotification(
-            "Query is empty, please select fields to build query",
+            t("logs.index.queryEmptySelectFieldsToBuild"),
           );
           return;
         }
@@ -3494,7 +3494,7 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
+            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
@@ -3503,7 +3503,7 @@ export default defineComponent({
           (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
         ) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
+            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
@@ -3512,13 +3512,13 @@ export default defineComponent({
           this.searchObj.meta.sqlMode == true
         ) {
           this.resetHistogramWithError(
-            "Histogram is not available for multi stream search.",
+            this.t("logs.index.histogramNotAvailableMultiStream"),
           );
         } else if (
           this.searchObj.data.queryResults.is_histogram_eligible == false
         ) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            this.t("logs.index.histogramUnavailableCtesDistinctLimit"),
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;

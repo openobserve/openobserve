@@ -132,6 +132,11 @@ const setField = (wrapper: VueWrapper<any>, name: string, value: unknown) =>
 const submitForm = async (wrapper: VueWrapper<any>) => {
   await getForm(wrapper).vm.form.handleSubmit();
   await flushPromises();
+  // Let any in-flight onDynamicAsync validation (scheduled on a macrotask by
+  // TanStack's async validator plumbing) land before assertions — otherwise a
+  // stale run can overwrite form.state.errors after the submit settles.
+  await new Promise((r) => setTimeout(r, 0));
+  await flushPromises();
 };
 
 describe("AddUser", () => {
@@ -210,7 +215,7 @@ describe("AddUser", () => {
       wrapper = mountComp({
         customRoles: ["admin-role", "editor-role", "viewer"],
       });
-      // update() runs its callback synchronously (the Quasar filter contract).
+      // update() runs its callback synchronously (the filter contract).
       wrapper.vm.filterFn("edit", (fn: () => void) => fn());
       expect(wrapper.vm.filterdOption).toEqual(["editor-role"]);
 

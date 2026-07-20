@@ -91,7 +91,7 @@ export default class DashboardImport {
       // Tab might already be active, continue
     }
 
-    // Quasar's q-file renders the underlying input as hidden — wait for
+    // The q-file renders the underlying input as hidden — wait for
     // `attached` (not visible) since setInputFiles works on hidden inputs.
     await this.inputFile.waitFor({ state: "attached", timeout: 20000 });
 

@@ -406,6 +406,7 @@ import {
   onBeforeUnmount,
   onActivated,
   computed,
+  toRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useI18n } from "vue-i18n";
@@ -502,7 +503,7 @@ export default defineComponent({
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
-    const { searchObj, tracesShareURL } = useTraces();
+    const { searchObj, tracesShareURL, tracesParser } = useTraces();
     const queryEditorRef = ref(null);
 
     const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
@@ -511,6 +512,7 @@ export default defineComponent({
         sqlMode: computed(() => searchObj.meta.sqlMode),
         query: computed(() => searchObj.data.editorValue ?? ""),
         streamName: computed(() => searchObj.data.stream.selectedStream?.value),
+        externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
       });
 
     const onQueryEditorFocus = () => {
@@ -522,7 +524,6 @@ export default defineComponent({
       await _sqlOnBlur();
     };
 
-    let parser: any;
     let streamName = "";
     const dateTimeRef = ref(null);
 
@@ -536,16 +537,6 @@ export default defineComponent({
       updateFieldKeywords,
       updateStreamKeywords,
     } = useSqlSuggestions();
-
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
-
-    onBeforeUnmount(async () => {
-      await importSqlParser();
-    });
 
     onActivated(async () => {
       await nextTick();
@@ -610,7 +601,7 @@ export default defineComponent({
       _sqlOnQueryChange();
       updateAutoComplete(value);
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.parsedQuery = parser.astify(value);
+        searchObj.data.parsedQuery = tracesParser.value?.astify(value);
         if (searchObj.data.parsedQuery?.from?.length > 0) {
           if (
             searchObj.data.parsedQuery.from[0].table !==
@@ -639,7 +630,7 @@ export default defineComponent({
               searchObj.data.stream.selectedStream = { label: "", value: "" };
               searchObj.data.stream.selectedStreamFields = [];
               toast({
-                message: "Stream not found",
+                message: t("traces.searchBar.streamNotFound"),
                 variant: "warning",
               });
             }
@@ -899,8 +890,8 @@ export default defineComponent({
 
     // Service Graph toolbar controls
     const serviceGraphVisualizationTabs = [
-      { label: "Tree View", value: "tree" },
-      { label: "Graph View", value: "graph" },
+      { label: t("traces.treeView"), value: "tree" },
+      { label: t("traces.graphView"), value: "graph" },
     ];
 
     const serviceGraphLayoutOptions = computed(() => {

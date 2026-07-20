@@ -233,11 +233,11 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar":
     "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-md",
-  // Compact labeled size for inline field chips (axis items) — ~28px, matches Quasar dense button
+  // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
-  // (needed because Quasar sets html font-size to 14px, making text-xs = 10.5px instead of 12px)
+  // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "h-6 ps-2 pe-1.5 !text-[12px] gap-1 rounded leading-none",
   "sm-action":
     "h-[2.125rem] ps-3 pe-3 min-w-[80px] text-sm gap-2 rounded-lg",

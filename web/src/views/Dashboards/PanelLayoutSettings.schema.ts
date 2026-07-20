@@ -5,7 +5,7 @@
 // (w/x/y/i) are NOT editable here — they are carried over from the existing
 // layout at submit, so they are not form fields.
 //
-// Restored Quasar rule (BEFORE inventory §4): `layout.h` was
+// The `layout.h` rule:
 //   empty → t("common.required"); else v > 0 ? pass : t("common.valueMustBeGreaterThanZero")
 // i.e. required (falsy → required) AND must be > 0 (negative → greater-than-zero).
 // Factory keeps both messages i18n-driven. Validation TIMING is owned by OForm.

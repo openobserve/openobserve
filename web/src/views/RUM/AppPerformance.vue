@@ -24,13 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <AppPageHeader
       :title="t('rum.performanceSummaryLabel')"
+      title-data-test="rum-performance-title"
+      icon="speed"
       class="shrink-0 px-4 border-b border-border-default"
     >
-      <template #title>
-        <span data-test="rum-performance-title">
-          {{ t("rum.performanceSummaryLabel") }}
-        </span>
-      </template>
       <template #actions>
         <DateTimePickerDashboard
           class="rum-date-time-picker"

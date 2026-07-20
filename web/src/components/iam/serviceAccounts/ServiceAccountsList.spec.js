@@ -67,8 +67,6 @@ const platform = {
   },
 };
 
-// Install Quasar with platform
-
 describe("ServiceAccountsList Component", () => {
   let wrapper;
   let mockRouter;
@@ -160,12 +158,7 @@ describe("ServiceAccountsList Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $route: mockRouter.currentRoute.value,
-          $q: {
-            platform,
-            notify: notifyMock,
-            dialog: dialogMock
-          }
+          $route: mockRouter.currentRoute.value
         },
         stubs: {
           'router-link': true,
@@ -194,13 +187,6 @@ describe("ServiceAccountsList Component", () => {
       },
       attachTo: document.body
     });
-
-    // Set up wrapper's $q.notify and dialog after mount — mutate in place
-    // so the closure-captured $q inside setup() also picks up the mocks
-    if (wrapper.vm.$q) {
-      wrapper.vm.$q.notify = notifyMock;
-      wrapper.vm.$q.dialog = dialogMock;
-    }
 
     // Mock the router in wrapper.vm if needed
     if (!wrapper.vm.$router) {
@@ -1208,44 +1194,40 @@ describe("ServiceAccountsList Component", () => {
     });
   });
 
-  describe("Token dialog — wizard step 2 (grant permissions, edition-gated)", () => {
+  describe("Token dialog — access summary (single screen, edition-gated)", () => {
     // aws-exports is mocked with isEnterprise: "true" (see top of file), so the
-    // enterprise next-step (grant-permissions hint + Add-to-Group link) renders.
-    it("opens at step 1 and advances to step 2 via Next", async () => {
+    // enterprise grant hint + Add-to-Role/Group fallback links can render.
+    const emptyAccess = () => ({
+      assigned: { roles: [], groups: [] },
+      failed: { roles: [], groups: [] },
+    });
+
+    it("rotate flow (no access arg) shows the token without an access summary but keeps the grant guidance", async () => {
       wrapper.vm.revealToken("tok", "svc@example.com");
       await nextTick();
-      expect(wrapper.vm.wizardStep).toBe(1);
 
-      // Step 2 content is gated behind the Next button.
+      expect(wrapper.vm.tokenAccess).toBe(null);
       expect(
-        wrapper.find('[data-test="service-accounts-token-step-2"]').exists()
+        wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()
       ).toBe(false);
-
-      await wrapper.find('[data-test="service-accounts-token-next-btn"]').trigger("click");
-      await nextTick();
-      expect(wrapper.vm.wizardStep).toBe(2);
+      // The rotated account may have no permissions — the nudge + links stay.
       expect(
-        wrapper.find('[data-test="service-accounts-token-step-2"]').exists()
+        wrapper.find('[data-test="service-accounts-list-token-next-step"]').exists()
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-accounts-list-token-add-to-role"]').exists()
       ).toBe(true);
     });
 
-    it("renders the grant-permissions next-step hint on step 2", async () => {
-      wrapper.vm.revealToken("tok", "svc@example.com");
-      wrapper.vm.wizardStep = 2;
+    it("creation with nothing selected renders the grant hint and fallback links", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com", emptyAccess());
       await nextTick();
 
-      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Grant permissions"
-      );
-      expect(tokenDialog).toBeDefined();
-      // Enterprise build: hint nudges the user to grant permissions via a group.
-      expect(tokenDialog.html()).toContain("no permissions yet");
-    });
-
-    it("renders Add-to-Role (first) and Add-to-Group links in enterprise builds on step 2", async () => {
-      wrapper.vm.revealToken("tok", "svc@example.com");
-      wrapper.vm.wizardStep = 2;
-      await nextTick();
+      // No grants and no failures: the hint block renders instead of a summary.
+      const hint = wrapper.find('[data-test="service-accounts-list-token-next-step"]');
+      expect(hint.exists()).toBe(true);
+      // Enterprise build: hint nudges the user to grant permissions.
+      expect(hint.html()).toContain("no permissions yet");
 
       const roleLink = wrapper.find('[data-test="service-accounts-list-token-add-to-role"]');
       const groupLink = wrapper.find('[data-test="service-accounts-list-token-add-to-group"]');
@@ -1254,8 +1236,72 @@ describe("ServiceAccountsList Component", () => {
       expect(wrapper.vm.showGroupLink).toBe(true);
 
       // Role must be the first option (appear before Group in the DOM).
-      const html = wrapper.find('[data-test="service-accounts-token-step-2"]').html();
+      const html = wrapper.find('[data-test="service-accounts-token-step-1"]').html();
       expect(html.indexOf("add-to-role")).toBeLessThan(html.indexOf("add-to-group"));
+    });
+
+    it("shows a pending line while the grant fan-out is unsettled, then the summary", async () => {
+      // The create flow reveals the token immediately and marks the grant
+      // outcome pending until the fan-out promise resolves.
+      wrapper.vm.revealToken("tok", "svc@example.com", null);
+      wrapper.vm.tokenAccessPending = true;
+      await nextTick();
+
+      expect(
+        wrapper.find('[data-test="service-accounts-token-access-pending"]').exists()
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()
+      ).toBe(false);
+
+      wrapper.vm.tokenAccess = {
+        assigned: { roles: ["editor"], groups: [] },
+        failed: { roles: [], groups: [] },
+      };
+      wrapper.vm.tokenAccessPending = false;
+      await nextTick();
+
+      expect(
+        wrapper.find('[data-test="service-accounts-token-access-pending"]').exists()
+      ).toBe(false);
+      const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
+      expect(summary.exists()).toBe(true);
+      expect(summary.text()).toContain("Roles assigned: editor");
+    });
+
+    it("creation with grants lists the assigned roles/groups and hides the fallback links", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com", {
+        assigned: { roles: ["editor"], groups: ["pipelines"] },
+        failed: { roles: [], groups: [] },
+      });
+      await nextTick();
+
+      const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
+      expect(summary.exists()).toBe(true);
+      expect(summary.text()).toContain("Roles assigned: editor");
+      expect(summary.text()).toContain("Added to user groups: pipelines");
+      expect(
+        wrapper.find('[data-test="service-accounts-list-token-add-to-role"]').exists()
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="service-accounts-token-access-failed"]').exists()
+      ).toBe(false);
+    });
+
+    it("creation with failed grants surfaces the failures and the retry hint", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com", {
+        assigned: { roles: [], groups: [] },
+        failed: { roles: ["editor"], groups: ["pipelines"] },
+      });
+      await nextTick();
+
+      const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
+      expect(summary.text()).toContain("Could not assign roles: editor");
+      expect(summary.text()).toContain("Could not add to user groups: pipelines");
+      expect(summary.text()).toContain("grant these later");
+      expect(
+        wrapper.find('[data-test="service-accounts-token-access-failed"]').exists()
+      ).toBe(true);
     });
 
     it("Add-to-Role link targets the roles route with the account prefilled", async () => {
@@ -1265,31 +1311,29 @@ describe("ServiceAccountsList Component", () => {
       expect(wrapper.vm.roleLinkTarget.query.member).toBe("svc@example.com");
     });
 
-    it("Back returns to step 1; Done closes the dialog", async () => {
+    it("Done closes the dialog", async () => {
       wrapper.vm.revealToken("tok", "svc@example.com");
-      wrapper.vm.wizardStep = 2;
       await nextTick();
 
-      await wrapper.find('[data-test="service-accounts-token-back-btn"]').trigger("click");
-      await nextTick();
-      expect(wrapper.vm.wizardStep).toBe(1);
-
-      wrapper.vm.wizardStep = 2;
-      await nextTick();
       await wrapper.find('[data-test="service-accounts-token-done-btn"]').trigger("click");
       await nextTick();
       expect(wrapper.vm.isShowToken).toBe(false);
     });
 
-    it("resets to step 1 each time the token is revealed", async () => {
-      wrapper.vm.revealToken("tok", "svc@example.com");
-      wrapper.vm.wizardStep = 2;
+    it("clears the previous access summary on the next reveal", async () => {
+      wrapper.vm.revealToken("tok", "svc@example.com", {
+        assigned: { roles: ["editor"], groups: [] },
+        failed: { roles: [], groups: [] },
+      });
       await nextTick();
 
-      // Revealing again (e.g. another create/rotate) must start at step 1.
+      // Revealing again without access (e.g. a rotate) must drop the summary.
       wrapper.vm.revealToken("tok2", "svc2@example.com");
       await nextTick();
-      expect(wrapper.vm.wizardStep).toBe(1);
+      expect(wrapper.vm.tokenAccess).toBe(null);
+      expect(
+        wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()
+      ).toBe(false);
     });
   });
 

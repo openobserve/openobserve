@@ -16,7 +16,7 @@
 /**
  * Pure helpers for the KPI cards on the LLM Insights dashboard.
  * Extracted from the SFC so the trend / formatter logic can be tested
- * without mounting the component (no Vue / quasar / echarts deps).
+ * without mounting the component (no Vue / echarts deps).
  */
 
 export type TrendDirection = "up" | "down" | "flat";

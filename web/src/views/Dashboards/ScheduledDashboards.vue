@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unit="us"
             mode="absolute"
             :timezone="store.state.timezone"
-            empty-label="Never"
+            :empty-label="t('dashboard.scheduledDashboardsPage.never')"
           />
         </span>
       </template>
@@ -120,7 +120,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
-import { convertUnixToQuasarFormat } from "@/utils/date";
+import { convertUnixToDateFormat } from "@/utils/date";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -232,10 +232,10 @@ const formatReports = () => {
         frequency: getFrequencyValue(report.frequency),
         last_triggered_at_raw: report.last_triggered_at || null,
         last_triggered_at: report.last_triggered_at
-          ? convertUnixToQuasarFormat(report.last_triggered_at)
+          ? convertUnixToDateFormat(report.last_triggered_at)
           : "-",
         created_at_raw: report.created_at || null,
-        created_at: convertUnixToQuasarFormat(report.created_at),
+        created_at: convertUnixToDateFormat(report.created_at),
         orgId: report.org_id,
         isCached: !report?.destinations?.length,
       });
@@ -362,27 +362,37 @@ const openReport = (row: any) => {
 
 const getFrequencyValue = (frequency: any) => {
   if (frequency.type === "cron") {
-    return `Cron ${frequency.cron}`;
+    return t("dashboard.scheduledDashboardsPage.cronFrequency", {
+      cron: frequency.cron,
+    });
   } else {
     switch (frequency.type) {
       case "once":
-        return `Once`;
+        return t("dashboard.scheduledDashboardsPage.once");
       case "hours":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Hours" : "Hour"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyHours", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyHour");
       case "weeks":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Weeks" : "Week"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyWeeks", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyWeek");
       case "months":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Months" : "Month"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyMonths", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyMonth");
       case "days":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Days" : "Day"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyDays", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyDay");
       default:
         return "";
     }
@@ -391,10 +401,10 @@ const getFrequencyValue = (frequency: any) => {
 
 const getTimeRangeValue = (dateTime: any) => {
   if (dateTime.type === "relative") {
-    return `Past ${dateTime.period}`;
+    return t("dashboard.scheduledDashboardsPage.past", { period: dateTime.period });
   } else {
-    const startDateTime = convertUnixToQuasarFormat(dateTime.from);
-    const endDateTime = convertUnixToQuasarFormat(dateTime.to);
+    const startDateTime = convertUnixToDateFormat(dateTime.from);
+    const endDateTime = convertUnixToDateFormat(dateTime.to);
     return `${startDateTime} - ${endDateTime}`;
   }
 };
@@ -415,7 +425,7 @@ const getTimeRangeValue = (dateTime: any) => {
 }
 
 .scheduled-dashboards thead tr {
-  background-color: var(--o2-table-header-bg) !important;
+  background-color: var(--color-table-header-bg);
 }
 
 .scheduled-dashboards .rum-tabs {

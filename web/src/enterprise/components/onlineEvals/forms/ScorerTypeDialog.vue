@@ -83,7 +83,7 @@
           data-test="scorer-type-code"
           disabled
         >
-          <span class="absolute top-3 right-3 py-[2px] px-2 rounded text-[11px] font-semibold leading-normal bg-[color-mix(in_srgb,var(--o2-status-warning-text)_14%,transparent)] text-(--o2-status-warning-text)">
+          <span class="absolute top-3 right-3 py-[2px] px-2 rounded text-[11px] font-semibold leading-normal bg-[color-mix(in_srgb,var(--color-status-warning-text)_14%,transparent)] text-(--color-status-warning-text)">
             {{ t("onlineEvals.scorerTypeDialog.comingSoonBadge") }}
           </span>
           <div class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">

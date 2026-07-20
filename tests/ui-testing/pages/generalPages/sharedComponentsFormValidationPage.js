@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { gotoMetricsEditor } from '../commonActions.js';
+
 export class SharedComponentsFormValidationPage {
     /**
      * @param {import('@playwright/test').Page} page
@@ -54,12 +56,14 @@ export class SharedComponentsFormValidationPage {
 
     // ── AddToDashboard helpers ────────────────────────────────────────────────
 
+    /**
+     * The AddToDashboard dialog under test is reached from the metrics panel
+     * EDITOR (run a query, then "Add to Dashboard"), so go there directly —
+     * the sidebar's Metrics item now opens the Metrics Explorer browse grid,
+     * which has no query bar at all.
+     */
     async navigateToMetrics() {
-        await this.page.locator(this.metricsMenuLink).click();
-        // Wait for metrics page to be visible
-        await this.page
-            .locator('[data-test="metrics-page"]')
-            .waitFor({ state: 'visible', timeout: 15000 });
+        await gotoMetricsEditor(this.page);
     }
 
     async waitForAddToDashboardDialog() {

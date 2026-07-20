@@ -418,7 +418,7 @@ export default defineComponent({
 
     // Keep filteredDestinations in sync with the destinations prop so the
     // dropdown is pre-populated on first open (OSelect @search only fires
-    // on user input, not on initial open like Quasar's @filter).
+    // on user input, not on initial open).
     watch(
       () => props.destinations,
       () => {

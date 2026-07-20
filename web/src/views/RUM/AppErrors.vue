@@ -58,34 +58,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-date-time-dropdown"
               @on:date-change="updateDateChange"
             />
-            <!-- Run query button -->
+            <!-- Run query button (also bound to the refresh shortcut) -->
             <OButton
               data-test="errors-run-query-button"
               variant="primary"
               size="sm-toolbar"
-              :title="t('metrics.runQuery')"
+              :loading="isLoadingIssues"
               @click="runQuery"
               class="shrink-0"
             >
               {{ t("metrics.runQuery") }}
+              <OTooltip side="bottom" :content="t('metrics.runQuery')" shortcut-id="rumErrorsRefresh" />
             </OButton>
             <OTableColumnToggle
               :columns="tableColumns"
               :column-visibility="columnVisibility"
               @update:column-visibility="setColumnVisibility"
             />
-            <!-- Refresh button -->
-            <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="refresh"
-              :loading="isLoadingIssues"
-              data-test="rum-app-errors-refresh-btn"
-              class="shrink-0"
-              @click="runQuery"
-            >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="rumErrorsRefresh" />
-            </OButton>
           </div><!-- end controls -->
         </div><!-- end flex row -->
       </div><!-- end card-container -->
@@ -151,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTable
             :data="visibleIssues"
             :columns="tableColumns"
+            :default-columns="false"
             :column-visibility="columnVisibility"
             :loading="!!isLoading.length || isLoadingIssues"
             row-key="_rowKey"
@@ -159,7 +149,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :dense="false"
             :row-height="60"
             :show-global-filter="false"
-            horizontal-scroll
             class="h-full"
             data-test="rum-app-errors-table"
             row-class="cursor-pointer"
@@ -242,14 +231,19 @@ import {
   ref,
   type Ref,
   defineAsyncComponent,
+  watch,
 } from "vue";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
-import { COL } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
@@ -298,12 +292,16 @@ const splitterModel = ref(250);
 const editorFocused = ref(false);
 const errorQueryEditorRef = ref<any>(null);
 
+// Server-error highlight ranges, forwarded to the filter editor by the composable.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+
 const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
   useSqlEditorDiagnostics({
     queryEditorRef: errorQueryEditorRef,
     sqlMode: computed(() => false),
     query: computed(() => errorTrackingState.data.editorValue ?? ""),
     streamName: computed(() => errorTrackingState.data.stream.errorStream),
+    externalErrors: sqlErrorRanges,
   });
 
 const onQueryEditorFocus = () => {
@@ -357,7 +355,24 @@ const {
   isLoadingKpis,
   fetchAll,
   fetchTrend,
+  lastQueryError,
 } = useErrorIssuesData();
+
+// Turn the last issues-search server error into editor squiggles (filter mode).
+watch(lastQueryError, async (err) => {
+  if (!err) {
+    sqlErrorRanges.value = [];
+    return;
+  }
+  sqlErrorRanges.value = await rangesFromServerError({
+    code: err.code,
+    message: err.message,
+    errorDetail: err.error_detail,
+    sqlMode: false,
+    query: errorTrackingState.data.editorValue,
+    streamName: errorTrackingState.data.stream.errorStream,
+  });
+});
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
@@ -494,7 +509,7 @@ const tableColumns = [
     size: COL.status,
     meta: { align: "left" },
   },
-];
+] satisfies OTableColumnDef[];
 
 const userDataSet = new Set([
   "user_agent_device_brand",

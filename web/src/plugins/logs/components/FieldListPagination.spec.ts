@@ -16,12 +16,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import FieldListPagination from "./FieldListPagination.vue";
+import enLocaleFull from "@/locales/languages/en-US.json";
+
+// Resolve real locale messages so migrated i18n keys render actual text
+// (with {placeholder} interpolation) instead of the raw key path.
+const resolveMessage = (key: string): unknown =>
+  key
+    .split(".")
+    .reduce<any>((obj, part) => (obj == null ? undefined : obj[part]), enLocaleFull);
 
 vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) => {
+      const message = resolveMessage(key);
+      if (typeof message !== "string") return key;
+      if (!params) return message;
+      return message.replace(/\{(\w+)\}/g, (match, name) =>
+        params[name] != null ? String(params[name]) : match
+      );
+    },
+  }),
 }));
 
-const quasarStubs = {
+const componentStubs = {
   OToggleGroup: {
     name: "OToggleGroup",
     template:
@@ -87,7 +104,7 @@ function createWrapper(props = {}) {
   return mount(FieldListPagination, {
     props: { ...defaultProps, ...props },
     global: {
-      stubs: quasarStubs,
+      stubs: componentStubs,
     },
   });
 }

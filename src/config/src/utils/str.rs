@@ -13,8 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock;
+
+use regex::Regex;
+
 pub static EMPTY_STRING: String = String::new();
 pub static EMPTY_STR: &str = "";
+
+/// Canonical email-validation regex (RFC 5321/5322 dot-atom form).
+///
+/// Local part = one or more non-empty atoms separated by single dots (accepts single-char dotted
+/// segments like `first.x`, rejects leading/trailing/consecutive dots). Domain requires at least
+/// one dot-separated label and a TLD of 2-63 letters (RFC 1035 label max; covers long TLDs like
+/// `.software`). Anchored on both ends. Shared by the OSS auth layer and enterprise domain
+/// management so email validation stays identical across crates.
+pub static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^([a-zA-Z0-9_+\-]+(\.[a-zA-Z0-9_+\-]+)*)@([a-zA-Z0-9]+([\-\.][a-zA-Z0-9]+)*\.[a-zA-Z]{2,63})$",
+    )
+    .unwrap()
+});
+
+/// Returns true if `email` is syntactically valid per [`EMAIL_REGEX`].
+pub fn is_valid_email(email: &str) -> bool {
+    EMAIL_REGEX.is_match(email)
+}
 
 #[inline(always)]
 #[cfg(not(target_arch = "x86_64"))]
@@ -72,6 +95,22 @@ impl StringExt for String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_valid_email() {
+        // Valid
+        assert!(is_valid_email("user@example.com"));
+        assert!(is_valid_email("john.doe+123@mail.co.in"));
+        assert!(is_valid_email("a_b-c.d+e@domain.org"));
+        assert!(is_valid_email("user@example.software"));
+        // Invalid
+        assert!(!is_valid_email("no-at-symbol.com"));
+        assert!(!is_valid_email("@missing-user.com"));
+        assert!(!is_valid_email("user@.com"));
+        assert!(!is_valid_email("user@com"));
+        assert!(!is_valid_email("user@domain..com"));
+        assert!(!is_valid_email(".leading@example.com"));
+    }
 
     #[test]
     fn test_find() {

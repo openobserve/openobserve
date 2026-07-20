@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-// Mock toast (replaces Quasar $q.notify)
+// Mock toast
 // vi.hoisted ensures mockToast is initialized before the vi.mock factory runs
 const { mockToast } = vi.hoisted(() => ({
   mockToast: vi.fn(() => vi.fn()),
@@ -754,11 +754,13 @@ describe("General", () => {
       await nextTick();
       expect(wrapper.vm.showColorPicker).toBe(true);
 
-      // second ODialog is the color picker
+      // Select the color-picker dialog by title (order-independent — other dialogs
+      // like the delete-org confirmation also exist in the template).
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const closeBtn = dialogs[dialogs.length - 1].find(
-        '[data-test-stub="o-dialog-primary"]',
+      const colorDialog = dialogs.find(
+        (d) => d.attributes("data-title") === "Pick Custom Color",
       );
+      const closeBtn = colorDialog.find('[data-test-stub="o-dialog-primary"]');
       await closeBtn.trigger("click");
       await nextTick();
 
@@ -778,10 +780,12 @@ describe("General", () => {
     it("forwards title and size to the color picker ODialog", () => {
       const wrapper = createWrapper();
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const colorDialog = dialogs[dialogs.length - 1];
+      // Select by title (order-independent — the delete-org confirmation dialog also
+      // exists and would otherwise be the last dialog in the template).
+      const colorDialog = dialogs.find(
+        (d) => d.attributes("data-title") === "Pick Custom Color",
+      );
       expect(colorDialog.attributes("data-size")).toBe("xs");
-      // title comes from i18n: "Pick Custom Color"
-      expect(colorDialog.attributes("data-title")).toBe("Pick Custom Color");
       expect(colorDialog.attributes("data-primary-label")).toBe("Close");
     });
   });

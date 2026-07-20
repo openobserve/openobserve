@@ -22,8 +22,6 @@ import router from "@/test/unit/helpers/router";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
 
-// Install Quasar plugins
-
 // Mock services
 vi.mock("@/services/stream", () => ({
   default: {
@@ -107,7 +105,7 @@ vi.mock("@/services/billings", () => ({
   }
 }));
 
-// Mock Toast (replaces quasar notify)
+// Mock Toast
 const mockNotify = vi.fn(() => vi.fn()); // Return a function for dismiss
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockNotify(...args),

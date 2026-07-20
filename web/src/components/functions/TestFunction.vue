@@ -41,14 +41,14 @@
           </template>
         </FullViewContainer>
         <div
-          class="flex items-center flex-wrap py-2 w-[100%]"
+          class="flex items-center flex-wrap gap-x-3 py-2 w-[100%]"
           :class="
             store.state.theme === 'dark' ? 'bg-gray-950' : ' bg-white'
           "
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input w-[120px] pr-3">
+          <div class="function-stream-select-input w-[100px]">
             <div
               class="text-[12px]"
               :class="
@@ -129,7 +129,7 @@
             {{ t("common.query") + " *" }}
           </div>
           <div
-            class="border-[1px] border-gray-200 relative w-[100%]"
+            class="relative w-[100%]"
           >
             <query-editor
               data-test="vrl-function-test-sql-editor"
@@ -206,7 +206,7 @@
       </FullViewContainer>
       <div
         v-show="expandState.events"
-        class="border-[1px] border-gray-200 relative"
+        class="relative"
         data-test="test-function-input-editor-section"
       >
         <query-editor
@@ -257,7 +257,7 @@
 
       <div
         v-show="expandState.output"
-        class="border-[1px] border-gray-200 relative"
+        class="relative"
         data-test="test-function-output-editor-section"
       >
         <div
@@ -270,7 +270,7 @@
             class="text-orange-400"
           />
           <div
-            class="text-[15px] text-gray-600"
+            class="text-[15px]"
             :class="
               store.state.theme === 'dark'
                 ? 'text-gray-200'
@@ -315,6 +315,10 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
@@ -377,11 +381,15 @@ const eventsErrorMsg = ref<string>("");
 
 const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
+// Server-error highlight ranges, forwarded to the SQL editor by the composable.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+
 const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
   useSqlEditorDiagnostics({
     queryEditorRef,
     sqlMode: computed(() => true),
     query: inputQuery,
+    externalErrors: sqlErrorRanges,
   });
 
 const onQueryEditorFocus = () => {
@@ -633,7 +641,7 @@ const getResults = async () => {
     .search({
       org_identifier: store.state.selectedOrganization.identifier,
       query,
-      page_type: "logs",
+      page_type: selectedStream.value.type,
     })
     .then((res: any) => {
       expandState.value.stream = false;
@@ -645,11 +653,24 @@ const getResults = async () => {
         2,
       );
       sqlQueryErrorMsg.value = "";
+      sqlErrorRanges.value = [];
     })
     .catch((err: any) => {
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
         : "Invalid SQL Query";
+
+      // Locate the offending token in the SQL and squiggle it in the editor.
+      rangesFromServerError({
+        code: err.response?.data?.code,
+        message: err.response?.data?.message,
+        errorDetail: err.response?.data?.error_detail,
+        sqlMode: true,
+        query: inputQuery.value,
+        streamName: selectedStream.value?.name,
+      }).then((ranges) => {
+        sqlErrorRanges.value = ranges;
+      });
 
       // Show error only if it is not real time alert
       // This case happens when user enters invalid query and then switches to real time alert

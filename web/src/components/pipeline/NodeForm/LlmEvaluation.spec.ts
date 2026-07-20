@@ -77,23 +77,29 @@ vi.mock("@/composables/useStreams", () => ({
 
 import LlmEvaluation from "./LlmEvaluation.vue";
 
+// ODrawer is stubbed to a slot-renderer so the REAL <OForm> mounts inside it and
+// the schema actually runs (the playbook requires at least one real-OForm test).
+// The form-id bridge wires the footer Save to submit; in tests we drive the
+// form's own handleSubmit() so the schema → @submit → save chain is awaited
+// deterministically.
 const ODrawerStub = {
   name: "ODrawer",
   props: [
-    "open", "size", "showClose", "title", "width", "persistent",
+    "open", "size", "showClose", "title", "width", "persistent", "formId",
     "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:secondary", "click:neutral"],
   template: `<div class="o-drawer-stub">
     <slot />
     <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
     <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" type="submit" form="llm-evaluation-form">{{ primaryButtonLabel }}</button>
   </div>`,
 };
 
 function createWrapper(overrides: Record<string, any> = {}): VueWrapper<any> {
   return mount(LlmEvaluation, {
+    props: { open: true },
     global: {
       plugins: [i18n, store],
       stubs: {
@@ -108,6 +114,17 @@ function createWrapper(overrides: Record<string, any> = {}): VueWrapper<any> {
     },
   });
 }
+
+// Drive the real form's submit so the schema runs + the @submit handler is
+// awaited deterministically.
+const submitForm = async (w: VueWrapper<any>) => {
+  await (w.vm as any).form.handleSubmit();
+  await flushPromises();
+};
+const setField = (w: VueWrapper<any>, name: string, value: unknown) =>
+  (w.vm as any).form.setFieldValue(name, value);
+const formValues = (w: VueWrapper<any>) =>
+  (w.vm as any).form.state.values;
 
 describe("LlmEvaluation - rendering", () => {
   let wrapper: VueWrapper<any>;
@@ -181,12 +198,10 @@ describe("LlmEvaluation - initial state", () => {
   });
 
   it("nodeName defaults to 'evaluate' when not in edit mode", () => {
-    // In non-edit mode (isEditNode: false), onMounted sets nodeName to "evaluate"
-    expect((wrapper.vm as any).nodeName).toBe("evaluate");
+    expect(formValues(wrapper).nodeName).toBe("evaluate");
   });
 
-  it("enableSampling is true by default (component default ref value)", () => {
-    // The ref default is true
+  it("enableSampling is true by default", () => {
     expect((wrapper.vm as any).enableSampling).toBe(true);
   });
 
@@ -194,12 +209,116 @@ describe("LlmEvaluation - initial state", () => {
     expect((wrapper.vm as any).samplingRate).toBe(0.01);
   });
 
-  it("llmSpanIdentifier defaults to 'gen_ai_system'", () => {
-    expect((wrapper.vm as any).llmSpanIdentifier).toBe("gen_ai_system");
+  it("spanIdentifier defaults to 'gen_ai_system'", () => {
+    expect(formValues(wrapper).spanIdentifier).toBe("gen_ai_system");
   });
 
-  it("loadingFields starts as false after mount completes", async () => {
+  it("loadingFields starts as false after mount completes", () => {
     expect((wrapper.vm as any).loadingFields).toBe(false);
+  });
+});
+
+describe("LlmEvaluation - schema validation (real OForm)", () => {
+  let wrapper: VueWrapper<any>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    wrapper = createWrapper();
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+  });
+
+  it("blocks submit and does NOT call addNode when nodeName is empty", async () => {
+    setField(wrapper, "nodeName", "");
+    await submitForm(wrapper);
+    expect((wrapper.vm as any).form.state.isValid).toBe(false);
+    expect(mockAddNode).not.toHaveBeenCalled();
+  });
+
+  it("blocks submit when nodeName is only whitespace (trim + min(1))", async () => {
+    setField(wrapper, "nodeName", "   ");
+    await submitForm(wrapper);
+    expect((wrapper.vm as any).form.state.isValid).toBe(false);
+    expect(mockAddNode).not.toHaveBeenCalled();
+  });
+
+  it("submits and calls addNode when nodeName is valid", async () => {
+    setField(wrapper, "nodeName", "my-llm-node");
+    await submitForm(wrapper);
+    expect((wrapper.vm as any).form.state.isValid).toBe(true);
+    expect(mockAddNode).toHaveBeenCalledOnce();
+  });
+});
+
+describe("LlmEvaluation - saveLlmEvaluationNode payload", () => {
+  let wrapper: VueWrapper<any>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    wrapper = createWrapper();
+    await flushPromises();
+  });
+
+  afterEach(() => {
+    wrapper.unmount();
+  });
+
+  it("calls addNode with node_type='llm_evaluation'", async () => {
+    setField(wrapper, "nodeName", "my-llm-node");
+    await submitForm(wrapper);
+    expect(mockAddNode).toHaveBeenCalledWith(
+      expect.objectContaining({ node_type: "llm_evaluation" })
+    );
+  });
+
+  it("calls addNode with enable_llm_judge=true", async () => {
+    setField(wrapper, "nodeName", "my-llm-node");
+    await submitForm(wrapper);
+    expect(mockAddNode).toHaveBeenCalledWith(
+      expect.objectContaining({ enable_llm_judge: true })
+    );
+  });
+
+  it("passes sampling_rate=0 when enableSampling is false", async () => {
+    setField(wrapper, "nodeName", "my-llm-node");
+    setField(wrapper, "enableSampling", false);
+    await submitForm(wrapper);
+    expect(mockAddNode).toHaveBeenCalledWith(
+      expect.objectContaining({ sampling_rate: 0.0 })
+    );
+  });
+
+  it("passes the actual samplingRate value when enableSampling is true", async () => {
+    setField(wrapper, "nodeName", "my-llm-node");
+    setField(wrapper, "enableSampling", true);
+    setField(wrapper, "samplingRate", 0.75);
+    await submitForm(wrapper);
+    expect(mockAddNode).toHaveBeenCalledWith(
+      expect.objectContaining({ sampling_rate: 0.75 })
+    );
+  });
+
+  it("trims whitespace from nodeName before saving", async () => {
+    setField(wrapper, "nodeName", "  trimmed-node  ");
+    await submitForm(wrapper);
+    expect(mockAddNode).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "trimmed-node" })
+    );
+  });
+
+  it("emits 'cancel:hideform' after successful save", async () => {
+    setField(wrapper, "nodeName", "valid-node");
+    await submitForm(wrapper);
+    expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
+  });
+
+  it("does not emit 'cancel:hideform' when nodeName is empty", async () => {
+    setField(wrapper, "nodeName", "");
+    await submitForm(wrapper);
+    expect(wrapper.emitted("cancel:hideform")).toBeFalsy();
   });
 });
 
@@ -217,7 +336,7 @@ describe("LlmEvaluation - sampling rate slider visibility", () => {
   });
 
   it("sampling rate slider is visible when enableSampling is true", async () => {
-    (wrapper.vm as any).enableSampling = true;
+    setField(wrapper, "enableSampling", true);
     await nextTick();
     expect(
       wrapper.find('[data-test="llm-evaluation-sampling-rate-slider"]').exists()
@@ -225,7 +344,7 @@ describe("LlmEvaluation - sampling rate slider visibility", () => {
   });
 
   it("sampling rate slider is hidden when enableSampling is false", async () => {
-    (wrapper.vm as any).enableSampling = false;
+    setField(wrapper, "enableSampling", false);
     await nextTick();
     expect(
       wrapper.find('[data-test="llm-evaluation-sampling-rate-slider"]').exists()
@@ -233,97 +352,10 @@ describe("LlmEvaluation - sampling rate slider visibility", () => {
   });
 
   it("sampling rate display text reflects samplingRate value when enabled", async () => {
-    (wrapper.vm as any).enableSampling = true;
-    (wrapper.vm as any).samplingRate = 0.5;
+    setField(wrapper, "enableSampling", true);
+    setField(wrapper, "samplingRate", 0.5);
     await nextTick();
     expect(wrapper.text()).toContain("50%");
-  });
-});
-
-describe("LlmEvaluation - saveLlmEvaluationNode validation", () => {
-  let wrapper: VueWrapper<any>;
-
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    wrapper = createWrapper();
-    await flushPromises();
-  });
-
-  afterEach(() => {
-    wrapper.unmount();
-  });
-
-  it("does not call addNode when nodeName is empty", async () => {
-    (wrapper.vm as any).nodeName = "";
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(mockAddNode).not.toHaveBeenCalled();
-  });
-
-  it("does not call addNode when nodeName is only whitespace", async () => {
-    (wrapper.vm as any).nodeName = "   ";
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(mockAddNode).not.toHaveBeenCalled();
-  });
-
-  it("calls addNode when nodeName is valid", async () => {
-    (wrapper.vm as any).nodeName = "my-llm-node";
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(mockAddNode).toHaveBeenCalledOnce();
-  });
-
-  it("calls addNode with correct node_type='llm_evaluation'", async () => {
-    (wrapper.vm as any).nodeName = "my-llm-node";
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(mockAddNode).toHaveBeenCalledWith(
-      expect.objectContaining({ node_type: "llm_evaluation" })
-    );
-  });
-
-  it("calls addNode with enable_llm_judge=true", async () => {
-    (wrapper.vm as any).nodeName = "my-llm-node";
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(mockAddNode).toHaveBeenCalledWith(
-      expect.objectContaining({ enable_llm_judge: true })
-    );
-  });
-
-  it("passes sampling_rate=0 when enableSampling is false", async () => {
-    (wrapper.vm as any).nodeName = "my-llm-node";
-    (wrapper.vm as any).enableSampling = false;
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(mockAddNode).toHaveBeenCalledWith(
-      expect.objectContaining({ sampling_rate: 0.0 })
-    );
-  });
-
-  it("passes the actual samplingRate value when enableSampling is true", async () => {
-    (wrapper.vm as any).nodeName = "my-llm-node";
-    (wrapper.vm as any).enableSampling = true;
-    (wrapper.vm as any).samplingRate = 0.75;
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(mockAddNode).toHaveBeenCalledWith(
-      expect.objectContaining({ sampling_rate: 0.75 })
-    );
-  });
-
-  it("trims whitespace from nodeName before saving", async () => {
-    (wrapper.vm as any).nodeName = "  trimmed-node  ";
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(mockAddNode).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "trimmed-node" })
-    );
-  });
-
-  it("emits 'cancel:hideform' after successful save", async () => {
-    (wrapper.vm as any).nodeName = "valid-node";
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-  });
-
-  it("does not emit 'cancel:hideform' when nodeName is empty", async () => {
-    (wrapper.vm as any).nodeName = "";
-    await (wrapper.vm as any).saveLlmEvaluationNode();
-    expect(wrapper.emitted("cancel:hideform")).toBeFalsy();
   });
 });
 
@@ -412,7 +444,6 @@ describe("LlmEvaluation - fetchSourceStreamFields", () => {
 
 describe("LlmEvaluation - dark mode class", () => {
   it("renders correctly when store theme is dark", async () => {
-    // The test store has theme: 'dark'
     const wrapper = createWrapper();
     await flushPromises();
     const section = wrapper.find('[data-test="llm-evaluation-node-section"]');
@@ -422,8 +453,7 @@ describe("LlmEvaluation - dark mode class", () => {
 });
 
 describe("LlmEvaluation - edit mode", () => {
-  it("shows delete button when isEditNode is true", async () => {
-    // Override useDnD to simulate edit mode
+  it("shows delete button when isEditNode is true and prefills nodeName", async () => {
     const { default: useDnD } = await import("@/plugins/pipelines/useDnD");
     (useDnD as ReturnType<typeof vi.fn>).mockReturnValueOnce({
       pipelineObj: {
@@ -449,6 +479,10 @@ describe("LlmEvaluation - edit mode", () => {
     expect(
       w.find('[data-test="o-drawer-neutral-btn"]').exists()
     ).toBe(true);
+    // Edit prefill seeds the form with the saved node values.
+    expect(formValues(w).nodeName).toBe("existing-node");
+    expect((w.vm as any).enableSampling).toBe(true);
+    expect((w.vm as any).samplingRate).toBe(0.5);
     w.unmount();
   });
 });
@@ -466,7 +500,7 @@ describe("LlmEvaluation - close icon button", () => {
     wrapper.unmount();
   });
 
-  it("emits 'cancel:hideform' when the header close button is clicked", async () => {
+  it("emits 'cancel:hideform' when the drawer is closed", async () => {
     vi.useFakeTimers();
     const drawer = wrapper.findComponent(ODrawerStub);
     expect(drawer.exists()).toBe(true);

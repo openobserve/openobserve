@@ -182,6 +182,9 @@ export default defineComponent({
     const editorRef: any = ref();
     // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
+    // Emits the editor's content immediately instead of waiting out the change
+    // debounce. Assigned when the editor is created; see `commitModelChange`.
+    let commitPendingChange: (() => void) | null = null;
     const { searchObj } = searchState();
     const {
       detectNaturalLanguage,
@@ -692,26 +695,36 @@ export default defineComponent({
         },
       });
 
-      editorObj.onDidChangeModelContent(
-        debounce((e: any) => {
-          const newValue = editorObj?.getValue()?.trim();
-          emit("update-query", newValue, e);
-          emit("update:query", newValue, e);
+      // The editor's content only reaches the parent after `debounceTime`. Held
+      // as a named handle so it can be flushed on the paths that consume the
+      // query (blur, run) — otherwise they act on the previous query and the
+      // parent re-renders the editor from that stale state, dropping the edit.
+      const commitModelChange = debounce((e: any) => {
+        const newValue = editorObj?.getValue()?.trim();
+        emit("update-query", newValue, e);
+        emit("update:query", newValue, e);
 
-          // Check for natural language after user stops typing (debounced)
-          if (newValue) checkForNaturalLanguage(newValue);
+        // Check for natural language after user stops typing (debounced)
+        if (newValue) checkForNaturalLanguage(newValue);
 
-          validateDoubleQuotes();
-        }, props.debounceTime),
-      );
+        validateDoubleQuotes();
+      }, props.debounceTime);
+
+      // No-op when nothing is pending, so it is safe on any path that consumes
+      // the query.
+      commitPendingChange = () => commitModelChange.flush();
+
+      editorObj.onDidChangeModelContent(commitModelChange);
+
+      const runQuery = () => {
+        commitModelChange.flush();
+        emit("run-query");
+      };
 
       editorObj.createContextKey("ctrlenter", true);
       editorObj.addCommand(
         monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-        function () {
-          // Emit run-query event when Ctrl/Cmd+Enter is pressed
-          emit("run-query");
-        },
+        runQuery,
         "ctrlenter",
       );
       editorObj.onDidFocusEditorWidget(() => {
@@ -722,10 +735,7 @@ export default defineComponent({
         // This is because the editor loses focus and the context key "ctrlenter" is not active anymore, so we need to re-add the command on focus
         editorObj.addCommand(
           monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-          function () {
-            // Emit run-query event when Ctrl/Cmd+Enter is pressed
-            emit("run-query");
-          },
+          runQuery,
           "ctrlenter",
         );
       });
@@ -754,6 +764,11 @@ export default defineComponent({
             () => null,
           );
         }
+
+        // Whatever was clicked (Apply, a query tab) is about to read the query.
+        // Flush after the trim above so the committed value is the trimmed one.
+        commitPendingChange?.();
+
         emit("blur");
       });
 
@@ -1076,9 +1091,12 @@ export default defineComponent({
         const startLine = range.startLine;
         const endLine = range.endLine;
         const startCol = range.column ?? 1;
-        // Highlight to end-of-line so the squiggle is visible
+        // Prefer an explicit end column (wraps a single token — e.g. an unknown
+        // field name). Otherwise highlight to end-of-line so a syntax-error
+        // squiggle near the cursor stays visible.
         const lineContent = model?.getLineContent?.(endLine) ?? "";
-        const endCol = lineContent.length + 1 || startCol + 1;
+        const endCol =
+          range.endColumn ?? (lineContent.length + 1 || startCol + 1);
         return {
           severity: monaco.MarkerSeverity.Error,
           startLineNumber: startLine,

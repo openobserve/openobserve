@@ -27,7 +27,6 @@ axum.workspace = true
 axum-client-ip.workspace = true
 base64.workspace = true
 bytes.workspace = true
-byteorder.workspace = true
 chrono.workspace = true
 chrono-tz.workspace = true
 cityhasher.workspace = true
@@ -76,7 +75,6 @@ tantivy-fst.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-tokio-util.workspace = true
 tower.workspace = true
 tower-http.workspace = true
 tracing.workspace = true
@@ -87,16 +85,11 @@ urlencoding.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
 vrl.workspace = true
-tonic.workspace = true
-tonic-prost.workspace = true
-tracing-opentelemetry.workspace = true
-vortex = { git = "https://github.com/openobserve/vortex", branch = "0.75.0-fix", features = [
-    "tokio",
-], optional = true }
+vortex = { workspace = true, optional = true }
 
 [dev-dependencies]
 expect-test.workspace = true
-float-cmp = "0.10"
+float-cmp.workspace = true
 
 [build-dependencies]
 chrono.workspace = true

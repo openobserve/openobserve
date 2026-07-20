@@ -87,6 +87,12 @@ test.describe('Streams Add Stream form validation', { tag: ['@streams-form-valid
         // Fill an invalid name (contains @, !, space — not allowed)
         await pm.streamsFormValidation.fillStreamName('bad@name!');
 
+        // The form uses submit-then-change validation (revalidateLogic:
+        // mode "submit", modeAfterSubmission "change"), so validation errors
+        // only surface after the first submit attempt — not while typing.
+        // Submit to reveal the format error (invalid name blocks onSubmit).
+        await pm.streamsFormValidation.clickSave();
+
         const nameError = pm.streamsFormValidation.getNameErrorLocator();
         await expect(nameError).toBeVisible();
         await expect(nameError).toContainText('alphanumeric');
@@ -249,6 +255,11 @@ test.describe('Streams StreamFieldInputs form validation', { tag: ['@streams-for
         testLogger.info('TC-SFI-003: Field name format error for invalid chars');
 
         await pm.streamsFormValidation.fillFieldName(0, 'bad-field@name!');
+
+        // Submit-then-change validation: per-row field errors only surface after
+        // the first submit attempt, not while typing. Submit to reveal the
+        // format error (invalid field name blocks onSubmit).
+        await pm.streamsFormValidation.clickSave();
 
         const nameError = pm.streamsFormValidation.getFieldNameErrorLocator(0);
         await expect(nameError).toBeVisible({ timeout: 5000 });

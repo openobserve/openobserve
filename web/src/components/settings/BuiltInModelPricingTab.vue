@@ -146,8 +146,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center gap-4 py-2 px-1 o2-table-footer-title"
           >
             <span
-              >{{ bottomProps.totalRows }} model{{
-                bottomProps.totalRows !== 1 ? "s" : ""
+              >{{
+                bottomProps.totalRows !== 1
+                  ? t("settings.builtInModelPricingTab.modelCountPlural", { count: bottomProps.totalRows })
+                  : t("settings.builtInModelPricingTab.modelCountSingular", { count: bottomProps.totalRows })
               }}</span
             >
             <span
@@ -155,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="color: var(--o2-primary-color)"
               class="font-semibold"
             >
-              {{ selectedIds.length }} selected
+              {{ t("settings.builtInModelPricingTab.selectedCount", { count: selectedIds.length }) }}
             </span>
           </div>
         </template>
@@ -304,7 +306,7 @@ export default defineComponent({
           }));
           loading.value = false;
           toast({
-            message: `${models.value.length} models loaded`,
+            message: t("settings.builtInModelPricingTab.modelsLoaded", { count: models.value.length }),
             variant: "success",
           });
           return;
@@ -325,7 +327,9 @@ export default defineComponent({
         });
       } catch (e: any) {
         error.value =
-          e.response?.data?.message || e.message || "Failed to load models";
+          e.response?.data?.message ||
+          e.message ||
+          t("settings.builtInModelPricingTab.failedToLoadModels");
         toast({
           variant: "error",
           message: error.value,
@@ -341,7 +345,7 @@ export default defineComponent({
       const selected = models.value.filter((m) => selectedIds.value.includes(m.name));
       if (selected.length === 0) {
         toast({
-          message: "No models selected. Please select at least one model.",
+          message: t("settings.builtInModelPricingTab.noModelsSelected"),
           variant: "warning",
         });
         return;

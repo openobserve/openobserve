@@ -39,10 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </h4>
           <template v-if="selectedPattern">
             <OTag type="countChip" value="neutral" class="shrink-0">
-              {{ selectedTemplateTokens.length }} {{ selectedTemplateTokens.length === 1 ? 'token' : 'tokens' }}
+              {{ selectedTemplateTokens.length }} {{ selectedTemplateTokens.length === 1 ? t('logs.patternDetailsDialog.token') : t('logs.patternDetailsDialog.tokens') }}
             </OTag>
             <OTag type="countChip" value="neutral" class="shrink-0">
-              {{ patternWildcardCount }} {{ patternWildcardCount === 1 ? 'variable slot' : 'variable slots' }}
+              {{ patternWildcardCount }} {{ patternWildcardCount === 1 ? t('logs.patternDetailsDialog.variableSlot') : t('logs.patternDetailsDialog.variableSlots') }}
             </OTag>
           </template>
         </div>
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   type="fieldType"
                   :value="row.var_type"
-                  :label="row.var_type || 'unknown'"
+                  :label="row.var_type || t('logs.patternDetailsDialog.unknown')"
                 />
               </div>
             </template>

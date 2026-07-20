@@ -18,6 +18,15 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     await pm.metricsPage.gotoMetricsPage();
     // Wait for the stream selector to be visible — deterministic ready signal
     await pm.metricsBuilderPage.streamSelectorInput.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+
+    // The editor seeds the auto-selected metric's default query, and in Builder
+    // mode the seed brings its operations along (a gauge seeds `avg(metric{})`,
+    // a counter `sum(rate(metric{}[5m]))`) — see utils/dashboard/promqlSeed.ts.
+    // Every test below builds its query from scratch and asserts exact operation
+    // counts / query text, so start them from an empty operations list.
+    const seededOps = await pm.metricsBuilderPage.clearOperations();
+    expect(seededOps).toBe(0);
+
     testLogger.info('Test setup completed - navigated to metrics page');
     return pm;
   }
@@ -1281,7 +1290,7 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     if (await dropdownBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
       await dropdownBtn.click();
     }
-    // PanelContainer uses ODropdown (Reka UI), not Quasar q-menu — wait for
+    // PanelContainer uses ODropdown (Reka UI), not the q-menu — wait for
     // the edit menu item directly instead of waiting for a .q-menu element.
 
     // Click Edit Panel menu item
@@ -1291,22 +1300,22 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     testLogger.info('Opened panel editor');
 
     // 11. Verify the panel edit view loads with correct builder config
-    // Check panel name
+    // The route transition is async, and `locator.isVisible()` does NOT wait
+    // (Playwright ignores its `timeout`), so the builder must not be read until
+    // the saved panel has actually landed in the editor — the panel name is that
+    // signal. Reading earlier counted zero of everything on the dashboard page
+    // that was still on screen.
     const panelNameInput = builder.getPanelNameInput();
-    if (await panelNameInput.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const panelNameValue = await panelNameInput.inputValue().catch(() => '');
-      expect(panelNameValue).toContain(panelTitle);
-      testLogger.info(`Panel name: ${panelNameValue}`);
-    }
+    await expect(panelNameInput).toHaveValue(new RegExp(panelTitle), { timeout: 15000 });
+    testLogger.info(`Panel name: ${await panelNameInput.inputValue()}`);
 
     // Verify builder mode is active (PromQL + Builder tabs)
     // OToggleGroupItem uses data-state="on" (Reka UI) rather than a "selected" CSS class
-    if (await builder.builderModeBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const classes = await builder.builderModeBtn.getAttribute('class') || '';
-      const dataState = await builder.builderModeBtn.getAttribute('data-state') || '';
-      expect(classes.includes('selected') || dataState === 'on').toBe(true);
-      testLogger.info('Builder mode active in panel editor');
-    }
+    await expect(builder.builderModeBtn).toBeVisible({ timeout: 5000 });
+    const classes = await builder.builderModeBtn.getAttribute('class') || '';
+    const dataState = await builder.builderModeBtn.getAttribute('data-state') || '';
+    expect(classes.includes('selected') || dataState === 'on').toBe(true);
+    testLogger.info('Builder mode active in panel editor');
 
     // 12. Verify label filter persisted
     const editFilterCount = await builder.getLabelFilterCount();

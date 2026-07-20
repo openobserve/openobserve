@@ -51,6 +51,12 @@ vi.mock('@/services/organizations', () => ({
   },
 }));
 vi.mock('@/services/iam', () => ({ getRoles: vi.fn(async () => ({ data: ['admin', 'member'] })) }));
+
+// Mock toast — Quota.vue notifies via toast(), not a legacy notify plugin
+const mockToast = vi.hoisted(() => vi.fn(() => vi.fn())); // toast returns a dismiss fn
+vi.mock('@/lib/feedback/Toast/useToast', () => ({
+  toast: mockToast,
+}));
 vi.mock('@/services/rate_limit', () => ({
   default: {
     update_batch: vi.fn(async () => ({ status: 200, data: { message: 'Saved' } })),
@@ -263,10 +269,10 @@ describe.skip('Quota page', () => {
 
   it('saveChanges validates and notifies on empty values', async () => {
     const wrapper = await mountQuota();
+    mockToast.mockClear();
     wrapper.vm.changedValues = { module_1: { get: '' } };
-    const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
     await wrapper.vm.saveChanges();
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'negative' }));
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' }));
   });
 
   it('saveChanges saves api-limits, refreshes and clears state', async () => {
@@ -299,20 +305,18 @@ describe.skip('Quota page', () => {
 
   it('saveJsonChanges updates via module path and notifies positive', async () => {
     const wrapper = await mountQuota();
-    // ensure notify returns a dismiss function for any spinner notifications
-    wrapper.vm.$q.notify = vi.fn(() => vi.fn());
+    mockToast.mockClear();
     wrapper.vm.activeTab = 'api-limits';
     wrapper.vm.selectedOrganization = { label: 'Org A', value: 'org_a' };
     wrapper.vm.jsonStrToDisplay = JSON.stringify({ module_1: { get: 1 } });
-    const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
     await wrapper.vm.saveJsonChanges();
     expect(rateSvc.update_batch).toHaveBeenCalledWith('org_a', { module_1: { get: 1 } }, 'module');
-    expect(notifySpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'positive' }));
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }));
   });
 
   it('saveJsonChanges updates via role path and notifies positive', async () => {
     const wrapper = await mountQuota();
-    wrapper.vm.$q.notify = vi.fn(() => vi.fn());
+    mockToast.mockClear();
     wrapper.vm.activeTab = 'role-limits';
     wrapper.vm.expandedRole = 'member';
     wrapper.vm.selectedOrganization = { label: 'Org A', value: 'org_a' };
@@ -338,13 +342,11 @@ describe.skip('Quota page', () => {
 
   it('uploadTemplate handles error and sets uploadError', async () => {
     const wrapper = await mountQuota();
-    const notifyStub = vi.spyOn(wrapper.vm.$q, 'notify').mockImplementation(() => ({}));
     wrapper.vm.selectedOrganization = { label: 'Org A', value: 'org_a' };
     wrapper.vm.uploadedRules = [new Blob([JSON.stringify({ module_1: { get: 1 } })], { type: 'application/json' })];
     rateSvc.upload_template.mockRejectedValueOnce(new Error('upload failed'));
     await wrapper.vm.uploadTemplate();
     expect(wrapper.vm.uploadError).toBe('Error while uploading rules');
-    notifyStub.mockRestore();
   });
 
   it('closeBulkUpdate resets related flags', async () => {
@@ -415,10 +417,10 @@ describe.skip('Quota page', () => {
 
   it('validateChanges detects empty values and returns false', async () => {
     const wrapper = await mountQuota();
-    const notifySpy = vi.spyOn(wrapper.vm.$q, 'notify');
+    mockToast.mockClear();
     const res = wrapper.vm.validateChanges({ module_1: { list: '' } });
     expect(res).toBe(false);
-    expect(notifySpy).toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalled();
   });
 
   it('transformData converts array to object with filtered keys', async () => {

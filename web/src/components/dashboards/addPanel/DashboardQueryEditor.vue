@@ -328,9 +328,10 @@ import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
-import { inject } from "vue";
+import { inject, type Ref } from "vue";
 import { onBeforeMount } from "vue";
 import { getImageURL } from "@/utils/zincutils";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { useStore } from "vuex";
 import useFunctions from "@/composables/useFunctions";
@@ -491,6 +492,13 @@ export default defineComponent({
 
     const queryEditorRef = ref(null);
 
+    // Server-error highlight ranges, provided by AddPanel.vue where the panel
+    // search runs. The composable forwards these to the editor.
+    const dashboardSqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
+      "dashboardSqlErrorRanges",
+      ref<SqlErrorRange[]>([]),
+    );
+
     const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
       useSqlEditorDiagnostics({
         queryEditorRef,
@@ -501,6 +509,7 @@ export default defineComponent({
               dashboardPanelData.layout.currentQueryIndex
             ]?.query ?? "",
         ),
+        externalErrors: dashboardSqlErrorRanges,
       });
 
     const currentEditorKeywords = computed(() => {
@@ -814,6 +823,32 @@ export default defineComponent({
       // Also call the existing updateQuery logic for autocomplete
       updateQuery(newQuery, {});
     };
+
+    /**
+     * Commit what the editor is showing into the tab being left, before the tab
+     * index moves. `handleQueryUpdate` writes the editor's debounced content
+     * into whatever tab is active when it fires, so switching tabs mid-debounce
+     * loses the edit: the outgoing tab never receives it, and `props.query`
+     * re-renders the editor from that tab's stale state.
+     *
+     * Must be `flush: "sync"` — a pre-flush watcher already runs too late, with
+     * `props.query` having overwritten the model. Custom queries only: in
+     * builder mode the editor is read-only and derived, never a source of truth.
+     */
+    watch(
+      () => dashboardPanelData.layout.currentQueryIndex,
+      (_newIndex, oldIndex) => {
+        const outgoing = dashboardPanelData.data.queries?.[oldIndex];
+        if (!outgoing?.customQuery) return;
+
+        const editorValue = queryEditorRef.value?.getValue?.();
+        if (typeof editorValue !== "string") return;
+
+        const trimmed = editorValue.trim();
+        if (trimmed && outgoing.query !== trimmed) outgoing.query = trimmed;
+      },
+      { flush: "sync" },
+    );
 
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: "sql" | "promql") => {

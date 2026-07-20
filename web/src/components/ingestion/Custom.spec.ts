@@ -42,12 +42,6 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar — kept as safety net for any transitive dependency that might need it.
-// Does NOT use importOriginal() since quasar has been removed from the project.
-vi.mock("quasar", () => ({
-  useQuasar: () => ({ notify: vi.fn() }),
-  copyToClipboard: vi.fn(),
-}));
 
 describe("Custom Component", () => {
   let wrapper: any = null;
@@ -109,7 +103,8 @@ describe("Custom Component", () => {
       
       expect(wrapper.vm.metricRoutes).toEqual([
         "prometheus",
-        "otelCollector", 
+        "vmagent",
+        "otelCollector",
         "telegraf",
         "cloudwatchMetrics"
       ]);
@@ -382,7 +377,30 @@ describe("Custom Component", () => {
           }
         },
       });
-      
+
+      expect(testWrapper.vm.tabs).toBe("ingestMetrics");
+      testWrapper.unmount();
+    });
+
+    it("should handle vmagent metric route", () => {
+      mockRouter.currentRoute.value.name = "vmagent";
+
+      const testWrapper = mount(Custom, {
+        props: { currOrgIdentifier: "test-org" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            'OSplitter': {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            },
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
+          }
+        },
+      });
+
       expect(testWrapper.vm.tabs).toBe("ingestMetrics");
       testWrapper.unmount();
     });

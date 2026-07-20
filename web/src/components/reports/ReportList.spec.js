@@ -109,8 +109,6 @@ const platform = {
   },
 };
 
-// Install Quasar with platform
-
 // ODrawer stub: mirrors props/events from the real component so tests can drive
 // open/close via v-model:open and the @close emit (q-dialog → ODrawer migration).
 // Props are exposed via `data-stub-*` to avoid colliding with the parent's
@@ -390,32 +388,12 @@ describe("ReportList Component", () => {
     });
   });
 
-  describe("Date Formatting", () => {
-    it.skip("formats unix timestamp correctly", () => {
-      const timestamp = 1234567890000000; // microseconds
-      const formatted = wrapper.vm.convertUnixToQuasarFormat(timestamp);
-      expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}$/);
-    });
-
-    it("handles null timestamp", () => {
-      const formatted = wrapper.vm.convertUnixToQuasarFormat(null);
-      expect(formatted).toBe("");
-    });
-
-    it("handles undefined timestamp", () => {
-      const formatted = wrapper.vm.convertUnixToQuasarFormat(undefined);
-      expect(formatted).toBe("");
-    });
-
-    it("handles invalid timestamp", () => {
-      try {
-        const formatted = wrapper.vm.convertUnixToQuasarFormat("invalid");
-        expect(formatted).toBe("");
-      } catch (error) {
-        expect(error).toBeInstanceOf(RangeError);
-      }
-    });
-  });
+  // The "Date Formatting" block that lived here called
+  // `wrapper.vm.convertUnixToDateFormat(...)` directly — asserting the shared
+  // util's null/undefined handling, which `date.spec.ts` owns, and which forced
+  // the component to `defineExpose` a function purely so a test could reach it.
+  // ReportList's own contribution — the `last_triggered_at` row mapping — is
+  // asserted in ReportList.spec.ts instead.
 
   describe("Report State Toggle", () => {
     it("successfully toggles report state from enabled to disabled", async () => {

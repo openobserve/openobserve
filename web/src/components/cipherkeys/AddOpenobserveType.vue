@@ -15,91 +15,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div>
-    <div v-if="!formData.isUpdate || isUpdate || formData.key.store.local === ''">
-      <OTextarea
+    <!-- Editable branch: a create, the user-chosen edit toggle, or an empty
+         stored secret. The textarea is an OForm* control bound to the parent
+         OForm by name (`key.store.local`); its required rule lives in
+         AddCipherKey.schema.ts (conditional on store.type === "local"). -->
+    <div v-if="!isUpdate || showSecretEdit || localValue === ''">
+      <OFormTextarea
         data-test="add-cipher-key-openobserve-secret-input"
-        v-model="formData.key.store.local"
-        :label="t('cipherKey.secret') + ' *'"
+        name="key.store.local"
+        :label="t('cipherKey.secret')"
+        required
         class="w-full pb-1"
-        :error="(secretTouched || submitAttempted) && !formData.key.store.local"
-        :error-message="t('cipherKey.secretRequired')"
-        @update:model-value="secretTouched = true"
-        @blur="secretTouched = true"
       />
-      <OButton data-test="add-cipher-key-openobserve-secret-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="formData.isUpdate && formData.key.store.local != ''" @click="isUpdate = false">{{ t('common.cancel') }}</OButton>
+      <OButton
+        data-test="add-cipher-key-openobserve-secret-input-cancel"
+        variant="outline"
+        size="sm-action"
+        class="mt-2"
+        v-if="isUpdate && localValue != ''"
+        @click="showSecretEdit = false"
+      >
+        {{ t('common.cancel') }}
+      </OButton>
     </div>
+    <!-- Read-only display branch (edit mode, secret present, not editing): pure
+         UI outside the form (R1) — not an editable field. -->
     <div v-else>
       <label class="flex q-field mb-3">
         <b>{{ t('cipherKey.secret') }}</b>
       </label>
-      <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ formData.key.store.local }}</pre>
-      <OButton data-test="add-cipher-key-openobserve-secret-input-update" variant="primary" size="sm-action" @click="isUpdate = true">{{ t('common.update') }}</OButton>
+      <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ localValue }}</pre>
+      <OButton
+        data-test="add-cipher-key-openobserve-secret-input-update"
+        variant="primary"
+        size="sm-action"
+        @click="showSecretEdit = true"
+      >
+        {{ t('common.update') }}
+      </OButton>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { ref, defineComponent } from "vue";
+import { computed, defineComponent, inject, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTextarea from '@/lib/forms/Input/OTextarea.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 
 export default defineComponent({
   name: "AddOpenobserveType",
-  components: { OButton, OTextarea },
+  components: { OButton, OFormTextarea },
   props: {
-    formData: {
-      type: Object,
-      required: true,
-      default: () => ({
-        key: {
-          store: {
-            type: "local",
-            akeyless: {
-              base_url: "",
-              access_id: "",
-              auth: {
-                type: "access_key",
-                access_key: "",
-                ldap: {
-                  username: "",
-                  password: "",
-                },
-              },
-              store: {
-                type: "static_secret",
-                static_secret: "",
-                dfc: {
-                  name: "",
-                  iv: "",
-                  encrypted_data: "",
-                },
-              },
-            },
-            local: "",
-          },
-          mechanism: {
-            type: "simple",
-            simple_algorithm: "aes-256-siv",
-          },
-        },
-      }),
-    },
-    // Parent toggles this to true on Continue click. The Secret field's
-    // error displays when either this OR the local touched flag is true.
-    submitAttempted: {
+    // Edit-vs-create flag, passed by AddCipherKey. UI display state (drives the
+    // read-only/edit branch) — NOT form data.
+    isUpdate: {
       type: Boolean,
       default: false,
     },
   },
-  setup(props) {
+  setup() {
     const { t } = useI18n();
-    const isUpdate = ref(false);
-    const secretTouched = ref(false);
+
+    // Local toggle for "edit the stored secret" (pure UI). The secret value
+    // itself is form-owned — read it reactively from the parent OForm.
+    const showSecretEdit = ref(false);
+
+    const form = inject(FORM_CONTEXT_KEY, null);
+    const localValue = form
+      ? form.useStore((s: any) => s?.values?.key?.store?.local ?? "")
+      : computed(() => "");
+
     return {
       t,
-      isUpdate,
-      secretTouched,
+      showSecretEdit,
+      localValue,
     };
   },
 });

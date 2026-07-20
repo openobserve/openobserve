@@ -1,0 +1,174 @@
+name: ENT e2e gate
+
+# Pre-merge GUARD (runs in openobserve) that stops an OSS PR from silently breaking the
+# enterprise-only e2e specs. web/tests live in OSS; the ENT e2e *triggers* live in o2-enterprise,
+# so today an OSS frontend/test change only surfaces as an ENT breakage in some later ENT PR.
+#
+# This job IS the required status check. Make `ent-e2e-gate` a required check on main in OSS
+# branch protection to actually block merges (one-time admin toggle).
+#
+# Behaviour (A+A+C design):
+#   - PR does NOT touch web/** or tests/ui-testing/**            → pass instantly (never blocks).
+#   - Touches them + `skip-ent-e2e` label                       → pass (explicit, auditable opt-out).
+#   - Touches them + NO `e2e` label                             → FAIL "add the e2e label" (blocks; no silent miss).
+#   - Touches them + `e2e` label                                → dispatch the ENT engine, POLL it,
+#                                                                  mirror pass/fail; comment on failure.
+#
+# Pure CI — no AI/LLM. Deterministic dispatch + poll of o2-enterprise/oss-pr-ent-gate.yml.
+#
+# Secrets/vars:
+#   secrets.ORG_ADMIN_TOKEN — PAT: o2-enterprise Actions R/W (dispatch+poll) + openobserve PRs R/W (comment as human).
+#   vars.ENT_GATE_REF       — o2-enterprise ref that carries oss-pr-ent-gate.yml (default 'main').
+#                             Set to 'ci/ent-e2e-gate' while this feature is still on a branch.
+#   vars.ENT_E2E_GATE_DISABLED — 'true' kill switch: gate passes without dispatching.
+
+on:
+  pull_request:
+    # labeled/unlabeled so adding `e2e`/`skip-ent-e2e` re-fires and re-evaluates the gate.
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+# PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
+concurrency:
+  group: ent-e2e-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ent-e2e-gate:
+    name: ent-e2e-gate
+    runs-on: ubuntu-latest
+    # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
+    # but a cold Rust cache can push the ENT build+run toward its own timeouts — don't false-fail
+    # the gate ("timed out") while ENT is still legitimately running.
+    timeout-minutes: 90
+    steps:
+      - name: Triage — relevant paths? which label?
+        id: triage
+        env:
+          GH_TOKEN: ${{ github.token }}          # OSS is same-repo/public → default token can read PR files
+          PR: ${{ github.event.pull_request.number }}
+          HAS_E2E: ${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}
+          HAS_SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'skip-ent-e2e') }}
+          DISABLED: ${{ vars.ENT_E2E_GATE_DISABLED }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+        run: |
+          set -euo pipefail
+          if [ "$DISABLED" = "true" ]; then
+            echo "::notice::ENT_E2E_GATE_DISABLED=true — passing without dispatch."
+            echo "mode=pass" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Fork PRs: head branch isn't in openobserve/openobserve and the PAT isn't available to
+          # forked-PR runs, so the ENT engine can't check it out. Pass with a notice; a maintainer
+          # re-runs from an internal branch if enterprise validation is needed.
+          if [ "$IS_FORK" = "true" ]; then
+            echo "::notice::Fork PR — ENT e2e gate can't run (no PAT / branch not in main repo). Passing."
+            echo "mode=pass" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          # Relevant = any changed file under web/ or tests/ui-testing/
+          FILES=$(gh api "repos/${{ github.repository }}/pulls/$PR/files" --paginate -q '.[].filename')
+          if printf '%s\n' "$FILES" | grep -qE '^(web/|tests/ui-testing/)'; then
+            RELEVANT=true
+          else
+            RELEVANT=false
+          fi
+          echo "::notice::Relevant (web/** or tests/ui-testing/**) changes: $RELEVANT"
+
+          if [ "$RELEVANT" != "true" ]; then
+            echo "mode=pass" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_SKIP" = "true" ]; then
+            echo "::warning::PR carries 'skip-ent-e2e' — enterprise gate explicitly opted out (auditable)."
+            echo "mode=skip" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_E2E" != "true" ]; then
+            echo "mode=need-label" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=run" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pass — no enterprise-relevant changes (or opted out / disabled)
+        if: steps.triage.outputs.mode == 'pass' || steps.triage.outputs.mode == 'skip'
+        run: echo "✅ ENT e2e gate not required for this PR."
+
+      - name: Block — enterprise-relevant change without the e2e label
+        if: steps.triage.outputs.mode == 'need-label'
+        run: |
+          echo "::error::This PR changes web/** or tests/ui-testing/**, which can break enterprise-only e2e specs."
+          echo "::error::Add the 'e2e' label to run the enterprise gate (or 'skip-ent-e2e' to explicitly opt out)."
+          exit 1
+
+      - name: Run — dispatch ENT engine, poll, mirror result
+        if: steps.triage.outputs.mode == 'run'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}       # PAT: dispatch+poll o2-enterprise, comment as human
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ENT_REF: ${{ vars.ENT_GATE_REF || 'main' }}
+        run: |
+          set -euo pipefail
+          REPO="openobserve/o2-enterprise"; WF="oss-pr-ent-gate.yml"
+
+          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF) for OSS PR #$PR ($HEAD_REF)…"
+          gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
+            -f oss_branch="$HEAD_REF" \
+            -f oss_pr="$PR" \
+            -f oss_sha="$HEAD_SHA" \
+            -f enterprise_ref="$ENT_REF"
+
+          # Correlate our run by its PR-scoped run-name: "ENT e2e gate — OSS PR #<PR> (<branch>)".
+          # `#<PR> (` boundary avoids #12 matching #123. gh returns newest-first, so [0] is our latest.
+          MATCH="OSS PR #$PR ("
+          RUN_ID=""
+          for i in $(seq 1 30); do            # ~5 min to appear
+            RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 \
+              --json databaseId,displayTitle \
+              -q "[.[] | select(.displayTitle | contains(\"$MATCH\"))][0].databaseId" 2>/dev/null || echo "")
+            if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then break; fi
+            sleep 10
+          done
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "::error::Could not locate the dispatched ENT run within 5 min — failing the gate (unverified)."
+            gh pr comment "$PR" --repo openobserve/openobserve --body \
+              "### 🚫 ENT e2e gate — could not start
+
+            Dispatching the enterprise e2e engine failed or the run never appeared (check \`ORG_ADMIN_TOKEN\` / \`ENT_GATE_REF=$ENT_REF\`). The gate stays red until it runs. Re-push or re-label to retry." || true
+            exit 1
+          fi
+
+          RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
+          echo "::notice::Tracking ENT run: $RUN_URL"
+
+          # Poll to completion (~75 min budget — covers a cold-cache ENT build+run worst case).
+          STATUS=""; CONCL=""
+          for i in $(seq 1 300); do           # 300 * 15s = 75 min
+            read -r STATUS CONCL < <(gh run view "$RUN_ID" --repo "$REPO" \
+              --json status,conclusion -q '.status + " " + (.conclusion // "")' 2>/dev/null || echo "unknown ")
+            if [ "$STATUS" = "completed" ]; then break; fi
+            sleep 15
+          done
+
+          if [ "$STATUS" != "completed" ]; then
+            echo "::error::ENT run did not finish within the poll window."
+            gh pr comment "$PR" --repo openobserve/openobserve --body \
+              "### ⏳ ENT e2e gate — timed out
+
+            The enterprise e2e run [did not finish in time]($RUN_URL). The gate stays red. Re-push to retry." || true
+            exit 1
+          fi
+
+          if [ "$CONCL" = "success" ]; then
+            echo "::notice::✅ Enterprise e2e specs passed against this PR."
+            exit 0
+          fi
+
+          echo "::error::Enterprise e2e specs failed (conclusion: $CONCL)."
+          gh pr comment "$PR" --repo openobserve/openobserve --body \
+            "### 🚫 ENT e2e gate — Needs Review
+
+          This PR changes \`web/**\`/\`tests/ui-testing/**\`, and the **enterprise-only** e2e specs failed against it: [ENT run]($RUN_URL) (conclusion: \`$CONCL\`).
+
+          These specs run only against the enterprise binary, so this breakage wouldn't show up in OSS CI. Open the run for the failing specs. Fix and re-push, or add \`skip-ent-e2e\` if this is a known-safe change." || true
+          exit 1

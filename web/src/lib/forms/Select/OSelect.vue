@@ -67,6 +67,23 @@ type NormalizedOption = {
   colorPalette?: string[];
   /** Optional badge/chip text rendered inline next to the label (e.g. "recommended"). */
   badge?: string;
+  /**
+   * Tooltip for the badge. Use when the badge is abbreviated — a one-letter chip
+   * is compact but not self-explanatory, and this is what tells you `C` is
+   * "Counter" without costing a row of width.
+   */
+  badgeTitle?: string;
+  /**
+   * Per-option badge colours, e.g. `{ color, background }`. Without it the badge
+   * is a green outline — fine for a one-off "recommended" tag, wrong for a badge
+   * that CLASSIFIES (every option green says nothing). Supplying a style turns it
+   * into a filled pill in that option's own colour, right-aligned so the chips
+   * form a single scannable column instead of ragging along the label ends.
+   *
+   * The right-align applies only to STYLED badges: a bare "recommended" tag reads
+   * as part of the label and belongs next to it, so those are left where they are.
+   */
+  badgeStyle?: Record<string, string>;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -204,6 +221,14 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
       ? (rawColorPalette as string[])
       : undefined,
     badge: typeof option["badge"] === "string" ? (option["badge"] as string) : undefined,
+    badgeTitle:
+      typeof option["badgeTitle"] === "string"
+        ? (option["badgeTitle"] as string)
+        : undefined,
+    badgeStyle:
+      option["badgeStyle"] && typeof option["badgeStyle"] === "object"
+        ? (option["badgeStyle"] as Record<string, string>)
+        : undefined,
   };
 }
 
@@ -555,7 +580,27 @@ function close() {
   searchTerm.value = "";
 }
 
-defineExpose({ close });
+/** Focus the trigger programmatically (both listbox and native-select modes). */
+function focus() {
+  if (typeof document === "undefined") return;
+  document.getElementById(inputId.value)?.focus();
+}
+
+defineExpose({ close, focus });
+
+// Type-to-search on the closed trigger: a printable keystroke opens the
+// dropdown and seeds the filter, mirroring native <select> typeahead. The
+// event is consumed here so page-level single-letter shortcuts (logs "s",
+// "r", "h", …) never fire while the select has keyboard focus.
+function handleTriggerKeydown(e: KeyboardEvent) {
+  if (props.disabled) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length !== 1 || e.key === " ") return;
+  e.preventDefault();
+  e.stopPropagation();
+  popoverOpen.value = true;
+  if (inputEnabled.value) searchTerm.value = searchTerm.value + e.key;
+}
 
 // ── Virtual scroll (listbox mode) ─────────────────────────────────────────
 // Items are virtualised whenever the listbox has more than 50 entries, keeping
@@ -681,7 +726,7 @@ function getPaletteGradient(colors: string[]): string {
   return `linear-gradient(to right, ${colors.join(", ")})`;
 }
 
-// Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at Quasar's 14px base.
+// Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at the 14px html base.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   sm: "h-6 text-sm",
   md: "h-[2.125rem] text-sm",
@@ -1003,6 +1048,9 @@ const fieldWidthClass = computed(() => {
             :name="name"
             :disabled="disabled"
             :tabindex="inputTabindex"
+            role="combobox"
+            :aria-expanded="popoverOpen"
+            @keydown="handleTriggerKeydown"
             :data-test="
               parentDataTest ? `${parentDataTest}-trigger` : undefined
             "
@@ -1432,8 +1480,20 @@ const fieldWidthClass = computed(() => {
                               <span class="truncate font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
                               <span
                                 v-if="filteredOptions[vRow.index].badge"
-                                class="shrink-0 text-[10px] font-medium px-1 py-px rounded border border-solid leading-tight"
-                                style="color: var(--o2-positive); border-color: var(--o2-positive);"
+                                class="shrink-0 rounded border border-solid"
+                                :class="[
+                                  filteredOptions[vRow.index].badgeTitle ? 'cursor-help' : undefined,
+                                  filteredOptions[vRow.index].badgeStyle
+                                    ? 'inline-flex items-center justify-center leading-none ml-auto min-w-[1.125rem] h-[1.125rem] px-1 text-xs font-semibold border-current'
+                                    : 'text-[10px] font-medium px-1 py-px leading-tight',
+                                ]"
+                                :title="filteredOptions[vRow.index].badgeTitle"
+                                :style="
+                                  filteredOptions[vRow.index].badgeStyle ?? {
+                                    color: 'var(--o2-positive)',
+                                    borderColor: 'var(--o2-positive)',
+                                  }
+                                "
                               >{{ filteredOptions[vRow.index].badge }}</span>
                             </span>
                             <span

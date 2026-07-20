@@ -21,16 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-lg border border-[var(--o2-border-color)] pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
+    class="card-container rounded-lg border border-[var(--color-border-default)] pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
     data-test="session-ribbon"
   >
     <!-- Header: title + subtitle (left) · metric toggle (right) -->
     <div class="flex items-baseline justify-between gap-[0.5rem] mb-[0.75rem]">
       <div>
-        <div class="text-[0.85rem] font-semibold text-[var(--o2-text-primary)]">
+        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
           {{ t('traces.sessionDetail.ribbon.title') }}
         </div>
-        <div class="text-[0.7rem] leading-normal text-[var(--o2-text-secondary)] mt-[0.1rem]">
+        <div class="text-[0.7rem] leading-normal text-[var(--color-text-secondary)] mt-[0.1rem]">
           {{ t('traces.sessionDetail.ribbon.subtitle') }}
         </div>
       </div>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- chart region: y-axis labels + bars, sharing the grown height -->
       <div class="flex gap-[0.5rem] flex-1 min-h-0">
         <div
-          class="flex flex-col justify-between items-end h-full w-[2.75rem] flex-shrink-0 text-[0.6rem] text-[var(--o2-text-muted)] tabular-nums"
+          class="flex flex-col justify-between items-end h-full w-[2.75rem] flex-shrink-0 text-[0.6rem] text-[var(--color-text-muted)] tabular-nums"
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-[3px] border-l border-b border-[var(--o2-border-color)]"
+          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-[3px] border-l border-b border-[var(--color-border-default)]"
         >
           <!-- gridlines (top + mid) to echo the dashboard chart grid -->
-          <div class="absolute inset-x-0 top-0 border-t border-[var(--o2-border-color)] opacity-60" />
-          <div class="absolute inset-x-0 top-1/2 border-t border-[var(--o2-border-color)] opacity-40" />
+          <div class="absolute inset-x-0 top-0 border-t border-[var(--color-border-default)] opacity-60" />
+          <div class="absolute inset-x-0 top-1/2 border-t border-[var(--color-border-default)] opacity-40" />
 
           <TurnPreviewCard
             v-for="bar in detailBars"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-for="bar in detailBars"
               :key="bar.index"
-              class="flex-1 min-w-0 text-center text-[0.6rem] text-[var(--o2-text-muted)] tabular-nums"
+              class="flex-1 min-w-0 text-center text-[0.6rem] text-[var(--color-text-muted)] tabular-nums"
             >
               {{ detailLabeled.has(bar.index + 1) ? bar.index + 1 : "" }}
             </span>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- x-axis title — matches the dashboard axis name (nameLocation
                "middle" + nameTextStyle bold/14px). -->
           <div
-            class="text-center text-[14px] font-bold text-[var(--o2-text-primary)] mt-[0.25rem]"
+            class="text-center text-[14px] font-bold text-[var(--color-text-heading)] mt-[0.25rem]"
           >
             {{ t('traces.sessionDetail.turnLabel') }}
           </div>
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- selected window: drag the body to pan, or either edge to resize -->
         <div
-          class="absolute top-0 bottom-0 rounded-[2px] border border-[color-mix(in_srgb,var(--o2-text-primary)_45%,transparent)] bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)]"
+          class="absolute top-0 bottom-0 rounded-[2px] border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
           :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
           :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
           @pointerdown.stop="(e) => beginDrag('pan', e)"
@@ -153,14 +153,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="absolute top-0 bottom-0 -left-[4px] w-[9px] cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-left', e)"
           >
-            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--o2-text-primary)_60%,transparent)]" />
+            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
           <!-- right resize handle -->
           <div
             class="absolute top-0 bottom-0 -right-[4px] w-[9px] cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-right', e)"
           >
-            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--o2-text-primary)_60%,transparent)]" />
+            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
         </div>
       </div>

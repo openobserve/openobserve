@@ -290,6 +290,11 @@ describe("VisualizeLogsQuery Component", () => {
       expect(wrapper.props("is_ui_histogram")).toBe(false);
     });
 
+    it("should offer area-stacked among the allowed chart types", () => {
+      expect(wrapper.vm.allowedChartTypes).toContain("area");
+      expect(wrapper.vm.allowedChartTypes).toContain("area-stacked");
+    });
+
     it("should have default value for is_ui_histogram prop", () => {
       const testWrapper = mount(VisualizeLogsQuery, {
         props: {

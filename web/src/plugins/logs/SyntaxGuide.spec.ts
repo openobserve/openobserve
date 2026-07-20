@@ -99,7 +99,7 @@ describe("SyntaxGuide.vue", () => {
     const button = wrapper.findComponent({ name: "OButton" });
     expect(button.exists()).toBe(true);
     expect(button.attributes("data-cy")).toBe("syntax-guide-button");
-    // OButton uses variant/size props instead of Quasar's dense/flat/icon props
+    // OButton uses variant/size props instead of dense/flat/icon props
     expect(button.props("variant")).toBe("ghost");
   });
 

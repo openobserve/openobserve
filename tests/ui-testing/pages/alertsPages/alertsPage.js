@@ -98,10 +98,12 @@ export class AlertsPage {
             multiTimeRangeDeleteButton: '[data-test="multi-time-range-alerts-delete-btn"]',
             goToViewEditorButton: '[data-test="go-to-view-editor-btn"]',
 
-            // Step 5: Deduplication (Scheduled only, v3 UI — in Advanced tab)
-            stepDeduplication: '.step-deduplication',
-            stepDeduplicationFingerprintSelect: '.step-deduplication .alert-v3-select',
-            stepDeduplicationTimeWindowInput: '.step-deduplication input[type="number"]',
+            // Step 5: Deduplication (Scheduled only — in Advanced tab). Use data-test
+            // hooks from Deduplication.vue; the old `.step-deduplication .alert-v3-select`
+            // class chain no longer exists on newer builds (e.g. alpha pre-cloud).
+            stepDeduplication: '[data-test="alert-dedup-fingerprint-fields"]',
+            stepDeduplicationFingerprintSelect: '[data-test="alert-dedup-fingerprint-fields"]',
+            stepDeduplicationTimeWindowInput: '[data-test="alert-dedup-time-window-field"]',
 
             // Step 6: Advanced settings
             contextAttributesAddButton: '[data-test="alert-variables-add-btn"]',
@@ -339,6 +341,11 @@ export class AlertsPage {
         if (this.creationWizard) {
             this.creationWizard.currentAlertName = value;
         }
+    }
+
+    /** Wait for the Add Alert button to render — the readiness gate before creating an alert. */
+    async waitForAddAlertButton() {
+        await this.page.locator(this.locators.addAlertButton).waitFor({ state: 'visible', timeout: 30000 });
     }
 
     async createAlert(streamName, column, value, destinationName, randomValue) {
@@ -1001,17 +1008,37 @@ export class AlertsPage {
             testLogger.info('Alert not immediately visible, navigating to alerts and searching', { alertName: nameToVerify });
             await this.page.locator(this.locators.alertMenuItem).click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
 
-            // Search for the alert
+            // Re-search across attempts: under concurrent load the alerts-list refetch after a
+            // fresh create can lag, so a single search + one long wait intermittently missed the
+            // row. Re-type the filter each attempt — and reload once to force a fresh list fetch —
+            // until the row renders. Deterministic (each probe waits for the actual cell); no
+            // reliance on one slow fetch landing inside a fixed window.
             const inputField = this.page.locator(this.locators.alertSearchInputField);
-            await inputField.waitFor({ state: 'attached', timeout: 10000 });
-            await inputField.fill(nameToVerify, { force: true });
-            await this.page.waitForTimeout(2000);
+            const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+            let found = false;
+            for (let attempt = 1; attempt <= 4 && !found; attempt++) {
+                if (attempt === 3) {
+                    // Force a fresh list fetch before the final attempts.
+                    await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+                    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                }
+                await inputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+                await inputField.fill('', { force: true }).catch(() => {});
+                await inputField.fill(nameToVerify, { force: true });
+                // The OTable shows a loading skeleton while the alerts list fetches — real rows
+                // aren't in the DOM yet, so checking now races an all-placeholder table. Wait for
+                // the skeleton to clear first.
+                await listSkeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+                found = await this.page.getByRole('cell', { name: nameToVerify }).first()
+                    .isVisible({ timeout: 10000 }).catch(() => false);
+                if (!found) testLogger.warn('Alert row not visible after search, re-searching', { alertName: nameToVerify, attempt });
+            }
         }
 
-        // Use a longer timeout since the alert list may take time to reload
-        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 30000 });
+        // Final deterministic assertions (the row is present by now under normal + slow paths).
+        await this.page.locator('[data-test="o2-table-skeleton-body"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 15000 });
         await expect(this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible({ timeout: 10000 });
     }
 
@@ -1091,17 +1118,16 @@ export class AlertsPage {
         await this.page.locator(this.locators.alertSubmitButton).click();
         await this.page.waitForTimeout(500);
 
-        // v3 shows a toast notification when name is empty
-        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
-        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
-        // strict-mode violation per AGENT_RULES §2.
-        await expect(
-            this.page
-                .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: 'Alert name is required.' })
-                .first()
-        ).toBeVisible({ timeout: 10000 });
-        testLogger.info('Invalid alert name validation working');
+        // An empty-name Save is rejected with a toast reading "Alert name is required."
+        // (alerts.nameRequired); the name OFormInput may additionally surface an inline field
+        // error (add-alert-name-input-error). Assert whichever signal is present — both
+        // confirm the empty-name save was blocked, which is what this validation verifies.
+        const nameError = this.page.locator('[data-test="add-alert-name-input-error"]');
+        const nameRequiredToast = this.page
+            .locator('[data-test="o-toast-message"]')
+            .filter({ hasText: 'Alert name is required.' });
+        await expect(nameError.or(nameRequiredToast).first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Invalid alert name validation working (empty-name save blocked)');
 
         // Close with robust handling for dialog backdrops
         await this._closeAlertWizard();
@@ -1463,9 +1489,17 @@ export class AlertsPage {
     async typeInAlertSearchInput(query) {
         const searchInput = this.page.locator(this.locators.alertSearchInputField);
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await searchInput.click();
-        await searchInput.pressSequentially(query, { delay: 100 });
-        // wait until the typed value is reflected on the input
+        // Re-type if the value doesn't stick: under concurrent load pressSequentially can
+        // drop keystrokes or the input re-renders mid-type, leaving a mismatched value.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await searchInput.click().catch(() => {});
+            await searchInput.fill('').catch(() => {});
+            await searchInput.pressSequentially(query, { delay: 80 });
+            if ((await searchInput.inputValue().catch(() => '')) === query) return;
+            testLogger.warn('Alert search value did not stick, retrying', { query, attempt });
+            await this.page.waitForTimeout(400);
+        }
+        // Final assertion so a genuine failure still surfaces clearly.
         await expect(searchInput).toHaveValue(query, { timeout: 5000 });
     }
 
@@ -1951,7 +1985,7 @@ export class AlertsPage {
     /**
      * Get severity badge text from incident detail header.
      * Header has 3 badges: Status (icon=info), Severity (icon=warning), Alert Count (icon=notifications_active).
-     * Quasar renders OIcon name as <i> text content, NOT as an HTML attribute.
+     * OIcon renders its name as <i> text content, NOT as an HTML attribute.
      * We match the badge that contains a P1/P2/P3/P4 span.
      * @returns {Promise<string>} e.g. "P1", "P2", "P3", "P4"
      */
@@ -2090,7 +2124,7 @@ export class AlertsPage {
         }
 
         // Check for error icon (also acceptable — just means no correlation data)
-        // Note: Quasar renders OIcon name as text content, not HTML attribute
+        // Note: OIcon renders its name as text content, not HTML attribute
         const errorIcon = this.page.locator('.OIcon:has-text("error_outline"), .OIcon:has-text("info_outline")');
         if (await errorIcon.isVisible({ timeout: 1000 }).catch(() => false)) {
             testLogger.info(`Telemetry tab ${tabName}: info/error state`);
@@ -2290,7 +2324,14 @@ export class AlertsPage {
 
         const baseUrl = process.env["ZO_BASE_URL"];
         const orgName = process.env["ORGNAME"];
-        const validationDestinationUrl = `${baseUrl}/api/${orgName}/${streamName}/_json`;
+        // On cloud the backend's SSRF guard rejects the self-referencing ingestion URL
+        // (the cluster's own domain resolves to a private IP), so use an inert public
+        // sink instead. Round-trip validation-stream checks are unavailable on cloud —
+        // tests that poll the validation stream must skip there.
+        const isCloud = isCloudEnvironment();
+        const validationDestinationUrl = isCloud
+            ? 'https://httpbin.org/post'
+            : `${baseUrl}/api/${orgName}/${streamName}/_json`;
 
         // Ensure validation template exists with proper JSON array format for ingestion API
         await pm.alertTemplatesPage.ensureValidationTemplateExists(templateName);
@@ -2303,23 +2344,24 @@ export class AlertsPage {
         const destinationFound = await pm.alertDestinationsPage.findDestinationAcrossPages(destinationName);
 
         if (!destinationFound) {
-            // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
-            const headers = getAuthHeaders();
-            const authHeader = headers['Authorization'] || (() => {
-                if (isCloudEnvironment()) {
-                    testLogger.warn('alertsPage: no cloud passcode available for destination creation - Basic auth will not work on cloud OIDC endpoints');
-                }
-                return this.commonActions.constructor.generateBasicAuthHeader(
+            // Self-referencing ingestion needs auth; never attach credentials when the
+            // destination points at the external sink (would leak the passcode).
+            let destinationHeaders = {};
+            if (!isCloud) {
+                // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
+                const headers = getAuthHeaders();
+                const authHeader = headers['Authorization'] || this.commonActions.constructor.generateBasicAuthHeader(
                     process.env["ZO_ROOT_USER_EMAIL"],
                     process.env["ZO_ROOT_USER_PASSWORD"]
                 );
-            })();
+                destinationHeaders = { 'Authorization': authHeader };
+            }
 
             await pm.alertDestinationsPage.createDestinationWithHeaders(
                 destinationName,
                 validationDestinationUrl,
                 templateName,
-                { 'Authorization': authHeader }
+                destinationHeaders
             );
             testLogger.info('Created validation destination', {
                 destinationName,
@@ -2516,7 +2558,7 @@ export class AlertsPage {
 
     /**
      * Select a stream by name from the dropdown, using keyboard typing to filter
-     * through Quasar's virtual scroll (only rendered items are in the DOM).
+     * through the virtual scroll (only rendered items are in the DOM).
      * @param {string} streamName - Exact stream name to select
      */
     async selectStreamByName(streamName) {

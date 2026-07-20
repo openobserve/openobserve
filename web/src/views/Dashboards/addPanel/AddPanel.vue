@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @click="showTutorial"
               data-test="dashboard-panel-tutorial-btn"
-              >Dashboard Tutorial</OButton
+              >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
             >
             <OButton
               v-if="
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-data-view-query-inspector-btn"
               icon-left="info-outline"
             >
-              <OTooltip side="left" align="center" content="Query Inspector" shortcut-id="panelEditorQueryInspector" />
+              <OTooltip side="left" align="center" :content="t('dashboard.addPanel.queryInspector')" shortcut-id="panelEditorQueryInspector" />
             </OButton>
             <DateTimePickerDashboard
               v-if="selectedDate"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ODropdownItem @select="runQuery(true)">
                     <div class="flex items-center gap-2">
                       <OIcon name="refresh" size="xs" />
-                      <span>Refresh Cache &amp; Apply</span>
+                      <span>{{ t("dashboard.addPanel.refreshCacheAndApply") }}</span>
                     </div>
                   </ODropdownItem>
                 </ODropdown>
@@ -222,6 +222,10 @@ import AddSettingVariable from "../../../components/dashboards/settings/AddSetti
 import { useLoading } from "@/composables/useLoading";
 import { debounce, isEqual } from "lodash-es";
 import { provide, inject } from "vue";
+import {
+  rangesFromServerError,
+  type SqlErrorRange,
+} from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
@@ -277,6 +281,10 @@ export default defineComponent({
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "dashboard");
+
+    // Server-error highlight ranges shared with the descendant query editor.
+    const dashboardSqlErrorRanges = ref<SqlErrorRange[]>([]);
+    provide("dashboardSqlErrorRanges", dashboardSqlErrorRanges);
 
     // PanelEditor ref for accessing exposed methods/properties
     const panelEditorRef = ref<InstanceType<typeof PanelEditor> | null>(null);
@@ -1232,7 +1240,7 @@ export default defineComponent({
           dashboardData.data.title == null ||
           dashboardData.data.title.trim() == ""
         ) {
-          errors.push("Name of Panel is required");
+          errors.push(t("dashboard.addPanel.nameOfPanelRequired"));
         }
       }
 
@@ -1241,7 +1249,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("dashboard.addPanel.fixErrors"),
         );
       }
 
@@ -1258,7 +1266,7 @@ export default defineComponent({
         errorData.errors.length > 0
       ) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("dashboard.addPanel.fixErrors"),
         );
         return;
       }
@@ -1311,8 +1319,9 @@ export default defineComponent({
 
             if (errorMessageOnSave instanceof Error) {
               errorData.errors.push(
-                "Error saving panel configuration : " +
-                  errorMessageOnSave.message,
+                t("dashboard.addPanel.errorSavingPanelConfig", {
+                  message: errorMessageOnSave.message,
+                }),
               );
               return;
             }
@@ -1327,8 +1336,9 @@ export default defineComponent({
             );
             if (errorMessageOnSave instanceof Error) {
               errorData.errors.push(
-                "Error saving panel configuration : " +
-                  errorMessageOnSave.message,
+                t("dashboard.addPanel.errorSavingPanelConfig", {
+                  message: errorMessageOnSave.message,
+                }),
               );
               return;
             }
@@ -1387,8 +1397,9 @@ export default defineComponent({
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
-              "Error saving panel configuration  : " +
-                errorMessageOnSave.message,
+              t("dashboard.addPanel.errorSavingPanelConfig2", {
+                message: errorMessageOnSave.message,
+              }),
             );
             return;
           }
@@ -1418,15 +1429,15 @@ export default defineComponent({
             error?.response?.data?.message ??
               error?.message ??
               (editMode.value
-                ? "Error while updating panel"
-                : "Error while creating panel"),
+                ? t("dashboard.addPanel.errorUpdatingPanel")
+                : t("dashboard.addPanel.errorCreatingPanel")),
           );
         } else {
           showErrorNotification(
             error?.message ??
               (editMode.value
-                ? "Error while updating panel"
-                : "Error while creating panel"),
+                ? t("dashboard.addPanel.errorUpdatingPanel")
+                : t("dashboard.addPanel.errorCreatingPanel")),
             {
               timeout: 2000,
             },
@@ -1438,18 +1449,33 @@ export default defineComponent({
     const expandedSplitterHeight = ref(null);
 
     const handleChartApiError = (errorMsg: any) => {
-      if (typeof errorMsg === "string") {
-        errorMessage.value = errorMsg;
+      const errorText =
+        typeof errorMsg === "string" ? errorMsg : (errorMsg?.message ?? "");
+
+      if (errorText) {
+        errorMessage.value = errorText;
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
-        errorList.push(errorMsg);
-      } else if (errorMsg?.message) {
-        errorMessage.value = errorMsg.message ?? "";
-        const errorList = errorData.errors ?? [];
-        errorList.splice(0);
-        errorList.push(errorMsg.message);
+        errorList.push(errorText);
       } else {
         errorMessage.value = "";
+      }
+
+      // Locate the offending token in the query and squiggle it in the editor
+      // (shares the central engine; message text carries the DataFusion detail).
+      if (!errorText) {
+        dashboardSqlErrorRanges.value = [];
+      } else {
+        const idx = dashboardPanelData.layout.currentQueryIndex;
+        const currentQuery = dashboardPanelData.data.queries?.[idx];
+        rangesFromServerError({
+          message: errorText,
+          sqlMode: dashboardPanelData.data.queryType === "sql",
+          query: currentQuery?.query,
+          streamName: currentQuery?.fields?.stream,
+        }).then((ranges) => {
+          dashboardSqlErrorRanges.value = ranges;
+        });
       }
     };
 

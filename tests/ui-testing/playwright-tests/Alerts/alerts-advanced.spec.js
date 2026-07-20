@@ -14,15 +14,12 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 const TEST_STREAM = 'e2e_automate';
 
 // Test timeout constants (in milliseconds)
 const NETWORK_IDLE_TIMEOUT_MS = 30000;
-const ALERT_LIST_ADD_BTN = '[data-test="alert-list-add-alert-btn"]';
-const TEMPLATE_LIST_ADD_BTN = '[data-test="template-list-add-btn"]';
-const DESTINATION_LIST_ADD_BTN = '[data-test="alert-destination-list-add-alert-btn"]';
 
 test.describe("Alerts Advanced Coverage Tests", () => {
     let pm;
@@ -35,7 +32,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertsPage.waitForAddAlertButton();
     });
 
     // ==================== ADVANCED CONDITIONS TESTS ====================
@@ -52,19 +49,19 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const destinationName = 'auto_dest_multicond_' + uniqueSuffix;
 
         await pm.alertTemplatesPage.navigateToTemplates();
-        await page.locator(TEMPLATE_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertTemplatesPage.waitForTemplateListReady();
         await pm.alertTemplatesPage.createTemplate(templateName);
         testLogger.info('Template created', { templateName });
 
         await pm.alertDestinationsPage.navigateToDestinations();
-        await page.locator(DESTINATION_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertDestinationsPage.waitForDestinationListReady();
         const webhookUrl = 'https://webhook.site/test-multicond-' + uniqueSuffix;
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertsPage.waitForAddAlertButton();
 
         const alertName = await pm.alertsPage.createAlertWithMultipleConditions(
             TEST_STREAM,
@@ -88,12 +85,12 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const destinationName = 'auto_dest_toggle_' + uniqueSuffix;
 
         await pm.alertTemplatesPage.navigateToTemplates();
-        await page.locator(TEMPLATE_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertTemplatesPage.waitForTemplateListReady();
         await pm.alertTemplatesPage.createTemplate(templateName);
         testLogger.info('Template created', { templateName });
 
         await pm.alertDestinationsPage.navigateToDestinations();
-        await page.locator(DESTINATION_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertDestinationsPage.waitForDestinationListReady();
         const webhookUrl = 'https://webhook.site/test-toggle-' + uniqueSuffix;
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
@@ -101,7 +98,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         // Navigate back to alerts page
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertsPage.waitForAddAlertButton();
 
         // Verifies: multiple conditions can be added, AND is default, can toggle to OR
         const result = await pm.alertsPage.testConditionOperatorToggle(TEST_STREAM, uniqueSuffix);
@@ -122,28 +119,28 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         testLogger.info('Testing bulk pause/unpause operations', { uniqueSuffix });
 
         await pm.alertTemplatesPage.navigateToTemplates();
-        await page.locator(TEMPLATE_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertTemplatesPage.waitForTemplateListReady();
         await pm.alertTemplatesPage.createTemplate(templateName);
         testLogger.info('Template created', { templateName });
 
         await pm.alertDestinationsPage.navigateToDestinations();
-        await page.locator(DESTINATION_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertDestinationsPage.waitForDestinationListReady();
         const webhookUrl = 'https://webhook.site/test-bulk-' + uniqueSuffix;
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertsPage.waitForAddAlertButton();
 
         // Create two alerts for bulk operations
         await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, destinationName, 'bulk1_' + uniqueSuffix);
-        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertsPage.waitForAddAlertButton();
         const createdAlert1 = pm.alertsPage.currentAlertName;
         testLogger.info('Created first alert for bulk test', { alertName: createdAlert1 });
 
         await pm.alertsPage.createAlertWithDefaults(TEST_STREAM, destinationName, 'bulk2_' + uniqueSuffix);
-        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertsPage.waitForAddAlertButton();
         const createdAlert2 = pm.alertsPage.currentAlertName;
         testLogger.info('Created second alert for bulk test', { alertName: createdAlert2 });
 
@@ -153,7 +150,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         testLogger.info('Bulk pause completed');
 
         // Wait for alert list table to be ready before re-selecting
-        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertsPage.waitForAddAlertButton();
 
         // Selection cleared after operation, re-select
         await pm.alertsPage.selectMultipleAlerts([createdAlert1, createdAlert2]);
@@ -178,19 +175,19 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         const destinationName = 'auto_dest_dedup_' + uniqueSuffix;
 
         await pm.alertTemplatesPage.navigateToTemplates();
-        await page.locator(TEMPLATE_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertTemplatesPage.waitForTemplateListReady();
         await pm.alertTemplatesPage.createTemplate(templateName);
         testLogger.info('Template created', { templateName });
 
         await pm.alertDestinationsPage.navigateToDestinations();
-        await page.locator(DESTINATION_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertDestinationsPage.waitForDestinationListReady();
         const webhookUrl = 'https://webhook.site/test-dedup-' + uniqueSuffix;
         await pm.alertDestinationsPage.createDestination(destinationName, webhookUrl, templateName);
         testLogger.info('Destination created', { destinationName });
 
         const alertsUrl = `${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`;
         await page.goto(alertsUrl);
-        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertsPage.waitForAddAlertButton();
 
         const dedupConfig = {
             timeWindowMinutes: 30
@@ -234,6 +231,11 @@ test.describe("Alerts Advanced Coverage Tests", () => {
     test("Deduplication validation - verify duplicate alerts are suppressed", {
         tag: ['@alertsAdvanced', '@alerts', '@deduplication', '@dedupValidation', '@enterprise', '@skip']
     }, async ({ page }) => {
+        // Round-trip verification needs a self-referencing destination (alert notification
+        // ingested back into a validation stream). On cloud the SSRF guard blocks the
+        // cluster's own (private-IP) URL at destination-create time, so this cannot run.
+        test.skip(isCloudEnvironment(), 'Self-referencing validation destination is blocked by the SSRF guard on cloud');
+
         test.slow(); // Mark as slow test due to scheduled alert evaluation cycles
 
         // Generate unique suffix (lowercase for API compatibility)
@@ -260,7 +262,7 @@ test.describe("Alerts Advanced Coverage Tests", () => {
         await pm.commonActions.navigateToAlerts();
         await page.reload();
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await page.locator(ALERT_LIST_ADD_BTN).waitFor({ state: 'visible', timeout: 30000 });
+        await pm.alertsPage.waitForAddAlertButton();
 
         // Create scheduled alert with deduplication for validation
         const dedupConfig = {

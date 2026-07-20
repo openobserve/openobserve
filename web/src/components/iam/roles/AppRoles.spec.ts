@@ -379,7 +379,7 @@ describe('AppRoles - bulkDeleteUserRoles', () => {
     (wrapper.vm as any).selectedRoleNames = ['Admin', 'Viewer'];
     await (wrapper.vm as any).bulkDeleteUserRoles();
     await flushPromises();
-    // Component uses toast function, not $q.notify()
+    // Component uses toast function
     expect(bulkDeleteRoles).toHaveBeenCalled();
   });
 

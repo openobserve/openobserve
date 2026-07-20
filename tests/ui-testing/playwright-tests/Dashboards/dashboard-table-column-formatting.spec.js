@@ -12,7 +12,12 @@ import {
   reopenPanelConfig,
   discardAndCleanupTestDashboard,
 } from "./utils/configPanelHelpers.js";
-import { TABLE_SELECTOR, TABLE_DATA_ROW_SELECTOR } from "../../pages/dashboardPages/dashboard-table-helpers.js";
+import {
+  TABLE_SELECTOR,
+  TABLE_DATA_ROW_SELECTOR,
+  readColumnCells,
+  waitForPanelTableSettled,
+} from "../../pages/dashboardPages/dashboard-table-helpers.js";
 const testLogger = require("../utils/test-logger.js");
 
 test.describe.configure({ mode: "parallel" });
@@ -209,6 +214,11 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     await pm.dashboardPanelConfigs.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
     await pm.dashboardPanelActions.applyDashboardBtn();
 
+    // The rules are evaluated against the table Apply is still fetching; the loop below
+    // reads computed styles row by row, which (unlike toHaveCSS) does not retry, so it
+    // has to run against a table that has stopped moving.
+    await waitForPanelTableSettled(page);
+
     const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
     const rowCount = await rows.count();
@@ -283,18 +293,23 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     await pm.dashboardPanelConfigs.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
     await pm.dashboardPanelActions.applyDashboardBtn();
 
+    // Apply re-runs the query, and the colors only exist on the table it renders when it
+    // comes back. Sampling before then read the PRE-Apply table — every cell still
+    // transparent, so one distinct background color, and the assertion below failed for
+    // a feature that works.
+    await waitForPanelTableSettled(page);
+
     const rows = page.locator(TABLE_DATA_ROW_SELECTOR);
     await rows.first().waitFor({ state: "visible", timeout: 15000 });
     const rowCount = await rows.count();
     expect(rowCount).toBeGreaterThan(1);
 
-    const textValues = new Set();
-    const bgColors = new Set();
-    for (let i = 0; i < Math.min(rowCount, 10); i++) {
-      const cell = rows.nth(i).locator("td").first();
-      textValues.add(await cell.locator('[data-test="dashboard-table-cell-value"]').textContent());
-      bgColors.add(await cell.evaluate((el) => getComputedStyle(el).backgroundColor));
-    }
+    // One pass over the DOM: reading value and color per row in separate round-trips let
+    // a re-render land between them and mix two tables' worth of data together.
+    const cells = await readColumnCells(page, 0, Math.min(rowCount, 10));
+    const textValues = new Set(cells.map((c) => c.text));
+    const bgColors = new Set(cells.map((c) => c.bgColor));
+
     // Sanity check: the column itself must actually have multiple distinct values —
     // otherwise a single-color result below would be indistinguishable from "the
     // unique-color feature is broken" vs. "there was nothing to color differently".

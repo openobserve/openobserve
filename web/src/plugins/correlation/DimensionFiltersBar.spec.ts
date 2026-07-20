@@ -194,7 +194,7 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should disable apply button when no pending changes", () => {
       wrapper = createWrapper({ hasPendingChanges: false });
-      // OButton uses native HTML disabled attribute (not Quasar's disable prop)
+      // OButton uses the native HTML disabled attribute (not a disable prop)
       const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
       expect(applyBtn.exists()).toBe(true);
       expect(applyBtn.attributes("disabled")).toBeDefined();

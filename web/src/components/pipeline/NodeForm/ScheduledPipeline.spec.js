@@ -1,11 +1,16 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import store from "@/test/unit/helpers/store";
-import router from "@/test/unit/helpers/router";
+import { defineComponent, h, nextTick } from "vue";
 import i18n from "@/locales";
 import ScheduledPipeline from "./ScheduledPipeline.vue";
 import searchService from "@/services/search";
-import { nextTick } from 'vue';
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { makeQuerySchema } from "./Query.schema";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
@@ -41,7 +46,7 @@ vi.mock('@/composables/useParser', () => {
       sqlParser: async () => ({
         astify: vi.fn((query) => {
           const lowerQuery = query.toLowerCase();
-        
+
           if (lowerQuery.includes("select *")) {
             return {
               columns: [
@@ -85,9 +90,104 @@ vi.mock("@/composables/useLogs", () => ({
   }),
 }));
 
+// ── Default form value (the streamRoute shape Query seeds) ────────────────────
+const buildDefaultValues = () => ({
+  name: "",
+  conditions: [],
+  stream_type: "logs",
+  query_condition: {
+    sql: "",
+    promql: "",
+    type: "sql",
+    aggregation: null,
+    promql_condition: null,
+  },
+  trigger_condition: {
+    frequency: 15,
+    period: 15,
+    frequency_type: "minutes",
+    timezone: "UTC",
+    cron: "",
+    operator: ">=",
+    threshold: 1,
+  },
+  delay: 0,
+  context_attributes: [],
+  description: "",
+  enabled: true,
+});
+
 describe("ScheduledPipeline Component", () => {
   let wrapper;
+  let child;
+  let form;
   let mockStore;
+
+  // Mount ScheduledPipeline INSIDE a real <OForm> (Rule ③ descendant) so it can
+  // inject the form (its single source of truth). The harness exposes both the
+  // child vm and the form for the assertions below.
+  const mountHarness = (overrides = {}, childProps = {}, formOptions = {}) => {
+    let innerForm;
+    const Harness = defineComponent({
+      name: "Harness",
+      setup(_, { expose }) {
+        innerForm = useOForm({
+          defaultValues: { ...buildDefaultValues(), ...overrides },
+          schema: makeQuerySchema(900, i18n.global.t),
+          onSubmit: formOptions.onSubmit ?? (() => {}),
+        });
+        expose({ form: innerForm });
+        return () =>
+          h(OForm, { form: innerForm }, () =>
+            h(ScheduledPipeline, {
+              ref: "child",
+              columns: [],
+              conditions: {},
+              alertData: { stream_type: "logs" },
+              disableThreshold: true,
+              ...childProps,
+            }),
+          );
+      },
+    });
+
+    const w = mount(Harness, {
+      global: {
+        plugins: [i18n],
+        provide: {
+          store: mockStore,
+        },
+        stubs: {
+          'q-splitter': true,
+          'q-dialog': true,
+          'q-select': true,
+          'q-input': true,
+          'q-btn': true,
+          'OIcon': true,
+          'q-tooltip': true,
+          'q-table': true,
+          'DateTime': true,
+          'FieldList': true,
+          'QueryEditor': true,
+          'UnifiedQueryEditor': {
+            template: '<div data-test="scheduled-pipeline-sql-editor" />',
+            methods: {
+              getCursorIndex: () => -1,
+              getValue: () => '',
+              setValue: () => {},
+              replaceRange: () => {},
+              triggerAutoComplete: () => {},
+            },
+          },
+          'TenstackTable': true,
+          'PreviewPromqlQuery': true,
+          'O2AIChat': true,
+          'FullViewContainer': true
+        }
+      },
+    });
+    return { w, f: innerForm };
+  };
 
   beforeEach(async () => {
     // Setup mock store
@@ -118,91 +218,22 @@ describe("ScheduledPipeline Component", () => {
       dispatch: vi.fn()
     };
 
-    // Mount component with props
-    wrapper = mount(ScheduledPipeline, {
-      global: {
-        plugins: [i18n],
-        provide: {
-          store: mockStore,
-        },
-        stubs: {
-          'q-splitter': true,
-          'q-dialog': true,
-          'q-select': true,
-          'q-input': true,
-          'q-btn': true,
-          'OIcon': true,
-          'q-tooltip': true,
-          'q-table': true,
-          'DateTime': true,
-          'FieldList': true,
-          'QueryEditor': true,
-          // UnifiedQueryEditor is the internal name used in ScheduledPipeline.vue
-          // It needs getCursorIndex and triggerAutoComplete so updateQueryValue doesn't throw
-          'UnifiedQueryEditor': {
-            template: '<div data-test="scheduled-pipeline-sql-editor" />',
-            methods: {
-              getCursorIndex: () => -1,
-              getValue: () => '',
-              setValue: () => {},
-              replaceRange: () => {},
-              triggerAutoComplete: () => {},
-            },
-          },
-          'TenstackTable': true,
-          'PreviewPromqlQuery': true,
-          'O2AIChat': true,
-          'FullViewContainer': true
-        }
-      },
-      props: {
-        columns: [],
-        conditions: {},
-        trigger: {
-          frequency: 15,
-          period: 15,
-          frequency_type: "minutes",
-          timezone: "UTC",
-          cron: "",
-          operator: ">=",
-          threshold: 1
-        },
-        sql: "",
-        query_type: "sql",
-        aggregation: null,
-        isAggregationEnabled: false,
-        promql: "",
-        promql_condition: null,
-        streamType: "logs",
-        delay: 0,
-        validatingSqlQuery: false
-      }
-    });
-
-    // Initialize required data
-    wrapper.vm.triggerData = {
-      frequency: 15,
-      period: 15,
-      frequency_type: "minutes",
-      timezone: "UTC",
-      cron: "",
-      operator: ">=",
-      threshold: 1
-    };
+    const mounted = mountHarness();
+    wrapper = mounted.w;
+    form = mounted.f;
+    child = wrapper.findComponent(ScheduledPipeline).vm;
 
     // Initialize dateTime with valid values
-    wrapper.vm.dateTime = {
+    child.dateTime = {
       startTime: Date.now() - 3600000, // 1 hour ago
       endTime: Date.now(),
       relativeTimePeriod: "15m",
       valueType: "relative"
     };
 
-    wrapper.vm.cronJobError = "";
-
     // Set up a mock editor ref so updateQueryValue does not throw when
     // accessing getCursorIndex / triggerAutoComplete on the stubbed component.
-    wrapper.vm.pipelineEditorRef = {
+    child.pipelineEditorRef = {
       getCursorIndex: vi.fn().mockReturnValue(-1),
       getValue: vi.fn().mockReturnValue(""),
       setValue: vi.fn(),
@@ -215,7 +246,7 @@ describe("ScheduledPipeline Component", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-    wrapper.vm.query = ""
+    if (child) child.query = "";
   });
 
   describe("Component Initialization", () => {
@@ -224,127 +255,136 @@ describe("ScheduledPipeline Component", () => {
     });
 
     it("initializes with correct default values", () => {
-      expect(wrapper.vm.tab).toBe("sql");
-      expect(wrapper.vm.selectedStreamType).toBe("logs");
-      expect(wrapper.vm.query).toBe("");
-      expect(wrapper.vm.expandState.query).toBe(true);
-      expect(wrapper.vm.expandState.output).toBe(false);
+      expect(child.tab).toBe("sql");
+      expect(child.selectedStreamType).toBe("logs");
+      expect(child.query).toBe("");
+      expect(child.expandState.query).toBe(true);
+      expect(child.expandState.output).toBe(false);
     });
 
     it("sets up correct splitter model values", () => {
-      expect(wrapper.vm.splitterModel).toBe(30);
-      expect(wrapper.vm.sideBarSplitterModel).toBe(60);
+      expect(child.splitterModel).toBe(30);
+      expect(child.sideBarSplitterModel).toBe(60);
     });
   });
 
   describe("Stream Management", () => {
     it("loads stream list on mount", async () => {
-      expect(wrapper.vm.streams.length).toBe(2);
-      expect(wrapper.vm.filteredStreams.length).toBe(2);
+      expect(child.streams.length).toBe(2);
+      expect(child.filteredStreams.length).toBe(2);
     });
 
     it("filters streams based on search input", async () => {
-      await wrapper.vm.filterStreams("stream1", (fn) => fn());
-      expect(wrapper.vm.filteredStreams.length).toBe(1);
-      expect(wrapper.vm.filteredStreams[0].value).toBe("stream1");
+      await child.filterStreams("stream1", (fn) => fn());
+      expect(child.filteredStreams.length).toBe(1);
+      expect(child.filteredStreams[0].value).toBe("stream1");
     });
 
     it("updates stream fields when stream is selected", async () => {
-      await wrapper.vm.getStreamFields();
+      await child.getStreamFields();
       await flushPromises();
-      expect(wrapper.vm.streamFields.length).toBe(2);
-      expect(wrapper.vm.streamFields[0].name).toBe("timestamp");
+      expect(child.streamFields.length).toBe(2);
+      expect(child.streamFields[0].name).toBe("timestamp");
     });
 
     it("updates query when stream is selected", async () => {
-      wrapper.vm.selectedStreamName = "test_stream";
-      await wrapper.vm.getStreamFields();
+      form.setFieldValue("stream_name", "test_stream");
+      await child.getStreamFields();
       await flushPromises();
-      expect(wrapper.vm.query).toContain("test_stream");
+      expect(child.query).toContain("test_stream");
     });
   });
 
   describe("Query Management", () => {
     it("updates SQL query correctly", async () => {
       const newQuery = "SELECT * FROM test_stream";
-      await wrapper.vm.updateQueryValue(newQuery);
-      expect(wrapper.vm.query).toBe(newQuery);
-      expect(wrapper.emitted()["update:sql"]).toBeTruthy();
+      await child.updateQueryValue(newQuery);
+      expect(child.query).toBe(newQuery);
+      // The Monaco SQL text is bridged into the form's query_condition.sql.
+      expect(form.state.values.query_condition.sql).toBe(newQuery);
     });
 
     it("updates PromQL query correctly", async () => {
-      wrapper.vm.tab = "promql";
+      child.tab = "promql";
       const newQuery = "test_metric{}";
-      await wrapper.vm.updateQueryValue(newQuery);
-      expect(wrapper.vm.query).toBe(newQuery);
-      expect(wrapper.emitted()["update:promql"]).toBeTruthy();
+      await child.updateQueryValue(newQuery);
+      expect(child.query).toBe(newQuery);
+      expect(form.state.values.query_condition.promql).toBe(newQuery);
     });
 
     it("handles query type switching", async () => {
-      await wrapper.vm.updateTab();
-      expect(wrapper.emitted()["update:query_type"]).toBeTruthy();
+      child.tab = "promql";
+      await child.updateTab();
+      await nextTick();
+      // query_condition.type is form-owned and kept in sync with the tab.
+      expect(form.state.values.query_condition.type).toBe("promql");
     });
   });
 
   describe("Trigger Condition Management", () => {
-    it("validates frequency for minutes", async () => {
-      wrapper.vm.triggerData.frequency_type = "minutes";
-      wrapper.vm.triggerData.frequency = 5;
-      wrapper.vm.validateFrequency();
+    it("blocks submit when minutes frequency is below the org minimum (schema)", async () => {
+      form.setFieldValue("trigger_condition.frequency_type", "minutes");
+      form.setFieldValue("trigger_condition.frequency", 5);
       await nextTick();
-      expect(wrapper.vm.cronJobError).toBe("Minimum frequency should be 15 minutes");
+      // min_auto_refresh_interval is 900s → 15 min minimum; 5 < 15 is invalid.
+      await form.handleSubmit();
+      await nextTick();
+      expect(form.state.isValid).toBe(false);
     });
 
-    it("validates cron expression", async () => {
-      wrapper.vm.triggerData.frequency_type = "cron";
-      wrapper.vm.triggerData.cron = "invalid";
-      wrapper.vm.validateFrequency();
+    it("blocks submit on an invalid cron expression (schema)", async () => {
+      form.setFieldValue("trigger_condition.frequency_type", "cron");
+      form.setFieldValue("trigger_condition.cron", "invalid");
       await nextTick();
-      expect(wrapper.vm.cronJobError).toBe("Invalid cron expression");
+      await form.handleSubmit();
+      await nextTick();
+      expect(form.state.isValid).toBe(false);
     });
 
     it("updates period based on frequency type", async () => {
-      wrapper.vm.triggerData.frequency_type = "minutes";
-      wrapper.vm.triggerData.frequency = 20;
-      await wrapper.vm.updateFrequency();
-      expect(wrapper.vm.triggerData.period).toBe(20);
+      form.setFieldValue("trigger_condition.frequency_type", "minutes");
+      form.setFieldValue("trigger_condition.frequency", 20);
+      await nextTick();
+      await child.updateFrequency();
+      await nextTick();
+      expect(form.state.values.trigger_condition.period).toBe(20);
     });
   });
 
   describe("UI Interactions", () => {
     it("toggles field list collapse", async () => {
-      await wrapper.vm.collapseFieldList();
-      expect(wrapper.vm.collapseFields).toBe(true);
-      expect(wrapper.vm.splitterModel).toBe(0);
+      await child.collapseFieldList();
+      expect(child.collapseFields).toBe(true);
+      expect(child.splitterModel).toBe(0);
     });
 
     it("handles AI chat toggle", async () => {
-      await wrapper.vm.toggleAIChat();
+      await child.toggleAIChat();
       await nextTick();
       expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
     });
 
     it("updates expand states correctly", async () => {
-      wrapper.vm.expandState.output = true;
+      child.expandState.output = true;
       await nextTick();
-      expect(wrapper.vm.expandState.query).toBe(false);
+      expect(child.expandState.query).toBe(false);
     });
 
   });
 
   describe("Search and Results", () => {
     it("executes SQL search query", async () => {
-      wrapper.vm.tab = "sql";
-      wrapper.vm.query = "SELECT * FROM test_stream";
+      child.tab = "sql";
+      child.query = "SELECT * FROM test_stream";
       searchService.search.mockResolvedValueOnce({
         data: {
           hits: [{ _timestamp: 1234567890000, message: "test" }]
         }
       });
 
-      await wrapper.vm.runQuery();
+      await child.runQuery();
       expect(searchService.search).toHaveBeenCalled();
-      expect(wrapper.vm.rows.length).toBe(1);
+      expect(child.rows.length).toBe(1);
     });
 
     it("handles empty search results", async () => {
@@ -354,14 +394,14 @@ describe("ScheduledPipeline Component", () => {
         }
       });
 
-      await wrapper.vm.runQuery();
-      expect(wrapper.vm.rows).toEqual([]);
+      await child.runQuery();
+      expect(child.rows).toEqual([]);
     });
 
     it("handles search errors", async () => {
       searchService.search.mockRejectedValueOnce(new Error("Search failed"));
-      await wrapper.vm.runQuery();
-      expect(wrapper.vm.rows).toEqual([]);
+      await child.runQuery();
+      expect(child.rows).toEqual([]);
     });
   });
 
@@ -374,12 +414,12 @@ describe("ScheduledPipeline Component", () => {
         setValue: vi.fn(),
         replaceRange: vi.fn()
       };
-      wrapper.vm.pipelineEditorRef = mockEditorRef;
-      wrapper.vm.tab = "custom";
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "custom";
 
-      await wrapper.vm.handleSidebarEvent("click", "field1");
+      await child.handleSidebarEvent("click", "field1");
       await nextTick();
-      expect(wrapper.vm.cursorPosition).toBe(15);
+      expect(child.cursorPosition).toBe(15);
     });
 
     it("inserts SQL filters before GROUP BY", async () => {
@@ -392,10 +432,10 @@ describe("ScheduledPipeline Component", () => {
           ),
         setValue: vi.fn(),
       };
-      wrapper.vm.pipelineEditorRef = mockEditorRef;
-      wrapper.vm.tab = "sql";
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
 
-      await wrapper.vm.handleSidebarEvent("add-field", "service='api'");
+      await child.handleSidebarEvent("add-field", "service='api'");
 
       expect(mockEditorRef.setValue).toHaveBeenCalledWith(
         'SELECT max(_timestamp), count(*) FROM "stream1" where service=\'api\' GROUP BY histogram(_timestamp)',
@@ -412,10 +452,10 @@ describe("ScheduledPipeline Component", () => {
           ),
         setValue: vi.fn(),
       };
-      wrapper.vm.pipelineEditorRef = mockEditorRef;
-      wrapper.vm.tab = "sql";
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
 
-      await wrapper.vm.handleSidebarEvent("add-field", "service='api'");
+      await child.handleSidebarEvent("add-field", "service='api'");
 
       expect(mockEditorRef.setValue).toHaveBeenCalledWith(
         'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' AND service=\'api\' GROUP BY histogram(_timestamp)',
@@ -432,10 +472,10 @@ describe("ScheduledPipeline Component", () => {
           ),
         setValue: vi.fn(),
       };
-      wrapper.vm.pipelineEditorRef = mockEditorRef;
-      wrapper.vm.tab = "sql";
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
 
-      await wrapper.vm.handleSidebarEvent("remove-field", "service");
+      await child.handleSidebarEvent("remove-field", "service");
 
       expect(mockEditorRef.setValue).toHaveBeenCalledWith(
         'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' GROUP BY histogram(_timestamp)',
@@ -456,9 +496,9 @@ describe("ScheduledPipeline Component", () => {
     });
 
     it("initializes with correct functions list", () => {
-      expect(wrapper.vm.functionsList).toBeDefined();
-      expect(wrapper.vm.functionsList.length).toBe(2);
-      expect(wrapper.vm.functionsList[0].name).toBe('avg');
+      expect(child.functionsList).toBeDefined();
+      expect(child.functionsList.length).toBe(2);
+      expect(child.functionsList[0].name).toBe('avg');
     });
 
 
@@ -470,107 +510,106 @@ describe("ScheduledPipeline Component", () => {
       };
 
       // Initialize the component's state
-      wrapper.vm.selectedFunction = null;
-      wrapper.vm.vrlFunctionContent = null;
+      child.selectedFunction = null;
+      child.vrlFunctionContent = null;
 
       // Call the method and wait for updates
-      await wrapper.vm.onFunctionSelect(testFunction);
+      await child.onFunctionSelect(testFunction);
       await nextTick();
 
       // Verify the state changes
-      expect(wrapper.vm.selectedFunction).toBe('avg');
+      expect(child.selectedFunction).toBe('avg');
     });
   });
 
   describe("Bug Fix: PromQL Tab Auto-Open Output Section (Issue #2)", () => {
     it("should not auto-expand output section when switching to promql tab", async () => {
-      wrapper.vm.expandState.output = false;
-      wrapper.vm.tab = "promql";
-      wrapper.vm.selectedStreamType = "metrics";
+      child.expandState.output = false;
+      child.tab = "promql";
+      form.setFieldValue("stream_type", "metrics");
 
-      await wrapper.vm.updateTab();
+      await child.updateTab();
       await nextTick();
 
       // Output should remain collapsed after switching to promql
-      expect(wrapper.vm.expandState.output).toBe(false);
+      expect(child.expandState.output).toBe(false);
     });
 
     it("should only show promql preview when output is expanded", () => {
-      wrapper.vm.tab = "promql";
-      wrapper.vm.expandState.output = false;
+      child.tab = "promql";
+      child.expandState.output = false;
 
-      // PreviewPromqlQuery component should not render when output is collapsed
-      // This is tested through the v-else-if condition: tab == 'promql' && expandState.output
-      expect(wrapper.vm.expandState.output).toBe(false);
+      expect(child.expandState.output).toBe(false);
     });
 
     it("should show promql preview when output is manually expanded", async () => {
-      wrapper.vm.tab = "promql";
-      wrapper.vm.expandState.output = false;
+      child.tab = "promql";
+      child.expandState.output = false;
 
       // Manually expand output
-      wrapper.vm.expandState.output = true;
+      child.expandState.output = true;
       await nextTick();
 
-      expect(wrapper.vm.expandState.output).toBe(true);
+      expect(child.expandState.output).toBe(true);
     });
   });
 
   describe("Bug Fix: Loader Pushing Footer (Issue #3)", () => {
     it("should only show loader when output section is expanded", async () => {
-      wrapper.vm.loading = true;
-      wrapper.vm.tab = "sql";
-      wrapper.vm.expandState.output = false;
+      child.loading = true;
+      child.tab = "sql";
+      child.expandState.output = false;
 
       await nextTick();
 
-      // Loader should not be visible when output is collapsed
-      expect(wrapper.vm.expandState.output).toBe(false);
+      expect(child.expandState.output).toBe(false);
     });
 
     it("should show loader when output is expanded and loading", async () => {
-      wrapper.vm.loading = true;
-      wrapper.vm.tab = "sql";
-      wrapper.vm.expandState.output = true;
+      child.loading = true;
+      child.tab = "sql";
+      child.expandState.output = true;
 
       await nextTick();
 
-      expect(wrapper.vm.loading).toBe(true);
-      expect(wrapper.vm.expandState.output).toBe(true);
+      expect(child.loading).toBe(true);
+      expect(child.expandState.output).toBe(true);
     });
 
     it("should not show table while loading", async () => {
-      wrapper.vm.loading = true;
-      wrapper.vm.tab = "sql";
-      wrapper.vm.expandState.output = true;
-      wrapper.vm.rows = [{ test: "data" }];
+      child.loading = true;
+      child.tab = "sql";
+      child.expandState.output = true;
+      child.rows = [{ test: "data" }];
 
       await nextTick();
 
-      // When loading is true, table should not be shown (tested via v-else-if)
-      expect(wrapper.vm.loading).toBe(true);
+      expect(child.loading).toBe(true);
     });
   });
 
   describe("Bug Fix: PromQL First Click Not Running Query (Issue #4)", () => {
     it("should run promql query on first click using nextTick", async () => {
-      wrapper.vm.tab = "promql";
-      wrapper.vm.expandState.output = false;
-      wrapper.vm.query = "test_metric{}";
-      wrapper.vm.selectedStreamName = "test_metric";
+      child.tab = "promql";
+      child.expandState.output = false;
+      child.query = "test_metric{}";
+      form.setFieldValue("stream_name", "test_metric");
 
       // Mock the previewPromqlQueryRef
       const mockRefreshData = vi.fn();
 
       // Simulate run query button click
-      wrapper.vm.expandState.output = true;
-      await nextTick();
-      // Set the template ref after expandState re-render
-      wrapper.vm.previewPromqlQueryRef = {
+      child.expandState.output = true;
+      // Fully settle all pending re-renders (tab/stream_name/expandState) BEFORE
+      // overwriting the template ref, so runQuery's internal nextTick doesn't
+      // re-bind previewPromqlQueryRef back to the stub and clobber the mock.
+      await flushPromises();
+      // Set the template ref after the promql preview has rendered.
+      child.previewPromqlQueryRef = {
         refreshData: mockRefreshData
       };
 
-      await wrapper.vm.runQuery();
+      await child.runQuery();
 
       // Wait for nextTick to complete
       await nextTick();
@@ -580,166 +619,133 @@ describe("ScheduledPipeline Component", () => {
     });
 
     it("should handle null previewPromqlQueryRef gracefully", async () => {
-      wrapper.vm.tab = "promql";
-      wrapper.vm.previewPromqlQueryRef = null;
+      child.tab = "promql";
+      child.previewPromqlQueryRef = null;
 
       // Should not throw error
-      await expect(wrapper.vm.runQuery()).resolves.not.toThrow();
+      await expect(child.runQuery()).resolves.not.toThrow();
     });
 
     it("should only call refreshData if ref exists after nextTick", async () => {
-      wrapper.vm.tab = "promql";
-      wrapper.vm.previewPromqlQueryRef = null;
+      child.tab = "promql";
+      child.previewPromqlQueryRef = null;
 
       // Run query without ref
-      await wrapper.vm.runQuery();
+      await child.runQuery();
 
       // Should complete without error
-      expect(wrapper.vm.tab).toBe("promql");
+      expect(child.tab).toBe("promql");
     });
   });
 
   describe("Bug Fix: PromQL Query and Stream Not Restored on Edit (Issue #5)", () => {
-    it("should initialize query from props.promql when query_type is promql", () => {
+    it("should initialize query from form promql when query_type is promql", () => {
       const promqlQuery = "cpu_usage{instance='server1'}";
-      const newWrapper = mount(ScheduledPipeline, {
-        global: {
-          plugins: [i18n],
-          provide: { store: mockStore },
-          stubs: {
-            'q-splitter': true,
-            'DateTime': true,
-            'FieldList': true,
-            'QueryEditor': true,
-            'TenstackTable': true,
-            'PreviewPromqlQuery': true,
-            'O2AIChat': true,
-            'FullViewContainer': true
-          }
-        },
-        props: {
-          columns: [],
-          trigger: wrapper.vm.triggerData,
+      const { w } = mountHarness({
+        query_condition: {
           sql: "SELECT * FROM logs",
           promql: promqlQuery,
-          query_type: "promql",
-          streamType: "metrics",
-          delay: 0
-        }
+          type: "promql",
+          aggregation: null,
+          promql_condition: null,
+        },
+        stream_type: "metrics",
       });
-
-      expect(newWrapper.vm.query).toBe(promqlQuery);
-      newWrapper.unmount();
+      const newChild = w.findComponent(ScheduledPipeline).vm;
+      expect(newChild.query).toBe(promqlQuery);
+      w.unmount();
     });
 
-    it("should initialize query from props.sql when query_type is sql", () => {
+    it("should initialize query from form sql when query_type is sql", () => {
       const sqlQuery = "SELECT * FROM logs";
-      const newWrapper = mount(ScheduledPipeline, {
-        global: {
-          plugins: [i18n],
-          provide: { store: mockStore },
-          stubs: {
-            'q-splitter': true,
-            'DateTime': true,
-            'FieldList': true,
-            'QueryEditor': true,
-            'TenstackTable': true,
-            'PreviewPromqlQuery': true,
-            'O2AIChat': true,
-            'FullViewContainer': true
-          }
-        },
-        props: {
-          columns: [],
-          trigger: wrapper.vm.triggerData,
+      const { w } = mountHarness({
+        query_condition: {
           sql: sqlQuery,
           promql: "metric{}",
-          query_type: "sql",
-          streamType: "logs",
-          delay: 0
-        }
+          type: "sql",
+          aggregation: null,
+          promql_condition: null,
+        },
+        stream_type: "logs",
       });
-
-      expect(newWrapper.vm.query).toBe(sqlQuery);
-      newWrapper.unmount();
+      const newChild = w.findComponent(ScheduledPipeline).vm;
+      expect(newChild.query).toBe(sqlQuery);
+      w.unmount();
     });
 
     it("should extract stream name from promql query on mount", async () => {
       const promqlQuery = "cpu_usage{instance='server1'}";
-      wrapper.vm.tab = "promql";
-      wrapper.vm.query = promqlQuery;
+      child.tab = "promql";
+      child.query = promqlQuery;
 
       // Simulate the onMounted extraction
       const match = promqlQuery.match(/^([a-zA-Z0-9_-]+)/);
       if (match) {
-        wrapper.vm.selectedStreamName = match[1];
+        form.setFieldValue("stream_name", match[1]);
       }
 
       await nextTick();
 
-      expect(wrapper.vm.selectedStreamName).toBe("cpu_usage");
+      expect(child.selectedStreamName).toBe("cpu_usage");
     });
 
     it("should handle promql query with complex label selectors", async () => {
       const promqlQuery = "http_requests_total{method='GET',status='200'}";
-      wrapper.vm.tab = "promql";
-      wrapper.vm.query = promqlQuery;
+      child.tab = "promql";
+      child.query = promqlQuery;
 
       const match = promqlQuery.match(/^([a-zA-Z0-9_-]+)/);
       if (match) {
-        wrapper.vm.selectedStreamName = match[1];
+        form.setFieldValue("stream_name", match[1]);
       }
 
       await nextTick();
 
-      expect(wrapper.vm.selectedStreamName).toBe("http_requests_total");
+      expect(child.selectedStreamName).toBe("http_requests_total");
     });
 
     it("should handle promql query with hyphens and underscores", async () => {
       const promqlQuery = "my-metric_name_123{}";
-      wrapper.vm.tab = "promql";
-      wrapper.vm.query = promqlQuery;
+      child.tab = "promql";
+      child.query = promqlQuery;
 
       const match = promqlQuery.match(/^([a-zA-Z0-9_-]+)/);
       if (match) {
-        wrapper.vm.selectedStreamName = match[1];
+        form.setFieldValue("stream_name", match[1]);
       }
 
       await nextTick();
 
-      expect(wrapper.vm.selectedStreamName).toBe("my-metric_name_123");
+      expect(child.selectedStreamName).toBe("my-metric_name_123");
     });
 
     it("should not extract stream name from invalid promql query", async () => {
       const promqlQuery = "{invalid}";
-      wrapper.vm.tab = "promql";
-      wrapper.vm.query = promqlQuery;
-      wrapper.vm.selectedStreamName = "";
+      child.tab = "promql";
+      child.query = promqlQuery;
+      form.setFieldValue("stream_name", "");
 
       const match = promqlQuery.match(/^([a-zA-Z0-9_-]+)/);
       if (match) {
-        wrapper.vm.selectedStreamName = match[1];
+        form.setFieldValue("stream_name", match[1]);
       }
 
       await nextTick();
 
-      expect(wrapper.vm.selectedStreamName).toBe("");
+      expect(child.selectedStreamName).toBe("");
     });
 
     it("should call getStreamFields after extracting stream name", async () => {
-      wrapper.vm.tab = "promql";
-      wrapper.vm.query = "test_metric{}";
-      wrapper.vm.selectedStreamName = "test_metric";
-
-      // Track initial state
-      const initialFieldsLength = wrapper.vm.streamFields.length;
+      child.tab = "promql";
+      child.query = "test_metric{}";
+      form.setFieldValue("stream_name", "test_metric");
 
       // Call getStreamFields
-      await wrapper.vm.getStreamFields();
+      await child.getStreamFields();
       await flushPromises();
 
       // Verify that streamFields was updated (function was executed)
-      expect(wrapper.vm.streamFields.length).toBeGreaterThanOrEqual(0);
+      expect(child.streamFields.length).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -749,36 +755,36 @@ describe("ScheduledPipeline Component", () => {
       const promqlQuery = "cpu_usage{instance='server1'}";
 
       // Fix #5: Initialize with promql query
-      wrapper.vm.tab = "promql";
-      wrapper.vm.query = promqlQuery;
-      wrapper.vm.selectedStreamType = "metrics";
+      child.tab = "promql";
+      child.query = promqlQuery;
+      form.setFieldValue("stream_type", "metrics");
 
       // Fix #5: Extract stream name
       const match = promqlQuery.match(/^([a-zA-Z0-9_-]+)/);
       if (match) {
-        wrapper.vm.selectedStreamName = match[1];
+        form.setFieldValue("stream_name", match[1]);
       }
-      expect(wrapper.vm.selectedStreamName).toBe("cpu_usage");
+      expect(child.selectedStreamName).toBe("cpu_usage");
 
       // Fix #2: Output should not auto-expand when switching tabs
-      wrapper.vm.expandState.output = false;
-      expect(wrapper.vm.expandState.output).toBe(false);
+      child.expandState.output = false;
+      expect(child.expandState.output).toBe(false);
 
       // Fix #3: Loader should respect output expand state
-      wrapper.vm.loading = true;
-      expect(wrapper.vm.expandState.output).toBe(false);
+      child.loading = true;
+      expect(child.expandState.output).toBe(false);
 
       // Manually expand output
-      wrapper.vm.expandState.output = true;
-      wrapper.vm.loading = false;
+      child.expandState.output = true;
+      child.loading = false;
 
       // Fix #4: First click should work with nextTick
       const mockRefreshData = vi.fn();
-      wrapper.vm.previewPromqlQueryRef = {
+      child.previewPromqlQueryRef = {
         refreshData: mockRefreshData
       };
 
-      await wrapper.vm.runQuery();
+      await child.runQuery();
       await nextTick();
 
       expect(mockRefreshData).toHaveBeenCalled();
@@ -786,15 +792,15 @@ describe("ScheduledPipeline Component", () => {
 
     it("should handle SQL workflow with stream type fix", async () => {
       // Fix #1: Should use correct stream type
-      wrapper.vm.tab = "sql";
-      wrapper.vm.selectedStreamType = "traces";
-      wrapper.vm.query = "SELECT * FROM traces_stream";
+      child.tab = "sql";
+      form.setFieldValue("stream_type", "traces");
+      child.query = "SELECT * FROM traces_stream";
 
       searchService.search.mockResolvedValueOnce({
         data: { hits: [] }
       });
 
-      await wrapper.vm.runQuery();
+      await child.runQuery();
 
       expect(searchService.search).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -802,6 +808,327 @@ describe("ScheduledPipeline Component", () => {
         }),
         expect.any(String)
       );
+    });
+  });
+
+  // Restored §5 #3 dropped validation, now SCHEMA-driven: group_by rows are
+  // required when aggregation is enabled. The old imperative validateInputs()
+  // gate is gone — drive the real form's submit and read the schema result.
+  describe("group_by row required when aggregation enabled (schema-driven)", () => {
+    it("blocks submit and surfaces a per-row error when a group_by row is empty", async () => {
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      vi.mocked(toast).mockClear();
+      form.setFieldValue("query_condition.aggregation", {
+        group_by: ["valid_col", ""],
+        function: "count",
+        having: { column: "level", operator: "=", value: "5" },
+      });
+      child._isAggregationEnabled = true;
+      await nextTick();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      // The per-row error view reads the form field meta for the empty row.
+      expect(child.groupByErrors[1]).toBeTruthy();
+    });
+
+    it("passes the group_by check when every row is filled", async () => {
+      form.setFieldValue("query_condition.aggregation", {
+        group_by: ["col_a", "col_b"],
+        function: "count",
+        having: { column: "level", operator: "=", value: "5" },
+      });
+      child._isAggregationEnabled = true;
+      await nextTick();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(true);
+      expect(child.groupByErrors[0]).toBeFalsy();
+      expect(child.groupByErrors[1]).toBeFalsy();
+    });
+
+    // Row-reuse guard: with an index-based :key, deleting a NON-LAST row must
+    // shift every following row's rendered value up by one (no stale reuse).
+    // The group_by[] fields bind by TanStack name path, so this proves the
+    // deletion goes through form.removeFieldValue and the rendered OFormSelect
+    // values track the shifted array — not the pre-delete positions.
+    const groupBySelects = () =>
+      wrapper
+        .findAllComponents(OFormSelect)
+        .filter((c) =>
+          String(c.props("name") || "").startsWith(
+            "query_condition.aggregation.group_by",
+          ),
+        );
+    const renderedGroupByValues = () =>
+      groupBySelects().map((c) => c.findComponent(OSelect).props("modelValue"));
+
+    it("shifts rendered group_by values up when a non-last row is deleted", async () => {
+      child.tab = "custom";
+      form.setFieldValue("query_condition.aggregation", {
+        group_by: ["col_a", "col_b", "col_c"],
+        function: "count",
+        having: { column: "level", operator: "=", value: "5" },
+      });
+      child._isAggregationEnabled = true;
+      await nextTick();
+
+      // three rows render, showing a / b / c in order
+      expect(groupBySelects()).toHaveLength(3);
+      expect(renderedGroupByValues()).toEqual(["col_a", "col_b", "col_c"]);
+
+      // delete the MIDDLE row (index 1)
+      child.deleteGroupByColumn(1);
+      await nextTick();
+
+      // the form-owned array shifted
+      expect(
+        form.state.values.query_condition.aggregation.group_by,
+      ).toEqual(["col_a", "col_c"]);
+
+      // and the RENDERED selects shifted: row 1 now shows col_c, NOT the stale
+      // col_b — one fewer row, values tracking the array (no row-reuse glitch).
+      expect(groupBySelects()).toHaveLength(2);
+      expect(renderedGroupByValues()).toEqual(["col_a", "col_c"]);
+    });
+  });
+
+  // R3 timing + single source of truth: the cron error must NOT appear before
+  // the first submit (the old @blur="cronTouched=true" + manual error div are
+  // gone), and on submit it must come from the schema (routed to the cron
+  // field), not a parallel manual ref.
+  describe("cron error is schema-driven and R3-timed (no pre-submit reveal)", () => {
+    it("shows no cron error before submit, then the schema error on submit", async () => {
+      child.tab = "custom";
+      form.setFieldValue("trigger_condition.frequency_type", "cron");
+      form.setFieldValue("trigger_condition.cron", "");
+      await nextTick();
+
+      // the removed manual error div must not exist any more
+      expect(
+        wrapper.find('[data-test="scheduled-pipeline-frequency-error-text"]')
+          .exists(),
+      ).toBe(false);
+      // before first submit: revalidateLogic keeps the cron field error empty
+      expect(
+        form.getFieldMeta("trigger_condition.cron")?.errors ?? [],
+      ).toHaveLength(0);
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      // on submit: the schema's cron superRefine routes the error to the field
+      // (the OFormInput renders it) and blocks the submit — single source.
+      expect(form.state.isValid).toBe(false);
+      expect(
+        (form.getFieldMeta("trigger_condition.cron")?.errors ?? []).length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  // R4: the footer Save is `type="submit"` and lives INSIDE Query's <OForm>, so
+  // pressing Enter fires native browser implicit submission → OForm's @submit →
+  // form.handleSubmit() → the schema-gated save. Regression guard for the earlier
+  // `type="button"` + @click-emit wiring, which saved on click but left Enter
+  // dead. The other submit tests drive form.handleSubmit() directly and so can
+  // NOT catch a broken Enter — these exercise the NATIVE submit path.
+  describe("R4: Enter submits via a type=submit Save button (native form submit)", () => {
+    it("renders the Save button as type=submit so Enter can submit the form", () => {
+      const saveBtn = wrapper.find(
+        '[data-test="stream-routing-query-save-btn"]',
+      );
+      expect(saveBtn.exists()).toBe(true);
+      expect(saveBtn.attributes("type")).toBe("submit");
+    });
+
+    it("runs the schema-gated save on a native form submit (Enter path)", async () => {
+      const onSubmit = vi.fn();
+      const { w } = mountHarness({}, {}, { onSubmit });
+      await flushPromises();
+
+      // The seeded defaults are valid for the disableThreshold path (period 15,
+      // minutes frequency 15 ≥ ceil(900/60)). A native submit — what Enter fires
+      // via implicit submission — must run the schema and reach onSubmit. The
+      // native submit is fire-and-forget (the playbook's documented gotcha), so
+      // wait for the validate→onSubmit chain to settle rather than a single flush.
+      await w.find("form").trigger("submit");
+      await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      w.unmount();
+    });
+
+    it("blocks the save when the schema is invalid (period 0)", async () => {
+      const onSubmit = vi.fn();
+      // period 0 fails the schema (`period ≥ 1`). Drive + await the form's own
+      // submit so the negative can be asserted deterministically (per the
+      // playbook — a fire-and-forget native submit can't be awaited reliably).
+      const { w, f } = mountHarness(
+        {
+          trigger_condition: {
+            ...buildDefaultValues().trigger_condition,
+            period: 0,
+          },
+        },
+        {},
+        { onSubmit },
+      );
+      await flushPromises();
+
+      await f.handleSubmit();
+      await flushPromises();
+
+      expect(f.state.isValid).toBe(false);
+      expect(onSubmit).not.toHaveBeenCalled();
+      w.unmount();
+    });
+
+    // The composite "number + unit" fields (frequency/period) suppress the
+    // built-in message with an empty #error slot and render the schema error in
+    // a FULL-WIDTH sibling below the bordered control — not inside the 7.5rem
+    // field where it would wrap/clip. Prove the external error text renders after
+    // an invalid submit, and that no inline OFormInput message (role="alert")
+    // leaks inside the narrow field.
+    it("renders the period schema error as a full-width sibling, not inside the field", async () => {
+      const { w, f } = mountHarness({
+        trigger_condition: {
+          ...buildDefaultValues().trigger_condition,
+          period: 0,
+        },
+      });
+      await flushPromises();
+
+      await f.handleSubmit();
+      await flushPromises();
+
+      const err = w.find(
+        '[data-test="scheduled-pipeline-period-error-text"]',
+      );
+      expect(err.exists()).toBe(true);
+      expect(err.text().length).toBeGreaterThan(0);
+      // the empty #error slot suppresses the inline message row inside the group
+      expect(w.findAll('[role="alert"]').length).toBe(0);
+      w.unmount();
+    });
+  });
+
+  // R1-strict: the remaining bare <OSelect>/<OInput> controls inside the <OForm>
+  // are now OForm* `name=` fields, so the injected form is the single source of
+  // truth for each. Prove both directions: form → rendered value, and rendered
+  // control change → form value (no local mirror, no @update bridge).
+  describe("R1-strict: promql / stream / aggregation / trigger controls are form-owned", () => {
+    const formSelectByName = (w, name) =>
+      w
+        .findAllComponents(OFormSelect)
+        .find((c) => c.props("name") === name);
+    const formInputByName = (w, name) =>
+      w
+        .findAllComponents(OFormInput)
+        .find((c) => c.props("name") === name);
+
+    it("group 1 — promql operator/value bind query_condition.promql_condition.*", async () => {
+      form.setFieldValue("query_condition.promql_condition", {
+        operator: "=",
+        value: 0,
+      });
+      form.setFieldValue("stream_type", "metrics");
+      child.tab = "promql";
+      await nextTick();
+      await flushPromises();
+
+      const op = formSelectByName(
+        wrapper,
+        "query_condition.promql_condition.operator",
+      );
+      const val = formInputByName(
+        wrapper,
+        "query_condition.promql_condition.value",
+      );
+      expect(op).toBeTruthy();
+      expect(val).toBeTruthy();
+
+      // form → view: the rendered operator reflects the form-owned value
+      expect(op.findComponent(OSelect).props("modelValue")).toBe("=");
+
+      // view → form: changing the controls writes the form (single source)
+      op.findComponent(OSelect).vm.$emit("update:model-value", ">");
+      val.findComponent(OInput).vm.$emit("update:model-value", 42);
+      await nextTick();
+      expect(
+        form.state.values.query_condition.promql_condition.operator,
+      ).toBe(">");
+      expect(
+        form.state.values.query_condition.promql_condition.value,
+      ).toBe(42);
+    });
+
+    it("group 4 — stream type/name bind stream_type / stream_name", async () => {
+      // form → view: setting the form-owned stream_type renders on the select
+      form.setFieldValue("stream_type", "traces");
+      await nextTick();
+      const typeSel = formSelectByName(wrapper, "stream_type");
+      expect(typeSel).toBeTruthy();
+      expect(typeSel.findComponent(OSelect).props("modelValue")).toBe("traces");
+
+      // view → form: choosing a stream writes stream_name back to the form, and
+      // the component's read-view tracks that same single source of truth.
+      const nameSel = formSelectByName(wrapper, "stream_name");
+      expect(nameSel).toBeTruthy();
+      nameSel.findComponent(OSelect).vm.$emit("update:model-value", "stream1");
+      await nextTick();
+      expect(form.state.values.stream_name).toBe("stream1");
+      expect(child.selectedStreamName).toBe("stream1");
+    });
+
+    it("groups 2 & 3 — aggregation function/having + trigger operator/threshold are OForm* (disableThreshold=false)", async () => {
+      const { w, f } = mountHarness({}, { disableThreshold: false });
+      await flushPromises();
+      const c = w.findComponent(ScheduledPipeline).vm;
+
+      // ── group 3: trigger operator/threshold (rendered while aggregation OFF) ──
+      const trigOp = formSelectByName(w, "trigger_condition.operator");
+      const trigThresh = formInputByName(w, "trigger_condition.threshold");
+      expect(trigOp).toBeTruthy();
+      expect(trigThresh).toBeTruthy();
+      // form → view (default operator seeded by buildDefaultValues)
+      expect(trigOp.findComponent(OSelect).props("modelValue")).toBe(">=");
+      // view → form
+      trigOp.findComponent(OSelect).vm.$emit("update:model-value", "<");
+      trigThresh.findComponent(OInput).vm.$emit("update:model-value", 7);
+      await nextTick();
+      expect(f.state.values.trigger_condition.operator).toBe("<");
+      expect(f.state.values.trigger_condition.threshold).toBe(7);
+
+      // ── group 2: aggregation function/having (rendered while aggregation ON) ──
+      c.tab = "custom";
+      f.setFieldValue("query_condition.aggregation", {
+        group_by: ["col_a"],
+        function: "avg",
+        having: { column: "level", operator: "=", value: "" },
+      });
+      c._isAggregationEnabled = true;
+      await nextTick();
+      await flushPromises();
+
+      const fn = formSelectByName(w, "query_condition.aggregation.function");
+      const havingVal = formInputByName(
+        w,
+        "query_condition.aggregation.having.value",
+      );
+      expect(fn).toBeTruthy();
+      expect(havingVal).toBeTruthy();
+      // form → view
+      expect(fn.findComponent(OSelect).props("modelValue")).toBe("avg");
+      // view → form
+      fn.findComponent(OSelect).vm.$emit("update:model-value", "sum");
+      havingVal.findComponent(OInput).vm.$emit("update:model-value", 9);
+      await nextTick();
+      expect(f.state.values.query_condition.aggregation.function).toBe("sum");
+      expect(f.state.values.query_condition.aggregation.having.value).toBe(9);
+
+      w.unmount();
     });
   });
 });

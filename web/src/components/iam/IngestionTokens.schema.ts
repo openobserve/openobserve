@@ -5,7 +5,7 @@
 //
 // Before migration the name was "required" only via a disabled-Save gate
 // (`:primary-button-disabled="!newTokenName.trim()"`) plus a `maxlength=256` on
-// the input — there was no Quasar `:rules`. This encodes that intent into Zod:
+// the input — there was no field-level validation rule. This encodes that intent into Zod:
 // name is required + max 256; description is optional.
 
 import { z } from "zod";

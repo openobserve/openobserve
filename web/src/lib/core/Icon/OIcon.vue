@@ -63,7 +63,7 @@ const isDestructiveIcon = computed<boolean>(() =>
         : { 'aria-hidden': 'true' }
     "
   >
-    <!-- img: prefix → external image (Quasar-compat) -->
+    <!-- img: prefix → external image -->
     <img
       v-if="isImgIcon"
       :src="imgSrc"

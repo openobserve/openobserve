@@ -6,7 +6,7 @@
 // lists + radios are display, and the save-time "domain needs emails" check
 // stays a submit-level guard in saveChanges().
 //
-// Restores the Quasar BEFORE rules (truthy→Zod inversion):
+// Restores the original BEFORE rules (truthy→Zod inversion):
 //   • newDomain: `isValidDomain(v) || invalidDomain` → required + domain regex
 //     (the audit adds ≤253 + reject-malicious, already enforced by isValidDomain).
 //   • domain.newEmail: REQUIRED for the Add-Email action — the email must be

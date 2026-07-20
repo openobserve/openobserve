@@ -29,6 +29,11 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use crate::errors::*;
+
+// Marker for the Arrow IPC entry format in WAL files. The legacy JSON format
+// starts with the stream name length (u16), which can never be 0xFFFF.
+const ENTRY_ARROW_FORMAT_MARKER: u16 = 0xFFFF;
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Entry {
     pub org_id: Arc<str>,
@@ -38,6 +43,10 @@ pub struct Entry {
     pub partition_key: Arc<str>, // 2023/12/18/00/country=US/state=CA
     pub data: Vec<Arc<serde_json::Value>>,
     pub data_size: usize,
+    // Decoded RecordBatch when the WAL entry was stored in Arrow IPC format,
+    // only populated by from_bytes during WAL replay
+    #[serde(skip)]
+    pub batch: Option<RecordBatch>,
 }
 
 impl Entry {
@@ -50,6 +59,7 @@ impl Entry {
             partition_key: "".into(),
             data: Vec::new(),
             data_size: 0,
+            batch: None,
         }
     }
     pub fn into_bytes(&mut self) -> Result<Vec<u8>> {
@@ -81,22 +91,94 @@ impl Entry {
         Ok(buf)
     }
 
-    pub fn from_bytes(value: &[u8]) -> Result<Self> {
+    /// Serialize the entry for WAL in Arrow IPC format, reusing the RecordBatch
+    /// already converted for the memtable instead of serializing back to JSON.
+    pub fn into_bytes_arrow(&self, batch: &RecordBatch) -> Result<Vec<u8>> {
+        let mut buf = Vec::with_capacity(4096);
+        buf.write_u16::<BigEndian>(ENTRY_ARROW_FORMAT_MARKER)
+            .context(WriteDataSnafu)?;
+        for field in [
+            self.stream.as_bytes(),
+            self.schema_key.as_bytes(),
+            self.partition_key.as_bytes(),
+            self.org_id.as_bytes(),
+        ] {
+            buf.write_u16::<BigEndian>(field.len() as u16)
+                .context(WriteDataSnafu)?;
+            buf.extend_from_slice(field);
+        }
+        // original json data size, used for stats
+        buf.write_u32::<BigEndian>(self.data_size as u32)
+            .context(WriteDataSnafu)?;
+
+        // arrow ipc stream (includes the schema), length-prefixed
+        let ipc_offset = buf.len();
+        buf.write_u32::<BigEndian>(0).context(WriteDataSnafu)?; // length placeholder
+        let mut writer = arrow::ipc::writer::StreamWriter::try_new(&mut buf, &batch.schema())
+            .context(ArrowIpcEncodeSnafu)?;
+        writer.write(batch).context(ArrowIpcEncodeSnafu)?;
+        writer.finish().context(ArrowIpcEncodeSnafu)?;
+        drop(writer);
+        let ipc_len = (buf.len() - ipc_offset - 4) as u32;
+        buf[ipc_offset..ipc_offset + 4].copy_from_slice(&ipc_len.to_be_bytes());
+
+        Ok(buf)
+    }
+
+    fn read_str(cursor: &mut Cursor<&[u8]>) -> Result<String> {
+        let len = cursor.read_u16::<BigEndian>().context(ReadDataSnafu)?;
+        let mut data = vec![0; len as usize];
+        cursor.read_exact(&mut data).context(ReadDataSnafu)?;
+        String::from_utf8(data).context(FromUtf8Snafu)
+    }
+
+    fn from_bytes_arrow(value: &[u8]) -> Result<Self> {
         let mut cursor = Cursor::new(value);
-        let stream_len = cursor.read_u16::<BigEndian>().context(ReadDataSnafu)?;
-        let mut stream = vec![0; stream_len as usize];
-        cursor.read_exact(&mut stream).context(ReadDataSnafu)?;
-        let stream = String::from_utf8(stream).context(FromUtf8Snafu)?;
-        let schema_key_len = cursor.read_u16::<BigEndian>().context(ReadDataSnafu)?;
-        let mut schema_key = vec![0; schema_key_len as usize];
-        cursor.read_exact(&mut schema_key).context(ReadDataSnafu)?;
-        let schema_key = String::from_utf8(schema_key).context(FromUtf8Snafu)?;
-        let partition_key_len = cursor.read_u16::<BigEndian>().context(ReadDataSnafu)?;
-        let mut partition_key = vec![0; partition_key_len as usize];
-        cursor
-            .read_exact(&mut partition_key)
-            .context(ReadDataSnafu)?;
-        let partition_key = String::from_utf8(partition_key).context(FromUtf8Snafu)?;
+        cursor.set_position(2); // skip the format marker
+        let stream = Self::read_str(&mut cursor)?;
+        let schema_key = Self::read_str(&mut cursor)?;
+        let partition_key = Self::read_str(&mut cursor)?;
+        let org_id = Self::read_str(&mut cursor)?;
+        let data_size = cursor.read_u32::<BigEndian>().context(ReadDataSnafu)?;
+        let ipc_len = cursor.read_u32::<BigEndian>().context(ReadDataSnafu)?;
+        let mut ipc_data = vec![0; ipc_len as usize];
+        cursor.read_exact(&mut ipc_data).context(ReadDataSnafu)?;
+        let reader = arrow::ipc::reader::StreamReader::try_new(Cursor::new(ipc_data), None)
+            .context(ArrowIpcDecodeSnafu)?;
+        let schema = reader.schema();
+        let mut batches = reader
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .context(ArrowIpcDecodeSnafu)?;
+        // into_bytes_arrow writes a single batch, but merge defensively
+        let batch = match batches.len() {
+            0 => RecordBatch::new_empty(schema),
+            1 => batches.pop().unwrap(),
+            _ => arrow::compute::concat_batches(&schema, batches.iter())
+                .context(ArrowIpcDecodeSnafu)?,
+        };
+
+        Ok(Self {
+            org_id: org_id.into(),
+            stream: stream.into(),
+            schema: None,
+            schema_key: schema_key.into(),
+            partition_key: partition_key.into(),
+            data: Vec::new(),
+            data_size: data_size as usize,
+            batch: Some(batch),
+        })
+    }
+
+    pub fn from_bytes(value: &[u8]) -> Result<Self> {
+        // check the entry format by the first u16
+        if value.len() >= 2 && u16::from_be_bytes([value[0], value[1]]) == ENTRY_ARROW_FORMAT_MARKER
+        {
+            return Self::from_bytes_arrow(value);
+        }
+        let mut cursor = Cursor::new(value);
+        let stream = Self::read_str(&mut cursor)?;
+        let schema_key = Self::read_str(&mut cursor)?;
+        let partition_key = Self::read_str(&mut cursor)?;
         let data_len = cursor.read_u32::<BigEndian>().context(ReadDataSnafu)?;
         let mut data = vec![0; data_len as usize];
         cursor.read_exact(&mut data).context(ReadDataSnafu)?;
@@ -104,10 +186,7 @@ impl Entry {
 
         // read org_id if available
         let org_id = if (cursor.position() as usize) < value.len() {
-            let org_id_len = cursor.read_u16::<BigEndian>().context(ReadDataSnafu)?;
-            let mut org_id_buf = vec![0; org_id_len as usize];
-            cursor.read_exact(&mut org_id_buf).context(ReadDataSnafu)?;
-            String::from_utf8(org_id_buf).context(FromUtf8Snafu)?
+            Self::read_str(&mut cursor)?
         } else {
             "".to_string()
         };
@@ -120,7 +199,21 @@ impl Entry {
             partition_key: partition_key.into(),
             data,
             data_size: data_len as usize,
+            batch: None,
         })
+    }
+
+    /// The legacy into_bytes() reset data_size to the serialized JSON length,
+    /// so callers could leave it 0. Downstream treats data_size == 0 as an
+    /// empty entry, so estimate it from the data when unset.
+    pub fn normalize_data_size(&mut self) {
+        if self.data_size == 0 && !self.data.is_empty() {
+            self.data_size = self
+                .data
+                .iter()
+                .map(|v| config::utils::json::estimate_json_bytes(v))
+                .sum();
+        }
     }
 
     pub fn into_batch(
@@ -288,6 +381,7 @@ mod tests {
             partition_key: Arc::from(partition_key),
             data: vec![Arc::new(serde_json::json!({"key": "value"}))],
             data_size: 0,
+            batch: None,
         }
     }
 
@@ -301,6 +395,8 @@ mod tests {
         assert_eq!(decoded.schema_key.as_ref(), "schema_v1");
         assert_eq!(decoded.partition_key.as_ref(), "2024/01/01/00");
         assert_eq!(decoded.data.len(), 1);
+        // legacy json format must not be detected as the arrow format
+        assert!(decoded.batch.is_none());
     }
 
     #[test]
@@ -313,10 +409,109 @@ mod tests {
             partition_key: Arc::from("part"),
             data: vec![],
             data_size: 0,
+            batch: None,
         };
         let bytes = entry.into_bytes().expect("serialize");
         let decoded = Entry::from_bytes(&bytes).expect("deserialize");
         assert_eq!(decoded.data.len(), 0);
+    }
+
+    #[test]
+    fn test_entry_arrow_roundtrip() {
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("msg", DataType::Utf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int64Array::from(vec![100i64, 200i64])),
+                Arc::new(arrow::array::StringArray::from(vec!["a", "b"])),
+            ],
+        )
+        .unwrap();
+        let entry = Entry {
+            org_id: Arc::from("myorg"),
+            stream: Arc::from("mystream"),
+            schema: None,
+            schema_key: Arc::from("schema_v1"),
+            partition_key: Arc::from("2024/01/01/00"),
+            data: vec![],
+            data_size: 123,
+            batch: None,
+        };
+        let bytes = entry.into_bytes_arrow(&batch).expect("serialize");
+        let decoded = Entry::from_bytes(&bytes).expect("deserialize");
+        assert_eq!(decoded.org_id.as_ref(), "myorg");
+        assert_eq!(decoded.stream.as_ref(), "mystream");
+        assert_eq!(decoded.schema_key.as_ref(), "schema_v1");
+        assert_eq!(decoded.partition_key.as_ref(), "2024/01/01/00");
+        assert_eq!(decoded.data_size, 123);
+        assert!(decoded.data.is_empty());
+        let decoded_batch = decoded.batch.expect("batch");
+        assert_eq!(decoded_batch, batch);
+    }
+
+    #[test]
+    fn test_entry_arrow_roundtrip_empty_batch() {
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            config::TIMESTAMP_COL_NAME,
+            DataType::Int64,
+            false,
+        )]));
+        let batch = RecordBatch::new_empty(schema.clone());
+        let entry = make_entry("org", "stream", "key", "2024/01/01/00");
+        let bytes = entry.into_bytes_arrow(&batch).expect("serialize");
+        let decoded = Entry::from_bytes(&bytes).expect("deserialize");
+        let decoded_batch = decoded.batch.expect("batch");
+        assert_eq!(decoded_batch.num_rows(), 0);
+        assert_eq!(decoded_batch.schema(), schema);
+    }
+
+    #[test]
+    fn test_entry_arrow_roundtrip_unicode_fields() {
+        use arrow_schema::{DataType, Field};
+        let schema = Arc::new(Schema::new(vec![Field::new("消息", DataType::Utf8, true)]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![Arc::new(arrow::array::StringArray::from(vec!["日志内容"]))],
+        )
+        .unwrap();
+        let entry = make_entry("组织", "日志流", "schema_v1", "2024/01/01/00/city=北京");
+        let bytes = entry.into_bytes_arrow(&batch).expect("serialize");
+        let decoded = Entry::from_bytes(&bytes).expect("deserialize");
+        assert_eq!(decoded.org_id.as_ref(), "组织");
+        assert_eq!(decoded.stream.as_ref(), "日志流");
+        assert_eq!(decoded.partition_key.as_ref(), "2024/01/01/00/city=北京");
+        assert_eq!(decoded.batch.expect("batch"), batch);
+    }
+
+    #[test]
+    fn test_normalize_data_size_sets_estimate_when_zero() {
+        let mut entry = make_entry("org", "stream", "key", "part");
+        assert_eq!(entry.data_size, 0);
+        entry.normalize_data_size();
+        // non-empty data must never keep data_size == 0, otherwise the entry
+        // is treated as empty and skipped by the memtable write
+        assert!(entry.data_size > 0);
+    }
+
+    #[test]
+    fn test_normalize_data_size_keeps_caller_value() {
+        let mut entry = make_entry("org", "stream", "key", "part");
+        entry.data_size = 42;
+        entry.normalize_data_size();
+        assert_eq!(entry.data_size, 42);
+    }
+
+    #[test]
+    fn test_normalize_data_size_empty_data_stays_zero() {
+        let mut entry = make_entry("org", "stream", "key", "part");
+        entry.data.clear();
+        entry.normalize_data_size();
+        assert_eq!(entry.data_size, 0);
     }
 
     #[test]

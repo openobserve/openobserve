@@ -188,7 +188,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-primary-100);
   --color-field-list-group-text:       var(--color-text-secondary);
-  --color-field-list-label-text:       var(--color-grey-text-primary);
+  --color-field-list-label-text:       var(--color-text-body);
   --color-field-list-label-icon:       var(--color-text-secondary);
   --color-field-list-drag-icon:        var(--color-text-secondary);
   --color-field-list-expand-icon:      var(--color-text-secondary);
@@ -582,15 +582,15 @@
 
   /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
   --color-datepicker-bg: var(--color-surface-base);
-  --color-datepicker-border: var(--color-border-strong);
-  --color-datepicker-hover-border: var(--color-primary-400);
-  --color-datepicker-focus-border: var(--color-primary-500);
+  --color-datepicker-border: var(--color-border-default);
+  --color-datepicker-hover-border: var(--color-primary-300);
+  --color-datepicker-focus-border: var(--color-primary-300);
   --color-datepicker-focus-ring: var(--color-primary-400);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
   --color-datepicker-text: var(--color-text-primary);
   --color-datepicker-placeholder: var(--color-text-disabled);
-  --color-datepicker-label: var(--color-text-secondary);
+  --color-datepicker-label: var(--color-text-primary);
   --color-datepicker-icon: var(--color-text-secondary);
   --color-datepicker-error-text: var(--color-error-600);
   --color-datepicker-error-border: var(--color-error-500);
@@ -1092,7 +1092,7 @@
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-field-list-row-hover-bg);
   --color-field-list-group-text:       var(--color-field-list-group-text);
-  --color-field-list-label-text:       var(--color-text-primary);
+  --color-field-list-label-text:       var(--color-text-body);
   --color-field-list-label-icon:       var(--color-field-list-label-icon);
   --color-field-list-drag-icon:        var(--color-field-list-drag-icon);
   --color-field-list-expand-icon:      var(--color-field-list-expand-icon);
@@ -3873,12 +3873,14 @@ button.date-time-button {
   opacity: 1;
 }
 
-.container {
+/* Namespaced: a bare `.container` collides with Tailwind's built-in container
+   utility, which adds viewport-keyed max-width caps and clips wide tables. */
+.o2-scroll-container {
   overflow: auto;
   border-radius: 0.5rem;
 }
 
-.container.virtual-scroll-active {
+.o2-scroll-container.virtual-scroll-active {
   will-change: scroll-position;
 }
 
@@ -3920,9 +3922,18 @@ button.date-time-button {
   display: block;
 }
 
-.logs-table thead {
+/* Unified list-page header — logs + traces read as one system.
+   Fixes: logs headers looked too bold/heavy (14px slate on a near-white bar);
+   traces headers looked washed out & blurry (light slate #5A5D6B, wide
+   0.06rem tracking, no weight) AND had no header background at all.
+   One crisp, medium-weight, neutral-grey style on a shared header band. */
+/* Header font-family is the only shared thead concern kept in CSS; all header
+   chrome (bg band, underline, label color/size/weight/capitalize) is now
+   applied via token-backed utility classes in-template (the OTable pattern),
+   so there are no per-file !important overrides here. */
+.logs-table thead,
+.traces-table-container thead {
   font-family: var(--font-sans);
-  font-size: 14px !important;
 }
 
 .table-row {
@@ -3944,7 +3955,12 @@ button.date-time-button {
 }
 
 .logs-table td {
-  font-family: monospace;
+  /* Brand monospace (Geist Mono), not the OS-default `monospace` keyword. */
+  font-family: var(--font-mono);
+  /* Monospace renders heavier than the sans UI chrome, so at the body-text
+     grey (#404040) log rows read as near-black. Step the data text to grey-500
+     so it optically matches the sans field list's weight — lighter, not faded. */
+  color: var(--color-grey-500);
 }
 
 .thead-sticky tr > *,

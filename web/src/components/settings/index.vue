@@ -33,14 +33,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="h-full min-h-0 flex flex-col"
     >
       <AppPageHeader
+        :title="activeSectionItem?.label || ''"
+        :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
         :subtitle="activeSectionItem?.description || ''"
         :icon="(activeSectionItem?.icon as any)"
         class="shrink-0 px-4 border-b border-border-subtle"
-      >
-        <template #title>
-          <span :data-test="`settings-${activeSectionItem?.key}-page-title`">{{ activeSectionItem?.label || '' }}</span>
-        </template>
-      </AppPageHeader>
+      />
       <ConstrainedPage
         size="lg"
         align="left"
@@ -334,9 +332,10 @@ export default defineComponent({
         {
           key: "gen_ai_agent_mapping",
           label: t("settings.genAiAgentMapping.tabLabel"),
-          description: "Map GenAI spans to agent identifiers",
+          description: t("settings.index.genAiAgentMappingDesc"),
           icon: "smart-toy",
           to: { name: "genAiAgentMapping", query: { org_identifier: org } },
+          visible: (isEnt || isCloud) && !!z.online_evals_enabled,
           dataTest: "gen-ai-agent-mapping-tab",
           group: "Data & AI",
         },

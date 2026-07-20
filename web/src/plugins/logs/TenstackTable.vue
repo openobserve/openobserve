@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="parentRef"
     :class="[
-      'container rounded-none! overflow-x-auto relative',
+      'o2-scroll-container rounded-none! overflow-x-auto relative',
       !props.scrollEl ? 'table-container' : '',
     ]"
-    style="color: var(--o2-log-table-text)"
+    style="color: var(--color-text-body)"
   >
     <!-- Top progress bar: keeps rows visible while a new result set streams in
       (e.g. streaming_aggs replacing values). Same component dashboard panels
@@ -59,9 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :animation="200"
           :sort="!isResizingHeader || !defaultColumns"
           handle=".table-head"
-          :class="{
-            'cursor-move': table.getState().columnOrder.length > 1,
-          }"
+          :class="[
+            { 'cursor-move': table.getState().columnOrder.length > 1 },
+            // Header-row chrome via centralized token utilities (same tokens
+            // OTable uses): background band + full-width underline on the row.
+            'bg-[var(--color-table-header-bg)] border-b border-[var(--color-grey-300)]',
+          ]"
           :style="{
             width:
               defaultColumns && wrap
@@ -70,7 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? tableRowSize + 'px'
                   : '100%',
             minWidth: '100%',
-            background: 'var(--o2-log-table-header-bg)',
           }"
           tag="tr"
           @start="(event) => handleDragStart(event)"
@@ -89,21 +91,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :data-test="`log-search-result-table-th-${header.id}`"
           >
+            <!-- Column separator / resize handle. The separator LINE renders on
+                 EVERY column (even non-resizable ones like timestamp/source, which
+                 set enableResizing:false) so the vertical dividers are continuous.
+                 The drag interactivity + hover accent only apply when the column
+                 is resizable. Matches the OTable spec: short 1px --color-border. -->
             <div
-              v-if="header.column.getCanResize()"
-              @dblclick="header.column.resetSize()"
-              @mousedown.self.prevent.stop="header.getResizeHandler()?.($event)"
+              @dblclick="
+                header.column.getCanResize() && header.column.resetSize()
+              "
+              @mousedown.self.prevent.stop="
+                header.column.getCanResize() &&
+                  header.getResizeHandler()?.($event)
+              "
               @touchstart.self.prevent.stop="
-                header.getResizeHandler()?.($event)
+                header.column.getCanResize() &&
+                  header.getResizeHandler()?.($event)
               "
               :class="[
-                'resizer',
-                'bg-[var(--o2-border-color)]',
-                header.column.getIsResizing() ? 'isResizing' : '',
+                'absolute right-0 top-0 h-full w-2 flex items-center justify-end select-none touch-none z-10 group/resizer',
+                header.column.getCanResize() ? 'resizer cursor-col-resize' : '',
               ]"
-              :style="{}"
-              class="right-0"
-            />
+            >
+              <div
+                :class="[
+                  'rounded-full transition-all duration-150',
+                  header.column.getIsResizing()
+                    ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
+                    : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                ]"
+              />
+            </div>
 
             <div
               v-if="!header.isPlaceholder"
@@ -117,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   header.column.getToggleSortingHandler(),
                 )
               "
-              class="overflow-hidden text-ellipsis"
+              class="overflow-hidden text-ellipsis text-[var(--color-table-header-text)] text-xs font-medium capitalize"
             >
               <FlexRender
                 :render="header.column.columnDef.header"
@@ -221,7 +239,7 @@ class="mr-1" />
         v-if="loading && tableRows.length === 0"
         data-test="logs-table-skeleton-body"
         aria-busy="true"
-        aria-label="Loading logs"
+        :aria-label="t('logs.tenstackTable.loadingLogs')"
       >
         <!-- Rows use flex to match the real virtual rows exactly -->
         <tr
@@ -305,9 +323,7 @@ class="mr-1" />
                 store.state.zoConfig.timestamp_column
               ] === highlightTimestamp &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? store.state.theme === 'dark'
-                  ? 'bg-zinc-700'
-                  : 'bg-zinc-300'
+                ? 'bg-(--color-table-row-selected-bg)'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                   ? 'log-row-base bg-(--o2-log-table-row-bg)'
                   : '',

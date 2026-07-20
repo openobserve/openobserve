@@ -491,11 +491,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #bottom>
-                  <div class="flex w-full justify-between items-center h-[48px]">
+                  <div class="flex w-full justify-between items-center h-12 gap-1">
                     <div
-                      class="o2-table-footer-title flex items-center w-[200px] mr-md"
+                      class="o2-table-footer-title flex items-center min-w-25"
                     >
-                      {{ resultTotal }} {{ t("alerts.header") }}
+                      <template v-if="selectedAlerts.length > 0">{{ selectedAlerts.length }} of {{ resultTotal }} selected</template>
+                      <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
                     </div>
 
                     <OButton
@@ -503,56 +504,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-move-across-folders-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="drive-file-move"
                       @click="moveMultipleAlerts"
-                    >
-                      <OIcon name="drive-file-move" size="sm" />
-                      <span class="ml-2">Move</span>
-                    </OButton>
+                    >Move</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-export-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="download"
                       @click="multipleExportAlert"
-                    >
-                      <OIcon name="download" size="sm" />
-                      <span class="ml-2">Export</span>
-                    </OButton>
+                    >Export</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-pause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="pause"
                       @click="bulkToggleAlerts('pause')"
-                    >
-                      <OIcon name="pause" size="sm" class="text-button-ghost-destructive-text" />
-                      <span class="ml-2">Pause</span>
-                    </OButton>
+                    >Pause</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="play-arrow"
                       @click="bulkToggleAlerts('resume')"
-                    >
-                      <OIcon name="play-arrow" size="sm" class="text-button-ghost-success-text" />
-                      <span class="ml-2">Resume</span>
-                    </OButton>
+                    >Resume</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
                       variant="outline-destructive"
                       size="sm"
-                      class="mr-2"
+                      icon-left="delete"
                       @click="openBulkDeleteDialog"
-                    >
-                      <OIcon name="delete" size="sm" />
-                      <span class="ml-2">Delete</span>
-                    </OButton>
+                    >Delete</OButton>
                   </div>
                 </template>
               </OTable>
@@ -695,7 +681,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { formatDate } from "@/utils/date";
+import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
@@ -1217,10 +1203,10 @@ export default defineComponent({
       frequency: anomaly.trigger_condition?.frequency ?? "",
       frequency_type: anomaly.trigger_condition?.frequency_type ?? "minutes",
       last_triggered_at: anomaly.last_triggered_at
-        ? convertUnixToQuasarFormat(anomaly.last_triggered_at)
+        ? convertUnixToDateFormat(anomaly.last_triggered_at)
         : "",
       last_satisfied_at: anomaly.last_satisfied_at
-        ? convertUnixToQuasarFormat(anomaly.last_satisfied_at)
+        ? convertUnixToDateFormat(anomaly.last_satisfied_at)
         : "",
       detection_window: (() => {
         const mins = anomaly.trigger_condition?.period_minutes;
@@ -1233,7 +1219,7 @@ export default defineComponent({
         return `${mins} mins`;
       })(),
       last_trained_at: anomaly.last_trained_at
-        ? convertUnixToQuasarFormat(anomaly.last_trained_at)
+        ? convertUnixToDateFormat(anomaly.last_trained_at)
         : "",
       total_evaluations: anomaly.total_evaluations ?? "--",
       firing_count: anomaly.firing_count ?? "--",
@@ -1357,10 +1343,10 @@ export default defineComponent({
             period: data.is_real_time ? "" : data?.trigger_condition?.period,
             frequency: data.is_real_time ? "" : frequency,
             frequency_type: data?.trigger_condition?.frequency_type,
-            last_triggered_at: convertUnixToQuasarFormat(
+            last_triggered_at: convertUnixToDateFormat(
               data.last_triggered_at,
             ),
-            last_satisfied_at: convertUnixToQuasarFormat(
+            last_satisfied_at: convertUnixToDateFormat(
               data.last_satisfied_at,
             ),
             last_trained_at: "",
@@ -1706,13 +1692,9 @@ export default defineComponent({
       return filteredResults.value?.length;
     });
 
-    function convertUnixToQuasarFormat(unixMicroseconds: any) {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return formatDate(formattedDate, "YYYY-MM-DD HH:mm:ss");
-    }
+    // No timezone suffix in this table, unlike the other lists.
+    const convertUnixToDateFormat = (unixMicroseconds: any) =>
+      convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
 
     const addAlert = () => {
       showAddAlertDialog.value = true;

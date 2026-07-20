@@ -232,8 +232,8 @@ export default defineComponent({
           message: JSON.stringify(
             err?.response?.data["message"] ||
               (organizationId
-                ? "Organization Update failed."
-                : "Organization creation failed."),
+                ? this.t("iam.addUpdateOrganization.updateFailed")
+                : this.t("iam.addUpdateOrganization.createFailed")),
           ),
         });
       }

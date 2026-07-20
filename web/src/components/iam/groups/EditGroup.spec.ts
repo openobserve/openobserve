@@ -40,16 +40,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-    }),
-  };
-});
-
 vi.mock("@/aws-exports", () => ({
   default: {
     isCloud: "false",

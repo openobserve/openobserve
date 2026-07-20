@@ -47,7 +47,7 @@
               >
                 <OTooltip side="top" max-width="250px">
                   <template #content>
-                    ({{ t("dashboard.optional") }}) <b>Legend - </b>
+                    ({{ t("dashboard.optional") }}) <b>{{ t('metrics.promQLBuilderOptions.legend') }}</b>
                     {{ t("dashboard.overrideMessage") }}
                     <br />
                     {{ t("dashboard.overrideMessageExample") }}
@@ -73,7 +73,7 @@
                 ].config.step_value
               "
               type="text"
-              placeholder="e.g., 30s, 1m"
+              :placeholder="t('metrics.promQLBuilderOptions.stepValuePlaceholder')"
               data-test="dashboard-promql-builder-step-value"
               style="width: 140px"
             >
@@ -81,7 +81,7 @@
                 <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" max-width="250px">
                     <template #content>
-                      ({{ t("dashboard.optional") }}) <b>Step - </b>
+                      ({{ t("dashboard.optional") }}) <b>{{ t('metrics.promQLBuilderOptions.step') }}</b>
                       {{ t("dashboard.stepValueTooltip") }}
                       <br />
                       {{ t("dashboard.stepValueTooltipInfo") }}
@@ -114,19 +114,21 @@
               valueKey="value"
               data-test="dashboard-promql-builder-query-type"
               style="width: 120px"
+            />
+            <OIcon
+              name="info"
+              size="sm"
+              data-test="promql-builder-options-field-info-icon"
+              class="cursor-pointer"
             >
-              <template v-slot:append>
-                <OIcon name="info" size="sm" class="cursor-pointer">
-                  <OTooltip side="top" max-width="250px">
-                    <template #content>
-                      <b>Query Type - </b><br />
-                      Range: Returns time series data over a time range.<br />
-                      Instant: Returns single value at a specific point in time.
-                    </template>
-                  </OTooltip>
-                </OIcon>
-              </template>
-            </OSelect>
+              <OTooltip side="top" max-width="250px">
+                <template #content>
+                  <b>{{ t('metrics.promQLBuilderOptions.queryType') }}</b><br />
+                  {{ t('metrics.promQLBuilderOptions.rangeDescription') }}<br />
+                  {{ t('metrics.promQLBuilderOptions.instantDescription') }}
+                </template>
+              </OTooltip>
+            </OIcon>
           </div>
         </div>
       </div>
@@ -175,11 +177,11 @@ export default defineComponent({
     // Query type options for q-select
     const queryTypeOptions = [
       {
-        label: "Range",
+        label: t("metrics.promQLBuilderOptions.range"),
         value: "range",
       },
       {
-        label: "Instant",
+        label: t("metrics.promQLBuilderOptions.instant"),
         value: "instant",
       },
     ];

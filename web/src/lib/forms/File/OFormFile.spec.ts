@@ -42,7 +42,8 @@ describe("OFormFile", () => {
         }),
       },
       slots: {
-        default: () => h(OFormFile, { name: "resume" }),
+        default: () =>
+          h(OFormFile, { name: "resume", "data-test": "resume-file" }),
       },
       global: { components: { OFormFile } },
     });
@@ -60,5 +61,10 @@ describe("OFormFile", () => {
     ).form.handleSubmit();
     await flushPromises();
     expect(wrapper.text()).toContain("Too big");
+    // The error must surface through OFile's canonical `<data-test>-error`
+    // span (the id E2E selectors target) — not a data-test-less duplicate node.
+    const errorEl = wrapper.find('[data-test="resume-file-error"]');
+    expect(errorEl.exists()).toBe(true);
+    expect(errorEl.text()).toContain("Too big");
   });
 });

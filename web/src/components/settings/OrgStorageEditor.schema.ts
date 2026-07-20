@@ -5,7 +5,7 @@
 // into the form as `selectedProvider` (the documented sanctioned discriminator
 // bridge, as CreateDestinationForm does) and `superRefine` branches on it.
 //
-// Restores the Quasar BEFORE rules (truthy→Zod inversion) — every per-provider
+// Restores the original BEFORE rules (truthy→Zod inversion) — every per-provider
 // credential was `(v)=>!!v?.trim() || t(<key>)`:
 //   • AwsCredentials  → bucket_name, access_key, secret_key required (trim)
 //   • AzureCredentials→ storage_account, bucket_name, secret_key required

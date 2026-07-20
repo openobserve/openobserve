@@ -247,7 +247,8 @@ export default defineConfig(({ mode }) => {
         plugins: [
           nodePolyfills() as any,
           visualizer({
-            open: true,
+            // Opt in with ANALYZE=true; every build used to pop the report open.
+            open: process.env.ANALYZE === "true",
             gzipSize: true,
             brotliSize: true,
           }),

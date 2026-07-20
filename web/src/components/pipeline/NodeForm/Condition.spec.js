@@ -79,17 +79,17 @@ vi.mock("@/utils/alerts/alertDataTransforms", async (importOriginal) => {
 const ODrawerStub = {
   name: "ODrawer",
   props: [
-    "open", "size", "showClose", "title", "width", "persistent",
+    "open", "size", "showClose", "title", "width", "persistent", "formId",
     "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
     "secondaryButtonVariant", "neutralButtonVariant",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:secondary", "click:neutral"],
   template: `
     <div class="o-drawer-stub">
       <slot />
       <slot name="header-right" />
       <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button v-if="primaryButtonLabel"   data-test="o-drawer-primary-btn"   @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+      <button v-if="primaryButtonLabel"   data-test="o-drawer-primary-btn"   type="submit" form="condition-form">{{ primaryButtonLabel }}</button>
       <button v-if="neutralButtonLabel"   data-test="o-drawer-neutral-btn"   @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
     </div>
   `,
@@ -201,12 +201,6 @@ describe("Condition Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       expect(wrapper.vm.isUpdating).toBe(false);
-    });
-
-    it("initializes isValidSqlQuery as true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.isValidSqlQuery).toBe(true);
     });
 
     it("clears userSelectedNode on mount", async () => {
@@ -359,51 +353,94 @@ describe("Condition Component", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("saveCondition – validation", () => {
-    it("notifies and does NOT call addNode when conditions array is empty", async () => {
+  // The "at least one condition" gate is now schema-driven (superRefine over the
+  // bridged FilterGroup model). Drive the real form's submit so the schema runs.
+  describe("schema validation – at least one condition (real OForm)", () => {
+    const submitForm = async (w) => {
+      // Production bridges the live FilterGroup model into the form via its
+      // change handlers (updateGroup / onInputUpdate); the spec sets
+      // `conditionGroup` directly, so bridge it the same way before submitting.
+      w.vm.onInputUpdate();
+      await w.vm.form.handleSubmit();
+      await flushPromises();
+    };
+
+    it("blocks submit and does NOT call addNode when conditions array is empty", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.conditionGroup = makeConditionGroup("AND", []);
-      const { toast } = await import("@/lib/feedback/Toast/useToast");
-      vi.mocked(toast).mockClear();
-      await wrapper.vm.saveCondition();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          variant: "error",
-          message: "Please add at least one condition",
-        })
-      );
+      await nextTick();
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
+      // The form-level error is surfaced below the FilterGroup.
+      expect(wrapper.find('[data-test="add-condition-error"]').text()).toContain(
+        "Please add at least one condition"
+      );
     });
 
-    it("notifies and does NOT call addNode when condition has empty column", async () => {
+    it("blocks submit and does NOT call addNode when condition has empty column", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.conditionGroup = makeConditionGroup("AND", [
         makeCondition({ column: "", operator: "=" }),
       ]);
-      const { toast } = await import("@/lib/feedback/Toast/useToast");
-      vi.mocked(toast).mockClear();
-      await wrapper.vm.saveCondition();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" })
-      );
+      await nextTick();
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
-    it("notifies and does NOT call addNode when condition has empty operator", async () => {
+    it("blocks submit and does NOT call addNode when condition has empty operator", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.conditionGroup = makeConditionGroup("AND", [
         makeCondition({ column: "level", operator: "" }),
       ]);
-      const { toast } = await import("@/lib/feedback/Toast/useToast");
-      vi.mocked(toast).mockClear();
-      await wrapper.vm.saveCondition();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" })
-      );
+      await nextTick();
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit and does NOT call addNode when condition has a column but empty value", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
+        makeCondition({ column: "_timestamp", operator: "=", value: "" }),
+      ]);
+      await nextTick();
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockAddNode).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="add-condition-error"]').text()).toContain(
+        "Please fill in all condition fields"
+      );
+    });
+
+    it("blocks submit when any one of multiple conditions has an empty value", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
+        makeCondition({ column: "level", value: "error", id: "cid-1" }),
+        makeCondition({ column: "service", value: "", id: "cid-2" }),
+      ]);
+      await nextTick();
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockAddNode).not.toHaveBeenCalled();
+    });
+
+    it("submits and calls addNode when at least one valid condition exists", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
+        makeCondition({ column: "level", value: "error" }),
+      ]);
+      await nextTick();
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(true);
+      expect(mockAddNode).toHaveBeenCalled();
     });
   });
 
@@ -555,9 +592,10 @@ describe("Condition Component", () => {
     it("shows dialog when changes were made", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.conditionGroup.conditions = [
+      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
         makeCondition({ column: "changed", value: "yes" }),
-      ];
+      ]);
+      await nextTick();
       await wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
@@ -566,7 +604,8 @@ describe("Condition Component", () => {
     it("dialog okCallback calls closeDialog which emits cancel:hideform", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.conditionGroup.conditions = [makeCondition()];
+      wrapper.vm.conditionGroup = makeConditionGroup("AND", [makeCondition()]);
+      await nextTick();
       await wrapper.vm.openCancelDialog();
       vi.useFakeTimers();
       wrapper.vm.dialog.okCallback();
@@ -667,7 +706,7 @@ describe("Condition Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const initialKey = wrapper.vm.filterGroupKey;
-      wrapper.vm.conditionGroup.label = "or";
+      wrapper.vm.conditionGroup = { ...wrapper.vm.conditionGroup, label: "or" };
       await nextTick();
       expect(wrapper.vm.filterGroupKey).toBe(initialKey + 1);
     });

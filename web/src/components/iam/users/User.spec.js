@@ -25,14 +25,26 @@ vi.mock("@/services/organizations", () => ({
   },
 }));
 
-// Mock vue-i18n
+// Mock vue-i18n. Resolve keys against the real app locale so migrated t()
+// calls produce the actual English text the notification assertions expect.
 vi.mock('vue-i18n', async (importOriginal) => {
   const actual = await importOriginal();
+  const en = (await import("@/locales/languages/en-US.json")).default;
+  const t = (key, params) => {
+    const val = String(key)
+      .split(".")
+      .reduce((o, k) => (o == null ? undefined : o[k]), en);
+    let out = typeof val === "string" ? val : key;
+    if (params && typeof out === "string") {
+      for (const p in params) {
+        out = out.replace(new RegExp("\\{\\s*" + p + "\\s*\\}", "g"), params[p]);
+      }
+    }
+    return out;
+  };
   return {
     ...actual,
-    useI18n: () => ({
-      t: (key) => key
-    })
+    useI18n: () => ({ t })
   };
 });
 

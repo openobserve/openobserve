@@ -49,7 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <code
         v-if="topFrame"
-        class="shrink-0"
+        class="truncate min-w-0"
+        :title="topFrame.line !== null ? `${topFrame.file}:${topFrame.line}` : topFrame.file"
         data-test="rum-error-issue-cell-frame"
         >{{ topFrame.file
         }}<template v-if="topFrame.line !== null"

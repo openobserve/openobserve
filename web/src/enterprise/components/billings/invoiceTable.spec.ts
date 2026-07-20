@@ -124,11 +124,6 @@ describe("InvoiceTable Component", () => {
           store: store,
         },
         plugins: [i18n, router],
-        mocks: {
-          $q: {
-            notify: vi.fn(),
-          },
-        },
       },
     });
   }
@@ -182,7 +177,6 @@ describe("InvoiceTable Component", () => {
         global: {
           provide: { store },
           plugins: [i18n, router],
-          mocks: { $q: { notify: vi.fn() } },
         },
       });
 

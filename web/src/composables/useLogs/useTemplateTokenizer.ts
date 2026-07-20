@@ -97,7 +97,7 @@ export function tokenizeTemplate(
 }
 
 /**
- * Return Tailwind/Quasar CSS classes for a wildcard chip based on the token
+ * Return Tailwind CSS classes for a wildcard chip based on the token
  * type so different data types are colour-coded at a glance.
  *
  * When the token is generic <*> and sampleValues are provided the function

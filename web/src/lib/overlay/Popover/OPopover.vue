@@ -51,7 +51,7 @@ const props = withDefaults(
     /** Hide the content when the trigger scrolls out of view (Floating UI). */
     hideWhenDetached?: boolean;
     ariaLabel?: string;
-    /** Content stacking order. Default sits above the Quasar header/drawer (2000/3000). */
+    /** Content stacking order. Default sits above the app header/drawer (2000/3000). */
     zIndex?: number;
     /** Extra classes merged onto the content surface. */
     contentClass?: string;

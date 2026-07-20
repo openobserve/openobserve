@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import FilterGroup from './FilterGroup.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import { nextTick } from 'vue';
+import enMessages from '@/locales/languages/en-US.json';
+import { nextTick, defineComponent, reactive, ref } from 'vue';
+import { z } from 'zod';
+import OForm from '@/lib/forms/Form/OForm.vue';
+import OFormSelect from '@/lib/forms/Select/OFormSelect.vue';
+import OFormInput from '@/lib/forms/Input/OFormInput.vue';
+import OSelect from '@/lib/forms/Select/OSelect.vue';
+import OInput from '@/lib/forms/Input/OInput.vue';
+import {
+  conditionGroupNodeSchema,
+  refineConditionsTree,
+} from './steps/QueryConfig.schema';
 
 // Mock getUUID
 vi.mock('@/utils/zincutils', () => ({
@@ -17,18 +28,12 @@ const mockStore = createStore({
   },
 });
 
+// Mount the REAL en.json messages (not a hand-written stub): the component's
+// user-facing strings are i18n keys, so a stub would make every t() fall back to
+// its raw key path and silently weaken the text assertions below.
 const mockI18n = createI18n({
   locale: 'en',
-  messages: {
-    en: {
-      alerts: {
-        column: 'Column',
-      },
-      common: {
-        value: 'Value',
-      },
-    },
-  },
+  messages: { en: enMessages },
 });
 
 
@@ -284,7 +289,7 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.emitted('add-condition')?.[0][0]).toEqual(wrapper.vm.groups);
     });
 
-    it('should add multiple conditions correctly', () => {
+    it('should add multiple conditions correctly', async () => {
       const wrapper = mount(FilterGroup, {
         props: defaultProps,
         global: {
@@ -300,9 +305,59 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
 
       const initialLength = wrapper.vm.groups.conditions.length;
       wrapper.vm.addCondition('test-group');
+      // Structural ops chain THROUGH the parent: each emitted group is written
+      // back to `group` before the next op, which re-syncs the working clone.
+      // The handler refreshes the clone from the live prop so bare-mode in-place
+      // leaf edits aren't lost — so a second add without that write-back would
+      // (correctly) start from the un-updated prop. Simulate the write-back here.
+      await wrapper.setProps({ group: wrapper.emitted('add-condition')![0][0] });
       wrapper.vm.addCondition('test-group');
 
       expect(wrapper.vm.groups.conditions).toHaveLength(initialLength + 2);
+    });
+
+    // Regression: bare-mode consumers (pipeline NodeForm/Condition.vue) edit the
+    // leaf conditions of `group` IN PLACE via v-model. A structural op must emit
+    // those in-place edits, not the stale working clone — otherwise the ancestor
+    // writes the stale clone back and wipes the user's typed values (which made
+    // the pipeline condition-node fail to save).
+    it('preserves in-place bare-mode leaf edits when a structural op emits', () => {
+      const group = {
+        groupId: 'g-1',
+        filterType: 'group',
+        logicalOperator: 'AND',
+        conditions: [
+          {
+            id: 'c-1',
+            filterType: 'condition',
+            column: '',
+            operator: '=',
+            value: '',
+            logicalOperator: 'AND',
+          },
+        ],
+      };
+      const wrapper = mount(FilterGroup, {
+        props: { ...defaultProps, group },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+          stubs: { FilterCondition: true },
+        },
+      });
+
+      // Simulate bare-mode v-model editing the leaf IN PLACE (no new reference,
+      // so the non-deep sync watch does not fire — the clone would go stale).
+      group.conditions[0].column = 'kubernetes_container_name';
+      group.conditions[0].value = 'prometheus';
+
+      // A structural op (add) must carry the in-place edits into its payload.
+      wrapper.vm.addCondition('g-1');
+
+      const emitted = wrapper.emitted('add-condition')![0][0] as any;
+      expect(emitted.conditions[0].column).toBe('kubernetes_container_name');
+      expect(emitted.conditions[0].value).toBe('prometheus');
+      expect(emitted.conditions).toHaveLength(2);
     });
   });
 
@@ -1939,4 +1994,254 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(wrapper.vm.isGroup(wrapper.vm.groups.conditions[1])).toBeFalsy();
     });
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FORM MODE (alerts-migration.md §A): the group passes the namePrefix down
+// recursively — the child at index i binds under `${namePrefix}.conditions[${i}]`
+// into the injected REAL OForm; the v-for :key stays the array INDEX (Rule ①).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('FilterGroup.vue Form Mode (namePrefix + OForm)', () => {
+  const streamFields = [
+    { label: 'Field 1', value: 'field1' },
+    { label: 'Field 2', value: 'field2' },
+    { label: 'User Name', value: 'username' },
+  ];
+
+  const makeLeaf = (
+    id: string,
+    column: string,
+    operator: string,
+    value: unknown,
+  ) => ({
+    filterType: 'condition',
+    column,
+    operator,
+    value,
+    values: [],
+    logicalOperator: 'AND',
+    id,
+  });
+
+  const makeGroup = (
+    groupId: string,
+    conditions: unknown[],
+    logicalOperator = 'AND',
+  ) => ({
+    filterType: 'group',
+    logicalOperator,
+    groupId,
+    conditions,
+  });
+
+  // Host with a REAL <OForm>. The tree object is BOTH the FilterGroup :group
+  // prop and the form's `tree` default value (one object graph — single source
+  // of truth). FilterGroup's structural ops (delete/add/reorder) mutate the
+  // group in place and emit; the host relays that to the form with a
+  // setFieldValue poke — exactly the wiring the QueryConfig phase will add on
+  // its existing @add-condition/@add-group/@remove-group handlers.
+  const mountFormHost = (
+    conditions: unknown[],
+    { namePrefix = 'tree' }: { namePrefix?: string } = {},
+  ) => {
+    const tree = reactive({
+      filterType: 'group',
+      logicalOperator: 'AND',
+      groupId: 'root',
+      conditions,
+    });
+    const onSubmit = vi.fn();
+    const testSchema = z
+      .object({ tree: conditionGroupNodeSchema })
+      .superRefine((val, ctx) =>
+        refineConditionsTree(val.tree, ctx, ['tree'], 'Field is required!'),
+      );
+
+    const Host = defineComponent({
+      components: { OForm, FilterGroup },
+      setup() {
+        const oform = ref<any>(null);
+        const treeChanged = (updated: any) => {
+          // A structural change arrives as the NEW tree (add-condition/add-group).
+          // Mirror useAlertForm: write it to the TanStack form so name-bound
+          // fields re-read it. In the app `props.group` is the form read-view, so
+          // it updates automatically; the host's `:group="tree"` is a separate
+          // ref, so replace its contents too (keeping identity) to model that.
+          // (remove-group emits a groupId string; delete-to-empty isn't exercised
+          // by these host tests.)
+          if (!updated || typeof updated !== 'object') return;
+          const next = JSON.parse(JSON.stringify(updated));
+          tree.filterType = next.filterType;
+          tree.logicalOperator = next.logicalOperator;
+          tree.conditions = next.conditions;
+          oform.value?.form.setFieldValue('tree', next, {
+            dontUpdateMeta: true,
+          });
+        };
+        return {
+          oform,
+          treeChanged,
+          tree,
+          onSubmit,
+          testSchema,
+          defaults: { tree },
+          streamFields,
+          namePrefix,
+        };
+      },
+      template: `
+        <OForm ref="oform" :schema="testSchema" :default-values="defaults" @submit="onSubmit">
+          <FilterGroup
+            :group="tree"
+            :stream-fields="streamFields"
+            :depth="0"
+            :name-prefix="namePrefix"
+            @add-condition="treeChanged"
+            @add-group="treeChanged"
+            @remove-group="treeChanged"
+          />
+        </OForm>`,
+    });
+
+    const wrapper = mount(Host, {
+      global: {
+        plugins: [mockI18n],
+        provide: { store: mockStore },
+      },
+    });
+    const form = (wrapper.findComponent(OForm).vm as any).form;
+    return { wrapper, onSubmit, form, tree };
+  };
+
+  const renderedValueInputs = (wrapper: ReturnType<typeof mount>) =>
+    wrapper
+      .findAllComponents(OFormInput)
+      .filter((c) => /\.value$/.test(String(c.props('name'))));
+
+  const renderedColumnSelects = (wrapper: ReturnType<typeof mount>) =>
+    wrapper
+      .findAllComponents(OFormSelect)
+      .filter((c) => /\.column$/.test(String(c.props('name'))));
+
+  const renderedOperatorSelects = (wrapper: ReturnType<typeof mount>) =>
+    wrapper
+      .findAllComponents(OFormSelect)
+      .filter((c) => /\.operator$/.test(String(c.props('name'))));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('passes the prefix recursively — child at index i binds `${namePrefix}.conditions[${i}]` (incl. nested groups)', () => {
+    const { wrapper } = mountFormHost([
+      makeLeaf('a', 'field1', '=', 'va'),
+      makeGroup('g-1', [makeLeaf('n', 'field2', '!=', 'vn')], 'OR'),
+    ]);
+
+    expect(
+      renderedColumnSelects(wrapper).map((c) => c.props('name')),
+    ).toEqual([
+      'tree.conditions[0].column',
+      'tree.conditions[1].conditions[0].column',
+    ]);
+    expect(renderedValueInputs(wrapper).map((c) => c.props('name'))).toEqual([
+      'tree.conditions[0].value',
+      'tree.conditions[1].conditions[0].value',
+    ]);
+
+    // Rendered controls read from the form.
+    expect(
+      renderedColumnSelects(wrapper).map((c) =>
+        c.findComponent(OSelect).props('modelValue'),
+      ),
+    ).toEqual(['field1', 'field2']);
+    expect(
+      renderedValueInputs(wrapper).map((c) =>
+        c.findComponent(OInput).props('modelValue'),
+      ),
+    ).toEqual(['va', 'vn']);
+  });
+
+  it('🔑 Rule-① gate: deleting a NON-last row keeps the RENDERED inputs in sync with the remaining rows (index :key + index names)', async () => {
+    const { wrapper } = mountFormHost([
+      makeLeaf('a', 'field1', '=', 'va'),
+      makeLeaf('b', 'field2', '>', 'vb'),
+      makeLeaf('c', 'username', '<', 'vc'),
+    ]);
+    await flushPromises();
+
+    // Sanity: 3 rows rendered, index-named, in order.
+    expect(renderedValueInputs(wrapper).map((c) => c.props('name'))).toEqual([
+      'tree.conditions[0].value',
+      'tree.conditions[1].value',
+      'tree.conditions[2].value',
+    ]);
+
+    // Delete the MIDDLE row (index 1 — a NON-last row).
+    const deleteBtns = wrapper.findAll(
+      '[data-test="alert-conditions-delete-condition-btn"]',
+    );
+    expect(deleteBtns).toHaveLength(3);
+    await deleteBtns[1].trigger('click');
+    await flushPromises();
+
+    // Assert the RENDERED inputs (each OForm* → inner control model-value),
+    // NOT just form.state.values — a stable-id :key would leave these
+    // shifted/blank while the data stays correct.
+    const columnValues = renderedColumnSelects(wrapper).map((c) =>
+      c.findComponent(OSelect).props('modelValue'),
+    );
+    const operatorValues = renderedOperatorSelects(wrapper).map((c) =>
+      c.findComponent(OSelect).props('modelValue'),
+    );
+    const valueValues = renderedValueInputs(wrapper).map((c) =>
+      c.findComponent(OInput).props('modelValue'),
+    );
+
+    expect(columnValues).toEqual(['field1', 'username']);
+    expect(operatorValues).toEqual(['=', '<']);
+    expect(valueValues).toEqual(['va', 'vc']);
+
+    // And the surviving rows re-bound to the compacted index names.
+    expect(renderedValueInputs(wrapper).map((c) => c.props('name'))).toEqual([
+      'tree.conditions[0].value',
+      'tree.conditions[1].value',
+    ]);
+  });
+
+  it('submit routes each schema error to the exact row (partial row blocks save)', async () => {
+    const { wrapper, onSubmit, form } = mountFormHost([
+      makeLeaf('a', 'field1', '=', 'va'),
+      makeLeaf('b', '', '=', 'vb'), // column missing on row 1
+    ]);
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(form.state.isValid).toBe(false);
+
+    const columnErrors = renderedColumnSelects(wrapper).map((c) =>
+      c.findComponent(OSelect).props('error'),
+    );
+    expect(columnErrors).toEqual([false, true]);
+    expect(wrapper.text()).toContain('Field is required!');
+  });
+
+  it('a complete tree submits (zero-safe value 0 included)', async () => {
+    const { onSubmit, form } = mountFormHost([
+      makeLeaf('a', 'field1', '=', 0),
+      makeGroup('g-1', [makeLeaf('n', 'field2', '!=', 'vn')]),
+    ]);
+
+    await form.handleSubmit();
+    await flushPromises();
+
+    expect(form.state.isValid).toBe(true);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onSubmit.mock.calls[0][0].tree.conditions[0].value).toBe(0);
+  });
+
+  // Bare-mode test removed: FilterCondition is now form-mode only (all
+  // FilterGroup consumers pass a name-prefix inside an OForm); no bare v-else.
 });

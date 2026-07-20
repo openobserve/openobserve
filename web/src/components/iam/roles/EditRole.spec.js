@@ -5,13 +5,11 @@ import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
 import router from '@/test/unit/helpers/router';
 
-// Mock toast so we can assert notification calls without needing $q
+// Mock toast so we can assert notification calls
 const mockToast = vi.fn();
 vi.mock('@/lib/feedback/Toast/useToast', () => ({
   toast: (...args) => mockToast(...args),
 }));
-
-// Ensure Quasar plugin
 
 // Avoid waiting for router readiness / guards to hang
 // @ts-ignore
@@ -419,7 +417,7 @@ describe('EditRole - save and cancel', () => {
   });
 
   it('saveRole notifies info when no changes', async () => {
-    // The component uses toast() from @/lib/feedback/Toast/useToast instead of $q.notify.
+    // The component uses toast() from @/lib/feedback/Toast/useToast.
     const wrapper = await mountEditRole();
     mockToast.mockClear();
 

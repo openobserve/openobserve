@@ -31,432 +31,424 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </AppPageHeader>
 
-    <div class="w-full flex-1 min-h-0 px-2.5 pb-2.5 pt-1">
-      <div
-        class="card-container overflow-auto"
-        style="max-height: calc(100vh - var(--navbar-height) - 157px)"
-      >
+    <!-- Inline (full-page) form. The footer Save lives INSIDE the <OForm>, so it
+         is `type="submit"` and Enter submits natively — no `form-id` needed. -->
+    <OForm
+      :form="form"
+      v-slot="{ isSubmitting }"
+      class="w-full flex-1 min-h-0 flex flex-col"
+    >
+      <div class="w-full flex-1 min-h-0 px-2.5 pb-2.5 pt-1">
         <div
-          ref="addAlertFormRef"
-          class="px-4 pb-3"
-          style="width: 1024px"
+          class="card-container overflow-auto"
+          style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
           <div
-            class="create-report-form"
+            ref="addAlertFormRef"
+            class="px-4 pb-3"
+            style="width: 1024px"
           >
             <div
-              data-test="add-action-script-name-input-wrapper"
-              class="report-name-input"
-              style="padding-top: 12px"
+              class="create-report-form"
             >
-              <OInput
-                data-test="add-action-script-name-input"
-                v-model.trim="formData.name"
-                :label="t('alerts.name') + ' *'"
-                class="showLabelOnTop"
-                :error="!!nameError"
-                :error-message="nameError"
-                tabindex="0"
-                style="width: 400px"
-                @update:model-value="(v: string) => {
-                  if (!v) { nameError = t('common.nameRequired'); }
-                  else if (!isValidResourceName(v)) { nameError = 'Characters like :, ?, /, #, and spaces are not allowed.'; }
-                  else { nameError = ''; }
-                }"
+              <div
+                data-test="add-action-script-name-input-wrapper"
+                class="report-name-input"
+                style="padding-top: 12px"
               >
-                <template #hint>
-                  Characters like :, ?, /, #, and spaces are not allowed.
-                </template>
-              </OInput>
-            </div>
-            <div data-test="add-action-script-description-input" class="report-name-input pb-2">
-              <OInput
-                v-model="formData.description"
-                :label="t('reports.description')"
-                class="showLabelOnTop"
-                tabindex="0"
-                style="width: 800px"
-              />
-            </div>
+                <OFormInput
+                  data-test="add-action-script-name-input"
+                  name="name"
+                  :label="t('alerts.name')"
+                  required
+                  class="showLabelOnTop"
+                  tabindex="0"
+                  style="width: 400px"
+                  help-text="Characters like :, ?, /, #, and spaces are not allowed."
+                />
+              </div>
+              <div data-test="add-action-script-description-input" class="report-name-input pb-2">
+                <OFormInput
+                  name="description"
+                  :label="t('reports.description')"
+                  class="showLabelOnTop"
+                  tabindex="0"
+                  style="width: 800px"
+                />
+              </div>
 
-            <div data-test="add-action-script-type" class="report-name-input mb-3">
-              <OSelect
-                data-test="add-action-script-type-select"
-                v-model="formData.type"
-                :label="t('common.type') + ' *'"
-                :options="actionTypes"
-                labelKey="label"
-                valueKey="value"
-                class="showLabelOnTop no-case w-[400px]"
-                :error="!!typeError"
-                :error-message="typeError"
-                :disabled="isEditingActionScript"
-                @update:model-value="(v: any) => { typeError = v ? '' : 'Field is required!'; }"
-              />
-            </div>
+              <div data-test="add-action-script-type" class="report-name-input mb-3">
+                <OFormSelect
+                  data-test="add-action-script-type-select"
+                  name="type"
+                  :label="t('common.type')"
+                  required
+                  :options="actionTypes"
+                  labelKey="label"
+                  valueKey="value"
+                  class="showLabelOnTop no-case w-[400px]"
+                  :disabled="isEditingActionScript"
+                />
+              </div>
 
-            <OStepper
-              v-model="step"
-              orientation="vertical"
-              animated
-              navigable
-              class="mb-3"
-            >
-              <OStep
-                data-test="add-action-script-step-1"
-                :name="1"
-                :title="t('actions.uploadCodeZip')"
-                icon="edit"
-                :done="step > 1"
+              <OStepper
+                v-model="step"
+                orientation="vertical"
+                animated
+                navigable
+                class="mb-3"
               >
-                <div
-                  data-test="add-action-script-file-input"
-                  class="flex items-center"
+                <OStep
+                  data-test="add-action-script-step-1"
+                  :name="1"
+                  :title="t('actions.uploadCodeZip')"
+                  icon="edit"
+                  :done="step > 1"
                 >
-                  <OFile
-                    v-if="
-                      !isEditingActionScript || formData.fileNameToShow == ''
-                    "
-                    ref="fileInput"
-                    v-model="formData.codeZip"
-                    :label="t('actions.zipFile') + ' *'"
-                    accept=".zip"
+                  <div
                     data-test="add-action-script-file-input"
-                    :error-message="!isEditingActionScript && !formData.codeZip ? 'ZIP File is required!' : undefined"
-                    :error="!isEditingActionScript && !formData.codeZip && step > 1"
+                    class="flex items-center"
                   >
-                    <template #hint>
-                      Note: Only .zip files are accepted and it may contain
-                      various resources such as .py, .txt and main.py file etc.
-                    </template>
-                  </OFile>
-
-                  <div
-                    v-else-if="
-                      isEditingActionScript && formData.fileNameToShow != ''
-                    "
-                  >
-                    {{ formData.fileNameToShow }}
-                    <OButton
-                      data-test="add-action-script-edit-file-btn"
-                      variant="ghost"
-                      size="icon-sm"
-                      @click="editFileToUpload"
-                      ><OIcon name="edit" size="sm"
-                    /></OButton>
-                  </div>
-                  <div
-                    v-if="
-                      isEditingActionScript && formData.fileNameToShow == ''
-                    "
-                    class="pt-3 mt-1 pl-3"
-                  >
-                    <OButton
-                      data-test="cancel-upload-new-btn-file"
-                      variant="outline-destructive"
-                      size="sm-action"
-                      @click="cancelUploadingNewFile"
-                      >Cancel</OButton
+                    <OFormFile
+                      v-if="
+                        !isEditingActionScript || formData.fileNameToShow == ''
+                      "
+                      name="codeZip"
+                      :label="t('actions.zipFile')"
+                      :required="!isEditingActionScript"
+                      accept=".zip"
+                      data-test="add-action-script-file-input"
                     >
-                  </div>
-                </div>
-                <div class="flex gap-2 mt-8">
-                  <OButton
-                    data-test="add-action-script-step1-continue-btn"
-                    variant="primary"
-                    size="sm"
-                    @click="step++"
-                    >Continue</OButton
-                  >
-                </div>
-              </OStep>
+                      <template #hint>
+                        Note: Only .zip files are accepted and it may contain
+                        various resources such as .py, .txt and main.py file etc.
+                      </template>
+                    </OFormFile>
 
-              <OStep
-                v-if="formData.type === 'scheduled'"
-                data-test="add-action-script-step-2"
-                :name="2"
-                title="Schedule"
-                icon="schedule"
-                :done="step > 2"
-                class="mt-3"
-              >
-                <div class="my-2 px-2">
-                  <div
-                    style="font-size: 14px"
-                    class="font-bold text-gray-500 mb-2"
-                    data-test="add-action-script-frequency-title"
-                  >
-                    {{ t("actions.frequency") }} *
-                  </div>
-                  <div class="p-1 el-border-radius el-border w-fit">
-                    <template
-                      v-for="visual in frequencyTabs"
-                      :key="visual.value"
+                    <div
+                      v-else-if="
+                        isEditingActionScript && formData.fileNameToShow != ''
+                      "
+                    >
+                      {{ formData.fileNameToShow }}
+                      <OButton
+                        data-test="add-action-script-edit-file-btn"
+                        variant="ghost"
+                        size="icon-sm"
+                        @click="editFileToUpload"
+                        ><OIcon name="edit" size="sm"
+                      /></OButton>
+                    </div>
+                    <div
+                      v-if="
+                        isEditingActionScript && formData.fileNameToShow == ''
+                      "
+                      class="pt-3 mt-1 pl-3"
                     >
                       <OButton
-                        :data-test="`add-action-script-schedule-frequency-${visual.value}-btn`"
-                        variant="ghost"
-                        :active="visual.value === frequency.type"
-                        size="xs"
-                        :disabled="isEditingActionScript"
-                        @click="frequency.type = visual.value"
-                        >{{ visual.label }}</OButton
+                        data-test="cancel-upload-new-btn-file"
+                        variant="outline-destructive"
+                        size="sm-action"
+                        @click="cancelUploadingNewFile"
+                        >Cancel</OButton
                       >
+                    </div>
+                  </div>
+                  <div class="flex gap-2 mt-8">
+                    <OButton
+                      data-test="add-action-script-step1-continue-btn"
+                      variant="primary"
+                      size="sm"
+                      @click="
+                        goToStep(['codeZip'], formType === 'scheduled' ? 2 : 3)
+                      "
+                      >Continue</OButton
+                    >
+                  </div>
+                </OStep>
+
+                <OStep
+                  v-if="formType === 'scheduled'"
+                  data-test="add-action-script-step-2"
+                  :name="2"
+                  title="Schedule"
+                  icon="schedule"
+                  :done="step > 2"
+                  class="mt-3"
+                >
+                  <div class="my-2 px-2">
+                    <div
+                      style="font-size: 14px"
+                      class="font-bold text-gray-500 mb-2"
+                      data-test="add-action-script-frequency-title"
+                    >
+                      {{ t("actions.frequency") }} *
+                    </div>
+                    <div class="p-1 el-border-radius el-border w-fit">
+                      <template
+                        v-for="visual in frequencyTabs"
+                        :key="visual.value"
+                      >
+                        <OButton
+                          :data-test="`add-action-script-schedule-frequency-${visual.value}-btn`"
+                          variant="ghost"
+                          :active="visual.value === frequency.type"
+                          size="xs"
+                          :disabled="isEditingActionScript"
+                          @click="frequency.type = visual.value"
+                          >{{ visual.label }}</OButton
+                        >
+                      </template>
+                    </div>
+
+                    <div
+                      v-if="frequency.type === 'once'"
+                      class="flex justify-start items-center mt-3"
+                      data-test="add-action-script-frequency-info"
+                    >
+                      <OIcon name="event" size="sm" class="mr-2" />
+                      <div style="font-size: 14px">
+                        The script will be triggered immediately after it is saved
+                      </div>
+                    </div>
+
+                    <template v-if="frequency.type === 'repeat'">
+                      <div class="flex">
+                        <div
+                          data-test="add-action-script-cron-input"
+                          class="mr-2"
+                          style="padding-top: 8px; width: 320px"
+                        >
+                          <div
+                            class="mb-1 font-bold text-gray-500"
+                            data-test="add-action-script-cron-expression-title"
+                          >
+                            {{ t("reports.cronExpression") + " *" }}
+                            <OIcon
+                              data-test="add-action-script-cron-info"
+                              name="info"
+                              size="sm"
+                              class="ml-1 cursor-pointer text-gray-400"
+                            >
+                              <OTooltip side="right" align="center">
+                                <template #content>
+                                  <span style="font-size: 14px">
+                                    Pattern: * * * * * means every minute .
+                                    <br />
+                                    Format: [Minute 0-59] [Hour 0-23] [Day of Month
+                                    1-31, 'L'] [Month 1-12] [Day of Week 0-7 or
+                                    '1L-7L', 0 and 7 for Sunday].
+                                    <br />
+                                    Use '*' to represent any value, 'L' for the last
+                                    day/weekday. <br />
+                                    Example: 0 12 * * ? - Triggers at 12:00 PM
+                                    daily. It specifies minute, hour, day of month,
+                                    month, and day of week, respectively.
+                                  </span>
+                                </template>
+                              </OTooltip>
+                            </OIcon>
+                          </div>
+
+                          <OFormInput
+                            name="cron"
+                            class="showLabelOnTop"
+                            type="text"
+                            debounce="300"
+                            style="width: 100%"
+                            :disabled="isEditingActionScript"
+                            :readonly="isEditingActionScript"
+                          />
+                        </div>
+                        <div class="flex pt-2.75">
+                          <OFormSelect
+                            data-test="add-action-script-timezone-select"
+                            name="timezone"
+                            :options="['UTC']"
+                            :label="t('actions.timezone')"
+                            required
+                            :loading="isFetchingServiceAccounts"
+                            class="showLabelOnTop no-case mb-[2.4rem]"
+                            disabled
+                            style="min-width: 250px !important; width: 250px !important;"
+                          />
+                        </div>
+                      </div>
                     </template>
                   </div>
-
-                  <div
-                    v-if="frequency.type === 'once'"
-                    class="flex justify-start items-center mt-3"
-                    data-test="add-action-script-frequency-info"
-                  >
-                    <OIcon name="event" size="sm" class="mr-2" />
-                    <div style="font-size: 14px">
-                      The script will be triggered immediately after it is saved
-                    </div>
-                  </div>
-
-                  <template v-if="frequency.type === 'repeat'">
-                    <div class="flex">
-                      <div
-                        data-test="add-action-script-cron-input"
-                        class="mr-2"
-                        style="padding-top: 8px; width: 320px"
-                      >
-                        <div
-                          class="mb-1 font-bold text-gray-500"
-                          data-test="add-action-script-cron-expression-title"
-                        >
-                          {{ t("reports.cronExpression") + " *" }}
-                          <OIcon
-                            data-test="add-action-script-cron-info"
-                            name="info"
-                            size="sm"
-                            class="ml-1 cursor-pointer text-gray-400"
-                          >
-                            <OTooltip side="right" align="center">
-                              <template #content>
-                                <span style="font-size: 14px">
-                                  Pattern: * * * * * means every minute .
-                                  <br />
-                                  Format: [Minute 0-59] [Hour 0-23] [Day of Month
-                                  1-31, 'L'] [Month 1-12] [Day of Week 0-7 or
-                                  '1L-7L', 0 and 7 for Sunday].
-                                  <br />
-                                  Use '*' to represent any value, 'L' for the last
-                                  day/weekday. <br />
-                                  Example: 0 12 * * ? - Triggers at 12:00 PM
-                                  daily. It specifies minute, hour, day of month,
-                                  month, and day of week, respectively.
-                                </span>
-                              </template>
-                            </OTooltip>
-                          </OIcon>
-                        </div>
-
-                        <OInput
-                          v-model="frequency.cron"
-                          class="showLabelOnTop"
-                          type="text"
-                          :error="!!cronFieldError"
-                          :error-message="cronFieldError"
-                          debounce="300"
-                          style="width: 100%"
-                          @update:model-value="(v: string) => {
-                            cronFieldError = !v?.length ? 'Field is required!' : (cronError.length ? cronError : '');
-                            validateFrequency(frequency.cron);
-                          }"
-                          :disabled="isEditingActionScript"
-                          :readonly="isEditingActionScript"
-                        />
-                      </div>
-                      <div class="flex pt-2.75">
-                        <OSelect
-                          data-test="add-action-script-timezone-select"
-                          v-model="formData.timezone"
-                          :options="['UTC']"
-                          :label="t('actions.timezone') + ' *'"
-                          :loading="isFetchingServiceAccounts"
-                          class="showLabelOnTop no-case mb-[2.4rem]"
-                          disabled
-                          style="min-width: 250px !important; width: 250px !important;"
-                        />
-                      </div>
-                    </div>
-                  </template>
-                </div>
-                <div class="flex gap-2 mt-4">
-                  <OButton
-                    data-test="add-action-script-step2-back-btn"
-                    variant="outline"
-                    size="sm"
-                    @click="step--"
-                    >Back</OButton
-                  >
-                  <OButton
-                    data-test="add-action-script-step2-continue-btn"
-                    variant="primary"
-                    size="sm"
-                    @click="step++"
-                    >Continue</OButton
-                  >
-                </div>
-              </OStep>
-
-              <OStep
-                data-test="add-action-script-step-3"
-                :name="3"
-                title="Select Service Account"
-                icon="dashboard"
-                :done="step > 3"
-                class="mt-3"
-              >
-                <div class="flex items-center">
-                  <div>
-                    <div
-                      data-test="add-action-script-service-account-title"
-                      class="mb-1 font-bold text-gray-500"
+                  <div class="flex gap-2 mt-4">
+                    <OButton
+                      data-test="add-action-script-step2-back-btn"
+                      variant="outline"
+                      size="sm"
+                      @click="step--"
+                      >Back</OButton
                     >
-                      {{ t("actions.serviceAccount") + " *" }}
-                      <OIcon
-                        name="info"
-                        size="sm"
-                        class="ml-1 cursor-pointer text-gray-400"
-                      >
-                        <OTooltip side="right" align="center">
-                          <template #content>
-                            <span style="font-size: 14px">
-                              Make sure service account has permissions to access
-                              Actions.
-                            </span>
-                          </template>
-                        </OTooltip>
-                      </OIcon>
-                    </div>
-                    <OSelect
-                      data-test="add-action-script-service-account-select"
-                      v-model="formData.service_account"
-                      :options="filteredServiceAccounts"
-                      :loading="isFetchingServiceAccounts"
-                      class="py-2 no-case"
-                      labelKey="label"
-                      valueKey="value"
-                      :error="!!serviceAccountError"
-                      :error-message="serviceAccountError"
-                      @update:model-value="(v: any) => { serviceAccountError = v ? '' : 'Field is required!'; }"
-                      @search="(val: string) => {
-                        filteredServiceAccounts.value = val
-                          ? serviceAccountsOptions.filter((s: any) => s.label.toLowerCase().includes(val.toLowerCase()))
-                          : [...serviceAccountsOptions];
-                      }"
-                      style="min-width: 250px !important; width: 250px !important;"
-                    />
-                  </div>
-                </div>
-                <div class="flex gap-2 mt-4">
-                  <OButton
-                    data-test="add-action-script-step3-back-btn"
-                    variant="outline"
-                    size="sm"
-                    @click="step === 3 ? (step = formData.type === 'scheduled' ? 2 : 1) : step--"
-                    >Back</OButton
-                  >
-                  <OButton
-                    data-test="add-action-script-step3-continue-btn"
-                    variant="primary"
-                    size="sm"
-                    @click="step++"
-                    >Continue</OButton
-                  >
-                </div>
-              </OStep>
-              <OStep
-                data-test="add-action-script-step-4"
-                :name="4"
-                title="Environmental Variables"
-                icon="lock"
-                :done="step > 4"
-                class="mt-3"
-              >
-                <div
-                  v-for="(header, index) in environmentalVariables"
-                  :key="header.uuid"
-                  class="flex gap-2"
-                  data-test="add-action-script-env-variable"
-                >
-                  <div class="w-5/12 ml-0">
-                    <OInput
-                      :data-test="`add-action-script-header-${header['key']}-key-input`"
-                      v-model="header.key"
-                      :placeholder="'Key'"
-                      tabindex="0"
-                    />
-                  </div>
-                  <div class="w-5/12 ml-0 mb-2">
-                    <OInput
-                      :data-test="`add-action-script-header-${header['key']}-value-input`"
-                      v-model="header.value"
-                      :placeholder="t('alert_destinations.api_header_value')"
-                      tabindex="0"
-                    />
-                  </div>
-                  <div class="w-1/6 ml-0">
                     <OButton
-                      :data-test="`add-action-script-header-${header['key']}-delete-btn`"
-                      variant="ghost"
-                      size="icon-circle-sm"
-                      :title="t('alert_templates.delete')"
-                      @click="deleteApiHeader(header)"
-                      ><OIcon name="delete" size="sm"
-                    /></OButton>
-                    <OButton
-                      data-test="add-action-script-add-header-btn"
-                      v-if="index === environmentalVariables.length - 1"
-                      variant="ghost"
-                      size="icon-circle-sm"
-                      :title="t('alert_templates.edit')"
-                      @click="addApiHeader()"
-                      ><OIcon name="add" size="sm"
-                    /></OButton>
+                      data-test="add-action-script-step2-continue-btn"
+                      variant="primary"
+                      size="sm"
+                      @click="goToStep(['cron', 'timezone'], 3)"
+                      >Continue</OButton
+                    >
                   </div>
-                </div>
-                <div class="flex gap-2 mt-4">
-                  <OButton
-                    data-test="add-action-script-step4-back-btn"
-                    variant="outline"
-                    size="sm"
-                    @click="step--"
-                    >Back</OButton
-                  >
-                </div>
-              </OStep>
-            </OStepper>
+                </OStep>
 
+                <OStep
+                  data-test="add-action-script-step-3"
+                  :name="3"
+                  title="Select Service Account"
+                  icon="dashboard"
+                  :done="step > 3"
+                  class="mt-3"
+                >
+                  <div class="flex items-center">
+                    <div>
+                      <div
+                        data-test="add-action-script-service-account-title"
+                        class="mb-1 font-bold text-gray-500"
+                      >
+                        {{ t("actions.serviceAccount") + " *" }}
+                        <OIcon
+                          name="info"
+                          size="sm"
+                          class="ml-1 cursor-pointer text-gray-400"
+                        >
+                          <OTooltip side="right" align="center">
+                            <template #content>
+                              <span style="font-size: 14px">
+                                Make sure service account has permissions to access
+                                Actions.
+                              </span>
+                            </template>
+                          </OTooltip>
+                        </OIcon>
+                      </div>
+                      <OFormSelect
+                        data-test="add-action-script-service-account-select"
+                        name="service_account"
+                        required
+                        :options="filteredServiceAccounts"
+                        :loading="isFetchingServiceAccounts"
+                        class="py-2 no-case"
+                        labelKey="label"
+                        valueKey="value"
+                        style="min-width: 250px !important; width: 250px !important;"
+                      />
+                    </div>
+                  </div>
+                  <div class="flex gap-2 mt-4">
+                    <OButton
+                      data-test="add-action-script-step3-back-btn"
+                      variant="outline"
+                      size="sm"
+                      @click="step === 3 ? (step = formType === 'scheduled' ? 2 : 1) : step--"
+                      >Back</OButton
+                    >
+                    <OButton
+                      data-test="add-action-script-step3-continue-btn"
+                      variant="primary"
+                      size="sm"
+                      @click="goToStep(['service_account'], 4)"
+                      >Continue</OButton
+                    >
+                  </div>
+                </OStep>
+                <OStep
+                  data-test="add-action-script-step-4"
+                  :name="4"
+                  title="Environmental Variables"
+                  icon="lock"
+                  :done="step > 4"
+                  class="mt-3"
+                >
+                  <!-- Env vars are a dynamic key/value array (DEFERRED per the
+                       migration brief): they carry no validation today and the
+                       form-array pattern is not yet live, so these stay bare
+                       OInput bound to the component-owned `environmentalVariables`
+                       and are NOT part of the form schema. -->
+                  <div
+                    v-for="(header, index) in environmentalVariables"
+                    :key="header.uuid"
+                    class="flex gap-2"
+                    data-test="add-action-script-env-variable"
+                  >
+                    <div class="w-5/12 ml-0">
+                      <OInput
+                        :data-test="`add-action-script-header-${header['key']}-key-input`"
+                        v-model="header.key"
+                        :placeholder="'Key'"
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="w-5/12 ml-0 mb-2">
+                      <OInput
+                        :data-test="`add-action-script-header-${header['key']}-value-input`"
+                        v-model="header.value"
+                        :placeholder="t('alert_destinations.api_header_value')"
+                        tabindex="0"
+                      />
+                    </div>
+                    <div class="w-1/6 ml-0">
+                      <OButton
+                        :data-test="`add-action-script-header-${header['key']}-delete-btn`"
+                        variant="ghost"
+                        size="icon-circle-sm"
+                        :title="t('alert_templates.delete')"
+                        @click="deleteApiHeader(header)"
+                        ><OIcon name="delete" size="sm"
+                      /></OButton>
+                      <OButton
+                        data-test="add-action-script-add-header-btn"
+                        v-if="index === environmentalVariables.length - 1"
+                        variant="ghost"
+                        size="icon-circle-sm"
+                        :title="t('alert_templates.edit')"
+                        @click="addApiHeader()"
+                        ><OIcon name="add" size="sm"
+                      /></OButton>
+                    </div>
+                  </div>
+                  <div class="flex gap-2 mt-4">
+                    <OButton
+                      data-test="add-action-script-step4-back-btn"
+                      variant="outline"
+                      size="sm"
+                      @click="step--"
+                      >Back</OButton
+                    >
+                  </div>
+                </OStep>
+              </OStepper>
+
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="mx-2">
-      <div
-        class="flex justify-end gap-2 px-3 w-full py-[0.625rem] card-container"
-        style="position: sticky; bottom: 0px; z-index: 2"
-      >
-        <OButton
-          data-test="add-action-script-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="openCancelDialog"
-          >{{ t("alerts.cancel") }}</OButton
+      <div class="mx-2">
+        <div
+          class="flex justify-end gap-2 px-3 w-full py-[0.625rem] card-container"
+          style="position: sticky; bottom: 0px; z-index: 2"
         >
-        <OButton
-          data-test="add-action-script-save-btn"
-          variant="primary"
-          size="sm-action"
-          @click="saveActionScript"
-          >{{ t("alerts.save") }}</OButton
-        >
+          <OButton
+            data-test="add-action-script-cancel-btn"
+            variant="outline"
+            size="sm-action"
+            :disabled="isSubmitting"
+            @click="openCancelDialog"
+            >{{ t("alerts.cancel") }}</OButton
+          >
+          <OButton
+            data-test="add-action-script-save-btn"
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            :loading="isSubmitting"
+            >{{ t("alerts.save") }}</OButton
+          >
+        </div>
       </div>
-    </div>
+    </OForm>
   </div>
 
   <ConfirmDialog
@@ -496,12 +488,19 @@ import service_accounts from "@/services/service_accounts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormFile from "@/lib/forms/File/OFormFile.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
-import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeEditScriptSchema,
+  type EditScriptForm,
+} from "./EditScript.schema";
 
 defineProps({
   report: {
@@ -540,8 +539,6 @@ const defaultActionScript = {
 
 const { t } = useI18n();
 const router = useRouter();
-
-const fileInput = ref(null);
 
 const originalActionScriptData: Ref<string> = ref("");
 
@@ -613,11 +610,6 @@ const isEditingActionScript = ref(false);
 const isFetchingActionScript = ref(false);
 
 const environmentalVariables = ref([{ key: "", value: "", uuid: getUUID() }]);
-const cronError = ref("");
-const nameError = ref("");
-const typeError = ref("");
-const cronFieldError = ref("");
-const serviceAccountError = ref("");
 
 const frequency = ref({
   type: "once",
@@ -627,6 +619,213 @@ const frequency = ref({
   },
   cron: "",
 });
+
+// ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
+// This component OWNS the <OForm> AND reads form state (`type`) to drive the
+// OStepper's conditional "Schedule" step. Vue `provide` flows downward, so the
+// owner cannot `inject` the form — it creates the form headlessly with useOForm
+// and reads it reactively via form.useStore (NOT a formRef + form.state.values
+// snapshot, which a computed cannot track). The form is handed to
+// <OForm :form="form">; the save is wired through useOForm({ onSubmit }).
+
+/**
+ * Validates a non-empty cron expression: parse-ability + min-refresh-interval.
+ * Returns an error message or "" when valid. Injected into the schema's
+ * superRefine so the cron rules live in the schema (no hand-rolled validate()).
+ */
+const getCronError = (cron: string): string => {
+  const value = String(cron ?? "").trim();
+  if (!value) return "Invalid cron expression!";
+  try {
+    CronExpressionParser.parse(value, {
+      currentDate: new Date(),
+      utc: true,
+    });
+  } catch {
+    return "Invalid cron expression!";
+  }
+  try {
+    const intervalInSecs = getCronIntervalDifferenceInSeconds(value);
+    if (
+      typeof intervalInSecs === "number" &&
+      !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
+    ) {
+      const minInterval =
+        Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
+      return `Frequency should be greater than ${minInterval - 1} seconds.`;
+    }
+  } catch {
+    return "Invalid cron expression!";
+  }
+  return "";
+};
+
+// Sticky flag: has the user edited the cron field? Byte-exact main parity — main
+// only validated cron once its inline @update handler had run (i.e. after an edit),
+// so a never-touched blank cron on create still saved. Flipped below the first time
+// the cron form value changes from user input. Injected into the schema's cron gate.
+const cronEdited = ref(false);
+
+// Co-located Zod schema (factory keeps create-vs-edit + cron checks injectable).
+const editScriptSchema = makeEditScriptSchema({
+  t,
+  getIsEditing: () => isEditingActionScript.value,
+  getCronError,
+  // Main validated cron via TWO paths (see EditScript.schema.ts):
+  //   (a) submit-path gate on execution_details === "repeat" (fires on EDIT), and
+  //   (b) the cron field's inline handler, which only ran after the user edited it.
+  getExecutionDetails: () => formData.value.execution_details ?? "",
+  getCronEdited: () => cronEdited.value,
+});
+
+// Dynamic (edit-prefill) defaults: projects the form-owned fields out of the
+// component's `formData` / `frequency`. Seeds useOForm at create; re-applied
+// via form.reset() when an edited record arrives async (see below).
+const editScriptDefaults = computed((): EditScriptForm => ({
+  name: formData.value.name ?? "",
+  description: formData.value.description ?? "",
+  type: formData.value.type ?? "scheduled",
+  service_account: formData.value.service_account ?? "",
+  timezone: formData.value.timezone ?? "UTC",
+  codeZip: (formData.value.codeZip as File | null) ?? null,
+  cron: frequency.value.cron ?? "",
+  frequencyType: frequency.value.type ?? "once",
+}));
+
+// Headless form (Rule ③ owner). defaultValues seed the blank create form; the
+// async edit record re-seeds via form.reset() below. onSubmit is deferred to
+// saveActionScript (defined later) so <OForm :form> runs the same save.
+const form = useOForm<EditScriptForm>({
+  defaultValues: editScriptDefaults.value,
+  schema: editScriptSchema,
+  onSubmit: (value) => saveActionScript(value),
+});
+
+// Reproduce main's "validate cron only after the field is edited" gate. On CREATE
+// the only cron-value changes come from user input — the field is disabled on edit
+// and create never calls form.reset — so a change here means the user edited it
+// (main's inline @update trigger). Guarded by !isEditing so the edit-load re-seed
+// (form.reset) doesn't count. Sticky, so a typed-then-cleared cron still validates
+// (matches main, which showed "Field is required!" on clear).
+const cronFieldValue = form.useStore((s: any) => s?.values?.cron ?? "");
+watch(cronFieldValue, () => {
+  if (!isEditingActionScript.value) cronEdited.value = true;
+});
+
+// Read the form-owned `type` reactively (form.useStore) — the stepper's
+// "Schedule" step shows only for a scheduled action.
+const formTypeValue = form.useStore((s: any) => s.values.type);
+const formType = computed<string>(
+  () => (formTypeValue.value as string) ?? formData.value.type ?? "scheduled",
+);
+
+// The Schedule step only exists for scheduled actions. If the user switches
+// type while ON that step, its panel unmounts and no step would be active —
+// snap forward to the next step (mirrors the 1 → 3 Continue skip).
+watch(formType, (t) => {
+  if (t !== "scheduled" && step.value === 2) step.value = 3;
+});
+
+// ── Per-step "Continue" validation ───────────────────────────────────────────
+// Continue used to blindly advance the OStepper; a user could walk past a blank
+// required field and only discover it at Save. This runs the SAME schema-driven
+// validation the footer Save uses (mirrors OForm.validate(): validate each field,
+// then read its meta.errors), and gates the advance ONLY on the fields listed at
+// the call site (the step's own fields — see the template's Continue buttons).
+//
+// We deliberately do NOT clear other fields' error meta here. The schema is
+// form-level, so form.validateField() runs the whole Zod schema and records every
+// field's error — but that write is additive, so Save's cross-step errors stay
+// put (clearing them made a later Continue wipe the errors Save had just surfaced
+// on other steps). We simply don't READ the out-of-step fields when deciding
+// whether to advance.
+const validateStepFields = async (fields: string[]): Promise<boolean> => {
+  let valid = true;
+  for (const name of fields) {
+    await form.validateField(name, "submit");
+    const errors = form.getFieldMeta(name)?.errors ?? [];
+    if (errors.length > 0) valid = false;
+  }
+  return valid;
+};
+
+// Validate the given fields; only advance to `next` when they all pass.
+const goToStep = async (fields: string[], next: number) => {
+  if (await validateStepFields(fields)) step.value = next;
+};
+
+// Map a Zod issue path to its OForm field name so we can match issues to the
+// field that owns them: ["cron"] → "cron". Actions only has flat scalar fields,
+// but keep the same helper reports uses (handles nested array paths too) for parity.
+const issuePathToName = (path: readonly (string | number)[]): string =>
+  path.reduce<string>(
+    (acc, seg) =>
+      typeof seg === "number"
+        ? `${acc}[${seg}]`
+        : acc
+          ? `${acc}.${seg}`
+          : String(seg),
+    "",
+  );
+
+// Clear a field's error the instant its value becomes valid — scoped to that one
+// field, never touching the others. Needed because the stepper's Continue
+// validates with validateField("submit"), which does NOT flip the form into
+// revalidate-on-change mode, so editing an OForm* field would otherwise leave a
+// stale error until the next Save (e.g. the uploaded ZIP kept showing "ZIP File
+// is required!" and a typed name kept showing "Name is required"). This ONLY
+// clears — it never adds errors — so editing one field can't surface validation
+// on another (no bleed to other steps).
+const formValuesRef = form.useStore((s: any) => s.values);
+watch(
+  formValuesRef,
+  () => {
+    const res = editScriptSchema.safeParse(form.state.values);
+    const invalidNames = new Set(
+      res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
+    );
+    for (const name of Object.keys(form.state.fieldMeta ?? {})) {
+      const meta = form.getFieldMeta(name);
+      if (!meta) continue;
+      const hasError = (meta.errors?.length ?? 0) > 0;
+      if (hasError && !invalidNames.has(name)) {
+        form.setFieldMeta(name, { ...meta, errorMap: {} });
+      }
+    }
+
+    // Also reconcile the FORM-LEVEL error map, not just per-field metas. A
+    // Continue click validates via validateField("submit"); because the schema is
+    // form-level, that runs the WHOLE Zod schema and records EVERY failing path
+    // into the form's own errorMap.onDynamic. When the form later becomes fully
+    // valid, clearing the field metas above is not enough: handleSubmit()
+    // re-validates fields but never re-runs or clears this form-level result, so
+    // canSubmit stays false and Save is silently blocked. Clear it here once the
+    // whole schema passes — like the loop above, this ONLY clears, so it can never
+    // reveal an error early.
+    if (res.success) {
+      const em: any = form.state.errorMap ?? {};
+      if (em.onDynamic != null || em.onDynamicAsync != null) {
+        form.setErrorMap({
+          ...em,
+          onDynamic: undefined,
+          onDynamicAsync: undefined,
+        });
+      }
+    }
+  },
+  { deep: true },
+);
+
+// Bridge the component-owned frequency tabs (repeat/once) into the form so the
+// schema's cron superRefine can branch on it. Default-values seeds the initial
+// value; this keeps it in sync on toggle (and re-validates cron after the first
+// submit, per revalidateLogic).
+watch(
+  () => frequency.value.type,
+  (v) => {
+    form.setFieldValue("frequencyType", v);
+  },
+);
 
 watch(
   () => router.currentRoute.value.query?.id,
@@ -682,153 +881,98 @@ const browserTime =
 timezoneOptions.unshift("UTC");
 timezoneOptions.unshift(browserTime);
 
-const saveActionScript = async () => {
-  // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
-  // if (frequency.value.type === "Repeat") {
-  //   const now = new Date();
+// @submit fires only once the whole Zod schema passes (name/type/service_account/
+// timezone + the codeZip-on-create and cron-when-scheduled-repeat superRefines),
+// so the schema — not a manual gate — blocks an invalid save and reveals errors.
+// `value` is the validated payload (source of truth for the form-owned fields);
+// env vars stay component-owned. The promise is returned so OForm's awaited
+// isSubmitting drives the footer Save spinner.
+const saveActionScript = async (value: EditScriptForm) => {
+  let form: FormData | Record<string, any>;
 
-  //   // Get the day, month, and year from the date object
-  //   const day = String(now.getDate()).padStart(2, "0");
-  //   const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
-  //   const year = now.getFullYear();
-
-  //   // Combine them in the DD-MM-YYYY format
-  //   scheduling.value.date = `${day}-${month}-${year}`;
-
-  //   // Get the hours and minutes, ensuring they are formatted with two digits
-  //   const hours = String(now.getHours()).padStart(2, "0");
-  //   const minutes = String(now.getMinutes()).padStart(2, "0");
-
-  //   // Combine them in the HH:MM format
-  //   scheduling.value.time = `${hours}:${minutes}`;
-  // }
-
-  // // If the user has selected to schedule now, we set the timezone to the current timezone
-  // if (formData.value.execution_details === "Once") {
-  //   scheduling.value.timezone = timezone.value;
-  // }
-  let form;
-
-  // Determine if FormData is needed
+  // FormData is needed on create, or when editing WITH a newly-uploaded file.
   const useFormData =
     !isEditingActionScript.value ||
-    (isEditingActionScript.value && formData.value.codeZip);
-  // Initialize form as FormData or plain object
+    (isEditingActionScript.value && !!value.codeZip);
   form = useFormData ? new FormData() : {};
 
-  // Common fields
   const commonFields: Record<string, any> = {
-    name: formData.value.name,
-    description: formData.value.description,
+    // Trim the name in the payload — parity with the pre-migration `v-model.trim`,
+    // which saved the trimmed name. Schema `.trim()` only validates the trimmed
+    // value; it is not written back into `value`, so trim it here.
+    name: (value.name ?? "").trim(),
+    description: value.description,
+    // Use the validated form value (frequencyType), not the component-owned
+    // frequency.value.type — the schema's cron rule branches on frequencyType,
+    // so the payload must agree with what was validated.
     execution_details:
-      formData.value.type === "scheduled"
-        ? frequency.value.type
-        : formData.value.type,
-    service_account: formData.value.service_account,
+      value.type === "scheduled" ? value.frequencyType : value.type,
+    service_account: value.service_account,
   };
-  // const convertedDateTime = convertDateToTimestamp(
-  //   scheduling.value.date,
-  //   scheduling.value.time,
-  //   scheduling.value.timezone,
-  // );
 
-  // Add cron expression if needed
-  if (
-    formData.value.type === "scheduled" &&
-    frequency.value.type === "repeat"
-  ) {
-    commonFields.cron_expr = frequency.value.cron.toString().trim();
-    // commonFields.timezoneOffset = convertedDateTime.offset.toString();
-    // commonFields.timezone = scheduling.value.timezone;
+  // Add cron expression for a scheduled action on a repeat schedule.
+  if (value.type === "scheduled" && value.frequencyType === "repeat") {
+    commonFields.cron_expr = String(value.cron ?? "").trim();
   }
 
   if (useFormData) {
     commonFields.owner = store.state.userInfo.email;
   }
-  // if (frequency.value.type == "Once") {
-  //   commonFields.timezone = null;
-  //   commonFields.timezoneOffset = null;
-  // }
 
-  // Add environment variables if present
+  // Add environment variables if present (component-owned dynamic array).
   if (environmentalVariables.value.length > 0) {
-    // Convert environmentalVariables to an object, ignoring conflicts with mandatory keys
     const environment_variables = environmentalVariables.value.reduce(
       (acc: any, curr: any) => {
-        // Check if the key exists in mandatoryKeys
         if (curr.key) {
-          // Add the key only if it is not a mandatory key
           acc[curr.key] = curr.value;
         }
-
         return acc;
       },
       {},
     );
-
-    // Assign to commonFields
     commonFields.environment_variables = environment_variables;
   }
 
   // Populate form (either FormData or plain object)
-  Object.entries(commonFields).forEach(([key, value]) => {
+  Object.entries(commonFields).forEach(([key, val]) => {
     if (useFormData) {
       (form as FormData).append(
         key,
-        typeof value === "object" ? JSON.stringify(value) : value,
+        typeof val === "object" ? JSON.stringify(val) : val,
       );
     } else {
-      (form as Record<string, any>)[key] = value;
+      (form as Record<string, any>)[key] = val;
     }
   });
 
   // Add file fields if using FormData
-  if (useFormData && formData.value.codeZip) {
-    (form as FormData).append("file", formData.value.codeZip || "");
-    (form as FormData).append(
-      "filename",
-      (formData.value.codeZip as File).name || "",
-    );
+  if (useFormData && value.codeZip) {
+    (form as FormData).append("file", value.codeZip as File);
+    (form as FormData).append("filename", (value.codeZip as File).name || "");
   }
 
-  if (isEditingActionScript.value && formData.value.codeZip) {
+  if (isEditingActionScript.value && value.codeZip) {
     (form as FormData).append("id", formData.value.id);
   }
 
-  // Check if all report input fields are valid
-  try {
-    validateActionScriptData();
-    await nextTick();
-    // Inline validation for migrated O2 fields
-    nameError.value = !formData.value.name
-      ? t('common.nameRequired')
-      : !isValidResourceName(formData.value.name)
-        ? 'Characters like :, ?, /, #, and spaces are not allowed.'
-        : '';
-    typeError.value = formData.value.type ? '' : 'Field is required!';
-    serviceAccountError.value = formData.value.service_account ? '' : 'Field is required!';
-    if (formData.value.execution_details === 'repeat') {
-      cronFieldError.value = !frequency.value.cron?.length ? 'Field is required!' : (cronError.value.length ? cronError.value : '');
-    }
-    if (nameError.value || typeError.value || serviceAccountError.value || cronFieldError.value) return;
-  } catch (err) {
-    console.log(err);
-  }
-
   const updateAction =
-    isEditingActionScript.value && !formData.value.codeZip
+    isEditingActionScript.value && !value.codeZip
       ? actions.update
       : actions.create;
 
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
-      timeout: 0,
-});
+    timeout: 0,
+  });
   const actionId: string = (router.currentRoute.value.query?.id ||
     "") as string;
 
-  updateAction(store.state.selectedOrganization.identifier, actionId, form)
+  return updateAction(
+    store.state.selectedOrganization.identifier,
+    actionId,
+    form,
+  )
     .then(() => {
       toast({
         variant: "success",
@@ -841,7 +985,7 @@ const saveActionScript = async () => {
     })
     .catch((error) => {
       step.value = 3;
-      if (error.response.status != 403) {
+      if (error.response?.status != 403) {
         toast({
           variant: "error",
           message:
@@ -855,72 +999,6 @@ const saveActionScript = async () => {
     .finally(() => {
       dismiss();
     });
-};
-
-const validateActionScriptData = async () => {
-  if (!formData.value.codeZip && !isEditingActionScript.value) {
-    step.value = 1;
-    return;
-  }
-
-  if (formData.value.execution_details === "repeat") {
-    try {
-      cronError.value = "";
-      CronExpressionParser.parse(frequency.value.cron, {
-        currentDate: new Date(),
-        utc: true,
-      });
-      validateFrequency(frequency.value.cron);
-    } catch (err) {
-      cronError.value = "Invalid cron expression!";
-      return;
-    }
-  }
-
-  if (formData.value.execution_details === "repeat" && cronError.value) {
-    step.value = 2;
-    return;
-  }
-
-  if (!formData.value.service_account) {
-    step.value = 3;
-    return;
-  }
-
-  if (!formData.value.execution_details) {
-    step.value = 2;
-    return;
-  }
-
-  // if (!formData.value.timezone) {
-  //   step.value = 2;
-  //   return;
-  // }
-};
-
-const validateFrequency = (value: string) => {
-  cronError.value = "";
-
-  if (!value || !value.trim()) {
-    cronError.value = "Invalid cron expression!";
-    return;
-  }
-
-  try {
-    const intervalInSecs = getCronIntervalDifferenceInSeconds(value);
-
-    if (
-      typeof intervalInSecs === "number" &&
-      !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
-    ) {
-      const minInterval =
-        Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-      cronError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
-      return;
-    }
-  } catch (err) {
-    cronError.value = "Invalid cron expression!";
-  }
 };
 
 const goToActionScripts = () => {
@@ -945,29 +1023,6 @@ const setupEditingActionScript = async (report: any) => {
     formData.value.type = "service";
   }
 
-  // set date, time and timezone in scheduling
-  // const date = new Date(report.start / 1000);
-
-  // // Get the day, month, and year from the date object
-  // const day = String(date.getDate()).padStart(2, "0");
-  // const month = String(date.getMonth() + 1).padStart(2, "0"); // January is 0!
-  // const year = date.getFullYear();
-
-  // // Combine them in the DD-MM-YYYY format
-  // scheduling.value.date = `${day}-${month}-${year}`;
-
-  // // Get the hours and minutes, ensuring they are formatted with two digits
-  // const hours = String(date.getHours()).padStart(2, "0");
-  // const minutes = String(date.getMinutes()).padStart(2, "0");
-
-  // // Combine them in the HH:MM format
-  // scheduling.value.time = `${hours}:${minutes}`;
-
-  // scheduling.value.timezone = report.timezone;
-
-  // // set selectedTimeTab to scheduleLater
-  // selectedTimeTab.value = "scheduleLater";
-
   // set frequency
   if (report.execution_details == "repeat") {
     frequency.value.type = "repeat";
@@ -989,7 +1044,17 @@ const setupEditingActionScript = async (report: any) => {
 };
 
 const openCancelDialog = () => {
-  if (originalActionScriptData.value === JSON.stringify(formData.value)) {
+  // Dirty-check across BOTH sources of truth. The <OForm> now owns the scalar
+  // fields (name/description/type/service_account/timezone/codeZip/cron), so
+  // editing them updates TanStack state — NOT `formData`. A `formData`-only
+  // compare therefore misses real edits and skips this confirmation (silent
+  // discard). `form.state.isDirty` catches any edited form field; the `formData`
+  // snapshot still catches the file-name display + env-var deletes, which remain
+  // component-owned. Show the confirm if EITHER changed.
+  const formEdited = form.state.isDirty;
+  const formDataEdited =
+    originalActionScriptData.value !== JSON.stringify(formData.value);
+  if (!formEdited && !formDataEdited) {
     goToActionScripts();
     return;
   }
@@ -1037,6 +1102,9 @@ const isRequiredValue = (value: any) => {
 
 const handleActionScript = async () => {
   isEditingActionScript.value = !!router.currentRoute.value.query?.id;
+  // Fresh load starts with an unedited cron field (edit-load re-seeds via
+  // form.reset, which re-baselines isDirty; this covers route re-navigation).
+  cronEdited.value = false;
 
   if (isEditingActionScript.value) {
     isEditingActionScript.value = true;
@@ -1046,10 +1114,16 @@ const handleActionScript = async () => {
       "") as string;
     actions
       .get_by_id(store.state.selectedOrganization.identifier, actionId)
-      .then((res: any) => {
-        setupEditingActionScript(res.data);
+      .then(async (res: any) => {
+        await setupEditingActionScript(res.data);
 
         originalActionScriptData.value = JSON.stringify(formData.value);
+
+        // :default-values is read once at mount; the record arrives async, so
+        // re-seed the form-owned fields when it loads (playbook §4.2/§5.8 —
+        // form.reset(record), not a per-field setFieldValue loop).
+        await nextTick();
+        form.reset(editScriptDefaults.value);
       })
       .catch((err) => {
         if (err.response.status != 403) {

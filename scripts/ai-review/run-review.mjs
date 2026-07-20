@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,40 +30,38 @@ const NOISE_EXTENSIONS = [".min.js", ".min.css", ".bundle.js", ".map", ".svg"];
 const NOISE_GENERATED_MARKERS = ["@generated", "auto-generated", "DO NOT EDIT", "Generated file"];
 
 // ─── Agent definitions ─────────────────────────────────────────────────────
+// Model/agent execution is delegated to `opencode serve` (see OpencodeServer below).
+// Each key here maps to an agent of the same name (`ai-review-<key>`) registered in
+// opencode.jsonc, all running GLM-5.2 at max reasoning effort with read-only repo tools.
 const AGENTS = {
   security: {
     name: "Security Reviewer",
     promptFile: "agents/security.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-security",
     fileFocus: f => /\.rs$|\.toml$|auth|authz|oauth|token|crypto|secret|password|unsafe/.test(f),
   },
   "code-quality": {
     name: "Code Quality Reviewer",
     promptFile: "agents/code-quality.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-code-quality",
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.js$/.test(f),
   },
   performance: {
     name: "Performance Reviewer",
     promptFile: "agents/performance.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-performance",
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.sql$/.test(f),
   },
   documentation: {
     name: "Documentation Reviewer",
     promptFile: "agents/documentation.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-documentation",
     fileFocus: () => true,
   },
   release: {
     name: "Release Reviewer",
     promptFile: "agents/release.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-release",
     fileFocus: f => /Cargo\.toml|package\.json|\.sql$|migration|Migration|\.yml$|Dockerfile|docker/.test(f),
   },
 };
@@ -74,17 +72,17 @@ const RISK_TIERS = {
     maxLines: 10,
     maxFiles: 20,
     agents: ["code-quality"],
-    coordinatorModel: "deepseek-chat",
+    coordinatorAgent: "ai-review-coordinator",
   },
   lite: {
     maxLines: 100,
     maxFiles: 20,
     agents: ["code-quality", "documentation"],
-    coordinatorModel: "deepseek-chat",
+    coordinatorAgent: "ai-review-coordinator",
   },
   full: {
     agents: ["security", "code-quality", "performance", "documentation", "release"],
-    coordinatorModel: "deepseek-chat",
+    coordinatorAgent: "ai-review-coordinator",
   },
 };
 
@@ -109,6 +107,37 @@ function ghSilent(args) {
     return gh(args);
   } catch {
     return "";
+  }
+}
+
+function git(args) {
+  return execSync(`git ${args}`, {
+    encoding: "utf-8",
+    maxBuffer: 50 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"],
+  }).trim();
+}
+
+function execErrorText(err) {
+  return [err?.message, err?.stderr?.toString(), err?.stdout?.toString()].filter(Boolean).join(" ");
+}
+
+// The API refuses to render a diff over 20k lines (HTTP 406). GitHub still publishes the
+// merge commit for the PR, and its first parent is the merge base, so diffing the two
+// reproduces the same three-dot diff with no size ceiling.
+function diffFromMergeRef(prNumber) {
+  git(`fetch --no-tags --depth=2 origin "refs/pull/${prNumber}/merge"`);
+  return git("diff FETCH_HEAD^1 FETCH_HEAD");
+}
+
+function fetchPrDiff(prNumber) {
+  try {
+    return gh(`pr diff "${prNumber}"`);
+  } catch (err) {
+    const detail = execErrorText(err);
+    if (!/exceeded the maximum number of lines|HTTP 406/i.test(detail)) throw err;
+    console.log(`[${isoNow()}] PR diff is too large for the GitHub API; rebuilding it from the merge ref`);
+    return diffFromMergeRef(prNumber);
   }
 }
 
@@ -447,87 +476,190 @@ function assessRiskTier(filteredDiff) {
   return "full";
 }
 
-// ─── LLM calls (DeepSeek only) ─────────────────────────────────────────────
+// ─── LLM calls (via `opencode serve`, GLM-5.2 max effort) ─────────────────
+//
+// Each reviewer/coordinator is a named agent in opencode.jsonc (ai-review-*), running
+// read-only against the checked-out repo via OpencodeServer + callOpencode below. Unlike
+// a bare chat-completion call, opencode agents can Read/Grep the actual codebase around
+// the diff, not just the diff text — that repo context is the main quality lever over the
+// old DeepSeek-only approach.
 
-async function callDeepSeek(systemPrompt, userPrompt, model, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new Error("DEEPSEEK_API_KEY not set");
+class OpencodeServer {
+  constructor() {
+    this.proc = null;
+    this.baseUrl = "";
+    this.starting = null;
+  }
 
+  async ensureStarted() {
+    if (this.baseUrl) return this.baseUrl;
+    if (this.starting) return this.starting;
+
+    this.starting = (async () => {
+      const apiKey = process.env.GLM_API_KEY;
+      if (!apiKey) throw new Error("GLM_API_KEY not set");
+
+      const proc = spawn("opencode", ["serve", "--hostname", "127.0.0.1", "--port", "0"], {
+        cwd: resolve(__dirname, "../.."),
+        env: { ...process.env },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      this.proc = proc;
+
+      let stderrTail = "";
+      proc.stderr.on("data", chunk => {
+        stderrTail = (stderrTail + chunk.toString()).slice(-4000);
+      });
+
+      const urlPattern = /opencode server listening on (http:\/\/[^\s]+)/;
+      const url = await new Promise((resolvePromise, rejectPromise) => {
+        let buf = "";
+        const onData = chunk => {
+          buf += chunk.toString();
+          const match = urlPattern.exec(buf) || urlPattern.exec(stderrTail);
+          if (match) {
+            cleanup();
+            resolvePromise(match[1]);
+          }
+        };
+        const onExit = code => {
+          cleanup();
+          rejectPromise(new Error(`opencode serve exited early (code ${code}): ${stderrTail}`));
+        };
+        const cleanup = () => {
+          proc.stdout.off("data", onData);
+          proc.stderr.off("data", onData);
+          proc.off("exit", onExit);
+        };
+        proc.stdout.on("data", onData);
+        proc.stderr.on("data", onData);
+        proc.on("exit", onExit);
+        setTimeout(() => {
+          cleanup();
+          rejectPromise(new Error(`opencode serve did not start within 30s: ${stderrTail}`));
+        }, 30_000);
+      });
+
+      proc.on("exit", () => {
+        this.baseUrl = "";
+        this.proc = null;
+      });
+
+      this.baseUrl = url;
+      return url;
+    })();
+
+    try {
+      return await this.starting;
+    } finally {
+      this.starting = null;
+    }
+  }
+
+  stop() {
+    if (this.proc && !this.proc.killed) {
+      this.proc.kill("SIGTERM");
+    }
+    this.proc = null;
+    this.baseUrl = "";
+  }
+}
+
+const OPENCODE = new OpencodeServer();
+
+function extractText(parts) {
+  return (parts || [])
+    .filter(p => p.type === "text")
+    .map(p => p.text || "")
+    .join("\n")
+    .trim();
+}
+
+async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
     "gen_ai.operation.name": traceOptions.operationName || "chat",
-    "gen_ai.system": "deepseek",
-    "gen_ai.request.model": model || "deepseek-chat",
-    "gen_ai.request.temperature": 0,
-    "gen_ai.request.max_tokens": 8192,
+    "gen_ai.system": "zai",
+    "gen_ai.request.model": "glm-5.2",
+    "gen_ai.request.reasoning_effort": "max",
     "ai.agent.key": traceOptions.agentKey,
     "ai.agent.name": traceOptions.agentName,
     "gen_ai.agent.name": traceOptions.agentName,
-    "server.address": "api.deepseek.com",
-    "url.full": "https://api.deepseek.com/v1/chat/completions",
-    "http.request.method": "POST",
+    "opencode.agent": agentName,
     "timeout.ms": timeoutMs,
   }, traceOptions.parentSpan);
 
-  const messages = [
-    { role: "system", content: systemPrompt.slice(0, 100_000) },
-    { role: "user", content: userPrompt.slice(0, 150_000) },
-  ];
+  const truncatedSystem = systemPrompt.slice(0, 100_000);
+  const truncatedUser = userPrompt.slice(0, 150_000);
 
   TRACE.setSpanAttributes(llmSpan, {
-    "gen_ai.input.messages": JSON.stringify(messages),
-    "gen_ai.prompt.0.role": messages[0].role,
-    "gen_ai.prompt.0.content": messages[0].content,
-    "gen_ai.prompt.1.role": messages[1].role,
-    "gen_ai.prompt.1.content": messages[1].content,
-    "gen_ai.prompt.system.content_length": messages[0].content.length,
-    "gen_ai.prompt.user.content_length": messages[1].content.length,
+    "gen_ai.prompt.system.content_length": truncatedSystem.length,
+    "gen_ai.prompt.user.content_length": truncatedUser.length,
   });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const resp = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    const baseUrl = await OPENCODE.ensureStarted();
+
+    const sessionResp = await fetch(`${baseUrl}/session`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model || "deepseek-chat",
-        messages,
-        temperature: 0.0,
-        max_tokens: 8192,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: `ai-review:${traceOptions.agentKey || agentName}` }),
       signal: controller.signal,
     });
-    TRACE.setSpanAttributes(llmSpan, { "http.response.status_code": resp.status });
-
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`DeepSeek API error ${resp.status}: ${err.slice(0, 500)}`);
+    if (!sessionResp.ok) {
+      throw new Error(`opencode session.create failed ${sessionResp.status}: ${(await sessionResp.text()).slice(0, 500)}`);
     }
+    const session = await sessionResp.json();
 
-    const data = await resp.json();
-    const responseId = data.id || "";
-    const text = data.choices?.[0]?.message?.content || "";
-    const finishReasons = data.choices?.map(choice => choice.finish_reason).filter(Boolean);
-    TRACE.setSpanAttributes(llmSpan, {
-      "gen_ai.output.messages": JSON.stringify([{ role: "assistant", content: text }]),
-      "gen_ai.completion.0.role": "assistant",
-      "gen_ai.completion.0.content": text,
-      "gen_ai.completion.0.content_length": text.length,
-      "gen_ai.response.id": responseId,
-      "gen_ai.response.model": data.model,
-      "gen_ai.response.finish_reasons": finishReasons,
-    });
-    TRACE.endSpan(llmSpan, {
-      "gen_ai.response.id": responseId,
-      "gen_ai.response.model": data.model,
-      "gen_ai.response.finish_reasons": finishReasons,
-      "gen_ai.response.text_length": text.length,
-    });
-    return { text, responseId };
+    try {
+      const messageResp = await fetch(`${baseUrl}/session/${session.id}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agent: agentName,
+          model: { providerID: "zai", modelID: "glm-5.2" },
+          variant: "max",
+          system: truncatedSystem,
+          parts: [{ type: "text", text: truncatedUser }],
+        }),
+        signal: controller.signal,
+      });
+      TRACE.setSpanAttributes(llmSpan, { "http.response.status_code": messageResp.status });
+
+      if (!messageResp.ok) {
+        const err = await messageResp.text();
+        throw new Error(`opencode session.prompt failed ${messageResp.status}: ${err.slice(0, 500)}`);
+      }
+
+      const data = await messageResp.json();
+      if (data.info?.error) {
+        const errInfo = data.info.error;
+        const message = errInfo.data?.message || errInfo.name || JSON.stringify(errInfo).slice(0, 500);
+        throw new Error(`opencode agent error (${errInfo.name || "unknown"}): ${message}`);
+      }
+
+      const text = extractText(data.parts);
+      const responseId = data.info?.id || "";
+
+      TRACE.setSpanAttributes(llmSpan, {
+        "gen_ai.output.messages": JSON.stringify([{ role: "assistant", content: text }]),
+        "gen_ai.completion.0.role": "assistant",
+        "gen_ai.completion.0.content": text,
+        "gen_ai.completion.0.content_length": text.length,
+        "gen_ai.response.id": responseId,
+        "gen_ai.response.model": "glm-5.2",
+      });
+      TRACE.endSpan(llmSpan, {
+        "gen_ai.response.id": responseId,
+        "gen_ai.response.model": "glm-5.2",
+        "gen_ai.response.text_length": text.length,
+      });
+      return { text, responseId };
+    } finally {
+      fetch(`${baseUrl}/session/${session.id}`, { method: "DELETE" }).catch(() => {});
+    }
   } catch (err) {
     TRACE.endSpan(llmSpan, {}, err);
     throw err;
@@ -573,18 +705,18 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     "ai.agent.key": agentKey,
     "ai.agent.name": agentDef.name,
     "gen_ai.agent.name": agentDef.name,
-    "gen_ai.system": agentDef.modelFamily,
-    "gen_ai.request.model": agentDef.model,
+    "gen_ai.system": "zai",
+    "gen_ai.request.model": "glm-5.2",
   }, parentSpan);
 
-  const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY);
-  if (!hasDeepSeek) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — DEEPSEEK_API_KEY not set`);
+  const hasGlm = Boolean(process.env.GLM_API_KEY);
+  if (!hasGlm) {
+    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — GLM_API_KEY not set`);
     TRACE.endSpan(reviewerSpan, {
       "review.skipped": true,
-      "review.error": "DEEPSEEK_API_KEY not set",
+      "review.error": "GLM_API_KEY not set",
     });
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: "DEEPSEEK_API_KEY not set", genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: "GLM_API_KEY not set", genAIResponseId: "" };
   }
 
   const systemPrompt = readPrompt("shared-rules.md");
@@ -617,14 +749,14 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
   const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
 
-  console.log(`[${isoNow()}] Starting ${agentDef.name} (deepseek/${agentDef.model})`);
+  console.log(`[${isoNow()}] Starting ${agentDef.name} (zai/glm-5.2, ${agentDef.opencodeAgent})`);
   const start = Date.now();
 
   try {
-    const completion = await callDeepSeek(
+    const completion = await callOpencode(
+      agentDef.opencodeAgent,
       fullSystem,
       userPrompt,
-      agentDef.model,
       AGENT_TIMEOUT_MS,
       {
         parentSpan: reviewerSpan,
@@ -738,24 +870,24 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   ].join("\n");
 
   const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
-  const coordinatorModel = tierConfig.coordinatorModel || "deepseek-chat";
+  const coordinatorAgent = tierConfig.coordinatorAgent || "ai-review-coordinator";
   const coordinatorSpan = TRACE.startSpan("ai_review.coordinator", {
     "review.agent.key": "coordinator",
     "review.agent.name": "Coordinator",
     "ai.agent.key": "coordinator",
     "ai.agent.name": "Coordinator",
     "gen_ai.agent.name": "Coordinator",
-    "gen_ai.system": "deepseek",
-    "gen_ai.request.model": coordinatorModel,
+    "gen_ai.system": "zai",
+    "gen_ai.request.model": "glm-5.2",
     "review.risk_tier": tier,
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
     "review.failed_agents": agentResults.filter(r => r.error).length,
   }, parentSpan);
 
-  console.log(`[${isoNow()}] Running coordinator (${coordinatorModel})`);
+  console.log(`[${isoNow()}] Running coordinator (zai/glm-5.2, ${coordinatorAgent})`);
 
   try {
-    const completion = await callDeepSeek(`${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, coordinatorModel, AGENT_TIMEOUT_MS, {
+    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, AGENT_TIMEOUT_MS, {
       parentSpan: coordinatorSpan,
       agentKey: "coordinator",
       agentName: "Coordinator",
@@ -817,26 +949,36 @@ function buildFallbackReview(agentResults, tier, failedAgents) {
 LGTM — No issues found by automated reviewers.
 
 <details>
-<summary>Review Details</summary>
+<summary>Review details</summary>
+
 - Risk tier: ${tier}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
+
 </details>`;
   }
 
-  const byCategory = {};
+  const findingLine = f => {
+    const loc = f.file && f.line && f.line !== "0" ? `\`${f.file}:${f.line}\` ` : f.file ? `\`${f.file}\` ` : "";
+    const cat = f.category ? `**[${f.category.charAt(0).toUpperCase() + f.category.slice(1)}]** ` : "";
+    const fix = f.suggestion ? ` (→ ${f.suggestion})` : "";
+    return `- ${loc}${cat}${f.summary}${fix}`;
+  };
+
+  const bySeverity = { critical: [], warning: [], suggestion: [] };
   for (const f of sorted) {
-    const cat = (f.category || "general").toLowerCase();
-    (byCategory[cat] ||= []).push(f);
+    const sev = (f.severity || "suggestion").toLowerCase();
+    (bySeverity[sev in bySeverity ? sev : "suggestion"]).push(f);
   }
 
   const sections = [];
-  for (const [cat, findings] of Object.entries(byCategory)) {
-    sections.push(`### ${cat.charAt(0).toUpperCase() + cat.slice(1)}`);
-    for (const f of findings) {
-      const loc = f.file && f.line ? `\`${f.file}:${f.line}\`` : f.file ? `\`${f.file}\`` : "";
-      sections.push(`- **${(f.severity || "suggestion").toUpperCase()}** ${loc ? `${loc} — ` : ""}${f.summary}`);
-      if (f.suggestion) sections.push(`  - Fix: ${f.suggestion}`);
-    }
+  if (bySeverity.critical.length > 0) {
+    sections.push(`#### 🔴 Blockers`, ...bySeverity.critical.map(findingLine), "");
+  }
+  if (bySeverity.warning.length > 0) {
+    sections.push(`#### 🟡 Warnings`, ...bySeverity.warning.map(findingLine), "");
+  }
+  if (bySeverity.suggestion.length > 0) {
+    sections.push(`#### 🔵 Suggestions`, ...bySeverity.suggestion.map(findingLine), "");
   }
 
   const failureNote = failedAgents.length > 0
@@ -852,15 +994,21 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
 
 ### Decision: approved_with_comments
 
-${deduped.length > 0 ? `Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.` : ""}${failureNote}${dedupNote}
+Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${failureNote}${dedupNote}
+
+**Findings:** 🔴 ${bySeverity.critical.length} blocker · 🟡 ${bySeverity.warning.length} warning · 🔵 ${bySeverity.suggestion.length} suggestion
+
+<details>
+<summary>Show findings (${sorted.length})</summary>
 
 ${sections.join("\n")}
 
-<details>
-<summary>Review Details</summary>
+---
+
 - Risk tier: ${tier}
 - Reviewers completed: ${agentResults.filter(r => !r.error).map(r => r.agentName).join(", ") || "none"}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
+
 </details>`;
 }
 
@@ -920,32 +1068,43 @@ async function main() {
     console.log(`[${isoNow()}] AI Code Review started for PR #${prNumber}`);
     console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
 
-    const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY);
-    if (!hasDeepSeek) {
-      console.warn(`[${isoNow()}] DEEPSEEK_API_KEY not set. Skipping AI Code Review.`);
-      outcome = "skipped";
+    const hasGlm = Boolean(process.env.GLM_API_KEY);
+    if (!hasGlm) {
+      outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,
-        "review.skip_reason": "missing_deepseek_api_key",
+        "review.skip_reason": "missing_glm_api_key",
       });
-      return;
+      // A missing key is a CI/secrets misconfiguration, not a "nothing to review" case —
+      // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
+      // dropping to zero can't slip by as a green check. Also post to the PR so it's
+      // visible without digging into Actions logs.
+      const message = "GLM_API_KEY is not set. AI Code Review did not run for this PR — this is a CI misconfiguration, not a skip.";
+      console.error(`[${isoNow()}] ${message}`);
+      try {
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`GLM_API_KEY\` secret is provisioned.`);
+      } catch (postErr) {
+        console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
+      }
+      throw new Error(message);
     }
 
-    console.log(`[${isoNow()}] DeepSeek: configured`);
+    console.log(`[${isoNow()}] GLM (via opencode serve): configured`);
 
     // 1. Get PR diff
     console.log(`[${isoNow()}] Fetching PR diff...`);
     let diff;
     const diffSpan = TRACE.startSpan("github.pr.diff", { "github.pr.number": prNumber }, rootSpan);
     try {
-      diff = gh(`pr diff "${prNumber}"`);
+      diff = fetchPrDiff(prNumber);
       const diffStats = diff.split("\n").length;
       TRACE.endSpan(diffSpan, { "diff.raw_lines": diffStats });
       console.log(`[${isoNow()}] Raw diff: ${diffStats} lines`);
     } catch (err) {
-      console.error("Failed to fetch PR diff");
+      const detail = execErrorText(err);
+      console.error(`Failed to fetch PR diff: ${detail}`);
       TRACE.endSpan(diffSpan, {}, err);
-      throw new Error("Failed to fetch PR diff");
+      throw new Error(`Failed to fetch PR diff: ${detail}`);
     }
 
     // 2. Filter diff
@@ -1093,7 +1252,7 @@ async function main() {
   } catch (err) {
     rootError = err;
     exitCode = 1;
-    outcome = "failure";
+    if (outcome !== "misconfigured") outcome = "failure";
     throw err;
   } finally {
     TRACE.endSpan(rootSpan, {
@@ -1101,6 +1260,7 @@ async function main() {
       "process.exit_code": exitCode,
     }, rootError);
     activeRootSpan = null;
+    OPENCODE.stop();
   }
 }
 
@@ -1114,6 +1274,7 @@ const timeout = setTimeout(() => {
     "workflow.outcome": "timeout",
     "process.exit_code": 1,
   }, err);
+  OPENCODE.stop();
   TRACE.flush().finally(() => process.exit(1));
 }, OVERALL_TIMEOUT_MS);
 

@@ -14,6 +14,29 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Resolve a design-token CSS custom property to its concrete value at runtime.
+ *
+ * Charts (ECharts options, SVG data-URI symbols, canvas) can't use `var(--x)` —
+ * they need a literal color string. This reads the token from the document root
+ * so the single source of truth stays the token layer (`lib/styles/tokens/*`),
+ * not a hardcoded hex. `fallback` is returned when the token is unset or the DOM
+ * is unavailable (SSR / unit tests), so callers still get a sensible value.
+ *
+ * @param token   - Token name, with or without the leading `--` (e.g. "--color-indigo-500")
+ * @param fallback - Value to use if the token can't be read
+ */
+export const cssToken = (token: string, fallback: string): string => {
+  if (typeof document === "undefined" || !document.documentElement) {
+    return fallback;
+  }
+  const name = token.startsWith("--") ? token : `--${token}`;
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  return value || fallback;
+};
+
+/**
  * Helper function to convert hex color to rgba
  * @param hex - Hex color code (e.g., "#3F7994")
  * @param opacity - Opacity value (1-10 scale, where 10 = fully opaque)
@@ -115,9 +138,9 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
   // Toggle .dark class on <html> for the O2 component library (Tailwind dark variant)
   document.documentElement.classList.toggle('dark', isDarkMode);
 
-  // Toggle Quasar-compat body classes so legacy `body.body--dark` / `body.body--light`
+  // Toggle the legacy `body.body--dark` / `body.body--light` compat classes so existing
   // selectors (~200 across SCSS/Vue) and `document.body.classList.contains('body--dark')`
-  // JS checks continue to work post-Quasar removal.
+  // JS checks continue to work.
   document.body.classList.toggle('body--dark', isDarkMode);
   document.body.classList.toggle('body--light', !isDarkMode);
 

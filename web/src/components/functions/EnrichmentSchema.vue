@@ -138,7 +138,6 @@
     import ConfirmDialog from "@/components/ConfirmDialog.vue";
     import useStreams from "@/composables/useStreams";
     import { useRouter } from "vue-router";
-    import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
     import AppTabs from "@/components/common/AppTabs.vue";
 
     import OTable from "@/lib/core/Table/OTable.vue";
@@ -174,7 +173,6 @@
     },
     components: {
         ConfirmDialog,
-        StreamFieldsInputs,
         AppTabs,
         OTable,
         ODrawer,

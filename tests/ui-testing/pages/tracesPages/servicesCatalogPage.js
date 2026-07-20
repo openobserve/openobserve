@@ -275,7 +275,7 @@ export class ServicesCatalogPage {
   }
 
   async clearFilter() {
-    // Use fill('') instead of clicking Quasar's clear icon which sets value to null (bug #11689)
+    // Use fill('') instead of clicking the clear icon which sets value to null (bug #11689)
     await this.filterInputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
     await this.filterInputField.fill('');
     // Wait for input to reflect the cleared value (deterministic).

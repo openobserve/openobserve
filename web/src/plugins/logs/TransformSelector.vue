@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img
               v-if="transformIcon?.startsWith('img:')"
               :src="transformIcon.slice(4)"
-              alt="Transform"
+              :alt="t('logs.transformSelector.transform')"
               class="size-4"
             />
             <OIcon v-else :name="transformIcon" size="sm" />
@@ -165,8 +165,8 @@ const functionModel = ref(false);
 
 const transformTypes = computed(() => {
   return [
-    { label: "Function", value: "function" },
-    { label: "Action", value: "action" },
+    { label: t("logs.transformSelector.function"), value: "function" },
+    { label: t("logs.transformSelector.action"), value: "action" },
   ];
 });
 
@@ -310,7 +310,7 @@ const selectTransform = (item: any, isSelected: boolean) => {
 
 const updateActionSelection = (item: any) => {
   toast({
-    message: `${item?.name} action applied successfully`,
+    message: t("logs.transformSelector.actionApplied", { name: item?.name }),
     variant: "success",
   });
 };

@@ -18,16 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="w-full h-full min-h-125">
     <div v-if="isLoading" data-test="traces-trace-dag-loading-container" class="flex items-center justify-center flex-col p-6 h-125">
       <OSpinner size="lg" />
-      <div class="mt-3 text-gray-400">Loading trace DAG...</div>
+      <div class="mt-3 text-gray-400">{{ t('traces.traceDAG.loading') }}</div>
     </div>
 
     <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
-      <OBanner variant="error" icon="error" :content="`Failed to load DAG: ${error}`" />
+      <OBanner variant="error" icon="error" :content="t('traces.traceDAG.failedToLoad', { error })" />
     </div>
 
     <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" data-test="traces-trace-dag-empty-container" class="flex items-center justify-center flex-col p-6 h-125">
       <OIcon name="info" style="width: 48px; height: 48px;" />
-      <div class="mt-3 text-gray-400">No DAG data available</div>
+      <div class="mt-3 text-gray-400">{{ t('traces.traceDAG.noData') }}</div>
     </div>
 
     <div v-else data-test="traces-trace-dag-wrapper" class="w-full h-full min-h-150 border border-(--o2-border) rounded relative dark:border-[#444]">
@@ -84,6 +84,7 @@ import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/cor
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 
 // VueFlow CSS imports
@@ -153,6 +154,7 @@ export default defineComponent({
   emits: ["node-click"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const isLoading = ref(true);
     const error = ref<string | null>(null);
     const dagData = ref<DAGResponse | null>(null);
@@ -385,7 +387,7 @@ export default defineComponent({
         dagData.value = response.data;
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
-        error.value = err.response?.data?.message || err.message || "Unknown error occurred";
+        error.value = err.response?.data?.message || err.message || t("traces.traceDAG.unknownError");
       } finally {
         isLoading.value = false;
       }
@@ -405,7 +407,7 @@ export default defineComponent({
           typeof endTime !== 'number' ||
           startTime >= endTime
         ) {
-          error.value = "Invalid parameters for DAG fetch";
+          error.value = t("traces.traceDAG.invalidParameters");
           isLoading.value = false;
           return;
         }
@@ -503,6 +505,7 @@ export default defineComponent({
     );
 
     return {
+      t,
       isLoading,
       error,
       dagData,

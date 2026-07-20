@@ -260,7 +260,7 @@ describe("DashboardHeader", () => {
     it("should have correct CSS classes for layout", () => {
       wrapper = createWrapper({ backButton: true });
 
-      // Migrated component uses tailwind layout, not Quasar grid.
+      // Migrated component uses tailwind layout, not a grid layout.
       expect(findTitle(wrapper)?.exists()).toBe(true);
 
       // Only the back button div and right slot container exist post-migration.

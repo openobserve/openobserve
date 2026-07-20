@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Standard page header: title + icon + subtitle, matching the Users page. -->
     <AppPageHeader
       :title="t('invitation.pendingInvitations')"
-      :subtitle="'Pending and sent member invitations'"
+      :subtitle="t('iam.invitationList.subtitle')"
       icon="mail"
       class="shrink-0 px-4 border-b border-border-default"
     />
@@ -267,7 +267,7 @@ export default defineComponent({
     const fetchPendingInvitations = async () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Loading pending invitations...",
+        message: t("iam.invitationList.loadingPending"),
               timeout: 0,
 });
 
@@ -288,7 +288,7 @@ export default defineComponent({
         toast({
           message:
             error.response?.data?.message ||
-            "Failed to load pending invitations",
+            t("iam.invitationList.failedLoadPending"),
           variant: "error",
         });
       } finally {
@@ -333,7 +333,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Accepting invitation...",
+        message: t("iam.invitationList.accepting"),
               timeout: 0,
 });
 
@@ -350,7 +350,7 @@ export default defineComponent({
 
         dismiss();
         toast({
-          message: "Invitation accepted successfully!",
+          message: t("iam.invitationList.acceptedSuccess"),
           variant: "success",
         });
 
@@ -369,7 +369,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            error.response?.data?.message || "Failed to accept invitation",
+            error.response?.data?.message || t("iam.invitationList.failedAccept"),
           variant: "error",
         });
       }
@@ -381,7 +381,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Rejecting invitation...",
+        message: t("iam.invitationList.rejecting"),
               timeout: 0,
 });
 
@@ -391,7 +391,7 @@ export default defineComponent({
         );
         dismiss();
         toast({
-          message: "Invitation rejected successfully!",
+          message: t("iam.invitationList.rejectedSuccess"),
           variant: "success",
         });
 
@@ -408,7 +408,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            error.response?.data?.message || "Failed to reject invitation",
+            error.response?.data?.message || t("iam.invitationList.failedReject"),
           variant: "error",
         });
       }

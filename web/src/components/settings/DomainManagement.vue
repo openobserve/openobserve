@@ -226,33 +226,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="p-3">
-          <!-- Radio Button Options -->
-          <ORadioGroup v-model="domain.allowAllUsers" orientation="vertical">
+          <!-- Access policy for this domain (allow/block are mutually exclusive per domain) -->
+          <ORadioGroup v-model="domain.policy" orientation="vertical">
             <div class="mb-1">
               <ORadio
-                :val="true"
+                :data-test="`domain-management-allow-all-radio-${domain.name}`"
+                val="allow_all"
                 :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
+              />
+            </div>
+            <div class="mb-1">
+              <ORadio
+                :data-test="`domain-management-allow-specific-radio-${domain.name}`"
+                val="allow_specific"
+                :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
+              />
+            </div>
+            <div class="mb-1">
+              <ORadio
+                :data-test="`domain-management-block-specific-radio-${domain.name}`"
+                val="block_specific"
+                :label="t('settings.blockSpecificUsers', { domain: '@'+domain.name })"
               />
             </div>
             <div class="mb-3">
               <ORadio
-                :val="false"
-                :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
+                :data-test="`domain-management-block-all-radio-${domain.name}`"
+                val="block_all"
+                :label="t('settings.blockAllUsersFromDomain', { domain: '@'+domain.name })"
               />
             </div>
           </ORadioGroup>
 
           <!-- Info message for all users -->
           <div
-            v-if="domain.allowAllUsers"
+            v-if="domain.policy === 'allow_all'"
             class="p-2 rounded mb-3"
             :class="store.state.theme === 'dark' ? 'bg-[#1a2535] text-blue-300' : 'bg-blue-50 text-blue-700'"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
 
-          <!-- Specific users section -->
-          <div v-if="!domain.allowAllUsers" class="specific-users-section ml-6">
+          <!-- Info message for whole-domain block -->
+          <div
+            v-if="domain.policy === 'block_all'"
+            class="p-2 rounded mb-3"
+            :class="store.state.theme === 'dark' ? 'bg-[#351a1a] text-red-300' : 'bg-red-50 text-red-700'"
+          >
+            {{ t("settings.allUsersBlockedMessage", { domain: '@'+domain.name }) }}
+          </div>
+
+          <!-- Specific allowed users section -->
+          <div v-if="domain.policy === 'allow_specific'" class="specific-users-section ml-6">
               <OForm
                 :ref="(el) => setEmailFormRef(domain.name, el)"
                 :schema="getEmailSchema(domain.name)"
@@ -267,10 +292,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex gap-x-2 items-start">
                   <OFormInput
+                    :data-test="`domain-management-allow-email-input-${domain.name}`"
                     name="newEmail"
                     class="email-input min-w-62.5"
                   />
                   <OButton
+                    data-test="domain-management-add-email-btn"
                     variant="primary"
                     size="sm-action"
                     type="submit"
@@ -279,8 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </OForm>
 
-            <!-- Email List -->
-            <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0">
+            <!-- Allowed Email List -->
+            <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0" class="mt-1">
               <div
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
@@ -298,6 +325,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
+
+          <!-- Specific blocked users section (mirrors the allow-email OForm pattern) -->
+          <div v-if="domain.policy === 'block_specific'" class="specific-users-section ml-6">
+              <OForm
+                :ref="(el) => setBlockedEmailFormRef(domain.name, el)"
+                :schema="getEmailSchema(domain.name)"
+                :default-values="addEmailDefaults()"
+                @submit="(v) => addBlockedEmail(domain, v.newEmail)"
+                v-slot="{ isSubmitting }"
+              >
+                <div class="o-input-label text-sm font-semibold leading-tight mb-1">
+                  {{ t('settings.blockedEmailPlaceholder', { domain: '@' + domain.name }) }}
+                </div>
+                <div class="flex gap-x-2 items-start">
+                  <OFormInput
+                    :data-test="`domain-management-block-email-input-${domain.name}`"
+                    name="newEmail"
+                    class="email-input min-w-62.5"
+                  />
+                  <OButton
+                    data-test="domain-management-block-email-btn"
+                    variant="destructive"
+                    size="sm-action"
+                    type="submit"
+                    :loading="isSubmitting"
+                  >{{ t('settings.addBlockedEmail') }}</OButton>
+                </div>
+              </OForm>
+
+            <!-- Blocked Email List -->
+            <div v-if="domain.blockedEmails && domain.blockedEmails.length > 0" class="mt-1">
+              <div
+                v-for="(email, emailIndex) in domain.blockedEmails"
+                :key="email"
+                class="flex items-center justify-between p-2 mb-1 rounded border"
+                :class="store.state.theme === 'dark' ? 'bg-[#2a1f1f] border-[#5a3a3a]' : 'bg-[#fff5f5] border-[#f3c6c6]'"
+              >
+                <div class="text-sm">{{ email }}</div>
+                <OButton
+                  icon-left="close"
+                  variant="ghost-destructive"
+                  size="icon-xs-sq"
+                  @click="removeBlockedEmail(domain, emailIndex)"
+                  :title="t('common.delete')"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Hint for any block policy -->
+          <div
+            v-if="domain.policy === 'block_specific' || domain.policy === 'block_all'"
+            class="text-xs text-gray-400 mt-3"
+          >
+            {{ t("settings.blockedUsersHint") }}
+          </div>
         </div>
       </div>
       </template>
@@ -313,19 +396,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   </div>
     <!-- Action Buttons — flow inline at the end of the constrained column. -->
-    <div class="flex justify-end gap-2 pt-4 mt-2 border-t border-(--o2-border-color)">
-      <OButton
-        variant="outline"
-        size="sm-action"
-        @click="resetForm"
-      >{{ t('common.cancel') }}</OButton>
-      <OButton
-        data-test="domain-management-save-changes-btn"
-        variant="primary"
-        size="sm-action"
-        @click="saveChanges"
-        :loading="saving"
-      >{{ t('settings.saveChanges') }}</OButton>
+    <div class="flex items-center justify-between gap-2 pt-4 mt-2 border-t border-(--o2-border-color)">
+      <!-- Unsaved-changes indicator: makes it obvious the in-card edits (domains, policies,
+           allow/block emails) are staged until Save is clicked. -->
+      <div
+        v-if="isDirty"
+        data-test="domain-management-unsaved-indicator"
+        class="flex items-center gap-2 text-sm"
+        style="color: var(--o2-text-muted)"
+      >
+        <span
+          class="inline-block w-2 h-2 rounded-full shrink-0"
+          style="background: var(--o2-primary-color)"
+        ></span>
+        {{ t('common.unsavedChanges') }}
+      </div>
+      <div v-else></div>
+
+      <div class="flex gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          :disabled="!isDirty || saving"
+          @click="resetForm"
+        >{{ t('common.cancel') }}</OButton>
+        <OButton
+          data-test="domain-management-save-changes-btn"
+          variant="primary"
+          size="sm-action"
+          @click="saveChanges"
+          :loading="saving"
+          :disabled="!isDirty"
+        >{{ t('settings.saveChanges') }}</OButton>
+      </div>
     </div>
   </div>
 
@@ -352,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="confirmRemoveEmailOpen = false"
     @click:primary="doRemoveEmail"
   >
-    <p v-if="pendingRemoveEmail !== null">{{ t('settings.confirmRemoveEmail', { email: pendingRemoveEmail.email }) }}</p>
+    <p v-if="pendingRemoveEmail !== null">{{ pendingRemoveEmail.blocked ? t('settings.confirmRemoveBlockedEmail', { email: pendingRemoveEmail.email }) : t('settings.confirmRemoveEmail', { email: pendingRemoveEmail.email }) }}</p>
   </ODialog>
 </template>
 
@@ -389,10 +492,13 @@ import {
   type AddDomainForm,
 } from "./DomainManagement.schema";
 
+type DomainPolicy = "allow_all" | "allow_specific" | "block_specific" | "block_all";
+
 interface Domain {
   name: string;
-  allowAllUsers: boolean;
+  policy: DomainPolicy;
   allowedEmails: string[];
+  blockedEmails: string[];
 }
 
 const { t } = useI18n();
@@ -401,24 +507,22 @@ const { t } = useI18n();
 const confirmRemoveDomainOpen = ref(false);
 const pendingRemoveDomainIndex = ref<number | null>(null);
 const confirmRemoveEmailOpen = ref(false);
-const pendingRemoveEmail = ref<{ domain: any; emailIndex: number; email: string } | null>(null);
+const pendingRemoveEmail = ref<{ domain: any; emailIndex: number; email: string; blocked: boolean } | null>(null);
 const store = useStore();
 const router = useRouter();
 
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
 
-// Schema-driven validation replaces the manual domainError ref + the
-// :disabled="!newDomain || !isValidDomain" gate (R3). The pure validators live
-// in the schema file (used by the Zod refines); the component only needs
-// `isValidEmail` for the addEmail guard, imported directly.
-
+// Schema-driven validation (upstream): pure validators live in the schema file; the component only
+// needs `isValidEmail` for the add guards, imported directly.
 const addDomainForm = ref<any>(null);
 const addDomainSchema = makeAddDomainSchema(t);
 
-// Per-domain email add-row forms: a schema cache (keyed by domain name, since
-// the email schema embeds the domain) + a ref map so each row can be reset
-// after a successful add.
+// Per-domain email add-row forms: a schema cache (keyed by domain name, since the email schema
+// embeds the domain) + ref maps so each row can be reset after a successful add. The blocklist adds
+// a parallel set of refs for the block-email add-row (same schema — the email must belong to the
+// domain — but an independent form instance).
 const emailSchemaCache = new Map<string, ReturnType<typeof makeAddEmailSchema>>();
 const getEmailSchema = (domainName: string) => {
   if (!emailSchemaCache.has(domainName)) {
@@ -431,6 +535,27 @@ const setEmailFormRef = (domainName: string, el: any) => {
   if (el) emailFormRefs.value[domainName] = el;
   else delete emailFormRefs.value[domainName];
 };
+const blockedEmailFormRefs = ref<Record<string, any>>({});
+const setBlockedEmailFormRef = (domainName: string, el: any) => {
+  if (el) blockedEmailFormRefs.value[domainName] = el;
+  else delete blockedEmailFormRefs.value[domainName];
+};
+
+// Baseline snapshot of the persisted domain-restriction state. `isDirty` compares the current
+// (normalized) config to this — set on load and after a successful save.
+const savedSnapshot = ref("");
+const domainSnapshot = (): string =>
+  JSON.stringify(
+    domains
+      .map((d) => ({
+        name: (d.name || "").toLowerCase(),
+        policy: d.policy,
+        allowedEmails: [...(d.allowedEmails || [])].sort(),
+        blockedEmails: [...(d.blockedEmails || [])].sort(),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+const isDirty = computed(() => domainSnapshot() !== savedSnapshot.value);
 
 // Claim parser function state
 const claimParserFunction = ref("");
@@ -484,15 +609,52 @@ const loadDomainSettings = async () => {
   try {
     const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
 
-    if (response.data && response.data.domains) {
-      const loadedDomains = response.data.domains
-        .filter((domain: any) => domain && typeof domain === 'object' && domain.domain) // Filter out invalid entries
-        .map((domain: any) => ({
-          name: domain.domain,
-          allowAllUsers: domain.allow_all_users,
-          allowedEmails: domain.allowed_emails || [],
-        }));
-      domains.splice(0, domains.length, ...loadedDomains);
+    if (response.data) {
+      // Decompose the flat backend model (domains + blocked_domains + blocked_emails) into one
+      // per-domain card each, keyed by domain name. Policy precedence when a domain appears in
+      // more than one list: block_all > block_specific > allow rules (block wins over allow).
+      const byDomain = new Map<string, Domain>();
+      const ensure = (name: string): Domain => {
+        const key = name.toLowerCase();
+        if (!byDomain.has(key)) {
+          byDomain.set(key, {
+            name,
+            policy: "allow_all",
+            allowedEmails: [],
+            blockedEmails: [],
+          });
+        }
+        return byDomain.get(key) as Domain;
+      };
+
+      // Allow rules
+      (response.data.domains || [])
+        .filter((d: any) => d && typeof d === "object" && d.domain)
+        .forEach((d: any) => {
+          const card = ensure(d.domain);
+          card.policy = d.allow_all_users ? "allow_all" : "allow_specific";
+          card.allowedEmails = d.allowed_emails || [];
+        });
+
+      // Blocked specific emails — grouped under their domain
+      (response.data.blocked_emails || [])
+        .filter((e: any) => typeof e === "string" && e.includes("@"))
+        .forEach((email: string) => {
+          const domainPart = email.split("@")[1];
+          const card = ensure(domainPart);
+          card.policy = "block_specific";
+          card.blockedEmails.push(email.toLowerCase());
+        });
+
+      // Blocked whole domains — highest precedence
+      (response.data.blocked_domains || [])
+        .filter((d: any) => typeof d === "string" && d)
+        .forEach((d: string) => {
+          const card = ensure(d);
+          card.policy = "block_all";
+        });
+
+      domains.splice(0, domains.length, ...Array.from(byDomain.values()));
     }
 
     // Pre-populate the OSelect with the saved value so the configured parser is
@@ -509,6 +671,9 @@ const loadDomainSettings = async () => {
 
     domains.splice(0, domains.length, ...existingDomains);
   }
+
+  // Capture the loaded state as the clean baseline → the form starts not-dirty.
+  savedSnapshot.value = domainSnapshot();
 };
 
 // @submit handler — fires only once the schema passes (required + valid
@@ -529,8 +694,9 @@ const addDomain = (value?: AddDomainForm) => {
 
   domains.push({
     name: candidate,
-    allowAllUsers: true,
+    policy: "allow_all",
     allowedEmails: [],
+    blockedEmails: [],
   });
 
   // Inline add-row cleared after save → reset() clears the field AND submit
@@ -571,30 +737,48 @@ const addEmail = (domain: Domain, emailValue?: string) => {
     return;
   }
 
+  // Staged until Save — reset the row's form field, but no "saved" toast (the unsaved-changes
+  // indicator + enabled Save button already signal there are pending changes).
   domain.allowedEmails.push(email.toLowerCase());
   emailFormRefs.value[domain.name]?.form?.reset();
-
-  toast({
-    variant: "success",
-    message: t("settings.emailAdded"),
-  });
 };
 
 const removeEmail = (domain: Domain, emailIndex: number) => {
-  pendingRemoveEmail.value = { domain, emailIndex, email: domain.allowedEmails[emailIndex] };
+  pendingRemoveEmail.value = { domain, emailIndex, email: domain.allowedEmails[emailIndex], blocked: false };
+  confirmRemoveEmailOpen.value = true;
+};
+
+// @submit handler for a domain's block-email add-row — mirrors addEmail (schema-validated, then
+// reset the row's form). The blocked email must be valid + belong to the domain.
+const addBlockedEmail = (domain: Domain, emailValue?: string) => {
+  const email = (emailValue ?? "").trim();
+  if (!email || !isValidEmail(email, domain.name)) return;
+
+  if (domain.blockedEmails.includes(email.toLowerCase())) {
+    toast({
+      variant: "error",
+      message: t("settings.emailAlreadyExists"),
+    });
+    return;
+  }
+
+  // Staged until Save (see addEmail) — reset the row's form field, no "saved" toast.
+  domain.blockedEmails.push(email.toLowerCase());
+  blockedEmailFormRefs.value[domain.name]?.form?.reset();
+};
+
+const removeBlockedEmail = (domain: Domain, emailIndex: number) => {
+  pendingRemoveEmail.value = { domain, emailIndex, email: domain.blockedEmails[emailIndex], blocked: true };
   confirmRemoveEmailOpen.value = true;
 };
 
 const doRemoveEmail = () => {
   const pending = pendingRemoveEmail.value;
   if (!pending) return;
-  pending.domain.allowedEmails.splice(pending.emailIndex, 1);
+  const list = pending.blocked ? pending.domain.blockedEmails : pending.domain.allowedEmails;
+  list.splice(pending.emailIndex, 1);
   pendingRemoveEmail.value = null;
   confirmRemoveEmailOpen.value = false;
-  toast({
-    variant: "success",
-    message: t("settings.emailRemoved"),
-  });
 };
 
 // Load VRL functions from _meta org
@@ -725,7 +909,7 @@ const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp / 1000); // Convert microseconds to milliseconds
     return formatDistanceToNow(date, { addSuffix: true });
   } catch (e) {
-    return "Unknown time";
+    return t("settings.domainManagement.unknownTime");
   }
 };
 
@@ -773,7 +957,7 @@ const saveChanges = async () => {
   try {
     // Validate all domains have proper configuration
     for (const domain of domains) {
-      if (!domain.allowAllUsers && domain.allowedEmails.length === 0) {
+      if (domain.policy === "allow_specific" && domain.allowedEmails.length === 0) {
         toast({
           variant: "error",
           message: t("settings.domainNeedsEmails", { domain: domain.name }),
@@ -781,15 +965,34 @@ const saveChanges = async () => {
         saving.value = false;
         return;
       }
+      if (domain.policy === "block_specific" && domain.blockedEmails.length === 0) {
+        toast({
+          variant: "error",
+          message: t("settings.domainNeedsBlockedEmails", { domain: domain.name }),
+        });
+        saving.value = false;
+        return;
+      }
     }
 
-    // Prepare data for API
+    // Compose the flat backend model from the per-domain cards.
     const domainData: any = {
-      domains: domains.map(domain => ({
-        domain: domain.name,
-        allow_all_users: domain.allowAllUsers,
-        allowed_emails: !domain.allowAllUsers ? domain.allowedEmails : []
-      }))
+      // Allow rules → domains[]
+      domains: domains
+        .filter(d => d.policy === "allow_all" || d.policy === "allow_specific")
+        .map(domain => ({
+          domain: domain.name,
+          allow_all_users: domain.policy === "allow_all",
+          allowed_emails: domain.policy === "allow_specific" ? domain.allowedEmails : []
+        })),
+      // Whole-domain blocks → blocked_domains[]
+      blocked_domains: domains
+        .filter(d => d.policy === "block_all")
+        .map(domain => domain.name),
+      // Specific blocked users → flat blocked_emails[]
+      blocked_emails: domains
+        .filter(d => d.policy === "block_specific")
+        .flatMap(domain => domain.blockedEmails)
     };
 
     // Save to backend API
@@ -799,6 +1002,9 @@ const saveChanges = async () => {
       variant: "success",
       message: t("settings.domainSettingsSaved"),
     });
+
+    // Persisted → this is now the clean baseline, so isDirty resets to false.
+    savedSnapshot.value = domainSnapshot();
 
     emit("saved", domains);
   } catch (error: any) {

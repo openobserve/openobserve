@@ -48,14 +48,6 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false" },
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
-  };
-});
-
 // Component import must come after all vi.mock() declarations.
 import QueryEditor from "./QueryEditor.vue";
 
@@ -192,7 +184,7 @@ describe("QueryEditor", () => {
 
       const sendBtn = wrapper.find('[data-test="query-editor-ai-send-btn"]');
       expect(sendBtn.exists()).toBe(true);
-      // Quasar q-btn renders disable attribute when disabled
+      // button renders the disable attribute when disabled
       expect(sendBtn.attributes("disabled") !== undefined || sendBtn.classes("disabled")).toBe(true);
     });
 

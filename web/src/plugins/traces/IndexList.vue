@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                   <div v-else class="pl-3 py-1 text-sm font-medium">
-                    {{ durationPercentileErrMsg || "No values found" }}
+                    {{ durationPercentileErrMsg || t('traces.indexList.noValuesFound') }}
                   </div>
                 </template>
               </FieldExpansion>
@@ -170,7 +170,7 @@ import { defineComponent, ref, computed, watch, defineAsyncComponent, onMounted 
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import useTraces, { DEFAULT_TRACE_COLUMNS } from "../../composables/useTraces";
+import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
 import { getImageURL, b64EncodeUnicode, b64DecodeUnicode, formatTimeWithSuffix } from "../../utils/zincutils";
 import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -180,7 +180,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles, { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
-import useParser from "@/composables/useParser";
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { removeFieldFromWhereAST, logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -225,7 +224,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
-    const { searchObj } = useTraces();
+    const { searchObj, tracesParser } = useTraces();
     const streamOptions: any = ref(searchObj.data.stream.streamLists);
 
     const pagination = ref({
@@ -366,13 +365,6 @@ export default defineComponent({
       errMsg: durationPercentileErrMsg,
     } = useDurationPercentiles();
 
-    const sqlParser = ref<any>(null);
-
-    onMounted(async () => {
-      const { sqlParser: loadSqlParser } = useParser();
-      sqlParser.value = await loadSqlParser();
-    });
-
     const PERCENTILE_LABELS = [
       { key: "p25", label: "P25" },
       { key: "p50", label: "P50" },
@@ -413,7 +405,7 @@ export default defineComponent({
 
       const durationParseResult = parseDurationWhereClause(
         whereClause,
-        sqlParser.value,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
       if (typeof durationParseResult === "string") {
@@ -422,7 +414,7 @@ export default defineComponent({
 
       whereClause = parseSpanKindWhereClause(
         whereClause,
-        sqlParser.value,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
 

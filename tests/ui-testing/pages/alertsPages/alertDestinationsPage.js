@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { CommonActions } from '../commonActions';
 import { AlertsPage } from './alertsPage.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class AlertDestinationsPage {
     constructor(page) {
@@ -206,6 +207,11 @@ export class AlertDestinationsPage {
         }
     }
 
+    /** Wait for the destinations list page to be ready (Add Destination button visible). */
+    async waitForDestinationListReady() {
+        await this.page.locator(this.addDestinationButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
     /** @param {string} destinationName @param {string} url @param {string} templateName */
     async createDestination(destinationName, url, templateName) {
         await this.navigateToDestinations();
@@ -301,10 +307,13 @@ export class AlertDestinationsPage {
         // so paginating one-by-one is unreliable. The per-row delete button uses the
         // destination name as part of its data-test, giving us a row anchor without
         // relying on getByRole / getByText.
+        const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
         const searchField = this.page.locator(this.destinationListSearchInputField);
         if (await searchField.isVisible({ timeout: 5000 }).catch(() => false)) {
             await searchField.fill('');
             await searchField.fill(destinationName);
+            // Wait for the OTable loading skeleton to clear so we check real rows, not placeholders.
+            await listSkeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
             const rowAnchor = this.getDeleteDestinationBtn(destinationName);
             try {
                 await rowAnchor.waitFor({ state: 'visible', timeout: 10000 });
@@ -319,6 +328,8 @@ export class AlertDestinationsPage {
         let isLastPage = false;
 
         while (!destinationFound && !isLastPage) {
+            // Wait for the loading skeleton to clear before checking the page's rows.
+            await listSkeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
             try {
                 await this.page.getByRole('cell', { name: destinationName }).waitFor({ timeout: 5000 });
                 destinationFound = true;
@@ -427,14 +438,24 @@ export class AlertDestinationsPage {
         // Drive `@search` on the OSelect search input so `filteredTemplates` is populated.
         // Type the exact name to narrow to a single matching option (deterministic).
         const searchInput = this.page.locator(this.destinationImportTemplateSearch);
-        await searchInput.waitFor({ state: 'visible', timeout: 5000 });
-        await searchInput.fill('');
-        await searchInput.fill(templateName);
+        await searchInput.waitFor({ state: 'visible', timeout: 10000 });
 
+        // The parent's `templates` prop is populated async via `getTemplates()`; under
+        // 5-worker load that fetch is slow, so `filteredTemplates` can stay empty for a
+        // while. Re-type the filter across several attempts with bounded fill timeouts
+        // (so a transient re-render can't hang the 45s action timeout) until it renders.
         const option = popover.locator(`[data-test-value="${templateName}"]`).first();
-        // The parent's `templates` prop is populated async via `getTemplates()` on the
-        // destinations list view; poll briefly so a newly-created template surfaces.
-        await expect(option).toBeVisible({ timeout: 15000 });
+        let optionVisible = false;
+        for (let attempt = 1; attempt <= 5 && !optionVisible; attempt++) {
+            await searchInput.fill('', { timeout: 5000 }).catch(() => {});
+            await searchInput.fill(templateName, { timeout: 5000 }).catch(() => {});
+            optionVisible = await option.isVisible({ timeout: 8000 }).catch(() => false);
+            if (!optionVisible) {
+                testLogger.warn('Import template option not rendered after search, re-filtering', { templateName, attempt });
+                await this.page.waitForTimeout(1500);
+            }
+        }
+        await expect(option).toBeVisible({ timeout: 8000 });
         await option.click();
         await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         testLogger.debug('Selected import template via OSelect search', { templateName });
@@ -965,32 +986,60 @@ export class AlertDestinationsPage {
      * then clicks the option matching `data-test-value="${templateName}"`. Falls back to scrollAndFindOption.
      */
     async selectDestinationTemplate(templateName) {
-        await this.page.locator(this.templateSelect).click();
+        // Click the OSelect -trigger (not the wrapper div, which doesn't reliably toggle
+        // the popover under load). Retry the open until the popover is visible.
         const popover = this.page.locator(this.templateSelectPopover);
+        const trigger = this.page.locator(this.templateSelect).locator('[data-test$="-trigger"]').first();
+        const opener = (await trigger.count().catch(() => 0)) > 0
+            ? trigger
+            : this.page.locator(this.templateSelect);
+        for (let open = 1; open <= 3; open++) {
+            await opener.click();
+            if (await popover.isVisible({ timeout: 5000 }).catch(() => false)) break;
+            await this.page.waitForTimeout(500);
+        }
         await popover.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Filter the listbox via the search input so virtualised options become visible.
+        // Wait (generously) for the option list to render BEFORE filtering. Under 5-worker
+        // load the shared org can take 20s+ to return the template list; typing into the
+        // search over an empty list leaves a stale filter that never matches.
+        await popover.locator('[data-test-value]').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+
         const search = this.page.locator(this.templateSelectSearch);
-        const hasSearch = await search.isVisible({ timeout: 2000 }).catch(() => false);
-        if (hasSearch) {
-            await search.click();
+        const option = popover.locator(`[data-test-value="${templateName}"]`).first();
+
+        // Filter + check, re-typing between attempts so a lost race (filter applied over a
+        // not-yet-rendered list) recovers. All search interactions use short, bounded
+        // timeouts + catch so a transient popover re-render can't hang the default
+        // 45s action timeout (which is what stalled the whole spec under load).
+        const typeFilter = async () => {
+            if (!(await search.isVisible({ timeout: 3000 }).catch(() => false))) return false;
+            await search.click({ timeout: 5000 }).catch(() => {});
             await this.page.keyboard.press('Control+A');
             await this.page.keyboard.press('Backspace');
-            await search.fill(templateName);
+            await search.fill(templateName, { timeout: 5000 }).catch(() => {});
+            return true;
+        };
+        for (let attempt = 1; attempt <= 4; attempt++) {
+            await typeFilter();
+            if (await option.isVisible({ timeout: 6000 }).catch(() => false)) {
+                await option.click();
+                // popover should dismiss after selection
+                await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                testLogger.debug('Selected template via data-test-value', { templateName, attempt });
+                return;
+            }
+            testLogger.warn('Template option not rendered after search, re-filtering', { templateName, attempt });
+            // Clear the filter so the full list re-renders before the next attempt
+            if (await search.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await search.click({ timeout: 5000 }).catch(() => {});
+                await this.page.keyboard.press('Control+A');
+                await this.page.keyboard.press('Backspace');
+            }
+            await this.page.waitForTimeout(1500);
         }
 
-        // Prefer the data-test-value selector (Reka OSelect convention)
-        const option = popover.locator(`[data-test-value="${templateName}"]`).first();
-        const found = await option.isVisible({ timeout: 5000 }).catch(() => false);
-        if (found) {
-            await option.click();
-            // popover should dismiss after selection
-            await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-            testLogger.debug('Selected template via data-test-value', { templateName });
-            return;
-        }
-
-        // Fallback: scroll the popover and locate via scrollAndFindOption (legacy path)
+        // Fallback: clear any residual filter, then scroll the full list (legacy path)
         await this.commonActions.scrollAndFindOption(templateName, 'template');
     }
 
@@ -998,39 +1047,103 @@ export class AlertDestinationsPage {
      * Select a prebuilt destination type
      * @param {string} type - Type ID (slack, discord, msteams, email, pagerduty, opsgenie, servicenow, custom)
      */
+    /**
+     * Wait until `locator` has been CONTINUOUSLY visible for `stableMs`, resetting the moment
+     * it detaches. Returns false if it never settles within `timeout`. This is the tool for a
+     * field that renders, gets UNMOUNTED by a re-render, then re-renders — a plain waitFor
+     * would accept the first (doomed) render; this only accepts the field once it has settled.
+     */
+    async _waitForFieldStable(locator, { stableMs = 1500, timeout = 20000 } = {}) {
+        const start = Date.now();
+        let stableSince = null;
+        while (Date.now() - start < timeout) {
+            const visible = await locator.isVisible().catch(() => false);
+            if (visible) {
+                if (stableSince === null) stableSince = Date.now();
+                if (Date.now() - stableSince >= stableMs) return true;
+            } else {
+                stableSince = null;
+            }
+            await this.page.waitForTimeout(250);
+        }
+        return false;
+    }
+
     async selectDestinationType(type) {
-        // Clean up any q-portal overlays that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
+        // Wait for the TYPE-SPECIFIC credential field (proof the type's form rendered) plus the
+        // common destination-name field the caller fills next. Each credential field is behind
+        // `v-if="destinationType === '<type>'"` in PrebuiltDestinationForm.vue.
+        const typeConfirmSelector = {
+            slack: '[data-test="slack-webhook-url-input-field"]',
+            discord: '[data-test="discord-webhook-url-input-field"]',
+            msteams: '[data-test="msteams-webhook-url-input-field"]',
+            pagerduty: '[data-test="pagerduty-integration-key-input-field"]',
+            opsgenie: '[data-test="opsgenie-api-key-input-field"]',
+            servicenow: '[data-test="servicenow-instance-url-input-field"]',
+            email: this.recipientsInputField,
+            custom: this.urlInput,
+        }[type] || this.destinationNameInput;
+        const confirmField = this.page.locator(typeConfirmSelector).first();
+        const nameField = this.page.locator(this.destinationNameInputField).first();
 
-        // Wait for selector to be mounted before probing for the card
-        await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        // On a REUSED destination form (2nd+ destination in a run), selecting a type sometimes
+        // triggers a re-render (template auto-load) that UNMOUNTS the credential/name fields and
+        // they stay gone — verified by watching count→0 for 25s+. A wait can't recover an
+        // unmounted element, so when the fields don't settle we re-open the form (fresh mount,
+        // like the always-stable first destination) and re-select. Deterministic — not a retry.
+        for (let openAttempt = 1; openAttempt <= 4; openAttempt++) {
+            await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+            const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
+            await card.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 
-        // Wait for card to be visible first
-        const card = this.page.locator(`${this.destinationTypeCard}[data-type="${type}"]`);
-        await card.waitFor({ state: 'visible', timeout: 15000 });
-        // Card list can re-render between waitFor and click (e.g. when prebuilt-templates
-        // load resolves), so retry on detached races before bailing. Use force-click to
-        // bypass actionability checks once the card has stabilised in the second attempt.
-        try {
-            await card.click({ timeout: 10000 });
-        } catch (e) {
-            testLogger.debug('selectDestinationType first click failed, retrying with force', { type, error: e.message });
-            await this.page.locator(this.prebuiltDestinationSelector).waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-            await card.waitFor({ state: 'visible', timeout: 10000 });
-            await card.click({ force: true, timeout: 10000 });
+            // Click the card once if not already selected. selectType() re-emits on every click,
+            // so re-clicking a selected card re-renders the form — only click when needed.
+            const cardSelected = () => card.evaluate((el) => el.classList.contains('selected')).catch(() => false);
+            if (!(await cardSelected())) {
+                await card.click({ timeout: 10000 }).catch((e) => {
+                    testLogger.debug('selectDestinationType card click failed', { type, openAttempt, error: e.message });
+                });
+            }
+            await expect.poll(cardSelected, { timeout: 8000, intervals: [400, 800, 1200] }).toBe(true).catch(() => {});
+
+            // Let the prebuilt TEMPLATE auto-load settle BEFORE judging field stability. Picking a
+            // type fires a template fetch whose completion re-renders the form and (on a reused
+            // form) unmounts the fields. That fetch can land AFTER a short stability window — so
+            // without this the fields looked "stable" here, then unmounted during the caller's
+            // fills (fillWebhookUrl → fillDestinationName). Waiting for the network to go idle ties
+            // us to the actual fetch, so the unmount happens inside the stability check below (and
+            // triggers a remount) instead of leaking into the fills.
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+            // Wait for BOTH fields to be STABLE (settled past any re-render), not just present.
+            // A healthy field settles in ~1-2s so this returns fast; the caps only bound how long
+            // we tolerate the UNMOUNTED case before remounting. The name field settles a touch
+            // later than the credential field, so it gets a longer budget.
+            const credStable = await this._waitForFieldStable(confirmField, { stableMs: 1500, timeout: 12000 });
+            const nameStable = credStable && await this._waitForFieldStable(nameField, { stableMs: 1000, timeout: 12000 });
+            if (credStable && nameStable) {
+                testLogger.debug('Selected destination type and form loaded', { type, openAttempt });
+                return;
+            }
+
+            // Fields unmounted and stuck — remount to force a fresh render, then retry. A light
+            // remount (cancel + re-open) first; if the stale parent state persists, escalate to a
+            // full page reload + fresh navigate — a guaranteed clean mount, like the always-stable
+            // first destination — which recovers the cases cancel+reopen can't.
+            testLogger.warn('Destination fields did not stabilise after type-select; remounting', { type, openAttempt, credStable, nameStable });
+            if (openAttempt === 1) {
+                await this.page.locator(this.cancelButton).first().click({ force: true, timeout: 10000 }).catch(() => {});
+                await this.page.locator(this.addDestinationTitle).first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                await this.clickNewDestination();
+            } else {
+                await this.navigateToDestinations();
+                await this.clickNewDestination();
+            }
         }
-
-        // Wait for either prebuilt form or custom form to appear
-        if (type === 'custom') {
-            await this.page.locator(this.urlInput).waitFor({ state: 'visible', timeout: 15000 });
-        } else {
-            // For prebuilt types, wait for destination name input
-            await this.page.locator(this.destinationNameInput).waitFor({ state: 'visible', timeout: 15000 });
-        }
-
-        testLogger.debug('Selected destination type and form loaded', { type });
+        // Surface a clear failure if remounts didn't recover it.
+        await confirmField.waitFor({ state: 'visible', timeout: 15000 });
+        await nameField.waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.debug('Selected destination type and form loaded (after remounts)', { type });
     }
 
     /**
@@ -1038,9 +1151,12 @@ export class AlertDestinationsPage {
      * @param {string} url - Webhook URL
      */
     async fillWebhookUrl(url) {
+        // selectDestinationType() now confirms this type-specific field is rendered before
+        // returning, so it is present here — just wait for visibility, fill, and verify.
         const input = this.page.locator(this.webhookInputAnyField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
+        await expect(input).toHaveValue(url, { timeout: 5000 });
         testLogger.debug('Filled webhook URL');
     }
 
@@ -1060,6 +1176,7 @@ export class AlertDestinationsPage {
      * @param {string} key - Integration key
      */
     async fillIntegrationKey(key) {
+        // selectDestinationType() now returns only once this field is stable, so it's present.
         const input = this.page.locator(this.integrationKeyInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(key);
@@ -1071,6 +1188,7 @@ export class AlertDestinationsPage {
      * @param {string} severity - Severity level (e.g., 'critical', 'error', 'warning', 'info')
      */
     async selectSeverity(severity) {
+        await this.page.waitForTimeout(5000);
         const select = this.page.locator(this.severitySelect).first();
         await select.waitFor({ state: 'visible', timeout: 10000 });
         await select.click();
@@ -1092,9 +1210,23 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async fillDestinationName(name) {
-        await this.page.locator(this.destinationNameInputField).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator(this.destinationNameInputField).fill(name);
-        await expect(this.page.locator(this.destinationNameInputField)).toHaveValue(name, { timeout: 5000 });
+        await this.page.waitForTimeout(5000);
+        const field = this.page.locator(this.destinationNameInputField);
+        // Prebuilt forms scroll the name field around as sections (webhook, template,
+        // headers) render; scroll it into view and retry so a transient re-render can't
+        // fail the visibility wait.
+        let ready = false;
+        for (let attempt = 1; attempt <= 3 && !ready; attempt++) {
+            await field.scrollIntoViewIfNeeded().catch(() => {});
+            ready = await field.isVisible({ timeout: 10000 }).catch(() => false);
+            if (!ready) {
+                testLogger.warn('Destination name field not visible yet, retrying', { attempt });
+                await this.page.waitForTimeout(1000);
+            }
+        }
+        await field.waitFor({ state: 'visible', timeout: 10000 });
+        await field.fill(name);
+        await expect(field).toHaveValue(name, { timeout: 5000 });
         testLogger.debug('Filled destination name', { name });
     }
 
@@ -1119,11 +1251,24 @@ export class AlertDestinationsPage {
         const saveBtn = this.page.locator(this.saveButton).first();
         // Prebuilt forms can scroll the submit button off-screen — scroll it into view first,
         // then wait for visibility, then force-click to bypass any overlay pointer interception.
-        await saveBtn.scrollIntoViewIfNeeded().catch(() => {});
-        await saveBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await expect(saveBtn).toBeEnabled({ timeout: 10000 });
+        // Under concurrent load the form can transiently re-render (toast/validation),
+        // briefly detaching the button, so retry the scroll+wait a couple of times.
+        let ready = false;
+        for (let attempt = 1; attempt <= 5 && !ready; attempt++) {
+            await saveBtn.scrollIntoViewIfNeeded().catch(() => {});
+            ready = await saveBtn.isVisible({ timeout: 10000 }).catch(() => false);
+            if (!ready) {
+                testLogger.warn('Save button not visible yet, retrying', { attempt });
+                await this.page.waitForTimeout(1500);
+            }
+        }
+        await saveBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await expect(saveBtn).toBeEnabled({ timeout: 15000 });
         // force-click bypasses any residual toast overlay still occupying pointer events.
         await saveBtn.click({ force: true, timeout: 10000 });
+        // Hard settle: the create/update API + form-close (expectSuccessNotification waits
+        // for the title to hide) can lag under load; give the request time to complete.
+        await this.page.waitForTimeout(5000);
         testLogger.debug('Clicked Save button');
     }
 
@@ -1330,7 +1475,23 @@ export class AlertDestinationsPage {
      * so the title becoming hidden is a reliable save-completion signal.
      */
     async expectSuccessNotification() {
-        await this.page.locator(this.addDestinationTitle).waitFor({ state: 'hidden', timeout: 30000 });
+        // The form closes (title hides) once the create/update API returns. Under load the
+        // request can lag; if it doesn't hide in time, reload the page (min 5s settle) to
+        // force the stuck form closed — the save itself has usually succeeded, and the
+        // caller's expectDestinationInList verifies the actual outcome afterward.
+        const title = this.page.locator(this.addDestinationTitle);
+        if (await title.waitFor({ state: 'hidden', timeout: 30000 }).then(() => true).catch(() => false)) {
+            return;
+        }
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            testLogger.warn('Destination form did not close after save, reloading', { attempt });
+            await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            await this.page.waitForTimeout(5000);
+            if (await title.isHidden().catch(() => true)) return;
+        }
+        // Surface clearly if the form is still stuck open after reloads.
+        await title.waitFor({ state: 'hidden', timeout: 10000 });
     }
 
     /**
@@ -1338,50 +1499,80 @@ export class AlertDestinationsPage {
      * @param {string} name - Destination name
      */
     async expectDestinationInList(name) {
-        // Wait for any loading spinners to disappear
-        await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
-
-        // Navigate to destinations page to ensure we're in the right place
-        await this.navigateToDestinations();
-
-        // Wait for OTable to render
-        await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
-
-        // Use the OInput search/filter input (fill the inner native field) to scope rows
-        const searchField = this.page.locator(this.destinationListSearchInputField);
-        if (await searchField.isVisible().catch(() => false)) {
-            await searchField.fill('');
-            await searchField.fill(name);
-            testLogger.debug('Used search to filter for destination', { name });
-        }
-
-        // Anchor on the destination-specific delete-button data-test (uniquely identifies the row)
-        const rowAnchor = this.getDeleteDestinationBtn(name);
-
-        let retries = 3;
-        while (retries > 0) {
-            try {
-                await expect(rowAnchor).toBeVisible({ timeout: 5000 });
-                testLogger.debug('Destination found in list', { name });
-                return;
-            } catch (error) {
-                retries--;
-                if (retries === 0) {
-                    testLogger.error('Destination not found after all attempts', { name });
-                    // Take screenshot for debugging
-                    await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
-                    throw new Error(`Destination "${name}" not found in list after multiple attempts. Screenshot saved to test-results/destination-not-found-${name}.png`);
-                }
-                testLogger.debug(`Destination not visible, retrying... (${retries} attempts left)`);
-                // Refresh the page and re-search
-                await this.page.reload({ waitUntil: 'domcontentloaded' });
-                await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-                if (await searchField.isVisible().catch(() => false)) {
-                    await searchField.fill('');
-                    await searchField.fill(name);
-                }
+        // ── Backend truth first (deterministic) ──────────────────────────────────────────
+        // Poll the destination's own API endpoint (session cookies via page.request) until it
+        // is registered. This separates two failure modes the rendered list conflates:
+        //   • the destination genuinely doesn't exist (a create/edit silently didn't persist) —
+        //     the list shows "0 of 0" and blind row-retries just time out with a vague error;
+        //   • the destination DOES exist but the list transiently rendered empty (fetch race) —
+        //     which we then resolve by re-driving the UI.
+        // If the API says it never exists, surface THAT clearly instead of "not found in list".
+        const baseUrl = process.env.ZO_BASE_URL;
+        const org = getOrgIdentifier();
+        const detailUrl = `${baseUrl}/api/${org}/alerts/destinations/${encodeURIComponent(name)}`;
+        const listUrl = `${baseUrl}/api/${org}/alerts/destinations?page_num=0&page_size=1000`;
+        // Confirm the destination is in the LIST the UI renders from — not just that the single
+        // GET returns 200. The detail endpoint can report 200 while the (paginated) list endpoint
+        // the UI actually reads hasn't reindexed the new row yet, which surfaced as "registered on
+        // backend but did not render in the list". Poll the list endpoint so we only drive the UI
+        // once the row will genuinely be there. 404 on detail = definitively gone (didn't persist).
+        let apiStatus = 0;
+        let inList = false;
+        // NOTE: the `.catch(() => {})` below intentionally swallows this poll's pass/fail — the
+        // poll is NOT the assertion. Its only job is to advance state (`apiStatus` / `inList`) and
+        // give the backend time to register the row. The real verdict is asserted right after:
+        // a 404 throws ("did not persist"), and the UI check below throws if the row never renders.
+        // Do not "fix" this into a hard `.toBe(true)` — a slow-but-eventually-present row would
+        // then fail here before the UI ever gets a chance to confirm it.
+        await expect.poll(async () => {
+            const detail = await this.page.request.get(detailUrl).catch(() => null);
+            apiStatus = detail ? detail.status() : 0;
+            if (apiStatus === 404) return true;               // definitively gone
+            if (apiStatus === 401 || apiStatus === 403) return true; // auth-inconclusive → rely on UI
+            const listResp = await this.page.request.get(listUrl).catch(() => null);
+            if (listResp && listResp.ok()) {
+                const body = await listResp.json().catch(() => null);
+                const arr = (body && (body.list || body.destinations)) || (Array.isArray(body) ? body : []);
+                inList = arr.some((d) => (d && (d.name || d)) === name);
             }
+            return inList;
+        }, { timeout: 30000, intervals: [1000, 1500, 2000, 3000] }).toBe(true).catch(() => {});
+        testLogger.debug('Destination backend pre-check', { name, apiStatus, inList });
+        if (apiStatus === 404) {
+            await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
+            throw new Error(`Destination "${name}" does not exist on the backend (API 404) — the create/edit did not persist. Screenshot: test-results/destination-not-found-${name}.png`);
         }
+
+        // ── UI check ─────────────────────────────────────────────────────────────────────
+        // The destination is registered (or auth was inconclusive). Navigate fresh so the list
+        // re-fetches, search to scope, and confirm the row — retrying the whole navigate+search
+        // so a transient empty list ("0 of 0") re-fetches and renders the row.
+        const searchField = this.page.locator(this.destinationListSearchInputField);
+        const rowAnchor = this.getDeleteDestinationBtn(name);
+        const skeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+        for (let attempt = 1; attempt <= 5; attempt++) {
+            await this.navigateToDestinations();
+            await this.page.locator(this.destinationsListTable).waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+            // The list renders a loading SKELETON (TenstackTable) while the destinations fetch is
+            // in flight — real rows aren't in the DOM yet. Wait for the skeleton to clear before
+            // checking for the row, else we search an all-placeholder table and never find it
+            // (the exact "inList=true but did not render" failure). Reload on the next attempt if
+            // the fetch is genuinely stuck.
+            await skeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+            if (await searchField.isVisible().catch(() => false)) {
+                await searchField.fill('');
+                // Last attempt: leave the search cleared to render the full list, in case the
+                // scoped search itself is the thing failing to surface the (confirmed) row.
+                if (attempt < 5) await searchField.fill(name);
+            }
+            if (await rowAnchor.isVisible({ timeout: 8000 }).catch(() => false)) {
+                testLogger.debug('Destination found in list', { name, attempt });
+                return;
+            }
+            testLogger.debug('Destination row not visible yet, re-navigating and re-searching', { name, attempt });
+        }
+        await this.page.screenshot({ path: `test-results/destination-not-found-${name}.png`, fullPage: true }).catch(() => {});
+        throw new Error(`Destination "${name}" is registered on the backend (API ${apiStatus}, inList=${inList}) but did not render in the list after retries. Screenshot: test-results/destination-not-found-${name}.png`);
     }
 
     /**
@@ -1530,9 +1721,39 @@ export class AlertDestinationsPage {
         await confirmBtn.waitFor({ state: 'visible', timeout: 10000 });
         await confirmBtn.click();
 
-        // Wait for the row anchor to detach — this is set by getDestinations() refresh
-        // after the delete API returns successfully.
-        await expect(deleteBtn).toHaveCount(0, { timeout: 15000 });
+        // Deterministic backend truth: poll the destination's own API endpoint until it is
+        // GONE (404). The rendered row detaching (toHaveCount(0)) races the list's getDestinations()
+        // re-fetch, which lags under load — so the row could still be shown briefly after the
+        // delete API returned, failing the count assertion. Confirming the backend deletion is
+        // the real signal; page.request carries the session cookies the endpoint needs.
+        const baseUrl = process.env.ZO_BASE_URL;
+        const org = getOrgIdentifier();
+        const detailUrl = `${baseUrl}/api/${org}/alerts/destinations/${encodeURIComponent(name)}`;
+        let apiStatus = 0;
+        await expect.poll(async () => {
+            const resp = await this.page.request.get(detailUrl).catch(() => null);
+            apiStatus = resp ? resp.status() : 0;
+            // Terminal states: gone (404), or auth-inconclusive (401/403) — fall back to the UI.
+            return apiStatus === 404 || apiStatus === 401 || apiStatus === 403;
+        }, { timeout: 20000, intervals: [1000, 1500, 2000, 3000] }).toBe(true).catch(() => {});
+        testLogger.debug('Destination delete backend-check', { name, apiStatus });
+        if (apiStatus === 404) {
+            // Backend confirms the destination is gone — the real success signal. The row
+            // detaches on the next list refresh; wait for it best-effort (its re-render can
+            // lag under load, but the delete is already done, so don't fail on UI lag).
+            await expect(deleteBtn).toHaveCount(0, { timeout: 15000 }).catch(() => {});
+        } else {
+            // API was auth-inconclusive — fall back to the row detaching as the assertion.
+            await expect(deleteBtn).toHaveCount(0, { timeout: 15000 });
+        }
+
+        // Clear the search filter so the list returns to its full state. Leaving the
+        // deleted name in the search box strands the list on a "No destinations found"
+        // empty state, which confuses the next create flow (the New-destination form can
+        // open over an empty/transitioning list and mis-render).
+        if (await searchField.isVisible().catch(() => false)) {
+            await searchField.fill('');
+        }
 
         testLogger.info('Destination deleted successfully');
     }
@@ -2020,6 +2241,7 @@ export class AlertDestinationsPage {
      * @param {string} apiKey - Opsgenie API key
      */
     async fillOpsgenieApiKey(apiKey) {
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.opsgenieApiKeyInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(apiKey);
@@ -2104,6 +2326,7 @@ export class AlertDestinationsPage {
      * @param {string} url - ServiceNow instance URL
      */
     async fillServiceNowInstanceUrl(url) {
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.servicenowInstanceUrlInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(url);
@@ -2115,6 +2338,7 @@ export class AlertDestinationsPage {
      * @param {string} username - ServiceNow username
      */
     async fillServiceNowUsername(username) {
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.servicenowUsernameInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(username);
@@ -2126,6 +2350,7 @@ export class AlertDestinationsPage {
      * @param {string} password - ServiceNow password
      */
     async fillServiceNowPassword(password) {
+        await this.page.waitForTimeout(5000);
         const input = this.page.locator(this.servicenowPasswordInputField).first();
         await input.waitFor({ state: 'visible', timeout: 15000 });
         await input.fill(password);

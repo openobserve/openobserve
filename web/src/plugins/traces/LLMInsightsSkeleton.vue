@@ -134,15 +134,15 @@ const store = useStore();
 </script>
 
 <style>
-.dark-tile-content {
-  --tile-bg: #2b2c2d;
-  --tile-border: #444444;
-  --text-primary: #cccfd1;
-}
+/* Tile tokens map to the centralized --color-* system, which is theme-paired
+   automatically — so the dark/light split no longer needs hardcoded hex.
+   Both classes are kept (the template toggles them) but resolve to the same
+   token-driven values in each theme. */
+.dark-tile-content,
 .light-tile-content {
-  --tile-bg: #ffffff;
-  --tile-border: #e7eaee;
-  --text-primary: #2e3133;
+  --tile-bg: var(--color-surface-base);
+  --tile-border: var(--color-border-default);
+  --text-primary: var(--color-text-heading);
 }
 
 .panel-tile__row:first-child {

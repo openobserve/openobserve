@@ -21,12 +21,6 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  "add": "add",
-  "visibility": "visibility",
-  "visibility-off": "visibility_off",
-}));
-
 vi.mock("@/components/common/FieldValuesPanel.vue", () => ({
   default: {
     name: "FieldValuesPanel",

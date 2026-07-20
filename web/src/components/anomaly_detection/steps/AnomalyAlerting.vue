@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trailing>
                     <button
                       type="button"
-                      aria-label="Remove"
+                      :aria-label="t('common.remove')"
                       class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
                       @click="removeAtIndex(index)"
                     >
@@ -123,8 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="
               config.alert_enabled && config.alert_destination_ids.length === 0
             "
-            class="text-red-8 pt-1"
-            style="font-size: 11px; line-height: 12px"
+            class="text-xs text-input-error-text pt-1"
             data-test="anomaly-destination-error"
           >
             {{ t('alerts.anomaly.destinationRequired') }}

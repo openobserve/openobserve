@@ -1,18 +1,17 @@
 <template>
   <div
     data-test="promql-query-builder"
-    class="px-2.5 max-w-350 mx-auto h-[calc(100vh-50px)] overflow-auto"
+    class="h-[calc(100vh-50px)] flex flex-col overflow-hidden"
   >
+    <AppPageHeader
+      :title="t('metrics.queryBuilder.title')"
+      :subtitle="t('metrics.queryBuilder.subtitle')"
+      icon="query-stats"
+      class="shrink-0 px-4 border-b border-border-default"
+    />
+    <div class="flex-1 overflow-auto px-2.5">
+      <div class="max-w-350 mx-auto py-2.5">
     <OCard>
-      <OCardSection role="header">
-        <div class="text-2xl font-semibold">PromQL Query Builder</div>
-        <div class="text-sm font-medium text-gray-400">
-          Build and test PromQL queries visually
-        </div>
-      </OCardSection>
-
-      <OSeparator />
-
       <OCardSection role="body">
         <!-- Query Builder Section -->
         <div class="flex flex-col gap-5">
@@ -39,10 +38,10 @@
 
       <!-- Generated Query Display -->
       <OCardSection>
-        <div class="text-base font-medium mb-2">Generated PromQL Query:</div>
+        <div class="text-base font-medium mb-2">{{ t('metrics.queryBuilder.generatedQuery') }}</div>
         <OCard class="bg-surface-panel">
           <OCardSection>
-            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-[#1976d2] font-medium">{{ generatedQuery || "No query built yet" }}</pre>
+            <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-[#1976d2] font-medium">{{ generatedQuery || t('metrics.queryBuilder.noQueryBuilt') }}</pre>
           </OCardSection>
         </OCard>
 
@@ -54,7 +53,7 @@
             :disabled="!generatedQuery"
           >
             <OIcon name="content-copy" size="xs" class="mr-1" />
-            Copy Query
+            {{ t('metrics.queryBuilder.copyQuery') }}
           </OButton>
           <OButton
             variant="outline"
@@ -62,7 +61,7 @@
             @click="clearQuery"
           >
             <OIcon name="close" size="xs" class="mr-1" />
-            Clear All
+            {{ t('metrics.queryBuilder.clearAll') }}
           </OButton>
           <OButton
             variant="outline"
@@ -71,14 +70,14 @@
             :disabled="!generatedQuery"
           >
             <OIcon name="play-arrow" size="xs" class="mr-1" />
-            Test Query
+            {{ t('metrics.queryBuilder.testQuery') }}
           </OButton>
         </div>
       </OCardSection>
 
       <!-- Query Result Preview -->
       <OCardSection v-if="queryResult">
-        <div class="text-base font-medium mb-2">Query Result Preview:</div>
+        <div class="text-base font-medium mb-2">{{ t('metrics.queryBuilder.queryResultPreview') }}</div>
         <OCard class="bg-surface-panel">
           <OCardSection>
             <pre class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-[#424242] max-h-100 overflow-y-auto">{{ queryResult }}</pre>
@@ -86,13 +85,16 @@
         </OCard>
       </OCardSection>
     </OCard>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { PromVisualQuery } from "@/components/promql/types";
-import { promQueryModeller } from "@/components/promql/operations/queryModeller";
+import { useI18n } from "vue-i18n";
+import { PromqlBuilderQuery } from "@/components/promql/types";
+import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
@@ -100,13 +102,16 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
 
+const { t } = useI18n();
+
 // State
-const visualQuery = ref<PromVisualQuery>({
+const visualQuery = ref<PromqlBuilderQuery>({
   metric: "",
   labels: [],
   operations: [],
@@ -126,14 +131,14 @@ const generatedQuery = computed(() => {
   if (!visualQuery.value.metric && visualQuery.value.labels.length === 0) {
     return "";
   }
-  return promQueryModeller.renderQuery(visualQuery.value);
+  return promqlRenderer.renderQuery(visualQuery.value);
 });
 
 // Methods
 const copyQuery = () => {
   if (generatedQuery.value) {
     copyToClipboard(generatedQuery.value, {
-      successMessage: "Query copied to clipboard!",
+      successMessage: t('metrics.queryBuilder.queryCopied'),
     });
   }
 };
@@ -147,20 +152,20 @@ const clearQuery = () => {
   queryResult.value = null;
   toast({
     variant: "info",
-    message: "Query cleared",  });
+    message: t('metrics.queryBuilder.queryCleared'),  });
 };
 
 const testQuery = () => {
   // TODO: Implement actual query execution
   toast({
     variant: "info",
-    message: "Query testing will be implemented soon",  });
+    message: t('metrics.queryBuilder.testingSoon'),  });
 
   // Mock result for now
   queryResult.value = JSON.stringify(
     {
       status: "success",
-      message: "Query execution will be implemented in the next phase",
+      message: t('metrics.queryBuilder.executionSoon'),
     },
     null,
     2

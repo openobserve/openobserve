@@ -137,7 +137,7 @@ function selectType(typeId: PrebuiltTypeId | 'custom') {
 }
 
 function getIconName(icon: string): string {
-  // Map destination type icons to Quasar icon names
+  // Map destination type icons to icon names
   const iconMap: Record<string, string> = {
     slack: 'chat',
     discord: 'forum',

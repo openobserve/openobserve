@@ -6,6 +6,7 @@ export function getUUID() {
   return uuidv4();
 }
 
-export function getUUIDv7() {
-  return uuidv7();
+export function getUUIDv7(compact = false) {
+  const id = uuidv7();
+  return compact ? id.replace(/-/g, "") : id;
 }

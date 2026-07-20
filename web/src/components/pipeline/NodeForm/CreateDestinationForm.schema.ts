@@ -17,24 +17,21 @@
 //     `destination_type` discriminator.
 //   • `headers`: a dynamic array-field (`headers[i].key` / `headers[i].value`),
 //     each row form-owned (see the §2 array-field pattern in the playbook).
-//   • A few entangled/auto-prefilled fields (url_endpoint/method/output_format/
-//     esbulk_index/separator/org/stream) stay mirrored on the component's
-//     `formData` reactive (a sanctioned single-source exception) but their rules
-//     still live here in `superRefine`.
-//   • `destination_type` is NOT an <input> — it is a custom card grid. It is
-//     bridged into the form via `watch -> setFieldValue("destination_type", …)`
-//     (the documented sanctioned bridge) so `superRefine` can branch on it.
+//   • The auto-prefilled / conditionally-editable fields (url_endpoint/method/
+//     output_format/esbulk_index/separator/org/stream) are also form-owned OForm
+//     fields; the component keeps them in sync when destination_type changes via
+//     direct `form.setFieldValue(...)` calls — there is NO `formData` mirror.
+//     Their conditional rules live here in `superRefine`.
+//   • `destination_type` is NOT an <input> — it is a custom card grid. The card
+//     @click writes it with a DIRECT `form.setFieldValue("destination_type", …)`
+//     and the template reads it back via `form.useStore`, so `superRefine` can
+//     branch on it (no watch, no mirror — the Rule-③ headless owner pattern).
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
 
 import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
-
-// Mirrors the old per-field :validators on `name`: required + the resource-name
-// character check ("Characters like :, ?, /, #, and spaces are not allowed.").
-const RESOURCE_NAME_MESSAGE =
-  "Characters like :, ?, /, #, and spaces are not allowed.";
 
 // One row in the dynamic Headers array-field. Both fields are free-form text
 // (a blank starter row is valid — only non-empty rows are persisted on save).
@@ -51,15 +48,15 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         .string()
         .min(1, t("common.nameRequired"))
         .refine((val) => isValidResourceName(String(val)), {
-          message: RESOURCE_NAME_MESSAGE,
+          message: t("pipeline.destResourceNameInvalid"),
         }),
       url: z
         .string()
         .refine((val) => String(val ?? "").trim().length > 0, {
-          message: "Field is required!",
+          message: t("pipeline.fieldRequired"),
         })
         .refine((val) => !String(val ?? "").trim().endsWith("/"), {
-          message: "URL should not end with a trailing slash",
+          message: t("pipeline.urlTrailingSlash"),
         }),
 
       // ── Form-owned toggle ────────────────────────────────────────────────
@@ -82,10 +79,10 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         })
         .optional(),
 
-      // ── Discriminator (bridged from the card grid) + entangled fields that
-      //    remain mirrored on `formData`. Kept loose at the object level; the
-      //    real conditional requirements are enforced in `superRefine` below so
-      //    they only apply for the relevant destination_type / output_format. ──
+      // ── Discriminator (written from the card grid via form.setFieldValue) +
+      //    the auto-prefilled entangled fields. Kept loose at the object level;
+      //    the real conditional requirements are enforced in `superRefine` below
+      //    so they only apply for the relevant destination_type / output_format. ─
       destination_type: z.string().default("openobserve"),
       url_endpoint: z.string().optional().default(""),
       method: z.string().optional().default("post"),
@@ -105,14 +102,14 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["org"],
-            message: "Organization is required for OpenObserve",
+            message: t("pipeline.orgRequiredOpenobserve"),
           });
         }
         if (!trimmed(val.stream)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["stream"],
-            message: "Stream name is required for OpenObserve",
+            message: t("pipeline.streamRequiredOpenobserve"),
           });
         }
       }
@@ -123,14 +120,14 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["url_endpoint"],
-          message: "Field is required!",
+          message: t("pipeline.fieldRequired"),
         });
       }
       if (trimmed(val.url_endpoint) && !trimmed(val.url_endpoint).startsWith("/")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["url_endpoint"],
-          message: "Endpoint path must start with /",
+          message: t("pipeline.endpointMustStartSlash"),
         });
       }
 
@@ -140,14 +137,14 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["method"],
-          message: "Field is required!",
+          message: t("pipeline.fieldRequired"),
         });
       }
       if (!val.output_format) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["output_format"],
-          message: "Field is required!",
+          message: t("pipeline.fieldRequired"),
         });
       }
 
@@ -156,7 +153,7 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["esbulk_index"],
-          message: "Index name is required for ESBulk format",
+          message: t("pipeline.indexRequiredEsbulk"),
         });
       }
 
@@ -172,7 +169,7 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["separator"],
-          message: "Separator is required for StringSeparated format",
+          message: t("pipeline.separatorRequiredStringseparated"),
         });
       }
 
@@ -182,14 +179,14 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["metadata", "ddsource"],
-            message: "DD Source is required for Datadog",
+            message: t("pipeline.ddSourceRequiredDatadog"),
           });
         }
         if (!trimmed(val.metadata?.ddtags)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["metadata", "ddtags"],
-            message: "DD Tags are required for Datadog",
+            message: t("pipeline.ddTagsRequiredDatadog"),
           });
         }
       }

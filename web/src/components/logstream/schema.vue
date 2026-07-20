@@ -19,73 +19,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="schema-drawer"
     :open="open"
     :width="60"
-    :title="t('logStream.schemaHeader')"
+    :title="indexData.name"
+    :title-data-test="'schema-title-text'"
+    :sub-title="t('logStream.schemaHeader')"
     @update:open="$emit('update:open', $event)"
   >
-    <!-- #header override: complex stream header with name badge, timeline info,
-         and close button — cannot be expressed with title + sub-slots -->
-    <template #header-left>
-      <div class="flex items-center flex-nowrap">
-        <div class="flex flex-col">
-          <div
-            class="text-[18px] flex items-center"
-            data-test="schema-title-text"
+    <!-- Timeline / time-range chip sits at the right of the header, next to the
+         close button; the stream name is the title and "Stream Detail" the
+         subtitle (structured ODrawer header). -->
+    <template #header-right>
+      <div
+        v-if="indexData.name"
+        :class="[
+          'flex items-center gap-1.5 px-2 py-1 rounded-md border',
+          store.state.theme === 'dark'
+            ? 'bg-gray-800/50 border-gray-600'
+            : 'bg-gray-50 border-gray-200',
+        ]"
+      >
+        <img
+          :src="getTimelineIcon"
+          alt="Timeline Icon"
+          class="w-[14px] h-[14px] opacity-70"
+        />
+        <div class="flex items-center gap-1.5">
+          <span
+            :class="[
+              'text-[10px] font-medium px-1.5 py-0.5 rounded',
+              store.state.theme === 'dark'
+                ? 'text-gray-300 bg-gray-700/50'
+                : 'text-gray-600 bg-gray-100',
+            ]"
           >
-            <!-- introduced name at the top  -->
-            <span
-              v-if="indexData.name"
-              :class="[
-                'font-semibold mr-4 px-2 py-1 rounded-md ml-2 inline-block',
-                store.state.theme === 'dark'
-                  ? 'text-blue-400 bg-blue-900/50'
-                  : 'text-blue-600 bg-blue-50',
-              ]"
-            >
-              {{ indexData.name }}
-              <OTooltip
-                v-if="indexData.name && indexData.name.length > 35"
-                :content="indexData.name"
-                side="top"
-              />
-            </span>
-            <div
-              :class="[
-                'flex items-center gap-1.5 px-2 py-1 rounded-md border',
-                store.state.theme === 'dark'
-                  ? 'bg-gray-800/50 border-gray-600'
-                  : 'bg-gray-50 border-gray-200',
-              ]"
-            >
-              <img
-                :src="getTimelineIcon"
-                alt="Timeline Icon"
-                class="w-[14px] h-[14px] opacity-70"
-              />
-              <div class="flex items-center gap-1.5">
-                <span
-                  :class="[
-                    'text-[10px] font-medium px-1.5 py-0.5 rounded',
-                    store.state.theme === 'dark'
-                      ? 'text-gray-300 bg-gray-700/50'
-                      : 'text-gray-600 bg-gray-100',
-                  ]"
-                >
-                  UTC
-                </span>
-                <div
-                  :class="[
-                    'text-xs font-semibold',
-                    store.state.theme === 'dark'
-                      ? 'text-gray-200'
-                      : 'text-gray-800',
-                  ]"
-                >
-                  {{ indexData.stats.doc_time_min }}
-                  <span class="text-base leading-none">→</span>
-                  {{ indexData.stats.doc_time_max }}
-                </div>
-              </div>
-            </div>
+            UTC
+          </span>
+          <div
+            :class="[
+              'text-xs font-semibold',
+              store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800',
+            ]"
+          >
+            {{ indexData.stats.doc_time_min }}
+            <span class="text-base leading-none">→</span>
+            {{ indexData.stats.doc_time_max }}
           </div>
         </div>
       </div>
@@ -468,17 +444,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           margin-bottom: 2px;
                         "
                       >
-                        <StreamFieldsInputs
-                          :fields="newSchemaFields"
-                          :showHeader="false"
-                          :visibleInputs="{
-                            name: true,
-                            data_type: true,
-                            index_type: false,
-                          }"
-                          @add="addSchemaField"
-                          @remove="removeSchemaField"
-                        />
+                        <OForm
+                          :form="newSchemaFieldsForm"
+                          @keyup="onAddFieldsKeyup"
+                        >
+                          <StreamFieldsInputs
+                            form-field-name="newSchemaFields"
+                            :showHeader="false"
+                            :visibleInputs="{
+                              name: true,
+                              data_type: true,
+                              index_type: false,
+                            }"
+                          />
+                        </OForm>
                       </OCardSection>
                     </OCard>
                   </div>
@@ -948,7 +927,10 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { formatDate as formatDateUtil, formatTimestamp } from "@/utils/date";
+import {
+  convertUnixToDateFormat as convertUnixToFormat,
+  formatTimestamp,
+} from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import {
@@ -985,6 +967,9 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { makeSchemaFieldsSchema } from "./Schema.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
@@ -1038,6 +1023,7 @@ export default defineComponent({
     OCheckbox,
     OCard,
     OCardSection,
+    OForm,
   },
   setup({ modelValue }) {
     type PatternAssociation = {
@@ -1075,7 +1061,16 @@ export default defineComponent({
 
     const patternIdToApplyAtMap = new Map();
 
-    const newSchemaFields = ref([]);
+    // The "Add Field(s)" rows are owned by a small TanStack form (StreamFieldInputs
+    // is form-only now). Writes go through the form (push/remove/reset); reads use
+    // the reactive `newSchemaFields` view below — single source of truth, no mirror.
+    const newSchemaFieldsForm = useOForm<{ newSchemaFields: any[] }>({
+      defaultValues: { newSchemaFields: [] },
+      schema: makeSchemaFieldsSchema(t),
+    });
+    const newSchemaFields = newSchemaFieldsForm.useStore(
+      (s: any) => s.values.newSchemaFields ?? [],
+    );
     const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
@@ -1089,6 +1084,18 @@ export default defineComponent({
       (indexData.value.schema || []).map((f: any) => f.name).sort(),
     );
     const isDialogOpen = ref(false);
+    // The child (StreamFieldInputs) owns row deletion now and no longer emits a
+    // @remove event, so the parent can't run "close the dialog when the last row
+    // is deleted" inline. Observe the row count instead: whenever the rows drain
+    // to empty while the dialog is open, close it (restores main's behavior).
+    watch(
+      () => newSchemaFields.value.length,
+      (len) => {
+        if (isDialogOpen.value && len === 0) {
+          isDialogOpen.value = false;
+        }
+      },
+    );
     const patternAssociations = ref([]);
     const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
@@ -1436,8 +1443,8 @@ export default defineComponent({
               index: String(index),
               original_start: field.start,
               original_end: field.end,
-              start: convertUnixToQuasarFormat(field.start),
-              end: convertUnixToQuasarFormat(field.end),
+              start: convertUnixToDateFormat(field.start),
+              end: convertUnixToDateFormat(field.end),
             });
           },
         );
@@ -1556,6 +1563,20 @@ export default defineComponent({
     };
 
     const onSubmit = async () => {
+      // Gate the save on the "Add Field(s)" rows (parity with AddStream): when the
+      // dialog has rows, they must pass the schema (name required + valid chars
+      // after normalization, data type required) before we merge them into
+      // settings. handleSubmit() reveals the inline row errors (which are the
+      // user-facing feedback — no toast needed) and an invalid row blocks the
+      // save instead of silently pushing an invalid name (e.g. "user!id") into
+      // defined_schema_fields. Empty when the dialog is closed, so a normal
+      // settings save is unaffected.
+      if (newSchemaFields.value.length > 0) {
+        await newSchemaFieldsForm.handleSubmit();
+        if (!newSchemaFieldsForm.state.isValid) {
+          return;
+        }
+      }
       patternAssociations.value = ungroupPatternAssociations(
         patternAssociations.value,
       );
@@ -1699,7 +1720,7 @@ export default defineComponent({
       }
       loadingState.value = true;
 
-      newSchemaFields.value = [];
+      newSchemaFieldsForm.reset({ newSchemaFields: [] });
 
       redDaysList.value = [];
 
@@ -1793,6 +1814,25 @@ export default defineComponent({
             message: err.response.data.message,
           });
         });
+    };
+
+    // Enter inside the "Add Field(s)" card triggers the settings save (Update
+    // Settings), matching normal form behavior. Needed because the nested <OForm>
+    // renders a real <form> with no submit button inside it, so the browser never
+    // implicitly submits on Enter once there are 2+ text inputs (multiple rows).
+    // Scoped to the field-NAME input (matched by its form `name`) so Enter used to
+    // pick a Data Type option in the dropdown does NOT submit.
+    const onAddFieldsKeyup = (e: KeyboardEvent) => {
+      if (e.key !== "Enter") return;
+      const el = e.target as HTMLInputElement | null;
+      if (
+        el?.tagName === "INPUT" &&
+        /^newSchemaFields\[\d+\]\.name$/.test(el.name || "")
+      ) {
+        // Return the promise so the save is awaitable (the @keyup handler ignores
+        // the return value; tests await it).
+        return onSubmit();
+      }
     };
 
     const showPartitionColumn = computed(() => {
@@ -2003,22 +2043,11 @@ export default defineComponent({
       },
     ];
 
-    const addSchemaField = () => {
-      newSchemaFields.value.push({
-        name: "",
-        type: "",
-        index_type: [],
-      });
-      formDirtyFlag.value = true;
-    };
-
-    const removeSchemaField = (field: any, index: number) => {
-      newSchemaFields.value.splice(index, 1);
-      if (newSchemaFields.value.length === 0) {
-        isDialogOpen.value = false;
-        newSchemaFields.value = [];
-      }
-    };
+    // NOTE: adding/removing "Add Field(s)" rows is owned by the child
+    // (StreamFieldInputs) via form.pushFieldValue / form.removeFieldValue. The
+    // parent seeds the first row in openDialog and closes the dialog when the
+    // rows drain to empty via the watch above — so no add/remove handlers live
+    // here anymore.
 
     const scrollToAddFields = () => {
       const el = document.getElementById("schema-add-fields-section");
@@ -2277,19 +2306,22 @@ export default defineComponent({
 
     const closeDialog = () => {
       isDialogOpen.value = false;
-      newSchemaFields.value = [];
+      // reset() clears the rows AND submit-state → no stale "required" flash.
+      newSchemaFieldsForm.reset({ newSchemaFields: [] });
     };
 
     const openDialog = () => {
       isDialogOpen.value = true;
       formDirtyFlag.value = true;
-      newSchemaFields.value = [
-        {
-          name: "",
-          type: "",
-          index_type: [],
-        },
-      ];
+      newSchemaFieldsForm.reset({
+        newSchemaFields: [
+          {
+            name: "",
+            type: "",
+            index_type: [],
+          },
+        ],
+      });
     };
     const updateResultTotal = (streamResponse) => {
       if (activeTab.value === "schemaFields") {
@@ -2299,13 +2331,9 @@ export default defineComponent({
         resultTotal.value = streamResponse.schema?.length;
       }
     };
-    function convertUnixToQuasarFormat(unixMicroseconds: any) {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return formatDateUtil(formattedDate, "DD-MM-YYYY");
-    }
+    // Date only: this column shows a retention window, not an instant.
+    const convertUnixToDateFormat = (unixMicroseconds: any) =>
+      convertUnixToFormat(unixMicroseconds, "DD-MM-YYYY");
     function formatDate(dateString) {
       const date = new Date(dateString); // Convert to Date object
       const day = String(date.getDate()).padStart(2, "0"); // Get day with leading zero
@@ -2316,6 +2344,14 @@ export default defineComponent({
     }
 
     const dateChangeValue = (value) => {
+      // Ignore programmatic / mount-replay emits from <date-time>. On mount (and
+      // on every remount triggered by loadingState toggling), DateTime emits an
+      // `on:date-change` for its default range with `userChangedValue: false`.
+      // Acting on it here would push today's date into redDaysList and call
+      // onSubmit(), which toggles loadingState → remounts <date-time> → emits
+      // again → infinite updateSettings/getStream loop. Only a genuine user
+      // Apply carries `userChangedValue: true`.
+      if (value.userChangedValue === false) return;
       const selectedFromDate =
         value.hasOwnProperty("selectedDate") &&
         formatDate(value.selectedDate.from);
@@ -2626,9 +2662,9 @@ export default defineComponent({
       rowsPerPage,
       filterField,
       columns,
-      addSchemaField,
-      removeSchemaField,
       newSchemaFields,
+      newSchemaFieldsForm,
+      onAddFieldsKeyup,
       scrollToAddFields,
       tabs,
       activeTab,
@@ -2682,7 +2718,7 @@ export default defineComponent({
       getFieldIndices,
       setSchema,
       formatDate,
-      convertUnixToQuasarFormat,
+      convertUnixToDateFormat,
       computedSchemaFieldsName,
       groupPatternAssociationsByField,
       ungroupPatternAssociations,
@@ -2725,7 +2761,7 @@ export default defineComponent({
 }
 
 .indexDetailsContainer .o2-schema-table thead tr th {
-  font-size: 0.875rem;
+  font-size: var(--text-xs);
   height: 35px;
 }
 

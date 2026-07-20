@@ -16,13 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col h-full p-0">
-    <div v-if="!showImportTemplate && !showTemplateEditor" class="flex flex-col h-full">
+    <PageLayout
+      v-if="!showImportTemplate && !showTemplateEditor"
+      :main-panel="false"
+      :header-class="'shrink-0 px-4 border-b border-border-default'"
+    >
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <template #header>
       <AppPageHeader
         :title="t('alert_templates.header')"
         icon="description"
         :subtitle="'Reusable alert message templates'"
-        class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>
           <OToggleGroup
@@ -60,6 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
       </AppPageHeader>
+      </template>
       <div class="card-container flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
@@ -198,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </PageLayout>
     <div v-else-if="!showImportTemplate && showTemplateEditor">
       <AddTemplate
         :template="editingTemplate"
@@ -255,6 +260,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import PageLayout from "@/components/common/PageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";

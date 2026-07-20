@@ -79,45 +79,9 @@ vi.mock("@/composables/useStreams", () => ({
 describe("RealUserMonitoring.vue", () => {
   let store: any;
   let router: any;
-  let $q: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Mock Quasar
-    $q = {
-      dark: { isActive: false, mode: false },
-      platform: {
-        is: {
-          mobile: false,
-          desktop: true,
-          cordova: false,
-          capacitor: false,
-          electron: false,
-          chrome: true,
-          safari: false,
-          firefox: false,
-          edge: false,
-          ie: false,
-          linux: false,
-          mac: true,
-          win: false,
-          android: false,
-          ios: false,
-        },
-        has: {
-          touch: false,
-        },
-        within: {
-          iframe: false,
-        },
-      },
-      iconMapFn: vi.fn((iconName: string) => iconName),
-      iconSet: {
-        name: 'material-icons',
-      },
-      notify: vi.fn(),
-    };
 
     store = createStore({
       state: {
@@ -182,7 +146,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": true,
@@ -213,7 +176,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": {
@@ -237,7 +199,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": {
@@ -292,7 +253,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": true,
@@ -326,7 +286,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": {
               template: '<div class="router-view"><slot /></div>',
@@ -354,7 +313,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": {
               template:
@@ -384,7 +342,6 @@ describe("RealUserMonitoring.vue", () => {
       mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": true,
@@ -421,7 +378,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": true,
@@ -443,7 +399,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": true,
@@ -464,7 +419,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": true,
@@ -485,7 +439,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": true,
@@ -518,7 +471,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": {
               template: '<div class="router-view" />',
@@ -554,7 +506,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": {
               template:
@@ -579,7 +530,6 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
             "q-btn": true,

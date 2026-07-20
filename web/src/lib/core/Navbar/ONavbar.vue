@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          - group:     a pure flyout group with no page of its own (click toggles);
                       supported here but not currently emitted by groupNavLinks.
          `pinBottom` groups float to the foot of the rail via the flex spacer. -->
-    <div class="flex flex-col flex-1 min-h-0">
+    <div class="flex flex-col flex-1 min-h-0 gap-y-1">
       <template
         v-for="entry in topEntries"
         :key="
@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * navigation (ArrowUp/ArrowDown) and Tab trapping.
  */
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type {
   NavbarProps,
   NavbarEmits,
@@ -107,10 +108,15 @@ const emit = defineEmits<NavbarEmits>();
 
 defineSlots<NavbarSlots>();
 
+const { t } = useI18n();
+
 // Reshape the flat link list into rail entries: daily-use links stay top-level,
 // config / occasional items fold into flyout groups. Split out pinned-bottom
-// groups so the template can float them to the foot of the rail.
-const railEntries = computed<RailEntry[]>(() => groupNavLinks(props.linksList));
+// groups so the template can float them to the foot of the rail. `t` is passed
+// so group tile labels are localized (and re-resolve on language change).
+const railEntries = computed<RailEntry[]>(() =>
+  groupNavLinks(props.linksList, t),
+);
 const topEntries = computed(() =>
   railEntries.value.filter((e) => !(e.type === "group" && e.pinBottom)),
 );

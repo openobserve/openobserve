@@ -69,11 +69,6 @@ const createMockRouter = (routeName = "message-queues") => {
   return router;
 };
 
-// Mock quasar
-const mockQuasar = {
-  notify: vi.fn(),
-};
-
 // Mock utils
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
@@ -103,7 +98,6 @@ describe("MessageQueues.vue", () => {
       global: {
         plugins: [i18n, store, router],
         mocks: {
-          $q: mockQuasar,
           $t: (key: string) => key,
         },
         stubs: {

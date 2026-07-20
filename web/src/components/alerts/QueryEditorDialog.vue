@@ -41,16 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Stream Type + Stream Name -->
           <div class="flex items-center gap-2">
             <div v-if="streamType" class="inline-flex flex-row items-center gap-[5px] py-[3px] px-[10px] rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(59,130,246,0.12)] border border-[rgba(59,130,246,0.3)]' : 'bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)]'">
-              <span class="text-[11px] font-semibold" :class="store.state.theme === 'dark' ? 'text-[#94a3b8]' : 'text-[#64748b]'">Stream Type</span>
+              <span class="text-[11px] font-semibold" :class="store.state.theme === 'dark' ? 'text-[#94a3b8]' : 'text-[#64748b]'">{{ t("alerts.streamType") }}</span>
               <span class="text-[11px] opacity-30" :class="store.state.theme === 'dark' ? 'text-[#64748b]' : 'text-[#94a3b8]'">:</span>
               <span class="text-xs font-bold" :class="store.state.theme === 'dark' ? 'text-[#60a5fa]' : 'text-[#2563eb]'">{{ streamType }}</span>
             </div>
             <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
             <div class="inline-flex flex-row items-center gap-[5px] py-[3px] px-[10px] rounded-md" :class="store.state.theme === 'dark' ? 'bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.3)]' : 'bg-[rgba(139,92,246,0.08)] border border-[rgba(139,92,246,0.25)]'">
-              <span class="text-[11px] font-semibold" :class="store.state.theme === 'dark' ? 'text-[#94a3b8]' : 'text-[#64748b]'">Stream Name</span>
+              <span class="text-[11px] font-semibold" :class="store.state.theme === 'dark' ? 'text-[#94a3b8]' : 'text-[#64748b]'">{{ t("alerts.stream_name") }}</span>
               <span class="text-[11px] opacity-30" :class="store.state.theme === 'dark' ? 'text-[#64748b]' : 'text-[#94a3b8]'">:</span>
               <span v-if="streamName" class="text-xs font-bold" :class="store.state.theme === 'dark' ? 'text-[#a78bfa]' : 'text-[#7c3aed]'">{{ streamName }}</span>
-              <span v-else class="text-xs font-bold opacity-40 italic" :class="store.state.theme === 'dark' ? 'text-[#a78bfa]' : 'text-[#7c3aed]'">none</span>
+              <span v-else class="text-xs font-bold opacity-40 italic" :class="store.state.theme === 'dark' ? 'text-[#a78bfa]' : 'text-[#7c3aed]'">{{ t("alerts.queryEditor.noStream") }}</span>
             </div>
           </div>
         </div>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex items-center gap-2">
                         <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-primary)" />
-                        <span class="text-xs font-semibold">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
+                        <span class="text-xs font-semibold">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
                       </div>
                       <div class="flex items-center gap-2">
                         <OSwitch
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
                           @update:model-value="(val) => val ? restoreVrlEditor() : (sqlEditorMaximized = true)"
                         >
-                          <OTooltip :delay="400" :content="sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor'" />
+                          <OTooltip :delay="400" :content="sqlEditorMaximized ? t('alerts.queryEditor.showVrlEditor') : t('alerts.queryEditor.hideVrlEditor')" />
                         </OSwitch>
                         <OButton
                           data-test="alert-run-query-btn"
@@ -188,23 +188,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
                         <OSpinner size="xs" class="shrink-0" />
-                        <span>Fetching results...</span>
+                        <span>{{ t('alerts.queryEditor.fetchingResults') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
                         <OIcon name="edit" size="xs" style="flex-shrink:0;opacity:0.6;" />
-                        <span>Write a query to get started</span>
+                        <span>{{ t('alerts.queryEditor.writeQueryHint') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--idle'">
                         <OIcon name="play-arrow" size="xs" style="flex-shrink:0;opacity:0.7;" />
-                        <span>Press Run Query to see results</span>
+                        <span>{{ t('alerts.queryEditor.runQueryHint') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--empty'">
                         <OIcon name="search-off" size="xs" style="flex-shrink:0;" />
-                        <span>Query ran successfully — no matching events</span>
+                        <span>{{ t('alerts.queryEditor.noMatchingEvents') }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--success'">
                         <OIcon name="check-circle" size="xs" style="flex-shrink:0;" />
-                        <span>{{ sqlResultCount }} event{{ sqlResultCount === 1 ? '' : 's' }} found</span>
+                        <span>{{ t('alerts.queryEditor.eventsFound', sqlResultCount) }}</span>
                       </template>
                     </div>
                     <OTooltip
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div class="flex items-center gap-2">
                       <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-secondary)" />
-                      <span class="text-xs font-semibold">VRL Editor</span>
+                      <span class="text-xs font-semibold">{{ t('alerts.vrlEditor') }}</span>
                     </div>
                     <div v-if="!sqlEditorMaximized" class="flex gap-2 items-center">
                       <!-- Saved functions -->
@@ -244,7 +244,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-saved-vrl-function-select"
                         labelKey="name"
                         valueKey="name"
-                        @filter="filterFunctionOptions"
                         @update:modelValue="onFunctionSelect"
                         class="mini-select alert-v3-select"
                         clearable
@@ -325,12 +324,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="flex items-center gap-2">
                     <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-primary)" />
-                    <span class="text-xs font-semibold">Query Result</span>
+                    <span class="text-xs font-semibold">{{ t('alerts.queryEditor.queryResult') }}</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
                       class="text-[10px] font-bold py-px px-[7px] rounded tracking-[0.04em]"
                       :class="store.state.theme === 'dark' ? 'bg-blue-500/[0.12] border border-blue-500/30 text-[#60a5fa]' : 'bg-blue-500/[0.08] border border-blue-500/25 text-[#2563eb]'"
-                    >results across all time windows</span>
+                    >{{ t('alerts.queryEditor.resultsAcrossWindows') }}</span>
                   </div>
                 </div>
 
@@ -382,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="flex items-center gap-2">
                     <div class="w-[3px] h-[14px] rounded-[2px] shrink-0 bg-(--q-secondary)" />
-                    <span class="text-xs font-semibold">Combined Output</span>
+                    <span class="text-xs font-semibold">{{ t('alerts.queryEditor.combinedOutput') }}</span>
                     <span
                       class="text-[10px] font-bold py-px px-[7px] rounded tracking-[0.04em]"
                       :class="store.state.theme === 'dark' ? 'bg-violet-500/[0.15] border border-violet-500/30 text-[#a78bfa]' : 'bg-violet-500/[0.10] border border-violet-500/25 text-[#7c3aed]'"
@@ -391,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Running indicator -->
                   <div v-if="runFnQueryLoading" class="flex items-center gap-1">
                     <span class="w-[6px] h-[6px] rounded-full bg-emerald-500 [animation:pulse_1.5s_ease-in-out_infinite]" />
-                    <span class="text-[10px] font-semibold text-emerald-400">Running</span>
+                    <span class="text-[10px] font-semibold text-emerald-400">{{ t('alerts.queryEditor.running') }}</span>
                   </div>
                 </div>
 
@@ -451,7 +450,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type PropType, onMounted } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  type PropType,
+  onMounted,
+  inject,
+  type Ref,
+} from "vue";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -705,20 +713,6 @@ watch(() => props.savedFunctions, (newVal) => {
   functionOptions.value = [...newVal];
 });
 
-// Filter functions
-const filterFunctionOptions = (val: string, update: any) => {
-  update(() => {
-    if (val === "") {
-      functionOptions.value = [...props.savedFunctions];
-    } else {
-      const needle = val.toLowerCase();
-      functionOptions.value = props.savedFunctions.filter((v: any) =>
-        v.name.toLowerCase().indexOf(needle) > -1
-      );
-    }
-  });
-};
-
 // Update handlers
 const updateSqlQuery = (value: string) => {
   localSqlQuery.value = value;
@@ -778,11 +772,13 @@ const handleAlertFunctionEditorGenerationSuccess = (payload: {
   // Function code is already updated via @update:query handler
 };
 
-// Column and function selection
-const onFunctionSelect = (func: any) => {
-  if (func && func.function) {
-    vrlFunctionContent.value = func.function;
-    updateVrlFunction(func.function);
+// Column and function selection.
+// OSelect emits the resolved `valueKey` (the function name), not the option
+// object — look the function up before reading its body.
+const onFunctionSelect = (name: any) => {
+  const func = props.savedFunctions.find((f: any) => f.name === name);
+  if (func) {
+    updateVrlFunction(func.function || func.body || "");
   }
 };
 
@@ -1000,12 +996,19 @@ const runPromqlQuery = async () => {
 // Unified Query Editor ref
 const queryEditorRef = ref<any>(null);
 
+// Server SQL-validation squiggle ranges, provided by AddAlert.vue.
+const alertSqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
+  "alertSqlErrorRanges",
+  ref<SqlErrorRange[]>([]),
+);
+
 const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
   useSqlEditorDiagnostics({
     queryEditorRef,
     sqlMode: computed(() => localTab.value === 'sql'),
     query: computed(() => localSqlQuery.value ?? ""),
     streamName: computed(() => props.streamName),
+    externalErrors: alertSqlErrorRanges,
   });
 
 const onQueryEditorFocus = () => {

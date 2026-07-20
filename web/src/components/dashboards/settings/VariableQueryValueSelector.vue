@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="toggleSelectAll"
               @click.stop
             />
-            <span>Select All</span>
+            <span>{{ t('dashboard.variableQueryValueSelector.selectAll') }}</span>
           </div>
           <!-- single-select: show plain All -->
           <div
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center gap-2 px-3 py-2 cursor-pointer"
             @click.stop="toggleSelectAll"
           >
-            <span>All</span>
+            <span>{{ t('dashboard.variableQueryValueSelector.all') }}</span>
           </div>
           <OSeparator data-test="dashboard-variable-all-separator" />
         </template>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop="handleCustomValue(currentSearchTerm)"
           >
             {{ currentSearchTerm }}
-            <span class="text-gray-400 text-xs italic">(Custom)</span>
+            <span class="text-gray-400 text-xs italic">{{ t('dashboard.variableQueryValueSelector.custom') }}</span>
           </div>
         </template>
         <div
@@ -104,10 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
-          <span class="text-gray-400 text-xs italic">(Custom)</span>
+          <span class="text-gray-400 text-xs italic">{{ t('dashboard.variableQueryValueSelector.custom') }}</span>
         </div>
         <div v-else class="italic text-gray-500 flex justify-center items-center py-3" data-test="variable-query-value-selector-no-data">
-          No Data Found
+          {{ t('dashboard.variableQueryValueSelector.noDataFound') }}
         </div>
       </template>
     </OSelect>
@@ -129,6 +129,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
@@ -136,6 +137,7 @@ export default defineComponent({
   props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
+    const { t } = useI18n();
     const selectedValue = ref(props.variableItem?.value);
     const currentSearchTerm = ref("");
     const selectRef = ref(null);
@@ -151,13 +153,13 @@ export default defineComponent({
           opt.value.endsWith(`${CUSTOM_VALUE}`)
         ) {
           const base = opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "");
-          return { ...opt, label: `${base} (Custom)` };
+          return { ...opt, label: `${base} ${t('dashboard.variableQueryValueSelector.custom')}` };
         }
         return opt;
       });
     });
 
-    // Handler for OSelect @search event (replaces Quasar @filter)
+    // Handler for OSelect @search event
     const onSearch = (val: string) => {
       currentSearchTerm.value = val;
       updateSearch(val);
@@ -324,27 +326,30 @@ export default defineComponent({
             const firstTwoValues = selectedValue.value
               .slice(0, 2)
               .map((it: any) => {
-                if (it === "") return "<blank>";
-                if (it === SELECT_ALL_VALUE) return "<ALL>";
+                if (it === "") return t('dashboard.variableQueryValueSelector.blank');
+                if (it === SELECT_ALL_VALUE) return t('dashboard.variableQueryValueSelector.allSelected');
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} (Custom)`;
+                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t('dashboard.variableQueryValueSelector.custom')}`;
                 return it;
               })
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
-            return `${firstTwoValues} ...+${remainingCount} more`;
+            return t('dashboard.variableQueryValueSelector.moreCount', {
+              firstTwoValues,
+              remainingCount,
+            });
           } else if (
             props?.variableItem?.options?.length === 0 &&
             selectedValue.value.length === 0
           ) {
-            return "(No Data Found)";
+            return t('dashboard.variableQueryValueSelector.noDataFoundParen');
           } else {
             return selectedValue.value
               .map((it: any) => {
-                if (it === "") return "<blank>";
-                if (it === SELECT_ALL_VALUE) return "<ALL>";
+                if (it === "") return t('dashboard.variableQueryValueSelector.blank');
+                if (it === SELECT_ALL_VALUE) return t('dashboard.variableQueryValueSelector.allSelected');
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} (Custom)`;
+                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t('dashboard.variableQueryValueSelector.custom')}`;
                 return it;
               })
               .join(", ");
@@ -355,22 +360,22 @@ export default defineComponent({
             props.variableItem.options &&
             props.variableItem.options.some((o: any) => o.value === "")
           ) {
-            return "<blank>";
+            return t('dashboard.variableQueryValueSelector.blank');
           }
           // Otherwise treat empty-string as unset
-          return "(No Data Found)";
+          return t('dashboard.variableQueryValueSelector.noDataFoundParen');
         } else if (selectedValue.value === SELECT_ALL_VALUE) {
-          return "<ALL>";
+          return t('dashboard.variableQueryValueSelector.allSelected');
         } else if (
           typeof selectedValue.value === "string" &&
           selectedValue.value.endsWith(`${CUSTOM_VALUE}`)
         ) {
-          return `${selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} (Custom)`;
+          return `${selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t('dashboard.variableQueryValueSelector.custom')}`;
         } else {
           return selectedValue.value;
         }
       } else {
-        return "(No Data Found)";
+        return t('dashboard.variableQueryValueSelector.noDataFoundParen');
       }
     });
 
@@ -457,6 +462,7 @@ export default defineComponent({
       handleKeydown,
       handleCustomValue,
       CUSTOM_VALUE,
+      t,
     };
   },
 });

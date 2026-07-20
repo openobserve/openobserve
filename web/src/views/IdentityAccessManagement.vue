@@ -63,6 +63,7 @@ const routeToIamTab: Record<string, string> = {
   users: "users",
   serviceAccounts: "serviceAccounts",
   ingestionTokens: "ingestionTokens",
+  mcpServer: "mcpServer",
   groups: "groups",
   editGroup: "groups",
   roles: "roles",
@@ -80,6 +81,9 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   const meta = isMetaOrg.value;
   const rbac = !!store.state.zoConfig.rbac_enabled;
   const svc = store.state.zoConfig.service_account_enabled ?? true;
+  // MCP is an AI feature (its endpoint requires O2_AI_ENABLED). Available on
+  // both enterprise and cloud builds, gated on the ai_enabled runtime flag.
+  const aiEnabled = isEnt && !!store.state.zoConfig.ai_enabled;
 
   const groups: { label: string; items: SectionHubItem[] }[] = [
     {
@@ -109,6 +113,15 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           icon: "key",
           to: { name: "ingestionTokens", query: orgQuery.value },
           dataTest: "iam-ingestion-tokens-tab",
+        },
+        {
+          key: "mcpServer",
+          label: t("iam.mcpServerLabel"),
+          description: t("iam.mcpServerDesc"),
+          icon: "mcp",
+          to: { name: "mcpServer", query: orgQuery.value },
+          visible: aiEnabled,
+          dataTest: "iam-mcp-server-tab",
         },
         {
           key: "invitations",

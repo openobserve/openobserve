@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="iam-service-accounts-selection-show-text"
               style="font-size: 14px"
             >
-              Show
+              {{ t('iam.groupServiceAccounts.show') }}
             </span>
             <OToggleGroup
               class="ml-1"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-accounts-list-search-input"
             v-model="userSearchKey"
             class="h-9 w-50"
-            placeholder="Search Service Accounts"
+            :placeholder="t('iam.groupServiceAccounts.searchServiceAccounts')"
           />
         </div>
       </div>
@@ -145,20 +145,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   const usersDisplay = ref("selected");
   
   const store = useStore();
-  
+
+  const { t } = useI18n();
+
   const usersDisplayOptions = [
     {
-      label: "All",
+      label: t("iam.groupServiceAccounts.all"),
       value: "all",
     },
     {
-      label: "Selected",
+      label: t("iam.groupServiceAccounts.selected"),
       value: "selected",
     },
   ];
-  
-  const { t } = useI18n();
-  
+
   const userSearchKey = ref("");
   
   const hasFetchedOrgServiceAccounts = ref(false);

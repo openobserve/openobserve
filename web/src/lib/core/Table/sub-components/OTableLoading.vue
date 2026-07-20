@@ -14,6 +14,8 @@ const props = defineProps<{
   selectionEnabled?: boolean;
   /** Render placeholder for the expand chevron column */
   expansionEnabled?: boolean;
+  /** Render placeholder for the drag-handle column */
+  enableRowReorder?: boolean;
 }>();
 
 const BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
@@ -120,6 +122,12 @@ const alignClassFor = (col: Column<any, any>): string => {
           aria-hidden="true"
         />
       </td>
+
+      <!-- Drag handle placeholder -->
+      <td
+        v-if="enableRowReorder"
+        class="w-4 min-w-4 px-0 text-center align-middle"
+      />
 
       <!-- Data cells — class & style mirror OTableBodyCell exactly -->
       <td

@@ -434,7 +434,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await page.getByText(">=", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
       await page.getByText(">=", { exact: true }).click();
 
-      // Quasar q-input may place data-test on the native <input> or on its root div,
+      // The q-input may place data-test on the native <input> or on its root div,
       // so match both: 'input[data-test]' (on input) and '[data-test] input' (input inside parent)
       const thresholdInput = page.locator(
         'input[data-test="alert-threshold-value-input"], [data-test="alert-threshold-value-input"] input'

@@ -32,16 +32,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
   }),
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(() => vi.fn()), // returns dismiss function
-    }),
-  };
-});
-
 import CommonService from "@/services/common";
 
 const mockNodeData = {

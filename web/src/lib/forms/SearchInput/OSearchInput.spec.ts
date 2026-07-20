@@ -3,6 +3,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import OSearchInput from "./OSearchInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
 describe("OSearchInput", () => {
   let wrapper: VueWrapper;
@@ -100,6 +101,29 @@ describe("OSearchInput", () => {
     const fieldEl = wrapper.find('[data-test="streams-search-stream-input-field"]');
     expect(fieldEl.exists()).toBe(true);
     expect(fieldEl.element.tagName.toLowerCase()).toBe("input");
+  });
+
+  it("renders an icon-right slot inside the field", () => {
+    // So a search can carry a control within its own border — the scope toggle the
+    // dashboard list and the metrics explorer both put in their search box.
+    wrapper = mount(OSearchInput, {
+      props: { modelValue: "" },
+      slots: { "icon-right": '<button data-test="scope">All</button>' },
+    });
+
+    expect(wrapper.find('[data-test="scope"]').exists()).toBe(true);
+  });
+
+  it("hands OInput no icon-right slot at all when the caller passes none", () => {
+    // The forwarding is under a `v-if` for a reason: OInput renders its right-hand
+    // box on `v-if="$slots['icon-right']"`, and an always-present-but-empty
+    // template still counts as present — which would give EVERY plain search input
+    // in the app an invisible, padded box on its right.
+    wrapper = mount(OSearchInput, { props: { modelValue: "" } });
+
+    expect(
+      wrapper.findComponent(OInput).vm.$slots["icon-right"],
+    ).toBeUndefined();
   });
 
   it("should debounce update:modelValue when debounce is set", async () => {

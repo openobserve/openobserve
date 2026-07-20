@@ -26,7 +26,7 @@
         :label="t('settings.traceIdFieldName')"
         required
         class="py-3 showLabelOnTop"
-        help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
+        :help-text="t('settings.organizationSettings.fieldNameHelp')"
       />
     </div>
 
@@ -40,7 +40,7 @@
         :label="t('settings.spanIdFieldName')"
         required
         class="py-3 showLabelOnTop"
-        help-text="Use alphanumeric and '+=,.@-_' characters only, without spaces."
+        :help-text="t('settings.organizationSettings.fieldNameHelp')"
       />
     </div>
 
@@ -177,12 +177,12 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
     formDirty.value = false;
 
     toast({
-      message: "Organization settings updated successfully",
+      message: t('settings.organizationSettings.settingsUpdated'),
       variant: "success",
     });
   } catch (e: any) {
     toast({
-      message: e?.message || "Error saving organization settings",
+      message: e?.message || t('settings.organizationSettings.settingsSaveError'),
       variant: "error",
     });
   }

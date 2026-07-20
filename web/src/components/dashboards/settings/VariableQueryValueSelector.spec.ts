@@ -14,9 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, config } from "@vue/test-utils";
 import { nextTick } from "vue";
+import i18n from "@/locales";
 import VariableQueryValueSelector from "./VariableQueryValueSelector.vue";
+
+// Install the real app i18n for every mount in this file so components
+// that call useI18n() during setup have an active i18n instance.
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Mock lodash debounce - improved version
 vi.mock("lodash-es", () => ({
@@ -67,7 +72,7 @@ describe("VariableQueryValueSelector", () => {
     { label: "Custom Test", value: "custom-test::_o2_custom" }
   ];
 
-  // OSelect stub that exposes the Quasar-style methods the component still
+  // OSelect stub that exposes the methods the component still
   // calls on its selectRef (updateInputValue/blur/hidePopup).
   const OSelectStub = {
     name: "OSelect",

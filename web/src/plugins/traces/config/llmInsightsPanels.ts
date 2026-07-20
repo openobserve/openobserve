@@ -30,6 +30,7 @@
 
 export type LLMPanelType =
   | "stacked-area"
+  | "stacked-bar"
   | "horizontal-bar"
   | "table";
 
@@ -131,7 +132,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     id: "cost-trend",
     title: "Cost trend",
     subtitle: "USD by model",
-    type: "stacked-area",
+    type: "stacked-bar",
     layout: { colSpan: 1 },
     query: {
       // Cost field populated by the backend extractor from
@@ -158,7 +159,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     id: "token-trend",
     title: "Token trend",
     subtitle: "tokens by model",
-    type: "stacked-area",
+    type: "stacked-bar",
     layout: { colSpan: 1 },
     query: {
       sql: `
@@ -181,7 +182,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     id: "span-trend",
     title: "Span trend",
     subtitle: "span count by kind",
-    type: "stacked-area",
+    type: "stacked-bar",
     layout: { colSpan: 1 },
     query: {
       sql: `
@@ -238,7 +239,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     id: "traces-over-time",
     title: "Traces over time",
     subtitle: "trace count by service",
-    type: "stacked-area",
+    type: "stacked-bar",
     layout: { colSpan: 1 },
     query: {
       sql: `
@@ -260,7 +261,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     id: "errors-over-time",
     title: "Errors over time",
     subtitle: "error count",
-    type: "stacked-area",
+    type: "stacked-bar",
     layout: { colSpan: 1 },
     color: "#ef4444",
     query: {

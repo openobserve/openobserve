@@ -1,424 +1,243 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// Behavior-focused spec for ScriptToolbar.vue after the OForm + Zod migration.
+// The old spec asserted removed internals (isValidMethodName / showInputError /
+// scriptNameError / onUpdate / addScriptForm). Those are gone — validation now
+// lives in ScriptToolbar.schema.ts and is enforced by a REAL <OForm>, so the
+// tests below mount the real form and assert behavior:
+//   • required + method-name regex gate `save` (schema, not a manual ref),
+//   • `update:name` still mirrors the form-owned value back to the parent,
+//   • the data-test selectors + back/cancel/fullscreen wiring are preserved.
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import { createRouter, createWebHistory } from 'vue-router';
-import { createStore } from 'vuex';
+import { mount, VueWrapper, flushPromises } from '@vue/test-utils';
 import ScriptToolbar from '@/components/actionScripts/ScriptToolbar.vue';
 
-// Mock vue-i18n
+// Mock vue-i18n — labels/buttons just echo their key.
 vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: (key: string) => key
-  })
+  useI18n: () => ({ t: (key: string) => key }),
 }));
 
-// ScriptToolbar calls toggleFullscreen() from @/utils/dom directly — mock at the module boundary.
+// ScriptToolbar calls toggleFullscreen() from @/utils/dom directly — mock at the
+// module boundary.
 const mockToggleFullscreen = vi.fn();
 vi.mock('@/utils/dom', () => ({
   toggleFullscreen: () => mockToggleFullscreen(),
 }));
 
-
 describe('ScriptToolbar.vue', () => {
   let wrapper: VueWrapper;
-  let router: any;
-  let store: any;
-  let mockQuasar: any;
 
-  beforeEach(() => {
-    // Mock router
-    router = createRouter({
-      history: createWebHistory(),
-      routes: [
-        { path: '/', component: { template: '<div>Home</div>' } }
-      ]
-    });
-
-    // Mock store
-    store = createStore({
-      state: {
-        theme: 'light'
-      },
-      mutations: {},
-      actions: {}
-    });
-
-    // Mock Quasar fullscreen
-    mockQuasar = {
-      fullscreen: {
-        toggle: vi.fn()
-      }
-    };
-  });
-
-  afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllMocks();
-  });
-
-  const createWrapper = (props = {}, storeState = {}) => {
-    const defaultProps = {
-      name: 'test_action',
-      disableName: false
-    };
-
-    const currentStore = createStore({
-      state: {
-        theme: 'light',
-        ...storeState
-      },
-      mutations: {},
-      actions: {}
-    });
+  const createWrapper = (props = {}) => {
+    const defaultProps = { name: 'test_action', disableName: false };
 
     return mount(ScriptToolbar, {
       props: { ...defaultProps, ...props },
       global: {
-        plugins: [currentStore, router],
-        provide: {
-          $q: mockQuasar,
-          _q_: mockQuasar
-        },
+        // Real <OForm>/<OFormInput>/<OInput>/<OButton> are mounted (NOT stubbed)
+        // so the schema wiring is actually exercised.
         stubs: {
-          'OIcon': {
-            template: '<div class="OIcon-stub" :name="name"><q-tooltip-stub v-if="$slots.default"><slot></slot></q-tooltip-stub></div>',
-            props: ['name', 'size']
+          OIcon: {
+            template: '<i class="OIcon-stub" :data-name="name"></i>',
+            props: ['name', 'size'],
           },
-          'q-input': {
-            template: '<input class="q-input-stub" :data-test="$attrs[\'data-test\']" />',
-            props: ['modelValue', 'label', 'readonly', 'disable', 'rules']
-          },
-          'q-btn': {
-            template: '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')">{{ label }}</button>',
-            props: ['label', 'color', 'padding', 'type', 'textColor', 'noEaps', 'icon']
-          },
-          OButton: {
-            template: '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
-            props: ['variant', 'size', 'disabled', 'loading', 'type']
-          },
-          'q-form': {
-            template: '<form class="q-form-stub"><slot></slot></form>',
-            props: []
-          },
-          'q-tooltip': {
-            template: '<div class="q-tooltip-stub"><slot></slot></div>',
-            props: ['anchor', 'self', 'maxWidth', 'offset']
-          }
-        }
-      }
+        },
+        directives: {
+          // `v-close-popup` is a directive not registered in the unit env.
+          'close-popup': {},
+        },
+      },
     });
   };
 
-  describe('Component Rendering', () => {
-    it('renders the component correctly', () => {
+  // Drive the form's own submit so the schema runs + the handler is awaited
+  // deterministically (a fire-and-forget native submit would not be).
+  const submit = async (w: VueWrapper) => {
+    await (w.vm as any).form.handleSubmit();
+    await flushPromises();
+  };
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+    vi.clearAllMocks();
+  });
+
+  describe('Rendering', () => {
+    it('renders the toolbar shell + title', () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-    });
-
-    it('displays the correct title', () => {
-      wrapper = createWrapper();
       expect(wrapper.text()).toContain('Add Action');
+      const toolbar = wrapper.find('[data-test="add-script-toolbar"]');
+      expect(toolbar.exists()).toBe(true);
+      expect(toolbar.classes()).toContain('flex');
+      expect(toolbar.classes()).toContain('justify-between');
     });
 
-    it('renders back button with correct styling', () => {
+    it('preserves every data-test selector', () => {
       wrapper = createWrapper();
-      const backBtn = wrapper.find('[data-test="add-script-back-btn"]');
-
-      expect(backBtn.exists()).toBe(true);
-      expect(backBtn.attributes('title')).toBe('Go Back');
-      // The back button uses Tailwind  prefix classes, not bare cursor-pointer
-      expect(backBtn.classes()).toContain('cursor-pointer');
+      expect(wrapper.find('[data-test="add-script-back-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-script-name-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-script-fullscreen-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-script-save-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-script-cancel-btn"]').exists()).toBe(true);
     });
 
-    it('renders name input field', () => {
-      wrapper = createWrapper();
-      // The component uses OInput (O2 lib), queried by its data-test attribute
-      const nameInput = wrapper.find('[data-test="add-script-name-input"]');
-
-      expect(nameInput.exists()).toBe(true);
+    it('seeds the name input from the `name` prop', () => {
+      wrapper = createWrapper({ name: 'seeded_name' });
+      const input = wrapper.find('[data-test="add-script-name-input"] input');
+      expect((input.element as HTMLInputElement).value).toBe('seeded_name');
     });
 
-    it('renders action buttons', () => {
+    it('renders the save button as a submit button', () => {
       wrapper = createWrapper();
-      const buttons = wrapper.findAll('.q-btn-stub');
-      
-      expect(buttons).toHaveLength(3); // fullscreen, save, cancel
-      expect(buttons[0].attributes('data-test')).toBe('add-script-fullscreen-btn');
-      expect(buttons[1].attributes('data-test')).toBe('add-script-save-btn');
-      expect(buttons[2].attributes('data-test')).toBe('add-script-cancel-btn');
+      const saveBtn = wrapper.find('[data-test="add-script-save-btn"]');
+      expect(saveBtn.attributes('type')).toBe('submit');
     });
   });
 
-  describe('Props Handling', () => {
-    it('accepts required name prop', () => {
+  describe('Props', () => {
+    it('accepts the required name prop', () => {
       wrapper = createWrapper({ name: 'custom_action' });
       expect(wrapper.props('name')).toBe('custom_action');
     });
 
-    it('accepts optional disableName prop', () => {
-      wrapper = createWrapper({ disableName: true });
-      expect(wrapper.props('disableName')).toBe(true);
-    });
-
-    it('uses default value for disableName prop', () => {
+    it('defaults disableName to false', () => {
       wrapper = createWrapper();
       expect(wrapper.props('disableName')).toBe(false);
     });
 
-    it('passes disableName to input field', () => {
+    it('disables + makes the input readonly when disableName is true', () => {
       wrapper = createWrapper({ disableName: true });
-      // The component uses OInput (O2 lib), queried by its data-test attribute
-      const nameInput = wrapper.find('[data-test="add-script-name-input"]');
-
-      expect(nameInput.exists()).toBe(true);
+      const input = wrapper.find('[data-test="add-script-name-input"] input');
+      expect(input.attributes('disabled')).toBeDefined();
+      expect(input.attributes('readonly')).toBeDefined();
     });
   });
 
-  describe('Action Name Computed Property', () => {
-    it('gets value from props', () => {
-      wrapper = createWrapper({ name: 'test_script' });
-      const vm = wrapper.vm as any;
-      
-      expect(vm.actionName).toBe('test_script');
-    });
-
-    it('emits update:name when set', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      vm.actionName = 'new_action';
-      
-      expect(wrapper.emitted('update:name')).toBeTruthy();
-      expect(wrapper.emitted('update:name')?.[0]).toEqual(['new_action']);
-    });
-  });
-
-  describe('Input Validation', () => {
-    it('validates required field', () => {
+  describe('Schema validation (real OForm)', () => {
+    it('blocks save when the name is empty', async () => {
       wrapper = createWrapper({ name: '' });
-      const vm = wrapper.vm as any;
-      
-      const result = vm.isValidMethodName();
-      expect(result).toBe('Field is required!');
+
+      await submit(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(wrapper.emitted('save')).toBeFalsy();
     });
 
-    it('validates method name pattern - valid names', () => {
-      const validNames = [
-        'valid_action',
-        'ValidAction',
-        'action123',
-        '_private_action',
-        'ACTION_NAME'
-      ];
+    it('blocks save when the name violates the method-name regex', async () => {
+      // Starts with a digit → invalid method name.
+      wrapper = createWrapper({ name: '123-bad' });
 
-      validNames.forEach(name => {
+      await submit(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(false);
+      expect(wrapper.emitted('save')).toBeFalsy();
+    });
+
+    it('emits save when the name is valid', async () => {
+      wrapper = createWrapper({ name: 'valid_action' });
+
+      await submit(wrapper);
+
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
+      expect(wrapper.emitted('save')).toBeTruthy();
+    });
+
+    it.each([
+      'valid_action',
+      'ValidAction',
+      'action123',
+      '_private_action',
+      'ACTION_NAME',
+    ])('accepts the valid method name %s', async (name) => {
+      wrapper = createWrapper({ name });
+      await submit(wrapper);
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
+    });
+
+    it.each(['123invalid', 'invalid-name', 'invalid name', 'invalid.name', '@invalid'])(
+      'rejects the invalid method name %s',
+      async (name) => {
         wrapper = createWrapper({ name });
-        const vm = wrapper.vm as any;
-        
-        const result = vm.isValidMethodName();
-        expect(result).toBe(true);
-      });
-    });
+        await submit(wrapper);
+        expect((wrapper.vm as any).form.state.isValid).toBe(false);
+        expect(wrapper.emitted('save')).toBeFalsy();
+      },
+    );
 
-    it('validates method name pattern - invalid names', () => {
-      const invalidNames = [
-        '123invalid',
-        'invalid-name',
-        'invalid name',
-        'invalid.name',
-        '@invalid'
-      ];
-
-      invalidNames.forEach(name => {
-        wrapper = createWrapper({ name });
-        const vm = wrapper.vm as any;
-        
-        const result = vm.isValidMethodName();
-        expect(result).toContain('Invalid method name');
-      });
-    });
-
-    it('shows validation error message', () => {
-      wrapper = createWrapper({ name: 'invalid-name' });
-      const vm = wrapper.vm as any;
-      
-      vm.showInputError = true;
-      const result = vm.isValidMethodName();
-      
-      expect(result).toContain('Invalid method name. Must start with a letter or underscore. Use only letters, numbers, and underscores.');
-    });
-
-
-    it('does not show error icon when validation passes', async () => {
-      wrapper = createWrapper({ name: 'valid_name' });
-      const vm = wrapper.vm as any;
-      
-      // Valid name should not show error
-      expect(vm.isValidMethodName()).toBe(true);
+    it('does not validate before the first submit (R3)', () => {
+      wrapper = createWrapper({ name: '' });
+      // No error text rendered until the form is submitted.
+      expect(wrapper.find('[data-test="add-script-name-input-error"]').exists()).toBe(false);
     });
   });
 
-  describe('Event Handling', () => {
-    it('emits back event when back button is clicked', async () => {
+  describe('update:name bridge (parent owns the value)', () => {
+    it('emits update:name when the form-owned value changes', async () => {
+      wrapper = createWrapper({ name: 'old_name' });
+      await flushPromises();
+
+      (wrapper.vm as any).form.setFieldValue('name', 'new_name');
+      await flushPromises();
+
+      const events = wrapper.emitted('update:name');
+      expect(events).toBeTruthy();
+      expect(events?.[events.length - 1]).toEqual(['new_name']);
+    });
+
+    it('trims surrounding whitespace (parity with the old v-model.trim)', async () => {
+      wrapper = createWrapper({ name: '' });
+      await flushPromises();
+
+      (wrapper.vm as any).form.setFieldValue('name', '  valid_action  ');
+      await flushPromises();
+
+      // Parent (value owner) receives the TRIMMED name, as before the migration.
+      const events = wrapper.emitted('update:name') as any[];
+      expect(events[events.length - 1]).toEqual(['valid_action']);
+
+      // A whitespace-padded valid name still passes (schema .trim() → was rejected
+      // by the method-name regex before the fix).
+      await submit(wrapper);
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
+      expect(wrapper.emitted('save')).toBeTruthy();
+    });
+  });
+
+  describe('Event wiring', () => {
+    it('emits back when the back button is clicked', async () => {
       wrapper = createWrapper();
-      const backBtn = wrapper.find('[data-test="add-script-back-btn"]');
-      
-      await backBtn.trigger('click');
-      
+      await wrapper.find('[data-test="add-script-back-btn"]').trigger('click');
       expect(wrapper.emitted('back')).toBeTruthy();
     });
 
-    it('handles fullscreen toggle', async () => {
+    it('emits cancel when the cancel button is clicked', async () => {
       wrapper = createWrapper();
-      const fullscreenBtn = wrapper.find('[data-test="add-script-fullscreen-btn"]');
-
-      await fullscreenBtn.trigger('click');
-
-      // Component calls toggleFullscreen() from @/utils/dom — verified via module mock
-      expect(mockToggleFullscreen).toHaveBeenCalled();
-    });
-
-    it('emits save event and shows input error when save button is clicked', async () => {
-      wrapper = createWrapper();
-      const saveBtn = wrapper.find('[data-test="add-script-save-btn"]');
-      const vm = wrapper.vm as any;
-      
-      await saveBtn.trigger('click');
-      
-      expect(wrapper.emitted('save')).toBeTruthy();
-      expect(vm.showInputError).toBe(true);
-    });
-
-    it('emits cancel event when cancel button is clicked', async () => {
-      wrapper = createWrapper();
-      const cancelBtn = wrapper.find('[data-test="add-script-cancel-btn"]');
-      
-      await cancelBtn.trigger('click');
-      
+      await wrapper.find('[data-test="add-script-cancel-btn"]').trigger('click');
       expect(wrapper.emitted('cancel')).toBeTruthy();
     });
 
-    it('shows input error when onUpdate is called', () => {
+    it('toggles fullscreen when the fullscreen button is clicked', async () => {
       wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      vm.onUpdate();
-      
-      expect(vm.showInputError).toBe(true);
+      await wrapper.find('[data-test="add-script-fullscreen-btn"]').trigger('click');
+      expect(mockToggleFullscreen).toHaveBeenCalled();
+    });
+
+    it('does not emit save on a plain button click without submit', async () => {
+      // Sanity: clicking cancel/back must never emit save.
+      wrapper = createWrapper({ name: 'valid_action' });
+      await wrapper.find('[data-test="add-script-cancel-btn"]').trigger('click');
+      expect(wrapper.emitted('save')).toBeFalsy();
     });
   });
 
-  describe('Theme Support', () => {
-    it('handles light theme', () => {
-      wrapper = createWrapper({ name: 'test' }, { theme: 'light' });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('handles dark theme', () => {
-      wrapper = createWrapper({ name: 'test' }, { theme: 'dark' });
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe('Input Field Configuration', () => {
-    it('configures input field', () => {
-      wrapper = createWrapper();
-      // The component uses OInput (O2 lib), queried by its data-test attribute
-      const nameInput = wrapper.find('[data-test="add-script-name-input"]');
-
-      expect(nameInput.exists()).toBe(true);
-    });
-
-    it('has validation rules', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      // Test validation function directly
-      expect(typeof vm.isValidMethodName).toBe('function');
-    });
-  });
-
-  describe('Button Configuration', () => {
-    it('configures fullscreen button correctly', () => {
-      wrapper = createWrapper();
-      const fullscreenBtn = wrapper.find('[data-test="add-script-fullscreen-btn"]');
-      
-      expect(fullscreenBtn.exists()).toBe(true);
-    });
-
-    it('configures save button correctly', () => {
-      wrapper = createWrapper();
-      const saveBtn = wrapper.find('[data-test="add-script-save-btn"]');
-      
-      expect(saveBtn.exists()).toBe(true);
-    });
-
-    it('configures cancel button correctly', () => {
-      wrapper = createWrapper();
-      const cancelBtn = wrapper.find('[data-test="add-script-cancel-btn"]');
-      
-      expect(cancelBtn.exists()).toBe(true);
-    });
-  });
-
-  describe('Component Structure', () => {
-    it('has correct main structure', () => {
-      wrapper = createWrapper();
-      const toolbar = wrapper.find('[data-test="add-script-toolbar"]');
-      
-      expect(toolbar.exists()).toBe(true);
-      expect(toolbar.classes()).toContain('pb-1.5');
-      expect(toolbar.classes()).toContain('w-full');
-      expect(toolbar.classes()).toContain('flex');
-      expect(toolbar.classes()).toContain('justify-between');
-      expect(toolbar.classes()).toContain('items-center');
-    });
-
-    it('has correct left section structure', () => {
-      wrapper = createWrapper();
-      const leftSection = wrapper.find('.flex.items-center');
-
-      expect(leftSection.exists()).toBe(true);
-    });
-
-    it('has correct actions section structure', () => {
-      wrapper = createWrapper();
-      const actionsSection = wrapper.find('[data-test="add-script-actions"]');
-
-      expect(actionsSection.exists()).toBe(true);
-      expect(actionsSection.classes()).toContain('flex');
-      expect(actionsSection.classes()).toContain('items-center');
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('handles empty name prop', () => {
-      wrapper = createWrapper({ name: '' });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('handles very long action names', () => {
+  describe('Edge cases', () => {
+    it('handles a very long action name', async () => {
       const longName = 'a'.repeat(100);
       wrapper = createWrapper({ name: longName });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('handles special characters in validation', () => {
-      const specialName = 'test@#$%';
-      wrapper = createWrapper({ name: specialName });
-      const vm = wrapper.vm as any;
-      
-      const result = vm.isValidMethodName();
-      expect(result).toContain('Invalid method name');
-    });
-
-    it('exposes addScriptForm ref', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      
-      expect(vm.addScriptForm).toBeDefined();
+      await submit(wrapper);
+      // Long but valid method name → passes (no length cap in the rule).
+      expect((wrapper.vm as any).form.state.isValid).toBe(true);
     });
   });
-
 });

@@ -16,14 +16,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import LlmEvaluationSettings from "./LlmEvaluationSettings.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
-const { mockGetPipelines, mockCreatePipeline, mockUpdatePipeline } = vi.hoisted(() => ({
-  mockGetPipelines: vi.fn(),
-  mockCreatePipeline: vi.fn(),
-  mockUpdatePipeline: vi.fn(),
-}));
+const { mockGetPipelines, mockCreatePipeline, mockUpdatePipeline } = vi.hoisted(
+  () => ({
+    mockGetPipelines: vi.fn(),
+    mockCreatePipeline: vi.fn(),
+    mockUpdatePipeline: vi.fn(),
+  }),
+);
+
+const mockToast = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/pipelines", () => ({
   default: {
@@ -31,6 +38,10 @@ vi.mock("@/services/pipelines", () => ({
     createPipeline: mockCreatePipeline,
     updatePipeline: mockUpdatePipeline,
   },
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
 }));
 
 const makeStore = (theme = "light") =>
@@ -65,18 +76,34 @@ describe("LlmEvaluationSettings", () => {
       global: { plugins: [i18n, customStore ?? store] },
     });
 
+  // The real OForm instance (single source of truth for the LLM-eval fields).
+  const getForm = (w: any) => {
+    const oform = w.findComponent(OForm);
+    return oform.exists() ? (oform.vm as any).form : undefined;
+  };
+  const values = (w: any) => getForm(w)?.state.values;
+  // Drive the form's own submit so the schema runs + the handler is awaited
+  // deterministically (a fire-and-forget native submit would not be).
+  const submit = async (w: any) => {
+    await getForm(w)?.handleSubmit();
+    await flushPromises();
+  };
+
   describe("Loading State", () => {
     it("should show loading spinner initially before getPipelines resolves", async () => {
-      // Don't resolve immediately
       let resolve: any;
-      mockGetPipelines.mockReturnValue(new Promise((r) => { resolve = r; }));
+      mockGetPipelines.mockReturnValue(
+        new Promise((r) => {
+          resolve = r;
+        }),
+      );
 
       const wrapper = mountComp();
 
-      // Should show loading spinner before promise resolves
-      expect(wrapper.find('[data-test="stream-llm-eval-loading"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="stream-llm-eval-loading"]').exists(),
+      ).toBe(true);
 
-      // Resolve to clean up
       resolve({ data: { list: [] } });
       await flushPromises();
     });
@@ -85,7 +112,9 @@ describe("LlmEvaluationSettings", () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="stream-llm-eval-loading"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="stream-llm-eval-loading"]').exists(),
+      ).toBe(false);
     });
 
     it("should call getPipelines on mount", async () => {
@@ -108,54 +137,85 @@ describe("LlmEvaluationSettings", () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="stream-llm-eval-enable-toggle"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="stream-llm-eval-enable-toggle"]').exists(),
+      ).toBe(true);
     });
 
     it("should show info banner when disabled (default)", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="stream-llm-eval-info-banner"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="stream-llm-eval-info-banner"]').exists(),
+      ).toBe(true);
     });
 
     it("should not show config fields when disabled", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="stream-llm-eval-span-identifier"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="stream-llm-eval-span-identifier"]').exists(),
+      ).toBe(false);
     });
 
-    it("should set default output stream name to streamName_evaluations", async () => {
+    it("should seed default output stream name to streamName_evaluations", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      // Internal state — no DOM representation when component is disabled.
-      // The value is set internally but the OInput is inside v-if="enabled".
-      const vm = wrapper.vm as any;
-      expect(vm.outputStream).toBe("my-stream_evaluations");
+      expect(values(wrapper).outputStream).toBe("my-stream_evaluations");
     });
 
     it("should initialize enabled as false", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      // Verify enabled=false via visible info-banner (disabled state)
-      expect(wrapper.find('[data-test="stream-llm-eval-info-banner"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="stream-llm-eval-span-identifier"]').exists()).toBe(false);
+      expect(values(wrapper).enabled).toBe(false);
+      expect(
+        wrapper.find('[data-test="stream-llm-eval-info-banner"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="stream-llm-eval-span-identifier"]').exists(),
+      ).toBe(false);
     });
 
     it("should initialize samplingRate as 0.01", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      // Internal state — sampling slider is inside v-if="enabled" && v-if="enableSampling".
-      // Not rendered when component is disabled by default.
-      const vm = wrapper.vm as any;
-      expect(vm.samplingRate).toBe(0.01);
+      expect(values(wrapper).samplingRate).toBe(0.01);
     });
   });
 
-  describe("Existing Pipeline", () => {
+  describe("Required-field indicators", () => {
+    // The three fields that become required once evaluation is enabled render
+    // the * via the OForm* `required` prop (never a hardcoded asterisk). The
+    // whole config section is v-if="enabled", so the fields are always required
+    // when visible → a static * is accurate.
+    it.each([
+      ["spanIdentifier", OFormSelect],
+      ["selectedTemplate", OFormSelect],
+      ["outputStream", OFormInput],
+    ] as const)("shows a required * on %s when enabled", async (name, Comp) => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      getForm(wrapper).setFieldValue("enabled", true);
+      await flushPromises();
+
+      const field = wrapper
+        .findAllComponents(Comp as any)
+        .find((c: any) => c.props("name") === name);
+      expect(field?.exists()).toBe(true);
+
+      const label = field!.find("label");
+      expect(label.exists()).toBe(true);
+      expect(label.text()).toContain("*");
+    });
+  });
+
+  describe("Existing Pipeline (prefill via form.reset)", () => {
     const existingPipeline = {
       pipeline_id: "pipeline-123",
       version: 1,
@@ -182,68 +242,57 @@ describe("LlmEvaluationSettings", () => {
       });
     });
 
-    it("should enable toggle when existing pipeline is found", async () => {
+    it("should enable toggle and reveal config fields when existing pipeline is found", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      // Info banner should be hidden when enabled
-      expect(wrapper.find('[data-test="stream-llm-eval-info-banner"]').exists()).toBe(false);
-      // Config fields should be visible
-      expect(wrapper.find('[data-test="stream-llm-eval-span-identifier"]').exists()).toBe(true);
+      expect(values(wrapper).enabled).toBe(true);
+      expect(
+        wrapper.find('[data-test="stream-llm-eval-info-banner"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="stream-llm-eval-span-identifier"]').exists(),
+      ).toBe(true);
     });
 
     it("should load span identifier from existing pipeline", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      // Internal state — the OSelect value is harder to query without knowing
-      // O2 component internals. The value is derived from the pipeline data.
-      const vm = wrapper.vm as any;
-      expect(vm.spanIdentifier).toBe("custom_identifier");
+      expect(values(wrapper).spanIdentifier).toBe("custom_identifier");
     });
 
     it("should load sampling rate from existing pipeline", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      expect(vm.samplingRate).toBe(0.1);
-      expect(vm.enableSampling).toBe(true);
+      expect(values(wrapper).samplingRate).toBe(0.1);
+      expect(values(wrapper).enableSampling).toBe(true);
     });
 
     it("should load output stream name from eval output node", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      expect(vm.outputStream).toBe("my-stream-eval-output");
-    });
-
-    it("should show config fields when enabled is true", async () => {
-      const wrapper = mountComp();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="stream-llm-eval-span-identifier"]').exists()).toBe(true);
+      expect(values(wrapper).outputStream).toBe("my-stream-eval-output");
     });
   });
 
-  describe("samplingRatePercent computed", () => {
+  describe("samplingRatePercent", () => {
     it("should compute samplingRatePercent from samplingRate", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.samplingRate = 0.25;
+      getForm(wrapper).setFieldValue("samplingRate", 0.25);
       await flushPromises();
-      expect(vm.samplingRatePercent).toBe("25");
+      expect((wrapper.vm as any).samplingRatePercent).toBe("25");
     });
 
     it("should show 1% for default 0.01 rate", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      expect(vm.samplingRatePercent).toBe("1");
+      expect((wrapper.vm as any).samplingRatePercent).toBe("1");
     });
   });
 
@@ -252,8 +301,7 @@ describe("LlmEvaluationSettings", () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.markDirty();
+      (wrapper.vm as any).markDirty();
 
       expect(wrapper.emitted("dirty")).toBeTruthy();
     });
@@ -268,7 +316,9 @@ describe("LlmEvaluationSettings", () => {
       const mockUpdate = vi.fn((cb: any) => cb());
 
       vm.filterFields("span", mockUpdate);
-      expect(vm.filteredFields).toEqual([{ label: "span_id", value: "span_id" }]);
+      expect(vm.filteredFields).toEqual([
+        { label: "span_id", value: "span_id" },
+      ]);
     });
 
     it("should return all fields when search is empty", async () => {
@@ -281,76 +331,129 @@ describe("LlmEvaluationSettings", () => {
       vm.filterFields("", mockUpdate);
       expect(vm.filteredFields).toHaveLength(2);
     });
-
-    it("should call update callback", async () => {
-      const wrapper = mountComp();
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      const mockUpdate = vi.fn((cb: any) => cb());
-
-      vm.filterFields("gen", mockUpdate);
-      expect(mockUpdate).toHaveBeenCalled();
-    });
-  });
-
-  describe("streamFields watch", () => {
-    it("should sync filteredFields when streamFields prop changes", async () => {
-      const wrapper = mountComp();
-      await flushPromises();
-
-      const newFields = [
-        { label: "new_field", value: "new_field" },
-      ];
-      await wrapper.setProps({ streamFields: newFields });
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      expect(vm.filteredFields).toEqual(newFields);
-    });
   });
 
   describe("Error Handling on Mount", () => {
-    it("should set default output stream name when getPipelines fails", async () => {
+    it("should seed default output stream name when getPipelines fails", async () => {
       mockGetPipelines.mockRejectedValue(new Error("Network error"));
 
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      expect(vm.outputStream).toBe("my-stream_evaluations");
-      expect(vm.loading).toBe(false);
+      expect(values(wrapper).outputStream).toBe("my-stream_evaluations");
+      expect((wrapper.vm as any).loading).toBe(false);
     });
   });
 
-  describe("save() exposed method", () => {
-    it("should show warning notify when enabled is false", async () => {
+  // ─────────────────────────────────────────────────────────────────────────
+  // Real-OForm validation wiring (per the playbook §5 — at least one test MUST
+  // mount the real OForm and prove the schema gates an invalid submit, so an
+  // unwired `:schema` (the silent Options-API bug) would be caught).
+  describe("OForm schema validation (real form)", () => {
+    it("submit is a no-op (warning, no create) when evaluation is disabled", async () => {
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      // enabled is false by default
-      await vm.save();
+      // enabled=false by default → schema relaxes everything → onSubmit runs
+      // but early-returns with a warning toast; no pipeline is created.
+      await submit(wrapper);
 
-      // Should not call create or update
+      expect(getForm(wrapper).state.isValid).toBe(true);
       expect(mockCreatePipeline).not.toHaveBeenCalled();
       expect(mockUpdatePipeline).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "warning" }),
+      );
     });
 
-    it("should call createPipeline when no existing pipeline", async () => {
+    it("blocks submit and does NOT create when enabled but required fields empty", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const form = getForm(wrapper);
+      form.setFieldValue("enabled", true);
+      form.setFieldValue("spanIdentifier", "");
+      form.setFieldValue("selectedTemplate", null);
+      form.setFieldValue("outputStream", "");
+      await flushPromises();
+
+      await submit(wrapper);
+
+      expect(form.state.isValid).toBe(false);
+      expect(mockCreatePipeline).not.toHaveBeenCalled();
+    });
+
+    it("reveals required errors after submit, then clears on change (R3)", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const form = getForm(wrapper);
+      form.setFieldValue("enabled", true);
+      form.setFieldValue("spanIdentifier", "");
+      form.setFieldValue("selectedTemplate", null);
+      form.setFieldValue("outputStream", "");
+      await flushPromises();
+
+      // No validation before the first submit.
+      expect(wrapper.text()).not.toContain("Field is required!");
+
+      await submit(wrapper);
+      expect(wrapper.text()).toContain("Field is required!");
+
+      // Fix every required field → errors clear on change.
+      form.setFieldValue("spanIdentifier", "gen_ai_system");
+      form.setFieldValue("selectedTemplate", "tmpl-1");
+      form.setFieldValue("outputStream", "my_stream_evaluations");
+      await flushPromises();
+      expect(form.state.isValid).toBe(true);
+    });
+
+    it("submits and creates a pipeline when the schema passes", async () => {
       mockGetPipelines
         .mockResolvedValueOnce({ data: { list: [] } }) // initial load
-        .mockResolvedValueOnce({ data: { list: [] } }); // after create
+        .mockResolvedValueOnce({ data: { list: [] } }); // reload after create
       mockCreatePipeline.mockResolvedValue({});
 
       const wrapper = mountComp();
       await flushPromises();
 
-      const vm = wrapper.vm as any;
-      vm.enabled = true;
-      await vm.save();
+      const form = getForm(wrapper);
+      form.setFieldValue("enabled", true);
+      form.setFieldValue("spanIdentifier", "gen_ai_system");
+      form.setFieldValue("selectedTemplate", "tmpl-1");
+      form.setFieldValue("enableSampling", true);
+      form.setFieldValue("samplingRate", 0.05);
+      form.setFieldValue("outputStream", "my_stream_evaluations");
+      await flushPromises();
 
-      expect(mockCreatePipeline).toHaveBeenCalled();
+      await submit(wrapper);
+
+      expect(form.state.isValid).toBe(true);
+      expect(mockCreatePipeline).toHaveBeenCalledTimes(1);
+      const payload = mockCreatePipeline.mock.calls[0][0].data;
+      const evalNode = payload.nodes.find(
+        (n: any) => n.data?.node_type === "llm_evaluation",
+      );
+      expect(evalNode.data.llm_span_identifier).toBe("gen_ai_system");
+      expect(evalNode.data.sampling_rate).toBe(0.05);
+      expect(evalNode.data.eval_template).toBe("tmpl-1");
+    });
+
+    it("exposed save() routes through the form (blocks an invalid submit)", async () => {
+      const wrapper = mountComp();
+      await flushPromises();
+
+      const form = getForm(wrapper);
+      form.setFieldValue("enabled", true);
+      form.setFieldValue("spanIdentifier", "");
+      form.setFieldValue("outputStream", "");
+      await flushPromises();
+
+      await (wrapper.vm as any).save();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      expect(mockCreatePipeline).not.toHaveBeenCalled();
     });
   });
 });

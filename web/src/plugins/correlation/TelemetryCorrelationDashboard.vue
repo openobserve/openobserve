@@ -548,14 +548,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- No Traces Found State -->
           <div
             v-else-if="traceCorrelationMode !== null"
-            class="flex flex-col items-center justify-center py-20"
+            class="min-h-[20rem]"
           >
-            <div class="text-base font-medium mb-2 opacity-90">
-              {{ t("correlation.noTracesFound") }}
-            </div>
-            <div class="text-sm opacity-70">
-              {{ t("correlation.noTracesDescription") }}
-            </div>
+            <OEmptyState
+              size="hero"
+              illustration="trace"
+              :title="t('correlation.noTracesFound')"
+              :description="t('correlation.noTracesDescription')"
+              data-test="correlation-no-traces-state-drawer"
+            />
           </div>
 
           <!-- Initial State (waiting for tab to be shown) -->
@@ -1050,15 +1051,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Traces Found State -->
         <div
           v-else-if="traceCorrelationMode !== null"
-          class="flex flex-col items-center justify-center h-[calc(100vh-7.5rem)] py-20"
+          class="h-[calc(100vh-7.5rem)]"
         >
-          <OIcon
-            name="search-off"
-            class="mb-4" style="width: 3.75rem; height: 3.75rem;" />
-          <div class="text-base">{{ t("correlation.noTracesFound") }}</div>
-          <div class="text-sm text-gray-500 mt-2">
-            {{ t("correlation.noTracesDescription", { service: serviceName }) }}
-          </div>
+          <OEmptyState
+            size="hero"
+            illustration="trace"
+            :title="t('correlation.noTracesFound')"
+            :description="t('correlation.noTracesDescription')"
+            data-test="correlation-no-traces-state"
+          />
         </div>
 
         <!-- Initial State (waiting for tab to be shown) -->
@@ -1248,6 +1249,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -2099,6 +2101,18 @@ const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
   }
 };
 
+/**
+ * Drop every rendered metric chart (both the flat and per-group dashboards).
+ * Used when the selection empties out, so the "no metrics" empty state shows
+ * instead of the previous selection's charts.
+ */
+const clearMetricDashboards = () => {
+  dashboardData.value = null;
+  dashboardRenderKey.value++;
+  groupedDashboardData.value = {};
+  groupedDashboardRenderKey.value++;
+};
+
 // Select all metrics in a group (adds any that aren't already selected)
 const selectAllInGroup = (groupId: string) => {
   const groupStreams = groupedFilteredMetricStreams.value.byGroup[groupId];
@@ -2376,7 +2390,8 @@ const loadDashboard = async () => {
       dashboardRenderKey.value++;
       regenerateGroupDashboards(config);
     } else {
-      // console.log("[TelemetryCorrelationDashboard] No metric streams selected, skipping metrics dashboard");
+      // Nothing selected: clear rather than leave the previous charts standing.
+      clearMetricDashboards();
     }
 
     // Generate logs dashboard JSON
@@ -3223,6 +3238,15 @@ watch(
       // Check actual current state when timeout fires (not captured values)
       const currentStreams = selectedMetricStreams.value;
       const currentPanels = dashboardData.value?.tabs?.[0]?.panels || [];
+
+      // Every metric deselected: drop the charts so the empty state shows.
+      // The reload paths below are all gated on a non-empty selection, so
+      // without this the last-deselected metric's chart would linger.
+      if (currentStreams.length === 0) {
+        clearMetricDashboards();
+        suppressNextStreamReload = false;
+        return;
+      }
 
       // Get current panel stream names
       const currentPanelStreamNames = new Set(

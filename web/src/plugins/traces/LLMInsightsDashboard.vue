@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="llm-insights-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="stream" size="sm">Stream</OToggleGroupItem>
-        <OToggleGroupItem value="agent" size="sm">Agent</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{ t('traces.lLMInsightsDashboard.stream') }}</OToggleGroupItem>
+        <OToggleGroupItem value="agent" size="sm">{{ t('traces.lLMInsightsDashboard.agent') }}</OToggleGroupItem>
       </OToggleGroup>
 
       <!-- Picker: Stream tab → stream picker; Agent tab → agent picker. -->
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-else
           v-model="activeAgent"
-          label="Agent"
+          :label="t('traces.lLMInsightsDashboard.agent')"
           label-position="inside"
           :options="agentSelectOptions"
           labelKey="label"
@@ -109,9 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       illustration="broken-panel"
       variant="error"
       data-test="llm-insights-empty-error"
-      title="Failed to load LLM Insights"
+      :title="t('traces.lLMInsightsDashboard.failedToLoad')"
       :description="error || ''"
-      action-label="Retry"
+      :action-label="t('traces.lLMInsightsDashboard.retry')"
       action-icon="refresh"
       @action="loadInsights()"
     />
@@ -145,9 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         size="hero"
         illustration="constellation"
-        title="No Agents In This Range"
-        description="No GenAI agents were detected for the selected time window. Try a wider range, switch to the Stream tab, or configure agent mapping in settings."
-        action-label="View by Stream"
+        :title="t('traces.lLMInsightsDashboard.noAgentsInRange')"
+        :description="t('traces.lLMInsightsDashboard.noAgentsDescription')"
+        :action-label="t('traces.lLMInsightsDashboard.viewByStream')"
         @action="onFilterModeChange('stream')"
       />
     </div>
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="card-container rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-(--o2-card-bg) border border-(--o2-border-color) transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+          class="card-container rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-(--color-surface-base) border border-(--color-border-default) transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -195,16 +195,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-else>
             <div class="flex flex-col gap-[0.25rem]">
-              <div class="text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-(--o2-text-muted)">
-                {{ card.label }}
+              <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
+                <div class="text-[0.7rem] leading-normal font-semibold text-(--color-text-secondary) min-w-0 truncate">
+                  {{ card.label }}
+                </div>
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md bg-(--color-surface-subtle) text-(--color-text-secondary)"
+                >
+                  <OIcon :name="card.icon" size="sm" />
+                </span>
               </div>
               <div class="flex items-baseline gap-[0.2rem]">
-                <span class="text-[1.4rem] font-bold leading-none text-(--o2-text-primary)">
+                <span class="text-[1.4rem] font-bold leading-none text-(--color-grey-600)">
                   {{ card.value }}
                 </span>
                 <span
                   v-if="card.unit"
-                  class="text-[0.8rem] font-semibold text-(--o2-text-secondary)"
+                  class="text-[0.8rem] font-semibold text-(--color-text-secondary)"
                 >
                   {{ card.unit }}
                 </span>
@@ -280,6 +287,7 @@ import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -628,6 +636,8 @@ function onEmptyAction(id?: string) {
 
 interface KpiCard {
   label: string;
+  /** Material-symbol icon name (OIcon) shown in the card's corner tile. */
+  icon: string;
   value: string;
   unit?: string;
   sparkData?: number[];
@@ -650,7 +660,8 @@ const kpiCards = computed<KpiCard[]>(() => {
   // If it's 0, either there are no LLM spans in the window or the SDK
   // isn't emitting cost; either way we render "$0".
   const costCard: KpiCard = {
-    label: "Total Cost",
+    label: t('traces.lLMInsightsDashboard.totalCost'),
+    icon: "payments",
     ...splitCost(kpi.value.totalCost),
     sparkData: sparklines.value.cost,
     sparkColor: "#0ea5e9",
@@ -659,21 +670,24 @@ const kpiCards = computed<KpiCard[]>(() => {
   return [
     costCard,
     {
-      label: "Total Tokens",
+      label: t('traces.lLMInsightsDashboard.totalTokens'),
+      icon: "tag",
       value: tokens.value,
       unit: tokens.unit,
       sparkData: sparklines.value.tokens,
       sparkColor: "#a855f7",
     },
     {
-      label: "Total Traces",
+      label: t('traces.lLMInsightsDashboard.totalTraces'),
+      icon: "account-tree",
       value: traces.value,
       unit: traces.unit,
       sparkData: sparklines.value.traces,
       sparkColor: "#3b82f6",
     },
     {
-      label: "P95 Latency",
+      label: t('traces.lLMInsightsDashboard.p95Latency'),
+      icon: "schedule",
       value: p95.value,
       unit: p95.unit,
       sparkData: sparklines.value.p95Micros,
@@ -681,7 +695,8 @@ const kpiCards = computed<KpiCard[]>(() => {
       loading: p95Loading.value,
     },
     {
-      label: "Error Rate",
+      label: t('traces.lLMInsightsDashboard.errorRate'),
+      icon: "error",
       value: errorRate.toFixed(1),
       unit: "%",
       sparkData: sparklines.value.errorRate,

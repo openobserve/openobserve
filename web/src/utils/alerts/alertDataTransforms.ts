@@ -143,6 +143,21 @@ export const removeConditionGroup = (
   const itemsArray = groupToProcess?.conditions || groupToProcess?.items;
   if (!itemsArray || !Array.isArray(itemsArray)) return;
 
+  // If the target IS this group, it can't be spliced out of a parent — at the
+  // root there is no parent, and FilterGroup at depth 0 emits remove-group with
+  // the root's own id. Empty it instead: that's what the confirm dialog promises
+  // ("will remove the entire condition group"). Mirrors the root check in
+  // updateConditionGroup above. Guarded on a truthy id so an id-less group can
+  // never match and wipe the whole tree.
+  if (targetGroupId && groupToProcess.groupId === targetGroupId) {
+    if (groupToProcess.conditions) {
+      groupToProcess.conditions = [];
+    } else {
+      groupToProcess.items = [];
+    }
+    return;
+  }
+
   const filterEmptyGroups = (items: any[]): any[] => {
     return items.filter((item: any) => {
       if (item.groupId === targetGroupId) {

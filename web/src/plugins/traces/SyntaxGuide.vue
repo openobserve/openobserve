@@ -60,38 +60,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
-                  For full text search of value 'error' use
+                  {{ t('traces.syntaxGuide.fullTextSearch') }}
                   <span class="bg-highlight"
                     >match_all('error') in query editor</span
                   >
                 </li>
                 <li>
-                  For column search of value 'error' use
+                  {{ t('traces.syntaxGuide.columnSearch') }}
                   <span class="bg-highlight"
                     >str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
-                  For case-insensitive column search of value 'error' use
+                  {{ t('traces.syntaxGuide.caseInsensitiveSearch') }}
                   <span class="bg-highlight"
                     >str_match_ignore_case(<b>fieldname</b>, 'Error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
+                  {{ t('traces.syntaxGuide.searchCode') }}
                   <span class="bg-highlight">code=200</span>
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
+                  {{ t('traces.syntaxGuide.searchStream') }}
                   <span class="bg-highlight">stream='stderr'</span>
                 </li>
                 <li>
-                  For additional examples,
+                  {{ t('traces.syntaxGuide.additionalExamples') }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
                     class="hover:underline text-primary"
-                    >click here</a
+                    >{{ t('traces.syntaxGuide.clickHere') }}</a
                   >.
                 </li>
               </ul>
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="syntax-guide-title">
-          <div class="label">Syntax Guide: SQL Mode</div>
+          <div class="label">{{ t('traces.syntaxGuide.sqlModeTitle') }}</div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
@@ -109,45 +109,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
-                  For full text search of value 'error' use
+                  {{ t('traces.syntaxGuide.fullTextSearch') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
-                  For column search of value 'error' use
+                  {{ t('traces.syntaxGuide.columnSearch') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
+                  {{ t('traces.syntaxGuide.searchCode') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
+                  {{ t('traces.syntaxGuide.searchStream') }}
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on column
-                  log use
+                  {{ t('traces.syntaxGuide.queryFunctionPrefix') }} <i>extract_ip</i> {{ t('traces.syntaxGuide.queryFunctionSuffix') }}
                   <span class="bg-highlight"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >
                 </li>
                 <li>
-                  For additional examples,
+                  {{ t('traces.syntaxGuide.additionalExamples') }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
                     class="hover:underline text-primary"
-                    >click here</a
+                    >{{ t('traces.syntaxGuide.clickHere') }}</a
                   >.
                 </li>
               </ul>

@@ -465,7 +465,12 @@ export class PipelinesFormValidationPage {
         for (let i = 0; i < count; i++) {
             await this.navigateToPipelines();
             const btns = this.page.locator('[data-test$="-update-pipeline"]');
-            await btns.nth(i).click();
+            // Shared org-wide list — other parallel files mutate it while we scan. Skip
+            // this index if the list shrank past it rather than hanging on a missing row.
+            if (i >= await btns.count()) break;
+            const target = btns.nth(i);
+            if (!(await target.isVisible({ timeout: 5000 }).catch(() => false))) continue;
+            await target.click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             const llmNode = this.page.locator('[data-test$="-llm-evaluation-node"]').first();
             if (await llmNode.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -493,7 +498,14 @@ export class PipelinesFormValidationPage {
         for (let i = 0; i < count; i++) {
             await this.navigateToPipelines();
             const btns = this.page.locator('[data-test$="-update-pipeline"]');
-            await btns.nth(i).click();
+            // The pipeline list is shared org-wide, so other parallel test files create
+            // and delete rows while we scan. Re-check the current row count and skip this
+            // index if the list has shrunk past it, instead of clicking a row that no
+            // longer exists (which would hang until the 45s action timeout and flake).
+            if (i >= await btns.count()) break;
+            const target = btns.nth(i);
+            if (!(await target.isVisible({ timeout: 5000 }).catch(() => false))) continue;
+            await target.click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
             // Function nodes have a click target on the node header area
             const funcNode = this.page.locator('[data-test$="-function-node"]').first();

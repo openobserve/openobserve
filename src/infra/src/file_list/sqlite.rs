@@ -1504,7 +1504,7 @@ GROUP BY stream;
     }
 
     async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)> {
-        let sql = r#"SELECT 
+        let sql = r#"SELECT
 SUM(original_size) AS original_size,
 SUM(index_size) AS index_size
 FROM file_list
@@ -1516,6 +1516,32 @@ WHERE org = $1 AND account = $2;"#;
             .fetch_optional(&pool)
             .await?;
         Ok(ret.unwrap_or_default())
+    }
+
+    async fn delete_by_org(&self, org_id: &str) -> Result<()> {
+        let client = CLIENT_RW.clone();
+        let client = client.lock().await;
+        let created_at = now_micros();
+        let mut tx = client.begin().await?;
+        // Move remaining rows into file_list_deleted first so the file GC removes
+        // the backing S3 objects. A bare DELETE would orphan those files in object
+        // store. (Normal per-stream deletion already routes files here; this is the
+        // catch-all for rows whose stream schema is already gone.)
+        sqlx::query(
+            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)
+               SELECT account, org, stream, date, file, index_file, flattened, $2
+               FROM file_list WHERE org = $1;"#,
+        )
+        .bind(org_id)
+        .bind(created_at)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query("DELETE FROM file_list WHERE org = $1;")
+            .bind(org_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
     }
 }
 

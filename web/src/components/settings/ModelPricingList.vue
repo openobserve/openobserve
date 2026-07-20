@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- List View Header -->
       <!-- Standard section header: title + actions only. Tabs + search moved
            into the table toolbar below. -->
-      <AppPageHeader icon="paid" :subtitle="'LLM model cost configuration'" class="shrink-0 px-4 border-b border-border-default">
+      <AppPageHeader icon="paid" :subtitle="t('settings.modelPricingList.subtitle')" class="shrink-0 px-4 border-b border-border-default">
         <template #title>
           {{ t("modelPricing.header") }}
           <OButton
@@ -330,26 +330,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div
-            class="w-full flex flex-col items-center justify-center gap-y-3"
-          >
-            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="text-gray-400" />
-            <div class="text-base font-medium text-gray-400 mt-2">
-              {{ t("modelPricing.noModels") }}
-            </div>
-            <div class="text-xs text-gray-400">
-              {{ t("modelPricing.noModelsDesc") }}
-            </div>
-            <OButton
-              variant="primary"
-              size="sm"
-              class="self-center"
-              @click="openEditor(null)"
-              data-test="model-pricing-empty-add-btn"
-            >
-              {{ t("modelPricing.newModel") }}
-            </OButton>
-          </div>
+          <OEmptyState
+            size="hero"
+            preset="no-model-pricing"
+            :filtered="isFiltered"
+            data-test="model-pricing-empty-state"
+            @action="(id) => id === 'clear-filters' ? clearFilters() : openEditor(null)"
+          />
         </template>
 
         <template #bottom="scope">
@@ -389,8 +376,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
-    <ODrawer data-test="model-pricing-list-pricing-drawer" v-model:open="showPricingDialog" :width="30" title="Hello">
-      <template #header-left>
+    <ODrawer
+      data-test="model-pricing-list-pricing-drawer"
+      v-model:open="showPricingDialog"
+      :width="30"
+      :title="pricingDialogRow?.match_pattern"
+      :title-data-test="'model-pricing-drawer-title'"
+      :sub-title="t('modelPricing.modelDetails')"
+    >
+      <!-- Source (built-in / inherited / custom) indicator trails on the right. -->
+      <template #header-right>
         <span
             v-if="getSource(pricingDialogRow) === 'built_in'"
             class="shrink-0 cursor-default inline-flex"
@@ -510,6 +505,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -655,6 +651,18 @@ function getSource(model: any): string {
 /** True when a model entry is read-only (built-in or from another org). */
 function isReadOnly(model: any): boolean {
   return model.source === "built_in" || model.org_id !== orgIdentifier.value;
+}
+
+// True when the search box or a non-"all" tab is narrowing the list. Drives
+// OEmptyState's `:filtered` so an empty result reads as "No model pricing found"
+// (with Clear filters) rather than the first-run "create your first" card.
+const isFiltered = computed(
+  () => !!filterQuery.value.trim() || selectedTab.value !== "all",
+);
+
+function clearFilters() {
+  filterQuery.value = "";
+  selectedTab.value = "all";
 }
 
 const filteredModels = computed(() => {
@@ -949,20 +957,15 @@ useShortcuts([
 </script>
 
 <style>
-/* Dark mode for pricing panel table header (th element selector — cannot inline) */
-.body--dark .pricing-panel-table th {
-  background: rgba(255, 255, 255, 0.04);
-}
-
 /* ── Pricing panel table (side panel) child selectors ──────────────── */
 .pricing-panel-table th {
   font-size: 11px;
   font-weight: 600;
-  opacity: 0.5;
+  color: var(--color-table-header-text);
   text-align: left;
   padding: 6px 14px;
-  background: rgba(0, 0, 0, 0.025);
-  border-bottom: 1px solid var(--o2-border-color);
+  background: var(--color-table-header-bg);
+  border-bottom: 1px solid var(--color-table-header-border);
 }
 
 .pricing-panel-table th:last-child {
@@ -972,7 +975,7 @@ useShortcuts([
 .pricing-panel-table td {
   font-size: 13px;
   padding: 8px 14px;
-  border-bottom: 1px solid var(--o2-border-color);
+  border-bottom: 1px solid var(--color-table-row-divider);
 }
 
 .pricing-panel-table td:last-child {
@@ -988,10 +991,11 @@ useShortcuts([
 .pricing-breakdown-table th {
   font-size: 11px;
   font-weight: 600;
-  opacity: 0.65;
+  color: var(--color-table-header-text);
+  background: var(--color-table-header-bg);
   text-align: left;
   padding: 0 16px 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid var(--color-table-header-border);
 }
 
 .pricing-breakdown-table th:last-child {

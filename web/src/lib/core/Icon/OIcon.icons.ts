@@ -127,7 +127,7 @@ import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
-import AutoAwesome from "~icons/material-symbols/wand-stars-outline";
+import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
 import Bookmark from "~icons/material-symbols/bookmark-outline";
 import Build from "~icons/material-symbols/build-outline";
@@ -168,6 +168,13 @@ import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
 import MenuBook from "~icons/material-symbols/menu-book-outline";
 
+// Batch 3: Synthetics / browser-check icons (2026-06-22)
+import OpenInBrowser from "~icons/material-symbols/open-in-browser";
+import StackedLineChart from "~icons/material-symbols/stacked-line-chart";
+import Keyboard from "~icons/material-symbols/keyboard";
+import Checklist from "~icons/material-symbols/checklist";
+import PhotoCamera from "~icons/material-symbols/photo-camera-outline";
+
 // Batch 2: Additional icons from full codebase audit (2026-05-16)
 import AddCircleIcon from "~icons/material-symbols/add-circle-outline";
 import AdsClickIcon from "~icons/material-symbols/ads-click";
@@ -180,7 +187,7 @@ import AssessmentIcon from "~icons/material-symbols/analytics-outline";
 import AssignmentIcon from "~icons/material-symbols/assignment-outline";
 import AttachFileIcon from "~icons/material-symbols/attach-file";
 import AttachMoneyIcon from "~icons/material-symbols/attach-money";
-// Material Symbols replacements for `@quasar/extras/material-symbols-outlined`
+// Material Symbols replacements for the old `material-symbols-outlined` icon set
 // (these specific icons don't ship an `-outline` variant in @iconify/material-symbols;
 // the base names render the outlined glyph by default)
 import SoundSampler from "~icons/material-symbols/sound-sampler";
@@ -299,7 +306,6 @@ import Folder from "~icons/material-symbols/folder";
 import FolderOutline from "~icons/material-symbols/folder-outline";
 import Widgets from "~icons/material-symbols/widgets-outline";
 import Lan from "~icons/material-symbols/lan-outline";
-import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import CheckCircleOutline from "~icons/material-symbols/check-circle-outline";
 import TrendingUpFilled from "~icons/material-symbols/trending-up";
 import ErrorOutlineFilled from "~icons/material-symbols/error-outline";
@@ -310,6 +316,9 @@ import Favorite from "~icons/material-symbols/favorite";
 import FavoriteBorder from "~icons/material-symbols/favorite-outline";
 import RadioButtonUnchecked from "~icons/material-symbols/radio-button-unchecked";
 import RadioButtonChecked from "~icons/material-symbols/radio-button-checked";
+import ComputerIcon from "~icons/material-symbols/computer-outline";
+import TabletIcon from "~icons/material-symbols/tablet-outline";
+import SmartphoneIcon from "~icons/material-symbols/smartphone-outline";
 import TouchApp from "~icons/material-symbols/touch-app";
 import NetworkCheck from "~icons/material-symbols/network-check";
 import CloudDownload from "~icons/material-symbols/cloud-download";
@@ -325,12 +334,17 @@ import Plagiarism from "~icons/material-symbols/plagiarism-outline";
 import Redo from "~icons/material-symbols/redo";
 import Tab from "~icons/material-symbols/tab-outline";
 import Web from "~icons/material-symbols/web";
+import SmartDisplay from "~icons/material-symbols/smart-display-outline";
+
+// Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
+import McpLogo from "./McpLogo.vue";
 
 import type { Component } from "vue";
 
 export const iconRegistry = {
   "alarm": Alarm,
   "add": Add,
+  "mcp": McpLogo,
   "arrow-back": ArrowBack,
   "arrow-back-ios-new": ArrowBackIosNew,
   "arrow-downward": ArrowDownward,
@@ -631,6 +645,9 @@ export const iconRegistry = {
   "wrap-text": WrapTextIcon,
   "radio-button-unchecked": RadioButtonUnchecked,
   "radio-button-checked": RadioButtonChecked,
+  "computer": ComputerIcon,
+  "tablet": TabletIcon,
+  "smartphone": SmartphoneIcon,
   "touch-app": TouchApp,
   "network-check": NetworkCheck,
   "cloud-download": CloudDownload,
@@ -646,6 +663,15 @@ export const iconRegistry = {
   "redo": Redo,
   "tab": Tab,
   "web": Web,
+
+  // Batch 3: Synthetics / browser-check icons (2026-06-22)
+  // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)
+  "open-in-browser": OpenInBrowser,
+  "stacked-line-chart": StackedLineChart,
+  "keyboard": Keyboard,
+  "checklist": Checklist,
+  "photo-camera": PhotoCamera,
+  "smart-display": SmartDisplay,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

@@ -47,7 +47,7 @@
  *        < 0   -> insert before node (id + insertionPoint)
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 // ---------------------------------------------------------------------------
 // Constants (mirror packages/browser-rum sessionReplayConstants.ts)

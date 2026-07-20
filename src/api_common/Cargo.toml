@@ -1,0 +1,19 @@
+[package]
+name = "openobserve-api-common"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+axum.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+utoipa.workspace = true
+
+[dev-dependencies]
+http.workspace = true

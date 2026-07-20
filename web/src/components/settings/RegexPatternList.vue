@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('regex_patterns.title')"
       icon="pattern"
-      :subtitle="'Reusable regex patterns for redaction'"
+      :subtitle="t('settings.regexPatternList.subtitle')"
       class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-row-action="export"
             variant="ghost"
             size="icon-sm"
-            title="Export Regex Pattern"
+            :title="t('settings.regexPatternList.exportTitle')"
             @click.stop="exportRegexPattern(row)"
             icon-left="download"
           />
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="delete"
             @click="openBulkDeleteDialog"
           >
-            Delete
+            {{ t("settings.regexPatternList.delete") }}
           </OButton>
         </div>
       </template>
@@ -164,8 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <ConfirmDialog
-      title="Delete Regex Patterns"
-      :message="`Are you sure you want to delete ${selectedPatterns.length} regex pattern(s)?`"
+      :title="t('settings.regexPatternList.bulkDeleteTitle')"
+      :message="t('settings.regexPatternList.bulkDeleteMessage', { n: selectedPatterns.length })"
       @update:ok="bulkDeleteRegexPatterns"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, onMounted, watch, defineComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { convertUnixToQuasarFormat } from "@/utils/zincutils";
+import { convertUnixToDateFormat } from "@/utils/zincutils";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -287,8 +287,8 @@ export default defineComponent({
 
     const deleteDialog = ref({
       show: false,
-      title: "Delete Regex Pattern",
-      message: "Are you sure you want to delete this regex pattern?",
+      title: t("settings.regexPatternList.deleteTitle"),
+      message: t("settings.regexPatternList.deleteMessage"),
       data: "" as any,
     });
 
@@ -367,14 +367,14 @@ export default defineComponent({
         regexPatterns.value = response.data.patterns.map((pattern: any) => ({
           ...pattern,
           "#": counter <= 9 ? `0${counter++}` : counter++,
-          created_at: convertUnixToQuasarFormat(pattern.created_at),
-          updated_at: convertUnixToQuasarFormat(pattern.updated_at),
+          created_at: convertUnixToDateFormat(pattern.created_at),
+          updated_at: convertUnixToDateFormat(pattern.updated_at),
         }));
         store.dispatch("setRegexPatterns", regexPatterns.value);
         resultTotal.value = regexPatterns.value.length;
       } catch (error: any) {
         toast({
-          message: error.data.message || "Error fetching regex patterns",
+          message: error.data.message || t("settings.regexPatternList.errorFetching"),
           variant: "error",
         });
       } finally {
@@ -401,7 +401,7 @@ export default defineComponent({
         );
         getRegexPatterns();
         toast({
-          message: "Regex pattern deleted successfully.",
+          message: t("settings.regexPatternList.deletedSuccess"),
           variant: "success",
         });
       } catch (error: any) {
@@ -409,7 +409,7 @@ export default defineComponent({
           message:
             error?.data?.message ||
             error?.response?.data?.message ||
-            "Error deleting regex pattern",
+            t("settings.regexPatternList.errorDeleting"),
           variant: "error",
         });
       }
@@ -449,12 +449,12 @@ export default defineComponent({
         link.download = `${row.name || "regex_pattern"}.json`;
         link.click();
         toast({
-          message: "Regex pattern exported successfully",
+          message: t("settings.regexPatternList.exportedSuccess"),
           variant: "success",
         });
       } catch (error: any) {
         toast({
-          message: error.data.message || "Error exporting regex pattern",
+          message: error.data.message || t("settings.regexPatternList.errorExporting"),
           variant: "error",
         });
       } finally {
@@ -498,17 +498,17 @@ export default defineComponent({
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
-            message: `Successfully deleted ${successful.length} regex pattern(s)`,
+            message: t("settings.regexPatternList.bulkDeleteSuccess", { n: successful.length }),
             variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
-            message: `Deleted ${successful.length} regex pattern(s), but ${unsuccessful.length} failed`,
+            message: t("settings.regexPatternList.bulkDeletePartial", { successful: successful.length, unsuccessful: unsuccessful.length }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: `Failed to delete ${unsuccessful.length} regex pattern(s)`,
+            message: t("settings.regexPatternList.bulkDeleteFailed", { n: unsuccessful.length }),
             variant: "error",
           });
         }
@@ -520,7 +520,7 @@ export default defineComponent({
         const errorMessage =
           error?.data?.message ||
           error?.message ||
-          "Error while deleting regex patterns";
+          t("settings.regexPatternList.errorBulkDeleting");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             message: errorMessage,

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div
-      class="flex items-center gap-1"
+      class="flex items-center gap-2"
       style="max-width: 100%; overflow: hidden"
     >
       <OButton
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.data.stream.streamType &&
           searchObj.data.stream.streamType !== 'logs'
         "
-        data-test="log-search-index-list-stream-type-badge"
-        variant="ghost"
+        data-test="log-search-index-list-back-to-logs-btn"
+        variant="outline"
         size="icon-sm"
-        class="shrink-0 h-8 w-8 border border-(--o2-border) rounded p-0"
+        class="shrink-0 h-8 w-8 border border-border-default rounded p-0"
         @click="onStreamTypeChange('logs')"
       >
-        <OIcon :name="streamTypeIcon" size="sm" />
-        <OTooltip :content="streamTypeLabel + ' — ' + t('search.switchToLogs')" side="bottom" align="center" />
+        <OIcon name="swap-horiz" size="sm" />
+        <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <div class="flex-1 min-w-0">
         <OSelect
@@ -497,29 +497,6 @@ export default defineComponent({
       rowsPerPage: 25,
     });
 
-    const streamTypes = [
-      { label: t("search.logs"), value: "logs", icon: "search" },
-      { label: t("search.traces"), value: "traces", icon: "account-tree" },
-      { label: t("search.metrics"), value: "metrics", icon: "bar-chart" },
-      {
-        label: t("search.enrichmentTables"),
-        value: "enrichment_tables",
-        icon: "table-view",
-      },
-    ];
-
-    const streamTypeIcon = computed(() => {
-      const current = searchObj.data.stream.streamType;
-      return (
-        streamTypes.find((t) => t.value === current)?.icon ?? "search"
-      );
-    });
-
-    const streamTypeLabel = computed(() => {
-      const current = searchObj.data.stream.streamType;
-      return streamTypes.find((t) => t.value === current)?.label ?? "";
-    });
-
     const onStreamTypeChange = async (newType: string) => {
       searchObj.data.stream.streamType = newType;
       searchObj.data.stream.selectedStream = [];
@@ -891,7 +868,7 @@ export default defineComponent({
       }
 
       if (!filtered.length) {
-        return [{ name: "No matching fields found", label: true, group: "__none__" }];
+        return [{ name: t("logs.indexList.noMatchingFields"), label: true, group: "__none__" }];
       }
       return filtered;
     };
@@ -1134,7 +1111,7 @@ export default defineComponent({
           if (!validationFlag) {
             fieldValues.value[name]["isLoading"] = false;
             fieldValues.value[name]["errMsg"] =
-              "Filter is not valid for selected streams.";
+              t("logs.indexList.filterNotValidForStreams");
             return;
           }
           if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
@@ -1227,7 +1204,7 @@ export default defineComponent({
         console.log(err);
         toast({
           variant: "error",
-          message: "Error while fetching field values",
+          message: t("logs.indexList.errorFetchingFieldValues"),
         });
       }
     };
@@ -1248,7 +1225,7 @@ export default defineComponent({
       } else {
         toast({
           variant: "error",
-          message: "Failed to generate filter expression",
+          message: t("logs.indexList.failedToGenerateFilterExpression"),
         });
       }
     };
@@ -1267,7 +1244,7 @@ export default defineComponent({
       if (!expressions.length) {
         toast({
           variant: "error",
-          message: "Failed to generate filter expressions",
+          message: t("logs.indexList.failedToGenerateFilterExpressions"),
         });
         return;
       }
@@ -1638,7 +1615,7 @@ export default defineComponent({
     const toggleFieldGroup = (group: string) => {
       searchObj.data.stream.expandGroupRows[group] =
         !searchObj.data.stream.expandGroupRows[group];
-      // Reset to page 1 so Quasar recalculates page count from the new row total
+      // Reset to page 1 so the table recalculates page count from the new row total
       pagination.value = { ...pagination.value, page: 1 };
     };
 
@@ -1742,8 +1719,7 @@ export default defineComponent({
       if (errorCodes.includes(response.code)) {
         handleSearchError(payload, {
           content: {
-            message:
-              "WebSocket connection terminated unexpectedly. Please check your network and try again",
+            message: t("logs.indexList.websocketTerminated"),
             trace_id: payload.traceId,
             code: response.code,
             error_detail: "",
@@ -1759,7 +1735,7 @@ export default defineComponent({
       if (fieldValues.value[request.queryReq?.fields[0]]) {
         fieldValues.value[request.queryReq.fields[0]].isLoading = false;
         fieldValues.value[request.queryReq.fields[0]].errMsg =
-          "Failed to fetch field values";
+          t("logs.indexList.failedToFetchFieldValues");
       }
 
       removeTraceId(request.queryReq.fields[0], request.traceId);
@@ -1883,7 +1859,7 @@ export default defineComponent({
         fieldValues.value[fieldName].isLoading = false;
       } catch (error) {
         console.error("Failed to fetch field values:", error);
-        fieldValues.value[fieldName].errMsg = "Failed to fetch field values";
+        fieldValues.value[fieldName].errMsg = t("logs.indexList.failedToFetchFieldValues");
         fieldValues.value[fieldName].isLoading = false;
       }
     };
@@ -1993,7 +1969,7 @@ export default defineComponent({
         return res;
       } catch (err) {
         console.error("Failed to fetch field values:", err);
-        fieldValues.value[name].errMsg = "Failed to fetch field values";
+        fieldValues.value[name].errMsg = t("logs.indexList.failedToFetchFieldValues");
       }
     };
 
@@ -2001,8 +1977,8 @@ export default defineComponent({
       page: number;
       rowsPerPage: number;
     }) => {
-      // When extractFields() temporarily clears the field list, Quasar's
-      // q-table recalculates pages and emits page=1.  Ignore that automatic
+      // When extractFields() temporarily clears the field list, the table
+      // recalculates pages and emits page=1.  Ignore that automatic
       // reset while the stream fields are still loading so the user stays on
       // their current page after the query completes.
       if (
@@ -2037,9 +2013,6 @@ export default defineComponent({
       openFilterCreator,
       addSearchTerm,
       fieldValues,
-      streamTypes,
-      streamTypeIcon,
-      streamTypeLabel,
       onStreamTypeChange,
       "add": "add",
       "visibility-off": "visibility-off",

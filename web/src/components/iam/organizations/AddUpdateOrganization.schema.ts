@@ -3,7 +3,7 @@
 // Validation schema for AddUpdateOrganization.vue. Built via a factory so the
 // required message stays i18n-driven (pass useI18n's `t`).
 //
-// Restores the full pre-migration Quasar rule for `name`
+// Restores the full pre-migration validation rule for `name`
 // (`!!v ? isValidOrgName : nameRequired`) per the truthy→Zod inversion: BOTH
 // required (min(1)) AND the alphanumeric/space/underscore regex — not regex-only.
 // `id` is a read-only display field (update mode) and `makeBilledMember` is an

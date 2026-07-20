@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="text-[var(--o2-text-4)]! text-[0.85rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
-        {{ spanStatusCode ? "HTTP Status Code" : "gRPC Status Code" }}
+        {{ spanStatusCode ? t("traces.traceErrorTab.httpStatusCode") : t("traces.traceErrorTab.grpcStatusCode") }}
       </div>
       <div class="flex items-center">
         <SpanStatusCodeBadge
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="text-[var(--o2-text-4)]! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
-        DB Response Status Code
+        {{ t("traces.traceErrorTab.dbResponseStatusCode") }}
       </div>
       <div class="flex items-center pl-[0.5rem]">
         <span
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="text-[var(--o2-text-4)]! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
       >
-        Process Exit Code
+        {{ t("traces.traceErrorTab.processExitCode") }}
       </div>
       <div class="flex items-center pl-[0.5rem]">
         <span

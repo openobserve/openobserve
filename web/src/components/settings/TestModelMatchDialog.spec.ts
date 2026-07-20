@@ -491,7 +491,7 @@ describe("TestModelMatchDialog", () => {
       await dialog.vm.$emit("update:open", false);
       // ODialog's update:open is wired via v-model:open which writes back
       // through the computed setter and re-emits update:modelValue.
-      // Quasar/Vue handles this implicitly; assert by setting internalValue.
+      // Vue handles this implicitly; assert by setting internalValue.
       (wrapper.vm as any).internalValue = false;
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeTruthy();

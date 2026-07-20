@@ -21,6 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AppPageHeader
       :title="t('search.metrics')"
       icon="bar-chart"
+      :back="{
+        label: t('search.metrics'),
+        onClick: goBackToExplorer,
+        dataTest: 'metrics-editor-back-btn',
+      }"
       class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
@@ -489,7 +494,7 @@ export default defineComponent({
           dashboardData.data.title == null ||
           dashboardData.data.title.trim() == ""
         ) {
-          errors.push("Name of Panel is required");
+          errors.push(t("metrics.index.namePanelRequired"));
         }
       }
 
@@ -498,7 +503,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("metrics.index.errorsFixTryAgain"),
         );
       }
 
@@ -586,7 +591,7 @@ export default defineComponent({
         // set errors into errorData
         errorData.errors = errors;
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("metrics.index.errorsFixTryAgain"),
         );
         return;
       } else {
@@ -596,6 +601,24 @@ export default defineComponent({
 
     const addPanelToDashboard = () => {
       showAddToDashboardDialog.value = false;
+    };
+
+    const goBackToExplorer = () => {
+      const back = router.options?.history?.state?.back;
+      if (
+        typeof back === "string" &&
+        back.startsWith("/metrics") &&
+        !back.startsWith("/metrics/editor")
+      ) {
+        router.back();
+        return;
+      }
+      router.push({
+        name: "metrics",
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+        },
+      });
     };
 
     // [END] cancel running queries
@@ -637,6 +660,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
+      goBackToExplorer,
       refreshInterval,
       panelEditorRef,
       metricsShareUrl,

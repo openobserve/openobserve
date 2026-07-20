@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div>
         <div
-          class="text-[0.85rem] font-semibold text-[var(--o2-text-primary)]"
+          class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]"
         >
           {{ displayTitle }}
         </div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       table-id="llm-recent-errors"
       show-index
       pagination="none"
-      :empty-message="panel.emptyStateText || 'No data'"
+      :empty-message="panel.emptyStateText || t('traces.lLMErrorTable.noData')"
       @row-click="onRowClick"
       data-test="llm-recent-errors-table"
       class="w-full"
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Operation is the one cell we colour — it names the failed span, so it
            reads in the error colour. -->
       <template #cell-operation="{ value }">
-        <span class="text-[var(--o2-status-error-text)]">{{ value }}</span>
+        <span class="text-[var(--color-error-600)]">{{ value }}</span>
       </template>
 
       <!-- Trace id: only a title for the full value on hover; default text. -->
@@ -148,7 +148,7 @@ const loading = ref(false);
 const columns = [
   {
     id: "time",
-    header: "Time",
+    header: t("traces.lLMErrorTable.time"),
     accessorKey: "_timestamp",
     sortable: false,
     size: COL.createdAt,
@@ -156,7 +156,7 @@ const columns = [
   },
   {
     id: "service",
-    header: "Service",
+    header: t("traces.lLMErrorTable.service"),
     accessorKey: "service_name",
     sortable: false,
     // Half the usual stream-name width — service names here are short.
@@ -165,7 +165,7 @@ const columns = [
   },
   {
     id: "operation",
-    header: "Operation",
+    header: t("traces.lLMErrorTable.operation"),
     accessorKey: "operation",
     sortable: false,
     // Numeric size + flex: fills the leftover width and stays resizable.
@@ -174,7 +174,7 @@ const columns = [
   },
   {
     id: "trace_id",
-    header: "Trace ID",
+    header: t("traces.lLMErrorTable.traceId"),
     accessorKey: "trace_id",
     sortable: false,
     size: COL.url,
@@ -268,6 +268,6 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .llm-trend-panel {
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-border-default);
 }
 </style>

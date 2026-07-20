@@ -27,7 +27,7 @@
                   <template #icon-left>
                     <OIcon name="drag-indicator" size="xs" />
                   </template>
-                  <OTooltip content="Drag to reorder" side="top" />
+                  <OTooltip :content="t('metrics.operationsList.dragToReorder')" side="top" />
                 </OButton>
                 <ODropdown>
                   <template #trigger>
@@ -50,15 +50,15 @@
                   >
                     <div style="width: 350px">
                       <div class="text-weight-medium">
-                        {{ getOperationDef(element.id)?.name || element.id }}
+                        {{ getStepSpec(element.id)?.name || element.id }}
                       </div>
                       <div class="text-xs text-gray-400">
-                        {{ getOperationDef(element.id)?.documentation }}
+                        {{ getStepSpec(element.id)?.documentation }}
                       </div>
 
                       <!-- Operation Parameters -->
                       <template
-                        v-for="(param, paramIndex) in getOperationDef(
+                        v-for="(param, paramIndex) in getStepSpec(
                           element.id,
                         )?.params"
                         :key="paramIndex"
@@ -95,7 +95,7 @@
                           :data-test="`promql-operation-param-${paramIndex}`"
                         >
                           <template #empty>
-                            <span>{{ availableLabels.length ? 'No matching labels' : 'Select a metric first to load labels' }}</span>
+                            <span>{{ availableLabels.length ? t('metrics.operationsList.noMatchingLabels') : t('metrics.operationsList.selectMetricFirst') }}</span>
                           </template>
                         </OSelect>
                       </template>
@@ -124,14 +124,14 @@
           data-test="promql-add-operation"
         >
           <OIcon name="add" size="sm" />
-          <OTooltip content="Add operation" side="top" />
+          <OTooltip :content="t('metrics.operationsList.addOperation')" side="top" />
         </OButton>
       </div>
     </div>
 
     <!-- Operation Selector Dialog -->
-    <ODialog data-test="operations-list-operation-selector-dialog" v-model:open="showOperationSelector" size="sm" title="Add Operation"
-      primary-button-label="Close"
+    <ODialog data-test="operations-list-operation-selector-dialog" v-model:open="showOperationSelector" size="sm" :title="t('metrics.operationsList.addOperationTitle')"
+      :primary-button-label="t('metrics.operationsList.close')"
       @click:primary="showOperationSelector = false"
     >
       <OSearchInput
@@ -185,18 +185,18 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import {
-  QueryBuilderOperation,
-  QueryBuilderOperationDef,
+  PromqlStep,
+  PromqlStepSpec,
 } from "@/components/promql/types";
-import { promQueryModeller } from "@/components/promql/operations/queryModeller";
+import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 
 const props = defineProps<{
-  operations: QueryBuilderOperation[];
+  operations: PromqlStep[];
   dashboardData?: any; // Dashboard data containing shared meta
 }>();
 
 const emit = defineEmits<{
-  "update:operations": [value: QueryBuilderOperation[]];
+  "update:operations": [value: PromqlStep[]];
 }>();
 
 const { t } = useI18n();
@@ -211,10 +211,10 @@ const availableLabels = computed(
 // Search query for filtering operations in the operation selector dialog
 const searchQuery = ref("");
 
-const categories = computed(() => promQueryModeller.getCategories());
+const categories = computed(() => promqlRenderer.getGroups());
 
-const computedLabel = (operation: QueryBuilderOperation): string => {
-  const opDef = getOperationDef(operation.id);
+const computedLabel = (operation: PromqlStep): string => {
+  const opDef = getStepSpec(operation.id);
   if (!opDef) return operation.id;
 
   // Show operation name with parameters if any
@@ -238,18 +238,18 @@ const computedLabel = (operation: QueryBuilderOperation): string => {
   return opDef.name;
 };
 
-const getItemKey = (item: QueryBuilderOperation, index: number) => {
+const getItemKey = (item: PromqlStep, index: number) => {
   return `${item.id}-${index}`;
 };
 
-const getOperationDef = (id: string): QueryBuilderOperationDef | undefined => {
-  return promQueryModeller.getOperationDef(id);
+const getStepSpec = (id: string): PromqlStepSpec | undefined => {
+  return promqlRenderer.getStepSpec(id);
 };
 
 const getFilteredOperationsForCategory = (
   category: string,
-): QueryBuilderOperationDef[] => {
-  const operations = promQueryModeller.getOperationsForCategory(category);
+): PromqlStepSpec[] => {
+  const operations = promqlRenderer.getStepsForGroup(category);
   // Operations for this category
   if (!searchQuery.value) return operations;
 
@@ -259,18 +259,18 @@ const getFilteredOperationsForCategory = (
       op.name.toLowerCase().includes(needle) ||
       op.id.toLowerCase().includes(needle) ||
       op.documentation?.toLowerCase().includes(needle) ||
-      op.category?.toLowerCase().includes(needle),
+      op.group?.toLowerCase().includes(needle),
   );
 };
 
-const handleDragUpdate = (newVal: QueryBuilderOperation[]) => {
+const handleDragUpdate = (newVal: PromqlStep[]) => {
   // Create new array instead of mutating props
   const newOperations = [...newVal];
   emit("update:operations", newOperations);
 };
 
-const addOperation = (opDef: QueryBuilderOperationDef) => {
-  const newOp: QueryBuilderOperation = {
+const addOperation = (opDef: PromqlStepSpec) => {
+  const newOp: PromqlStep = {
     id: opDef.id,
     params: [...opDef.defaultParams],
   };
@@ -291,7 +291,7 @@ defineExpose({
 </script>
 
 <style>
-/* Deep Quasar override — must stay in CSS */
+/* Deep override — must stay in CSS */
 :deep(
   .operation-label-selector.q-field--labeled.showLabelOnTop.q-select
     .q-field__control-container

@@ -36,15 +36,6 @@ vi.mock("@/services/model_pricing", () => ({
   },
 }));
 
-const notifyMock = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual<any>("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: notifyMock }),
-  };
-});
-
 const mockToastFn = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToastFn(...args),

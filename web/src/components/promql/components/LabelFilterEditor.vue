@@ -36,7 +36,7 @@
                   <OSelect
                     v-model="label.label"
                     :options="availableLabelOptions"
-                    label="Label"
+                    :label="t('metrics.labelFilterEditor.label')"
                     class="label-filter-label-select showLabelOnTop normal-case! mb-2"
                     searchable
                     clearable
@@ -45,8 +45,8 @@
                     <template #empty>
                       <span class="text-text-secondary px-3 py-2">{{
                         loadingLabels
-                          ? "Loading labels..."
-                          : "No labels found"
+                          ? t('metrics.labelFilterEditor.loadingLabels')
+                          : t('metrics.labelFilterEditor.noLabelsFound')
                       }}</span>
                     </template>
                   </OSelect>
@@ -55,7 +55,7 @@
                   <OSelect
                     v-model="label.op"
                     :options="operatorOptions"
-                    label="Operator"
+                    :label="t('metrics.labelFilterEditor.operator')"
                     class="label-filter-operator-select showLabelOnTop mb-2"
                     data-test="promql-operator-select"
                   />
@@ -64,7 +64,7 @@
                   <OSelect
                     v-model="label.value"
                     :options="getLabelValueOptions(label.label)"
-                    label="Value"
+                    :label="t('metrics.labelFilterEditor.value')"
                     class="label-filter-value-select showLabelOnTop"
                     :value-key="'value'"
                     :label-key="'label'"
@@ -76,8 +76,8 @@
                     <template #empty>
                       <span class="text-text-secondary px-3 py-2">{{
                         !label.label
-                          ? 'Select a label first'
-                          : 'No values found'
+                          ? t('metrics.labelFilterEditor.selectLabelFirst')
+                          : t('metrics.labelFilterEditor.noValuesFound')
                       }}</span>
                     </template>
                   </OSelect>
@@ -103,7 +103,7 @@
           data-test="promql-add-label-filter"
         >
           <OIcon name="add" size="sm" />
-          <OTooltip content="Add label filter" side="top" />
+          <OTooltip :content="t('metrics.labelFilterEditor.addLabelFilter')" side="top" />
         </OButton>
       </div>
     </div>
@@ -119,18 +119,18 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { useI18n } from "vue-i18n";
-import { QueryBuilderLabelFilter } from "@/components/promql/types";
+import { PromqlLabelMatcher } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 const props = defineProps<{
-  labels: QueryBuilderLabelFilter[];
+  labels: PromqlLabelMatcher[];
   metric?: string;
   dashboardData?: any; // Dashboard data containing variables
   dashboardPanelData?: any;
 }>();
 
 const emit = defineEmits<{
-  "update:labels": [value: QueryBuilderLabelFilter[]];
+  "update:labels": [value: PromqlLabelMatcher[]];
 }>();
 
 const { t } = useI18n();
@@ -163,9 +163,9 @@ const availableLabelOptions = computed(() => {
   );
 });
 
-const computedLabel = (label: QueryBuilderLabelFilter): string => {
+const computedLabel = (label: PromqlLabelMatcher): string => {
   if (!label.label) {
-    return "Select label";
+    return t('metrics.labelFilterEditor.selectLabel');
   }
   if (!label.value) {
     return label.label;
@@ -191,7 +191,7 @@ watch(
 );
 
 const addLabel = () => {
-  const newLabels: QueryBuilderLabelFilter[] = [
+  const newLabels: PromqlLabelMatcher[] = [
     ...props.labels,
     {
       label: "",
@@ -242,13 +242,13 @@ const getLabelValueOptions = (labelKey: string) => {
 const getOperatorHint = (op: string): string => {
   switch (op) {
     case "=":
-      return "Exact match";
+      return t('metrics.labelFilterEditor.exactMatch');
     case "!=":
-      return "Not equal to";
+      return t('metrics.labelFilterEditor.notEqualTo');
     case "=~":
-      return "Regex pattern (e.g., prod.*)";
+      return t('metrics.labelFilterEditor.regexPattern');
     case "!~":
-      return "Regex not matching (e.g., test.*)";
+      return t('metrics.labelFilterEditor.regexNotMatching');
     default:
       return "";
   }

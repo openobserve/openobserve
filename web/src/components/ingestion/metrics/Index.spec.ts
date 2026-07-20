@@ -24,7 +24,7 @@ vi.mock("../../../aws-exports", () => ({
   },
 }));
 
-// Mock clipboard utility — replaces the removed quasar copyToClipboard
+// Mock clipboard utility
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
 }));
@@ -191,6 +191,18 @@ describe("IngestMetrics Component", () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    });
+
+    it("should push with org_identifier query when route is 'vmagent'", () => {
+      mockRouter.currentRoute.value.name = "vmagent";
+      const tw = mount(IngestMetrics, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "vmagent",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
     });
 
     it("should push with org_identifier query when route is 'otelCollector'", () => {

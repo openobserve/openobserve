@@ -9,10 +9,8 @@
 // `jsonStr` and the custom `selectedFolder` dropdown also stay bare (documented
 // no-OForm* exceptions).
 //
-// There were NO field-level Quasar `:rules` on ImportDashboard before the revamp
-// (it is absent from the BEFORE inventory), so nothing is "restored" here. The
-// only field rule is the http(s) URL format check that previously lived in the
-// `watch(url)` handler. It is intentionally NON-required: the URL tab also
+// The only field rule is the http(s) URL format check that previously lived in
+// the `watch(url)` handler. It is intentionally NON-required: the URL tab also
 // accepts JSON pasted straight into the Monaco editor (no URL), so requiring the
 // URL would break that flow. `url`/`jsonFiles` are form-owned (name=); the page
 // reads them via form.useStore for the import logic / watchers (no v-model, no

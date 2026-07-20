@@ -37,14 +37,6 @@ const { mockQCopyToClipboard, cellActionsColumnRef } = vi.hoisted(() => ({
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: mockQCopyToClipboard,
 }));
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
-  };
-});
-
 // ─── Shared searchObj reference — lets tests read addToFilter after mutation ─
 const sharedSearchObj = {
   data: {

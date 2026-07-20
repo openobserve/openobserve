@@ -24,12 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="toolMeta"
           value="tool"
           class="mr-2"
-        >{{ `Tool: ${toolMetadata.name}` }}</OTag>
+        >{{ t('traces.lLMContentRenderer.tool', { name: toolMetadata.name }) }}</OTag>
         <OTag
           v-if="toolMetadata.callId"
           type="toolMeta"
           value="callid"
-        >{{ `Call ID: ${toolMetadata.callId}` }}</OTag>
+        >{{ t('traces.lLMContentRenderer.callId', { callId: toolMetadata.callId }) }}</OTag>
       </div>
       <div class="tool-data flex-1">
         <CodeQueryEditor
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="idx"
               class="message-item mb-2 h-full"
               :style="{
-                border: '1px solid var(--o2-border)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
               }"
             >
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="message-role text-xs font-bold p-2 capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--o2-border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
                 {{ roleLabel(msg.role) }}
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="isMessageJson(msg.content)"
                 class="message-content-json p-2 h-full text-[13px]"
-                style="background-color: var(--o2-code-bg)"
+                style="background-color: var(--color-code-bg)"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-${idx}`"
@@ -109,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-else
                 class="message-content markdown-body p-2 overflow-x-auto"
-                style="background-color: var(--o2-code-bg)"
+                style="background-color: var(--color-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--o2-code-bg) rounded overflow-x-auto">{{ contentStats.previewText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--color-code-bg) rounded overflow-x-auto">{{ contentStats.previewText }}</pre>
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-llm-content-renderer-expand-btn"
             @click="isExpanded = true"
           >
-            ...expand ({{ contentStats.remainingChars }} more characters)
+            {{ t('traces.lLMContentRenderer.expandMore', { count: contentStats.remainingChars }) }}
           </OButton>
         </div>
       </div>
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="idx"
               class="message-item mb-2 h-full"
               :style="{
-                border: '1px solid var(--o2-border)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
               }"
             >
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="message-role text-xs font-bold p-2 capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--o2-border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
                 {{ roleLabel(msg.role) }}
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="isMessageJson(msg.content)"
                 class="message-content-json p-2 h-full text-[13px]"
-                style="background-color: var(--o2-code-bg)"
+                style="background-color: var(--color-code-bg)"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-full-${idx}`"
@@ -210,13 +210,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-else
                 class="message-content markdown-body p-2 overflow-x-auto"
-                style="background-color: var(--o2-code-bg)"
+                style="background-color: var(--color-code-bg)"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--o2-code-bg) rounded overflow-x-auto">{{ fullText }}</pre>
+            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-[13px] leading-normal bg-(--color-code-bg) rounded overflow-x-auto">{{ fullText }}</pre>
           </div>
           <div v-else class="json-content h-full">
             <CodeQueryEditor
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             @click="isExpanded = false"
           >
-            Collapse
+            {{ t('traces.lLMContentRenderer.collapse') }}
           </OButton>
         </div>
       </div>
@@ -262,8 +262,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+
+const { t } = useI18n();
 
 const CodeQueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -657,10 +660,10 @@ const roleColor = (role: string) => {
 
 const roleLabel = (role: string) => {
   const labels: Record<string, string> = {
-    user: "User",
-    assistant: "Assistant",
-    system: "System",
-    tool: "Tool",
+    user: t("traces.lLMContentRenderer.roleUser"),
+    assistant: t("traces.lLMContentRenderer.roleAssistant"),
+    system: t("traces.lLMContentRenderer.roleSystem"),
+    tool: t("traces.lLMContentRenderer.roleTool"),
   };
   return labels[role] || role;
 };
@@ -752,10 +755,10 @@ const renderMarkdown = (content: string): string => {
 }
 
 .messages-view .message-item .message-content blockquote {
-  border-left: 3px solid var(--o2-border-color);
+  border-left: 3px solid var(--color-border-default);
   margin: 8px 0;
   padding-left: 12px;
-  color: var(--o2-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .messages-view .message-item .message-content table {
@@ -766,7 +769,7 @@ const renderMarkdown = (content: string): string => {
 
 .messages-view .message-item .message-content table th,
 .messages-view .message-item .message-content table td {
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-border-default);
   padding: 6px 8px;
   text-align: left;
 }

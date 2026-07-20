@@ -84,6 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           :column-visibility="columnVisibility"
           :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="pipelines-pipeline-history-list"
           row-key="id"
           width="100%"
           class="w-full h-full"
@@ -640,7 +643,10 @@ const columns = ref([
     accessorKey: "retries",
     sortable: true,
     hideable: true,
-    size: 50,
+    // Wide enough for the header word "Retries" + the sort icon; at 50px the
+    // header truncated to just "R…". minSize keeps it legible after a resize.
+    size: 90,
+    minSize: 80,
     meta: { align: "right" as const },
   },
   {

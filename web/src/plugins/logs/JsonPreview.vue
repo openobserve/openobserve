@@ -89,7 +89,7 @@
               size="xs"
               variant="ghost"
               class="ml-2 log-json-field-dropdown-btn"
-              aria-label="Add icon"
+              :aria-label="t('logs.jsonPreview.addIcon')"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
             </OButton>
@@ -151,7 +151,7 @@
             <template #icon-left>
               <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
-            Send to AI Chat
+            {{ t('logs.jsonPreview.sendToAiChat') }}
           </ODropdownItem>
           <ODropdownItem
             v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
@@ -204,7 +204,7 @@
       >
         <div class="context-menu-item" @click="copySelectedText">
           <OIcon name="content-copy" size="sm" class="mr-2" />
-          Copy
+          {{ t('logs.jsonPreview.copy') }}
         </div>
         <div class="context-menu-item" @click="handleCreateRegex">
           <img
@@ -213,7 +213,7 @@
             style="width: 14px; height: 14px"
             alt=""
           />
-          Create regex pattern
+          {{ t('logs.jsonPreview.createRegexPattern') }}
         </div>
       </div>
     </div>
@@ -221,7 +221,7 @@
       v-if="config.isEnterprise == 'true'"
       v-model:open="typeOfRegexPattern"
       size="lg"
-      title="What is the type of regex pattern you want to create?"
+      :title="t('logs.jsonPreview.regexPatternTypeTitle')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
       @click:secondary="typeOfRegexPattern = false"
@@ -230,7 +230,7 @@
       <OInput
         data-test="regex-pattern-type-input"
         v-model="regexPatternType"
-        label="Type of regex pattern (e.g. email, phone number, etc.)"
+        :label="t('logs.jsonPreview.regexPatternTypeLabel')"
       />
     </ODialog>
   </div>
@@ -720,7 +720,8 @@ export default {
         loading.value = false;
         toast({
           message:
-            err.response?.data?.message || "Failed to get the Original data",
+            err.response?.data?.message ||
+            t('logs.jsonPreview.failedToGetOriginalData'),
           variant: "error",
         });
       } finally {
@@ -867,8 +868,8 @@ export default {
     const copySelectedText = () => {
       if (selectedText.value) {
         copyToClipboard(selectedText.value, {
-          successMessage: "Text copied to clipboard",
-          errorMessage: "Failed to copy text",
+          successMessage: t('logs.jsonPreview.textCopiedToClipboard'),
+          errorMessage: t('logs.jsonPreview.failedToCopyText'),
           timeout: 1500,
         }).then((success) => {
           if (success) {

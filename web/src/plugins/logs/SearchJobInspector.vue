@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="p-0 bg-(--q-background) w-full h-full flex flex-col min-h-0">
     <AppPageHeader
-      title="Search Job Inspector"
+      :title="t('logs.searchJobInspector.title')"
       :back="{ onClick: goBack, dataTest: 'inspector-close-button' }"
       class="shrink-0 px-4 border-b border-border-default"
     >
       <template #title>
-        <span data-test="inspector-title">Search Job Inspector</span>
+        <span data-test="inspector-title">{{ t('logs.searchJobInspector.title') }}</span>
       </template>
       <template #actions>
         <div
@@ -76,13 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-base font-small"
                   :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                 >
-                  Results
+                  {{ t('logs.searchJobInspector.results') }}
                 </div>
                 <div
                   class="w-10 h-10 rounded-lg flex items-center justify-center border"
                   style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
                 >
-                  <img src="@/assets/images/home/records.svg" alt="Results Icon" class="h-6 w-6" />
+                  <img src="@/assets/images/home/records.svg" :alt="t('logs.searchJobInspector.resultsIconAlt')" class="h-6 w-6" />
                 </div>
               </div>
               <div class="flex flex-col gap-1">
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-[10px]"
                   :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'"
                 >
-                  Returned from query
+                  {{ t('logs.searchJobInspector.returnedFromQuery') }}
                 </div>
               </div>
             </div>
@@ -113,13 +113,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-base font-small"
                   :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                 >
-                  Scanned Events
+                  {{ t('logs.searchJobInspector.scannedEvents') }}
                 </div>
                 <div
                   class="w-10 h-10 rounded-lg flex items-center justify-center border"
                   style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
                 >
-                  <img src="@/assets/images/home/streams.svg" alt="Events Icon" class="h-6 w-6" />
+                  <img src="@/assets/images/home/streams.svg" :alt="t('logs.searchJobInspector.eventsIconAlt')" class="h-6 w-6" />
                 </div>
               </div>
               <div class="flex flex-col gap-1">
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-[10px]"
                   :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'"
                 >
-                  Scanned events for this query
+                  {{ t('logs.searchJobInspector.scannedEventsForQuery') }}
                 </div>
               </div>
             </div>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-base font-small"
                   :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                 >
-                  Time Taken
+                  {{ t('logs.searchJobInspector.timeTaken') }}
                 </div>
                 <div
                   class="w-10 h-10 rounded-lg flex items-center justify-center border"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-[10px]"
                   :class="hasNoData ? (store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400') : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).colorClass"
                 >
-                  {{ hasNoData ? 'No data' : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).text }}
+                  {{ hasNoData ? t('logs.searchJobInspector.noData') : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).text }}
                 </div>
               </div>
             </div>
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-base font-small"
                   :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
                 >
-                  Trace ID
+                  {{ t('logs.searchJobInspector.traceId') }}
                 </div>
                 <div
                   class="w-10 h-10 rounded-lg flex items-center justify-center border"
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-sm font-semibold"
                 :class="store.state.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'"
               >
-                View Query
+                {{ t('logs.searchJobInspector.viewQuery') }}
               </div>
             </div>
           </div>
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- SQL Query Dialog -->
-    <ODrawer data-test="search-job-inspector-sql-drawer" v-model:open="showSqlDialog" size="lg" title="SQL Query">
+    <ODrawer data-test="search-job-inspector-sql-drawer" v-model:open="showSqlDialog" size="lg" :title="t('logs.searchJobInspector.sqlQuery')">
       <template #header-right>
         <OButton
           v-if="profileData?.sql"
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="content-copy" size="sm" v-if="!copiedSql" />
               <OIcon name="check" size="sm" v-else />
-          <OTooltip :content="copiedSql ? 'Copied!' : 'SQL'" />
+          <OTooltip :content="copiedSql ? t('logs.searchJobInspector.copied') : t('logs.searchJobInspector.sql')" />
         </OButton>
       </template>
       <div
@@ -332,12 +332,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <pre
           class="font-mono text-[13px] leading-[1.6] m-0 whitespace-pre-wrap break-words"
           data-test="inspector-sql-query-content"
-        >{{ profileData?.sql || 'No SQL query available' }}</pre>
+        >{{ profileData?.sql || t('logs.searchJobInspector.noSqlAvailable') }}</pre>
       </div>
     </ODrawer>
 
     <!-- Trace ID Dialog -->
-    <ODialog data-test="search-job-inspector-trace-id-dialog" v-model:open="showTraceIdDialog" size="sm" title="Full Trace ID">
+    <ODialog data-test="search-job-inspector-trace-id-dialog" v-model:open="showTraceIdDialog" size="sm" :title="t('logs.searchJobInspector.fullTraceId')">
       <div class="flex items-center gap-3">
         <div class="flex-1 font-mono text-sm break-all p-3 rounded border"
              :class="store.state.theme === 'dark' ? 'bg-gray-800 border-gray-700 text-blue-400' : 'bg-gray-50 border-gray-200 text-blue-600'">
@@ -357,6 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import NoData from "@/components/shared/grid/NoData.vue";
 import AppPageHeader from "@/components/common/AppPageHeader.vue";
@@ -424,6 +425,7 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+    const { t } = useI18n();
 
     const loading = ref(false);
     const errorMessage = ref("");
@@ -449,35 +451,35 @@ export default defineComponent({
       },
       {
         id: "duration",
-        header: "Duration",
+        header: t("logs.searchJobInspector.columnDuration"),
         accessorKey: "duration",
         meta: { align: "left" },
         size: 200,
       },
       {
         id: "node_name",
-        header: "Node Name",
+        header: t("logs.searchJobInspector.columnNodeName"),
         accessorKey: "node_name",
         meta: { align: "left" },
         size: 280,
       },
       {
         id: "search_role",
-        header: "Role",
+        header: t("logs.searchJobInspector.columnRole"),
         accessorKey: "search_role",
         meta: { align: "left" },
         size: COL.role,
       },
       {
         id: "component",
-        header: "Operation",
+        header: t("logs.searchJobInspector.columnOperation"),
         accessorKey: "component",
         meta: { align: "left" },
         size: 340,
       },
       {
         id: "desc",
-        header: "Description",
+        header: t("logs.searchJobInspector.columnDescription"),
         accessorKey: "desc",
         meta: { align: "left", autoWidth: true },
         size: COL.description,
@@ -486,7 +488,7 @@ export default defineComponent({
 
     const fetchProfileData = async () => {
       if (!traceId.value || !orgIdentifier.value) {
-        errorMessage.value = "Missing required parameters";
+        errorMessage.value = t("logs.searchJobInspector.missingParameters");
         return;
       }
 
@@ -506,7 +508,7 @@ export default defineComponent({
         errorMessage.value =
           error.response?.data?.message ||
           error.message ||
-          "Failed to fetch profile data";
+          t("logs.searchJobInspector.failedToFetch");
       } finally {
         loading.value = false;
       }
@@ -625,31 +627,31 @@ export default defineComponent({
     };
 
     const getResponseTimeLabel = (ms: number | undefined) => {
-      if (!ms) return { text: "No data", colorClass: "text-gray-400" };
+      if (!ms) return { text: t("logs.searchJobInspector.noData"), colorClass: "text-gray-400" };
 
       if (ms < 50) {
         return {
-          text: "Ultra-fast response",
+          text: t("logs.searchJobInspector.ultraFastResponse"),
           colorClass: store.state.theme === 'dark' ? 'text-green-400' : 'text-green-600'
         };
       } else if (ms < 200) {
         return {
-          text: "Fast response",
+          text: t("logs.searchJobInspector.fastResponse"),
           colorClass: store.state.theme === 'dark' ? 'text-green-400' : 'text-green-600'
         };
       } else if (ms < 500) {
         return {
-          text: "Good response",
+          text: t("logs.searchJobInspector.goodResponse"),
           colorClass: store.state.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
         };
       } else if (ms < 1000) {
         return {
-          text: "Moderate response",
+          text: t("logs.searchJobInspector.moderateResponse"),
           colorClass: store.state.theme === 'dark' ? 'text-yellow-400' : 'text-yellow-600'
         };
       } else {
         return {
-          text: "Slow response",
+          text: t("logs.searchJobInspector.slowResponse"),
           colorClass: store.state.theme === 'dark' ? 'text-red-400' : 'text-red-600'
         };
       }
@@ -678,7 +680,7 @@ export default defineComponent({
 
     const copyTraceId = () => {
       copyToClipboard(traceId.value, {
-        errorMessage: 'Failed to copy trace ID to clipboard',
+        errorMessage: t('logs.searchJobInspector.failedToCopyTraceId'),
       }).then((success) => {
         if (success) {
           copiedTraceId.value = true;
@@ -692,7 +694,7 @@ export default defineComponent({
     const copiedSql = ref(false);
     const copySql = () => {
       copyToClipboard(profileData.value?.sql || "", {
-        errorMessage: 'Failed to copy SQL to clipboard',
+        errorMessage: t('logs.searchJobInspector.failedToCopySql'),
       }).then((success) => {
         if (success) {
           copiedSql.value = true;
@@ -729,6 +731,7 @@ export default defineComponent({
       copySql,
       store,
       hasNoData,
+      t,
     };
   },
 });

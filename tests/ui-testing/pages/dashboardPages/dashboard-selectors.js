@@ -11,10 +11,10 @@
  */
 
 /**
- * Static selectors - Quasar Framework UI components
+ * Static selectors - Framework UI components
  */
-const QUASAR = {
-  // Dialog components — match both the legacy Quasar dialog and the new ODrawer/ODialog
+const COMPONENTS = {
+  // Dialog components — match both the legacy dialog and the new ODrawer/ODialog
   // panels migrated for the dialog v2 UX overhaul. Many specs use this to detect "is the
   // settings overlay still open" after `addScopedVariable` saves; the settings drawer
   // overlay intercepts pointer events on the dashboard, so missing the new selector
@@ -132,12 +132,12 @@ const INSPECTOR = {
  * Combined SELECTORS export for easy access
  */
 const SELECTORS = {
-  ...QUASAR,
+  ...COMPONENTS,
   ...DASHBOARD,
   ...ROLES,
   ...INSPECTOR,
-  // Keep QUASAR as nested object for explicit access like SELECTORS.QUASAR.DIALOG
-  QUASAR,
+  // Keep COMPONENTS as nested object for explicit access like SELECTORS.COMPONENTS.DIALOG
+  COMPONENTS,
 };
 
 /**
@@ -219,7 +219,7 @@ function getMenuItemByText(text, exact = true) {
   const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = exact ? new RegExp(`^${escaped}$`) : new RegExp(escaped);
   return {
-    selector: QUASAR.MENU_ITEM,
+    selector: COMPONENTS.MENU_ITEM,
     filter: { hasText: pattern }
   };
 }
@@ -231,7 +231,7 @@ function getMenuItemByText(text, exact = true) {
  */
 function getDialogByText(text) {
   return {
-    selector: QUASAR.DIALOG,
+    selector: COMPONENTS.DIALOG,
     filter: { hasText: text }
   };
 }
@@ -274,7 +274,7 @@ function getTabSelector(tabTitle) {
 
 module.exports = {
   // Selector groups
-  QUASAR,
+  COMPONENTS,
   DASHBOARD,
   ROLES,
   INSPECTOR,

@@ -1,6 +1,6 @@
 <template>
   <section class="flex flex-col gap-[10px] min-h-0 flex-1" data-test="quality-score-configs-overview">
-    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-[var(--color-dialog-header-border,var(--o2-border))] rounded-md text-center text-[var(--color-text-secondary,var(--o2-text-secondary))]">
+    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-[var(--color-dialog-header-border,var(--o2-border))] rounded-md text-center text-[var(--color-text-secondary)]">
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.loading") }}</span>
     </div>
@@ -64,7 +64,7 @@
         </template>
 
         <template #cell-name="{ row }">
-          <div class="font-semibold text-[var(--color-text-primary,currentColor)]">{{ row.name }}</div>
+          <div class="text-[var(--color-text-primary)]">{{ row.name }}</div>
         </template>
 
         <template #cell-type="{ row }">
@@ -73,7 +73,7 @@
             type="evalDataType"
             :value="row.dataType"
           />
-          <span v-else class="text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
+          <span v-else class="text-[var(--color-text-secondary)]">—</span>
         </template>
 
         <template #cell-totalScores="{ row }">
@@ -82,7 +82,7 @@
 
         <template #cell-coverage="{ row }">
           <span v-if="row.coveragePct != null" class="[font-variant-numeric:tabular-nums]">{{ formatPct(row.coveragePct) }}</span>
-          <span v-else class="text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
+          <span v-else class="text-[var(--color-text-secondary)]">—</span>
         </template>
 
         <template #cell-trend="{ row }">
@@ -101,14 +101,14 @@
               :points="sparkPoints(row.trendSparkline)"
             />
           </svg>
-          <span v-else class="text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
+          <span v-else class="text-[var(--color-text-secondary)]">—</span>
         </template>
 
         <template #cell-updated="{ row }">
-          <span v-if="row.lastUpdatedMs" class="text-[11px] text-[var(--color-text-secondary,var(--o2-text-secondary))] [font-variant-numeric:tabular-nums]">
+          <span v-if="row.lastUpdatedMs" class="text-[11px] text-[var(--color-text-secondary)] [font-variant-numeric:tabular-nums]">
             {{ relativeTime(row.lastUpdatedMs) }}
           </span>
-          <span v-else class="text-[var(--color-text-secondary,var(--o2-text-secondary))]">—</span>
+          <span v-else class="text-[var(--color-text-secondary)]">—</span>
         </template>
       </OTable>
     </div>
@@ -167,10 +167,10 @@ const filteredRows = computed(() => {
 });
 
 function sparkClass(status: string): string {
-  if (status === 'unhealthy' || status === 'warn') return 'text-[var(--o2-status-warning-text,#b25400)]';
-  if (status === 'healthy') return 'text-[var(--o2-status-success-text,#2e7d32)]';
-  if (status === 'noData') return 'text-[var(--color-text-secondary,var(--o2-text-secondary))] opacity-[0.55]';
-  return 'text-[var(--color-text-secondary,var(--o2-text-secondary))]';
+  if (status === 'unhealthy' || status === 'warn') return 'text-[var(--color-status-warning-text)]';
+  if (status === 'healthy') return 'text-[var(--color-status-success-text)]';
+  if (status === 'noData') return 'text-[var(--color-text-secondary)] opacity-[0.55]';
+  return 'text-[var(--color-text-secondary)]';
 }
 
 function rowClassOf(row: ScoreConfigRow): string {

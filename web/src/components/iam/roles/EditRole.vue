@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="edit-role-permissions-show-text"
                   style="font-size: 14px"
                 >
-                  Show
+                  {{ t('iam.editRole.show') }}
                 </span>
                 <OToggleGroup
                   class="ml-1"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :debounce="500"
                   class="no-border o2-search-input h-[36px] w-[200px]"
                   :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-                  :placeholder="`Search Permissions`"
+                  :placeholder="t('iam.editRole.searchPermissions')"
                   @update:model-value="onResourceChange"
                 >
                   <template #icon-left>
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSelect
                   v-model="filter.resource"
                   :options="resourceOptions"
-                  placeholder="Select Resource"
+                  :placeholder="t('iam.editRole.selectResource')"
                   clearable
                   searchable
                   style="width: 200px"
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="edit-role-permissions-count"
                 class="font-bold text-[14px]"
               >
-                {{ selectedPermissionsHash.size }} Permissions
+                {{ t('iam.editRole.permissionsCount', { count: selectedPermissionsHash.size }) }}
               </span>
               <OToggleGroup
                 data-test="edit-role-permissions-ui-type-toggle"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-show="permissionsUiType === 'json'">
               <div class="flex items-center justify-between">
                 <div class="mb-3 font-bold">
-                  {{ selectedPermissionsHash.size }} Permission
+                  {{ t('iam.editRole.permissionCountSingular', { count: selectedPermissionsHash.size }) }}
                 </div>
                 <div
                   class="flex items-center cursor-pointer"
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="toggleHelpSection"
                 >
                   <OIcon name="help" size="sm" />
-                  <span class="ml-1"> Help </span>
+                  <span class="ml-1"> {{ t('iam.editRole.help') }} </span>
                 </div>
               </div>
               <div class="flex flex-nowrap">
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-if="isHelpOpen" style="width: 350px" class="p-2">
                   <div class="flex justify-between items-center px-2">
-                    <div style="font-size: 16px">Quick Reference</div>
+                    <div style="font-size: 16px">{{ t('iam.editRole.quickReference') }}</div>
                     <OIcon
                       class="cursor-pointer"
                       name="close"
@@ -218,8 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSeparator class="mt-2 mb-4" />
                   <div class="mt-2 px-2">
                     <div>
-                      Configure access with JSON objects specifying "object"
-                      (resource) and "permission" (access level).
+                      {{ t('iam.editRole.jsonConfigHelp') }}
                     </div>
                     <pre style="font-size: 12px">
 {
@@ -228,10 +227,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }</pre
                     >
                     <div>
-                      <span class="font-bold">Child Resource:</span> <br />
-                      Specific instance or
-                      <span class="font-bold">organizationID</span> for all
-                      instances within a main resource.
+                      <span class="font-bold">{{ t('iam.editRole.childResource') }}</span> <br />
+                      {{ t('iam.editRole.specificInstanceOr') }}
+                      <span class="font-bold">organizationID</span> {{ t('iam.editRole.forAllInstances') }}
                     </div>
                   </div>
                 </div>
@@ -319,6 +317,7 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import config from "@/aws-exports";
 import commonService from "@/services/common";
+import syntheticsService from "@/services/synthetics";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -439,13 +438,13 @@ const tabs = computed(() => {
   const baseTabs = [
     {
       value: "permissions",
-      label: "Permissions",
+      label: t('iam.editRole.permissions'),
       icon: "shield",
       dirty: isPermissionsDirty.value,
     },
     {
       value: "users",
-      label: "Users",
+      label: t('iam.editRole.users'),
       icon: "group",
       dirty: isUsersDirty.value,
     },
@@ -454,7 +453,7 @@ const tabs = computed(() => {
   if (store.state.zoConfig.service_account_enabled) {
     baseTabs.push({
       value: "serviceAccounts",
-      label: "Service Accounts",
+      label: t('iam.editRole.serviceAccounts'),
       icon: "smart-toy",
       dirty: isServiceAccountsDirty.value,
     });
@@ -465,12 +464,12 @@ const tabs = computed(() => {
 
 const permissionDisplayOptions = [
   {
-    label: "All",
+    label: t('iam.editRole.all'),
     value: "all",
     icon: "format-list-bulleted",
   },
   {
-    label: "Selected",
+    label: t('iam.editRole.selected'),
     value: "selected",
     icon: "check-box",
   },
@@ -478,12 +477,12 @@ const permissionDisplayOptions = [
 
 const permissionUiOptions = [
   {
-    label: "Table",
+    label: t('iam.editRole.table'),
     value: "table",
     icon: "table-chart",
   },
   {
-    label: "JSON",
+    label: t('iam.editRole.json'),
     value: "json",
     icon: "data-object",
   },
@@ -554,8 +553,8 @@ const getRoleDetails = () => {
       isFetchingInitialRoles.value = false;
       toast({
         message: error?.response?.status === 404
-          ? "Role not found or has been deleted. Redirecting to roles list."
-          : error?.message || "Failed to load role details. Redirecting to roles list.",
+          ? t('iam.editRole.roleNotFound')
+          : error?.message || t('iam.editRole.loadFailed'),
         variant: "error",
       });
       router.push({
@@ -862,6 +861,24 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         }
       }
 
+      if (!resourceMapper[resource] && resource === "synthetics") {
+        if (!resourceMapper["synthetic_folder"]) {
+          resourceMapper["synthetic_folder"] = getResourceByName(
+            permissionsState.permissions,
+            "synthetic_folder",
+          ) as Resource;
+        }
+
+        await getResourceEntities(resourceMapper["synthetic_folder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+
       if (!resourceMapper[resource]) continue;
 
       if (
@@ -908,6 +925,14 @@ const updateRolePermissions = async (permissions: Permission[]) => {
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(reportResource as Entity);
+      } else if (resource === "synthetics") {
+        // Synthetics entities are plain monitor ids (no folder prefix), so the
+        // owning folder can't be derived from the entity — load every folder's
+        // monitors so the permission can be matched to its row.
+        for (const folderEntity of resourceMapper["synthetic_folder"]?.entities ??
+          []) {
+          await getResourceEntities(folderEntity as Entity);
+        }
       } else if (
         resource === "logs" ||
         resource === "metrics" ||
@@ -1125,6 +1150,12 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["rfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
+      } else if (resource === "synthetics") {
+        // Plain-id entity — locate the folder whose loaded monitors contain it.
+        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find(
+          (f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
@@ -1176,6 +1207,12 @@ const updateJsonInTable = () => {
 
         resourceDetails = resourceMapper.value["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
+        ) as Entity;
+      } else if (resource === "synthetics") {
+        // Plain-id entity — locate the folder whose loaded monitors contain it.
+        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find(
+          (f: Entity) =>
+            (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
       } else if (resource === "report") {
         const [folderId] = entity.split("/");
@@ -1526,6 +1563,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
     rfolder: getReportFolders,
+    synthetic_folder: getSyntheticsFolders,
+    synthetics: getSynthetics,
     re_patterns: getRePatterns,
     provider: getProviders,
     score_config: getScoreConfigs,
@@ -1677,6 +1716,53 @@ const getAlertFolders = async () => {
     "name",
     "alert",
   );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getSyntheticsFolders = async () => {
+  // Same shape as getAlertFolders — synthetics folders live under folder type "synthetics".
+  const folders: any = await commonService.list_Folders(
+    store.state.selectedOrganization.identifier,
+    "synthetics",
+  );
+
+  let isDefaultPresent = folders.data.list.find(
+    (folder: any) => folder.folderId === "default",
+  );
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities(
+    "synthetic_folder",
+    ["folderId"],
+    [...folders.data.list],
+    true,
+    "name",
+    "synthetics",
+  );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getSynthetics = async (resource: Entity | Resource) => {
+  // Monitors of one folder. Unlike alerts, synthetics FGA entities are plain
+  // monitor ids (no folder prefix) — matches backend set_ownership objects.
+  const res: any = await syntheticsService.listByFolderId(
+    store.state.selectedOrganization.identifier,
+    resource.name,
+  );
+
+  updateEntityEntities(
+    resource,
+    ["id"],
+    [...(res.data?.monitors ?? [])],
+    false,
+    "name",
+  );
+
   return new Promise((resolve) => {
     resolve(true);
   });
@@ -2413,7 +2499,7 @@ const saveRole = () => {
   ) {
     toast({
       variant: "info",
-      message: `No updates detected.`,
+      message: t('iam.editRole.noUpdatesDetected'),
     });
 
     return;
@@ -2429,7 +2515,7 @@ const saveRole = () => {
 
       toast({
         variant: "success",
-        message: `Updated role successfully!`,
+        message: t('iam.editRole.updateSuccess'),
       });
 
       // Resetting permissions state on save
@@ -2479,7 +2565,7 @@ const saveRole = () => {
       if (err.response.status != 403) {
         toast({
           variant: "error",
-          message: `Error while updating role!`,
+          message: t('iam.editRole.updateError'),
         });
       }
       console.log(err);

@@ -9,7 +9,6 @@ default = []
 cloud = []
 
 [dependencies]
-ahash.workspace = true
 anyhow.workspace = true
 arc-swap.workspace = true
 arrow.workspace = true
@@ -36,12 +35,11 @@ sqlx.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-tokio-stream.workspace = true
-zstd.workspace = true
 tracing.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
 reqwest.workspace = true
+url.workspace = true
 tonic.workspace = true
 opentelemetry.workspace = true
 tracing-opentelemetry.workspace = true

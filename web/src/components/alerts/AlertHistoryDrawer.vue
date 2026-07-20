@@ -18,34 +18,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer data-test="alert-history-drawer"
     :open="open"
     :width="65"
-    :title="t('alert_list.alert_history')"
+    :title="alertDetails?.name"
+    :title-data-test="'alert-history-name-badge'"
+    :sub-title="t('alert_list.alert_history')"
     @update:open="emit('update:open', $event)"
   >
-    <!-- #header override required: header contains alert name/type badges,
-         tab toggle, and datetime picker — too complex for title + sub-slots -->
+    <!-- The alert name is the drawer title and "History" its subtitle (matching
+         the other detail headers); the type badge + History/Condition toggle
+         trail in header-left, the datetime picker sits in header-right. -->
     <template #header-left>
           <div
             class="flex items-center gap-2 flex-1 min-w-0"
             data-test="alert-details-title"
           >
-            <!-- Alert Name Badge — truncates so a long name can never push the
-                 tab toggle into the datetime picker; full name stays in tooltip -->
-            <span
-              v-if="alertDetails"
-              :class="[
-                'font-semibold text-[18px] mr-2 px-2 py-1 rounded-md ml-2 min-w-0 truncate',
-                store.state.theme === 'dark'
-                  ? 'text-blue-400 bg-blue-900/50'
-                  : 'text-blue-600 bg-blue-50',
-              ]"
-              data-test="alert-history-name-badge"
-            >
-              {{ alertDetails.name }}
-              <OTooltip
-                v-if="alertDetails.name"
-                :content="alertDetails.name"
-              />
-            </span>
             <!-- Alert Type Badge -->
             <div
               v-if="alertDetails"
@@ -151,45 +136,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex h-full flex-col flex-1 overflow-hidden px-2 py-2"
           >
             <!-- Empty state -->
-            <div
+            <OEmptyState
               v-if="!isLoadingHistory && alertHistory.length === 0"
-              class="flex flex-col items-center justify-center flex-1 gap-2"
-            >
-              <div
-                class="w-14 h-14 rounded-full flex items-center justify-center mb-1"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-gray-800'
-                    : 'bg-gray-100'
-                "
-              >
-                <OIcon
-                  name="history-toggle-off"
-                  size="lg"
-                  :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'"
-                />
-              </div>
-              <div
-                class="text-sm font-medium"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-gray-400'
-                    : 'text-gray-600'
-                "
-              >
-                {{ t("alerts.alertDetails.noHistoryAvailable") }}
-              </div>
-              <div
-                class="text-xs"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'text-gray-600'
-                    : 'text-gray-400'
-                "
-              >
-                Try expanding the time range
-              </div>
-            </div>
+              size="block"
+              illustration="history"
+              :title="t('alerts.alertDetails.noHistoryAvailable')"
+              :description="t('alerts.alertDetails.tryExpandingTimeRange')"
+              :hide-action="true"
+              class="flex-1"
+            />
 
             <!-- History Table -->
             <div
@@ -486,6 +441,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

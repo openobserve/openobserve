@@ -8,7 +8,7 @@
 // via API, AddPanel duplicate-name) still run imperatively AFTER the schema
 // passes.
 //
-// Restored / preserved BEFORE rules (complete-quasar-validation-inventory):
+// Restored / preserved BEFORE rules (complete-validation-inventory):
 //   • name              → required + `^[a-zA-Z0-9_-]*$` regex
 //   • selectedTabs       → required when scope is "tabs" | "panels"
 //   • selectedPanels     → required when scope is "panels"

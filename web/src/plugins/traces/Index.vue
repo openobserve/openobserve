@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             searchObj.data.stream.selectedStream.label
                           "
                           as="RouterLink"
-                          >Click here</OButton
+                          >{{ t('traces.index.clickHere') }}</OButton
                         >
                         {{ t("traces.configureFullTextSearch") }}
                       </div>
@@ -297,14 +297,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog
       v-model:open="streamChangeDialog.show"
-      title="Change stream?"
+      :title="t('traces.index.changeStreamTitle')"
       size="sm"
-      primary-button-label="Switch stream"
-      secondary-button-label="Cancel"
+      :primary-button-label="t('traces.index.switchStream')"
+      :secondary-button-label="t('traces.index.cancel')"
       @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
       @click:secondary="streamChangeDialog.show = false"
     >
-      <p>This will also update the stream in the Traces/Spans tab and reset existing query.</p>
+      <p>{{ t('traces.index.changeStreamMessage') }}</p>
     </ODialog>
   </div>
 </template>
@@ -349,6 +349,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
+import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
@@ -416,6 +417,8 @@ const {
   setServiceColors,
   loadLocalLogFilterField,
   updatedLocalLogFilterField,
+  loadTracesParser,
+  tracesParser,
 } = useTraces();
 const { fnParsedSQL } = logsUtils();
 
@@ -438,7 +441,6 @@ const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
-let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
 const disableMoreErrorDetails = ref(false);
@@ -488,12 +490,6 @@ const selectedStreamName = computed(
 
 const isLLMSpanPresent = ref(false);
 
-const importSqlParser = async () => {
-  const useSqlParser: any = await import("@/composables/useParser");
-  const { sqlParser }: any = useSqlParser.default();
-  parser = await sqlParser();
-};
-
 function getQueryTransform() {
   try {
     searchObj.data.stream.functions = [];
@@ -526,7 +522,7 @@ function getQueryTransform() {
     return;
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while getting functions");
+    showErrorNotification(t("traces.index.errorGettingFunctions"));
   }
 }
 
@@ -575,8 +571,7 @@ async function getStreamList() {
         searchObj.loadingStream = false;
         toast({
           variant: "error",
-          message:
-            "Error while pulling index for selected organization" + e.message,
+          message: t("traces.index.errorPullingIndex", { message: e.message }),
         });
       })
       .finally(() => {
@@ -585,7 +580,7 @@ async function getStreamList() {
   } catch (e) {
     searchObj.loadingStream = false;
     console.error("Error while getting streams", e);
-    showErrorNotification("Error while getting streams");
+    showErrorNotification(t("traces.index.errorGettingStreams"));
   }
 }
 
@@ -650,7 +645,7 @@ function loadStreamLists() {
     }
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while loading streams");
+    showErrorNotification(t("traces.index.errorLoadingStreams"));
   }
 }
 
@@ -659,7 +654,7 @@ function getConsumableDateTime() {
     if (searchObj.data.datetime.tab == "relative") {
       let period = "";
       let periodValue = 0;
-      // quasar does not support arithmetic on weeks. convert to days.
+      // arithmetic on weeks is not supported; convert to days.
 
       if (
         searchObj.data.datetime.relative.period.label.toLowerCase() == "weeks"
@@ -771,7 +766,7 @@ function buildSearch() {
       // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
       const durationParseResult = parseDurationWhereClause(
         whereClause,
-        parser,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
       if (typeof durationParseResult === "string") {
@@ -781,7 +776,7 @@ function buildSearch() {
       // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
       whereClause = parseSpanKindWhereClause(
         whereClause,
-        parser,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
 
@@ -822,9 +817,7 @@ function buildSearch() {
   } catch (e) {
     console.error("Error while constructing the search query", e);
     searchObj.loading = false;
-    showErrorNotification(
-      "An error occurred while constructing the search query.",
-    );
+    showErrorNotification(t("traces.index.errorConstructingQuery"));
   }
 }
 
@@ -892,7 +885,9 @@ function fetchTracesCount() {
 
 const showTraceDetailsError = () => {
   showErrorNotification(
-    `Trace ${router.currentRoute.value.query.trace_id} not found`,
+    t("traces.index.traceNotFound", {
+      traceId: router.currentRoute.value.query.trace_id,
+    }),
   );
   const query = cloneDeep(router.currentRoute.value.query);
   delete query.trace_id;
@@ -939,6 +934,7 @@ async function getQueryData(
     }
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
+    searchObj.data.sqlSyntaxErrorRanges = [];
 
     searchObj.searchApplied = true;
     searchObj.loading = true;
@@ -989,7 +985,7 @@ async function getQueryData(
     ).trim();
     const filterParseResult = parseDurationWhereClause(
       filter,
-      parser,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
     if (typeof filterParseResult === "string") {
@@ -999,7 +995,7 @@ async function getQueryData(
     // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
     filter = parseSpanKindWhereClause(
       filter,
-      parser,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
 
@@ -1181,7 +1177,7 @@ async function getQueryData(
           const { message, trace_id, code, error_detail } = errData ?? {};
 
           let errorMsg =
-            message || err?.message || "Error while processing request";
+            message || err?.message || t("traces.index.errorProcessingRequest");
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
@@ -1192,6 +1188,20 @@ async function getQueryData(
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
+
+          // Locate the offending token in the query and squiggle it in the
+          // editor (shares the central engine + externalErrors ref with Logs).
+          rangesFromServerError({
+            code,
+            message,
+            errorDetail: error_detail,
+            sqlMode: searchObj.meta.sqlMode,
+            query: searchObj.data.editorValue,
+            streamName: searchObj.data.stream.selectedStream?.value,
+          }).then((ranges) => {
+            searchObj.data.sqlSyntaxErrorRanges = ranges;
+          });
+
           currentSearchTraceId = null;
           delete tracesPartitionMap[searchTraceId];
         },
@@ -1215,7 +1225,7 @@ async function getQueryData(
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
-    searchObj.data.errorMsg = e?.message || "Search request failed";
+    searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
   }
 }
@@ -1589,7 +1599,7 @@ onBeforeMount(async () => {
   }
   setupContextProvider();
   restoreUrlQueryParams();
-  await importSqlParser();
+  await loadTracesParser();
   if (!searchObj.loading) {
     await loadPageData();
   }
@@ -1724,7 +1734,7 @@ const restoreFilters = (query: string) => {
 
   const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
-  const parsedQuery = parser.astify(defaultQuery + query);
+  const parsedQuery = tracesParser.value.astify(defaultQuery + query);
 
   restoreFiltersFromQuery(parsedQuery.where);
 };

@@ -4,7 +4,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import enLocale from "@/locales/languages/en.json";
+import enLocale from "@/locales/languages/en-US.json";
 import SettingsIndex from "./index.vue";
 
 // Mock composables and config with factory functions
@@ -46,19 +46,8 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Global mock notify for Quasar
+// Global mock notify
 const globalMockNotify = vi.fn(() => vi.fn());
-
-// Mock Quasar composables
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: globalMockNotify,
-    }),
-  };
-});
 
 const mockStore = createStore({
   state: {

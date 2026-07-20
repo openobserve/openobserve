@@ -110,14 +110,6 @@ vi.mock("./llmInsightsDashboard.utils", () => ({
   splitCost: vi.fn((n: number) => ({ value: `$${n}`, unit: "" })),
 }));
 
-// Quasar mock (no longer a dependency)
-vi.mock("quasar", () => ({
-  copyToClipboard: vi.fn().mockResolvedValue(undefined),
-  useQuasar: () => ({
-    notify: vi.fn(),
-  }),
-}));
-
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -504,7 +496,7 @@ describe("SessionDetails — turn rows", () => {
     const wrapper = await mountComponent();
     const row = wrapper.find(turnRowSelector("err-trace"));
     expect(row.classes()).toContain(
-      "bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))]",
+      "bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))]",
     );
   });
 
@@ -516,7 +508,7 @@ describe("SessionDetails — turn rows", () => {
 
     const wrapper = await mountComponent();
     const row = wrapper.find(turnRowSelector("ok-trace"));
-    expect(row.classes()).toContain("bg-[var(--o2-card-bg)]");
+    expect(row.classes()).toContain("bg-[var(--color-surface-base)]");
   });
 
   it("status badge in turn header uses critical class for error traces", async () => {
@@ -529,7 +521,7 @@ describe("SessionDetails — turn rows", () => {
     const header = wrapper.find(turnHeaderSelector());
     // Look for the status badge span within the header
     const badgeSpan = header.findAll("span").find(
-      (s) => s.classes().join("").includes("text-[var(--o2-service-health-critical)]"),
+      (s) => s.classes().join("").includes("text-[var(--color-error-500)]"),
     );
     expect(badgeSpan).toBeTruthy();
   });
@@ -544,7 +536,7 @@ describe("SessionDetails — turn rows", () => {
     const header = wrapper.find(turnHeaderSelector());
     const badgeSpan = header.findAll("span").find(
       (s) =>
-        s.classes().join("").includes("text-[var(--o2-service-health-healthy)]"),
+        s.classes().join("").includes("text-[var(--color-text-secondary)]"),
     );
     expect(badgeSpan).toBeTruthy();
   });

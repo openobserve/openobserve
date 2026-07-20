@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AppPageHeader
         :title="t('aiToolset.header')"
         icon="smart-toy"
-        :subtitle="'Configure AI tool integrations'"
+        :subtitle="t('settings.aiToolsetsPage.subtitle')"
         class="shrink-0 px-4 border-b border-border-default"
       >
         <template #actions>

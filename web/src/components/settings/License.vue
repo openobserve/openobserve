@@ -86,22 +86,22 @@
           <OCard class="border border-solid border-[var(--o2-border-color)]">
             <OCardSection role="body">
               <div class="text-xl font-semibold mb-3">{{ t("about.license_info") }}</div>
-              <table class="w-full border-collapse border border-solid border-[var(--o2-border-color)]">
+              <table class="w-full border-collapse border border-solid border-[var(--color-table-header-border)]">
                 <tbody>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.installation_id") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.installation_id }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.license_id") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.license_id }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.status_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">
@@ -114,24 +114,24 @@
                       </OBadge>
                     </td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.create_at_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ formatDate(licenseData.license.created_at) }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.expires_at_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ formatDate(licenseData.license.expires_at) }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">{{ t("about.company") }}</td>
+                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">{{ t("about.company") }}</td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.company }}</td>
                   </tr>
-                  <tr v-if="licenseData.key" class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr v-if="licenseData.key" class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.license_key") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">
@@ -149,20 +149,20 @@
                       </div>
                     </td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_name" class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr v-if="licenseData.license.contact_name" class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.contact_name") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_name }}</td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_email" class="border-b border-solid border-[var(--o2-border-color)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                  <tr v-if="licenseData.license.contact_email" class="border-b border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.contact_email") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_email }}</td>
                   </tr>
                   <tr v-if="licenseData.license.environment_type">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--o2-border-color)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
                       {{ t("about.environment_type") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.environment_type }}</td>
@@ -586,7 +586,7 @@ export default defineComponent({
           message:
             t("about.failed_to_update_license") +
             " : " +
-            (error?.response?.data?.message || "unexpected error"),
+            (error?.response?.data?.message || t("settings.licensePage.unexpectedError")),
         });
       }
     };
@@ -617,7 +617,7 @@ export default defineComponent({
           message:
             t("about.failed_to_refresh_license") +
             " : " +
-            (error?.response?.data?.message || "unexpected error"),
+            (error?.response?.data?.message || t("settings.licensePage.unexpectedError")),
         }); 
       }
     }
@@ -746,11 +746,11 @@ export default defineComponent({
       );
 
       if (daysUntilExpiry > 1) {
-        return `${daysUntilExpiry} days remaining until your license expires`;
+        return t("settings.licensePage.daysRemaining", { days: daysUntilExpiry });
       } else if (daysUntilExpiry === 1) {
-        return `1 day remaining until your license expires`;
+        return t("settings.licensePage.oneDayRemaining");
       } else {
-        return "Your license has expired";
+        return t("settings.licensePage.licenseExpired");
       }
     };
 

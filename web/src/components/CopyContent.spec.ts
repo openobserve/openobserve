@@ -5,7 +5,7 @@ import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { nextTick } from 'vue';
 
-// Mock clipboard utility (replaces old quasar copyToClipboard)
+// Mock clipboard utility
 const mockCopyToClipboard = vi.fn().mockResolvedValue(true);
 vi.mock('@/utils/clipboard', () => ({
   copyToClipboard: (...args: any[]) => mockCopyToClipboard(...args),

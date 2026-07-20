@@ -33,30 +33,20 @@ if (import.meta.env.DEV && !form) {
     :name="props.name"
   >
     <template #default="{ field }">
+      <!--
+        Forward the whole typed props object rather than a hand-written prop
+        list. FormSelectProps re-declares every OSelect prop (except
+        modelValue/error/errorMessage), so a declared-but-unforwarded prop like
+        `loading`, `optionTooltip`, `labelPosition`, etc. would be stripped from
+        `$attrs` AND missing from the manual list — silently dropped. Binding
+        `props` keeps the wrapper transparent as new OSelect props are added.
+        The field-driven bindings (model-value/error/error-message) come last so
+        they win, and are the exact three keys FormSelectProps omits.
+      -->
       <OSelect
-        v-bind="$attrs"
-        :label="props.label"
-        :placeholder="props.placeholder"
-        :options="props.options"
-        :multiple="props.multiple"
-        :searchable="props.searchable"
-        :search-debounce="props.searchDebounce"
-        :hide-selected="props.hideSelected"
-        :select-all="props.selectAll"
-        :creatable="props.creatable"
-        :label-key="props.labelKey"
-        :value-key="props.valueKey"
-        :clearable="props.clearable"
-        :disabled="props.disabled"
-        :required="props.required"
-        :size="props.size"
-        :width="props.width"
-        :name="props.name"
-        :id="props.id"
+        v-bind="{ ...$attrs, ...props }"
         :model-value="field.state.value"
-        :error="
-          field.state.meta.errors.length > 0
-        "
+        :error="field.state.meta.errors.length > 0"
         :error-message="
           field.state.meta.errors.length > 0
             ? firstFieldError(field.state.meta.errors)

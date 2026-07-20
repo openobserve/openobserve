@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   EmptyStreamSelect — object-only "pick a stream to start exploring" illustration:
-  a list card of stream rows with ONE row highlighted (selected) and a cursor
-  pointing at it, signalling "choose a stream from the list". Built on the same
-  card grammar as EmptyServicesCatalog. No character. CSS motion gated by
-  `animated` + prefers-reduced-motion.
+  a list card of stream rows with ONE row highlighted (selected), signalling
+  "choose a stream from the list". Built on the same card grammar as
+  EmptyServicesCatalog. No character. CSS motion gated by `animated` +
+  prefers-reduced-motion.
 -->
 <template>
   <svg
@@ -64,17 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <circle class="es-dot es-dot-3" cx="58" cy="134" r="5" fill="var(--color-primary-300)" />
     <rect x="72" y="130" width="70" height="8" rx="4" fill="var(--color-border-strong)" opacity="0.4" />
     <rect x="150" y="130" width="34" height="8" rx="4" fill="var(--color-border-default)" opacity="0.35" />
-
-    <!-- Cursor pointing at the selected row -->
-    <g class="es-cursor" transform="translate(166 98)">
-      <path
-        d="M0 0 L0 17 L4.2 12.8 L7.4 19.4 L10 18.2 L6.8 11.7 L12.2 11.7 Z"
-        fill="var(--color-primary-600)"
-        stroke="var(--color-surface-base)"
-        stroke-width="1.25"
-        stroke-linejoin="round"
-      />
-    </g>
   </svg>
 </template>
 
@@ -96,25 +85,15 @@ withDefaults(
 .es-dot-3 {
   animation: es-pulse 2.4s ease-in-out infinite 1.2s;
 }
-/* Cursor gives a gentle "click" nudge toward the selected row. */
-.es-cursor {
-  transform-box: fill-box;
-  transform-origin: top left;
-  animation: es-cursor-nudge 2.8s ease-in-out infinite;
-}
 @keyframes es-pulse {
   0%, 100% { opacity: 0.4; transform: scale(0.9); }
   50% { opacity: 1; transform: scale(1.15); }
 }
-@keyframes es-cursor-nudge {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(-2px, -2px); }
-}
-.es-static :where(.es-dot-1, .es-dot-3, .es-cursor) {
+.es-static :where(.es-dot-1, .es-dot-3) {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(.es-dot-1, .es-dot-3, .es-cursor) {
+  :where(.es-dot-1, .es-dot-3) {
     animation: none;
   }
 }

@@ -50,13 +50,6 @@ vi.mock("@/components/common/GroupHeader.vue", () => ({
   },
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: vi.fn() }),
-  };
-});
 
 import alertsService from "@/services/alerts";
 import settingsService from "@/services/settings";

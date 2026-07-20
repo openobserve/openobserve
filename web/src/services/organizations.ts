@@ -103,6 +103,16 @@ const organizations = {
     return http().delete(`/api/${orgIdentifier}/external_contract/${targetOrgId}`);
   },
 
+  get_cleanup_tasks: (targetOrgId: string) => {
+    return http().get(`/api/_meta/org_cleanup_tasks/${targetOrgId}`);
+  },
+  delete_org: (orgIdentifier: string) => {
+    return http().delete(`/api/${orgIdentifier}/organizations`);
+  },
+  resurrect_org: (metaOrg: string, targetOrg: string) => {
+    return http().post(`/api/${metaOrg}/organizations/${targetOrg}/resurrect`);
+  },
+
   // Org ingestion tokens
   list_org_ingestion_tokens: (orgIdentifier: string) => {
     return http().get(`/api/${orgIdentifier}/ingestion-tokens`);

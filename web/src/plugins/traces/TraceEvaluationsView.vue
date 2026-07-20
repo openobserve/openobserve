@@ -14,15 +14,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
-  <div class="w-full h-full flex flex-col overflow-y-auto bg-(--o2-surface) p-4 gap-4">
+  <div class="w-full h-full flex flex-col overflow-y-auto bg-(--color-surface-base) p-4 gap-4">
     <!-- Loading state -->
-    <div v-if="isLoading" class="flex flex-col items-center justify-center h-[60vh] gap-4 text-(--o2-text-secondary)">
+    <div v-if="isLoading" class="flex flex-col items-center justify-center h-[60vh] gap-4 text-(--color-text-secondary)">
       <OSpinner size="xl" />
       <div>{{ $t("traces.evaluations.loading") }}</div>
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="evalData.length === 0" class="flex flex-col items-center justify-center h-[60vh] gap-4 text-(--o2-text-secondary)">
+    <div v-else-if="evalData.length === 0" class="flex flex-col items-center justify-center h-[60vh] gap-4 text-(--color-text-secondary)">
       <div class="text-[64px] opacity-30">
         <OIcon name="assessment" size="sm" />
       </div>
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
       <!-- Template Selector — page-level, above all records -->
       <div class="flex justify-end items-center">
         <div class="flex items-center gap-2">
-          <span class="text-xs font-medium text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.templateLabel") }}</span>
+          <span class="text-xs font-medium text-[var(--color-text-secondary)]">{{ $t("traces.evaluations.templateLabel") }}</span>
           <OSelect
             v-model="selectedTemplate"
             :options="availableTemplates"
@@ -58,10 +58,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
         <div class="flex gap-3 mb-4 h-[100px]">
           <!-- 1. Quality Score Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
-              <div class="text-xs font-medium text-[var(--o2-text-secondary)]">
+              <div class="text-xs font-medium text-[var(--color-text-secondary)]">
                 {{ $t("traces.evaluations.qualityScore") }}
               </div>
               <div class="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -71,17 +71,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                         class="text-[20px]" />
               </div>
             </div>
-            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--o2-text-primary)]">
+            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--color-grey-600)]">
               {{ formatScore(record.llm_evaluation_quality_score) }}
             </div>
           </div>
 
           <!-- 2. Verdict Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
-              <div class="text-xs font-medium text-[var(--o2-text-secondary)]">
+              <div class="text-xs font-medium text-[var(--color-text-secondary)]">
                 {{ $t("traces.evaluations.verdict") }}
               </div>
               <div class="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -92,58 +92,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               </div>
             </div>
             <div class="text-2xl font-bold tracking-tight leading-none"
-                 :class="getVerdict(record) === 'PASS' ? 'text-green-500' : getVerdict(record) === 'FAIL' ? 'text-red-500' : 'text-[var(--o2-text-secondary)]'">
+                 :class="getVerdict(record) === 'PASS' ? 'text-green-500' : getVerdict(record) === 'FAIL' ? 'text-red-500' : 'text-[var(--color-text-secondary)]'">
               {{ getVerdict(record) }}
             </div>
           </div>
 
           <!-- 3. Steps Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
-              <div class="text-xs font-medium text-[var(--o2-text-secondary)]">
+              <div class="text-xs font-medium text-[var(--color-text-secondary)]">
                 {{ $t("traces.evaluations.traceSteps") }}
               </div>
               <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/10">
                 <OIcon name="layers" size="sm" class="text-blue-500 text-[20px]" />
               </div>
             </div>
-            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--o2-text-primary)]">
+            <div class="text-3xl font-bold tracking-tight leading-none text-[var(--color-grey-600)]">
               {{ record.total_steps || "0" }}
             </div>
           </div>
 
           <!-- 4. Tools Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
-              <div class="text-xs font-medium text-[var(--o2-text-secondary)]">
+              <div class="text-xs font-medium text-[var(--color-text-secondary)]">
                 {{ $t("traces.evaluations.toolCalls") }}
               </div>
               <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-purple-500/10">
                 <OIcon name="build" size="sm" class="text-purple-500 text-[20px]" />
               </div>
             </div>
-            <div class="text-3xl font-bold leading-none text-[var(--o2-text-primary)]">
+            <div class="text-3xl font-bold leading-none text-[var(--color-grey-600)]">
               {{ record.total_tool_calls || "0" }}
             </div>
           </div>
 
           <!-- 5. Completion Card -->
           <div
-            class="flex-1 flex flex-col justify-between border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] p-3"
+            class="flex-1 flex flex-col justify-between border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-3"
           >
             <div class="flex justify-between items-start">
-              <div class="text-xs font-medium text-[var(--o2-text-secondary)]">
+              <div class="text-xs font-medium text-[var(--color-text-secondary)]">
                 {{ $t("traces.evaluations.doneVia") }}
               </div>
               <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-500/10">
                 <OIcon name="flag" size="sm" class="text-teal-500 text-[20px]" />
               </div>
             </div>
-            <div class="text-lg font-semibold leading-tight text-[var(--o2-text-primary)] truncate" :title="record.completion_signal">
+            <div class="text-lg font-semibold leading-tight text-[var(--color-grey-600)] truncate" :title="record.completion_signal">
               {{ record.completion_signal || "N/A" }}
             </div>
           </div>
@@ -154,10 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <!-- PART 1: Primary Content (Analysis & reasoning) - 2/3 Width -->
           <div class="flex flex-col gap-4 w-[66.67%]">
             <!-- 2.1A: Issues & Analysis Card -->
-            <div class="border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] p-4">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-4">
               <div class="flex items-center gap-2 mb-3">
                 <OIcon name="rule" size="sm" />
-                <div class="text-sm font-semibold text-[var(--o2-text-primary)]">{{ $t("traces.evaluations.issuesAnalysis") }}</div>
+                <div class="text-sm font-semibold text-[var(--color-text-heading)]">{{ $t("traces.evaluations.issuesAnalysis") }}</div>
               </div>
 
               <!-- Template Evaluation Criteria (shown when a template with content is active) -->
@@ -174,10 +174,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                     <OIcon name="warning" size="xs" />
                     <span>{{ $t("traces.evaluations.criteriaTemplateMismatchNote", { template: selectedTemplateData?.name, evaluated: evaluatedTemplateName(record) }) }}</span>
                   </div>
-                  <div class="mt-2 p-3 bg-[var(--o2-border-color)] rounded-md text-xs leading-relaxed whitespace-pre-wrap text-[var(--o2-text-primary)]">
+                  <div class="mt-2 p-3 bg-[var(--color-border-default)] rounded-md text-xs leading-relaxed whitespace-pre-wrap text-[var(--color-text-heading)]">
                     {{ selectedTemplateData.content }}
                   </div>
-                  <div class="mt-1 text-[10px] text-[var(--o2-text-secondary)] italic">
+                  <div class="mt-1 text-[10px] text-[var(--color-text-secondary)] italic">
                     {{ $t("traces.evaluations.criteriaSyntaxNote") }}
                   </div>
                 </OCollapsible>
@@ -199,12 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
               <!-- Fix Suggestions Card (Phase 2) -->
               <div v-if="getFixSuggestions(record).length > 0" class="mb-4">
-                <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase mb-2 text-primary">{{ $t("traces.evaluations.recommendedFixes") }}</div>
+                <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase mb-2">{{ $t("traces.evaluations.recommendedFixes") }}</div>
                 <div class="space-y-2">
                   <div v-for="(fix, i) in getFixSuggestions(record)" :key="i"
                        class="flex items-start gap-2 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg border-dashed">
                     <OIcon name="lightbulb" size="sm" class="mt-1" />
-                    <div class="text-xs text-[var(--o2-text-primary)] flex-1 leading-relaxed">
+                    <div class="text-xs text-[var(--color-text-heading)] flex-1 leading-relaxed">
                       <strong>{{ $t("traces.evaluations.fixSuggestion") }}</strong> {{ fix }}
                     </div>
                   </div>
@@ -214,30 +214,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
               <div v-if="getWeakestDimension(record)" class="mb-4">
                 <div class="flex items-center gap-2 mb-2">
                   <OIcon name="trending-down" size="xs" />
-                  <span class="text-xs font-medium text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.weakestDimension") }}</span>
+                  <span class="text-xs font-medium text-[var(--color-text-secondary)]">{{ $t("traces.evaluations.weakestDimension") }}</span>
                   <OTag type="evalBadge" value="weakest">{{ formatDimLabel(getWeakestDimension(record)!.dimension) }}</OTag>
                 </div>
-                <div v-if="getWeakestDimension(record)!.reasoning" class="text-sm bg-[var(--o2-border-color)] p-3 rounded-md leading-relaxed">
+                <div v-if="getWeakestDimension(record)!.reasoning" class="text-sm bg-[var(--color-border-default)] p-3 rounded-md leading-relaxed">
                   {{ getWeakestDimension(record)!.reasoning }}
                 </div>
               </div>
             </div>
 
             <!-- 2.1B: Score Reasoning Card -->
-            <div class="border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] p-4">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-4">
               <div class="flex items-center gap-2 mb-3">
                 <OIcon name="psychology" size="sm" />
-                <div class="text-sm font-semibold text-[var(--o2-text-primary)]">{{ $t("traces.evaluations.dimensionReasoning") }}</div>
+                <div class="text-sm font-semibold text-[var(--color-text-heading)]">{{ $t("traces.evaluations.dimensionReasoning") }}</div>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div
                   v-for="dim in getDimensionScores(record).filter(d => d.reasoning).slice().sort((a, b) => (isTemplateDimension(b.dimension) ? 1 : 0) - (isTemplateDimension(a.dimension) ? 1 : 0))"
                   :key="dim.dimension"
                   class="p-3 rounded-md flex flex-col gap-1"
-                  :class="isTemplateDimension(dim.dimension) ? 'bg-[rgba(25,118,210,0.05)] border border-[rgba(25,118,210,0.2)] dark:bg-[rgba(96,165,250,0.07)] dark:border-[rgba(96,165,250,0.25)]' : 'bg-[var(--o2-border-color)]'"
+                  :class="isTemplateDimension(dim.dimension) ? 'bg-[rgba(25,118,210,0.05)] border border-[rgba(25,118,210,0.2)] dark:bg-[rgba(96,165,250,0.07)] dark:border-[rgba(96,165,250,0.25)]' : 'bg-[var(--color-border-default)]'"
                 >
                   <div class="flex items-center gap-1.5">
-                    <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase tracking-wider">
+                    <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase tracking-wider">
                       {{ formatDimLabel(dim.dimension) }}
                     </div>
                     <!-- Pass/Fail inline -->
@@ -248,33 +248,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                       class="text-[9px] py-px px-1"
                     />
                   </div>
-                  <div class="text-xs leading-relaxed text-[var(--o2-text-primary)]">
+                  <div class="text-xs leading-relaxed text-[var(--color-text-heading)]">
                     {{ truncateContent(dim.reasoning, 200) }}
                   </div>
                 </div>
-                <div v-if="!getDimensionScores(record).some(d => d.reasoning)" class="text-sm italic text-[var(--o2-text-secondary)]">
+                <div v-if="!getDimensionScores(record).some(d => d.reasoning)" class="text-sm italic text-[var(--color-text-secondary)]">
                   {{ $t("traces.evaluations.noDimensionReasoning") }}
                 </div>
               </div>
             </div>
 
             <!-- 2.1C: Query & Response Card (Full Width in column) -->
-            <div class="border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] overflow-hidden">
-              <div class="px-4 py-3 border-b border-[var(--o2-border-color)] bg-[var(--o2-border-color)]/30">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] overflow-hidden">
+              <div class="px-4 py-3 border-b border-[var(--color-border-default)] bg-[var(--color-border-default)]/30">
                 <div class="flex items-center gap-2">
                   <OIcon name="code" size="sm" />
-                  <div class="text-sm font-semibold text-[var(--o2-text-primary)]">{{ $t("traces.evaluations.queryResponse") }}</div>
+                  <div class="text-sm font-semibold text-[var(--color-text-heading)]">{{ $t("traces.evaluations.queryResponse") }}</div>
                 </div>
               </div>
 
-              <div class="flex flex-col divide-y divide-[var(--o2-border-color)]">
+              <div class="flex flex-col divide-y divide-[var(--color-border-default)]">
                 <!-- System Prompt (Expandable) -->
                 <OCollapsible
                   v-if="parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).system"
                   icon="settings"
                   :label="$t('traces.evaluations.systemPrompt')"
                 >
-                  <div class="p-4 bg-[var(--o2-code-bg)]">
+                  <div class="p-4 bg-[var(--color-code-bg)]">
                     <LLMContentRenderer
                       :content="JSON.stringify([{ role: 'system', content: parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).system }])"
                       :contentType="'input'"
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   :model-value="true"
                   :label="$t('traces.evaluations.userMessages')"
                 >
-                  <div class="p-4 bg-[var(--o2-code-bg)]">
+                  <div class="p-4 bg-[var(--color-code-bg)]">
                     <LLMContentRenderer
                       :content="JSON.stringify(parseMessages(record.gen_ai_input_messages, record.gen_ai_system_instructions).user)"
                       :contentType="'input'"
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   :model-value="true"
                   :label="$t('traces.evaluations.assistantResponse')"
                 >
-                  <div class="p-4 bg-[var(--o2-code-bg)]">
+                  <div class="p-4 bg-[var(--color-code-bg)]">
                     <LLMContentRenderer
                       :content="getHighlightedResponse(record)"
                       :contentType="'output'"
@@ -321,22 +321,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
           <!-- PART 2: Sidebar Content (Dimensions & Metadata) - 1/3 Width -->
           <div class="flex flex-col gap-4 w-[33.33%]">
             <!-- 2.2A: Dimensions Card -->
-            <div class="border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] p-4 flex flex-col gap-4">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-4 flex flex-col gap-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <OIcon name="analytics" size="sm" />
-                  <div class="text-sm font-semibold text-[var(--o2-text-primary)]">{{ $t("traces.evaluations.dimensions") }}</div>
+                  <div class="text-sm font-semibold text-[var(--color-text-heading)]">{{ $t("traces.evaluations.dimensions") }}</div>
                 </div>
                 <!-- Threshold explainer shown only when template dimensions are present -->
                 <div v-if="selectedTemplateData?.dimensions?.length" class="flex items-center gap-1">
-                  <span class="text-[10px] text-[var(--o2-text-secondary)]">{{ $t("traces.evaluations.passThreshold") }}</span>
+                  <span class="text-[10px] text-[var(--color-text-secondary)]">{{ $t("traces.evaluations.passThreshold") }}</span>
                   <OIcon name="info-outline" size="xs" />
                     <OTooltip :content="$t('traces.evaluations.passThresholdTooltip')" max-width="220px" />
                 </div>
               </div>
 
               <!-- Template aspects legend (shown when a template is active) -->
-              <div v-if="selectedTemplateData?.dimensions?.length" class="flex items-center gap-1.5 text-[10px] text-[var(--o2-text-secondary)]">
+              <div v-if="selectedTemplateData?.dimensions?.length" class="flex items-center gap-1.5 text-[10px] text-[var(--color-text-secondary)]">
                 <OIcon name="assignment" size="xs" />
                 <span>{{ $t("traces.evaluations.templateAspectsFrom", { template: selectedTemplateData.name }) }}</span>
               </div>
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   <div class="flex justify-between items-center">
                     <div class="flex items-center gap-2">
                       <OIcon :name="getDimIcon(dim.dimension)" :class="getDimColorClass(dim.dimension)" size="sm" />
-                      <span class="text-xs font-medium text-[var(--o2-text-primary)]">{{ formatDimLabel(dim.dimension) }}</span>
+                      <span class="text-xs font-medium text-[var(--color-text-heading)]">{{ formatDimLabel(dim.dimension) }}</span>
                       <!-- Template aspect badge -->
                       <OTag
                         v-if="isTemplateDimension(dim.dimension)"
@@ -377,10 +377,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                         :value="getDimVerdict(dim.score)"
                         class="text-[9px] py-px px-1"
                       />
-                      <span class="text-xs font-bold text-[var(--o2-text-primary)]">{{ formatScore(dim.score) }}</span>
+                      <span class="text-xs font-bold text-[var(--color-text-heading)]">{{ formatScore(dim.score) }}</span>
                     </div>
                   </div>
-                  <div class="h-1.5 w-full bg-[var(--o2-border-color)] rounded-full overflow-hidden">
+                  <div class="h-1.5 w-full bg-[var(--color-border-default)] rounded-full overflow-hidden">
                     <div
                       class="h-full transition-all duration-500"
                       :style="{
@@ -397,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
             </div>
 
             <!-- 2.2B: Metadata Details Card -->
-            <div class="border border-[var(--o2-border)] rounded-lg bg-[var(--o2-card-bg)] p-4">
+            <div class="border border-[var(--color-border-default)] rounded-lg bg-[var(--color-surface-base)] p-4">
               <div class="flex items-center gap-2 mb-4">
                 <OIcon name="info" size="sm" />
                 <div class="text-sm font-semibold">{{ $t("traces.evaluations.technicalDetails") }}</div>
@@ -405,19 +405,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
               <div class="flex flex-col gap-3">
                 <div class="grid grid-cols-[80px_1fr] gap-1">
-                  <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase">{{ $t("traces.evaluations.judge") }}</div>
+                  <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase">{{ $t("traces.evaluations.judge") }}</div>
                   <div class="text-xs truncate">{{ getJudgeModel(record) }}</div>
                 </div>
                 <div class="grid grid-cols-[80px_1fr] gap-1">
-                  <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase">{{ $t("traces.evaluations.time") }}</div>
+                  <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase">{{ $t("traces.evaluations.time") }}</div>
                   <div class="text-xs">{{ formatTimestampDisplay(record._timestamp) }}</div>
                 </div>
                 <div class="grid grid-cols-[80px_1fr] gap-1">
-                  <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase">{{ $t("traces.evaluations.confidence") }}</div>
+                  <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase">{{ $t("traces.evaluations.confidence") }}</div>
                   <div class="text-xs">{{ formatScore(record.llm_evaluation_judge_confidence) }}</div>
                 </div>
                 <div class="grid grid-cols-[80px_1fr] gap-1">
-                  <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase">{{ $t("traces.evaluations.status") }}</div>
+                  <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase">{{ $t("traces.evaluations.status") }}</div>
                   <div>
                     <OTag
                       type="evalStatus"
@@ -427,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
                   </div>
                 </div>
                 <div v-if="record.is_multi_step" class="grid grid-cols-[80px_1fr] gap-1">
-                  <div class="text-[10px] font-bold text-[var(--o2-text-secondary)] uppercase">{{ $t("traces.evaluations.type") }}</div>
+                  <div class="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase">{{ $t("traces.evaluations.type") }}</div>
                   <div class="text-xs">{{ $t("traces.evaluations.multiStepAgent") }}</div>
                 </div>
               </div>
@@ -441,6 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <script lang="ts">
 import { defineComponent, PropType, ref, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { getQualityScoreColor } from "@/utils/llmUtils";
 import LLMContentRenderer from "./LLMContentRenderer.vue";
 import { useStore } from "vuex";
@@ -474,6 +475,7 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
+    const { t } = useI18n();
     const getBarWidth = (value: any): string => {
       if (value == null) return "0%";
       const num = parseFloat(value as any);
@@ -668,11 +670,11 @@ export default defineComponent({
       numeric_grounding: "numbers",
     };
     const DIM_COLOR_CLASSES: Record<string, string> = {
-      relevance: "text-[var(--o2-primary)]",
-      groundedness: "text-[var(--o2-positive)]",
+      relevance: "text-[var(--color-primary-600)]",
+      groundedness: "text-[var(--color-success-600)]",
       conciseness: "text-purple-700",
       instruction_following: "text-orange-500",
-      accuracy: "text-[var(--o2-negative)]",
+      accuracy: "text-[var(--color-error-600)]",
       trajectory_efficiency: "text-cyan-500",
       completeness: "text-teal-500",
       safety: "text-red-500",
@@ -739,7 +741,7 @@ export default defineComponent({
       if (suggestions.length === 0) {
         const weakest = getWeakestDimension(record);
         if (weakest && weakest.score < 0.3 && weakest.reasoning) {
-          suggestions.push(`Focus on improving ${formatDimLabel(weakest.dimension)}: ${weakest.reasoning}`);
+          suggestions.push(t('traces.traceEvaluationsView.focusOnImproving', { dimension: formatDimLabel(weakest.dimension), reasoning: weakest.reasoning }));
         }
       }
 
@@ -769,7 +771,7 @@ export default defineComponent({
       ungrounded.forEach(val => {
         // Simple string replacement for now, could be improved with regex
         const regex = new RegExp(`\\b${val}\\b`, 'g');
-        content = content.replace(regex, `<span class="ungrounded-highlight" title="Ungrounded value detected">${val}</span>`);
+        content = content.replace(regex, `<span class="ungrounded-highlight" title="${t('traces.traceEvaluationsView.ungroundedValueDetected')}">${val}</span>`);
       });
 
       return content;
@@ -876,7 +878,7 @@ export default defineComponent({
             if (parsed?.config?.system_instruction) {
                return {
                  system: parsed.config.system_instruction,
-                 user: [{ role: "user", content: "Original Input Full JSON: " + JSON.stringify(parsed, null, 2) }]
+                 user: [{ role: "user", content: t('traces.traceEvaluationsView.originalInputFullJson') + JSON.stringify(parsed, null, 2) }]
                };
             }
             return {
@@ -1033,7 +1035,7 @@ export default defineComponent({
     // Name of the template that was actually used to evaluate this record.
     const evaluatedTemplateName = (record: any): string => {
       const usedId = record.llm_evaluation_template_id;
-      if (!usedId) return "unknown";
+      if (!usedId) return t('traces.traceEvaluationsView.unknown');
       const matched = availableTemplates.value.find((t: any) => t.id === usedId);
       return matched?.name ?? usedId;
     };

@@ -542,12 +542,15 @@
   --o2-sticky-col-header-bg: #565656;
   --o2-pivot-header-border: rgba(255, 255, 255, 0.12);
   --o2-table-actions-bg: #1f2223;
-  --o2-log-table-row-bg: #21242c;
-  --o2-log-table-row-alt-bg: #252934;
-  --o2-log-table-row-hover: #3a4a78;
-  --o2-log-table-row-border: rgba(255, 255, 255, 0.14);
+  /* Legacy log-table row tokens alias the OTable --color-table-row-* tokens
+     (see semantic.css), which are themselves dark-paired further down this
+     file — so no separate dark override is needed here. Kept as aliases for
+     any code that still references the light-mode names. */
+  --o2-log-table-row-bg: var(--color-surface-base);
+  --o2-log-table-row-alt-bg: var(--color-table-row-striped-bg);
+  --o2-log-table-row-hover: var(--color-table-row-hover-bg);
+  --o2-log-table-row-border: var(--color-table-row-divider);
   --o2-log-table-header-bg: var(--color-table-header-bg);
-  --o2-log-table-text: var(--o2-text-heading);
   --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
   --o2-tab-text-color: #FFFFFF;
   --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #112027);
@@ -579,6 +582,19 @@
   --o2-status-warning-bg: #402929;
   --o2-status-error-text: #EB938D;
   --o2-status-error-bg: #402929;
+  /* New --color-status-* tokens — same dark values as the --o2-status-* set
+     above, so both systems render identically in dark mode. */
+  --color-status-success-text: #A0DBA5;
+  --color-status-success-bg: #253627;
+  --color-status-info-text: #A1AFFF;
+  --color-status-info-bg: #181829;
+  --color-status-warning-text: #E37774;
+  --color-status-warning-bg: #402929;
+  --color-status-error-text: #EB938D;
+  --color-status-error-bg: #402929;
+  /* Favorite (filled heart) — lighter rose (rose-400) so it reads clearly on
+     dark surfaces without vibrating the way a saturated rose-500 would. */
+  --color-favorite: #FB7185;
   /* Log-severity colors — aligned with STATUS_COLORS_DARK in statusParser.ts */
   --o2-severity-error-color: #D95C5C;
   --o2-severity-warning-color: #D4944A;

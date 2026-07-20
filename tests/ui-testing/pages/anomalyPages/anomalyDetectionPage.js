@@ -66,7 +66,7 @@ class AnomalyDetectionPage {
             saveButton: '[data-test="add-alert-submit-btn"]',
             cancelButton: '[data-test="add-alert-cancel-btn"]',
 
-            // Generic Quasar components
+            // Generic framework components
             qToggle: '.q-toggle',
             qMenuItem: '[data-test$="-popover"] [data-test$="-option"]',
             qMenu: '[data-test$="-popover"]',

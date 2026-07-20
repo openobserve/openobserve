@@ -25,108 +25,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }
     "
     size="sm"
+    form-id="time-range-editor-form"
     :title="t('correlation.logs.timeRange.title')"
     :secondary-button-label="t('common.cancel')"
     :neutral-button-label="t('common.reset')"
     :primary-button-label="t('common.apply')"
-    :primary-button-disabled="!isValid"
     @click:secondary="handleCancel"
     @click:neutral="handleReset"
-    @click:primary="handleApply"
   >
-    <!-- Source Log Time -->
-    <div class="mb-6">
-      <div class="text-sm font-semibold mb-2">
-        {{ t("correlation.logs.timeRange.sourceTime") }}
-      </div>
-      <div
-        class="p-3 border border-solid border-[var(--o2-border-color)] rounded bg-surface-panel flex items-center gap-2"
-      >
-        <OIcon name="schedule" size="sm" />
-        <span class="font-mono text-sm">{{
-          formatTimestamp(sourceTimestamp)
-        }}</span>
-      </div>
-    </div>
-
-    <!-- Time Window Presets -->
-    <div class="mb-6">
-      <div class="text-sm font-semibold mb-3">
-        {{ t("correlation.logs.timeRange.window") }}
-      </div>
-
-      <div class="space-y-2">
-        <ORadioGroup
-          :model-value="selectedWindow"
-          orientation="vertical"
-          @update:model-value="onWindowSelect"
+    <OForm id="time-range-editor-form" :form="form">
+      <!-- Source Log Time -->
+      <div class="mb-6">
+        <div class="text-sm font-semibold mb-2">
+          {{ t("correlation.logs.timeRange.sourceTime") }}
+        </div>
+        <div
+          class="p-3 border border-solid border-[var(--o2-border-color)] rounded bg-surface-panel flex items-center gap-2"
         >
-          <ORadio
-            val="1min"
-            :label="t('correlation.logs.timeRange.minute1')"
-            data-test="window-1min"
-          />
-          <ORadio
-            val="5min"
-            :label="t('correlation.logs.timeRange.minute5')"
-            data-test="window-5min"
-          />
-          <ORadio
-            val="15min"
-            :label="t('correlation.logs.timeRange.minute15')"
-            data-test="window-15min"
-          />
-          <ORadio
-            val="30min"
-            :label="t('correlation.logs.timeRange.minute30')"
-            data-test="window-30min"
-          />
-          <ORadio
-            val="1hour"
-            :label="t('correlation.logs.timeRange.hour1')"
-            data-test="window-1hour"
-          />
-          <ORadio
-            val="custom"
-            :label="t('correlation.logs.timeRange.custom')"
-            data-test="window-custom"
-          />
-        </ORadioGroup>
-      </div>
-    </div>
-
-    <!-- Custom Time Range Inputs (only shown when custom is selected) -->
-    <div v-if="selectedWindow === 'custom'" class="mb-4 space-y-3">
-      <div>
-        <div class="text-sm font-semibold mb-2">
-          {{ t("correlation.logs.timeRange.customStart") }}
+          <OIcon name="schedule" size="sm" />
+          <span class="font-mono text-sm">{{
+            formatTimestamp(sourceTimestamp)
+          }}</span>
         </div>
-        <OInput
-          v-model="customStartTime"
-          type="datetime-local"
-          :error="!!startTimeError"
-          :error-message="startTimeError"
-          @update:model-value="onStartTimeChange"
-          data-test="custom-start-input"
-        />
       </div>
 
-      <div>
-        <div class="text-sm font-semibold mb-2">
-          {{ t("correlation.logs.timeRange.customEnd") }}
+      <!-- Time Window Presets -->
+      <div class="mb-6">
+        <div class="text-sm font-semibold mb-3">
+          {{ t("correlation.logs.timeRange.window") }}
         </div>
-        <OInput
-          v-model="customEndTime"
-          type="datetime-local"
-          :error="!!endTimeError"
-          :error-message="endTimeError"
-          @update:model-value="onEndTimeChange"
-          data-test="custom-end-input"
-        />
-      </div>
-    </div>
 
-    <!-- Current Range Display -->
+        <div class="space-y-2">
+          <OFormRadioGroup name="selectedWindow" orientation="vertical">
+            <ORadio
+              val="1min"
+              :label="t('correlation.logs.timeRange.minute1')"
+              data-test="window-1min"
+            />
+            <ORadio
+              val="5min"
+              :label="t('correlation.logs.timeRange.minute5')"
+              data-test="window-5min"
+            />
+            <ORadio
+              val="15min"
+              :label="t('correlation.logs.timeRange.minute15')"
+              data-test="window-15min"
+            />
+            <ORadio
+              val="30min"
+              :label="t('correlation.logs.timeRange.minute30')"
+              data-test="window-30min"
+            />
+            <ORadio
+              val="1hour"
+              :label="t('correlation.logs.timeRange.hour1')"
+              data-test="window-1hour"
+            />
+            <ORadio
+              val="custom"
+              :label="t('correlation.logs.timeRange.custom')"
+              data-test="window-custom"
+            />
+          </OFormRadioGroup>
+        </div>
+      </div>
+
+      <!-- Custom Time Range Inputs (only shown when custom is selected) -->
+      <div v-if="mSelectedWindow === 'custom'" class="mb-4 space-y-3">
+        <div>
+          <div class="text-sm font-semibold mb-2">
+            {{ t("correlation.logs.timeRange.customStart") }}
+          </div>
+          <OFormInput
+            name="customStartTime"
+            type="datetime-local"
+            data-test="custom-start-input"
+          />
+        </div>
+
+        <div>
+          <div class="text-sm font-semibold mb-2">
+            {{ t("correlation.logs.timeRange.customEnd") }}
+          </div>
+          <OFormInput
+            name="customEndTime"
+            type="datetime-local"
+            data-test="custom-end-input"
+          />
+        </div>
+      </div>
+
+      <!-- Current Range Display -->
     <div
       class="p-3 border border-solid border-[var(--o2-border-color)] rounded bg-blue-50"
     >
@@ -158,20 +148,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
+    </OForm>
   </ODialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { computed, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
-import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
+import {
+  makeTimeRangeEditorSchema,
+  type TimeRangeEditorForm,
+} from "./TimeRangeEditor.schema";
 
 interface Props {
   modelValue: boolean;
@@ -190,31 +187,93 @@ const emit = defineEmits<{
 // Composables
 const { t } = useI18n();
 const store = useStore();
+const timeRangeEditorSchema = makeTimeRangeEditorSchema(t);
 
-// State
-const selectedWindow = ref<string>("5min");
+// Preset window half-widths (±) in microseconds.
+const WINDOW_MICROS: Record<string, number> = {
+  "1min": 1 * 60 * 1000 * 1000,
+  "5min": 5 * 60 * 1000 * 1000,
+  "15min": 15 * 60 * 1000 * 1000,
+  "30min": 30 * 60 * 1000 * 1000,
+  "1hour": 60 * 60 * 1000 * 1000,
+};
 
-function onWindowSelect(val: string) {
-  selectedWindow.value = val;
-  if (val !== "custom") applyPreset();
-}
-const pendingStartTime = ref<number>(props.currentRange.startTime);
-const pendingEndTime = ref<number>(props.currentRange.endTime);
-const customStartTime = ref<string>("");
-const customEndTime = ref<string>("");
-const startTimeError = ref("");
-const endTimeError = ref("");
+/** Convert a datetime-local string to a microsecond timestamp. */
+const datetimeToMicros = (datetime: string): number =>
+  new Date(datetime).getTime() * 1000;
 
-// Computed
-const isValid = computed(() => {
-  if (selectedWindow.value === "custom") {
-    return (
-      customStartTime.value &&
-      customEndTime.value &&
-      pendingStartTime.value < pendingEndTime.value
-    );
+/** Convert a microsecond timestamp to datetime-local (minute precision). */
+const microsToDatetime = (micros: number): string => {
+  const ms = Math.floor(micros / 1000);
+  return formatDate(ms, "YYYY-MM-DDTHH:mm");
+};
+
+/** Detect the preset window (or "custom") that produced a given range. Pure. */
+const detectWindow = (
+  range: { startTime: number; endTime: number },
+  sourceTimestamp: number,
+): string => {
+  const duration = range.endTime - range.startTime;
+  const center = (range.startTime + range.endTime) / 2;
+  // Symmetric around the source timestamp (within 1 second tolerance)?
+  const isSymmetric = Math.abs(center - sourceTimestamp) < 1000000;
+  if (!isSymmetric) return "custom";
+
+  const durationMinutes = duration / (60 * 1000 * 1000);
+  if (Math.abs(durationMinutes - 2) < 0.1) return "1min"; // ±1 min
+  if (Math.abs(durationMinutes - 10) < 0.1) return "5min"; // ±5 min
+  if (Math.abs(durationMinutes - 30) < 0.1) return "15min"; // ±15 min
+  if (Math.abs(durationMinutes - 60) < 0.1) return "30min"; // ±30 min
+  if (Math.abs(durationMinutes - 120) < 0.1) return "1hour"; // ±1 hour
+  return "custom";
+};
+
+// Dynamic (edit-prefill) defaults → a typed component computed. Seeds the
+// detected window + the custom datetime inputs from the current range.
+const timeRangeEditorDefaults = computed((): TimeRangeEditorForm => ({
+  selectedWindow: detectWindow(props.currentRange, props.sourceTimestamp),
+  customStartTime: microsToDatetime(props.currentRange.startTime),
+  customEndTime: microsToDatetime(props.currentRange.endTime),
+}));
+
+// ── Owner-pattern form (Rule ③) ─────────────────────────────────────────────
+// TimeRangeEditor OWNS the <OForm>, and its template needs form state to drive
+// the custom-inputs v-if + the live "Current Range" preview. We create the form
+// here with useOForm and read it reactively via form.useStore — ONE source of
+// truth (no mirror ref / store.subscribe). Programmatic changes (reset / window)
+// go THROUGH the form; the result is handed to <OForm :form="form">.
+const form = useOForm<TimeRangeEditorForm>({
+  defaultValues: timeRangeEditorDefaults.value,
+  schema: timeRangeEditorSchema,
+  onSubmit: handleApply,
+});
+
+// Reactive read-only views of the form-owned fields (NOT copies). useOForm
+// keeps the form's TFormData generic, so cast the loose reads to the schema's
+// string shape.
+const mSelectedWindow = form.useStore((s) => s.values.selectedWindow as string);
+const mCustomStart = form.useStore((s) => s.values.customStartTime as string);
+const mCustomEnd = form.useStore((s) => s.values.customEndTime as string);
+
+// Live preview range (microseconds), derived from the form-owned values:
+//  • preset window → source ± window;
+//  • custom → the custom datetime inputs (fall back to the current range while
+//    a custom input is still blank).
+const pendingStartTime = computed<number>(() => {
+  if (mSelectedWindow.value === "custom") {
+    return mCustomStart.value
+      ? datetimeToMicros(mCustomStart.value)
+      : props.currentRange.startTime;
   }
-  return pendingStartTime.value < pendingEndTime.value;
+  return props.sourceTimestamp - (WINDOW_MICROS[mSelectedWindow.value] ?? 0);
+});
+const pendingEndTime = computed<number>(() => {
+  if (mSelectedWindow.value === "custom") {
+    return mCustomEnd.value
+      ? datetimeToMicros(mCustomEnd.value)
+      : props.currentRange.endTime;
+  }
+  return props.sourceTimestamp + (WINDOW_MICROS[mSelectedWindow.value] ?? 0);
 });
 
 /**
@@ -249,225 +308,69 @@ const formatDuration = (durationMicros: number): string => {
   }
 };
 
-/**
- * Apply preset time window
- */
-const applyPreset = () => {
-  let windowMicros: number;
-
-  switch (selectedWindow.value) {
-    case "1min":
-      windowMicros = 1 * 60 * 1000 * 1000; // 1 minute in microseconds
-      break;
-    case "5min":
-      windowMicros = 5 * 60 * 1000 * 1000; // 5 minutes
-      break;
-    case "15min":
-      windowMicros = 15 * 60 * 1000 * 1000; // 15 minutes
-      break;
-    case "30min":
-      windowMicros = 30 * 60 * 1000 * 1000; // 30 minutes
-      break;
-    case "1hour":
-      windowMicros = 60 * 60 * 1000 * 1000; // 1 hour
-      break;
-    default:
-      return; // Custom - don't apply preset
-  }
-
-  // Calculate ±window around source timestamp
-  pendingStartTime.value = props.sourceTimestamp - windowMicros;
-  pendingEndTime.value = props.sourceTimestamp + windowMicros;
+// Re-seed the form to the current range. `:default-values` is read once at
+// mount, so re-seed explicitly on open + when currentRange changes while open.
+const reseedForm = async () => {
+  await nextTick();
+  form.reset(timeRangeEditorDefaults.value);
 };
 
 /**
- * Convert datetime-local input to microsecond timestamp
+ * Apply handler — @submit fires only when the schema passes (custom → both
+ * times present + start < end; presets always pass), so no manual gating.
  */
-const datetimeToMicros = (datetime: string): number => {
-  return new Date(datetime).getTime() * 1000; // Convert ms to microseconds
-};
-
-/**
- * Convert microsecond timestamp to datetime-local format
- */
-const microsToDatetime = (micros: number): string => {
-  const ms = Math.floor(micros / 1000);
-  return formatDate(ms, "YYYY-MM-DDTHH:mm");
-};
-
-const onStartTimeChange = (val: string) => {
-  const result = validateStartTime(val);
-  startTimeError.value = result === true ? "" : (result as string);
-};
-
-const onEndTimeChange = (val: string) => {
-  const result = validateEndTime(val);
-  endTimeError.value = result === true ? "" : (result as string);
-};
-
-/**
- * Validate start time
- */
-const validateStartTime = (val: string): boolean | string => {
-  if (!val) return t("validation.required");
-
-  const startMicros = datetimeToMicros(val);
-  pendingStartTime.value = startMicros;
-
-  if (startMicros >= pendingEndTime.value) {
-    return t("correlation.logs.timeRange.startBeforeEnd");
-  }
-
-  return true;
-};
-
-/**
- * Validate end time
- */
-const validateEndTime = (val: string): boolean | string => {
-  if (!val) return t("validation.required");
-
-  const endMicros = datetimeToMicros(val);
-  pendingEndTime.value = endMicros;
-
-  if (endMicros <= pendingStartTime.value) {
-    return t("correlation.logs.timeRange.endAfterStart");
-  }
-
-  return true;
-};
-
-/**
- * Detect current window from time range
- */
-const detectCurrentWindow = () => {
-  const duration = pendingEndTime.value - pendingStartTime.value;
-  const center = (pendingStartTime.value + pendingEndTime.value) / 2;
-
-  // Check if range is symmetric around source timestamp (within 1 second tolerance)
-  const isSymmetric = Math.abs(center - props.sourceTimestamp) < 1000000; // 1 second in microseconds
-
-  if (!isSymmetric) {
-    selectedWindow.value = "custom";
-    return;
-  }
-
-  // Detect preset based on duration
-  const durationMinutes = duration / (60 * 1000 * 1000);
-
-  if (Math.abs(durationMinutes - 2) < 0.1) {
-    // ±1 min = 2 min total
-    selectedWindow.value = "1min";
-  } else if (Math.abs(durationMinutes - 10) < 0.1) {
-    // ±5 min = 10 min total
-    selectedWindow.value = "5min";
-  } else if (Math.abs(durationMinutes - 30) < 0.1) {
-    // ±15 min = 30 min total
-    selectedWindow.value = "15min";
-  } else if (Math.abs(durationMinutes - 60) < 0.1) {
-    // ±30 min = 60 min total
-    selectedWindow.value = "30min";
-  } else if (Math.abs(durationMinutes - 120) < 0.1) {
-    // ±1 hour = 120 min total
-    selectedWindow.value = "1hour";
+// Declared as a hoisted function so useOForm (above) can reference it.
+function handleApply(value: TimeRangeEditorForm) {
+  if (value.selectedWindow === "custom") {
+    emit(
+      "update:range",
+      datetimeToMicros(value.customStartTime),
+      datetimeToMicros(value.customEndTime),
+    );
   } else {
-    selectedWindow.value = "custom";
-  }
-};
-
-/**
- * Handle apply button click
- */
-const handleApply = () => {
-  if (selectedWindow.value === "custom") {
-    // Use custom times
-    const startMicros = datetimeToMicros(customStartTime.value);
-    const endMicros = datetimeToMicros(customEndTime.value);
-
-    if (startMicros < endMicros) {
-      emit("update:range", startMicros, endMicros);
-      emit("update:modelValue", false);
-    }
-  } else {
-    // Use preset times
     emit("update:range", pendingStartTime.value, pendingEndTime.value);
-    emit("update:modelValue", false);
   }
-};
+  emit("update:modelValue", false);
+}
 
 /**
  * Handle cancel button click
  */
 const handleCancel = () => {
-  // Restore original range
-  pendingStartTime.value = props.currentRange.startTime;
-  pendingEndTime.value = props.currentRange.endTime;
-  detectCurrentWindow();
   emit("update:modelValue", false);
   emit("close");
 };
 
 /**
- * Handle reset button click
+ * Handle reset button click — reset to the ±5 minute preset (through the form).
  */
 const handleReset = () => {
-  // Reset to ±5 minutes
-  selectedWindow.value = "5min";
-  applyPreset();
+  form.setFieldValue("selectedWindow", "5min");
 };
 
 /**
  * Handle dialog close
  */
 const handleClose = () => {
-  // Restore original range
-  pendingStartTime.value = props.currentRange.startTime;
-  pendingEndTime.value = props.currentRange.endTime;
-  detectCurrentWindow();
   emit("close");
 };
 
-// Watch for prop changes
+// Re-seed when the range changes while the dialog is open.
 watch(
   () => props.currentRange,
-  (newRange) => {
-    pendingStartTime.value = newRange.startTime;
-    pendingEndTime.value = newRange.endTime;
-    detectCurrentWindow();
+  () => {
+    if (props.modelValue) reseedForm();
   },
   { deep: true },
 );
 
+// On open, re-seed the form from the current range (covers overlays that keep
+// the body mounted; a fresh remount also re-reads :default-values).
 watch(
   () => props.modelValue,
   (isOpen) => {
-    if (isOpen) {
-      // Reset pending times when dialog opens
-      pendingStartTime.value = props.currentRange.startTime;
-      pendingEndTime.value = props.currentRange.endTime;
-      detectCurrentWindow();
-
-      // Initialize custom datetime inputs
-      customStartTime.value = microsToDatetime(pendingStartTime.value);
-      customEndTime.value = microsToDatetime(pendingEndTime.value);
-    }
+    if (isOpen) reseedForm();
   },
 );
-
-// Watch custom inputs and update pending times
-watch(customStartTime, (newVal) => {
-  if (newVal) {
-    pendingStartTime.value = datetimeToMicros(newVal);
-  }
-});
-
-watch(customEndTime, (newVal) => {
-  if (newVal) {
-    pendingEndTime.value = datetimeToMicros(newVal);
-  }
-});
-
-// Initialize on mount
-detectCurrentWindow();
 </script>
 

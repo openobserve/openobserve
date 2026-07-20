@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// Copyright 2026 OpenObserve Inc.
+
 import type { DialogProps, DialogEmits, DialogSlots } from "./ODialog.types";
 import {
   DialogClose,
@@ -14,6 +16,7 @@ import { ref, watch, watchEffect, useSlots, computed, nextTick, useAttrs, inject
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -83,6 +86,21 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
   }
   clearBodyValidation();
   handleOpenChange(false);
+}
+
+// Modal keystroke containment. When focus sits on a non-field element inside
+// the dialog (a footer button, the panel itself after clicking empty space),
+// a bare printable key would bubble to the window-level shortcut manager and
+// fire page shortcuts on top of the open modal (e.g. logs "s" opening Saved
+// Views over Saved Functions). Swallow those here. Keys typed in input-like
+// elements pass through untouched (the shortcut manager already ignores
+// them), as do modifier combos (Ctrl/⌘ shortcuts stay app-wide by design) and
+// non-printable keys — Escape must keep reaching reka's dismiss layer.
+function handleContentKeydown(e: KeyboardEvent) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length !== 1) return;
+  if (isInputFocused(e.target)) return;
+  e.stopPropagation();
 }
 
 function handleInteractOutside(e: Event) {
@@ -190,7 +208,7 @@ const contentStyle = computed(() => {
 });
 
 // ── Validation reset on cancel-path close ───────────────────────────────────
-/** Reset Quasar q-field validation for every field in the body slot so that
+/** Reset q-field validation for every field in the body slot so that
  *  cancel-path closes (Cancel button, ×, Escape, overlay click) never surface
  *  lazy-rules validation errors to the user. */
 function clearBodyValidation() {
@@ -224,24 +242,45 @@ function handleBodyFocusIn(e: FocusEvent) {
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 
+// Text fields take priority; a select/combobox trigger (OSelect listbox
+// trigger, reka SelectTrigger, q-select) is the second tier so a dialog whose
+// only field is a select still keeps keyboard focus on a field — otherwise
+// keystrokes land on a plain button and leak to page-level single-letter
+// shortcuts (e.g. "s" on logs opening Save View over an open dialog).
+const AUTOFOCUS_TEXT_FIELDS = [
+  'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
+  'textarea:not([disabled])',
+].join(', ');
+const AUTOFOCUS_COMBOBOX =
+  '[role="combobox"]:not([disabled]):not([aria-disabled="true"])';
+const AUTOFOCUS_ANY_FIELD = `${AUTOFOCUS_TEXT_FIELDS}, ${AUTOFOCUS_COMBOBOX}`;
+
+function findAutoFocusTarget(root: Element): HTMLElement | null {
+  const scan = (selector: string): HTMLElement[] => {
+    const nested = Array.from(root.querySelectorAll<HTMLElement>(selector));
+    return root.matches(selector) ? [root as HTMLElement, ...nested] : nested;
+  };
+  const textField = scan(AUTOFOCUS_TEXT_FIELDS).find(
+    (el) =>
+      !el.closest(
+        '.q-select, .o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]',
+      ),
+  );
+  if (textField) return textField;
+  return (
+    scan(AUTOFOCUS_COMBOBOX).find((el) => !el.closest('[data-no-autofocus]')) ??
+    null
+  );
+}
+
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
   nextTick(() => {
     const body = bodyRef.value;
-    if (body) {
-      const candidates = body.querySelectorAll<HTMLElement>(
-        [
-          'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
-          'textarea:not([disabled])',
-        ].join(', ')
-      );
-      const firstField = Array.from(candidates).find(
-        (el) => !el.closest('.q-select, .o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]')
-      );
-      if (firstField) {
-        firstField.focus();
-        return;
-      }
+    const field = body ? findAutoFocusTarget(body) : null;
+    if (field) {
+      field.focus();
+      return;
     }
     // No form field found → focus primary button (confirm dialog pattern)
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
@@ -250,6 +289,57 @@ function handleOpenAutoFocus(event: Event) {
     }
   });
 }
+
+// ── Focus repair on body content swaps ───────────────────────────────────────
+// A v-if/v-else swap inside the body (e.g. a Create/Update toggle replacing an
+// input with a select) leaves focus on whatever was clicked — a toggle button
+// — or drops it to <body> when the focused field itself was removed. Either
+// way the next keystroke bypasses the input-focus guard and fires page-level
+// single-letter shortcuts. When a mutation batch both removes and adds fields,
+// move focus to the first field of the newly added content — unless the user
+// is still focused in a field that survived the swap.
+watchEffect((cleanup) => {
+  if (!internalOpen.value) return;
+  const body = bodyRef.value;
+  if (!body) return;
+
+  const containsField = (node: Node): node is Element =>
+    node instanceof Element &&
+    (node.matches(AUTOFOCUS_ANY_FIELD) ||
+      !!node.querySelector(AUTOFOCUS_ANY_FIELD));
+
+  const observer = new MutationObserver((records) => {
+    const added = records
+      .flatMap((r) => Array.from(r.addedNodes))
+      .filter(containsField);
+    const removedField = records
+      .flatMap((r) => Array.from(r.removedNodes))
+      .some(containsField);
+    if (!added.length || !removedField) return;
+
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      body.contains(active) &&
+      active.matches(AUTOFOCUS_ANY_FIELD)
+    ) {
+      return;
+    }
+
+    nextTick(() => {
+      for (const el of added) {
+        if (!el.isConnected) continue;
+        const field = findAutoFocusTarget(el);
+        if (field) {
+          field.focus();
+          return;
+        }
+      }
+    });
+  });
+  observer.observe(body, { childList: true, subtree: true });
+  cleanup(() => observer.disconnect());
+});
 
 // ── Focus-trap workaround for portaled elements ─────────────────────────────
 // Same workaround as ODrawer — see the comment block there for full rationale.
@@ -356,6 +446,7 @@ watch(internalOpen, (open) => {
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
+        @keydown="handleContentKeydown"
       >
         <!--
           DialogTitle is ALWAYS rendered for accessibility.

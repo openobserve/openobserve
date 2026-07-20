@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for BuildFieldPopUp.vue. The popup collects a single
-// editable value: the field `label`. Restored Quasar rule (BEFORE inventory §4,
+// editable value: the field `label`. Restored rule (BEFORE inventory §4,
 // dashboards): label was `v.length > 0 || 'Required'` → required. Factory keeps
 // the message i18n-driven. Validation TIMING is owned by OForm.
 

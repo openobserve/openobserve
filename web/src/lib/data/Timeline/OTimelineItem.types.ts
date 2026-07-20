@@ -1,7 +1,7 @@
 /**
  * Visual emphasis variants — map to dot background colours.
  *
- * | Variant       | Token                          | Maps from Quasar         |
+ * | Variant       | Token                          | Legacy color prop        |
  * |---------------|--------------------------------|--------------------------|
  * | primary       | --color-timeline-dot-primary   | color="primary" (default)|
  * | success       | --color-timeline-dot-success   | color="positive"         |

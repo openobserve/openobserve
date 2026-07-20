@@ -282,7 +282,7 @@ onBeforeUnmount(() => {
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[
-          // Layout + stacking (must be above Quasar header/drawer: 2000/3000)
+          // Layout + stacking (must be above the app header/drawer: 2000/3000)
           'min-w-40 p-1 z-[6000]',
           // Surface
           'bg-dropdown-bg border border-dropdown-border rounded-lg shadow-md',

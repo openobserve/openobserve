@@ -33,16 +33,6 @@ vi.mock("@/services/model_pricing", () => ({
   },
 }));
 
-// useQuasar mock
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: mockNotify }),
-  };
-});
-
 // Toast mock
 const mockToastFn = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({

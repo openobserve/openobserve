@@ -966,7 +966,7 @@ describe("PromQLChartConfig", () => {
     it("should render info tooltips for configurations", async () => {
       wrapper = createWrapper({ chartType: "pie" });
 
-      // Component uses OTooltip now (Quasar removed)
+      // Component uses OTooltip now
       const tooltips = wrapper.findAllComponents({ name: "OTooltip" });
       expect(tooltips.length).toBeGreaterThan(0);
     });
@@ -1071,7 +1071,7 @@ describe("PromQLChartConfig", () => {
 
       const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
       expect(popup.exists()).toBe(true);
-      // Quasar/Vue normalizes kebab-case props to camelCase on props()
+      // Vue normalizes kebab-case props to camelCase on props()
       expect(popup.props("columnOrder")).toEqual(["alpha", "beta", "gamma"]);
     });
 

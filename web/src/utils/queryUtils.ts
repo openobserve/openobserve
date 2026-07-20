@@ -181,7 +181,7 @@ export const validateEmail = (email: string) => {
 };
 
 export const isValidResourceName = (name: string) => {
-  const roleNameRegex = /^[^:#?&%'"\s]+$/;
+  const roleNameRegex = /^[^:#?&%'"\/\s]+$/;
   return roleNameRegex.test(name);
 };
 

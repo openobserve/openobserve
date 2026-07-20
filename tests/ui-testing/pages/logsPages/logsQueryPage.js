@@ -39,7 +39,25 @@ export class LogsQueryPage {
   }
 
   async clickRefresh() {
-    await this.page.locator(this.refreshButton).click();
+    // Same button as logsPage.clickRefreshButton: it swaps to a "Cancel query" variant
+    // while a prior / auto search is in flight. A plain click during that window cancels
+    // the in-flight search instead of starting a new one, so a subsequent
+    // waitForResponse('/_search') never fires (60s timeout on the histogram tests).
+    // Wait for the run-mode variant to be visible AND idle before clicking.
+    const btn = this.page.locator(this.refreshButton);
+    await btn.waitFor({ state: 'visible', timeout: 15000 });
+    await this.page.waitForFunction((selector) => {
+      const el = document.querySelector(selector);
+      if (!el) return false;
+      const disabled = el.hasAttribute('disabled')
+        || el.getAttribute('aria-disabled') === 'true'
+        || el.getAttribute('aria-busy') === 'true';
+      const text = (el.textContent || '').trim();
+      const title = (el.getAttribute('title') || '').trim();
+      const isCancel = text.includes('Cancel') || title.toLowerCase().includes('cancel');
+      return !disabled && !isCancel;
+    }, this.refreshButton, { timeout: 30000 });
+    await btn.click();
   }
 
   async clickErrorMessage() {

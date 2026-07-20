@@ -22,11 +22,6 @@ vi.mock("@/services/sourcemaps", () => ({
   },
 }));
 
-// Avoid pulling in the real icon module
-vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  "delete": "outlined-delete-icon",
-}));
-
 // Mock toast so notification tests can verify calls
 const toastMock = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({

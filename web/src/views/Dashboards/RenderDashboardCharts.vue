@@ -753,18 +753,24 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        showPositiveNotification("Dashboard updated successfully");
+        showPositiveNotification(
+          t("dashboard.renderDashboardCharts.dashboardUpdatedSuccessfully"),
+        );
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Dashboard update failed",
+              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Dashboard update failed", {
-            timeout: 2000,
-          });
+          showErrorNotification(
+            error?.message ??
+              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
+            {
+              timeout: 2000,
+            },
+          );
         }
 
         // refresh dashboard
@@ -1696,11 +1702,11 @@ export default defineComponent({
   Plain GLOBAL (unscoped) style block.
   Only rules that target third-party / dynamically-created DOM that this
   template does NOT render directly are kept here (GridStack-injected classes,
-  Quasar internals, print/page setup). All component-own element styles are
+  legacy component internals, print/page setup). All component-own element styles are
   expressed as inline  utilities in the template above.
 -->
 <style>
-/* Quasar table top toolbar (dynamic Quasar DOM — cannot be inlined) */
+/* Table top toolbar (dynamic DOM — cannot be inlined) */
 .q-table__top {
   border-bottom: 1px solid var(--color-border-default);
   justify-content: flex-end;
@@ -1792,7 +1798,7 @@ export default defineComponent({
     overflow: visible !important;
   }
 
-  /* Quasar virtual-scroll inserts padding divs above/below the rendered
+  /* Virtual-scroll inserts padding divs above/below the rendered
    * rows to simulate the full scroll height. In print mode these become
    * empty white space. Hide them so no blank gaps appear in table panels. */
   .q-virtual-scroll__padding {

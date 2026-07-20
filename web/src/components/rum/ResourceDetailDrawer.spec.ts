@@ -573,7 +573,7 @@ describe("ResourceDetailDrawer", () => {
 
     describe.skip("Session Events Action", () => {
       it("shows info notification when View All Session Events is clicked", async () => {
-        // Skip: requires intercepting toast calls which is complex without Quasar notify
+        // Skip: requires intercepting toast calls which is complex
         const eventsBtn = wrapper.find('[data-test="view-session-events-btn"]');
         await eventsBtn.trigger("click");
         await flushPromises();

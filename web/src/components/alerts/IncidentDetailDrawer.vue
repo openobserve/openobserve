@@ -17,23 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="rounded-md p-0" data-test="incident-detail-page">
     <div class="w-full h-full flex flex-col">
-    <!-- Header -->
-    <div class="flex items-center flex-nowrap card-container py-2.5 h-[60px] px-2.5">
-      <div class="flex items-center gap-3 flex-1">
-        <button
-          type="button"
-          data-test="incident-detail-back-btn"
-          class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-[0.625rem] text-text-secondary transition-colors hover:bg-surface-subtle hover:text-text-primary outline-none focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset cursor-pointer"
-          :title="t('alerts.incidents.goBack')"
-          :aria-label="t('alerts.incidents.goBack')"
-          @click="close"
-        >
-          <OIcon name="chevron-left" size="md" />
-        </button>
-        <div class="text-xl font-semibold text-text-primary">
-          {{ t('alerts.incidents.incident') }}
-        </div>
-        <!-- Incident name with colored indicator -->
+    <!-- Header — shared AppPageHeader: back button in the icon-tile spot, the
+         incident name as the title (with its status badges trailing), and the
+         section label "Incident" as the muted subtitle. -->
+    <AppPageHeader
+      :back="{
+        onClick: close,
+        label: t('alerts.incidents.goBack'),
+        dataTest: 'incident-detail-back-btn',
+      }"
+      :subtitle="t('alerts.incidents.incident')"
+      class="shrink-0 px-4 border-b border-border-default"
+    >
+      <template #title>
+        <!-- Incident name (inline-editable) -->
         <input
           v-if="incidentDetails && isEditingTitle"
           v-model="editableTitle"
@@ -48,20 +45,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <span
           v-else-if="incidentDetails"
-          :class="[
-            'font-semibold px-2 py-1 rounded-md inline-block',
-            store.state.theme === 'dark'
-              ? 'text-blue-400 bg-blue-900/50'
-              : 'text-blue-600 bg-blue-50'
-          ]"
           data-test="incident-detail-title"
+          :title="incidentDetails.title"
         >
           {{ incidentDetails.title }}
           <OTooltip v-if="incidentDetails && incidentDetails.title.length > 35" :content="incidentDetails.title" />
         </span>
+      </template>
 
-        <!-- Status, Severity, Alerts badges — match the soft dot-badge variant
-             used in the Incident list (no heavy ring/icon). -->
+      <!-- Status, Severity, Alerts badges — trail immediately after the title
+           (soft dot-badge variant used in the Incident list). -->
+      <template #title-trail>
         <template v-if="incidentDetails && !isEditingTitle">
           <span class="inline-flex cursor-default">
             <OTag type="incidentStatus" :value="incidentDetails.status" />
@@ -78,66 +72,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
           </span>
         </template>
-      </div>
+      </template>
 
-      <!-- Save/Cancel buttons when editing -->
-      <div v-if="incidentDetails && isEditingTitle" class="flex items-center gap-2 ml-auto">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="cancelTitleEdit"
-        >{{ t('alerts.cancel') }}</OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="saveTitleEdit"
-        >{{ t('alerts.save') }}</OButton>
-      </div>
+      <template #actions>
+        <!-- Save/Cancel when editing the title -->
+        <template v-if="incidentDetails && isEditingTitle">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            @click="cancelTitleEdit"
+          >{{ t('alerts.cancel') }}</OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            @click="saveTitleEdit"
+          >{{ t('alerts.save') }}</OButton>
+        </template>
 
-      <!-- Vertical Separator -->
-      <div
-        v-if="incidentDetails && !isEditingTitle"
-        :class="[
-          'h-8 w-px mx-2',
-          'bg-surface-panel'
-        ]"
-      ></div>
+        <!-- Incident actions otherwise -->
+        <template v-else-if="incidentDetails">
+          <OButton
+            v-if="incidentDetails.status === 'open'"
+            variant="outline"
+            size="sm"
+            :loading="updating"
+            @click="acknowledgeIncident"
+          ><OIcon name="visibility" size="sm"/>{{ t("alerts.incidents.acknowledge") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')" /></OButton>
+          <OButton
+            v-if="incidentDetails.status !== 'resolved'"
+            variant="outline"
+            size="sm"
+            :loading="updating"
+            @click="resolveIncident"
+          ><OIcon name="task-alt" size="sm"/>{{ t("alerts.incidents.resolve") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')" /></OButton>
+          <OButton
+            v-if="incidentDetails.status === 'resolved'"
+            variant="outline"
+            size="sm"
+            :loading="updating"
+            @click="reopenIncident"
+          ><OIcon name="refresh" size="sm"/>{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
 
-      <!-- Action buttons at extreme right of header -->
-      <div v-if="incidentDetails && !isEditingTitle" class="flex gap-2 items-center ml-auto">
-        <OButton
-          v-if="incidentDetails.status === 'open'"
-          variant="outline"
-          size="sm"
-          :loading="updating"
-          @click="acknowledgeIncident"
-        ><OIcon name="visibility" size="sm"/>{{ t("alerts.incidents.acknowledge") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')" /></OButton>
-        <OButton
-          v-if="incidentDetails.status !== 'resolved'"
-          variant="outline"
-          size="sm"
-          :loading="updating"
-          @click="resolveIncident"
-        ><OIcon name="task-alt" size="sm"/>{{ t("alerts.incidents.resolve") }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')" /></OButton>
-        <OButton
-          v-if="incidentDetails.status === 'resolved'"
-          variant="outline"
-          size="sm"
-          :loading="updating"
-          @click="reopenIncident"
-        ><OIcon name="refresh" size="sm"/>{{ t("alerts.incidents.reopen") }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')" /></OButton>
-
-        <!-- Edit Title Button -->
-        <OButton
-          variant="outline"
-          size="sm"
-          @click="startTitleEdit"
-        ><OIcon name="edit" size="sm"/>{{ t("alerts.edit") }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')" /></OButton>
-      </div>
-    </div>
+          <!-- Edit Title Button -->
+          <OButton
+            variant="outline"
+            size="sm"
+            @click="startTitleEdit"
+          ><OIcon name="edit" size="sm"/>{{ t("alerts.edit") }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')" /></OButton>
+        </template>
+      </template>
+    </AppPageHeader>
 
     <!-- Content -->
-    <div v-if="!loading && incidentDetails" class="card-container flex flex-col overflow-hidden -mt-2 flex-1 min-h-0">
+    <div v-if="!loading && incidentDetails" class="card-container flex flex-col overflow-hidden flex-1 min-h-0">
       <div class="flex-shrink-0 px-2 border-b border-border-default">
         <OTabs
           v-model="activeTab"
@@ -1167,6 +1154,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -1174,6 +1162,7 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
+    AppPageHeader,
     OTabs,
     OTab,
     TelemetryCorrelationDashboard,
@@ -2679,23 +2668,23 @@ export default defineComponent({
               const cell = token.header[i];
               const content = this.parser.parseInline(cell.tokens);
               const cellClass = i === 0 ? 'rca-first-cell' : '';
-              header += `<th class="px-3 py-2 text-left font-semibold text-sm border-b ${cellClass}">${content}</th>`;
+              header += `<th class="px-3 py-2 text-left font-semibold text-sm text-[var(--color-table-header-text)] border-b border-[var(--color-table-header-border)] ${cellClass}">${content}</th>`;
             }
             header += '</tr>';
 
             let body = '';
             for (const row of token.rows) {
-              body += '<tr class="hover:bg-gray-50">';
+              body += '<tr class="hover:bg-[var(--color-table-row-hover-bg)]">';
               for (let i = 0; i < row.length; i++) {
                 const cell = row[i];
                 const content = this.parser.parseInline(cell.tokens);
                 const cellClass = i === 0 ? 'rca-first-cell' : '';
-                body += `<td class="px-3 py-2 text-sm border-b ${cellClass}">${content}</td>`;
+                body += `<td class="px-3 py-2 text-sm border-b border-[var(--color-table-row-divider)] ${cellClass}">${content}</td>`;
               }
               body += '</tr>';
             }
 
-            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-gray-300 rounded"><thead class="bg-gray-100">${header}</thead><tbody>${body}</tbody></table></div>`;
+            return `<div class="rca-table-wrapper my-4 overflow-x-auto"><table class="rca-table w-full border border-[var(--color-table-header-border)] rounded"><thead class="bg-[var(--color-table-header-bg)]">${header}</thead><tbody>${body}</tbody></table></div>`;
           },
           blockquote({ tokens }: any) {
             const text = this.parser.parse(tokens);

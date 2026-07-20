@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-baseline justify-between mb-[0.25rem]">
       <div>
         <div
-          class="text-[0.85rem] font-semibold text-[var(--o2-text-primary)]"
+          class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]"
         >
           {{ displayTitle }}
         </div>
@@ -153,7 +153,7 @@ const selectedTimeObj = computed(() => ({
 
 <style lang="scss" scoped>
 .llm-trend-panel {
-  border: 1px solid var(--o2-border-color);
+  border: 1px solid var(--color-border-default);
 }
 
 /* Match LLMTrendPanel's chart height (.llm-trend-chart = 220px) so the

@@ -1306,7 +1306,7 @@ export default class DashboardVariablesScoped {
         const isDefault = typeof value === 'object' && value.selected === true;
 
         // If this is not the first item, add a new option and wait for it to appear.
-        // The q-field__bottom Quasar validation div permanently intercepts pointer events over
+        // The q-field__bottom validation div permanently intercepts pointer events over
         // the button, blocking both regular and force clicks. Use evaluate() to call the DOM
         // native click() which fires the full event sequence and bypasses CSS pointer-events.
         if (i > 0) {

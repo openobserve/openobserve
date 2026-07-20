@@ -30,33 +30,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
       <div v-if="!sqlmode">
-        <div class="syntax-guide-title w-[420px]">
-          <div class="label text-[15px] font-bold">{{ t("search.syntaxGuideLabel") }}</div>
+        <div class="syntax-guide-title w-[26.25rem]">
+          <div class="label text-[0.9375rem] font-bold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="mb-[5px]">
-            <div class="text-xs ml-[5px]">
-              <ul class="px-[10px] mt-[10px] mb-0 text-[14px] leading-[23px]">
+          <div class="mb-[0.3125rem]">
+            <div class="text-xs ml-[0.3125rem]">
+              <ul class="px-[0.625rem] mt-[0.625rem] mb-0 text-[0.875rem] leading-[1.4375rem]">
+                <!-- The prose is translated; the PromQL samples beside it are
+                     NOT — they are syntax, and a translated `rate(...)` would be
+                     a query that does not run. -->
                 <li>
-                  For instant vector selectors, use
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
+                  {{ t("metrics.syntaxGuide.instantVector") }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
                     >metric_name{label1="value1", label2="value2"}</span
                   >
                 </li>
                 <li>
-                  For range vector selectors, use
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">metric_name[5m]</span>
+                  {{ t("metrics.syntaxGuide.rangeVector") }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                    >metric_name[5m]</span
+                  >
                 </li>
                 <li>
-                  To aggregate data, use
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">sum by (label)(metric_name)</span>
-                  or
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"> avg by (label)(metric_name)</span>
+                  {{ t("metrics.syntaxGuide.aggregate") }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                    >sum by (label)(metric_name)</span
+                  >
+                  {{ t("metrics.syntaxGuide.or") }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                    >avg by (label)(metric_name)</span
+                  >
                 </li>
                 <li>
-                  For rate calculations over a range vector, use
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">rate(metric_name[5m])</span>
+                  {{ t("metrics.syntaxGuide.rate") }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                    >rate(metric_name[5m])</span
+                  >
                 </li>
               </ul>
             </div>
@@ -64,54 +75,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div v-else>
-        <div class="syntax-guide-title w-[420px]">
-          <div class="label text-[15px] font-bold">Syntax Guide: SQL Mode</div>
+        <div class="syntax-guide-title w-[26.25rem]">
+          <div class="label text-[0.9375rem] font-bold">
+            {{ t("metrics.syntaxGuide.sqlTitle") }}
+          </div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="mb-[5px]">
-            <div class="text-xs ml-[5px]">
-              <ul class="px-[10px] mt-[10px] mb-0 text-[14px] leading-[23px]">
+          <div class="mb-[0.3125rem]">
+            <div class="text-xs ml-[0.3125rem]">
+              <ul class="px-[0.625rem] mt-[0.625rem] mb-0 text-[0.875rem] leading-[1.4375rem]">
+                <!-- As above: prose translated, SQL samples left literal. -->
                 <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
+                  {{ t("metrics.syntaxGuide.sqlFullText") }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
-                  For column search of value 'error' use
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
+                  {{ t("metrics.syntaxGuide.sqlColumn") }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
+                  {{ t("metrics.syntaxGuide.sqlCode") }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
+                  {{ t("metrics.syntaxGuide.sqlStream") }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on column
-                  log use
-                  <span class="bg-highlight px-[5px]" :class="store.state.theme == 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'"
+                  <!-- The function name is a parameter, so the sentence can be
+                       reordered by a translator without stranding the `<i>`. -->
+                  {{
+                    t("metrics.syntaxGuide.sqlFunction", { fn: "extract_ip" })
+                  }}
+                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >
                 </li>
                 <li>
-                  For additional examples,
+                  {{ t("metrics.syntaxGuide.sqlMoreExamples") }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
                     class="hover:underline text-primary"
-                    >click here</a
+                    >{{ t("metrics.syntaxGuide.sqlClickHere") }}</a
                   >.
                 </li>
               </ul>
@@ -153,9 +170,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.q-btn:before {
-  border: 0px solid var(--o2-border-input);
-}
-</style>

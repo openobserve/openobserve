@@ -29,15 +29,16 @@ import OrganizationManagement from "./OrganizationManagement.vue";
 import { extendTrialSchema } from "./OrganizationManagement.schema";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
+import enLocaleFull from "@/locales/languages/en-US.json";
 import { nextTick } from "vue";
 
-// ── Mock toast (replaces deprecated $q.notify) ──
+// ── Mock toast ──
 const mockToastFn = vi.fn().mockReturnValue(vi.fn());
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToastFn(...args),
 }));
 
-// ── Mock confirm dialog (replaces deprecated $q.dialog) ──
+// ── Mock confirm dialog ──
 const mockConfirmFn = vi.fn().mockResolvedValue(true);
 vi.mock("@/composables/useConfirmDialog", () => ({
   useConfirmDialog: vi.fn(() => ({
@@ -108,25 +109,7 @@ const i18n = createI18n({
   fallbackLocale: "en",
   legacy: false,
   globalInjection: true,
-  messages: {
-    en: {
-      settings: {
-        organizationManagement: "Organization Management",
-        searchOrgs: "Search Organizations",
-        paginationOrganizationLabel: "Organizations",
-        org_name: "Name",
-        org_identifier: "Identifier",
-        subscription_status: "Subscription Status",
-        created_on: "Created On",
-        trial_expiry: "Trial Expiry",
-        actions: "Actions",
-        extendTrial: "Extend Trial",
-      },
-      common: {
-        cancel: "Cancel",
-      },
-    },
-  },
+  messages: { en: enLocaleFull },
 });
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so

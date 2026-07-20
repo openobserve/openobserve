@@ -4,7 +4,7 @@ import TestFunction from './TestFunction.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { nextTick } from 'vue';
-import enLocale from '@/locales/languages/en.json';
+import enLocale from '@/locales/languages/en-US.json';
 
 // Mock dependencies
 vi.mock('@/composables/useStreams', () => ({
@@ -314,7 +314,6 @@ describe('TestFunction.vue Branch Coverage', () => {
           plugins: [mockI18n],
           provide: {
             store: mockStore,
-            $q: { notify: vi.fn() },
           },
           stubs: {
             'query-editor': true,
@@ -395,7 +394,6 @@ describe('TestFunction.vue Branch Coverage', () => {
           plugins: [mockI18n],
           provide: {
             store: mockStore,
-            $q: { notify: vi.fn() },
           },
           stubs: {
             'query-editor': true,

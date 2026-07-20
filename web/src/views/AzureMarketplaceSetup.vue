@@ -73,24 +73,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-gray-400">
                 Create a new organization with Azure Marketplace billing
               </p>
-              <OInput
-                v-model="newOrgName"
-                data-test="azure-marketplace-org-name"
-                label="Organization Name"
-                class="mb-3"
-                :error="!!orgNameError"
-                :error-message="orgNameError"
-                @update:model-value="orgNameError = ''"
-              />
-              <OButton
-                data-test="azure-marketplace-create-link-btn"
-                variant="primary"
-                size="sm-action"
-                block
-                @click="createNewOrgForAzure"
-                :loading="isProcessing"
-                :disabled="!newOrgName"
-              >Create &amp; Link</OButton>
+              <OForm
+                id="azure-create-org-form"
+                :schema="azureCreateOrgSchema"
+                :default-values="azureCreateOrgDefaults()"
+                @submit="createNewOrgForAzure"
+                v-slot="{ isSubmitting }"
+              >
+                <OFormInput
+                  name="newOrgName"
+                  data-test="azure-marketplace-org-name"
+                  label="Organization Name"
+                  required
+                  class="mb-3"
+                />
+                <OButton
+                  data-test="azure-marketplace-create-link-btn"
+                  type="submit"
+                  variant="primary"
+                  size="sm-action"
+                  block
+                  :loading="isSubmitting"
+                >Create &amp; Link</OButton>
+              </OForm>
             </OCardSection>
           </OCard>
 
@@ -104,22 +109,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-gray-400">
                 Link Azure billing to an existing organization
               </p>
-              <OSelect
-                v-model="selectedOrg"
-                :options="eligibleOrganizations"
-                labelKey="name"
-                valueKey="identifier"
-                label="Select Organization"
-                class="mb-3"
-              />
-              <OButton
-                variant="primary"
-                size="sm-action"
-                block
-                @click="linkToExistingOrg"
-                :loading="isProcessing"
-                :disabled="!selectedOrg"
-              >Link Azure Billing</OButton>
+              <OForm
+                id="azure-link-org-form"
+                :schema="azureLinkOrgSchema"
+                :default-values="azureLinkOrgDefaults()"
+                @submit="linkToExistingOrg"
+                v-slot="{ isSubmitting }"
+              >
+                <OFormSelect
+                  name="selectedOrg"
+                  :options="eligibleOrganizations"
+                  label-key="name"
+                  value-key="identifier"
+                  label="Select Organization"
+                  required
+                  class="mb-3"
+                />
+                <OButton
+                  type="submit"
+                  variant="primary"
+                  size="sm-action"
+                  block
+                  :loading="isSubmitting"
+                >Link Azure Billing</OButton>
+              </OForm>
             </OCardSection>
           </OCard>
         </div>
@@ -174,15 +187,26 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import azureMarketplace from "@/services/azureMarketplace";
 import organizationsService from "@/services/organizations";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import {
+  makeAzureCreateOrgSchema,
+  azureCreateOrgDefaults,
+  makeAzureLinkOrgSchema,
+  azureLinkOrgDefaults,
+  type AzureCreateOrgForm,
+  type AzureLinkOrgForm,
+} from "./AzureMarketplaceSetup.schema";
+// NOTE: the old `toast` import was removed — the empty-selection guard is now
+// schema-driven (z.string().min(1)), not an imperative toast.
 
 type SetupState =
   | "select_org"
@@ -194,19 +218,20 @@ type SetupState =
 
 export default defineComponent({
   name: "AzureMarketplaceSetup",
-  components: { OButton, OSpinner, OInput, OSelect,
+  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect,
     OIcon, OCard, OCardSection,
 },
   setup() {
     const store = useStore();
     const router = useRouter();
+    const { t } = useI18n();
+
+    // Factory-built so the required messages resolve through i18n.
+    const azureCreateOrgSchema = makeAzureCreateOrgSchema(t);
+    const azureLinkOrgSchema = makeAzureLinkOrgSchema(t);
 
     const state = ref<SetupState>("select_org");
     const errorMessage = ref("");
-    const isProcessing = ref(false);
-    const newOrgName = ref("");
-    const orgNameError = ref("");
-    const selectedOrg = ref<{ identifier: string; name: string } | null>(null);
     const eligibleOrganizations = ref<{ identifier: string; name: string }[]>(
       []
     );
@@ -239,50 +264,41 @@ export default defineComponent({
       }
     };
 
-    const createNewOrgForAzure = async () => {
-      if (!newOrgName.value) {
-        orgNameError.value = "Please enter an organization name";
-        return;
-      }
-
-      isProcessing.value = true;
+    // Plain async @submit handler — the schema already gated `value.newOrgName`
+    // (required), so no imperative empty-check is needed. The Save spinner is
+    // form-driven (OForm awaits this handler).
+    const createNewOrgForAzure = async (value: AzureCreateOrgForm) => {
       state.value = "processing";
 
       try {
         // Create the organization
         const orgRes = await organizationsService.create({
-          name: newOrgName.value,
+          name: value.newOrgName,
         });
 
         const orgId = orgRes.data.identifier;
 
-        // Link AWS Marketplace subscription
-        await linkSubscription(orgId);
+        // Link Azure Marketplace subscription
+        await linkSubscription(orgId, value.newOrgName);
       } catch (error: any) {
         console.error("Failed to create organization:", error);
         state.value = "error";
         errorMessage.value =
           error.response?.data?.message || "Failed to create organization";
-        isProcessing.value = false;
       }
     };
 
-    const linkToExistingOrg = async () => {
-      if (!selectedOrg.value) {
-        toast({
-          variant: "error",
-          message: "Please select an organization",
-        });
-        return;
-      }
-
-      isProcessing.value = true;
+    // `value.selectedOrg` is the org identifier (OSelect value-key="identifier").
+    const linkToExistingOrg = async (value: AzureLinkOrgForm) => {
       state.value = "processing";
 
-      await linkSubscription(selectedOrg.value.identifier);
+      const org = eligibleOrganizations.value.find(
+        (o) => o.identifier === value.selectedOrg,
+      );
+      await linkSubscription(value.selectedOrg, org?.name ?? value.selectedOrg);
     };
 
-    const linkSubscription = async (orgId: string) => {
+    const linkSubscription = async (orgId: string, orgLabel: string) => {
       try {
         await azureMarketplace.linkSubscription(
           orgId,
@@ -292,12 +308,11 @@ export default defineComponent({
         // Clear the token from sessionStorage
         sessionStorage.removeItem("azure_marketplace_token");
         state.value = "success";
-        isProcessing.value = false;
 
         // Update selected org in store
         const orgData = {
             identifier: orgId,
-            label: newOrgName.value || selectedOrg.value?.name || orgId,
+            label: orgLabel || orgId,
             user_email: store.state.userInfo?.email,
         };
         useLocalOrganization(orgData);
@@ -307,7 +322,6 @@ export default defineComponent({
         state.value = "error";
         errorMessage.value =
           error.response?.data?.message || "Failed to link Azure subscription";
-        isProcessing.value = false;
       }
     };
 
@@ -324,19 +338,21 @@ export default defineComponent({
     const resetAndRetry = () => {
       state.value = "select_org";
       errorMessage.value = "";
-      isProcessing.value = false;
     };
 
     return {
       store,
       state,
       errorMessage,
-      isProcessing,
-      newOrgName,
-      orgNameError,
-      selectedOrg,
       eligibleOrganizations,
       getImageURL,
+      // Schemas + typed default factories must be returned from setup() so the
+      // Options-API template can resolve `:schema` / `:default-values`
+      // (a module-level import would be out of the template's scope).
+      azureCreateOrgSchema,
+      azureCreateOrgDefaults,
+      azureLinkOrgSchema,
+      azureLinkOrgDefaults,
       createNewOrgForAzure,
       linkToExistingOrg,
       goToDashboard,

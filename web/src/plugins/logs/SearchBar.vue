@@ -197,16 +197,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-saved-views-pinned"
           class="p-0 element-box-shadow border border-button-outline-border"
         >
-          <OButton
-            data-test="logs-search-bar-saved-views-pinned-list-btn"
-            variant="ghost"
-            size="icon-toolbar"
-            @click="openSavedViewsList"
+          <!-- A real dropdown, not a modal: one click to open, one click to
+               apply. The heavyweight list dialog stays reachable via Manage. -->
+          <ODropdown
+            :open="savedViewsDropdownOpen"
+            side="bottom"
+            align="start"
+            @update:open="onSavedViewsDropdownOpenChange"
           >
-            <OIcon name="saved-search" size="sm" />
-            <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
-            <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
-          </OButton>
+            <template #trigger>
+              <OButton
+                data-test="logs-search-bar-saved-views-pinned-list-btn"
+                variant="ghost"
+                size="icon-toolbar"
+              >
+                <OIcon name="saved-search" size="sm" />
+                <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
+                <OTooltip
+                  :content="t('search.listSavedViews')"
+                  :side-offset="2"
+                />
+              </OButton>
+            </template>
+            <ODropdownGroup :label="t('search.savedViewsLabel')">
+              <div
+                v-if="searchObj.loadingSavedView"
+                class="flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary"
+              >
+                <OSpinner size="xs" />
+                {{ t("confirmDialog.loading") }}
+              </div>
+              <template v-else-if="sortedSavedViews.length">
+                <ODropdownItem
+                  v-for="view in sortedSavedViews"
+                  :key="view.view_id"
+                  :data-test="`logs-search-bar-saved-views-menu-apply-${view.view_name}`"
+                  @select="applySavedView(view)"
+                >
+                  <template #icon-left>
+                    <OIcon
+                      :name="
+                        favoriteViews.includes(view.view_id)
+                          ? 'favorite'
+                          : 'saved-search'
+                      "
+                      size="sm"
+                      :class="
+                        favoriteViews.includes(view.view_id)
+                          ? 'text-favorite'
+                          : ''
+                      "
+                    />
+                  </template>
+                  <span class="truncate max-w-56">{{ view.view_name }}</span>
+                  <template #icon-right>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      icon-left="edit"
+                      class="ms-auto"
+                      :title="t('search.updateSavedViewWithCurrent')"
+                      :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
+                      @click.stop.prevent="quickUpdateSavedView(view)"
+                    />
+                  </template>
+                </ODropdownItem>
+              </template>
+              <ODropdownItem v-else disabled>
+                {{ t("search.savedViewsNotFound") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+            <ODropdownSeparator />
+            <ODropdownItem
+              icon-left="save"
+              data-test="logs-search-bar-saved-views-menu-create"
+              @select="fnSavedView"
+            >
+              {{ t("search.createSavedView") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="settings"
+              data-test="logs-search-bar-saved-views-menu-manage"
+              @select="openSavedViewsList"
+            >
+              {{ t("search.manageSavedViews") }}
+            </ODropdownItem>
+          </ODropdown>
           <OButton
             data-test="logs-search-bar-saved-views-pinned-create-btn"
             variant="ghost"
@@ -569,7 +645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <img
                     :src="customRangeIcon"
-                    alt="Custom Range"
+                    :alt="t('logs.searchBar.customRangeAlt')"
                     class="w-4 h-4"
                   />
                 </span>
@@ -593,7 +669,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <img
                     :src="createScheduledSearchIcon"
-                    alt="Create Scheduled Search"
+                    :alt="t('logs.searchBar.createScheduledSearchAlt')"
                     class="w-4 h-4"
                   />
                 </span>
@@ -612,7 +688,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <img
                     :src="listScheduledSearchIcon"
-                    alt="List Scheduled Search"
+                    :alt="t('logs.searchBar.listScheduledSearchAlt')"
                     class="w-4 h-4"
                   />
                 </span>
@@ -1457,92 +1533,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="search-bar-store-state-saved-view-dialog"
       v-model:open="store.state.savedViewDialog"
       size="md"
+      form-id="saved-view-form"
       :title="t('search.savedViewsLabel')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('common.save')"
-      :primary-button-loading="saveViewLoader"
       @click:secondary="store.state.savedViewDialog = false"
-      @click:primary="handleSavedView"
     >
-      <div v-if="isSavedViewAction == 'create'">
-        <OInput
-          data-test="add-alert-name-input"
-          v-model="savedViewName"
-          :label="t('search.savedViewName')"
-          :error="!!savedViewNameError"
-          :error-message="savedViewNameError"
-          @update:model-value="savedViewNameError = ''"
-        />
-      </div>
-      <div v-else>
-        <OSelect
-          data-test="saved-view-name-select"
-          v-model="savedViewSelectedName"
-          :options="searchObj.data.savedViews"
-          labelKey="view_name"
-          valueKey="view_id"
-          :label="t('search.savedViewName')"
-          class="py-2"
-          :error="!!savedViewSelectError"
-          :error-message="savedViewSelectError"
-          @update:model-value="savedViewSelectError = ''"
-        />
-      </div>
+      <OForm
+        id="saved-view-form"
+        ref="savedViewFormRef"
+        :schema="savedViewSchema"
+        :default-values="savedViewDefaults"
+        @submit="handleSavedView"
+      >
+        <div v-if="isSavedViewAction == 'create'">
+          <OFormInput
+            name="savedViewName"
+            data-test="add-alert-name-input"
+            :label="t('search.savedViewName')"
+            required
+          />
+        </div>
+        <div v-else>
+          <OFormSelect
+            name="savedViewSelectedName"
+            data-test="saved-view-name-select"
+            :options="searchObj.data.savedViews"
+            label-key="view_name"
+            value-key="view_id"
+            :label="t('search.savedViewName')"
+            class="py-2"
+            required
+          />
+        </div>
+      </OForm>
     </ODialog>
     <ODialog
       data-test="search-bar-store-state-saved-function-dialog"
       v-model:open="store.state.savedFunctionDialog"
       size="md"
+      form-id="saved-function-form"
       :title="t('search.functionPlaceholder')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
-      :primary-button-loading="saveFunctionLoader"
       @click:secondary="store.state.savedFunctionDialog = false; functionUpdateConfirm = false"
-      @click:primary="saveFunction"
       @update:open="(open) => { if (!open) functionUpdateConfirm = false }"
     >
-      <OToggleGroup
-        data-test="saved-function-action-toggle"
-        :model-value="isSavedFunctionAction"
-        :disabled="functionOptions.length == 0"
-        class="mb-3"
-        @update:model-value="isSavedFunctionAction = $event; savedFunctionName = ''"
-      >
-        <OToggleGroupItem value="update" size="sm">{{ t('common.update') }}</OToggleGroupItem>
-        <OToggleGroupItem value="create" size="sm">{{ t('common.create') }}</OToggleGroupItem>
-      </OToggleGroup>
-      <div v-if="isSavedFunctionAction == 'create'">
-        <OInput
-          data-test="saved-function-name-input"
-          v-model="savedFunctionName"
-          :label="t('search.saveFunctionName')"
-          :error="!!savedFunctionNameError"
-          :error-message="savedFunctionNameError"
-          @update:model-value="savedFunctionNameError = ''"
-        />
-      </div>
-      <div v-else>
-        <OSelect
-          data-test="saved-function-name-select"
-          v-model="savedFunctionSelectedName"
-          :options="functionOptions"
-          labelKey="name"
-          valueKey="name"
-          :label="t('search.saveFunctionName')"
-          :placeholder="t('search.selectFunctionNamePlaceholder')"
-          class="py-2"
-          :error="!!savedFunctionSelectError"
-          :error-message="savedFunctionSelectError"
-          @update:model-value="savedFunctionSelectError = ''"
-        />
-      </div>
+      <OForm id="saved-function-form" :form="savedFunctionForm">
+        <!-- Form-owned create/update mode (OFormToggleGroup binds it to the
+             `isSavedFunctionAction` field so the schema's superRefine branches
+             on it). The v-if reads `savedFunctionMode`, a mirror of that field. -->
+        <OFormToggleGroup
+          name="isSavedFunctionAction"
+          data-test="saved-function-action-toggle"
+          :disabled="functionOptions.length == 0"
+          class="mb-3"
+        >
+          <OToggleGroupItem value="update" size="sm">{{ t('common.update') }}</OToggleGroupItem>
+          <OToggleGroupItem value="create" size="sm">{{ t('common.create') }}</OToggleGroupItem>
+        </OFormToggleGroup>
+        <div v-if="savedFunctionMode == 'create'">
+          <OFormInput
+            name="savedFunctionName"
+            data-test="saved-function-name-input"
+            :label="t('search.saveFunctionName')"
+            required
+          />
+        </div>
+        <div v-else>
+          <OFormSelect
+            name="savedFunctionSelectedName"
+            data-test="saved-function-name-select"
+            :options="functionOptions"
+            label-key="name"
+            value-key="name"
+            :label="t('search.saveFunctionName')"
+            :placeholder="t('search.selectFunctionNamePlaceholder')"
+            class="py-2"
+            required
+          />
+        </div>
+      </OForm>
     </ODialog>
 
     <!-- Function update confirmation dialog -->
     <ConfirmDialog
       data-test="search-bar-function-update-confirm-dialog"
       :title="t('search.confirmFunctionUpdateTitle')"
-      :message="t('search.confirmFunctionUpdateMsg', { name: savedFunctionSelectedName })"
+      :message="t('search.confirmFunctionUpdateMsg', { name: functionToUpdateName })"
       v-model="functionUpdateConfirm"
       @update:ok="executeFunctionUpdate"
       @update:cancel="functionUpdateConfirm = false"
@@ -1712,6 +1790,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'favorite-border'
                         "
                         size="xs"
+                        :class="
+                          favoriteViews.includes(row.view_id)
+                            ? 'text-favorite'
+                            : ''
+                        "
                       />
                     </OButton>
                     <OButton
@@ -1794,7 +1877,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="handleFavoriteSavedView(row, true)"
                     >
-                      <OIcon name="favorite" size="xs" />
+                      <OIcon name="favorite" size="xs" class="text-favorite" />
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
@@ -1897,7 +1980,6 @@ import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import { useLoading } from "@/composables/useLoading";
 import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -1927,6 +2009,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -1943,9 +2026,22 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OTree from "@/lib/data/Tree/OTree.vue";
+import {
+  makeSavedViewSchema,
+  type SavedViewForm,
+} from "./SearchBar.SavedView.schema";
+import { sortSavedViews } from "./savedViewsSort";
+import {
+  makeSavedFunctionSchema,
+  type SavedFunctionForm,
+} from "./SearchBar.SavedFunction.schema";
 
 const defaultValue: any = () => {
   return {
@@ -2028,11 +2124,15 @@ export default defineComponent({
     OIcon,
     OToggleGroup,
     OToggleGroupItem,
+    OFormToggleGroup,
     OSpinner,
     OTooltip,
     OInput,
     OSearchInput,
     OSelect,
+    OForm,
+    OFormInput,
+    OFormSelect,
     OSwitch,
     OTree,
     OTable,
@@ -2082,7 +2182,7 @@ export default defineComponent({
       if (this.searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
-          message: "No stream available to update save view.",
+          message: this.t('logs.searchBar.noStreamUpdateView'),
         });
         return;
       }
@@ -2108,14 +2208,14 @@ export default defineComponent({
       let initNumber = parseInt(this.downloadCustomInitialNumber);
       if (initNumber < 0) {
         toast({
-          message: "Initial number must be positive number.",
+          message: this.t('logs.searchBar.initialNumberPositive'),
           variant: "warning",
         });
         return;
       }
       if (!this.searchObj?.data?.customDownloadQueryObj?.query) {
         toast({
-          message: "Please run a query first before downloading.",
+          message: this.t('logs.searchBar.runQueryBeforeDownload'),
           variant: "warning",
         });
         return;
@@ -2140,7 +2240,7 @@ export default defineComponent({
             this.downloadLogs(res.data.hits, this.downloadCustomFileType);
           } else {
             toast({
-              message: "No data found to download.",
+              message: this.t('logs.searchBar.noDataToDownload'),
               variant: "warning",
             });
           }
@@ -2256,13 +2356,53 @@ export default defineComponent({
     const functionModel: string = ref(null);
     const fnEditorRef: any = ref(null);
 
-    const isSavedFunctionAction: string = ref("create");
-    const savedFunctionName: string = ref("");
-    const savedFunctionNameError = ref("");
-    const savedFunctionSelectError = ref("");
-    const savedFunctionSelectedName: string = ref("");
-    const saveFunctionLoader = ref(false);
+    // savedFunctionName / savedFunctionSelectedName are now OForm-owned fields
+    // (see savedFunctionSchema). The name the confirm dialog + update flow show
+    // is captured into this ref when the update is requested.
+    const functionToUpdateName = ref("");
     const functionUpdateConfirm = ref(false);
+    const savedFunctionSchema = makeSavedFunctionSchema(t);
+    // The dialog body unmounts on close + remounts on open; the form is created
+    // here (owner pattern), so re-seed it to "create" mode on open. The
+    // OFormToggleGroup changes the mode within the open session.
+    const savedFunctionDefaults = computed((): SavedFunctionForm => ({
+      isSavedFunctionAction: "create",
+      savedFunctionName: "",
+      savedFunctionSelectedName: "",
+    }));
+
+    // Owner-pattern form (Rule ③): SearchBar OWNS this <OForm> and its dialog
+    // body needs the create/update mode to drive a v-if. We create the form here
+    // with useOForm and read `isSavedFunctionAction` reactively via
+    // form.useStore — ONE source of truth (no mirror ref / store.subscribe).
+    // Handed to <OForm :form="savedFunctionForm">.
+    const savedFunctionForm = useOForm<SavedFunctionForm>({
+      defaultValues: savedFunctionDefaults.value,
+      schema: savedFunctionSchema,
+      onSubmit: saveFunction,
+    });
+    const savedFunctionMode = savedFunctionForm.useStore(
+      (s) => (s.values.isSavedFunctionAction as string) ?? "create",
+    );
+    // Re-seed on open (the form persists in setup across the dialog remount).
+    watch(
+      () => store.state.savedFunctionDialog,
+      (open) => {
+        if (open) savedFunctionForm.reset(savedFunctionDefaults.value);
+      },
+    );
+    // Parity with the pre-migration toggle handler (main cleared the name on
+    // every mode switch: `isSavedFunctionAction = $event; savedFunctionName = ''`).
+    // Clear ONLY the create-mode name field when the mode changes so toggling
+    // update→create shows a blank input, not a stale name (the update select is
+    // untouched). `dontUpdateMeta`/`dontValidate` mirror the old naked assignment
+    // — no touched/dirty marking, no premature "required" flash.
+    watch(savedFunctionMode, () => {
+      savedFunctionForm.setFieldValue("savedFunctionName", "", {
+        dontUpdateMeta: true,
+        dontValidate: true,
+      });
+    });
 
     const isFocused = ref(false);
     const editorContainerRef = ref<HTMLElement | null>(null);
@@ -2305,7 +2445,6 @@ export default defineComponent({
     let streamName = "";
 
     const dateTimeRef = ref(null);
-    const saveViewLoader = ref(false);
     const favoriteViews = ref([]);
 
     const localSavedViews = ref([]);
@@ -2338,11 +2477,19 @@ export default defineComponent({
       searchObj.meta.refreshInterval = Number(item.value);
     };
 
+    // Mode flag (always "create" in the current flow — the update branch is
+    // dead UI). Kept as a local ref AND seeded into the saved-view OForm so the
+    // schema's superRefine can branch on it.
     const isSavedViewAction = ref("create");
-    const savedViewName = ref("");
-    const savedViewNameError = ref("");
-    const savedViewSelectError = ref("");
-    const savedViewSelectedName = ref("");
+    // savedViewName / savedViewSelectedName are now OForm-owned fields (see
+    // savedViewSchema).
+    const savedViewFormRef = ref<any>(null);
+    const savedViewSchema = makeSavedViewSchema(t);
+    const savedViewDefaults = computed((): SavedViewForm => ({
+      isSavedViewAction: isSavedViewAction.value,
+      savedViewName: "",
+      savedViewSelectedName: "",
+    }));
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
@@ -2519,8 +2666,8 @@ export default defineComponent({
 
     const transformTypes = computed(() => {
       return [
-        { label: "Function", value: "function" },
-        { label: "Action", value: "action" },
+        { label: t('logs.searchBar.transformTypeFunction'), value: "function" },
+        { label: t('logs.searchBar.transformTypeAction'), value: "action" },
       ];
     });
 
@@ -2581,7 +2728,7 @@ export default defineComponent({
         ) {
           if (!checkFnQuery(searchObj.data.tempFunctionContent)) {
             toast({
-              message: "Job Context have been removed",
+              message: t('logs.searchBar.jobContextRemoved'),
               variant: "info",
             });
             searchObj.meta.jobId = "";
@@ -2597,7 +2744,7 @@ export default defineComponent({
       (val) => {
         if (val == true && searchObj.meta.jobId != "") {
           toast({
-            message: "Histogram is not available for scheduled search",
+            message: t('logs.searchBar.histogramNotAvailableScheduled'),
             variant: "info",
           });
           searchObj.meta.showHistogram = false;
@@ -2656,10 +2803,10 @@ export default defineComponent({
         searchObj.data.selectedTransform?.type === "action" &&
         searchObj.data.selectedTransform?.name
       ) {
-        return `${searchObj.data.selectedTransform?.name} action applied successfully. Run Query to see results.`;
+        return t('logs.searchBar.actionAppliedRunQuery', { name: searchObj.data.selectedTransform?.name });
       }
 
-      return "Select an action to apply";
+      return t('logs.searchBar.selectActionToApply');
     });
 
     const updateAutoComplete = (value) => {
@@ -2913,7 +3060,7 @@ export default defineComponent({
         ) {
           if (!checkQuery(value)) {
             toast({
-              message: "Job Context have been removed",
+              message: t('logs.searchBar.jobContextRemoved'),
               variant: "info",
             });
             searchObj.meta.jobId = "";
@@ -2973,7 +3120,7 @@ export default defineComponent({
           // User-visible warning so the silent rewrite isn't invisible.
           toast({
             variant: "warning",
-            message: `Selected range exceeds the ${searchObj.data.datetime.queryRangeRestrictionInHour}-hour limit. Start time was adjusted to fit.`,
+            message: t('logs.searchBar.rangeExceedsLimit', { hours: searchObj.data.datetime.queryRangeRestrictionInHour }),
           });
 
           value.startTime = newStartTime;
@@ -3104,7 +3251,7 @@ export default defineComponent({
 
       if (!data || data.length === 0) {
         toast({
-          message: "No data found to download.",
+          message: t('logs.searchBar.noDataToDownload'),
           variant: "warning",
         });
         return;
@@ -3145,7 +3292,7 @@ export default defineComponent({
         showDownloadMenu.value = false;
         toast({
           variant: "error",
-          message: "Error downloading logs",
+          message: t('logs.searchBar.errorDownloadingLogs'),
         });
       }
     };
@@ -3209,40 +3356,23 @@ export default defineComponent({
       });
     });
 
-    const saveFunction = () => {
-      saveFunctionLoader.value = true;
-      let callTransform: Promise<{ data: any }>;
+    // @submit handler — the schema already gated the name/select per mode
+    // (required + the restored alphanumeric regexes), so there is no imperative
+    // field validation here. The content check is a NON-form guard (about the
+    // function-editor content). Loading is form-driven (OForm awaits this).
+    // Declared as a hoisted function so useOForm (above) can reference it.
+    async function saveFunction(value: SavedFunctionForm) {
       const content = searchObj.data.tempFunctionContent;
-      let fnName = "";
-      if (isSavedFunctionAction.value == "create") {
-        fnName = savedFunctionName.value;
-        if (!fnName.trim()) {
-          savedFunctionNameError.value = "This field is required";
-          saveFunctionLoader.value = false;
-          return;
-        }
-        const pattern = /^[a-zA-Z][a-zA-Z0-9_]*$/;
-        if (!pattern.test(fnName)) {
-          savedFunctionNameError.value = "Input must be alphanumeric";
-          saveFunctionLoader.value = false;
-          return;
-        }
-      } else {
-        if (!savedFunctionSelectedName.value) {
-          savedFunctionSelectError.value = "Field is required!";
-          saveFunctionLoader.value = false;
-          return;
-        }
-        fnName = savedFunctionSelectedName.value;
-      }
+      const fnName =
+        value.isSavedFunctionAction == "create"
+          ? value.savedFunctionName
+          : value.savedFunctionSelectedName;
 
       if (content.trim() == "") {
         toast({
           variant: "warning",
-          message:
-            "The function field must contain a value and cannot be left empty.",
+          message: t('logs.searchBar.functionFieldRequired'),
         });
-        saveFunctionLoader.value = false;
         return;
       }
 
@@ -3252,56 +3382,46 @@ export default defineComponent({
       formData.value.name = fnName;
       searchObj.data.tempFunctionContent = content;
 
-      // const result = functionOptions.value.find((obj) => obj.name === fnName);
-      if (isSavedFunctionAction.value == "create") {
-        callTransform = jsTransformService.create(
-          store.state.selectedOrganization.identifier,
-          formData.value,
-        );
-
-        callTransform
-          .then((res: { data: any }) => {
-            toast({
-              variant: "success",
-              message: res.data.message,
-            });
-
-            functionModel.value = {
-              name: formData.value.name,
-              function: formData.value.function,
-            };
-            functionOptions.value.push({
-              name: formData.value.name,
-              function: formData.value.function,
-              transType: 0,
-              params: "row",
-            });
-            store.dispatch("setSavedFunctionDialog", false);
-            isSavedFunctionAction.value = "create";
-            savedFunctionName.value = "";
-            saveFunctionLoader.value = false;
-            savedFunctionSelectedName.value = "";
-          })
-          .catch((err) => {
-            saveFunctionLoader.value = false;
-            toast({
-              variant: "error",
-              message:
-                JSON.stringify(err.response.data["message"]) ||
-                "Function creation failed",
-              timeout: 5000,
-            });
+      if (value.isSavedFunctionAction == "create") {
+        try {
+          const res: { data: any } = await jsTransformService.create(
+            store.state.selectedOrganization.identifier,
+            formData.value,
+          );
+          toast({
+            variant: "success",
+            message: res.data.message,
           });
+
+          functionModel.value = {
+            name: formData.value.name,
+            function: formData.value.function,
+          };
+          functionOptions.value.push({
+            name: formData.value.name,
+            function: formData.value.function,
+            transType: 0,
+            params: "row",
+          });
+          store.dispatch("setSavedFunctionDialog", false);
+        } catch (err: any) {
+          toast({
+            variant: "error",
+            message:
+              JSON.stringify(err.response.data["message"]) ||
+              t('logs.searchBar.functionCreationFailed'),
+            timeout: 5000,
+          });
+        }
       } else {
-        // Validate, set up formData, then show the teleported confirmation overlay
-        saveFunctionLoader.value = false;
+        // Update mode → capture the function name + open the confirmation
+        // overlay (the update itself runs in executeFunctionUpdate).
+        functionToUpdateName.value = fnName;
         functionUpdateConfirm.value = true;
-        return;
       }
-    };
+    }
 
     const executeFunctionUpdate = () => {
-      saveFunctionLoader.value = true;
       const callTransform = jsTransformService.update(
         store.state.selectedOrganization.identifier,
         formData.value,
@@ -3311,7 +3431,7 @@ export default defineComponent({
         .then((res: { data: any }) => {
           toast({
             variant: "success",
-            message: "Function updated successfully.",
+            message: t('logs.searchBar.functionUpdatedSuccess'),
           });
 
           const transformIndex = searchObj.data.transforms.findIndex(
@@ -3327,19 +3447,14 @@ export default defineComponent({
           functionOptions.value = searchObj.data.transforms;
           store.dispatch("setSavedFunctionDialog", false);
           functionUpdateConfirm.value = false;
-          isSavedFunctionAction.value = "create";
-          savedFunctionName.value = "";
-          saveFunctionLoader.value = false;
-          savedFunctionSelectedName.value = "";
         })
         .catch((err) => {
           functionUpdateConfirm.value = false;
-          saveFunctionLoader.value = false;
           toast({
             variant: "error",
             message:
               JSON.stringify(err.response.data["message"]) ||
-              "Function updation failed",
+              t('logs.searchBar.functionUpdationFailed'),
             timeout: 5000,
           });
         });
@@ -3349,10 +3464,6 @@ export default defineComponent({
       fnEditorRef?.value?.setValue("");
       store.dispatch("setSavedFunctionDialog", false);
       functionUpdateConfirm.value = false;
-      isSavedFunctionAction.value = "create";
-      savedFunctionName.value = "";
-      saveFunctionLoader.value = false;
-      savedFunctionSelectedName.value = "";
     };
 
     const resetEditorLayout = () => {
@@ -3374,7 +3485,7 @@ export default defineComponent({
       if (flag) {
         toast({
           variant: "success",
-          message: `${fnValue.name} function applied successfully.`,
+          message: t('logs.searchBar.functionAppliedSuccess', { name: fnValue.name }),
         });
       }
 
@@ -3396,15 +3507,11 @@ export default defineComponent({
       if (content == "") {
         toast({
           variant: "error",
-          message: "No function definition found.",
+          message: t('logs.searchBar.noFunctionDefinition'),
         });
         return;
       }
       store.dispatch("setSavedFunctionDialog", true);
-      isSavedFunctionAction.value = "create";
-      savedFunctionName.value = "";
-      saveFunctionLoader.value = false;
-      savedFunctionSelectedName.value = "";
     };
 
     const showConfirmDialog = (callback) => {
@@ -3452,21 +3559,45 @@ export default defineComponent({
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
-          message: "No stream available to save view.",
+          message: t('logs.searchBar.noStreamSaveView'),
         });
         return;
       }
       store.dispatch("setSavedViewDialog", true);
       isSavedViewAction.value = "create";
-      savedViewName.value = "";
-      saveViewLoader.value = false;
-      savedViewSelectedName.value = "";
       savedViewDropdownModel.value = false;
     };
 
     const openSavedViewsList = () => {
       loadSavedView();
       savedViewsListDialog.value = true;
+    };
+
+    // ── Saved views quick dropdown (pinned toolbar) ──────────────────────
+    // Controlled open state so a quick update can close the menu itself.
+    const savedViewsDropdownOpen = ref(false);
+    const onSavedViewsDropdownOpenChange = (open: boolean) => {
+      savedViewsDropdownOpen.value = open;
+      // Lazy-fetch the list the first time the menu opens.
+      if (open) loadSavedView();
+    };
+
+    const sortedSavedViews = computed(() =>
+      sortSavedViews(searchObj.data.savedViews, favoriteViews.value),
+    );
+
+    // One-click overwrite of a view with the current search state — no list
+    // dialog, no stacked confirm dialog.
+    const quickUpdateSavedView = (item: any) => {
+      if (searchObj.data.stream.selectedStream.length == 0) {
+        toast({
+          variant: "error",
+          message: t('logs.searchBar.noStreamUpdateView'),
+        });
+        return;
+      }
+      savedViewsDropdownOpen.value = false;
+      updateSavedViews(item.view_id, item.view_name);
     };
 
     // Common function to restore visualization data and sync to URL
@@ -3902,7 +4033,7 @@ export default defineComponent({
             updateEditorWidth();
 
             toast({
-              message: `${item.view_name} view applied successfully.`,
+              message: t('logs.searchBar.viewAppliedSuccess', { name: item.view_name }),
               variant: "success",
             });
             setTimeout(async () => {
@@ -3968,50 +4099,24 @@ export default defineComponent({
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
-            message: `Error while applying saved view.`,
+            message: t('logs.searchBar.errorApplyingSavedView'),
             variant: "error",
           });
           console.log("Error while applying saved view", err);
         });
     };
 
-    const handleSavedView = () => {
-      if (isSavedViewAction.value == "create") {
-        if (!savedViewName.value.trim()) {
-          savedViewNameError.value = "This field is required";
-          return;
-        }
-        if (!/^[A-Za-z0-9 _-]+$/.test(savedViewName.value)) {
-          savedViewNameError.value = "Input must be alphanumeric";
-          return;
-        }
-        saveViewLoader.value = true;
-        createSavedViews(savedViewName.value);
-      } else {
-        if (!savedViewSelectedName.value) {
-          savedViewSelectError.value = "Field is required!";
-          return;
-        }
+    // @submit handler — the schema already gated the name (required + the
+    // restored `/^[A-Za-z0-9 _-]+$/` alphanumeric rule) in create mode and the
+    // selected view in update mode, so there is no imperative validation here.
+    // Loading is form-driven (OForm awaits createSavedViews).
+    const handleSavedView = async (value: SavedViewForm) => {
+      if (value.isSavedViewAction == "create") {
+        await createSavedViews(value.savedViewName);
       }
-      //  else {
-      //   if (savedViewSelectedName.value.view_id) {
-      //     saveViewLoader.value = false;
-      //     showSavedViewConfirmDialog(() => {
-      //       saveViewLoader.value = true;
-      //       updateSavedViews(
-      //         savedViewSelectedName.value.view_id,
-      //         savedViewSelectedName.value.view_name,
-      //       );
-      //     });
-      //   } else {
-      //     toast({
-      //       message: `Please select saved view to update.`,
-      //       color: "negative",
-      //       position: "bottom-right",
-      //       timeout: 1000,
-      //     });
-      //   }
-      // }
+      // The update branch is intentionally a no-op: updating from this dialog
+      // was disabled (the legacy logic was commented out); the schema still
+      // requires a selected view so this path can't run with an empty select.
     };
 
     const deleteSavedViews = async () => {
@@ -4117,14 +4222,15 @@ export default defineComponent({
       }
     };
 
+    // Returns the post promise so the @submit handler can await it (the Save
+    // spinner is form-driven and spans the request).
     const createSavedViews = (viewName: string) => {
       try {
         if (viewName.trim() == "") {
           toast({
-            message: `Please provide valid view name.`,
+            message: t('logs.searchBar.provideValidViewName'),
             variant: "warning",
           });
-          saveViewLoader.value = false;
           return;
         }
 
@@ -4133,7 +4239,7 @@ export default defineComponent({
           view_name: viewName,
         };
 
-        savedviewsService
+        return savedviewsService
           .post(store.state.selectedOrganization.identifier, viewObj)
           .then((res) => {
             if (res.status == 200) {
@@ -4153,10 +4259,7 @@ export default defineComponent({
               });
               getSavedViews();
               isSavedViewAction.value = "create";
-              savedViewName.value = "";
-              saveViewLoader.value = false;
             } else {
-              saveViewLoader.value = false;
               toast({
                 message: `${t("search.errorCreatingSavedView")} ${res.data.error_detail}`,
                 variant: "error",
@@ -4164,7 +4267,6 @@ export default defineComponent({
             }
           })
           .catch((err) => {
-            saveViewLoader.value = false;
             toast({
               message: t("search.errorCreatingSavedView"),
               variant: "error",
@@ -4173,10 +4275,8 @@ export default defineComponent({
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
-        savedViewName.value = "";
-        saveViewLoader.value = false;
         toast({
-          message: `Error while saving view: ${e}`,
+          message: t('logs.searchBar.errorSavingView', { e }),
           variant: "error",
         });
         console.log("Error while saving view", e);
@@ -4191,7 +4291,7 @@ export default defineComponent({
         };
 
         const dismiss = toast({
-          message: "Updating saved view...",
+          message: t('logs.searchBar.updatingSavedView'),
           variant: "loading",
           timeout: 0,
         });
@@ -4217,11 +4317,8 @@ export default defineComponent({
                 variant: "success",
               });
               isSavedViewAction.value = "create";
-              savedViewSelectedName.value = "";
-              saveViewLoader.value = false;
               confirmSavedViewDialogVisible.value = false;
             } else {
-              saveViewLoader.value = false;
               toast({
                 message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
                 variant: "error",
@@ -4230,7 +4327,6 @@ export default defineComponent({
           })
           .catch((err) => {
             dismiss();
-            saveViewLoader.value = false;
             toast({
               message: t("search.errorUpdatingSavedView"),
               variant: "error",
@@ -4239,10 +4335,8 @@ export default defineComponent({
           });
       } catch (e: any) {
         isSavedViewAction.value = "create";
-        savedViewSelectedName.value = "";
-        saveViewLoader.value = false;
         toast({
-          message: `Error while saving view: ${e}`,
+          message: t('logs.searchBar.errorSavingView', { e }),
           variant: "error",
         });
         console.log("Error while saving view", e);
@@ -4467,7 +4561,7 @@ export default defineComponent({
       if (!flag) {
         if (favoriteViews.value.length >= 10) {
           toast({
-            message: "You can only save 10 views.",
+            message: t('logs.searchBar.maxViewsLimit'),
             variant: "warning",
           });
           return;
@@ -4480,14 +4574,14 @@ export default defineComponent({
 
         useLocalSavedView(localSavedView);
         toast({
-          message: "View added to favorites.",
+          message: t('logs.searchBar.viewAddedFavorites'),
           variant: "success",
         });
       } else {
         // alert(favoriteViews.value.length)
         // moveItemsToTop(localSavedView, favoriteViews.value);
         toast({
-          message: "View removed from favorites.",
+          message: t('logs.searchBar.viewRemovedFavorites'),
           variant: "success",
         });
       }
@@ -4844,7 +4938,7 @@ export default defineComponent({
         ) {
           toast({
             variant: "error",
-            message: "Please select a stream before scheduling a job",
+            message: t('logs.searchBar.selectStreamBeforeSchedule'),
           });
           return;
         }
@@ -4941,7 +5035,7 @@ export default defineComponent({
 
     const updateActionSelection = (item: any) => {
       toast({
-        message: `${item?.name} action applied successfully`,
+        message: t('logs.searchBar.actionAppliedSuccess', { name: item?.name }),
         variant: "success",
       });
     };
@@ -5092,26 +5186,32 @@ export default defineComponent({
       fnSavedView,
       openSavedViewsList,
       applySavedView,
+      savedViewsDropdownOpen,
+      onSavedViewsDropdownOpenChange,
+      sortedSavedViews,
+      quickUpdateSavedView,
       isSavedViewAction,
-      savedViewName,
-      savedViewNameError,
-      savedViewSelectError,
-      savedViewSelectedName,
+      // Saved-view OForm (schema returned from setup() so the Options-API
+      // template resolves :schema; a bare import would be out of scope).
+      savedViewSchema,
+      savedViewDefaults,
+      savedViewFormRef,
       handleSavedView,
       deleteSavedViews,
       deleteViewID,
       confirmDelete,
-      saveViewLoader,
       savedViewDropdownModel,
       savedViewsListDialog,
       moreOptionsDropdownModel,
       fnSavedFunctionDialog,
-      isSavedFunctionAction,
-      savedFunctionName,
-      savedFunctionNameError,
-      savedFunctionSelectError,
-      savedFunctionSelectedName,
-      saveFunctionLoader,
+      // Saved-function OForm (owner pattern, Rule ③): the form is created with
+      // useOForm and handed to <OForm :form>; `savedFunctionMode` is a reactive
+      // form.useStore read of `isSavedFunctionAction` that drives the dialog v-if.
+      savedFunctionForm,
+      savedFunctionMode,
+      savedFunctionSchema,
+      savedFunctionDefaults,
+      functionToUpdateName,
       functionUpdateConfirm,
       executeFunctionUpdate,
       shareURL,
@@ -5271,10 +5371,10 @@ export default defineComponent({
       return this.searchObj.meta.showTransformEditor;
     },
     confirmMessage() {
-      return "Are you sure you want to update the function?";
+      return this.t('logs.searchBar.confirmUpdateFunction');
     },
     confirmMessageSavedView() {
-      return "Are you sure you want to update the saved view?";
+      return this.t('logs.searchBar.confirmUpdateSavedViewMsg');
     },
     resetFunction() {
       return this.searchObj.data.tempFunctionName;

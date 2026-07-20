@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('regex_patterns.name')"
               required
               data-test="add-regex-pattern-name-input"
-              placeholder="Eg. Internal Passwords"
+              :placeholder="t('settings.addRegexPattern.namePlaceholder')"
             />
             <OFormInput
               name="description"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('regex_patterns.description')"
               class="pb-3"
               data-test="add-regex-pattern-description-input"
-              placeholder="Describe your pattern to help users understand"
+              :placeholder="t('settings.addRegexPattern.descriptionPlaceholder')"
             />
             <OBanner
               variant="info"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBanner>
             <div class="regex-pattern-input-container">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold leading-5.25"> Regex Pattern </span>
+                <span class="text-sm font-bold leading-5.25">{{ t('settings.addRegexPattern.regexPatternLabel') }}</span>
                 <OButton
                   v-if="
                     config.isEnterprise == 'true' &&
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     class="text-[#5960B2] text-sm flex items-center gap-1"
                   >
-                    Try O2 Assistant to write expressions
+                    {{ t('settings.addRegexPattern.tryAiAssistant') }}
                   </span>
                   <OIcon
                     size="sm"
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : 'text-[#6B7280]',
                     ]"
                   >
-                    Write Pattern
+                    {{ t('settings.addRegexPattern.writePattern') }}
                   </div>
                 </div>
                 <OFormTextarea
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="regex-pattern-input"
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  placeholder="Eg. \d....\d "
+                  :placeholder="t('settings.addRegexPattern.patternPlaceholder')"
                   :rows="5"
                 />
               </div>
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div class="flex items-center justify-between">
                 <span class="text-sm font-bold leading-5.25">
-                  Test Regex Pattern
+                  {{ t('settings.addRegexPattern.testRegexPattern') }}
                 </span>
                 <OButton
                   variant="primary"
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!patternValue"
                   @click="testStringOutput"
                 >
-                  Test Input
+                  {{ t('settings.addRegexPattern.testInput') }}
                 </OButton>
               </div>
             </div>
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FullViewContainer
                 name="query"
                 v-model:is-expanded="expandState.regexTestString"
-                label="Input string"
+                :label="t('settings.addRegexPattern.inputStringLabel')"
                 class="mt-1 py-md h-[24px]"
                 :labelClass="
                   store.state.theme === 'dark'
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="regex-test-string-input"
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  placeholder="Eg. 1234567890"
+                  :placeholder="t('settings.addRegexPattern.testStringPlaceholder')"
                   :rows="5"
                 />
               </div>
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FullViewContainer
                 name="output"
                 v-model:is-expanded="expandState.outputString"
-                label="Output"
+                :label="t('settings.addRegexPattern.outputLabel')"
                 class="mt-1 py-md h-[24px]"
                 :labelClass="
                   store.state.theme === 'dark'
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="regex-test-string-input"
                   tabindex="0"
                   style="width: 100%; resize: none"
-                  placeholder="Output String"
+                  :placeholder="t('settings.addRegexPattern.outputStringPlaceholder')"
                   :rows="5"
                 />
                 <div
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : 'text-[#4B5563]'
                       "
                     >
-                      Please click Test Input to see the results
+                      {{ t('settings.addRegexPattern.clickTestInputHint') }}
                     </span>
                   </div>
                   <div v-else-if="testLoading">
@@ -523,8 +523,8 @@ export default defineComponent({
         if (response.status == 200) {
           toast({
             message: props.isEdit
-              ? "Regex pattern updated successfully"
-              : "Regex pattern created successfully",
+              ? t("settings.addRegexPattern.updateSuccess")
+              : t("settings.addRegexPattern.createSuccess"),
             variant: "success",
           });
           emit("close");
@@ -536,8 +536,8 @@ export default defineComponent({
             message:
               error.response?.data?.message ||
               (props.isEdit
-                ? "Failed to update regex pattern"
-                : "Failed to create regex pattern"),
+                ? t("settings.addRegexPattern.updateFailed")
+                : t("settings.addRegexPattern.createFailed")),
             variant: "error",
           });
         }
@@ -565,7 +565,7 @@ export default defineComponent({
         );
       } catch (error) {
         toast({
-          message: error.response?.data?.message || "Failed to test string",
+          message: error.response?.data?.message || t("settings.addRegexPattern.testFailed"),
           variant: "error",
         });
       } finally {

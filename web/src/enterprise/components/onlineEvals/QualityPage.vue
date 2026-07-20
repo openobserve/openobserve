@@ -77,9 +77,9 @@
         <span
           class="qpd-type inline-flex py-0 px-1 rounded-[2px] font-bold text-[13px] leading-[1.4] tracking-[0.02em]"
           :class="{
-            'bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] text-[#4f5bcf]': detailDataType === 'numeric',
-            'bg-[color-mix(in_srgb,#9333ea_14%,transparent)] text-[#7c3aed]': detailDataType === 'categorical',
-            'bg-[color-mix(in_srgb,#16a34a_14%,transparent)] text-[#15803d]': detailDataType === 'boolean',
+            'bg-[color-mix(in_srgb,var(--color-indigo-500)_14%,transparent)] text-[var(--color-indigo-700)]': detailDataType === 'numeric',
+            'bg-[color-mix(in_srgb,var(--color-purple-600)_14%,transparent)] text-[var(--color-purple-700)]': detailDataType === 'categorical',
+            'bg-[color-mix(in_srgb,var(--color-success-600)_14%,transparent)] text-[var(--color-success-700)]': detailDataType === 'boolean',
           }"
           data-test="quality-detail-type-badge"
         >

@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// macOS ld cannot encode compact-unwind offsets once __eh_frame exceeds 16MB;
+// harmless for a binary this size (only slows panic unwinding), so silence it.
+#![allow(linker_messages)]
+
 use std::{
     cmp::max,
     collections::HashMap,
@@ -32,10 +36,7 @@ use config::{
 use infra::runtime::{create_grpc_runtime, create_job_runtime};
 use openobserve::{
     cli::basic::cli,
-    common::{
-        infra::{self as common_infra, cluster},
-        meta,
-    },
+    common::{infra::cluster, meta},
     handler::{
         grpc::{
             auth::check_auth,
@@ -54,6 +55,7 @@ use openobserve::{
     },
     job, migration, router,
     service::{
+        bootstrap,
         cluster_info::ClusterInfoService,
         db::{self, scheduler::TriggerModule::QueryRecommendations},
         metadata,
@@ -76,7 +78,7 @@ use proto::cluster_rpc::{
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
 };
-use tokio::{net::TcpListener, sync::oneshot};
+use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataMap, MetadataValue},
@@ -86,11 +88,11 @@ use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
+use utoipa::OpenApi;
 #[cfg(feature = "enterprise")]
 use {
     config::Config,
     o2_enterprise::enterprise::{ai, common::config::O2Config},
-    utoipa::OpenApi,
 };
 
 #[cfg(feature = "mimalloc")]
@@ -235,9 +237,17 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("infra init failed: {e}");
             }
 
-            if let Err(e) = common_infra::init().await {
+            if let Err(e) = bootstrap::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {e}");
+            }
+
+            // Initialize MCP tools from the OpenAPI spec for all editions.
+            let api = openapi::ApiDoc::openapi();
+            if let Err(e) = openobserve_mcp::tools::init_mcp_tools(&api) {
+                log::error!("Failed to initialize MCP tools: {e}");
+            } else {
+                log::info!("Initialized MCP tools");
             }
 
             // init enterprise
@@ -409,13 +419,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     // init http server
-    if !cfg.common.tracing_enabled
-        && (cfg.common.tracing_search_enabled || cfg.common.search_inspector_enabled)
-    {
-        if let Err(e) = init_http_server_without_tracing().await {
-            log::error!("HTTP server runs failed: {e}");
-        }
-    } else if let Err(e) = init_http_server().await {
+    if let Err(e) = init_http_server().await {
         log::error!("HTTP server runs failed: {e}");
     }
     log::info!("HTTP server stopped");
@@ -658,10 +662,10 @@ async fn init_router_grpc_server(
     Ok(())
 }
 
-async fn init_http_server() -> Result<(), anyhow::Error> {
+/// Resolve the HTTP listen address from config
+fn http_server_addr() -> Result<SocketAddr, anyhow::Error> {
     let cfg = get_config();
-
-    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
+    let haddr = if cfg.http.ipv6_enabled {
         format!("[::]:{}", cfg.http.port).parse()?
     } else {
         let ip = if !cfg.http.addr.is_empty() {
@@ -671,148 +675,92 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         };
         format!("{}:{}", ip, cfg.http.port).parse()?
     };
+    Ok(haddr)
+}
 
-    let scheme = if cfg.http.tls_enabled {
-        "HTTPS"
-    } else {
-        "HTTP"
-    };
-    log::info!("Starting {scheme} server at: {haddr}");
-
-    // Build the router
+/// Apply the middlewares shared by all HTTP servers: access log, slow log and
+/// client IP resolution
+fn apply_common_middlewares(app: axum::Router) -> axum::Router {
+    let cfg = get_config();
     let ip_sources = config::axum::middlewares::resolve_client_ip_sources(&cfg.http.real_ip_source);
     log::info!(
         "HTTP client IP sources (in order, implicit ConnectInfo fallback): {}",
         cfg.http.real_ip_source
     );
-    let app = create_app_router()
-        .layer(config::axum::middlewares::AccessLogLayer::new(
-            config::axum::middlewares::get_http_access_log_format(),
-        ))
-        .layer(config::axum::middlewares::SlowLogLayer::new(
-            cfg.limit.http_slow_log_threshold,
-        ))
-        .layer(axum::middleware::from_fn(
-            config::axum::middlewares::extract_real_ip,
-        ))
-        .layer(axum::Extension(ip_sources))
-        .layer(CompressionLayer::new())
-        .layer(TraceLayer::new_for_http());
+    app.layer(config::axum::middlewares::AccessLogLayer::new(
+        config::axum::middlewares::get_http_access_log_format(),
+    ))
+    .layer(config::axum::middlewares::SlowLogLayer::new(
+        cfg.limit.http_slow_log_threshold,
+    ))
+    .layer(axum::middleware::from_fn(
+        config::axum::middlewares::extract_real_ip,
+    ))
+    .layer(axum::Extension(ip_sources))
+}
 
+/// Serve `app` on `haddr`, with TLS if configured. Graceful shutdown is
+/// bounded by ZO_HTTP_SHUTDOWN_TIMEOUT so long-lived connections (SSE,
+/// websocket) cannot block process exit.
+async fn serve_http(haddr: SocketAddr, app: axum::Router) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    let handle = axum_server::Handle::new();
+    let shutdown_timeout = cfg.limit.http_shutdown_timeout;
+
+    // Spawn task to handle shutdown signal
+    tokio::spawn({
+        let handle = handle.clone();
+        async move {
+            shutdown_signal().await;
+            handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
+        }
+    });
+
+    let service = app.into_make_service_with_connect_info::<SocketAddr>();
     if cfg.http.tls_enabled {
-        // TLS server using axum-server
         let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
             &cfg.http.tls_cert_path,
             &cfg.http.tls_key_path,
         )
         .await?;
-
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
-            }
-        });
-
         axum_server::bind_rustls(haddr, tls_config)
             .handle(handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .serve(service)
             .await?;
     } else {
-        // Non-TLS server
-        let listener = TcpListener::bind(haddr).await?;
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+        axum_server::bind(haddr)
+            .handle(handle)
+            .serve(service)
+            .await?;
     }
 
     Ok(())
 }
 
-async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
+async fn init_http_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-
-    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
-        format!("[::]:{}", cfg.http.port).parse()?
-    } else {
-        let ip = if !cfg.http.addr.is_empty() {
-            cfg.http.addr.clone()
-        } else {
-            "0.0.0.0".to_string()
-        };
-        format!("{}:{}", ip, cfg.http.port).parse()?
-    };
-
-    let scheme = if cfg.http.tls_enabled {
-        "HTTPS"
-    } else {
-        "HTTP"
-    };
-    log::info!("Starting {scheme} server at: {haddr}");
-
-    // Build the router without tracing
-    let ip_sources = config::axum::middlewares::resolve_client_ip_sources(&cfg.http.real_ip_source);
+    let haddr = http_server_addr()?;
     log::info!(
-        "HTTP client IP sources (in order, implicit ConnectInfo fallback): {}",
-        cfg.http.real_ip_source
+        "Starting {} server at: {haddr}",
+        if cfg.http.tls_enabled {
+            "HTTPS"
+        } else {
+            "HTTP"
+        }
     );
-    let app = create_app_router()
-        .layer(config::axum::middlewares::AccessLogLayer::new(
-            config::axum::middlewares::get_http_access_log_format(),
-        ))
-        .layer(config::axum::middlewares::SlowLogLayer::new(
-            cfg.limit.http_slow_log_threshold,
-        ))
-        .layer(axum::middleware::from_fn(
-            config::axum::middlewares::extract_real_ip,
-        ))
-        .layer(axum::Extension(ip_sources))
-        .layer(CompressionLayer::new());
 
-    if cfg.http.tls_enabled {
-        // TLS server using axum-server
-        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
-            &cfg.http.tls_cert_path,
-            &cfg.http.tls_key_path,
-        )
-        .await?;
-
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
-            }
-        });
-
-        axum_server::bind_rustls(haddr, tls_config)
-            .handle(handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await?;
+    // Build the router
+    let app = apply_common_middlewares(create_app_router()).layer(CompressionLayer::new());
+    // Skip the request tracing layer when tracing is enabled only for search
+    let app = if !cfg.common.tracing_enabled
+        && (cfg.common.tracing_search_enabled || cfg.common.search_inspector_enabled)
+    {
+        app
     } else {
-        // Non-TLS server
-        let listener = TcpListener::bind(haddr).await?;
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
-    }
+        app.layer(TraceLayer::new_for_http())
+    };
 
-    Ok(())
+    serve_http(haddr, app).await
 }
 
 /// Signal handler for graceful shutdown
@@ -1382,78 +1330,25 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
 #[cfg(feature = "enterprise")]
 async fn init_action_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-
-    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
-        format!("[::]:{}", cfg.http.port).parse()?
-    } else {
-        let ip = if !cfg.http.addr.is_empty() {
-            cfg.http.addr.clone()
-        } else {
-            "0.0.0.0".to_string()
-        };
-        format!("{}:{}", ip, cfg.http.port).parse()?
-    };
+    let haddr = http_server_addr()?;
 
     // Setup the namespace
     o2_enterprise::enterprise::actions::action_deployer::init().await?;
 
-    let scheme = if cfg.http.tls_enabled {
-        "HTTPS"
-    } else {
-        "HTTP"
-    };
-    log::info!("Starting Action Server {scheme} server at: {haddr}");
+    log::info!(
+        "Starting Action Server {} server at: {haddr}",
+        if cfg.http.tls_enabled {
+            "HTTPS"
+        } else {
+            "HTTP"
+        }
+    );
 
     // Build the router for action server
-    let ip_sources = config::axum::middlewares::resolve_client_ip_sources(&cfg.http.real_ip_source);
-    let app = create_action_server_router()
-        .layer(config::axum::middlewares::AccessLogLayer::new(
-            config::axum::middlewares::get_http_access_log_format(),
-        ))
-        .layer(config::axum::middlewares::SlowLogLayer::new(
-            cfg.limit.http_slow_log_threshold,
-        ))
-        .layer(axum::middleware::from_fn(
-            config::axum::middlewares::extract_real_ip,
-        ))
-        .layer(axum::Extension(ip_sources))
-        .layer(TraceLayer::new_for_http());
+    let app =
+        apply_common_middlewares(create_action_server_router()).layer(TraceLayer::new_for_http());
 
-    if cfg.http.tls_enabled {
-        // TLS server using axum-server
-        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
-            &cfg.http.tls_cert_path,
-            &cfg.http.tls_key_path,
-        )
-        .await?;
-
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle
-                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
-            }
-        });
-
-        axum_server::bind_rustls(haddr, tls_config)
-            .handle(handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await?;
-    } else {
-        // Non-TLS server
-        let listener = TcpListener::bind(haddr).await?;
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
-    }
+    serve_http(haddr, app).await?;
 
     log::info!("HTTP server stopped");
 
@@ -1527,12 +1422,11 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         openobserve::super_cluster_queue::init().await?;
     }
 
-    // Initialize OpenAPI spec for AI and MCP modules (includes agent client)
-    let api = openapi::ApiDoc::openapi();
-    if let Err(e) = o2_enterprise::enterprise::ai::init_ai_components(api) {
-        log::error!("Failed to init AI/MCP/Agent: {e}");
+    // Initialize enterprise AI components (agent and evaluation clients).
+    if let Err(e) = o2_enterprise::enterprise::ai::init_ai_components() {
+        log::error!("Failed to initialize enterprise AI components: {e}");
     } else {
-        log::info!("Initialized AI, MCP, and Agent components");
+        log::info!("Initialized enterprise AI components");
     }
 
     // check ratelimit config

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="iam-users-selection-show-text"
             style="font-size: 14px"
           >
-            Show
+            {{ t("iam.groupUsers.show") }}
           </span>
           <OToggleGroup
             class="ml-1"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-search-input"
           v-model="userSearchKey"
           class="h-[36px] w-[200px]"
-          placeholder="Search User"
+          :placeholder="t('iam.groupUsers.searchUser')"
         />
       </div>
 
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchable
           class="organizationlist"
           @update:model-value="updateOrganization"
-          placeholder="Select Organization"
+          :placeholder="t('iam.groupUsers.selectOrganization')"
         />
 
         </div>
@@ -194,16 +194,17 @@ const rows: Ref<any[]> = ref([]);
 const usersDisplay = ref("selected");
 
 const store = useStore();
-const orgOptions = ref([{ label: "All", value: "all" }]);
+const { t } = useI18n();
+const orgOptions = ref([{ label: t("iam.groupUsers.all"), value: "all" }]);
 const selectedOrg = ref(orgOptions.value[0]);
 const orgList = ref([...orgOptions.value]);
 const usersDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.groupUsers.all"),
     value: "all",
   },
   {
-    label: "Selected",
+    label: t("iam.groupUsers.selected"),
     value: "selected",
   },
 ];
@@ -216,7 +217,6 @@ const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
     );
   });
 };
-const { t } = useI18n();
 
 const userSearchKey = ref("");
 
@@ -257,7 +257,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   if (store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org) {
     baseColumns.push({
       id: "organization",
-      header: "Organizations",
+      header: t("iam.groupUsers.organizations"),
       accessorKey: "org",
       sortable: true,
       resizable: true,
@@ -293,7 +293,7 @@ onBeforeMount(async () => {
     otherOrgOptions.sort((a:any, b:any) => a.label.localeCompare(b.label));
 
     // Prepend "All" option to the sorted list
-    orgOptions.value = [{ label: "All", value: "all" }, ...otherOrgOptions];
+    orgOptions.value = [{ label: t("iam.groupUsers.all"), value: "all" }, ...otherOrgOptions];
   }
   selectedOrg.value = orgOptions.value[0]; // Default to "All"
 });

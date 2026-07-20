@@ -323,12 +323,12 @@ test.describe("Traces Regression Bugs", () => {
     await scPage.filterByServiceName('alert');
     testLogger.info('✓ Typed "alert" in search filter');
 
-    // Click the actual Quasar clear/cross icon (this was the bug trigger — Quasar sets value to null)
+    // Click the actual clear/cross icon (this was the bug trigger — the framework sets value to null)
     const clearClicked = await scPage.clickFilterClearButton();
-    testLogger.info(clearClicked ? '✓ Clicked Quasar clear/cross icon' : 'Clear button not visible, used fill(\'\') fallback');
+    testLogger.info(clearClicked ? '✓ Clicked clear/cross icon' : 'Clear button not visible, used fill(\'\') fallback');
 
-    // STRONG ASSERTION: Must click the actual Quasar clear icon — the fill('') fallback doesn't reproduce bug #11689
-    expect(clearClicked, 'Bug #11689: Quasar clear icon must be clickable — fill(\'\') fallback does not exercise the regression').toBe(true);
+    // STRONG ASSERTION: Must click the actual clear icon — the fill('') fallback doesn't reproduce bug #11689
+    expect(clearClicked, 'Bug #11689: clear icon must be clickable — fill(\'\') fallback does not exercise the regression').toBe(true);
 
     // PRIMARY ASSERTION: Table should NOT be blank after clearing
     const afterClearCount = await scPage.getServiceCount();
