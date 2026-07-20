@@ -122,17 +122,17 @@ describe("MetricsVisualize", () => {
     expect(panelData.current.layout.showQueryBar).toBe(true);
   });
 
-  it("offers area-stacked among the allowed chart types", async () => {
-    // Dashboards have supported stacked area on PromQL for years; the metrics
-    // visualize pane narrowed the list and silently dropped it.
+  it("does not restrict chart types — matches AddPanel (ChartSelection's PromQL rules govern)", async () => {
+    // The pane used to pass a narrow allowedChartTypes list, disabling stacked,
+    // gauge, pie, heatmap, etc. AddPanel passes none; the metrics pane must not
+    // silently drop chart types the dashboard offers for the same PromQL panel.
     const wrapper = mountVisualize();
     await flushPromises();
 
     const allowed = wrapper
       .findComponent({ name: "PanelEditor" })
       .props("allowedChartTypes");
-    expect(allowed).toContain("area");
-    expect(allowed).toContain("area-stacked");
+    expect(allowed).toBeUndefined();
   });
 
   it("opens the add-to-dashboard dialog only when the panel validates", async () => {
