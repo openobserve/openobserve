@@ -15,14 +15,14 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import TagInput from "./TagInput.vue";
+import OTagInput from "./OTagInput.vue";
 
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 
 function buildWrapper(props: Record<string, any> = {}): VueWrapper<any> {
-  return mount(TagInput, {
+  return mount(OTagInput, {
     props: {
       modelValue: [],
       ...props,
@@ -34,7 +34,7 @@ function buildWrapper(props: Record<string, any> = {}): VueWrapper<any> {
 // tests
 // ---------------------------------------------------------------------------
 
-describe("TagInput", () => {
+describe("OTagInput", () => {
   let wrapper: VueWrapper<any> | null = null;
 
   afterEach(() => {

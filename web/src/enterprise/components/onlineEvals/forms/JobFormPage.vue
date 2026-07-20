@@ -96,10 +96,7 @@
             @update:model-value="form.setFieldValue('scorerIds', $event)"
           />
 
-          <JobFilterBuilder
-            :group="filterGroup"
-            @update:group="filterGroup = $event"
-          />
+          <JobFilterBuilder name-prefix="filterGroup" />
 
           <JobInputMapping
             :selected-scorers="selectedScorers"
@@ -291,9 +288,14 @@ const form = useOForm<JobForm>({
 });
 const formValues = form.useStore((s: any) => s.values as JobForm);
 
-// Composite / un-validated working state (built into the payload at submit) —
-// kept as local non-form state, not mirrored into the form.
-const filterGroup = ref(initFilterGroup(props.row));
+// The filter-builder tree is FORM-OWNED now: a reactive READ-VIEW of the
+// form's `filterGroup` field (JobFilterBuilder renders FilterGroup in form mode
+// and writes structural changes straight to the form). Single source of truth,
+// no mirror ref. Drives the preview computeds below and the save payload.
+const filterGroup = form.useStore(
+  (s: any) => s.values.filterGroup ?? createEmptyJobFilterGroup(),
+);
+// Input-mapping composite stays local non-form working state.
 const inputMappings = ref(initInputMappings(props.row));
 const scorerVersions = ref(initScorerVersions(props.row));
 // Which create-mode submit was triggered (draft vs. create-and-activate). Set
@@ -373,6 +375,7 @@ function initForm(row: EvalJob | null): JobForm {
       scorerIds: [] as string[],
       samplingMode: "rate",
       samplingValue: "0.1",
+      filterGroup: initFilterGroup(row),
     };
   }
   return {
@@ -383,6 +386,7 @@ function initForm(row: EvalJob | null): JobForm {
     scorerIds: (row.scorers || []).map(scorerRefId),
     samplingMode: samplingModeOf(row),
     samplingValue: stringifyJson(valueOf(row, "samplingValue", "sampling_value")),
+    filterGroup: initFilterGroup(row),
   };
 }
 
@@ -438,7 +442,7 @@ async function onSubmit(value: JobForm) {
       description: value.description?.trim() || null,
       stream: value.stream,
       streamType: value.streamType,
-      filterCondition: buildJobFilterConditionPayload(filterGroup.value),
+      filterCondition: buildJobFilterConditionPayload(value.filterGroup),
       scorers: value.scorerIds.map((id) => ({ id, version: scorerVersions.value[id] ?? null })),
       inputMapping: buildJobInputMappingPayload(value.scorerIds, inputMappings.value),
       samplingMode: value.samplingMode as any,

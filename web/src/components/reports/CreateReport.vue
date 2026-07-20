@@ -215,11 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-report-variable-select"
                       class="w-full mt-3 o2-input"
                     >
-                      <VariablesInput
-                        :variables="dashboardVariables"
-                        @add:variable="addDashboardVariable"
-                        @remove:variable="removeDashboardVariable"
-                      />
+                      <VariablesInput name-prefix="variables" />
                     </div>
 
                     <!-- Report Format -->
@@ -716,7 +712,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, nextTick, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { getUUID, useLocalTimezone } from "@/utils/zincutils";
+import { useLocalTimezone } from "@/utils/zincutils";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
 import dashboardService from "@/services/dashboards";
@@ -763,8 +759,8 @@ const props = defineProps({
 // Payload skeleton — the non-form server fields (destinations, frequency shape,
 // timezone, timestamps, owner/lastEditedBy, ...) that aren't OForm-owned. It is
 // the save base in saveReport(): the validated @submit value overwrites the
-// form-owned parts on top of it. Only the dashboard `variables` stay
-// component-owned (VariablesInput has no OForm* wrapper) and are merged in at save.
+// form-owned parts on top of it. The dashboard `variables` are form-owned too
+// (VariablesInput renders in form mode, name-prefix="variables").
 const defaultReport = {
   dashboards: [
     {
@@ -879,9 +875,8 @@ const selectedTimeTab = form.useStore(
 );
 const dashboardRows = form.useStore((s: any) => s.values?.dashboards ?? []);
 
-// The dashboard's `variables` stay component-owned (VariablesInput has no OForm*
-// equivalent and carries no validation); merged into the payload at save.
-const dashboardVariables = ref<{ key: string; value: string; id: string }[]>([]);
+// `variables` are now form-owned (VariablesInput renders in form mode,
+// name-prefix="variables"); read from the form value at save.
 
 const filteredTimezone: any = ref([]);
 
@@ -934,8 +929,8 @@ const seedForm = async (values: CreateReportForm) => {
 // (covers every field incl. the dashboards row) + the component-owned variables.
 const snapshot = () =>
   JSON.stringify({
+    // `variables` are now form-owned, so form.state.values already covers them.
     values: form.state.values ?? {},
-    variables: dashboardVariables.value,
   });
 
 onBeforeMount(async () => {
@@ -1293,20 +1288,6 @@ const browserTime =
 timezoneOptions.unshift("UTC");
 timezoneOptions.unshift(browserTime);
 
-const addDashboardVariable = () => {
-  dashboardVariables.value.push({
-    key: "",
-    value: "",
-    id: getUUID(),
-  });
-};
-
-const removeDashboardVariable = (variable: any) => {
-  dashboardVariables.value = dashboardVariables.value.filter(
-    (_variable: any) => _variable.id !== variable.id,
-  );
-};
-
 const getDashboaordFolders = () => {
   return new Promise((resolve, reject) => {
     isFetchingFolders.value = true;
@@ -1354,7 +1335,7 @@ const saveReport = async (value: CreateReportForm) => {
     folder: row.folder,
     dashboard: row.dashboard,
     tabs: [row.tabs],
-    variables: dashboardVariables.value,
+    variables: value.variables ?? [],
     timerange: row.timerange,
     report_type: row.report_type,
     email_attachment_type: row.email_attachment_type,
@@ -1559,9 +1540,6 @@ const setupEditingReport = async (report: any) => {
   // into the form below.
   formData.value = { ...report };
 
-  // `variables` are component-owned (the VariablesInput composite).
-  dashboardVariables.value = report.dashboards[0].variables ?? [];
-
   // set date, time and timezone for the form (scheduleLater).
   // Use Luxon to interpret the timestamp in the report's own timezone so that
   // the displayed date/time matches what convertDateToTimestamp will re-encode
@@ -1688,6 +1666,12 @@ const setupEditingReport = async (report: any) => {
       frequencyType: freqType,
       selectedTimeTab: timeTab,
       dashboards: [row],
+      // `variables` are form-owned now; seed them from the record (drop the
+      // frontend-only `id` — the schema row is {key, value}).
+      variables: (report.dashboards?.[0]?.variables ?? []).map((v: any) => ({
+        key: v.key ?? "",
+        value: v.value ?? "",
+      })),
     }),
   );
 };

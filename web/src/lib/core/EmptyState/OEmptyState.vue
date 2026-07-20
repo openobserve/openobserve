@@ -89,7 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (+ optional secondary) button(s) from preset/props -->
       <div
         v-if="$slots.actions || showCards || resolvedActionLabel || secondaryActionLabel"
-        :class="['flex flex-nowrap items-stretch justify-center', sizeClass.actions]"
+        :class="[
+          props.columns
+            ? 'flex flex-wrap justify-center'
+            : 'flex flex-nowrap items-stretch justify-center',
+          sizeClass.actions,
+        ]"
       >
         <slot name="actions">
           <template v-if="showCards">
@@ -175,6 +180,11 @@ const props = withDefaults(
     secondaryActionLabel?: string;
     /** Suppress the preset's actions (e.g. table empties with no CTA). */
     hideAction?: boolean;
+    /**
+     * Whether to wrap action cards onto multiple rows (flex-wrap) instead of
+     * forcing a single row (flex-nowrap). Use when you have more than 2-3 cards.
+     */
+    columns?: boolean;
     /**
      * The underlying list HAS items but the current filter/search matched none.
      * Switches to a "no results" treatment (magnifier + "No {noun} found" +

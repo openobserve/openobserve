@@ -749,6 +749,68 @@ const goToStep = async (fields: string[], next: number) => {
   if (await validateStepFields(fields)) step.value = next;
 };
 
+// Map a Zod issue path to its OForm field name so we can match issues to the
+// field that owns them: ["cron"] → "cron". Actions only has flat scalar fields,
+// but keep the same helper reports uses (handles nested array paths too) for parity.
+const issuePathToName = (path: readonly (string | number)[]): string =>
+  path.reduce<string>(
+    (acc, seg) =>
+      typeof seg === "number"
+        ? `${acc}[${seg}]`
+        : acc
+          ? `${acc}.${seg}`
+          : String(seg),
+    "",
+  );
+
+// Clear a field's error the instant its value becomes valid — scoped to that one
+// field, never touching the others. Needed because the stepper's Continue
+// validates with validateField("submit"), which does NOT flip the form into
+// revalidate-on-change mode, so editing an OForm* field would otherwise leave a
+// stale error until the next Save (e.g. the uploaded ZIP kept showing "ZIP File
+// is required!" and a typed name kept showing "Name is required"). This ONLY
+// clears — it never adds errors — so editing one field can't surface validation
+// on another (no bleed to other steps).
+const formValuesRef = form.useStore((s: any) => s.values);
+watch(
+  formValuesRef,
+  () => {
+    const res = editScriptSchema.safeParse(form.state.values);
+    const invalidNames = new Set(
+      res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
+    );
+    for (const name of Object.keys(form.state.fieldMeta ?? {})) {
+      const meta = form.getFieldMeta(name);
+      if (!meta) continue;
+      const hasError = (meta.errors?.length ?? 0) > 0;
+      if (hasError && !invalidNames.has(name)) {
+        form.setFieldMeta(name, { ...meta, errorMap: {} });
+      }
+    }
+
+    // Also reconcile the FORM-LEVEL error map, not just per-field metas. A
+    // Continue click validates via validateField("submit"); because the schema is
+    // form-level, that runs the WHOLE Zod schema and records EVERY failing path
+    // into the form's own errorMap.onDynamic. When the form later becomes fully
+    // valid, clearing the field metas above is not enough: handleSubmit()
+    // re-validates fields but never re-runs or clears this form-level result, so
+    // canSubmit stays false and Save is silently blocked. Clear it here once the
+    // whole schema passes — like the loop above, this ONLY clears, so it can never
+    // reveal an error early.
+    if (res.success) {
+      const em: any = form.state.errorMap ?? {};
+      if (em.onDynamic != null || em.onDynamicAsync != null) {
+        form.setErrorMap({
+          ...em,
+          onDynamic: undefined,
+          onDynamicAsync: undefined,
+        });
+      }
+    }
+  },
+  { deep: true },
+);
+
 // Bridge the component-owned frequency tabs (repeat/once) into the form so the
 // schema's cron superRefine can branch on it. Default-values seeds the initial
 // value; this keeps it in sync on toggle (and re-validates cron after the first

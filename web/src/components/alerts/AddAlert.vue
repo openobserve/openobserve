@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- AddAlert owns the single OForm: `form` is created in setup() via
-       useAlertForm's useOForm and handed to <OForm :form> so the topbar OForm*
-       fields and the descendant steps (QueryConfig / AlertSettings) bind by
-       nested `name=` into it. -->
-  <OForm :form="form" class="w-full h-full">
+  <!-- AddAlert OWNS the ONE form (Rule ③ owner pattern): `form` is created in
+       setup() via useAlertForm's useOForm and handed to <OForm :form> so the
+       topbar OForm* fields and the already-migrated descendant steps
+       (QueryConfig / AlertSettings) bind by nested `name=` into it. -->
+  <OForm :form="form" v-slot="{ isSubmitting }" class="w-full h-full">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
@@ -348,13 +348,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-alert-cancel-btn"
           variant="outline"
           size="sm-action"
+          :disabled="isSubmitting"
           @click="$emit('cancel:hideform')"
         >{{ t('alerts.cancel') }}</OButton>
         <OButton
           data-test="add-alert-submit-btn"
           variant="primary"
           size="sm-action"
-          :loading="isAnomalyMode ? anomalySaving : false"
+          :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
           @click="handleSave"
         >{{ isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save') }}</OButton>
       </div>

@@ -16,8 +16,10 @@
 import { z } from "zod";
 
 // Co-located Zod schema for SemanticGroupItem (the inline correlation "semantic
-// field group" row). Form-owned controls: display (required), is_workload_type
-// (optional boolean), fields/TagInput (optional string[]).
+// field group" row). Only three controls are form-owned:
+//   • display           → required (pre-migration rule: `!!v || t('common.name') + ' is required'`)
+//   • is_workload_type  → optional boolean (no rule today)
+//   • fields (OFormTagInput) → optional string[] (NO required rule today — do NOT add one)
 //
 // The generated `id` and the parent-supplied `group` (category) are NOT form
 // fields — `id` is a slugify side-effect of `display` and `group` comes from the

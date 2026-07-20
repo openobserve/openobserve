@@ -27,9 +27,15 @@ function getTimestampNs() {
 /**
  * Generate a single distributed trace
  * @param {number} iteration - Trace iteration number
+ * @param {Object} [options]
+ * @param {'error'|'success'} [options.forceScenario] - Deterministically pick an
+ *   error (spanStatus=2) or success (spanStatus=1) scenario instead of a random
+ *   one. Used by tests that must guarantee error traces exist (e.g. the traces
+ *   error-only toggle), removing the data-dependent flake where a random draw
+ *   produced no error spans.
  * @returns {Object} OTLP trace data
  */
-function generateTrace(iteration) {
+function generateTrace(iteration, options = {}) {
   // Generate IDs
   const traceId = generateHexId(16);
   const rootSpanId = generateHexId(8);
@@ -92,7 +98,19 @@ function generateTrace(iteration) {
     }
   ];
 
-  const selected = scenarios[Math.floor(Math.random() * scenarios.length)];
+  // Scenario selection. `forceScenario` makes the error/success mix deterministic
+  // (round-robin within the matching subset) so callers can guarantee at least one
+  // error span; without it we keep the original random draw.
+  let selected;
+  if (options.forceScenario === 'error') {
+    const errorScenarios = scenarios.filter((s) => s.spanStatus === 2);
+    selected = errorScenarios[iteration % errorScenarios.length];
+  } else if (options.forceScenario === 'success') {
+    const successScenarios = scenarios.filter((s) => s.spanStatus === 1);
+    selected = successScenarios[iteration % successScenarios.length];
+  } else {
+    selected = scenarios[Math.floor(Math.random() * scenarios.length)];
+  }
 
   // Calculate timestamps for distributed trace spans
   const clientStart = Number(startTime) + 1000000;
@@ -234,8 +252,8 @@ function generateTrace(iteration) {
  * @param {number} traceCount - Number of traces to generate and ingest
  * @returns {Promise<Object>} Ingestion result
  */
-async function ingestTraces(page, traceCount = 10) {
-  testLogger.info(`Starting trace ingestion`, { traceCount });
+async function ingestTraces(page, traceCount = 10, options = {}) {
+  testLogger.info(`Starting trace ingestion`, { traceCount, forceScenario: options.forceScenario });
 
   const orgId = getOrgIdentifier() || "default";
   const headers = getAuthHeaders();
@@ -245,7 +263,7 @@ async function ingestTraces(page, traceCount = 10) {
   const traceIds = [];
 
   for (let i = 1; i <= traceCount; i++) {
-    const traceData = generateTrace(i);
+    const traceData = generateTrace(i, options);
     traceIds.push(traceData.resourceSpans[0].scopeSpans[0].spans[0].traceId);
 
     try {

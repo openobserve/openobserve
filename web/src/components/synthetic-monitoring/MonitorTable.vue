@@ -247,8 +247,10 @@
     <!-- Empty state -->
     <template #empty>
       <OEmptyState
-        size="hero"
+        size="block"
         preset="no-synthetic-monitors"
+        :filtered="props.hasFilters"
+        columns
         :description="t('synthetics.table.noResults')"
         :data-test="`${dataTest}-empty-state`"
         @action="(id: string) => emit('empty-action', id)"
@@ -376,6 +378,7 @@ const props = withDefaults(defineProps<{
   selectedIds?: string[]
   showFolderColumn?: boolean
   bulkActionLoading?: boolean
+  hasFilters?: boolean
 }>(), {
   loading: false,
   footerTitle: 'Checks',
@@ -386,6 +389,7 @@ const props = withDefaults(defineProps<{
   selectedIds: () => [],
   showFolderColumn: false,
   bulkActionLoading: false,
+  hasFilters: false,
 })
 
 const emit = defineEmits<{

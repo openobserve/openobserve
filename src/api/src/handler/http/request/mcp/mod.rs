@@ -14,37 +14,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{
+    Json,
     body::{Body, Bytes},
     extract::Path,
-    http::{StatusCode, header},
+    http::{HeaderMap, StatusCode, header},
     response::Response,
 };
+use futures_util::StreamExt;
 #[cfg(feature = "enterprise")]
-use {
-    axum::{Json, http::HeaderMap},
-    futures_util::StreamExt,
-    o2_enterprise::enterprise::ai::mcp::{
-        MCPRequest, OAuthServerMetadata, handle_mcp_request, handle_mcp_request_stream,
-    },
+use openobserve_mcp::OAuthServerMetadata;
+use openobserve_mcp::{
+    MCP_PROTOCOL_VERSION, MCPRequest, handle_mcp_request, handle_mcp_request_stream,
 };
 
-#[cfg(not(feature = "enterprise"))]
-/// Returns a 404 response for non-enterprise builds
-fn mcp_only_in_enterprise() -> Response {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(
-            serde_json::to_string(&serde_json::json!({
-                "error": "MCP server is only available in enterprise edition"
-            }))
-            .unwrap(),
-        ))
-        .unwrap()
-}
-
 /// MCP protocol version header name (MCP 2025-11-25)
-#[cfg(feature = "enterprise")]
 const MCP_PROTOCOL_VERSION_HEADER: &str = "MCP-Protocol-Version";
 
 /// Handler for MCP POST requests (single request/response)
@@ -53,7 +36,6 @@ const MCP_PROTOCOL_VERSION_HEADER: &str = "MCP-Protocol-Version";
 /// - Requests with `id` → 200 with JSON or SSE response
 /// - Notifications (no `id`) → 202 Accepted, no body
 /// - Validates `MCP-Protocol-Version` header on non-initialize requests
-#[cfg(feature = "enterprise")]
 #[utoipa::path(
     post,
     path = "/{org_id}/mcp",
@@ -83,8 +65,6 @@ pub async fn handle_mcp_post(
     headers: HeaderMap,
     Json(mcp_request): Json<MCPRequest>,
 ) -> Response {
-    use o2_enterprise::enterprise::ai::mcp::MCP_PROTOCOL_VERSION;
-
     // Extract auth token from Authorization header
     let auth_token = headers
         .get(header::AUTHORIZATION)
@@ -178,7 +158,6 @@ pub async fn handle_mcp_post(
 ///
 /// Clients may DELETE the MCP endpoint to explicitly terminate a session.
 /// Since O2 MCP is stateless, this always succeeds.
-#[cfg(feature = "enterprise")]
 #[utoipa::path(
     delete,
     path = "/{org_id}/mcp",
@@ -206,13 +185,7 @@ pub async fn handle_mcp_delete(Path(_org_id): Path<String>) -> Response {
         .unwrap()
 }
 
-#[cfg(not(feature = "enterprise"))]
-pub async fn handle_mcp_delete(Path(_org_id): Path<String>, _body: Bytes) -> Response {
-    mcp_only_in_enterprise()
-}
-
 /// Handler for MCP GET requests (streaming)
-#[cfg(feature = "enterprise")]
 #[utoipa::path(
     post,
     path = "/{org_id}/mcp",
@@ -312,59 +285,6 @@ pub async fn handle_mcp_get(
         .unwrap()
 }
 
-// Dummy handlers for non-enterprise builds
-#[cfg(not(feature = "enterprise"))]
-#[utoipa::path(
-    post,
-    path = "/{org_id}/mcp",
-    context_path = "/api",
-    tag = "MCP",
-    operation_id = "MCPRequest",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization ID"),
-    ),
-    request_body(content = Object, description = "MCP request payload", content_type = "application/json"),
-    responses(
-        (status = 404, description = "Not Found - MCP server is only available in enterprise edition", content_type = "application/json"),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "post"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
-    ),
-)]
-pub async fn handle_mcp_post(Path(_org_id): Path<String>, _body: Bytes) -> Response {
-    mcp_only_in_enterprise()
-}
-
-#[cfg(not(feature = "enterprise"))]
-#[utoipa::path(
-    post,
-    path = "/{org_id}/mcp",
-    context_path = "/api",
-    tag = "MCP",
-    operation_id = "MCPRequestStream",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-    ),
-    request_body(content = Object, description = "MCP request payload", content_type = "application/json"),
-    responses(
-        (status = 404, description = "Not Found - MCP server is only available in enterprise edition", content_type = "application/json"),
-    ),
-    extensions(
-        ("x-o2-ratelimit" = json!({"module": "mcp", "operation": "get"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
-    ),
-)]
-pub async fn handle_mcp_get(Path(_org_id): Path<String>, _body: Bytes) -> Response {
-    mcp_only_in_enterprise()
-}
-
 /// Handler for OAuth 2.0 Authorization Server Metadata (Enterprise)
 /// RFC 8414: https://datatracker.ietf.org/doc/html/rfc8414
 /// This endpoint provides discovery information for OAuth clients
@@ -409,12 +329,77 @@ pub async fn oauth_authorization_server_metadata() -> Response {
     tag = "MCP",
     operation_id = "OAuthServerMetadata",
     responses(
-        (status = 404, description = "Not Found - MCP server is only available in enterprise edition", content_type = "application/json"),
+        (status = 404, description = "Not Found - OAuth discovery is only available in enterprise edition", content_type = "application/json"),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn oauth_authorization_server_metadata() -> Response {
-    mcp_only_in_enterprise()
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "error": "OAuth discovery is only available in enterprise edition"
+            }))
+            .unwrap(),
+        ))
+        .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{Value, json};
+    use utoipa::OpenApi;
+
+    use super::*;
+
+    fn ping_request() -> MCPRequest {
+        MCPRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(1)),
+            method: "ping".to_string(),
+            params: Value::Null,
+        }
+    }
+
+    #[tokio::test]
+    async fn post_ping_is_available() {
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            Json(ping_request()),
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn post_rejects_unsupported_protocol_version() {
+        let mut headers = HeaderMap::new();
+        headers.insert(MCP_PROTOCOL_VERSION_HEADER, "unsupported".parse().unwrap());
+
+        let response =
+            handle_mcp_post(Path("default".to_string()), headers, Json(ping_request())).await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn delete_session_is_available() {
+        let response = handle_mcp_delete(Path("default".to_string())).await;
+
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    #[test]
+    fn oss_openapi_initializes_mcp_tools() {
+        let api = crate::handler::http::router::openapi::ApiDoc::openapi();
+
+        openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
+
+        assert!(!openobserve_mcp::tools::get_mcp_tools().is_empty());
+    }
 }

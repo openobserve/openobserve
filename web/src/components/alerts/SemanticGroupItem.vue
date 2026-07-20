@@ -83,7 +83,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import OFormTagInput from "./OFormTagInput.vue";
+import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {

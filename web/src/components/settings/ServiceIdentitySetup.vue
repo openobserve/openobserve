@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click:secondary="showFieldMappingDialog = false"
             @click:primary="saveFieldMappings"
           >
-            <TagInput
+            <OTagInput
               :model-value="editableServiceFields"
               @update:model-value="editableServiceFields = $event"
               :placeholder="t('settings.correlation.fieldMappingPlaceholder')"
@@ -1391,7 +1391,7 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
-import TagInput from "@/components/alerts/TagInput.vue";
+import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { clearIdentityConfigCache } from "@/utils/identityConfig";
 import OButton from "@/lib/core/Button/OButton.vue";
