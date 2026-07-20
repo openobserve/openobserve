@@ -28,7 +28,7 @@
                 </OButton>
               </template>
               <div
-                class="p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+                class="p-4"
                 :data-test="`promql-label-filter-${index}-menu`"
               >
                 <div style="width: 350px">

@@ -45,14 +45,17 @@
                     </OButton>
                   </template>
                   <div
-                    class="operations-list-dropdown p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+                    class="operations-list-dropdown p-4"
                     :data-test="`promql-operation-${index}-menu`"
                   >
                     <div style="width: 350px">
                       <div class="font-medium">
                         {{ getStepSpec(element.id)?.name || element.id }}
                       </div>
-                      <div class="text-xs text-text-muted">
+                      <div
+                        v-if="getStepSpec(element.id)?.documentation"
+                        class="text-xs text-text-muted mb-3"
+                      >
                         {{ getStepSpec(element.id)?.documentation }}
                       </div>
 
