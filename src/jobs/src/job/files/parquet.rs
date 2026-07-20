@@ -45,6 +45,7 @@ use infra::{
     storage,
 };
 use ingester::WAL_PARQUET_METADATA;
+use openobserve_compactor::tantivy::create_tantivy_index;
 use tokio::{
     fs::remove_file,
     sync::{Mutex, RwLock},
@@ -72,7 +73,6 @@ use crate::{
             exec::TableBuilder,
             merge::{self, MergeParquetResult},
         },
-        tantivy::create_tantivy_index,
     },
 };
 

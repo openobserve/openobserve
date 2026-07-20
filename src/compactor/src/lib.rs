@@ -28,6 +28,7 @@ mod metadata;
 pub mod repository;
 pub mod retention;
 pub mod stats;
+pub mod tantivy;
 pub mod worker;
 
 pub(crate) fn is_past_hour(offset: i64) -> bool {

@@ -6813,7 +6813,10 @@ dependencies = [
  "rand 0.10.1",
  "rayon",
  "search",
+ "tantivy",
+ "tantivy_utils",
  "tokio",
+ "vortex",
 ]
 
 [[package]]
@@ -6900,8 +6903,6 @@ dependencies = [
  "sourcemap",
  "sqlparser",
  "svix-ksuid",
- "tantivy",
- "tantivy_utils",
  "thiserror 2.0.18",
  "tiktoken-rs",
  "time",

@@ -12,6 +12,7 @@ path = "src/lib.rs"
 default = []
 enterprise = ["dep:o2_enterprise", "config/enterprise"]
 cloud = ["enterprise", "o2_enterprise/cloud"]
+vortex = ["dep:vortex", "config/vortex", "o2_enterprise?/vortex"]
 
 [dependencies]
 anyhow.workspace = true
@@ -34,4 +35,7 @@ parquet.workspace = true
 rand.workspace = true
 rayon.workspace = true
 search.workspace = true
+tantivy.workspace = true
+tantivy_utils.workspace = true
 tokio.workspace = true
+vortex = { workspace = true, optional = true }

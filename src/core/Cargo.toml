@@ -41,6 +41,7 @@ vortex = [
     "dep:vortex",
     "config/vortex",
     "o2_enterprise?/vortex",
+    "openobserve-compactor/vortex",
     "search/vortex",
 ]
 
@@ -134,8 +135,6 @@ infra.workspace = true
 ingester.workspace = true
 wal.workspace = true
 lettre.workspace = true
-tantivy.workspace = true
-tantivy_utils.workspace = true
 zip.workspace = true
 futures-util.workspace = true
 flight.workspace = true

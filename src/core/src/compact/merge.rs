@@ -47,6 +47,7 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
+use openobserve_compactor::tantivy::create_tantivy_index;
 use tokio::{
     sync::{Semaphore, mpsc},
     task::JoinHandle,
@@ -60,7 +61,6 @@ use crate::{
         exec::TableBuilder,
         merge::{self, MergeParquetResult},
     },
-    tantivy::create_tantivy_index,
 };
 
 /// Generate merging job by stream
