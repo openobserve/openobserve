@@ -60,9 +60,24 @@ export class StreamAssociationPage {
     testLogger.info(`Opening stream detail for: ${streamName}`);
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Find the cell with stream name
+    // Find the cell with stream name. A freshly-ingested stream can lag the
+    // /streams table under cloud load — the row may be absent on first load even
+    // after search (the caller already navigated + searched). Reload the streams
+    // page and re-search until the stream's row actually appears (bounded ~90s), so
+    // the row is reliably present before we resolve its Stream Detail button.
+    // NOTE: use waitFor (auto-waits up to timeout), NOT isVisible (instant check) —
+    // the stream needs time to appear in the table after each reload.
     const streamCell = this.page.getByRole('cell', { name: streamName }).first();
-    await streamCell.waitFor({ state: 'visible', timeout: 5000 });
+    let cellVisible = await streamCell.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+    for (let attempt = 1; attempt <= 6 && !cellVisible; attempt++) {
+      testLogger.info(`Stream "${streamName}" row not yet in /streams (attempt ${attempt}) — reloading + re-searching`);
+      await this.navigateToStreams();
+      await this.searchForStream(streamName);
+      cellVisible = await streamCell.waitFor({ state: 'visible', timeout: 12000 }).then(() => true).catch(() => false);
+    }
+    if (!cellVisible) {
+      throw new Error(`openStreamDetail: stream "${streamName}" row not found in /streams after reload + re-search retries (backend never listed the ingested stream)`);
+    }
     testLogger.info(`Found stream cell for: ${streamName}`);
 
     // Navigate to parent row
@@ -92,31 +107,24 @@ export class StreamAssociationPage {
       throw new Error('Stream Detail button not found in the row');
     }
 
-    await detailButton.waitFor({ state: 'visible', timeout: 5000 });
-    testLogger.info('Stream Detail button is visible, attempting click with JavaScript...');
-
-    // Try JavaScript click first - sometimes Playwright's click doesn't work if element is partially obscured
-    await detailButton.evaluate(el => el.click());
-    testLogger.info('Executed JavaScript click on Stream Detail button');
-
-    // Wait for sidebar to open - just use waitFor, no fixed timeout
     const updateSettingsButton = this.page.locator('[data-test="schema-update-settings-button"]');
 
-    // Wait up to 3 seconds for sidebar to appear, if not try regular click
-    const opened = await updateSettingsButton.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
-
-    if (!opened) {
-      testLogger.warn('Sidebar did not open with JavaScript click, trying regular click...');
-      await detailButton.scrollIntoViewIfNeeded();
-      await detailButton.click();
-      testLogger.info('Executed Playwright click on Stream Detail button');
-      await updateSettingsButton.waitFor({ state: 'visible', timeout: 5000 });
-    }
+    // The revamped Reka-based streams table re-renders/detaches rows mid-animation,
+    // so a one-shot Playwright `click()` can spin on actionability until the 45s
+    // actionTimeout, and a single JS click can race the sidebar-open on a slow cloud.
+    // Re-resolve the row's Stream Detail button FRESH each attempt (the row may have
+    // detached), fire a native DOM click (no actionability polling to hang on), and
+    // verify the detail sidebar actually opened — retry the whole sequence until it
+    // does. Deterministic: keyed to the real "sidebar open" signal, not blind waits.
+    await expect(async () => {
+      const btn = streamRow.getByRole('button', { name: 'Stream Detail' }).first();
+      await expect(btn).toBeVisible({ timeout: 5000 });
+      await btn.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
+      await btn.evaluate((el) => el.click());
+      await expect(updateSettingsButton).toBeVisible({ timeout: 5000 });
+    }).toPass({ timeout: 45000 });
 
     testLogger.info('Stream detail sidebar opened successfully');
-
-    // Wait for schema table to load (minimal wait)
-    await this.page.waitForTimeout(300);
   }
 
   async clickAddPatternCell(fieldName) {
@@ -156,11 +164,15 @@ export class StreamAssociationPage {
       throw new Error(`Add Pattern button not found for field ${fieldName}`);
     }
 
-    await addPatternButton.waitFor({ state: 'visible', timeout: 5000 });
+    // Assert the real readiness signal (the Add Pattern control is visible) before scrolling.
+    await expect(addPatternButton).toBeVisible({ timeout: 10000 });
 
-    // Scroll into view before clicking
-    await addPatternButton.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(500);
+    // Scroll into view before clicking. Use an instant native scrollIntoView rather than
+    // Playwright's scrollIntoViewIfNeeded: the schema table inside the (still-animating) stream
+    // detail ODrawer re-renders rows mid-animation, so scrollIntoViewIfNeeded's attached+stable
+    // polling can spin until the 45s actionTimeout. Native scroll resolves the element once and
+    // returns immediately; the JS/Playwright click below drives the actual interaction.
+    await addPatternButton.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
 
     testLogger.info(`Clicking Add Pattern button for field: ${fieldName}`);
 
@@ -722,9 +734,14 @@ export class StreamAssociationPage {
       throw new Error(`Field ${fieldName} does not have any patterns linked`);
     }
 
-    await viewPatternsLink.waitFor({ state: 'visible', timeout: 5000 });
-    await viewPatternsLink.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(500);
+    // Assert the real readiness signal (the "View N Patterns" link is visible) before scrolling.
+    await expect(viewPatternsLink).toBeVisible({ timeout: 10000 });
+
+    // Instant native scrollIntoView instead of scrollIntoViewIfNeeded: the schema table inside
+    // the stream detail ODrawer re-renders/detaches rows mid-animation, so the attached+stable
+    // polling of scrollIntoViewIfNeeded can spin until the 45s actionTimeout even though the link
+    // is already visible. Native scroll returns immediately; the click below drives interaction.
+    await viewPatternsLink.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
 
     testLogger.info(`Clicking View Patterns link for field: ${fieldName}`);
 

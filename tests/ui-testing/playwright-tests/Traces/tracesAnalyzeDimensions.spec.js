@@ -5,9 +5,38 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { ingestTraces } = require('../utils/trace-ingestion.js');
 
 test.describe("Traces Analyze Dimensions testcases", () => {
   let pm;
+
+  // Seed guaranteed error traces into the `default` stream ONCE for the file.
+  // The error-count badge (which is the error-only toggle) renders only when the
+  // search returns at least one error span. The shared `default` stream has no
+  // guaranteed error data in the 15m window, which made "P0: Error-only toggle"
+  // fail deterministically on runners where the recent window happened to hold no
+  // errors (and pass on runners where it did). Ingesting forced-error traces here
+  // removes that data dependency.
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120000);
+    const context = await browser.newContext({
+      storageState: 'playwright-tests/utils/auth/user.json',
+    });
+    const page = await context.newPage();
+    try {
+      const result = await ingestTraces(page, 8, { forceScenario: 'error' });
+      testLogger.info('Seeded error traces for analyze-dimensions', {
+        successful: result.successful,
+        failed: result.failed,
+      });
+    } catch (e) {
+      // Non-fatal: the error-only test still has a bounded retry to surface the
+      // badge, and the other tests in this file don't need error data.
+      testLogger.warn('Error-trace seeding failed (continuing)', { error: e.message });
+    } finally {
+      await context.close();
+    }
+  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -91,9 +120,9 @@ test.describe("Traces Analyze Dimensions testcases", () => {
 
     testLogger.info('Testing error-only toggle functionality');
 
-    await searchAndAssertResults();
-
-    const errorToggleVisible = await pm.tracesPage.isErrorOnlyToggleVisible();
+    // Re-runs the search until the seeded error traces are indexed and the
+    // error-count badge appears — deterministic given beforeAll seeded errors.
+    const errorToggleVisible = await pm.tracesPage.waitForErrorBadgeAfterSearch();
     expect(errorToggleVisible, 'Error-only toggle must be visible').toBeTruthy();
 
     // Toggle error-only filter ON

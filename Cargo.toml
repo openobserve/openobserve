@@ -59,6 +59,7 @@ tokio-console = ["dep:console-subscriber"]
 [profile.release]
 debug = false
 strip = true
+codegen-units = 4
 
 [profile.release-ci]
 inherits = "release"
@@ -79,7 +80,6 @@ lto = "thin"
 inherits = "release"
 debug = true
 strip = false
-codegen-units = 4
 
 # tikv-jemalloc-sys is a link-time dependency: it forces the "profiling"
 # feature on the jemalloc sys crate that jemalloc_pprof requires.
