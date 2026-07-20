@@ -132,8 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Canvas drop area — gray rounded inset card, matching the pipeline
            editor's `#pipelineChartContainer` so both look identical. -->
       <div
-        class="flex-1 relative min-w-0 rounded-xl overflow-hidden mb-3"
-        :class="store.state.theme === 'dark' ? '' : 'bg-gray-100'"
+        class="flex-1 relative min-w-0 rounded-xl overflow-hidden mb-3 bg-surface-subtle"
       >
         <WorkflowCanvas />
       </div>

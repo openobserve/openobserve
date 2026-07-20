@@ -68,8 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-1 flex min-h-0 pt-3 px-2 gap-2">
       <!-- Read-only canvas (per-node run status overlay). -->
       <div
-        class="flex-1 relative min-w-0 rounded-xl overflow-hidden mb-3"
-        :class="store.state.theme === 'dark' ? '' : 'bg-gray-100'"
+        class="flex-1 relative min-w-0 rounded-xl overflow-hidden mb-3 bg-surface-subtle"
       >
         <WorkflowCanvas />
       </div>

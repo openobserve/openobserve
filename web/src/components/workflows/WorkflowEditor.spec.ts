@@ -1143,18 +1143,27 @@ describe("WorkflowEditor", () => {
   // ── theme ──────────────────────────────────────────────────────────────────
 
   describe("theme", () => {
-    it("keeps the canvas inset transparent in dark mode", async () => {
-      store.state.theme = "dark";
-      wrapper = mountEditor();
-      await flushPromises();
-      expect(wrapper.find("#workflow-workspace .bg-gray-100").exists()).toBe(false);
-    });
-
-    it("greys the canvas inset in light mode", async () => {
-      store.state.theme = "light";
-      wrapper = mountEditor();
-      await flushPromises();
-      expect(wrapper.find("#workflow-workspace .bg-gray-100").exists()).toBe(true);
+    // The canvas inset used to be `:class="theme === 'dark' ? '' : 'bg-gray-100'"`.
+    // That class was DEAD: Tailwind emitted `.bg-gray-100{background-color:
+    // var(--color-gray-100)}` but this repo only defines `--color-grey-*` (with an
+    // "e"), so the light-mode grey never actually rendered — and these tests
+    // passed anyway, because they only checked that the class ATTRIBUTE was
+    // present. It is now a single token utility with no theme branch, so the
+    // surface follows the theme through the token instead of a JS conditional.
+    it("uses a token-backed surface on the canvas inset, in BOTH themes", async () => {
+      for (const theme of ["light", "dark"]) {
+        store.state.theme = theme;
+        wrapper = mountEditor();
+        await flushPromises();
+        expect(
+          wrapper.find("#workflow-workspace .bg-surface-subtle").exists(),
+        ).toBe(true);
+        // No theme-conditional class survives.
+        expect(
+          wrapper.find("#workflow-workspace .bg-gray-100").exists(),
+        ).toBe(false);
+        wrapper.unmount();
+      }
       store.state.theme = "dark";
     });
   });
