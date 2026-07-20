@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="scrape_interval"
               type="number"
               min="0"
-              class="ml-2 w-30"
+              class="ml-2 w-30!"
               data-test="general-settings-scrape-interval"
             />
             <span class="individual-setting-description text-compact opacity-70">
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :min="1000"
               :max="1000000"
-              class="ml-2 w-45"
+              class="ml-2 w-45!"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
               data-test="general-settings-max-series-per-query"
             >

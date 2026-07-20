@@ -157,7 +157,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       :data-state="dataState"
       :disabled="isDisabled"
       :class="[
-        'shrink-0 rounded-default border cursor-[inherit]',
+        'shrink-0 rounded-checkbox border cursor-[inherit]',
         boxSizeClasses[size ?? 'md'],
         // Base / unchecked
         'bg-checkbox-bg border-checkbox-border',

@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
       </template>
 
-      <div class="p-3 flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-y-auto">
         <div v-if="pricingDialogRow">
           <div class="mb-4">
             <div class="text-xs font-semibold mb-1.5 text-text-secondary">

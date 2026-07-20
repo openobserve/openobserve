@@ -996,7 +996,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <!-- Stream contribution chart (single-value only) -->
-          <div class="px-5 py-4 flex flex-col h-full">
+          <div class="flex flex-col h-full">
           <template
             v-if="
               !(insightData as any).isCardLevel &&

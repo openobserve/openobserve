@@ -280,7 +280,7 @@
 
   /* --- Radius scale --- */
   /* Two real corner radii, one job each — no fake tiers:
-       --radius-default (4px)   tight interactive controls (buttons, inputs,
+       --radius-default (6px)   tight interactive controls (buttons, inputs,
                                 chips, small icon buttons)
        --radius-surface (12px)  large surfaces (dialogs, drawers, cards/panels,
                                 the app-shell content area)
@@ -288,9 +288,13 @@
      its whole tier at once. The old sm/md/lg/xl scale was retired — it exposed
      five names for what was one value; every former ref was repointed
      (small→default, large→surface). Do NOT reintroduce sm/md/lg/xl. */
-  --radius-default: 0.25rem;   /* 4px  — control tier */
+  --radius-default: 0.375rem;  /* 6px  — control tier */
   --radius-surface: 0.75rem;   /* 12px — surface tier (matches the historical dialog curve) */
   --radius-full: 9999px;       /* pills / avatars / circles */
+  /* Checkboxes stay at the original 4px: the tick box is tiny (12–16px), and the
+     control tier's 6px reads as visibly round on a box that small. Pinned to its
+     own knob so it holds independent of --radius-default. */
+  --radius-checkbox: 0.25rem;  /* 4px  — checkbox tick box only */
 
   /* --- Shadow scale — hairline-border philosophy ---
      Only md/lg render real elevation (overlays: dialogs, menus). Cards use a

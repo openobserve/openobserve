@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? isFullScreen
               ? 'w-[75%] pl-2'
               : 'w-[65%] pl-2'
-            : 'w-full px-3'
+            : 'w-full'
         "
       >
         <OForm
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :schema="addRegexPatternSchema"
           :default-values="addRegexPatternDefaults"
           @submit="saveRegexPattern"
-          class="flex flex-col gap-4 mt-2"
+          class="flex flex-col gap-4"
         >
           <div class="flex flex-col gap-y-3">
             <OFormInput

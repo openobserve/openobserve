@@ -197,6 +197,7 @@
   --radius-default: var(--radius-default);
   --radius-surface: var(--radius-surface);
   --radius-full: var(--radius-full);
+  --radius-checkbox: var(--radius-checkbox);
 
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);

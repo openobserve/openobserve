@@ -138,6 +138,12 @@
 
     /* ---- Button overrides ---- */
 
+    /* primary — disabled fill: the light-mode value (--color-primary-300, a
+       light lavender) left the white foreground text near-invisible on dark
+       surfaces (~2:1). Use a dark, desaturated teal so the shared white label
+       keeps a strong, readable contrast while still reading as muted/disabled. */
+    --color-button-primary-disabled: color-mix(in srgb, var(--color-primary-600) 30%, var(--color-surface-overlay));
+
     /* secondary (darkened surface) */
     --color-button-secondary: var(--color-surface-overlay);
     --color-button-secondary-foreground: var(--color-text-heading);
