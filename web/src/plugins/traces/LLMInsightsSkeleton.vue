@@ -51,11 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="n in 4"
         :key="n"
-        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default p-4 flex flex-col gap-[0.4rem] tile-content"
+        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default flex flex-col tile-content"
       >
-        <OSkeleton type="text" class="w-30 h-4" />
-        <OSkeleton type="text" class="w-40 h-2.5" />
-        <div class="relative h-55 mt-2 overflow-hidden">
+        <div class="flex flex-col gap-[0.4rem] mb-1 p-1.5">
+          <OSkeleton type="text" class="w-30 h-4" />
+          <OSkeleton type="text" class="w-40 h-2.5" />
+        </div>
+        <div class="relative h-55 overflow-hidden">
           <svg
             class="w-full h-full block"
             viewBox="0 0 200 80"

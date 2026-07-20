@@ -328,7 +328,7 @@ watch(internalOpen, (open) => {
           isRight
             ? 'border-s border-t border-dialog-border'
             : 'border-e border-t border-dialog-border',
-          'shadow-xl',
+          'shadow-lg',
           // Focus ring
           'outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring',
           // Slide-in animation — direction matches side.

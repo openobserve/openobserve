@@ -1,5 +1,5 @@
 /* ============================================================
-   Structural lock on the --color-* theme namespace.
+   Structural lock on the --color-* and --shadow-* theme namespaces.
    ============================================================
    Tailwind v4 ships a full built-in colour palette (--color-red-500,
    --color-gray-400, --color-blue-100, …). Those generate utilities
@@ -15,7 +15,17 @@
    not merely lint-discouraged. `bg-surface-base`, `text-text-heading`,
    `bg-primary-600`, `bg-grey-500`, `bg-transparent`, `text-white` etc. are all
    re-registered downstream and keep working.
+
+   The same lock applies to --shadow-*: Tailwind's default scale spans
+   2xs…2xl, but the hairline-border philosophy sanctions only two real
+   elevation tiers — shadow-md / shadow-lg for overlays (dialogs, menus,
+   drawers). Flat surfaces (cards) use a 1px border, never a drop shadow.
+   Clearing the namespace here makes shadow-sm / shadow-xl / shadow-2xl
+   structurally impossible; semantic.css re-registers only --shadow-md and
+   --shadow-lg downstream. (`shadow-none` is a static Tailwind utility and is
+   unaffected.)
    ============================================================ */
 @theme {
   --color-*: initial;
+  --shadow-*: initial;
 }

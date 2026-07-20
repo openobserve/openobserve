@@ -77,7 +77,7 @@ function fmtDuration(ms: number) {
         <div class="absolute inset-0 bg-black/40" @click="emit('close')" />
 
         <!-- Drawer panel -->
-        <div class="relative z-10 w-full max-w-2xl h-full border-l border-border-default flex flex-col overflow-hidden shadow-2xl bg-surface-base">
+        <div class="relative z-10 w-full max-w-2xl h-full border-l border-border-default flex flex-col overflow-hidden shadow-lg bg-surface-base">
 
           <!-- Header -->
           <div class="flex items-center gap-3 px-5 py-4 border-b border-border-default shrink-0">

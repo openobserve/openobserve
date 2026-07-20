@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LLMInsightsSkeleton
         v-if="loading || !hasLoadedOnce"
         kpi-only
-        class="mt-2.5 mb-2.5"
+        class="mb-2.5"
       />
       <!-- KPI Cards Row -->
       <KpiCardRow
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 border border-border-default transition-shadow duration-200 hover:shadow-md"
+          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 min-h-32.5 border border-border-default transition-colors duration-200 hover:border-border-strong"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
