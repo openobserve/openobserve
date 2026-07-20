@@ -83,14 +83,20 @@
         <template #default="{ field }">
           <div class="mt-2.5">
             <label class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("dashboard.enterCustomQuery") }}</label>
-            <query-editor class="h-20"
-              data-test="scheduled-alert-sql-editor"
-              ref="queryEditorRef"
-              editor-id="alerts-query-editor"
-              :debounceTime="300"
-              :query="drilldownData.data.logsQuery"
-              @update:query="updateQueryValue"
-            />
+            <!-- Fixed-height wrapper: CodeQueryEditor's root is h-full, so it
+                 fills this box. Putting h-20 on the editor itself collides with
+                 that h-full and collapses the editor. -->
+            <div class="h-20 mt-1">
+              <query-editor
+                class="h-full"
+                data-test="scheduled-alert-sql-editor"
+                ref="queryEditorRef"
+                editor-id="alerts-query-editor"
+                :debounceTime="300"
+                :query="drilldownData.data.logsQuery"
+                @update:query="updateQueryValue"
+              />
+            </div>
             <span
               v-if="field.state.meta.errors.length > 0"
               class="text-xs text-input-error-text leading-none mt-1 block"
