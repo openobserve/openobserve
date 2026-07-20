@@ -29,6 +29,7 @@ exceptions = [
     { name = "common", allow = ["AGPL-3.0"] },
     { name = "openobserve-core", allow = ["AGPL-3.0"] },
     { name = "openobserve-jobs", allow = ["AGPL-3.0"] },
+    { name = "openobserve-mcp", allow = ["AGPL-3.0"] },
     { name = "openobserve-vrl", allow = ["AGPL-3.0"] },
     { name = "search", allow = ["AGPL-3.0"] },
     { name = "promql", allow = ["AGPL-3.0"] },

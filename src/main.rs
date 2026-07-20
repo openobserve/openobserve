@@ -88,11 +88,11 @@ use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
+use utoipa::OpenApi;
 #[cfg(feature = "enterprise")]
 use {
     config::Config,
     o2_enterprise::enterprise::{ai, common::config::O2Config},
-    utoipa::OpenApi,
 };
 
 #[cfg(feature = "mimalloc")]
@@ -240,6 +240,14 @@ async fn main() -> Result<(), anyhow::Error> {
             if let Err(e) = bootstrap::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {e}");
+            }
+
+            // Initialize MCP tools from the OpenAPI spec for all editions.
+            let api = openapi::ApiDoc::openapi();
+            if let Err(e) = openobserve_mcp::tools::init_mcp_tools(&api) {
+                log::error!("Failed to initialize MCP tools: {e}");
+            } else {
+                log::info!("Initialized MCP tools");
             }
 
             // init enterprise
@@ -1529,12 +1537,11 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         openobserve::super_cluster_queue::init().await?;
     }
 
-    // Initialize OpenAPI spec for AI and MCP modules (includes agent client)
-    let api = openapi::ApiDoc::openapi();
-    if let Err(e) = o2_enterprise::enterprise::ai::init_ai_components(api) {
-        log::error!("Failed to init AI/MCP/Agent: {e}");
+    // Initialize enterprise AI components (agent and evaluation clients).
+    if let Err(e) = o2_enterprise::enterprise::ai::init_ai_components() {
+        log::error!("Failed to initialize enterprise AI components: {e}");
     } else {
-        log::info!("Initialized AI, MCP, and Agent components");
+        log::info!("Initialized enterprise AI components");
     }
 
     // check ratelimit config

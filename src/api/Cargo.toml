@@ -52,6 +52,7 @@ openobserve-core.workspace = true
 openobserve-api-management.workspace = true
 openobserve-api-query.workspace = true
 openobserve-api-common.workspace = true
+openobserve-mcp.workspace = true
 axum.workspace = true
 axum-extra.workspace = true
 tower.workspace = true
