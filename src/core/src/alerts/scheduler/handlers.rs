@@ -43,6 +43,7 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
+use openobserve_pipeline::batch_execution::ExecutablePipeline;
 use proto::cluster_rpc;
 
 #[cfg(feature = "enterprise")]
@@ -57,7 +58,6 @@ use crate::{
     dashboards::reports::SendReport,
     db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
-    pipeline::batch_execution::ExecutablePipeline,
     self_reporting::publish_triggers_usage,
 };
 

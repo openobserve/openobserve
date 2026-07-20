@@ -184,6 +184,45 @@ pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<(i64, bool), 
     Ok((new_ts, is_valid))
 }
 
+/// Normalize a record timestamp to microseconds and enforce the configured ingestion window.
+///
+/// Protocol handlers and pipeline destinations share this policy so records are not accepted or
+/// rejected differently depending on which write path they use.
+pub fn normalize_record_timestamp(
+    value: &mut json::Value,
+    min_ts: i64,
+    max_ts: i64,
+) -> Result<i64, anyhow::Error> {
+    let local_val = value
+        .as_object_mut()
+        .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
+    let (timestamp, has_valid_timestamp) = match local_val.get(crate::TIMESTAMP_COL_NAME) {
+        Some(v) if !v.is_null() => parse_timestamp_micro_from_value(v)
+            .map_err(|_| anyhow::Error::msg("Can't parse timestamp"))?,
+        _ => (Utc::now().timestamp_micros(), false),
+    };
+
+    if timestamp < min_ts {
+        return Err(anyhow::anyhow!(
+            "Too old data, only last {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>",
+            crate::get_config().limit.ingest_allowed_upto
+        ));
+    }
+    if timestamp > max_ts {
+        return Err(anyhow::anyhow!(
+            "Too far data, only future {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_IN_FUTURE=<max_hours>",
+            crate::get_config().limit.ingest_allowed_in_future
+        ));
+    }
+    if !has_valid_timestamp {
+        local_val.insert(
+            crate::TIMESTAMP_COL_NAME.to_string(),
+            json::Value::Number(timestamp.into()),
+        );
+    }
+    Ok(timestamp)
+}
+
 pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
     let chars = s.chars().collect::<Vec<char>>();
 

@@ -24,14 +24,12 @@ use config::{
 };
 use infra::{coordinator::pipelines::PIPELINES_WATCH_PREFIX, db};
 pub use openobserve_pipeline::repository::PipelineError;
-use openobserve_pipeline::repository::pipelines as pipeline_repository;
+use openobserve_pipeline::{
+    batch_execution::ExecutablePipeline, repository::pipelines as pipeline_repository,
+};
 
-use crate::{
-    common::infra::config::{
-        PIPELINE_ID_TO_ORG, PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES,
-        STREAM_EXECUTABLE_PIPELINES,
-    },
-    service::pipeline::batch_execution::ExecutablePipeline,
+use crate::common::infra::config::{
+    PIPELINE_ID_TO_ORG, PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES, STREAM_EXECUTABLE_PIPELINES,
 };
 
 /// Stores a new pipeline to database.

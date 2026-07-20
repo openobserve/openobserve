@@ -23,8 +23,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub use crate::{
     alerts, dashboards, db, enrichment, file_list, folders, http, ingestion, ingestion_tokens,
-    logs, metadata, metrics, organization, pipeline, schema, search, self_reporting, short_url,
-    stream, traces, users,
+    logs, metadata, metrics, organization, schema, search, self_reporting, short_url, stream,
+    traces, users,
 };
 #[cfg(feature = "enterprise")]
 pub use crate::{

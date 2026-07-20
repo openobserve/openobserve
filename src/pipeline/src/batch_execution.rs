@@ -44,14 +44,36 @@ use futures::future::try_join_all;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use openobserve_transform::{
-    JSRuntimeConfig, apply_js_fn, apply_vrl_fn, compile_js_function, compile_vrl_function,
+    JSRuntimeConfig, QUERY_FUNCTIONS, apply_js_fn, apply_vrl_fn, compile_js_function,
+    compile_vrl_function,
 };
 use proto::cluster_rpc;
 #[cfg(feature = "enterprise")]
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 
-use crate::{common::infra::config::QUERY_FUNCTIONS, service::self_reporting::publish_error};
+use crate::ports;
+
+async fn report_request_usage_stats(
+    stats: config::meta::self_reporting::usage::RequestStats,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    usage_type: config::meta::self_reporting::usage::UsageType,
+    num_functions: u16,
+    timestamp: i64,
+) {
+    ports::report_usage(ports::UsageReport {
+        stats,
+        org_id: org_id.to_string(),
+        stream_name: stream_name.to_string(),
+        stream_type,
+        usage_type,
+        num_functions,
+        timestamp,
+    })
+    .await;
+}
 
 // Global batch buffer for accumulating remote stream records
 #[cfg(feature = "enterprise")]
@@ -273,7 +295,7 @@ impl ExecutablePipeline {
                     error: Some(format!("Init error: failed to compile function: {e}")),
                     node_errors: HashMap::new(),
                 };
-                publish_error(ErrorData {
+                ports::publish_error(ErrorData {
                     _timestamp: Utc::now().timestamp_micros(),
                     stream_params: pipeline.get_source_stream_params(),
                     error_source: ErrorSource::Pipeline(pipeline_error),
@@ -293,7 +315,7 @@ impl ExecutablePipeline {
                     ),
                     node_errors: HashMap::new(),
                 };
-                publish_error(ErrorData {
+                ports::publish_error(ErrorData {
                     _timestamp: Utc::now().timestamp_micros(),
                     stream_params: pipeline.get_source_stream_params(),
                     error_source: ErrorSource::Pipeline(pipeline_error),
@@ -540,7 +562,7 @@ impl ExecutablePipeline {
             log::debug!(
                 "[Pipeline] {pipeline_name} [inv={inv_id}]: execution errors occurred and published"
             );
-            publish_error(error_data).await;
+            ports::publish_error(error_data).await;
         }
         let error_collect_ms = error_task_start.elapsed().as_millis();
 
@@ -592,7 +614,7 @@ impl ExecutablePipeline {
                 ..config::meta::self_reporting::usage::RequestStats::default()
             };
 
-            crate::self_reporting::report_request_usage_stats(
+            report_request_usage_stats(
                 req_stats,
                 org_id,
                 &self.id,
@@ -911,7 +933,7 @@ async fn process_llm_evaluation_node(
     let job_id = params.job_id.as_deref();
     while let Some(item) = channels.receiver.recv().await {
         if let Some(mut ctx) =
-            crate::llm_evaluations::eval_jobs::executor_runtime::extract_context_from_span(
+            o2_enterprise::enterprise::llm_evaluations::eval_jobs::executor_runtime::extract_context_from_span(
                 &metadata.org_id,
                 job_id,
                 &item.record,
@@ -926,8 +948,8 @@ async fn process_llm_evaluation_node(
             ctx.sampled = Some(sampled);
 
             if !sampled {
-                let skipped_trace = crate::llm_evaluations::evaluator_trace::create_evaluator_trace(
-                    crate::llm_evaluations::evaluator_trace::EvaluatorTraceInput {
+                let skipped_trace = o2_enterprise::enterprise::llm_evaluations::evaluator_trace::create_evaluator_trace(
+                    o2_enterprise::enterprise::llm_evaluations::evaluator_trace::EvaluatorTraceInput {
                         org_id: ctx.org_id.clone(),
                         evaluator_trace_id: ctx.evaluator_trace_id.clone(),
                         target_span_id: ctx.span_id.clone(),
@@ -1050,7 +1072,9 @@ async fn process_remote_stream_node(
             };
         }
         if !record.is_null() && record.is_object() {
-            if let Err(e) = crate::logs::ingest::handle_timestamp(&mut record, min_ts, max_ts) {
+            if let Err(e) =
+                config::utils::time::normalize_record_timestamp(&mut record, min_ts, max_ts)
+            {
                 let err_msg = format!("DestinationNode error handling timestamp: {e}");
                 if let Err(send_err) = channels
                     .error_sender
@@ -1175,7 +1199,7 @@ async fn process_remote_stream_node(
                                 ..config::meta::self_reporting::usage::RequestStats::default()
                             };
 
-                            crate::self_reporting::report_request_usage_stats(
+                            report_request_usage_stats(
                                 req_stats,
                                 &metadata.org_id,
                                 &remote_stream.destination_name,
@@ -1735,7 +1759,7 @@ async fn process_stream_node(
                     ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
                     metadata: None,
                 };
-                match openobserve_pipeline::ports::ingest(req).await {
+                match crate::ports::ingest(req).await {
                     Ok(resp) if resp.status_code == 200 => {
                         log::debug!(
                             "[Pipeline] {pl_name} [inv={inv}]: cross-type ingestion successful to {dest_stream_type}:{dest_stream_name}, records: {record_count}",
@@ -1842,7 +1866,7 @@ pub async fn flush_all_buffers() -> Result<(), anyhow::Error> {
                             ..config::meta::self_reporting::usage::RequestStats::default()
                         };
 
-                        crate::self_reporting::report_request_usage_stats(
+                        report_request_usage_stats(
                             req_stats,
                             &org_id,
                             &destination_name,
@@ -1941,7 +1965,7 @@ async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
         return Ok(trans.value().clone());
     }
     // get from database
-    crate::db::functions::get(org_id, fn_name).await
+    ports::get_transform(org_id, fn_name).await
 }
 
 fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {

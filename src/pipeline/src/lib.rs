@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod backfill;
+pub mod batch_execution;
 mod http;
 pub mod ports;
 pub mod repository;

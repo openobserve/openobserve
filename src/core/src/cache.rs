@@ -16,8 +16,7 @@
 use std::sync::LazyLock as Lazy;
 
 use config::{RwAHashMap, meta::stream::StreamParams};
-
-use crate::pipeline::batch_execution::ExecutablePipeline;
+use openobserve_pipeline::batch_execution::ExecutablePipeline;
 
 pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, Vec<ExecutablePipeline>>> =
     Lazy::new(Default::default);

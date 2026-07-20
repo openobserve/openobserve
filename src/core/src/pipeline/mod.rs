@@ -36,9 +36,8 @@ use super::db::{
     scheduler,
 };
 
-pub mod batch_execution;
-
 struct CoreRecordSink;
+struct CoreRuntimeServices;
 
 #[async_trait]
 impl openobserve_pipeline::ports::RecordSink for CoreRecordSink {
@@ -52,8 +51,37 @@ impl openobserve_pipeline::ports::RecordSink for CoreRecordSink {
     }
 }
 
+#[async_trait]
+impl openobserve_pipeline::ports::RuntimeServices for CoreRuntimeServices {
+    async fn get_transform(
+        &self,
+        org_id: &str,
+        name: &str,
+    ) -> anyhow::Result<config::meta::function::Transform> {
+        Ok(db_functions::get(org_id, name).await?)
+    }
+
+    async fn publish_error(&self, error: config::meta::self_reporting::error::ErrorData) {
+        crate::self_reporting::publish_error(error).await;
+    }
+
+    async fn report_usage(&self, report: openobserve_pipeline::ports::UsageReport) {
+        crate::self_reporting::report_request_usage_stats(
+            report.stats,
+            &report.org_id,
+            &report.stream_name,
+            report.stream_type,
+            report.usage_type,
+            report.num_functions,
+            report.timestamp,
+        )
+        .await;
+    }
+}
+
 pub fn install_record_sink() {
     let _ = openobserve_pipeline::ports::install_record_sink(Arc::new(CoreRecordSink));
+    let _ = openobserve_pipeline::ports::install_runtime_services(Arc::new(CoreRuntimeServices));
 }
 
 /// Validates that no JavaScript functions are used in the pipeline.

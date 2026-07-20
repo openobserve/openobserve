@@ -43,6 +43,7 @@ use config::{
     },
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
+use openobserve_pipeline::batch_execution::ExecutablePipeline;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
@@ -63,7 +64,6 @@ use crate::{
             write_file,
         },
         metrics::get_exclude_labels,
-        pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
         self_reporting::report_request_usage_stats,
     },

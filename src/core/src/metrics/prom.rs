@@ -45,6 +45,7 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use openobserve_pipeline::batch_execution::ExecutablePipeline;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use proto::prometheus_rpc;
@@ -60,7 +61,6 @@ use crate::{
         ingestion::{
             TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
         },
-        pipeline::batch_execution::ExecutablePipeline,
         schema::{check_for_schema, stream_schema_exists},
         search as search_service,
         self_reporting::report_request_usage_stats,

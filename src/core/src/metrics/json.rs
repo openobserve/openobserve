@@ -40,6 +40,7 @@ use config::{
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::schema::{SchemaCache, get_partition_time_level};
+use openobserve_pipeline::batch_execution::ExecutablePipeline;
 
 use super::get_exclude_labels;
 use crate::{
@@ -55,7 +56,6 @@ use crate::{
             TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
             get_write_partition_key, write_file,
         },
-        pipeline::batch_execution::ExecutablePipeline,
         schema::check_for_schema,
         self_reporting::report_request_usage_stats,
     },

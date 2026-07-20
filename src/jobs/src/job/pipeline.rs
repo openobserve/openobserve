@@ -9,7 +9,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     tokio::spawn(async move {
         loop {
             interval.tick().await;
-            if let Err(e) = openobserve_core::pipeline::batch_execution::flush_all_buffers().await {
+            if let Err(e) = openobserve_pipeline::batch_execution::flush_all_buffers().await {
                 log::error!("Error flushing all buffers: {e}");
             }
         }

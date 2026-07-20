@@ -32,7 +32,7 @@ use config::{
     utils::{
         flatten,
         json::{self, estimate_json_bytes},
-        time::{now_micros, parse_timestamp_micro_from_value},
+        time::{normalize_record_timestamp as handle_timestamp, now_micros},
     },
 };
 use flate2::read::GzDecoder;
@@ -58,10 +58,8 @@ use crate::{
         IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
     },
     service::{
-        format_stream_name, get_formatted_stream_name,
-        ingestion::check_ingestion_allowed,
+        format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
         logs::bulk::TRANSFORM_FAILED,
-        schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 
@@ -751,43 +749,6 @@ fn finalize_and_buffer_record(
         }
     };
     true
-}
-
-pub fn handle_timestamp(
-    value: &mut json::Value,
-    min_ts: i64,
-    max_ts: i64,
-) -> Result<i64, anyhow::Error> {
-    let local_val = value
-        .as_object_mut()
-        .ok_or_else(|| anyhow::Error::msg("Value is not an object"))?;
-    let (timestamp, has_valid_timestamp) = match local_val.get(TIMESTAMP_COL_NAME) {
-        Some(v) => {
-            if !v.is_null() {
-                match parse_timestamp_micro_from_value(v) {
-                    Ok(t) => t,
-                    Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
-                }
-            } else {
-                (Utc::now().timestamp_micros(), false)
-            }
-        }
-        None => (Utc::now().timestamp_micros(), false),
-    };
-    // check ingestion time
-    if timestamp < min_ts {
-        return Err(get_upto_discard_error());
-    }
-    if timestamp > max_ts {
-        return Err(get_future_discard_error());
-    }
-    if !has_valid_timestamp {
-        local_val.insert(
-            TIMESTAMP_COL_NAME.to_string(),
-            json::Value::Number(timestamp.into()),
-        );
-    }
-    Ok(timestamp)
 }
 
 trait IngestionDataExt {
