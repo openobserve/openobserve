@@ -57,8 +57,9 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm"> =
         'rounded-default',
         'transition-all duration-150',
         'outline-none cursor-pointer',
-        // Hover (inactive only)
-        'hover:bg-toggle-item-hover-bg',
+        // Hover (inactive only) — scoped to data-state=off so hovering the
+        // active item never repaints over the sliding indicator / active fill.
+        'data-[state=off]:hover:bg-toggle-item-hover-bg',
         // Active fill: normally painted per-item. When the group animates the
         // selection (opt-in), a single sliding indicator paints the fill instead,
         // so suppress the per-item background and just keep the active text colour.
