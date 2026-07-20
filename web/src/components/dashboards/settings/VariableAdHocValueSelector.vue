@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center">
     <div
-      class="flex flex-nowrap items-center mb-1 gap-x-1"
+      class="flex flex-nowrap items-center mb-2 mr-4 gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >

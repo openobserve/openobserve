@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       store.state.printMode ? '' : 'h-full overflow-y-auto',
     ]"
   >
-    <div class="px-page-edge render-dashboard-charts-container">
+    <div class="px-page-edge pt-2 render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span class="hidden"
         v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <slot name="before_panels" />
-      <div class="displayDiv clear-both min-h-0 h-auto">
+      <div class="displayDiv clear-both min-h-0 h-auto mt-2">
         <div class="h-full w-full"
           v-if="
             store.state.printMode &&
