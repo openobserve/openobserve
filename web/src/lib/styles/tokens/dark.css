@@ -53,10 +53,11 @@
     --d-border:        #454545;  /* default: card / input / table / rail edges  */
     --d-border-strong: #6B6B6B;  /* strong: checkbox / radio / file outlines    */
 
-    /* Text — VS Code editor foreground scale */
-    --d-text:      #D4D4D4;  /* primary text, headings, record names            */
-    --d-text-2:    #AAAAAA;  /* secondary: body, nav, labels                    */
-    --d-text-3:    #858585;  /* metadata, captions, column heads, IDs           */
+    /* Text — mapped straight to the registered --color-grey-* palette in the
+       block below (mirrors light mode, where each tier = a grey step). No
+       separate --d-text* anchors: they were just hardcoded hex standing in for
+       grey shades, which flattened the hierarchy (body==secondary, and
+       label==muted==disabled==placeholder all landed on one value). */
 
     /* Row / item states on the content surface */
     --d-hover:     var(--color-primary-900);  /* row & list-item hover — MATCHES
@@ -65,18 +66,18 @@
                              /* selected row — teal-tinted (brand signal)       */
     --d-zebra:     #252526;  /* striped-row bg — VS Code list alternating row    */
 
-    /* --- Text (mapped to the foundation) --- */
-    --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */
-    --color-text-soft:        var(--d-text);   /* feeds --color-select-text (OSelect trigger value). Soft variant: var(--d-text-2) */
-    --color-text-body:        var(--d-text-2); /* paragraphs, default body */
-    --color-text-secondary:   var(--d-text-2); /* supporting text, descriptions */
-    --color-text-label:       var(--d-text-3); /* form labels, metadata */
-    --color-text-muted:       var(--d-text-3); /* disabled, de-emphasized */
-    --color-text-disabled:    var(--d-text-3);
-    --color-text-placeholder: var(--d-text-3); /* input placeholders */
+    /* --- Text — grey palette steps, one per tier (light half of the ramp) --- */
+    --color-text-heading:     var(--color-grey-200); /* h1-h6, modal titles — brightest */
+    --color-text-soft:        var(--color-grey-200); /* feeds --color-select-text (OSelect trigger value) */
+    --color-text-body:        var(--color-grey-300); /* paragraphs, default body */
+    --color-text-secondary:   var(--color-grey-400); /* supporting text, descriptions */
+    --color-text-label:       var(--color-grey-500); /* form labels, metadata */
+    --color-text-muted:       var(--color-grey-500); /* de-emphasized */
+    --color-text-disabled:    var(--color-grey-600); /* dimmer than labels so disabled reads disabled */
+    --color-text-placeholder: var(--color-grey-500); /* input placeholders — dim but legible, above disabled */
     --color-text-link:        var(--color-primary-400);  /* clickable links (teal) */
     --color-text-link-hover:  var(--color-primary-300);  /* link hover state (teal) */
-    --color-text-code:        var(--d-text-2);           /* inline code, monospace */
+    --color-text-code:        var(--color-grey-300);     /* inline code, monospace */
     --color-text-inverse:     var(--color-grey-900);     /* text on light/colored bg */
     --color-accent:           var(--color-primary-400);  /* brand accent — lighter shade for dark surfaces */
     --color-sql-accent:       #A78BFA;                    /* SQL/query violet — lighter for dark surfaces */
@@ -192,7 +193,7 @@
 
     /* Tooltip */
     --color-tooltip-bg: var(--d-overlay);
-    --color-tooltip-text: var(--d-text);
+    --color-tooltip-text: var(--color-text-heading);
     --color-tooltip-border: var(--d-border);
     --color-tooltip-arrow: var(--d-overlay);
 
@@ -323,7 +324,7 @@
     --color-input-border: var(--color-border-default);
     --color-input-disabled-bg: var(--d-well);
     --color-input-disabled-text: var(--color-text-secondary);
-    --color-input-placeholder: var(--color-text-disabled);
+    --color-input-placeholder: var(--color-text-placeholder);
     --color-input-error-text: var(--color-error-400);
     --color-input-border-error: var(--color-error-400);
 
@@ -332,7 +333,7 @@
     --color-select-border: var(--color-border-default);
     --color-select-disabled-bg: var(--d-well);
     --color-select-disabled-text: var(--color-text-secondary);
-    --color-select-placeholder: var(--color-text-disabled);
+    --color-select-placeholder: var(--color-text-placeholder);
     --color-select-error-text: var(--color-error-400);
     --color-select-border-error: var(--color-error-400);
     --color-select-content-bg: var(--color-surface-overlay);
@@ -430,12 +431,12 @@
     --color-dialog-bg: var(--color-surface-base);
     --color-dialog-border: var(--d-border);
     --color-dialog-header-bg: var(--color-surface-panel);
-    --color-dialog-header-text: var(--d-text);
+    --color-dialog-header-text: var(--color-text-heading);
     --color-dialog-header-border: var(--d-border);
-    --color-dialog-content-text: var(--d-text);
+    --color-dialog-content-text: var(--color-text-heading);
     --color-dialog-footer-bg: var(--color-surface-panel);
     --color-dialog-footer-border: var(--d-border);
-    --color-dialog-close-text: var(--d-text-3);
+    --color-dialog-close-text: var(--color-text-muted);
     --color-dialog-close-hover-bg: var(--d-divider);
     --color-dialog-close-active-bg: var(--d-border);
 
