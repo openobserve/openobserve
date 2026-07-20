@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="border border-border h-full flex flex-col transition-all duration-200 ease-in-out rounded-lg hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_4px_12px_rgba(255,255,255,0.1)]"
+    class="border border-border h-full flex flex-col transition-all duration-200 ease-in-out rounded-lg hover:-translate-y-0.5 hover:shadow-lg"
   >
     <OCardSection class="p-4 pb-2 flex-1">
       <div class="flex items-start justify-between mb-2">
-        <div class="font-semibold text-base leading-[1.4]" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
+        <div class="font-semibold text-base leading-snug text-text-heading">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -32,10 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`aws-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />
-          <OTooltip content="View Documentation" />
+          <OTooltip :content="t('ingestion.awsSetup.viewDocumentation')" />
         </OButton>
       </div>
-      <div class="text-sm mb-3 leading-normal min-h-[3em]" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
+      <div class="text-sm mb-3 leading-normal min-h-[3em] text-text-secondary">
         {{ integration.description }}
       </div>
     </OCardSection>
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleAddSource()"
         class="flex-1"
         :data-test="`aws-${integration.id}-add-source-btn`"
-        >Add Source</OButton
+        >{{ t("ingestion.awsSetup.addSource") }}</OButton
       >
       <!-- Documentation Button (only shown if no CloudFormation) -->
       <OButton
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleDocumentation()"
         class="flex-1"
         :data-test="`aws-${integration.id}-documentation-btn`"
-        >Documentation</OButton
+        >{{ t("ingestion.awsSetup.documentation") }}</OButton
       >
       <!-- Add Dashboard Button -->
       <OButton
@@ -69,17 +69,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="!integration.hasDashboard || !integration.dashboardGithubUrl"
         class="flex-1"
         :data-test="`aws-${integration.id}-add-dashboard-btn`"
-        >Add Dashboard</OButton
+        >{{ t("ingestion.awsSetup.addDashboard") }}</OButton
       >
     </OCardActions>
 
     <!-- Unified Integration Method Selection Dialog -->
-    <ODialog data-test="aws-integration-tile-template-dialog" v-model:open="showTemplateDialog" size="sm" title="Choose Integration Method"
-      secondary-button-label="Cancel"
+    <ODialog
+      data-test="aws-integration-tile-template-dialog"
+      v-model:open="showTemplateDialog"
+      size="sm"
+      :title="t('ingestion.awsSetup.chooseMethod')"
+      :secondary-button-label="t('common.cancel')"
       @click:secondary="showTemplateDialog = false"
     >
       <div class="text-sm font-medium mb-3">
-        Select how you want to integrate {{ integration.displayName }}:
+        {{
+          t("ingestion.awsSetup.chooseMethodPrompt", {
+            service: integration.displayName,
+          })
+        }}
       </div>
       <ul class="aws-integration-options-list flex flex-col list-none p-0 m-0">
         <!-- CloudFormation Templates -->
@@ -135,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, type PropType, ref, computed, shallowRef } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -170,6 +179,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const { t } = useI18n();
     const store = useStore();
     const { confirm } = useConfirmDialog();
     const router = useRouter();
@@ -560,6 +570,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       handleAddSource,
       handleAddDashboard,

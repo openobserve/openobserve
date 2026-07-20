@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
+import enUS from '@/locales/languages/en-US.json';
 import { createRouter, createWebHistory } from 'vue-router';
 import AzureQuickSetup from './AzureQuickSetup.vue';
 
@@ -56,7 +57,9 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({ locale: 'en', messages: { en: {} } });
+// Real locale messages: the component renders t() keys, and several
+// assertions below check the resulting English text.
+const mockI18n = createI18n({ locale: 'en', messages: { en: enUS } });
 const mockRouter = createRouter({
   history: createWebHistory(),
   routes: [{ path: '/', component: { template: '<div>Home</div>' } }],

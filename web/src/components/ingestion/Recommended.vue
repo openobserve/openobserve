@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="ingestTabType"
     :tabs="recommendedTabs"
     :splitter-width="270"
+    searchable
+    search-data-test="recommended-list-search-input"
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >

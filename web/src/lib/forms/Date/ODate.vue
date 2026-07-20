@@ -117,8 +117,8 @@ function onFocusOut(e: FocusEvent) {
 }
 
 const heightClasses: Record<NonNullable<DateProps["size"]>, string> = {
-  sm: "h-8 text-xs",
-  md: "h-10 text-sm",
+  sm: "h-6 text-sm",
+  md: "h-8.5 text-sm",
 };
 
 const wrapperClasses = computed(() => [
@@ -129,7 +129,7 @@ const wrapperClasses = computed(() => [
     ? "border-datepicker-error-border"
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:border-datepicker-focus-border",
-  "focus-within:ring-2 focus-within:ring-datepicker-focus-ring",
+  "focus-within:ring-[0.125rem] focus-within:ring-primary-500/25",
   props.disabled
     ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60"
     : "",
@@ -142,7 +142,7 @@ const wrapperClasses = computed(() => [
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="text-xs font-medium text-datepicker-label leading-none flex items-center gap-1"
+      class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
     >
       <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon

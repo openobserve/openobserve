@@ -1,185 +1,121 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import { createStore } from 'vuex';
-import { createI18n } from 'vue-i18n';
-import { createRouter, createWebHistory } from 'vue-router';
-import WindowsConfig from './WindowsConfig.vue';
-import CopyContent from '@/components/CopyContent.vue';
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-vi.mock('../../../aws-exports', () => ({
-  default: { API_ENDPOINT: 'http://localhost:5080', region: 'us-east-1' },
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import { ref } from "vue";
+import WindowsConfig from "./WindowsConfig.vue";
+import windowsCard from "@/components/ingestion/setupCard/content/windows";
+import linuxCard from "@/components/ingestion/setupCard/content/linux";
+import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+
+const mockEndpoint = ref({
+  url: "https://test.openobserve.ai",
+  host: "test.openobserve.ai",
+  port: 443,
+  protocol: "https",
+  tls: true,
+});
+
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
 }));
 
-vi.mock('../../../utils/zincutils', () => ({
-  getImageURL: vi.fn((path) => `mock-image-url-${path}`),
-  getEndPoint: vi.fn(() => ({ url: 'http://localhost:5080', host: 'localhost', port: '5080', protocol: 'http', tls: false })),
-  getIngestionURL: vi.fn(() => 'http://localhost:5080'),
-  b64EncodeStandard: vi.fn((str) => btoa(str)),
-}));
-
-vi.mock('@/components/CopyContent.vue', () => ({
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
   default: {
-    name: 'CopyContent',
-    template: '<div data-test="copy-content">{{ content }}</div>',
-    props: ['content'],
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
   },
 }));
 
 const mockStore = createStore({
   state: {
-    selectedOrganization: { identifier: 'test-org', name: 'Test Organization' },
-    userInfo: { email: 'test@example.com' },
-    organizationData: { organizationPasscode: 'test-passcode' },
+    selectedOrganization: { identifier: "test-org", name: "Test Organization" },
+    userInfo: { email: "test@example.com" },
+    organizationData: { organizationPasscode: "test-passcode" },
+    theme: "light",
   },
 });
+const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 
-const mockI18n = createI18n({ locale: 'en', messages: { en: {} } });
-const mockRouter = createRouter({ history: createWebHistory(), routes: [{ path: '/', component: { template: '<div>Home</div>' } }] });
+const SUBS = {
+  url: "https://test.openobserve.ai",
+  org: "test-org",
+  token: "dGVzdEB0b2tlbg==",
+};
 
-
-describe('WindowsConfig.vue', () => {
-  let wrapper: VueWrapper;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe("windowsCard builder", () => {
+  it("builds the Windows card metadata and step flow", () => {
+    const card = windowsCard(SUBS);
+    expect(card.provider.name).toBe("Windows");
+    expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
+    expect(card.steps.map((s) => s.id)).toEqual(["install", "verify"]);
   });
+
+  it("uses PowerShell, not bash", () => {
+    const install = windowsCard(SUBS).steps[0];
+    expect(install.chip?.label).toBe("PowerShell");
+    for (const v of install.variants!) {
+      expect(v.code.lang).toBe("powershell");
+      expect(v.code.raw).toContain("Invoke-WebRequest");
+      expect(v.code.raw).toContain("-AUTH_KEY");
+    }
+  });
+
+  it("points each variant at its matching install script", () => {
+    const [generic, ec2] = windowsCard(SUBS).steps[0].variants!;
+    expect(generic.code.raw).toContain("/windows/install.ps1");
+    expect(generic.code.raw).not.toContain("/ec2/");
+    expect(ec2.code.raw).toContain("/windows/ec2/install.ps1");
+    expect(ec2.note).toContain("ec2:DescribeTags");
+    expect(generic.note).not.toContain("ec2:DescribeTags");
+  });
+
+  it("substitutes url/org and masks the ingestion token", () => {
+    const generic = windowsCard(SUBS).steps[0].variants![0];
+    expect(generic.code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
+    expect(generic.code.raw).not.toContain("[BASIC_PASSCODE]");
+    expect(generic.code.masked).not.toContain(SUBS.token);
+  });
+
+  it("adds the execution-policy guidance Linux does not need", () => {
+    const questions = windowsCard(SUBS).extras!.troubleshooting!.map((r) => r.q);
+    expect(questions[0]).toContain("fails to run");
+    // Shares the rest of its troubleshooting with the Linux card.
+    const linuxQs = linuxCard(SUBS).extras!.troubleshooting!.map((r) => r.q);
+    expect(questions).toEqual(expect.arrayContaining(linuxQs));
+  });
+});
+
+describe("WindowsConfig.vue", () => {
+  let wrapper: VueWrapper<any>;
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
   });
 
-  const createWrapper = (props = {}) => {
-    const defaultProps = { currOrgIdentifier: 'test-org', currUserEmail: 'test@example.com' };
-    return mount(WindowsConfig, {
-      props: { ...defaultProps, ...props },
-      global: {
-        plugins: [mockI18n, mockRouter],
-        provide: { store: mockStore },
-        components: { CopyContent },
-      },
+  it("renders the shared setup card for the windows slug", () => {
+    expect(getDataSourceCard("windows", SUBS)?.provider.name).toBe("Windows");
+    wrapper = mount(WindowsConfig, {
+      global: { plugins: [mockStore, mockI18n] },
     });
-  };
-
-  describe('Component Rendering', () => {
-    it('should mount without errors', () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should unmount without errors', () => {
-      wrapper = createWrapper();
-      expect(() => wrapper.unmount()).not.toThrow();
-    });
-
-    it('should render CopyContent component', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.exists()).toBe(true);
-    });
-
-    it('should render PowerShell instructions', () => {
-      wrapper = createWrapper();
-      expect(wrapper.text()).toContain('PowerShell');
-    });
-
-    it('should render installation description', () => {
-      wrapper = createWrapper();
-      expect(wrapper.text()).toContain('Once installed');
-    });
-
-    it('should render Windows event log info', () => {
-      wrapper = createWrapper();
-      expect(wrapper.text()).toContain('Windows Event Log');
-    });
-
-    it('should render metrics collection info', () => {
-      wrapper = createWrapper();
-      expect(wrapper.text()).toContain('performance counter');
-    });
-  });
-
-  describe('Props Validation', () => {
-    it('should accept currOrgIdentifier prop', () => {
-      wrapper = createWrapper({ currOrgIdentifier: 'my-org' });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should accept currUserEmail prop', () => {
-      wrapper = createWrapper({ currUserEmail: 'user@test.com' });
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe('activeCommand Computed', () => {
-    it('should generate a command string', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(typeof vm.activeCommand).toBe('string');
-    });
-
-    it('should include PowerShell command (Invoke-WebRequest)', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.activeCommand).toContain('Invoke-WebRequest');
-    });
-
-    it('should include install.ps1 in the command', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.activeCommand).toContain('install.ps1');
-    });
-
-    it('should include the endpoint URL in the command', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.activeCommand).toContain('http://localhost:5080');
-    });
-
-    it('should include the org identifier in the command', () => {
-      wrapper = createWrapper({ currOrgIdentifier: 'my-org' });
-      const vm = wrapper.vm as any;
-      expect(vm.activeCommand).toContain('my-org');
-    });
-
-    it('should include BASIC_PASSCODE placeholder', () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.activeCommand).toContain('[BASIC_PASSCODE]');
-    });
-  });
-
-  describe('CopyContent Integration', () => {
-    it('should pass getCommand to CopyContent', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.props('content')).toBeDefined();
-      expect(typeof copyContent.props('content')).toBe('string');
-    });
-
-    it('should pass command containing org identifier to CopyContent', () => {
-      wrapper = createWrapper({ currOrgIdentifier: 'test-org' });
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.props('content')).toContain('test-org');
-    });
-
-    it('should pass PowerShell command to CopyContent', () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.props('content')).toContain('Invoke-WebRequest');
-    });
-  });
-
-  describe('Utilities', () => {
-    it('should call getEndPoint on setup', async () => {
-      const zincutils = await import('../../../utils/zincutils');
-      wrapper = createWrapper();
-      expect(zincutils.getEndPoint).toHaveBeenCalled();
-    });
-
-    it('should call getIngestionURL on setup', async () => {
-      const zincutils = await import('../../../utils/zincutils');
-      wrapper = createWrapper();
-      expect(zincutils.getIngestionURL).toHaveBeenCalled();
-    });
+    const stub = wrapper.findComponent({ name: "SetupCardRenderer" });
+    expect(stub.exists()).toBe(true);
+    expect((stub.props("content") as any).provider.name).toBe("Windows");
   });
 });

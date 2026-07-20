@@ -18,6 +18,7 @@ import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import AWSConfig from "./AWSConfig.vue";
 import { createI18n } from 'vue-i18n';
+import enUS from '@/locales/languages/en-US.json';
 import { nextTick } from 'vue';
 
 // Mock dependencies
@@ -103,10 +104,12 @@ const mockStore = createStore({
 });
 
 // Create mock i18n
+// Real locale messages: the component renders t() keys, and several
+// assertions below check the resulting English text.
 const mockI18n = createI18n({
   locale: 'en',
   messages: {
-    en: {}
+    en: enUS
   }
 });
 
@@ -255,9 +258,8 @@ describe("AWSConfig", () => {
     expect(content).toContain('Access Key: [BASIC_PASSCODE]');
   });
 
-  // Test 15: AWSQuickSetup component integration (replaces AWSIntegrationGrid)
-  it("should render AWSIntegrationGrid component", () => {
-    // Component now uses AWSQuickSetup and AWSIndividualServices instead of AWSIntegrationGrid
+  // Test 15: quick-setup panel is mounted
+  it("should render AWSQuickSetup component", () => {
     const quickSetup = wrapper.findComponent({ name: 'AWSQuickSetup' });
     expect(quickSetup.exists()).toBe(true);
   });
