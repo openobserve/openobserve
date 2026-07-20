@@ -25,6 +25,7 @@ use config::{
     utils::{json, time::BASE_TIME},
 };
 use infra::{cache::stats, db as infra_db, table::enrichment_table_urls};
+use openobserve_search_service::cluster::http as search_cluster;
 use rayon::prelude::*;
 use vrl::prelude::NotNan;
 #[cfg(feature = "enterprise")]
@@ -40,7 +41,6 @@ use crate::{
     service::{
         db as db_service,
         enrichment::{StreamTable, storage::Values},
-        search::cluster::http as search_cluster,
     },
 };
 

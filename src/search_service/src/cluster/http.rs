@@ -16,6 +16,7 @@
 use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
+use ::search::{sql::Sql, utils::is_default_query_limit_exceeded};
 use config::{
     datafusion::request::Request,
     meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
@@ -36,9 +37,7 @@ use o2_enterprise::enterprise::actions::{
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::search::{
-    SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded,
-};
+use super::{SearchResult, flight};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(
@@ -110,7 +109,7 @@ pub async fn search(
             // compile vrl function & apply the same before returning the response
             let input_fn = query_fn.trim();
 
-            let apply_over_hits = super::super::RESULT_ARRAY.is_match(input_fn);
+            let apply_over_hits = config::meta::function::RESULT_ARRAY.is_match(input_fn);
             let mut runtime = ::common::utils::functions::init_vrl_runtime();
             let program = match openobserve_transform::compile_vrl_function(&query_fn, &sql.org_id)
             {
@@ -355,7 +354,7 @@ pub async fn search_inner(
             .enabled
         && !local_cluster_search
     {
-        super::super::super_cluster::leader::search(
+        crate::super_cluster::leader::search(
             &trace_id,
             sql.clone(),
             req,

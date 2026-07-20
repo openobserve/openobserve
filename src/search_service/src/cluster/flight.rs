@@ -15,6 +15,19 @@
 
 use std::sync::{Arc, atomic::Ordering};
 
+use ::search::{
+    datafusion::{
+        context::{SearchContextBuilder, register_table},
+        optimizer::{
+            context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
+            create_physical_plan,
+        },
+        plan_metrics::get_peak_memory_from_ctx,
+    },
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    sql::Sql,
+    utils::{ScanStatsVisitor, check_query_default_limit_exceeded},
+};
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
@@ -44,30 +57,12 @@ use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
+    crate::SEARCH_SERVER,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::{WorkGroup, admission},
-    openobserve_search_service::SEARCH_SERVER,
 };
 
-use crate::{
-    db::enrichment_table,
-    search::{
-        SearchResult,
-        datafusion::{
-            context::{SearchContextBuilder, register_table},
-            optimizer::{
-                context::{
-                    PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext,
-                },
-                create_physical_plan,
-            },
-            plan_metrics::get_peak_memory_from_ctx,
-        },
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        sql::Sql,
-        utils::{ScanStatsVisitor, check_query_default_limit_exceeded},
-    },
-};
+use super::SearchResult;
 
 #[async_recursion]
 #[tracing::instrument(
@@ -204,7 +199,7 @@ pub async fn search(trace_id: &str, sql: Arc<Sql>, mut req: Request) -> Result<S
         .with_label_values(&[&req.org_id])
         .inc();
 
-    let _lock = openobserve_search_service::work_group::acquire_work_group_lock(
+    let _lock = crate::work_group::acquire_work_group_lock(
         trace_id,
         &req,
         &mut took_watch,
@@ -676,13 +671,18 @@ pub async fn get_file_id_lists(
         if let Some(schema) = stream.schema()
             && (schema == "enrich" || schema == "enrichment_tables")
         {
-            let start = enrichment_table::get_start_time(org_id, &name).await;
+            let start = crate::grpc_runtime()
+                .map_err(|err| Error::Message(err.to_string()))?
+                .enrichment_table_start_time(org_id, &name)
+                .await;
             let end = now_micros();
             time_range = (start, end);
         }
         // get file list
-        let file_id_list =
-            crate::file_list::query_ids(trace_id, org_id, stream_type, &name, time_range).await?;
+        let file_id_list = crate::grpc_runtime()
+            .map_err(|err| Error::Message(err.to_string()))?
+            .query_file_ids(trace_id, org_id, stream_type, &name, time_range)
+            .await?;
         file_lists.insert(stream.clone(), file_id_list);
     }
     Ok(file_lists)

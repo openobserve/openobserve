@@ -24,9 +24,10 @@ use infra::{
     cluster,
     errors::{Error, ErrorCodes},
 };
-use openobserve_search_service::query_utils::server_internal_error;
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
 use tracing::{Instrument, info_span};
+
+use crate::query_utils::server_internal_error;
 
 #[tracing::instrument(name = "service:search:grpc_search", skip_all)]
 pub async fn grpc_search(

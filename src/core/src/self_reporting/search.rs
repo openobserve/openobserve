@@ -28,8 +28,6 @@ use config::{
 use infra::{client::grpc::make_grpc_search_client, cluster::get_node_by_uuid, errors::ErrorCodes};
 use proto::cluster_rpc::GetLicenseUsageResponse;
 
-use crate::search as SearchService;
-
 pub async fn get_usage(
     sql: String,
     start_time: i64,
@@ -75,7 +73,7 @@ pub async fn get_usage(
     };
 
     let trace_id = ider::uuid();
-    let resp = SearchService::grpc_search::grpc_search(
+    let resp = openobserve_search_service::grpc_search::grpc_search(
         &trace_id,
         META_ORG_ID,
         StreamType::Logs,

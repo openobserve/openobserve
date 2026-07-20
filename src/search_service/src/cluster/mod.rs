@@ -19,6 +19,14 @@ use ::datafusion::arrow::datatypes::Schema;
 use config::{TIMESTAMP_COL_NAME, utils::json};
 use hashbrown::HashMap;
 
+pub type SearchResult = (
+    Vec<arrow::array::RecordBatch>,
+    config::meta::search::ScanStats,
+    usize,
+    bool,
+    String,
+);
+
 pub mod cacher;
 pub mod flight;
 pub mod http;

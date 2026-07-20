@@ -40,8 +40,7 @@ use tracing::Instrument;
 
 use super::promql;
 use crate::{
-    search::{self as SearchService, utils::is_permissable_function_error},
-    self_reporting::http_report_metrics,
+    search::utils::is_permissable_function_error, self_reporting::http_report_metrics,
     service::setup_tracing_with_trace_id,
 };
 
@@ -640,7 +639,7 @@ impl QueryConditionExt for QueryCondition {
             log::debug!(
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search_multi, {req:?}"
             );
-            SearchService::grpc_search::grpc_search_multi(
+            openobserve_search_service::grpc_search::grpc_search_multi(
                 &trace_id,
                 org_id,
                 stream_type,
@@ -700,7 +699,7 @@ impl QueryConditionExt for QueryCondition {
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {req:?}"
             );
             // SearchService::search(&trace_id, org_id, stream_type, None, &req).await
-            SearchService::grpc_search::grpc_search(
+            openobserve_search_service::grpc_search::grpc_search(
                 &trace_id,
                 org_id,
                 stream_type,

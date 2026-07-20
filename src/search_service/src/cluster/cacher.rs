@@ -19,10 +19,11 @@ use infra::{
     cluster,
     errors::{Error, ErrorCodes},
 };
-use openobserve_search_service::query_utils::server_internal_error;
 use proto::cluster_rpc;
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
 use tracing::{Instrument, info_span};
+
+use crate::query_utils::server_internal_error;
 
 pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
     let trace_id = path.clone();
@@ -121,9 +122,7 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
         );
         tasks.push(task);
     }
-    match openobserve_search_service::cache::cacher::delete_cache(&path, delete_ts, None, None)
-        .await
-    {
+    match crate::cache::cacher::delete_cache(&path, delete_ts, None, None).await {
         Ok(_) => {
             log::info!(
                 "[trace_id {trace_id}] delete_cached_results->grpc: local node delete success"

@@ -120,7 +120,7 @@ pub async fn search(
     // so that select_nodes with strategy=stream receives a non-empty,
     // deterministic key.  A single PromQL request may cover multiple metric
     // names, so we cannot provide a more specific stream name here.
-    let nodes = crate::search::cluster::flight::get_online_querier_nodes(
+    let nodes = openobserve_search_service::cluster::flight::get_online_querier_nodes(
         trace_id,
         &req.org_id,
         "metrics/",

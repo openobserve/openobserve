@@ -93,7 +93,7 @@ pub mod search_jobs {
             req: &Request,
             role_group: Option<RoleGroup>,
         ) -> Result<Response, Error> {
-            crate::search::grpc_search::grpc_search(
+            openobserve_search_service::grpc_search::grpc_search(
                 trace_id,
                 org_id,
                 stream_type,
@@ -113,7 +113,7 @@ pub mod search_jobs {
             role_group: Option<RoleGroup>,
             skip_max_query_range: bool,
         ) -> Result<SearchPartitionResponse, Error> {
-            crate::search::grpc_search::grpc_search_partition(
+            openobserve_search_service::grpc_search::grpc_search_partition(
                 trace_id,
                 org_id,
                 stream_type,

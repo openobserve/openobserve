@@ -340,7 +340,7 @@ async fn get_ctx_and_physical_plan(
 ) -> Result<PlanResult, infra::errors::Error> {
     if req.super_cluster_info.is_super_cluster {
         let (ctx, physical_plan, lock, scan_stats) =
-            openobserve_core::search::super_cluster::follower::search(trace_id, req).await?;
+            openobserve_search_service::super_cluster::follower::search(trace_id, req).await?;
         Ok((ctx, physical_plan, Some(lock), scan_stats))
     } else {
         let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;

@@ -25,7 +25,9 @@ use infra::errors::Error;
 
 pub mod cache;
 pub mod cardinality;
+pub mod cluster;
 pub mod grpc;
+pub mod grpc_search;
 pub mod grpc_server;
 #[cfg(feature = "enterprise")]
 pub mod jobs;
@@ -35,6 +37,8 @@ pub mod query_utils;
 pub mod repository;
 mod searcher;
 pub mod streaming;
+#[cfg(feature = "enterprise")]
+pub mod super_cluster;
 pub mod work_group;
 
 pub use searcher::Searcher;
@@ -43,6 +47,17 @@ pub static SEARCH_SERVER: LazyLock<Searcher> = LazyLock::new(Searcher::new);
 
 #[async_trait::async_trait]
 pub trait GrpcRuntime: Send + Sync {
+    async fn enrichment_table_start_time(&self, org_id: &str, stream_name: &str) -> i64;
+
+    async fn query_file_ids(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<infra::file_list::FileId>, Error>;
+
     async fn query_file_keys_by_ids(
         &self,
         trace_id: &str,

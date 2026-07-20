@@ -15,6 +15,18 @@
 
 use std::sync::Arc;
 
+use ::search::{
+    datafusion::{
+        context::{SearchContextBuilder, register_table},
+        optimizer::{
+            context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
+            create_physical_plan,
+        },
+    },
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    sql::Sql,
+    utils::{AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded},
+};
 use arrow::array::RecordBatch;
 use async_recursion::async_recursion;
 use config::{
@@ -37,25 +49,12 @@ use infra::{
 };
 use itertools::Itertools;
 use o2_enterprise::enterprise::{search::WorkGroup, super_cluster::search::get_cluster_nodes};
-use openobserve_search_service::SEARCH_SERVER;
 use parking_lot::Mutex;
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::search::{
-    SearchResult,
-    datafusion::{
-        context::{SearchContextBuilder, register_table},
-        optimizer::{
-            context::{PhysicalOptimizerContext, RemoteScanContext, StreamingAggregationContext},
-            create_physical_plan,
-        },
-    },
-    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    sql::Sql,
-    utils::{AsyncDefer, ScanStatsVisitor, check_query_default_limit_exceeded},
-};
+use crate::{SEARCH_SERVER, cluster::SearchResult};
 
 #[async_recursion]
 #[tracing::instrument(

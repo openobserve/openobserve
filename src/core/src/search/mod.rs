@@ -16,7 +16,7 @@
 #[cfg(feature = "enterprise")]
 use std::sync::Arc;
 
-use arrow::array::RecordBatch;
+pub use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME,
@@ -66,13 +66,6 @@ use crate::{
     common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
     service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
-
-pub mod cluster;
-pub mod grpc_search;
-#[cfg(feature = "enterprise")]
-pub mod super_cluster;
-
-pub use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
 
 /// Core's composition adapter for cache-owned search orchestration.
 #[derive(Clone, Copy, Debug, Default)]
@@ -205,6 +198,21 @@ impl openobserve_search_service::partition::PartitionRuntime for CoreSearchRunti
 
 #[async_trait::async_trait]
 impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
+    async fn enrichment_table_start_time(&self, org_id: &str, stream_name: &str) -> i64 {
+        crate::db::enrichment_table::get_start_time(org_id, stream_name).await
+    }
+
+    async fn query_file_ids(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: (i64, i64),
+    ) -> Result<Vec<infra::file_list::FileId>, Error> {
+        crate::file_list::query_ids(trace_id, org_id, stream_type, stream_name, time_range).await
+    }
+
     async fn query_file_keys_by_ids(
         &self,
         trace_id: &str,
@@ -325,8 +333,6 @@ impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
-type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);
-
 // Please note: `query_fn` which is the vrl needs to be base64::decoded
 // when using this search
 #[tracing::instrument(name = "service:search:enter", skip_all)]
@@ -433,8 +439,17 @@ pub async fn search(
 
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters, true).await }
-            .instrument(span),
+        async move {
+            openobserve_search_service::cluster::http::search(
+                request,
+                query,
+                req_regions,
+                req_clusters,
+                true,
+            )
+            .await
+        }
+        .instrument(span),
     );
     let res = match handle.await {
         Ok(Ok(res)) => Ok(res),

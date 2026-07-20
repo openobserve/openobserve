@@ -15,6 +15,19 @@
 
 use std::sync::Arc;
 
+use ::search::{
+    datafusion::{
+        distributed_plan::{
+            NewEmptyExecVisitor,
+            codec::get_physical_extension_codec,
+            node::{RemoteScanNode, SearchInfos},
+            remote_scan_exec::RemoteScanExec,
+        },
+        exec::{DataFusionContextBuilder, register_udf},
+        optimizer::physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,
+    },
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+};
 use config::{
     cluster::LOCAL_NODE,
     datafusion::request::{FlightSearchRequest, Request},
@@ -35,25 +48,12 @@ use infra::{
     errors::{Error, Result},
     file_list::FileId,
 };
-use openobserve_search_service::{SEARCH_SERVER, work_group::DeferredLock};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    db::enrichment_table,
-    search::{
-        cluster::flight::{get_online_querier_nodes, partition_file_list},
-        datafusion::{
-            distributed_plan::{
-                NewEmptyExecVisitor,
-                codec::get_physical_extension_codec,
-                node::{RemoteScanNode, SearchInfos},
-                remote_scan_exec::RemoteScanExec,
-            },
-            exec::{DataFusionContextBuilder, register_udf},
-            optimizer::physical_optimizer::remote_scan::wrap_partial_reduce_for_aggregate,
-        },
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    },
+    SEARCH_SERVER,
+    cluster::flight::{get_online_querier_nodes, partition_file_list},
+    work_group::DeferredLock,
 };
 
 /// in cluster search function only single stream take part in
@@ -208,7 +208,7 @@ pub async fn search(
     );
 
     // check work group
-    let _lock = openobserve_search_service::work_group::acquire_work_group_lock(
+    let _lock = crate::work_group::acquire_work_group_lock(
         &trace_id,
         &req,
         &mut took_watch,
@@ -343,13 +343,17 @@ pub async fn get_file_id_lists(
     if let Some(schema) = stream.schema()
         && (schema == "enrich" || schema == "enrichment_tables")
     {
-        let start = enrichment_table::get_start_time(org_id, &stream_name).await;
+        let start = crate::grpc_runtime()
+            .map_err(|err| Error::Message(err.to_string()))?
+            .enrichment_table_start_time(org_id, &stream_name)
+            .await;
         let end = config::utils::time::now_micros();
         time_range = (start, end);
     }
-    let file_id_list =
-        crate::file_list::query_ids(trace_id, org_id, stream_type, &stream_name, time_range)
-            .await?;
+    let file_id_list = crate::grpc_runtime()
+        .map_err(|err| Error::Message(err.to_string()))?
+        .query_file_ids(trace_id, org_id, stream_type, &stream_name, time_range)
+        .await?;
     Ok(file_id_list)
 }
 
