@@ -85,10 +85,7 @@ use crate::{
         utils::auth::{UserEmail, is_root_user},
     },
     handler::http::extractors::Headers,
-    service::{
-        db,
-        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-    },
+    service::search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
 };
 
 /// Macro to conditionally select a value based on the "enterprise" feature flag.
@@ -567,7 +564,7 @@ pub async fn cache_status() -> impl IntoResponse {
 
     let file_list_num = file_list::len().await;
     let file_list_last_update_at = file_list::get_max_update_at().await.unwrap_or_default();
-    let (last_check_updated_at, _) = db::compact::stats::get_offset().await;
+    let (last_check_updated_at, _) = openobserve_compactor::repository::stats::get_offset().await;
 
     stats.insert(
         "FILE_LIST",
@@ -1008,7 +1005,11 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             match token_ver {
                 Ok(res) => {
                     // check for service accounts , do not to allow login
-                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await
+                    if let Some(db_user) =
+                        openobserve_organization::repository::user::get_user_by_email(
+                            &res.0.user_email,
+                        )
+                        .await
                         && db_user
                             .organizations
                             .iter()
@@ -1574,10 +1575,12 @@ pub async fn refresh_nodes_list() -> Response {
 }
 
 pub async fn refresh_user_sessions() -> Response {
-    let _ = db::session::cache().await.map_err(|e| {
-        log::error!("[CLUSTER] refresh_user_sessions failed: {}", e);
-        e
-    });
+    let _ = openobserve_organization::repository::session::cache()
+        .await
+        .map_err(|e| {
+            log::error!("[CLUSTER] refresh_user_sessions failed: {}", e);
+            e
+        });
     MetaHttpResponse::json("user sessions refreshed")
 }
 
@@ -1602,19 +1605,21 @@ const CACHE_MODULES: &[&str] = &[
 async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
     match module {
         "schema" => openobserve_catalog::schema::cache().await,
-        "organization" => db::organization::cache().await,
-        "user" => db::user::cache().await,
-        "session" => db::session::cache().await,
-        "functions" => db::functions::cache().await,
+        "organization" => openobserve_organization::repository::organization::cache().await,
+        "user" => openobserve_organization::repository::user::cache().await,
+        "session" => openobserve_organization::repository::session::cache().await,
+        "functions" => openobserve_transform::repository::cache().await,
         "pipeline" => openobserve_pipeline::service::cache().await,
-        "alerts" => db::alerts::alert::cache().await,
-        "destinations" => db::alerts::destinations::cache().await,
-        "templates" => db::alerts::templates::cache().await,
-        "short_url" => db::short_url::cache().await,
-        "realtime_triggers" => db::alerts::realtime_triggers::cache().await,
-        "org_users" => db::org_users::cache().await,
-        "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
-        "compact_retention" => db::compact::retention::cache().await,
+        "alerts" => openobserve_alerts::repository::alert::cache().await,
+        "destinations" => openobserve_alerts::repository::destinations::cache().await,
+        "templates" => openobserve_alerts::repository::templates::cache().await,
+        "short_url" => common::short_url::repository::cache().await,
+        "realtime_triggers" => openobserve_alerts::repository::realtime_triggers::cache().await,
+        "org_users" => openobserve_organization::repository::org_users::cache().await,
+        "org_ingestion_tokens" => {
+            openobserve_ingestion::repository::org_ingestion_tokens::cache().await
+        }
+        "compact_retention" => openobserve_compactor::repository::retention::cache().await,
         _ => Err(anyhow::anyhow!("unsupported module")),
     }
 }

@@ -28,7 +28,8 @@ use o2_enterprise::enterprise::{
     scheduled_jobs::StatusUpdateTuple,
     super_cluster::queue::{Message, MessageType},
 };
-use openobserve_core::db;
+use openobserve_alerts::repository::alert;
+use openobserve_reports::repository as reports;
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
         MessageType::SchedulerPush => {
@@ -114,7 +115,7 @@ async fn update(msg: Message) -> Result<()> {
                 );
                 return Ok(());
             };
-            if let Ok(Some(_)) = db::alerts::alert::get_by_id(conn, &trigger.org, alert_id).await {
+            if let Ok(Some(_)) = alert::get_by_id(conn, &trigger.org, alert_id).await {
                 // We need to add this trigger to the db in this region
                 scheduler::push(trigger.clone()).await.map_err(|e| {
                     let error_msg = format!(
@@ -132,10 +133,7 @@ async fn update(msg: Message) -> Result<()> {
             }
         }
         TriggerModule::Report => {
-            if db::dashboards::reports::get_by_id(conn, &trigger.module_key)
-                .await
-                .is_ok()
-            {
+            if reports::get_by_id(conn, &trigger.module_key).await.is_ok() {
                 // We need to add this trigger to the db in this region
                 scheduler::push(trigger.clone()).await.map_err(|e| {
                     let error_msg = format!(
@@ -329,8 +327,7 @@ async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
 
     // get alert id from alert name
     if let Some(alert) =
-        db::alerts::alert::get_by_name(&trigger.org, stream_type.into(), stream_name, alert_name)
-            .await?
+        alert::get_by_name(&trigger.org, stream_type.into(), stream_name, alert_name).await?
     {
         trigger.module_key = alert.get_unique_key();
     }

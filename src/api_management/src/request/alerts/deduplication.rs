@@ -256,7 +256,7 @@ pub struct SemanticGroupModification {
 )]
 pub async fn get_semantic_groups(Path(org_id): Path<String>) -> Response {
     // Use system_settings which has proper caching and cluster watch
-    let groups = openobserve_core::db::system_settings::get_semantic_field_groups(&org_id).await;
+    let groups = common::system_settings::get_semantic_field_groups(&org_id).await;
     axum::response::Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(axum::http::header::CONTENT_TYPE, "application/json")
@@ -338,8 +338,7 @@ pub async fn preview_semantic_groups_diff(
     }
 
     // Get current groups from system_settings (with caching)
-    let current_groups =
-        openobserve_core::db::system_settings::get_semantic_field_groups(&org_id).await;
+    let current_groups = common::system_settings::get_semantic_field_groups(&org_id).await;
 
     // Build a map of current groups by ID
     let current_map: std::collections::HashMap<String, &FieldAlias> =
@@ -474,8 +473,7 @@ pub async fn save_semantic_groups(
     // resurrected any group the UI had deleted. Treat the incoming list as the
     // full replacement — but re-inject protected groups (like "service") from the
     // existing config if the client omitted them, so they can never be lost.
-    let existing_groups =
-        openobserve_core::db::system_settings::get_semantic_field_groups(&org_id).await;
+    let existing_groups = common::system_settings::get_semantic_field_groups(&org_id).await;
 
     let incoming_ids: std::collections::HashSet<String> =
         incoming_groups.iter().map(|g| g.id.clone()).collect();
@@ -502,7 +500,7 @@ pub async fn save_semantic_groups(
     )
     .with_category(SettingCategory::Correlation);
 
-    match openobserve_core::db::system_settings::set(&setting).await {
+    match common::system_settings::set(&setting).await {
         Ok(_) => axum::response::Response::builder()
             .status(axum::http::StatusCode::OK)
             .header(axum::http::header::CONTENT_TYPE, "application/json")

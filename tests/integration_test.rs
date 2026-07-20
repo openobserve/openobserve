@@ -71,12 +71,10 @@ mod tests {
         },
         migration,
     };
-    use openobserve_core::{
-        alerts::scheduler::handlers::handle_triggers,
-        enrichment::storage::{Values, local},
-        search::SEARCH_SERVER,
-    };
+    use openobserve_core::enrichment::storage::{Values, local};
     use openobserve_ingestion::types::IngestionResponse;
+    use openobserve_jobs::job::alert_scheduler::handlers::handle_triggers;
+    use openobserve_search_service::SEARCH_SERVER;
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
     use serde_json::json;
@@ -2670,7 +2668,7 @@ mod tests {
         // Save pipeline directly to DB (bypassing API validation) to simulate a pipeline
         // with an invalid query that was saved before validation was added, or to test
         // what happens at evaluation time when the stream does not exist.
-        openobserve_core::db::pipeline::set(&pipeline_data)
+        openobserve_pipeline::service::set(&pipeline_data)
             .await
             .expect("Failed to set pipeline in DB");
         // Create the scheduler trigger directly with needs_validated=false so the
@@ -2679,7 +2677,7 @@ mod tests {
             PipelineSource::Scheduled(ds) => ds.clone(),
             _ => panic!("Expected scheduled pipeline"),
         };
-        openobserve_core::alerts::derived_streams::save(
+        openobserve_pipeline::derived_streams::save(
             derived_stream,
             &pipeline_data.name,
             &pipeline_data.id,
@@ -2724,7 +2722,7 @@ mod tests {
         assert!(trigger.retries > 0);
 
         // Clean up the invalid pipeline
-        let _ = openobserve_core::db::pipeline::delete(&pipeline.id).await;
+        let _ = openobserve_pipeline::service::delete(&pipeline.id).await;
     }
 
     // Test to handle case where pipeline triggers for invalid timerange where start time
@@ -2874,7 +2872,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = openobserve_core::db::pipeline::delete(&pipeline.id).await;
+        let _ = openobserve_pipeline::service::delete(&pipeline.id).await;
         // Also delete the trigger job from scheduled jobs table
         let _ = openobserve_scheduler::delete(
             "e2e",
@@ -3055,7 +3053,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = openobserve_core::db::pipeline::delete(&pipeline.id).await;
+        let _ = openobserve_pipeline::service::delete(&pipeline.id).await;
         // Also delete the trigger job from scheduled jobs table
         let _ = openobserve_scheduler::delete(
             "e2e",
@@ -3083,7 +3081,7 @@ mod tests {
         let pipeline = pipeline.unwrap();
 
         // Clean up test pipelines
-        let _ = openobserve_core::db::pipeline::delete(&pipeline.id).await;
+        let _ = openobserve_pipeline::service::delete(&pipeline.id).await;
     }
 
     async fn get_pipeline_from_api(pipeline_name: &str) -> http::models::pipelines::Pipeline {
@@ -3179,7 +3177,7 @@ mod tests {
 
         // Get the meta table stats for enrichment table
         let meta_table_stats =
-            openobserve_core::db::enrichment_table::get_meta_table_stats(org_id, table_name).await;
+            openobserve_enrichment::repository::get_meta_table_stats(org_id, table_name).await;
         assert!(meta_table_stats.is_some());
         let meta_table_stats = meta_table_stats.unwrap();
         assert_ne!(meta_table_stats.size, 0);
@@ -3299,7 +3297,7 @@ mod tests {
 
         // Get the meta table stats for enrichment table
         let meta_table_stats_first =
-            openobserve_core::db::enrichment_table::get_meta_table_stats(org_id, table_name).await;
+            openobserve_enrichment::repository::get_meta_table_stats(org_id, table_name).await;
         assert!(meta_table_stats_first.is_some());
         let meta_table_stats_first = meta_table_stats_first.unwrap();
         assert_ne!(meta_table_stats_first.size, 0);
@@ -3365,7 +3363,7 @@ mod tests {
 
         // Get the meta table stats for enrichment table
         let meta_table_stats_second =
-            openobserve_core::db::enrichment_table::get_meta_table_stats(org_id, table_name).await;
+            openobserve_enrichment::repository::get_meta_table_stats(org_id, table_name).await;
         assert!(meta_table_stats_second.is_some());
         let meta_table_stats_second = meta_table_stats_second.unwrap();
         assert_ne!(meta_table_stats_second.size, 0);
@@ -3913,7 +3911,7 @@ mod tests {
     // ========================================================================
 
     async fn test_backfill_job_list_and_delete() {
-        use openobserve_core::alerts::backfill::{delete_backfill_job, list_backfill_jobs};
+        use openobserve_pipeline::backfill::{delete_backfill_job, list_backfill_jobs};
 
         // Test listing backfill jobs
         let org_id = "e2e";
@@ -3937,7 +3935,7 @@ mod tests {
     }
 
     async fn test_backfill_job_get_nonexistent() {
-        use openobserve_core::alerts::backfill::get_backfill_job;
+        use openobserve_pipeline::backfill::get_backfill_job;
 
         // Test getting a non-existent job
         let org_id = "e2e";
@@ -3947,7 +3945,7 @@ mod tests {
     }
 
     async fn test_backfill_job_delete_by_pipeline() {
-        use openobserve_core::alerts::backfill::delete_backfill_jobs_by_pipeline;
+        use openobserve_pipeline::backfill::delete_backfill_jobs_by_pipeline;
 
         // Test deleting jobs by pipeline
         let org_id = "e2e";
@@ -3962,7 +3960,7 @@ mod tests {
     }
 
     async fn test_backfill_job_enable_disable() {
-        use openobserve_core::alerts::backfill::{enable_backfill_job, list_backfill_jobs};
+        use openobserve_pipeline::backfill::{enable_backfill_job, list_backfill_jobs};
 
         // Test enable/disable on existing jobs
         let org_id = "e2e";

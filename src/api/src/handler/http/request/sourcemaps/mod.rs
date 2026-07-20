@@ -22,15 +22,13 @@ use axum::{
     response::Response,
 };
 use infra::table::source_maps::FileType;
+use openobserve_search_service::sourcemaps::repository as db_sourcemaps;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    service::{
-        db::sourcemaps as db_sourcemaps,
-        sourcemaps::{self as sv_sourcemaps, TranslatedStack},
-    },
+    service::sourcemaps::{self as sv_sourcemaps, TranslatedStack},
 };
 
 #[derive(Serialize)]

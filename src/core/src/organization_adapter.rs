@@ -31,7 +31,7 @@ impl openobserve_organization::Runtime for CoreOrganizationRuntime {
         &self,
         org_id: &str,
     ) -> anyhow::Result<Vec<config::meta::function::Transform>> {
-        crate::db::functions::list(org_id).await
+        openobserve_transform::repository::list(org_id).await
     }
 
     async fn stream_schemas(

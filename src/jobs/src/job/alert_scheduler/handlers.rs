@@ -43,8 +43,9 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
-use openobserve_alerts::service::alert::{
-    AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map,
+use openobserve_alerts::{
+    repository::alert::set_without_updating_trigger,
+    service::alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
 };
 use openobserve_ingestion::internal as ingestion_service;
 use openobserve_pipeline::{
@@ -56,22 +57,18 @@ use proto::cluster_rpc;
 use crate::job::query_optimization_recommendation::QueryOptimizerContext;
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
-use crate::service::{
-    dashboards::reports::SendReport,
-    db::{self, alerts::alert::set_without_updating_trigger},
-    self_reporting::publish_triggers_usage,
-};
+use crate::service::{dashboards::reports::SendReport, self_reporting::publish_triggers_usage};
 
 pub async fn handle_triggers(
     trace_id: &str,
-    trigger: db::scheduler::Trigger,
+    trigger: openobserve_scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     // Do not execute scheduled work for an org that is soft-deleted (pending_deletion)
     // or actively deleting: the org is hidden and blocked everywhere, so firing its
     // scheduled alerts/pipelines/reports would send notifications for an org the user
     // believes is gone. Keep the trigger alive (reschedule ~1h out) so it resumes if
     // the org is resurrected; on hard-delete the scheduler rows are purged by cleanup.
-    if crate::service::db::org_status::is_blocked(&trigger.org) {
+    if openobserve_organization::status::is_blocked(&trigger.org) {
         log::debug!(
             "[scheduler] org={} is pending deletion/deleting; skipping {:?} trigger {}",
             trigger.org,
@@ -80,22 +77,28 @@ pub async fn handle_triggers(
         );
         let mut trigger = trigger;
         trigger.next_run_at = config::utils::time::now_micros() + 3600 * 1_000_000;
-        trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger, false, trace_id).await?;
+        trigger.status = openobserve_scheduler::TriggerStatus::Waiting;
+        openobserve_scheduler::update_trigger(trigger, false, trace_id).await?;
         return Ok(());
     }
 
     match trigger.module {
-        db::scheduler::TriggerModule::Report => handle_report_triggers(trace_id, trigger).await,
-        db::scheduler::TriggerModule::Alert => handle_alert_triggers(trace_id, trigger).await,
-        db::scheduler::TriggerModule::DerivedStream => {
+        openobserve_scheduler::TriggerModule::Report => {
+            handle_report_triggers(trace_id, trigger).await
+        }
+        openobserve_scheduler::TriggerModule::Alert => {
+            handle_alert_triggers(trace_id, trigger).await
+        }
+        openobserve_scheduler::TriggerModule::DerivedStream => {
             handle_derived_stream_triggers(trace_id, trigger).await
         }
-        db::scheduler::TriggerModule::QueryRecommendations => {
+        openobserve_scheduler::TriggerModule::QueryRecommendations => {
             handle_query_recommendations_triggers(trace_id, trigger).await
         }
-        db::scheduler::TriggerModule::Backfill => handle_backfill_triggers(trace_id, trigger).await,
-        db::scheduler::TriggerModule::AnomalyDetection => {
+        openobserve_scheduler::TriggerModule::Backfill => {
+            handle_backfill_triggers(trace_id, trigger).await
+        }
+        openobserve_scheduler::TriggerModule::AnomalyDetection => {
             handle_anomaly_detection_triggers(trigger).await
         }
     }
@@ -106,7 +109,7 @@ pub async fn handle_triggers(
 /// Loads the config, runs detection via the enterprise crate (if trained),
 /// then reschedules the trigger according to `schedule_interval`.
 async fn handle_anomaly_detection_triggers(
-    mut trigger: db::scheduler::Trigger,
+    mut trigger: openobserve_scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     use config::utils::time::now_micros;
     use infra::table::anomaly_detection::config as anomaly_config_table;
@@ -126,8 +129,8 @@ async fn handle_anomaly_detection_triggers(
         .disabled
     {
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
-        trigger.status = db::scheduler::TriggerStatus::Completed;
-        db::scheduler::update_trigger(trigger, true, "").await?;
+        trigger.status = openobserve_scheduler::TriggerStatus::Completed;
+        openobserve_scheduler::update_trigger(trigger, true, "").await?;
         return Ok(());
     }
 
@@ -151,16 +154,16 @@ async fn handle_anomaly_detection_triggers(
             trigger.org
         );
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
-        trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger, true, "").await?;
+        trigger.status = openobserve_scheduler::TriggerStatus::Waiting;
+        openobserve_scheduler::update_trigger(trigger, true, "").await?;
         return Ok(());
     };
 
     // If not yet trained or disabled, skip and publish a Skipped trigger record.
     if !config.is_trained || !config.enabled {
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
-        trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger.clone(), true, "").await?;
+        trigger.status = openobserve_scheduler::TriggerStatus::Waiting;
+        openobserve_scheduler::update_trigger(trigger.clone(), true, "").await?;
 
         crate::service::self_reporting::publish_triggers_usage(TriggerData {
             _timestamp: now_micros(),
@@ -272,8 +275,8 @@ async fn handle_anomaly_detection_triggers(
 
     // Reschedule.
     trigger.next_run_at = next_run;
-    trigger.status = db::scheduler::TriggerStatus::Waiting;
-    db::scheduler::update_trigger(trigger, true, "").await?;
+    trigger.status = openobserve_scheduler::TriggerStatus::Waiting;
+    openobserve_scheduler::update_trigger(trigger, true, "").await?;
 
     Ok(())
 }
@@ -378,7 +381,7 @@ fn _get_max_considerable_delay(frequency: i64) -> i64 {
 
 async fn handle_alert_triggers(
     trace_id: &str,
-    trigger: db::scheduler::Trigger,
+    trigger: openobserve_scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
@@ -391,10 +394,10 @@ async fn handle_alert_triggers(
     let triggered_at = trigger.start_time.unwrap_or_default();
     let time_in_queue = Duration::microseconds(now - triggered_at).num_milliseconds();
     let source_node = LOCAL_NODE.name.clone();
-    let mut new_trigger = db::scheduler::Trigger {
+    let mut new_trigger = openobserve_scheduler::Trigger {
         next_run_at: now,
         is_silenced: false,
-        status: db::scheduler::TriggerStatus::Waiting,
+        status: openobserve_scheduler::TriggerStatus::Waiting,
         retries: 0,
         ..trigger.clone()
     };
@@ -402,16 +405,17 @@ async fn handle_alert_triggers(
     // here it can be alert id or alert name
     let alert = if let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) {
         let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-        match db::alerts::alert::get_by_id(client, &trigger.org, alert_id).await {
+        match openobserve_alerts::repository::alert::get_by_id(client, &trigger.org, alert_id).await
+        {
             Ok(Some((_, alert))) => alert,
             Ok(None) => {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Alert not found for module_key: {}, deleting this trigger job",
                     trigger.module_key
                 );
-                if let Err(e) = db::scheduler::delete(
+                if let Err(e) = openobserve_scheduler::delete(
                     &trigger.org,
-                    db::scheduler::TriggerModule::Alert,
+                    openobserve_scheduler::TriggerModule::Alert,
                     &trigger.module_key,
                 )
                 .await
@@ -449,14 +453,15 @@ async fn handle_alert_triggers(
                     // next run at is after 5mins
                     let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
                     new_trigger.next_run_at = next_run_at;
-                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                    openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id)
+                        .await?;
                 } else {
                     // Mark the trigger as failed
-                    db::scheduler::update_status(
+                    openobserve_scheduler::update_status(
                         &trigger.org,
-                        db::scheduler::TriggerModule::Alert,
+                        openobserve_scheduler::TriggerModule::Alert,
                         &trigger.module_key,
-                        db::scheduler::TriggerStatus::Waiting,
+                        openobserve_scheduler::TriggerStatus::Waiting,
                         trigger.retries + 1,
                         None,
                         true,
@@ -491,9 +496,9 @@ async fn handle_alert_triggers(
             trigger.module_key
         );
         // Module key is not a valid ksuid, delete the trigger job
-        if let Err(e) = db::scheduler::delete(
+        if let Err(e) = openobserve_scheduler::delete(
             &trigger.org,
-            db::scheduler::TriggerModule::Alert,
+            openobserve_scheduler::TriggerModule::Alert,
             &trigger.module_key,
         )
         .await
@@ -579,9 +584,9 @@ async fn handle_alert_triggers(
                 );
             }
 
-            if let Err(e) = db::scheduler::delete(
+            if let Err(e) = openobserve_scheduler::delete(
                 &trigger.org,
-                db::scheduler::TriggerModule::Alert,
+                openobserve_scheduler::TriggerModule::Alert,
                 &trigger.module_key,
             )
             .await
@@ -608,7 +613,7 @@ async fn handle_alert_triggers(
             trigger.module_key
         );
         // wakeup the trigger
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -616,7 +621,7 @@ async fn handle_alert_triggers(
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         new_trigger.is_silenced = true;
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -649,7 +654,7 @@ async fn handle_alert_triggers(
         // Keep the last_satisfied_at field
         trigger_data.reset();
         new_trigger.data = json::to_string(&trigger_data).unwrap();
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -809,14 +814,14 @@ async fn handle_alert_triggers(
             trigger_data.reset();
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             trigger_data_stream.next_run_at = new_trigger.next_run_at;
-            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+            openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         } else {
             // update its status and retries
-            db::scheduler::update_status(
+            openobserve_scheduler::update_status(
                 &new_trigger.org,
                 new_trigger.module,
                 &new_trigger.module_key,
-                db::scheduler::TriggerStatus::Waiting,
+                openobserve_scheduler::TriggerStatus::Waiting,
                 trigger.retries + 1,
                 None,
                 true,
@@ -915,10 +920,7 @@ async fn handle_alert_triggers(
                         };
 
                     let semantic_groups =
-                        crate::service::db::system_settings::get_semantic_field_groups(
-                            &new_trigger.org,
-                        )
-                        .await;
+                        common::system_settings::get_semantic_field_groups(&new_trigger.org).await;
 
                     if let Some(first_row) = data.first() {
                         crate::service::alerts::deduplication::calculate_fingerprint(
@@ -988,7 +990,7 @@ async fn handle_alert_triggers(
                     None
                 };
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 publish_triggers_usage(trigger_data_stream);
                 return Ok(());
             }
@@ -1024,7 +1026,8 @@ async fn handle_alert_triggers(
                             None
                         };
                         new_trigger.data = json::to_string(&trigger_data).unwrap();
-                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id)
+                            .await?;
                         publish_triggers_usage(trigger_data_stream);
                         return Ok(());
                     }
@@ -1161,7 +1164,7 @@ async fn handle_alert_triggers(
                 None
             };
             new_trigger.data = json::to_string(&trigger_data).unwrap();
-            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+            openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         } else {
             // Direct notification — creates_incident=false, or incident correlation errored.
             match alert
@@ -1201,7 +1204,8 @@ async fn handle_alert_triggers(
                     new_trigger.data = json::to_string(&trigger_data).unwrap();
                     // Notification is already sent to some destinations,
                     // hence in case of partial errors, no need to retry
-                    db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                    openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id)
+                        .await?;
                 }
                 Err(e) => {
                     log::error!(
@@ -1230,15 +1234,16 @@ async fn handle_alert_triggers(
                         trigger_data.period_end_time = None;
                         new_trigger.data = json::to_string(&trigger_data).unwrap();
                         trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id)
+                            .await?;
                     } else {
                         let trigger_data = json::to_string(&trigger_data).unwrap();
                         // Otherwise update its status and data only
-                        db::scheduler::update_status(
+                        openobserve_scheduler::update_status(
                             &new_trigger.org,
                             new_trigger.module,
                             &new_trigger.module_key,
-                            db::scheduler::TriggerStatus::Waiting,
+                            openobserve_scheduler::TriggerStatus::Waiting,
                             trigger.retries + 1,
                             Some(&trigger_data),
                             true,
@@ -1267,7 +1272,7 @@ async fn handle_alert_triggers(
             None
         };
         new_trigger.data = json::to_string(&trigger_data).unwrap();
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.end_time = trigger_results.end_time;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
@@ -1290,7 +1295,7 @@ async fn handle_alert_triggers(
 #[cfg(not(feature = "enterprise"))]
 async fn handle_query_recommendations_triggers(
     _trace_id: &str,
-    _trigger: db::scheduler::Trigger,
+    _trigger: openobserve_scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     Ok(())
 }
@@ -1298,7 +1303,7 @@ async fn handle_query_recommendations_triggers(
 #[cfg(feature = "enterprise")]
 async fn handle_query_recommendations_triggers(
     trace_id: &str,
-    trigger: db::scheduler::Trigger,
+    trigger: openobserve_scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     use std::{
         sync::Arc,
@@ -1338,14 +1343,14 @@ async fn handle_query_recommendations_triggers(
         });
 
     // Always queue the next run, regardless of success or failure
-    let new_trigger = db::scheduler::Trigger {
+    let new_trigger = openobserve_scheduler::Trigger {
         status: TriggerStatus::Waiting,
         retries: 3,
         next_run_at,
         ..trigger
     };
 
-    db::scheduler::update_trigger(new_trigger, false, trace_id)
+    openobserve_scheduler::update_trigger(new_trigger, false, trace_id)
         .await
         .inspect_err(|e| {
             log::error!(
@@ -1369,7 +1374,7 @@ async fn handle_query_recommendations_triggers(
 
 async fn handle_report_triggers(
     trace_id: &str,
-    trigger: db::scheduler::Trigger,
+    trigger: openobserve_scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let query_trace_id = ider::generate_trace_id();
@@ -1388,17 +1393,19 @@ async fn handle_report_triggers(
     let processing_delay = now - trigger.next_run_at;
     let time_in_queue = now - triggered_at;
 
-    let mut new_trigger = db::scheduler::Trigger {
+    let mut new_trigger = openobserve_scheduler::Trigger {
         next_run_at: now,
         is_realtime: false,
         is_silenced: false,
-        status: db::scheduler::TriggerStatus::Waiting,
+        status: openobserve_scheduler::TriggerStatus::Waiting,
         retries: 0,
         ..trigger.clone()
     };
 
-    let (_report_folder, mut report) = match db::dashboards::reports::get_by_id(conn, report_id)
-        .await
+    let (_report_folder, mut report) = match openobserve_reports::repository::get_by_id(
+        conn, report_id,
+    )
+    .await
     {
         Ok((folder, report)) => (folder, report),
         Err(e) => {
@@ -1410,14 +1417,14 @@ async fn handle_report_triggers(
                 // next run at is after 5mins
                 let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
                 new_trigger.next_run_at = next_run_at;
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             } else {
                 // Mark the trigger as failed
-                db::scheduler::update_status(
+                openobserve_scheduler::update_status(
                     &trigger.org,
-                    db::scheduler::TriggerModule::Report,
+                    openobserve_scheduler::TriggerModule::Report,
                     &trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
+                    openobserve_scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                     None,
                     true,
@@ -1479,9 +1486,9 @@ async fn handle_report_triggers(
                 );
             }
 
-            if let Err(e) = db::scheduler::delete(
+            if let Err(e) = openobserve_scheduler::delete(
                 &trigger.org,
-                db::scheduler::TriggerModule::Report,
+                openobserve_scheduler::TriggerModule::Report,
                 &trigger.module_key,
             )
             .await
@@ -1503,7 +1510,7 @@ async fn handle_report_triggers(
         );
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
     let mut run_once = false;
@@ -1608,7 +1615,7 @@ async fn handle_report_triggers(
             org_id = new_trigger.org,
             report_name = report_name
         );
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
     match report.send_subscribers().await {
@@ -1618,7 +1625,7 @@ async fn handle_report_triggers(
             );
             // Report generation successful, update the trigger
             if run_once {
-                new_trigger.status = db::scheduler::TriggerStatus::Completed;
+                new_trigger.status = openobserve_scheduler::TriggerStatus::Completed;
                 // Get the report again from db to pause it
                 match infra::table::reports::get_by_id(conn, report_id).await? {
                     Some((folder, mut old_report)) => {
@@ -1627,13 +1634,14 @@ async fn handle_report_triggers(
                             // Disable the report
                             old_report.enabled = false;
                         }
-                        let result = db::dashboards::reports::update_without_updating_trigger(
-                            conn,
-                            &folder.folder_id,
-                            None,
-                            old_report,
-                        )
-                        .await;
+                        let result =
+                            openobserve_reports::repository::update_without_updating_trigger(
+                                conn,
+                                &folder.folder_id,
+                                None,
+                                old_report,
+                            )
+                            .await;
                         if result.is_err() {
                             log::error!(
                                 "[SCHEDULER trace_id {scheduler_trace_id}] Failed to update report: {report_name} after trigger: {}",
@@ -1648,7 +1656,7 @@ async fn handle_report_triggers(
                     }
                 }
             }
-            db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+            openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             log::debug!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Update trigger for report name: {report_name} id: {report_id}"
             );
@@ -1665,17 +1673,17 @@ async fn handle_report_triggers(
                     "[SCHEDULER trace_id {scheduler_trace_id}] This report trigger: {org_id}/{report_name} has reached maximum possible retries"
                 );
                 trigger_data_stream.next_run_at = new_trigger.next_run_at;
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
             } else {
                 if run_once {
                     report.enabled = true;
                 }
                 // Otherwise update its status only
-                db::scheduler::update_status(
+                openobserve_scheduler::update_status(
                     &new_trigger.org,
                     new_trigger.module,
                     &new_trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
+                    openobserve_scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                     None,
                     true,
@@ -1699,7 +1707,7 @@ async fn handle_report_triggers(
 
 async fn handle_derived_stream_triggers(
     trace_id: &str,
-    trigger: db::scheduler::Trigger,
+    trigger: openobserve_scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     let query_trace_id = ider::generate_trace_id();
     let current_time = now_micros();
@@ -1725,10 +1733,10 @@ async fn handle_derived_stream_triggers(
             }
         };
 
-    let mut new_trigger = db::scheduler::Trigger {
+    let mut new_trigger = openobserve_scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
         is_silenced: false,
-        status: db::scheduler::TriggerStatus::Waiting,
+        status: openobserve_scheduler::TriggerStatus::Waiting,
         ..trigger.clone()
     };
     let mut new_trigger_data = if trigger.data.is_empty() {
@@ -1794,7 +1802,7 @@ async fn handle_derived_stream_triggers(
                 log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
                 new_trigger_data.reset();
                 new_trigger.data = new_trigger_data.to_json_string();
-                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 publish_triggers_usage(trigger_data_stream);
                 return Err(anyhow::anyhow!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] {}",
@@ -1825,9 +1833,9 @@ async fn handle_derived_stream_triggers(
                 );
             }
 
-            if let Err(e) = db::scheduler::delete(
+            if let Err(e) = openobserve_scheduler::delete(
                 &trigger.org,
-                db::scheduler::TriggerModule::DerivedStream,
+                openobserve_scheduler::TriggerModule::DerivedStream,
                 &trigger.module_key,
             )
             .await
@@ -1874,7 +1882,7 @@ async fn handle_derived_stream_triggers(
             ..Default::default()
         };
         log::info!("[SCHEDULER trace_id {scheduler_trace_id}] {msg}");
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         publish_triggers_usage(trigger_data_stream);
         return Ok(());
     }
@@ -1913,7 +1921,7 @@ async fn handle_derived_stream_triggers(
         log::error!("[SCHEDULER trace_id {scheduler_trace_id}] {err_msg}");
         new_trigger_data.reset();
         new_trigger.data = new_trigger_data.to_json_string();
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         publish_triggers_usage(trigger_data_stream);
         return Err(anyhow::anyhow!(
             "[SCHEDULER trace_id {scheduler_trace_id}] {}",
@@ -2089,7 +2097,7 @@ async fn handle_derived_stream_triggers(
         trigger_data_stream.error = Some(format!(
             "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
         ));
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         publish_triggers_usage(trigger_data_stream);
         return Ok(());
     }
@@ -2113,7 +2121,7 @@ async fn handle_derived_stream_triggers(
         )?;
         // Start over next time
         new_trigger.retries = 0;
-        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+        openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         return Ok(());
     }
 
@@ -2416,7 +2424,8 @@ async fn handle_derived_stream_triggers(
         new_trigger.retries = 0; // start over
     }
 
-    if let Err(e) = db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await {
+    if let Err(e) = openobserve_scheduler::update_trigger(new_trigger, true, &query_trace_id).await
+    {
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline({}/{})]: DerivedStream's new trigger failed to be updated, caused by {}",
             pipeline.org,
@@ -2453,7 +2462,7 @@ pub fn get_pipeline_info_from_module_key(
 
 async fn handle_backfill_triggers(
     trace_id: &str,
-    trigger: db::scheduler::Trigger,
+    trigger: openobserve_scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
     use config::meta::{
         pipeline::components::PipelineSource,
@@ -2482,9 +2491,9 @@ async fn handle_backfill_triggers(
                 job_id
             );
             // Delete the trigger if config is not found
-            let _ = db::scheduler::delete(
+            let _ = openobserve_scheduler::delete(
                 &trigger.org,
-                db::scheduler::TriggerModule::Backfill,
+                openobserve_scheduler::TriggerModule::Backfill,
                 &job_id,
             )
             .await;
@@ -2524,9 +2533,9 @@ async fn handle_backfill_triggers(
             job_id
         );
         // Mark trigger as Completed when disabled
-        let _ = db::scheduler::update_trigger(
-            db::scheduler::Trigger {
-                status: db::scheduler::TriggerStatus::Completed,
+        let _ = openobserve_scheduler::update_trigger(
+            openobserve_scheduler::Trigger {
+                status: openobserve_scheduler::TriggerStatus::Completed,
                 ..trigger
             },
             true,
@@ -2547,11 +2556,11 @@ async fn handle_backfill_triggers(
             let new_retries = trigger.retries + 1;
             if new_retries >= max_retries {
                 let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
-                let _ = db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
+                let _ = openobserve_scheduler::update_trigger(
+                    openobserve_scheduler::Trigger {
                         next_run_at,
                         retries: new_retries,
-                        status: db::scheduler::TriggerStatus::Waiting,
+                        status: openobserve_scheduler::TriggerStatus::Waiting,
                         ..trigger.clone()
                     },
                     true,
@@ -2559,11 +2568,11 @@ async fn handle_backfill_triggers(
                 )
                 .await;
             } else {
-                let _ = db::scheduler::update_status(
+                let _ = openobserve_scheduler::update_status(
                     &trigger.org,
-                    db::scheduler::TriggerModule::Backfill,
+                    openobserve_scheduler::TriggerModule::Backfill,
                     &job_id,
-                    db::scheduler::TriggerStatus::Waiting,
+                    openobserve_scheduler::TriggerStatus::Waiting,
                     new_retries,
                     None,
                     true,
@@ -2605,11 +2614,11 @@ async fn handle_backfill_triggers(
             let new_retries = trigger.retries + 1;
             if new_retries >= max_retries {
                 let next_run_at = now + Duration::minutes(5).num_microseconds().unwrap();
-                let _ = db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
+                let _ = openobserve_scheduler::update_trigger(
+                    openobserve_scheduler::Trigger {
                         next_run_at,
                         retries: new_retries,
-                        status: db::scheduler::TriggerStatus::Waiting,
+                        status: openobserve_scheduler::TriggerStatus::Waiting,
                         ..trigger.clone()
                     },
                     true,
@@ -2617,11 +2626,11 @@ async fn handle_backfill_triggers(
                 )
                 .await;
             } else {
-                let _ = db::scheduler::update_status(
+                let _ = openobserve_scheduler::update_status(
                     &trigger.org,
-                    db::scheduler::TriggerModule::Backfill,
+                    openobserve_scheduler::TriggerModule::Backfill,
                     &job_id,
-                    db::scheduler::TriggerStatus::Waiting,
+                    openobserve_scheduler::TriggerStatus::Waiting,
                     new_retries,
                     None,
                     true,
@@ -2664,9 +2673,9 @@ async fn handle_backfill_triggers(
             );
             if trigger.retries + 1 >= max_retries {
                 // Delete the trigger after max retries
-                let _ = db::scheduler::delete(
+                let _ = openobserve_scheduler::delete(
                     &trigger.org,
-                    db::scheduler::TriggerModule::Backfill,
+                    openobserve_scheduler::TriggerModule::Backfill,
                     &job_id,
                 )
                 .await;
@@ -2693,11 +2702,11 @@ async fn handle_backfill_triggers(
                     ..Default::default()
                 });
             } else {
-                let _ = db::scheduler::update_status(
+                let _ = openobserve_scheduler::update_status(
                     &trigger.org,
-                    db::scheduler::TriggerModule::Backfill,
+                    openobserve_scheduler::TriggerModule::Backfill,
                     &job_id,
-                    db::scheduler::TriggerStatus::Waiting,
+                    openobserve_scheduler::TriggerStatus::Waiting,
                     trigger.retries + 1,
                     None,
                     true,
@@ -2739,9 +2748,9 @@ async fn handle_backfill_triggers(
                 config.pipeline_id
             );
             // Delete the trigger as this is a configuration error
-            let _ = db::scheduler::delete(
+            let _ = openobserve_scheduler::delete(
                 &trigger.org,
-                db::scheduler::TriggerModule::Backfill,
+                openobserve_scheduler::TriggerModule::Backfill,
                 &job_id,
             )
             .await;
@@ -2777,9 +2786,9 @@ async fn handle_backfill_triggers(
                 "[SCHEDULER trace_id {trace_id}] [job_id: {}] Failed to get destination streams: {e}",
                 job_id
             );
-            let _ = db::scheduler::delete(
+            let _ = openobserve_scheduler::delete(
                 &trigger.org,
-                db::scheduler::TriggerModule::Backfill,
+                openobserve_scheduler::TriggerModule::Backfill,
                 &job_id,
             )
             .await;
@@ -2893,9 +2902,9 @@ async fn handle_backfill_triggers(
                         backfill_job: Some(backfill_job),
                         ..trigger_data
                     };
-                    db::scheduler::update_trigger(
-                        db::scheduler::Trigger {
-                            status: db::scheduler::TriggerStatus::Completed,
+                    openobserve_scheduler::update_trigger(
+                        openobserve_scheduler::Trigger {
+                            status: openobserve_scheduler::TriggerStatus::Completed,
                             data: updated_trigger_data.to_json_string(),
                             ..trigger
                         },
@@ -2920,10 +2929,10 @@ async fn handle_backfill_triggers(
                 let delay = config.delay_between_chunks_secs.unwrap_or(30);
                 let next_run_at = now + (delay * 1_000_000);
 
-                db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
+                openobserve_scheduler::update_trigger(
+                    openobserve_scheduler::Trigger {
                         next_run_at,
-                        status: db::scheduler::TriggerStatus::Waiting,
+                        status: openobserve_scheduler::TriggerStatus::Waiting,
                         data: updated_trigger_data.to_json_string(),
                         ..trigger
                     },
@@ -2987,10 +2996,10 @@ async fn handle_backfill_triggers(
                         let delay = config.delay_between_chunks_secs.unwrap_or(30);
                         let next_run_at = now + (delay * 1_000_000);
 
-                        db::scheduler::update_trigger(
-                            db::scheduler::Trigger {
+                        openobserve_scheduler::update_trigger(
+                            openobserve_scheduler::Trigger {
                                 next_run_at,
-                                status: db::scheduler::TriggerStatus::Waiting,
+                                status: openobserve_scheduler::TriggerStatus::Waiting,
                                 ..trigger
                             },
                             true,
@@ -3072,11 +3081,11 @@ async fn handle_backfill_triggers(
                 next_run_at = now + (delay * 1_000_000);
 
                 // Update trigger with reset retries and scheduled next run
-                db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
+                openobserve_scheduler::update_trigger(
+                    openobserve_scheduler::Trigger {
                         retries: 0, // Reset retries for next attempt
                         next_run_at,
-                        status: db::scheduler::TriggerStatus::Waiting,
+                        status: openobserve_scheduler::TriggerStatus::Waiting,
                         ..trigger
                     },
                     true,
@@ -3088,10 +3097,10 @@ async fn handle_backfill_triggers(
                 // immediately
                 next_run_at = now; // Will retry immediately
 
-                db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
+                openobserve_scheduler::update_trigger(
+                    openobserve_scheduler::Trigger {
                         retries: new_retries,
-                        status: db::scheduler::TriggerStatus::Waiting,
+                        status: openobserve_scheduler::TriggerStatus::Waiting,
                         ..trigger
                     },
                     true,
@@ -3162,11 +3171,11 @@ async fn handle_backfill_triggers(
                 next_run_at = now + (delay * 1_000_000);
 
                 // Update trigger with reset retries and scheduled next run
-                db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
+                openobserve_scheduler::update_trigger(
+                    openobserve_scheduler::Trigger {
                         retries: 0, // Reset retries for next attempt
                         next_run_at,
-                        status: db::scheduler::TriggerStatus::Waiting,
+                        status: openobserve_scheduler::TriggerStatus::Waiting,
                         ..trigger
                     },
                     true,
@@ -3178,10 +3187,10 @@ async fn handle_backfill_triggers(
                 // immediately
                 next_run_at = now; // Will retry immediately
 
-                db::scheduler::update_trigger(
-                    db::scheduler::Trigger {
+                openobserve_scheduler::update_trigger(
+                    openobserve_scheduler::Trigger {
                         retries: new_retries,
-                        status: db::scheduler::TriggerStatus::Waiting,
+                        status: openobserve_scheduler::TriggerStatus::Waiting,
                         ..trigger
                     },
                     true,
@@ -3265,11 +3274,11 @@ async fn handle_backfill_triggers(
                     next_run_at = now + (delay * 1_000_000);
 
                     // Update trigger with reset retries and scheduled next run
-                    db::scheduler::update_trigger(
-                        db::scheduler::Trigger {
+                    openobserve_scheduler::update_trigger(
+                        openobserve_scheduler::Trigger {
                             retries: 0, // Reset retries for next attempt
                             next_run_at,
-                            status: db::scheduler::TriggerStatus::Waiting,
+                            status: openobserve_scheduler::TriggerStatus::Waiting,
                             ..trigger
                         },
                         true,
@@ -3281,10 +3290,10 @@ async fn handle_backfill_triggers(
                     // immediately
                     next_run_at = now; // Will retry immediately
 
-                    db::scheduler::update_trigger(
-                        db::scheduler::Trigger {
+                    openobserve_scheduler::update_trigger(
+                        openobserve_scheduler::Trigger {
                             retries: new_retries,
-                            status: db::scheduler::TriggerStatus::Waiting,
+                            status: openobserve_scheduler::TriggerStatus::Waiting,
                             ..trigger
                         },
                         true,
@@ -3420,11 +3429,11 @@ async fn handle_backfill_triggers(
             next_run_at = now + (delay * 1_000_000);
 
             // Update trigger with reset retries and scheduled next run
-            db::scheduler::update_trigger(
-                db::scheduler::Trigger {
+            openobserve_scheduler::update_trigger(
+                openobserve_scheduler::Trigger {
                     retries: 0, // Reset retries for next attempt
                     next_run_at,
-                    status: db::scheduler::TriggerStatus::Waiting,
+                    status: openobserve_scheduler::TriggerStatus::Waiting,
                     ..trigger
                 },
                 true,
@@ -3436,11 +3445,11 @@ async fn handle_backfill_triggers(
             // immediately
             next_run_at = now; // Will retry immediately
 
-            db::scheduler::update_trigger(
-                db::scheduler::Trigger {
+            openobserve_scheduler::update_trigger(
+                openobserve_scheduler::Trigger {
                     retries: new_retries,
                     next_run_at,
-                    status: db::scheduler::TriggerStatus::Waiting,
+                    status: openobserve_scheduler::TriggerStatus::Waiting,
                     ..trigger
                 },
                 true,
@@ -3498,9 +3507,9 @@ async fn handle_backfill_triggers(
         let org = trigger.org.clone();
 
         // Update trigger to completed status
-        db::scheduler::update_trigger(
-            db::scheduler::Trigger {
-                status: db::scheduler::TriggerStatus::Completed,
+        openobserve_scheduler::update_trigger(
+            openobserve_scheduler::Trigger {
+                status: openobserve_scheduler::TriggerStatus::Completed,
                 data: serde_json::to_string(&updated_trigger_data)?,
                 ..trigger
             },
@@ -3572,10 +3581,10 @@ async fn handle_backfill_triggers(
         // Clone org before moving trigger
         let org = trigger.org.clone();
 
-        db::scheduler::update_trigger(
-            db::scheduler::Trigger {
+        openobserve_scheduler::update_trigger(
+            openobserve_scheduler::Trigger {
                 next_run_at,
-                status: db::scheduler::TriggerStatus::Waiting,
+                status: openobserve_scheduler::TriggerStatus::Waiting,
                 data: updated_trigger_data.to_json_string(),
                 retries: 0, // Reset retries on successful chunk
                 ..trigger
@@ -3712,7 +3721,7 @@ async fn initiate_stream_deletion(
     };
 
     // Create deletion job using existing retention service
-    let (key, _created) = crate::service::db::compact::retention::delete_stream(
+    let (key, _created) = openobserve_compactor::repository::retention::delete_stream(
         org_id,
         stream.stream_type,
         &stream.stream_name,
@@ -3729,7 +3738,7 @@ async fn initiate_stream_deletion(
         ended_at: 0,
     };
 
-    let job_id = crate::service::db::compact::compactor_manual_jobs::add_job(job).await?;
+    let job_id = openobserve_compactor::repository::compactor_manual_jobs::add_job(job).await?;
     Ok(job_id)
 }
 
@@ -3737,7 +3746,7 @@ async fn initiate_stream_deletion(
 /// We need to only check this local region status. This is because the ingestion will happen only
 /// in this region, so we can start backfilling as soon as the deletion in this region is complete.
 async fn check_deletion_status(job_id: &str) -> Result<String, anyhow::Error> {
-    let job = crate::service::db::compact::compactor_manual_jobs::get_job(job_id).await?;
+    let job = openobserve_compactor::repository::compactor_manual_jobs::get_job(job_id).await?;
     let status_str = match job.status {
         infra::table::compactor_manual_jobs::Status::Pending => "pending",
         infra::table::compactor_manual_jobs::Status::Running => "running",

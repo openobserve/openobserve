@@ -26,7 +26,7 @@ use crate::{
         organization::DEFAULT_ORG,
         user::{UserOrgRole, UserRequest},
     },
-    service::{alerts, db, self_reporting, users},
+    service::{alerts, self_reporting, users},
 };
 
 #[cfg(feature = "enterprise")]
@@ -88,7 +88,7 @@ async fn patch_sre_readonly_alerts_incidents() {
         return;
     }
 
-    let orgs = match openobserve_core::db::organization::list(None).await {
+    let orgs = match openobserve_organization::repository::organization::list(None).await {
         Ok(orgs) => orgs,
         Err(e) => {
             log::error!("Failed to list orgs for sre-readonly alerts/incidents patch: {e}");
@@ -141,7 +141,7 @@ async fn backfill_sys_rca_agent_openfga_tuples() {
     }
 
     // Get all orgs and ensure SA exists (idempotent — creates OpenFGA tuples for existing DB rows)
-    match openobserve_core::db::organization::list(None).await {
+    match openobserve_organization::repository::organization::list(None).await {
         Ok(orgs) => {
             for org in orgs {
                 if let Err(e) =
@@ -300,7 +300,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
 
     // init root user
-    if !db::user::root_user_exists().await {
+    if !openobserve_organization::repository::user::root_user_exists().await {
         if cfg.auth.root_user_email.is_empty()
             || !email_regex.is_match(&cfg.auth.root_user_email)
             || cfg.auth.root_user_password.is_empty()
@@ -355,26 +355,30 @@ pub async fn init() -> Result<(), anyhow::Error> {
         openobserve_core::enrichment_table::init_url_processor();
     }
 
-    db::user::cache().await.expect("user cache failed");
-    db::organization::cache()
+    openobserve_organization::repository::user::cache()
+        .await
+        .expect("user cache failed");
+    openobserve_organization::repository::organization::cache()
         .await
         .expect("organizations cache failed");
-    db::org_users::cache().await.expect("org user cache failed");
-    db::org_ingestion_tokens::cache()
+    openobserve_organization::repository::org_users::cache()
+        .await
+        .expect("org user cache failed");
+    openobserve_ingestion::repository::org_ingestion_tokens::cache()
         .await
         .expect("org ingestion tokens cache failed");
 
-    db::organization::org_settings_cache()
+    openobserve_organization::repository::organization::org_settings_cache()
         .await
         .expect("organization settings cache sync failed");
 
     // watch org users
-    tokio::task::spawn(db::user::watch());
-    tokio::task::spawn(db::org_users::watch());
-    tokio::task::spawn(db::org_ingestion_tokens::watch());
-    tokio::task::spawn(db::organization::watch());
-    tokio::task::spawn(db::org_status::watch());
-    if let Err(e) = db::org_status::load_from_db().await {
+    tokio::task::spawn(openobserve_organization::repository::user::watch());
+    tokio::task::spawn(openobserve_organization::repository::org_users::watch());
+    tokio::task::spawn(openobserve_ingestion::repository::org_ingestion_tokens::watch());
+    tokio::task::spawn(openobserve_organization::repository::organization::watch());
+    tokio::task::spawn(openobserve_organization::status::watch());
+    if let Err(e) = openobserve_organization::status::load_from_db().await {
         log::error!("Failed to load org status cache: {e}");
     }
 
@@ -431,7 +435,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // All nodes need org settings watch for consistent cache
-    tokio::task::spawn(db::organization::org_settings_watch());
+    tokio::task::spawn(openobserve_organization::repository::organization::org_settings_watch());
 
     // Domain management (allow-list + blocklist) is enforced in the auth path —
     // `validate_credentials`, `validate_credentials_ext`, `token_validator` and `process_token`
@@ -468,22 +472,22 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(self_reporting::run());
 
     // cache short_urls
-    tokio::task::spawn(db::short_url::watch());
-    db::short_url::cache()
+    tokio::task::spawn(common::short_url::repository::watch());
+    common::short_url::repository::cache()
         .await
         .expect("short url cache failed");
 
     // initialize metadata watcher
     tokio::task::spawn(openobserve_catalog::schema::watch());
-    tokio::task::spawn(db::functions::watch());
-    tokio::task::spawn(db::compact::retention::watch());
+    tokio::task::spawn(openobserve_transform::repository::watch());
+    tokio::task::spawn(openobserve_compactor::repository::retention::watch());
     tokio::task::spawn(openobserve_ingestion::metrics::cluster::watch_prom_cluster_leader());
-    tokio::task::spawn(db::system_settings::watch());
-    tokio::task::spawn(db::model_pricing::watch());
-    tokio::task::spawn(db::alerts::templates::watch());
-    tokio::task::spawn(db::alerts::destinations::watch());
-    tokio::task::spawn(db::alerts::realtime_triggers::watch());
-    tokio::task::spawn(db::alerts::alert::watch());
+    tokio::task::spawn(common::system_settings::watch());
+    tokio::task::spawn(openobserve_ingestion::repository::model_pricing::watch());
+    tokio::task::spawn(openobserve_alerts::repository::templates::watch());
+    tokio::task::spawn(openobserve_alerts::repository::destinations::watch());
+    tokio::task::spawn(openobserve_alerts::repository::realtime_triggers::watch());
+    tokio::task::spawn(openobserve_alerts::repository::alert::watch());
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with
@@ -508,14 +512,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // Dashboard id->org cache: maintained on every node type so HTTP handlers (e.g.
     // timed annotations) can perform cross-org IDOR checks in O(1).
-    tokio::task::spawn(db::dashboards::watch_id_to_org());
+    tokio::task::spawn(openobserve_dashboards::repository::watch_id_to_org());
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() {
-        tokio::task::spawn(db::session::watch());
+        tokio::task::spawn(openobserve_organization::repository::session::watch());
     }
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(db::enrichment_table::watch());
+        tokio::task::spawn(openobserve_enrichment::repository::watch());
     }
 
     tokio::task::yield_now().await;
@@ -524,22 +528,22 @@ pub async fn init() -> Result<(), anyhow::Error> {
     openobserve_catalog::schema::cache()
         .await
         .expect("stream cache failed");
-    db::functions::cache()
+    openobserve_transform::repository::cache()
         .await
         .expect("functions cache failed");
-    db::compact::retention::cache()
+    openobserve_compactor::repository::retention::cache()
         .await
         .expect("compact delete cache failed");
     openobserve_ingestion::metrics::cluster::cache_prom_cluster_leader()
         .await
         .expect("prom cluster leader cache failed");
 
-    db::system_settings::cache()
+    common::system_settings::cache()
         .await
         .expect("system settings cache failed");
 
     if config::get_config().common.model_pricing_enabled {
-        db::model_pricing::cache()
+        openobserve_ingestion::repository::model_pricing::cache()
             .await
             .expect("model pricing cache failed");
 
@@ -575,17 +579,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("system templates initialization failed");
 
     // cache alerts (this will include the system templates we just created)
-    db::alerts::templates::cache()
+    openobserve_alerts::repository::templates::cache()
         .await
         .expect("alerts templates cache failed");
 
-    db::alerts::destinations::cache()
+    openobserve_alerts::repository::destinations::cache()
         .await
         .expect("alerts destinations cache failed");
-    db::alerts::realtime_triggers::cache()
+    openobserve_alerts::repository::realtime_triggers::cache()
         .await
         .expect("alerts realtime triggers cache failed");
-    db::alerts::alert::cache()
+    openobserve_alerts::repository::alert::cache()
         .await
         .expect("alerts cache failed");
     // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
@@ -602,7 +606,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        db::session::cache()
+        openobserve_organization::repository::session::cache()
             .await
             .expect("user session cache failed");
     }
@@ -1033,7 +1037,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Pipeline cache failed");
 
     // Lightweight dashboard id->org cache for cross-org IDOR checks. Runs on every node.
-    db::dashboards::cache_id_to_org()
+    openobserve_dashboards::repository::cache_id_to_org()
         .await
         .expect("Dashboard id->org cache failed");
 

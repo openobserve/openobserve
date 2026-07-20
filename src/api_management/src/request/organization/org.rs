@@ -127,7 +127,7 @@ pub async fn organizations(
         // them via the dedicated all_organizations endpoint instead. This matches
         // the blocked_orgs middleware, which also gates on is_blocked.
         #[cfg(feature = "cloud")]
-        if openobserve_core::db::org_status::is_blocked(&org.identifier) {
+        if openobserve_organization::status::is_blocked(&org.identifier) {
             continue;
         }
         id += 1;
@@ -228,9 +228,10 @@ pub async fn all_organizations(
                 None
             }
         });
-        let settings = openobserve_core::db::organization::get_org_setting(&org.identifier)
-            .await
-            .unwrap_or_default();
+        let settings =
+            openobserve_organization::repository::organization::get_org_setting(&org.identifier)
+                .await
+                .unwrap_or_default();
         let org = AllOrgListDetails {
             id,
             identifier: org.identifier.clone(),
@@ -591,7 +592,7 @@ pub async fn extend_trial_period(
     Path(org_id): Path<String>,
     Json(req): Json<ExtendTrialPeriodRequest>,
 ) -> Response {
-    use openobserve_core::db::organization::ORG_KEY_PREFIX;
+    use openobserve_organization::repository::organization::ORG_KEY_PREFIX;
 
     let org = org_id;
     if org != "_meta" {
@@ -907,7 +908,9 @@ pub async fn enable_org_storage(
     let target_org_id = req.org_id;
 
     let mut org_settings =
-        match openobserve_core::db::organization::get_org_setting(&target_org_id).await {
+        match openobserve_organization::repository::organization::get_org_setting(&target_org_id)
+            .await
+        {
             Ok(org) => org,
             Err(e) => {
                 return MetaHttpResponse::not_found(e.to_string());
@@ -918,8 +921,11 @@ pub async fn enable_org_storage(
     }
     org_settings.org_storage_enabled = true;
 
-    if let Err(e) =
-        openobserve_core::db::organization::set_org_setting(&target_org_id, &org_settings).await
+    if let Err(e) = openobserve_organization::repository::organization::set_org_setting(
+        &target_org_id,
+        &org_settings,
+    )
+    .await
     {
         return MetaHttpResponse::internal_error(format!(
             "error while saving settings for org {target_org_id} : {e}"

@@ -15,7 +15,7 @@
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job, utils::time::now_micros};
 use infra::cluster::get_cached_online_ingester_nodes;
-use openobserve_core::db;
+use openobserve_pipeline::repository::pipeline_errors;
 
 /// Runs the periodic pipeline error cleanup job.
 ///
@@ -85,7 +85,7 @@ pub fn run() {
                 cutoff_timestamp
             );
 
-            match db::pipeline_errors::delete_older_than(cutoff_timestamp).await {
+            match pipeline_errors::delete_older_than(cutoff_timestamp).await {
                 Ok(deleted_count) => {
                     if deleted_count > 0 {
                         log::info!(

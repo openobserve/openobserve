@@ -24,11 +24,12 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use common::system_settings;
 use config::meta::system_settings::{
     SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery,
 };
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::system_settings};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Get a specific system setting with resolution (user -> org -> system)
 #[utoipa::path(

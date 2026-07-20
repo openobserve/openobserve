@@ -20,7 +20,7 @@
 //! source stream binding, the LLM evaluation node, and an output sink.
 //!
 //! This module is intentionally side-effect bounded — it only reads/writes
-//! the underlying pipeline via the `service::pipeline` and `service::db::pipeline`
+//! the underlying pipeline via the pipeline service and repository layers.
 //! layers. The caller (`service::llm_evaluations::eval_jobs`) is responsible for persisting any
 //! resulting `pipeline_id` on the job row.
 

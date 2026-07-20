@@ -15,14 +15,12 @@
 
 use config::meta::cluster::get_internal_grpc_token;
 use http_auth_basic::Credentials;
+use openobserve_organization::repository::org_users::get_cached_user_org;
 use tonic::{Request, Status, metadata::MetadataValue};
 
-use crate::{
-    common::{
-        infra::config::ROOT_USER,
-        utils::auth::{get_hash, is_root_user},
-    },
-    service::db::org_users::get_cached_user_org,
+use crate::common::{
+    infra::config::ROOT_USER,
+    utils::auth::{get_hash, is_root_user},
 };
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {

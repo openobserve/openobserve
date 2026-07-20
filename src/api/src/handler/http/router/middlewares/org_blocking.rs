@@ -39,7 +39,7 @@ pub async fn blocked_orgs_middleware(request: Request, next: Next) -> Response {
 
     if !org_id.is_empty()
         && !SYSTEM_PREFIXES.contains(&org_id)
-        && openobserve_core::db::org_status::is_blocked(org_id)
+        && openobserve_organization::status::is_blocked(org_id)
     {
         use axum::{http::StatusCode, response::IntoResponse};
         // "deleted", not "being deleted": this gate also covers the soft-delete
@@ -96,6 +96,6 @@ mod tests {
     #[test]
     fn test_non_blocked_org_is_allowed_by_cache() {
         // ORG_STATUS_CACHE starts empty; is_blocked for an unknown org returns false
-        assert!(!openobserve_core::db::org_status::is_blocked("someorg"));
+        assert!(!openobserve_organization::status::is_blocked("someorg"));
     }
 }

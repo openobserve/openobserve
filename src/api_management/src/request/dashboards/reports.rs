@@ -24,6 +24,7 @@ use config::meta::{
     folder::DEFAULT_FOLDER,
     triggers::{Trigger, TriggerModule},
 };
+use openobserve_scheduler as scheduler;
 use serde::Deserialize;
 
 #[cfg(feature = "enterprise")]
@@ -33,10 +34,7 @@ use crate::{
     extractors::Headers,
     models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
     request::{BulkDeleteRequest, BulkDeleteResponse, dashboards::get_folder},
-    service::{
-        dashboards::reports::{self, ReportError},
-        db::scheduler,
-    },
+    service::dashboards::reports::{self, ReportError},
 };
 
 #[derive(Debug, serde::Serialize, Deserialize, utoipa::ToSchema)]

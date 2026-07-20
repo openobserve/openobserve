@@ -15,9 +15,7 @@
 
 use infra::errors::{Error, Result};
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-use openobserve_core::db::enrichment_table::{
-    ENRICHMENT_TABLE_META_STREAM_STATS_KEY, notify_update,
-};
+use openobserve_enrichment::repository::{ENRICHMENT_TABLE_META_STREAM_STATS_KEY, notify_update};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let db = infra::db::get_db().await;

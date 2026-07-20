@@ -132,8 +132,7 @@ pub async fn get_agent_mapping(
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
 
-        let config =
-            openobserve_core::db::system_settings::get_gen_ai_agent_mapping_config(&org_id).await;
+        let config = common::system_settings::get_gen_ai_agent_mapping_config(&org_id).await;
         MetaHttpResponse::json(config)
     }
 
@@ -187,7 +186,7 @@ pub async fn save_agent_mapping(
             Err(e) => return MetaHttpResponse::bad_request(e),
         };
 
-        match openobserve_core::db::system_settings::set_gen_ai_agent_mapping_config(
+        match common::system_settings::set_gen_ai_agent_mapping_config(
             &org_id,
             &user_email.user_id,
             config.clone(),

@@ -65,9 +65,11 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         if !get_config().common.ingestion_log_enabled {
             return false;
         }
-        crate::db::organization::get_org_setting_toggle_ingestion_logs(META_ORG_ID)
-            .await
-            .unwrap_or(false)
+        openobserve_organization::repository::organization::get_org_setting_toggle_ingestion_logs(
+            META_ORG_ID,
+        )
+        .await
+        .unwrap_or(false)
     }
 
     async fn ensure_gen_ai_fields_in_schema(

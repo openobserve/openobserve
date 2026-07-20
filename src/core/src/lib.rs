@@ -23,7 +23,6 @@ pub use openobserve_alerts::anomaly_detection;
 pub use openobserve_organization::{auth, authz};
 pub mod bootstrap;
 pub mod dashboards;
-pub mod db;
 pub use openobserve_dashboards::folders;
 pub use openobserve_enrichment::{enrichment, enrichment_table};
 pub use openobserve_search_service::file_list;

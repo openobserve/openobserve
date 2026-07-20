@@ -15,7 +15,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
-use openobserve_core::db::scheduler::{Trigger, TriggerModule, pull as scheduler_pull};
+use openobserve_scheduler::{Trigger, TriggerModule, pull as scheduler_pull};
 use tokio::{
     sync::{Mutex, mpsc},
     time,

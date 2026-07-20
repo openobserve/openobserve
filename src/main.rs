@@ -56,7 +56,7 @@ use openobserve::{
     job, migration, router,
 };
 use openobserve_compactor::cluster_info::ClusterInfoService;
-use openobserve_core::{bootstrap, db, metadata, self_reporting};
+use openobserve_core::{bootstrap, metadata, self_reporting};
 use openobserve_scheduler::TriggerModule::QueryRecommendations;
 use openobserve_search_service::SEARCH_SERVER;
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
@@ -283,7 +283,7 @@ async fn main() -> Result<(), anyhow::Error> {
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
             // flush compact offset cache to disk disk
-            _ = db::compact::files::sync_cache_to_db().await;
+            _ = openobserve_compactor::repository::files::sync_cache_to_db().await;
             // flush db
             let db = infra::db::get_db().await;
             _ = db.close().await;
@@ -374,10 +374,10 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // Check for query recommendations trigger and create one
-    match db::scheduler::list(Some(QueryRecommendations)).await {
+    match openobserve_scheduler::list(Some(QueryRecommendations)).await {
         Ok(list) if list.len() == 1 => {}
         _ => {
-            let _ = db::scheduler::delete(
+            let _ = openobserve_scheduler::delete(
                 META_ORG_ID,
                 TriggerModule::QueryRecommendations,
                 "QueryRecommendations",
@@ -405,7 +405,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 retries: 3,
                 ..Default::default()
             };
-            let _ = db::scheduler::push(trigger).await.inspect_err(|e| {
+            let _ = openobserve_scheduler::push(trigger).await.inspect_err(|e| {
                 log::error!(
                     "Failed to setup the initial trigger for recommendations. e={:?}",
                     e

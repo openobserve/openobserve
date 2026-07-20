@@ -20,6 +20,7 @@ use axum::{
 };
 use config::meta::dashboards::Dashboard;
 use hashbrown::HashMap;
+use openobserve_dashboards::repository as dashboards_db;
 
 #[cfg(feature = "enterprise")]
 use crate::common::utils::auth::check_permissions;
@@ -32,7 +33,7 @@ use crate::{
         PanelRequestBody, PanelResponseBody,
     },
     request::{BulkDeleteRequest, BulkDeleteResponse},
-    service::{dashboards, db::dashboards as dashboards_db},
+    service::dashboards,
 };
 
 pub mod reports;

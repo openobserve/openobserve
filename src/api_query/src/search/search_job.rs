@@ -24,19 +24,16 @@ use config::meta::search::Request;
 use openobserve_core::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use {
+    crate::common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::http::{
+            get_or_create_trace_id, get_search_event_context_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
+        },
+    },
     crate::search::{
         query_manager::cancel_query_inner,
         utils::{StreamPermissionResourceType, check_stream_permissions},
-    },
-    crate::{
-        common::{
-            meta::http::HttpResponse as MetaHttpResponse,
-            utils::http::{
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
-            },
-        },
-        service::db::search_job::{search_job_partitions::*, search_jobs::*},
     },
     axum::http::HeaderMap,
     config::{
@@ -51,6 +48,9 @@ use {
     hashbrown::HashMap,
     infra::table::entity::search_jobs::Model as JobModel,
     openobserve_search_service::jobs::{get_result, merge_response},
+    openobserve_search_service::repository::search_job::{
+        search_job_partitions::*, search_jobs::*,
+    },
     tracing::Span,
 };
 

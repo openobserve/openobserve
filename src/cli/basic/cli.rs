@@ -32,7 +32,7 @@ use crate::{
     },
     common::{infra::config::USERS, meta},
     migration,
-    service::{db, users},
+    service::users,
 };
 
 /// Not to be confused with [`clap::arg`] macro, this is a custom macro that
@@ -225,8 +225,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     match name.as_str() {
         "reset" => {
             infra::init().await?;
-            db::org_users::cache().await?;
-            db::org_ingestion_tokens::cache().await?;
+            openobserve_organization::repository::org_users::cache().await?;
+            openobserve_ingestion::repository::org_ingestion_tokens::cache().await?;
             let component = command.get_one::<String>("component").unwrap();
             match component.as_str() {
                 "root" => {
@@ -268,24 +268,24 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     }
                 }
                 "user" => {
-                    db::user::reset().await?;
+                    openobserve_organization::repository::user::reset().await?;
                 }
                 "alert" => {
-                    db::alerts::alert::reset().await?;
+                    openobserve_alerts::repository::alert::reset().await?;
                 }
                 "dashboard" => {
                     table::dashboards::delete_all().await?;
                 }
                 "report" => {
                     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-                    db::dashboards::reports::reset(conn).await?;
+                    openobserve_reports::repository::reset(conn).await?;
                 }
                 "function" => {
-                    db::functions::reset().await?;
+                    openobserve_transform::repository::reset().await?;
                 }
                 "stream-stats" => {
                     // reset stream stats update offset
-                    db::compact::stats::set_offset(0, None).await?;
+                    openobserve_compactor::repository::stats::set_offset(0, None).await?;
                     // reset stream stats table data
                     infra_file_list::reset_stream_stats().await?;
                     // load stream list
@@ -330,7 +330,8 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         );
                     }
                     // 1. reset file offset in meta table
-                    let n = db::compact::files::reset_offset(time, stream).await?;
+                    let n = openobserve_compactor::repository::files::reset_offset(time, stream)
+                        .await?;
                     println!(
                         "reset {n} compact file offsets to {time} (stream: {})",
                         stream.unwrap_or("*")
@@ -367,9 +368,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     println!("version: {}", ::common::metadata::version::get().await?);
                 }
                 "user" => {
-                    db::user::cache().await?;
-                    db::org_users::cache().await?;
-                    db::org_ingestion_tokens::cache().await?;
+                    openobserve_organization::repository::user::cache().await?;
+                    openobserve_organization::repository::org_users::cache().await?;
+                    openobserve_ingestion::repository::org_ingestion_tokens::cache().await?;
                     let mut id = 0;
                     for user in USERS.iter() {
                         id += 1;

@@ -31,7 +31,7 @@ impl openobserve_pipeline::ports::RuntimeServices for CoreRuntimeServices {
         org_id: &str,
         name: &str,
     ) -> anyhow::Result<config::meta::function::Transform> {
-        crate::db::functions::get(org_id, name).await
+        openobserve_transform::repository::get(org_id, name).await
     }
 
     async fn wait_for_geoip(&self) {

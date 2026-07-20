@@ -86,7 +86,10 @@ impl openobserve_self_reporting::Runtime for CoreSelfReportingRuntime {
     }
 
     async fn usage_stream_enabled(&self, org_id: &str) -> infra::errors::Result<bool> {
-        crate::db::organization::get_org_setting_usage_stream_enabled(org_id).await
+        openobserve_organization::repository::organization::get_org_setting_usage_stream_enabled(
+            org_id,
+        )
+        .await
     }
 
     async fn merge_schema(

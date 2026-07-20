@@ -226,7 +226,7 @@ impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
     }
 
     async fn max_promql_series(&self, org_id: &str) -> usize {
-        match crate::db::organization::get_org_setting(org_id).await {
+        match openobserve_organization::repository::organization::get_org_setting(org_id).await {
             Ok(settings) => settings
                 .max_series_per_query
                 .unwrap_or_else(|| config::get_config().limit.metrics_max_series_response),

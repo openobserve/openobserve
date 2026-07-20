@@ -22,9 +22,8 @@ use o2_enterprise::enterprise::recommendations::{
 };
 use openobserve_catalog::stream::get_streams;
 use openobserve_ingestion::internal as ingestion_service;
+use openobserve_organization::repository::organization;
 use proto::cluster_rpc::{IngestionData, IngestionRequest, IngestionResponse, IngestionType};
-
-use crate::service::db::organization;
 
 #[derive(Clone)]
 pub struct QueryOptimizerContext;

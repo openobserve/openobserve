@@ -27,6 +27,7 @@ use config::{
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
 pub use openobserve_organization::authz::{check_permissions, list_objects_for_user};
+use openobserve_organization::repository as db;
 
 #[cfg(feature = "enterprise")]
 pub use crate::common::utils::auth::get_user_email_from_auth_str;
@@ -46,7 +47,7 @@ use crate::{
             redirect_response::RedirectResponseBuilder,
         },
     },
-    service::{db, users},
+    service::users,
 };
 
 pub const PKCE_STATE_ORG: &str = "o2_pkce_state";

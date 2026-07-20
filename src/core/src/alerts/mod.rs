@@ -42,7 +42,7 @@ pub mod destinations {
         for CoreDestinationReferences
     {
         async fn user_exists(&self, org_id: &str, email: &str) -> bool {
-            crate::db::user::get(Some(org_id), email)
+            openobserve_organization::repository::user::get(Some(org_id), email)
                 .await
                 .is_ok_and(|user| user.is_some())
         }
@@ -306,7 +306,12 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
             return Ok(None);
         }
         if let Some(folder_id) = folder_id {
-            let user_role = match crate::db::user::get(Some(org_id), user_id).await {
+            let user_role = match openobserve_organization::repository::user::get(
+                Some(org_id),
+                user_id,
+            )
+            .await
+            {
                 Ok(Some(user)) => user.role,
                 _ => return Err(PermissionError::UserNotFound),
             };

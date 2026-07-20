@@ -1083,7 +1083,8 @@ pub async fn decline_invitation(
     Headers(user_email): Headers<UserEmail>,
     Path(token): Path<String>,
 ) -> Response {
-    use openobserve_core::{db, organization};
+    use openobserve_core::organization;
+    use openobserve_organization::repository as db;
 
     use super::super::auth::jwt;
 

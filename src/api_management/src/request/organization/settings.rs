@@ -20,20 +20,16 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use infra::errors::{DbError, Error};
+use openobserve_organization::repository::organization::{get_org_setting, set_org_setting};
 #[cfg(feature = "enterprise")]
 use {
     axum::extract::{Multipart, Query},
     o2_enterprise::enterprise::common::settings,
 };
 
-use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        organization::{
-            OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse,
-        },
-    },
-    service::db::organization::{get_org_setting, set_org_setting},
+use crate::common::meta::{
+    http::HttpResponse as MetaHttpResponse,
+    organization::{OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse},
 };
 
 /// Organization specific settings

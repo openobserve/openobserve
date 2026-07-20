@@ -13,6 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use {
+    crate::common::meta::user::TokenValidationResponse,
+    config::meta::user::DBUser,
+    jsonwebtoken::TokenData,
+    o2_openfga::authorizer::authz::{get_new_user_creation_tuple, update_tuples},
+    o2_openfga::config::get_config as get_openfga_config,
+    openobserve_organization::repository as db,
+    regex::Regex,
+    serde_json::Value,
+    std::collections::HashMap,
+    std::sync::LazyLock as Lazy,
+};
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 use {
     crate::{
@@ -26,18 +39,6 @@ use {
         check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
     },
     std::str::FromStr,
-};
-#[cfg(feature = "enterprise")]
-use {
-    crate::{common::meta::user::TokenValidationResponse, service::db},
-    config::meta::user::DBUser,
-    jsonwebtoken::TokenData,
-    o2_openfga::authorizer::authz::{get_new_user_creation_tuple, update_tuples},
-    o2_openfga::config::get_config as get_openfga_config,
-    regex::Regex,
-    serde_json::Value,
-    std::collections::HashMap,
-    std::sync::LazyLock as Lazy,
 };
 
 #[cfg(feature = "cloud")]
@@ -896,7 +897,7 @@ pub async fn check_and_add_to_org(
     }
     let org_users = org_users.map(|orgs| {
         orgs.into_iter()
-            .filter(|o| !openobserve_core::db::org_status::is_blocked(&o.org_id))
+            .filter(|o| !openobserve_organization::status::is_blocked(&o.org_id))
             .collect::<Vec<_>>()
     });
 
@@ -1056,7 +1057,7 @@ async fn process_custom_claim_parsing(
     let function_loader_fn = |function_name: &str| {
         let function_name = function_name.to_string();
         Box::pin(async move {
-            match db::functions::get("_meta", &function_name).await {
+            match openobserve_transform::repository::get("_meta", &function_name).await {
                 Ok(func) => Ok(func), // Return full Transform object with trans_type
                 Err(e) => Err(anyhow::anyhow!(
                     "Failed to load function '{}' from _meta org: {}",

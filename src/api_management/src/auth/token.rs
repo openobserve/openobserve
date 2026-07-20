@@ -16,7 +16,9 @@
 #[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
 #[cfg(feature = "enterprise")]
-use openobserve_core::{db, users};
+use openobserve_core::users;
+#[cfg(feature = "enterprise")]
+use openobserve_organization::repository as db;
 
 use super::validator::{AuthError, AuthValidationResult, RequestData};
 use crate::common::utils::auth::AuthExtractor;

@@ -47,7 +47,7 @@ use infra::{
 };
 use ingester::WAL_PARQUET_METADATA;
 use openobserve_catalog::file_list as catalog_file_list;
-use openobserve_compactor::tantivy::create_tantivy_index;
+use openobserve_compactor::{repository::retention, tantivy::create_tantivy_index};
 use tokio::{
     fs::remove_file,
     sync::{Mutex, RwLock},
@@ -68,12 +68,9 @@ use {
 
 use crate::{
     common::infra::wal,
-    service::{
-        db,
-        search::datafusion::{
-            exec::TableBuilder,
-            merge::{self, MergeParquetResult},
-        },
+    service::search::datafusion::{
+        exec::TableBuilder,
+        merge::{self, MergeParquetResult},
     },
 };
 
@@ -374,7 +371,7 @@ async fn move_files(
     let (org_id, stream_type, stream_name, prefix_date) = split_perfix(prefix);
 
     // check if we are allowed to ingest or just delete the file
-    if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
+    if retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
         for file in files {
             let file_key = &file.key;
             log::warn!(
@@ -983,10 +980,8 @@ async fn queue_services_from_data_file(
     let start = std::time::Instant::now();
 
     // Get semantic field groups upfront (before spawning tasks)
-    let semantic_groups =
-        openobserve_core::db::system_settings::get_semantic_field_groups(org_id).await;
-    let identity_config =
-        openobserve_core::db::system_settings::get_service_identity_config(org_id).await;
+    let semantic_groups = common::system_settings::get_semantic_field_groups(org_id).await;
+    let identity_config = common::system_settings::get_service_identity_config(org_id).await;
 
     // Create bounded channel for backpressure - drops records if consumer can't keep up
     // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)

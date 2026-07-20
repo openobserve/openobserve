@@ -25,6 +25,7 @@ vortex = ["openobserve-core/vortex"]
 common.workspace = true
 openobserve-api-common.workspace = true
 openobserve-core.workspace = true
+openobserve-enrichment.workspace = true
 openobserve-ingestion.workspace = true
 openobserve-organization.workspace = true
 openobserve-search-service.workspace = true

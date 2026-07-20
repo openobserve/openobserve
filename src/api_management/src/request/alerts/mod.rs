@@ -32,6 +32,7 @@ use openobserve_alerts::{
     evaluation::build_sql,
     service::alert::{self, AlertError},
 };
+use openobserve_scheduler as scheduler;
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
@@ -62,7 +63,6 @@ use crate::{
         BulkDeleteRequest, BulkDeleteResponse,
         dashboards::{get_folder, is_overwrite},
     },
-    service::db::scheduler,
 };
 
 pub mod dedup_stats;

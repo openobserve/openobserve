@@ -177,10 +177,9 @@ async fn query(
         if let Err(e) = openobserve_search_service::service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
         }
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::db::org_users::get_cached_user_org,
-        };
+        use openobserve_organization::repository::org_users::get_cached_user_org;
+
+        use crate::common::utils::auth::{AuthExtractor, is_root_user};
 
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
         let mut visitor = promql::name_visitor::MetricNameVisitor::default();
@@ -450,10 +449,9 @@ async fn query_range(
     let trace_id = get_or_create_trace_id(headers, &http_span);
     #[cfg(feature = "enterprise")]
     {
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::db::org_users::get_cached_user_org,
-        };
+        use openobserve_organization::repository::org_users::get_cached_user_org;
+
+        use crate::common::utils::auth::{AuthExtractor, is_root_user};
 
         if let Err(e) = openobserve_search_service::service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
@@ -654,7 +652,7 @@ pub async fn metadata(
         use crate::common::utils::auth::{AuthExtractor, is_root_user};
 
         if !is_root_user(&_user_email.user_id) {
-            use openobserve_core::db::org_users::get_cached_user_org;
+            use openobserve_organization::repository::org_users::get_cached_user_org;
             let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
                 Some(u) => u,
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
@@ -822,10 +820,9 @@ async fn series(
 
     #[cfg(feature = "enterprise")]
     {
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::db::org_users::get_cached_user_org,
-        };
+        use openobserve_organization::repository::org_users::get_cached_user_org;
+
+        use crate::common::utils::auth::{AuthExtractor, is_root_user};
 
         let metric_name = match selector
             .as_ref()
@@ -974,7 +971,7 @@ async fn labels(
         use crate::common::utils::auth::{AuthExtractor, is_root_user};
 
         if !is_root_user(_user_email) {
-            use openobserve_core::db::org_users::get_cached_user_org;
+            use openobserve_organization::repository::org_users::get_cached_user_org;
             let user = match get_cached_user_org(org_id, _user_email) {
                 Some(u) => u,
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
@@ -1092,7 +1089,7 @@ pub async fn label_values(
         use crate::common::utils::auth::{AuthExtractor, is_root_user};
 
         if !is_root_user(&_user_email.user_id) {
-            use openobserve_core::db::org_users::get_cached_user_org;
+            use openobserve_organization::repository::org_users::get_cached_user_org;
             let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
                 Some(u) => u,
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),

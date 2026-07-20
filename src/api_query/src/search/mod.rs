@@ -43,6 +43,7 @@ use http::HeaderMap;
 use openobserve_core::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use openobserve_core::search::sql::visitor::cipher_key::get_cipher_key_names;
+use openobserve_enrichment::repository as enrichment_table;
 use openobserve_search_service::service as SearchService;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
@@ -66,7 +67,6 @@ use crate::{
     },
     extractors::Headers,
     service::{
-        db::enrichment_table,
         search::{
             datafusion::plan::projections::get_result_schema,
             sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
@@ -2064,7 +2064,7 @@ pub async fn result_schema(
     {
         use std::collections::HashSet as StdHashSet;
 
-        use openobserve_core::db::organization::get_org_setting;
+        use openobserve_organization::repository::organization::get_org_setting;
 
         let field_alias_map = &res_schema.field_alias_map;
 

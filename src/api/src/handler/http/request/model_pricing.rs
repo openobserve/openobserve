@@ -22,6 +22,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::model_pricing::{BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource};
+use openobserve_ingestion::repository::model_pricing;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
 use {
@@ -29,7 +30,7 @@ use {
     crate::handler::http::extractors::Headers,
 };
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::model_pricing};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 fn source_priority(source: &PricingSource) -> u8 {
     match source {
@@ -140,7 +141,7 @@ pub async fn list(
             parents[idx].0.children.push(item);
         } else {
             let compiled = regex::RegexBuilder::new(&item.match_pattern)
-                .size_limit(openobserve_core::db::model_pricing::REGEX_SIZE_LIMIT)
+                .size_limit(openobserve_ingestion::repository::model_pricing::REGEX_SIZE_LIMIT)
                 .build()
                 .unwrap_or_else(|_| never_matches.clone());
             parents.push((item, compiled));
@@ -747,7 +748,7 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
         return Err("Match pattern must be 512 characters or fewer".to_string());
     }
     if let Err(e) = regex::RegexBuilder::new(&item.match_pattern)
-        .size_limit(openobserve_core::db::model_pricing::REGEX_SIZE_LIMIT)
+        .size_limit(openobserve_ingestion::repository::model_pricing::REGEX_SIZE_LIMIT)
         .build()
     {
         return Err(format!("Invalid regex pattern: {e}"));

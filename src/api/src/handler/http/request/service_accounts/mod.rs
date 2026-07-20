@@ -214,7 +214,9 @@ pub async fn update(
 
     // Check if this is a system service account - prefer role-based check over email pattern
     // matching
-    if let Ok(user_record) = openobserve_core::db::org_users::get(&org_id, &email_id).await {
+    if let Ok(user_record) =
+        openobserve_organization::repository::org_users::get(&org_id, &email_id).await
+    {
         if user_record.role == UserRole::SreAgent {
             return MetaHttpResponse::forbidden("System service accounts cannot be modified");
         }
@@ -410,7 +412,7 @@ pub async fn delete_bulk(
     let mut err = None;
 
     // Bulk fetch all users for the org to avoid N+1 queries
-    let org_users = openobserve_core::db::org_users::list_users_by_org(&org_id)
+    let org_users = openobserve_organization::repository::org_users::list_users_by_org(&org_id)
         .await
         .unwrap_or_default();
 

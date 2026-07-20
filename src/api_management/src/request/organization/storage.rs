@@ -74,13 +74,14 @@ pub async fn save(
     #[cfg(feature = "cloud")]
     {
         // for cloud, the org storage must be enabled first
-        let org_settings = match openobserve_core::db::organization::get_org_setting(&org_id).await
-        {
-            Ok(org) => org,
-            Err(e) => {
-                return HttpResponse::not_found(e.to_string());
-            }
-        };
+        let org_settings =
+            match openobserve_organization::repository::organization::get_org_setting(&org_id).await
+            {
+                Ok(org) => org,
+                Err(e) => {
+                    return HttpResponse::not_found(e.to_string());
+                }
+            };
 
         if !org_settings.org_storage_enabled {
             return HttpResponse::bad_request(
@@ -222,13 +223,14 @@ pub async fn update(
     #[cfg(feature = "cloud")]
     {
         // for cloud, org storage must be enabled first
-        let org_settings = match openobserve_core::db::organization::get_org_setting(&org_id).await
-        {
-            Ok(org) => org,
-            Err(e) => {
-                return HttpResponse::not_found(e.to_string());
-            }
-        };
+        let org_settings =
+            match openobserve_organization::repository::organization::get_org_setting(&org_id).await
+            {
+                Ok(org) => org,
+                Err(e) => {
+                    return HttpResponse::not_found(e.to_string());
+                }
+            };
 
         if !org_settings.org_storage_enabled {
             return HttpResponse::bad_request(
