@@ -56,14 +56,12 @@ pub struct CompositeSpec {
 /// A single term of a composite alert. A term is one of two shapes, and the
 /// composite never mutates or pauses anything it points at:
 ///
-///  - a **reference** to an existing alert (`alert_id` set): each tick the
-///    composite re-runs that alert's current query over its own shared window
-///    (ReRun, §10.6.2). The referenced alert keeps running on its own schedule
-///    and is completely unaffected by the composite. It must live in the
-///    composite's folder (RBAC v1).
-///  - an **inline** query (`query` set): a query defined directly on the
-///    composite with no separate alert row. It exists only as part of this
-///    composite.
+///  - a **reference** to an existing alert (`alert_id` set): each tick the composite re-runs that
+///    alert's current query over its own shared window (ReRun, §10.6.2). The referenced alert keeps
+///    running on its own schedule and is completely unaffected by the composite. It must live in
+///    the composite's folder (RBAC v1).
+///  - an **inline** query (`query` set): a query defined directly on the composite with no separate
+///    alert row. It exists only as part of this composite.
 ///
 /// Exactly one of `alert_id` / `query` is set (validated at save-time).
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]

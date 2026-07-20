@@ -417,82 +417,82 @@ async fn prepare_alert(
     // the top-level query. A composite has neither (each term is validated on
     // its own query_condition), so they are skipped for composites.
     if !is_composite {
-    // before saving alert check column type to decide numeric condition
-    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    if stream_name.is_empty() || schema.fields().is_empty() {
-        return Err(AlertError::StreamNotFound {
-            stream_name: stream_name.to_owned(),
-        });
-    }
-
-    // Alerts must follow the max_query_range of the stream as set in the schema
-    if let Some(settings) = unwrap_stream_settings(&schema) {
-        let max_query_range = settings.max_query_range;
-        if max_query_range > 0
-            && !alert.is_real_time
-            && alert.trigger_condition.period > max_query_range * 60
-        {
-            return Err(AlertError::PeriodExceedsMaxQueryRange {
-                max_query_range_hours: max_query_range,
+        // before saving alert check column type to decide numeric condition
+        let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+        if stream_name.is_empty() || schema.fields().is_empty() {
+            return Err(AlertError::StreamNotFound {
                 stream_name: stream_name.to_owned(),
             });
         }
-    }
 
-    if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
-        return Err(AlertError::RealtimeMissingCustomQuery);
-    }
-
-    match alert.query_condition.query_type {
-        QueryType::SQL => {
-            if alert.query_condition.sql.is_none()
-                || alert.query_condition.sql.as_ref().unwrap().is_empty()
+        // Alerts must follow the max_query_range of the stream as set in the schema
+        if let Some(settings) = unwrap_stream_settings(&schema) {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && !alert.is_real_time
+                && alert.trigger_condition.period > max_query_range * 60
             {
-                return Err(AlertError::SqlMissingQuery);
+                return Err(AlertError::PeriodExceedsMaxQueryRange {
+                    max_query_range_hours: max_query_range,
+                    stream_name: stream_name.to_owned(),
+                });
             }
-            if alert.query_condition.sql.is_some()
-                && RE_ONLY_SELECT.is_match(alert.query_condition.sql.as_ref().unwrap())
-            {
-                return Err(AlertError::SqlContainsSelectStar);
-            }
+        }
 
-            let sql = alert.query_condition.sql.as_ref().unwrap();
-            let stream_names = match resolve_stream_names(sql) {
-                Ok(stream_names) => stream_names,
-                Err(e) => {
-                    return Err(AlertError::ResolveStreamNameError(e));
-                }
-            };
+        if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
+            return Err(AlertError::RealtimeMissingCustomQuery);
+        }
 
-            // SQL may contain multiple stream names, check for each stream
-            // if the alert period is greater than the max query range
-            for stream in stream_names.iter() {
-                if !stream.eq(stream_name)
-                    && let Some(settings) =
-                        infra::schema::get_settings(org_id, stream, stream_type).await
+        match alert.query_condition.query_type {
+            QueryType::SQL => {
+                if alert.query_condition.sql.is_none()
+                    || alert.query_condition.sql.as_ref().unwrap().is_empty()
                 {
-                    let max_query_range = settings.max_query_range;
-                    if max_query_range > 0
-                        && !alert.is_real_time
-                        && alert.trigger_condition.period > max_query_range * 60
+                    return Err(AlertError::SqlMissingQuery);
+                }
+                if alert.query_condition.sql.is_some()
+                    && RE_ONLY_SELECT.is_match(alert.query_condition.sql.as_ref().unwrap())
+                {
+                    return Err(AlertError::SqlContainsSelectStar);
+                }
+
+                let sql = alert.query_condition.sql.as_ref().unwrap();
+                let stream_names = match resolve_stream_names(sql) {
+                    Ok(stream_names) => stream_names,
+                    Err(e) => {
+                        return Err(AlertError::ResolveStreamNameError(e));
+                    }
+                };
+
+                // SQL may contain multiple stream names, check for each stream
+                // if the alert period is greater than the max query range
+                for stream in stream_names.iter() {
+                    if !stream.eq(stream_name)
+                        && let Some(settings) =
+                            infra::schema::get_settings(org_id, stream, stream_type).await
                     {
-                        return Err(AlertError::PeriodExceedsMaxQueryRange {
-                            max_query_range_hours: max_query_range,
-                            stream_name: stream_name.to_owned(),
-                        });
+                        let max_query_range = settings.max_query_range;
+                        if max_query_range > 0
+                            && !alert.is_real_time
+                            && alert.trigger_condition.period > max_query_range * 60
+                        {
+                            return Err(AlertError::PeriodExceedsMaxQueryRange {
+                                max_query_range_hours: max_query_range,
+                                stream_name: stream_name.to_owned(),
+                            });
+                        }
                     }
                 }
             }
+            QueryType::PromQL
+                if (alert.query_condition.promql.is_none()
+                    || alert.query_condition.promql.as_ref().unwrap().is_empty()
+                    || alert.query_condition.promql_condition.is_none()) =>
+            {
+                return Err(AlertError::PromqlMissingQuery);
+            }
+            _ => {}
         }
-        QueryType::PromQL
-            if (alert.query_condition.promql.is_none()
-                || alert.query_condition.promql.as_ref().unwrap().is_empty()
-                || alert.query_condition.promql_condition.is_none()) =>
-        {
-            return Err(AlertError::PromqlMissingQuery);
-        }
-        _ => {}
-    }
     } // end if !is_composite
 
     // Commented intentionally - in case the alert period is big and there
@@ -509,10 +509,7 @@ async fn prepare_alert(
 /// `on_composite` must have at least one destination, and every destination
 /// referenced by `on_composite` or any `on_term` entry must exist and be an
 /// alert-type destination.
-async fn validate_composite_destinations(
-    org_id: &str,
-    alert: &Alert,
-) -> Result<(), AlertError> {
+async fn validate_composite_destinations(org_id: &str, alert: &Alert) -> Result<(), AlertError> {
     let notify = &alert
         .composite
         .as_ref()
@@ -931,7 +928,8 @@ pub async fn delete_by_id<C: ConnectionTrait + TransactionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
-    let Some((_folder, _alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+    let Some((_folder, _alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await?
+    else {
         return Ok(());
     };
 

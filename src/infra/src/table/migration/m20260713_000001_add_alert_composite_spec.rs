@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Adds the composite-alert column to the alerts table:
-//!  - `composite_spec` (JSON, nullable): when present, holds the JSONB
-//!    serialization of a `CompositeSpec` and marks the alert as a composite.
+//!  - `composite_spec` (JSON, nullable): when present, holds the JSONB serialization of a
+//!    `CompositeSpec` and marks the alert as a composite.
 //!
 //! A composite never mutates the alerts it references, so no back-reference is
 //! stored on referenced alerts. Legacy rows are `NULL` (ordinary single-query
