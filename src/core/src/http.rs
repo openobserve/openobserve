@@ -38,12 +38,12 @@ use crate::{
     },
 };
 
-/// Build a `HeaderValue` for the `X-Error-Message` header from an arbitrary
-/// error string.
+/// Build a `HeaderValue` for the `X-Error-Message` header from an error-code
+/// JSON string.
 ///
-/// Error strings are derived from user-controlled input (org/stream names,
-/// query params, request bodies) and may contain bytes that are illegal in an
-/// HTTP header value, e.g. control characters. If such a value were handed to
+/// The JSON embeds user-controlled input (org/stream names, query params) and
+/// may contain bytes that are illegal in an HTTP header value, e.g. control
+/// characters. If such a value were handed to
 /// axum directly it would fail the whole response with a `500 failed to parse
 /// header value`, masking the real error status/body. To avoid that we strip
 /// any byte that is not a valid header-value character (visible ASCII plus
@@ -98,9 +98,11 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             )
                 .into_response(),
         },
+        // These errors don't carry a structured error code, so we don't set the
+        // `X-Error-Message` header (it should only carry error codes). The full
+        // message is still returned in the JSON response body.
         errors::Error::ResourceError(_) => (
             StatusCode::SERVICE_UNAVAILABLE,
-            [(ERROR_HEADER, error_header_value(&err.to_string()))],
             Json(MetaHttpResponse::error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 err,
@@ -111,13 +113,11 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
         // request body, so surface it as 400 rather than a 500 server error.
         errors::Error::SerdeJsonError(_) => (
             StatusCode::BAD_REQUEST,
-            [(ERROR_HEADER, error_header_value(&err.to_string()))],
             Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
         _ => (
             StatusCode::BAD_REQUEST,
-            [(ERROR_HEADER, error_header_value(&err.to_string()))],
             Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
@@ -388,7 +388,11 @@ mod tests {
         // trailing newline is dropped, the tab is kept.
         assert_eq!(v.to_str().unwrap(), "org -n not found\t");
         // The header value must be constructible and contain no invalid bytes.
-        assert!(v.as_bytes().iter().all(|&b| b == b'\t' || (0x20..=0x7e).contains(&b)));
+        assert!(
+            v.as_bytes()
+                .iter()
+                .all(|&b| b == b'\t' || (0x20..=0x7e).contains(&b))
+        );
     }
 
     #[test]
