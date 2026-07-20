@@ -28,9 +28,8 @@ pub mod bootstrap;
 pub mod cluster_info;
 pub mod dashboards;
 pub mod db;
-pub use openobserve_enrichment::{enrichment, enrichment_table};
-pub mod file_downloader;
 pub use openobserve_dashboards::folders;
+pub use openobserve_enrichment::{enrichment, enrichment_table};
 pub use openobserve_search_service::file_list;
 pub use openobserve_transform::management as functions;
 pub mod grpc {
