@@ -277,7 +277,7 @@ reuse or add the matching predicate rather than duplicating raw booleans.
 ## 4. i18n for menu labels
 
 Menu labels use the **`menu.*`** namespace in
-`web/src/locales/languages/en.json` (add keys only here — other locales mirror
+`web/src/locales/languages/en-US.json` (add keys only here — other locales mirror
 it). Reference them as `t("menu.xxx")` in `linksList` (rail) or as `titleKey`
 strings in `navGroups.ts` (flyout children may also use feature namespaces like
 `function.header`). SectionRail items translate `label`/`description` directly
@@ -292,7 +292,7 @@ strings in `navGroups.ts` (flyout children may also use feature namespaces like
       `component`, `meta.title`.
 - [ ] `NavItem` in `MainLayout.vue` `linksList` (spliced from a computed gate if
       conditional).
-- [ ] `menu.*` key in `en.json`.
+- [ ] `menu.*` key in `en-US.json`.
 - [ ] Gating decided ([§3](#3-cloud--enterprise--rbac-gating-mandatory)); if
       hideable via config, `name` respected by `custom_hide_menus`.
 

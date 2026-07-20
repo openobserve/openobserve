@@ -150,6 +150,7 @@ export default defineComponent({
     // Allowed chart types for logs visualization
     const allowedChartTypes = [
       "area",
+      "area-stacked",
       "bar",
       "h-bar",
       "line",
@@ -185,7 +186,7 @@ export default defineComponent({
         isSimpleSelectAllQuery(logsPageQuery)
       ) {
         showErrorNotification(
-          "Select * query is not supported for visualization.",
+          t("logs.visualizeLogsQuery.selectAllNotSupported"),
         );
         // Prevent the change by not updating the type
         return;
@@ -280,7 +281,7 @@ export default defineComponent({
         // set errors into errorData
         errorDataModel.value.errors = errors;
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("logs.visualizeLogsQuery.fixErrorsAndRetry"),
         );
         return;
       } else {

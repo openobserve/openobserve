@@ -2,8 +2,10 @@
   <OCard class="h-full flex flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
     <div class="flex items-center gap-2 p-[0.375rem] pb-0">
-      <!-- Stream selector -->
+      <!-- Stream selector (hidden when a parent drives selection, e.g. the
+           Agent Graph page which selects by agent). -->
       <div
+        v-if="!hideStreamSelector"
         data-test="service-graph-stream-selector"
         class="w-44 flex-shrink-0"
       >
@@ -232,7 +234,7 @@
               <div class="text-center flex flex-col items-center">
                 <OSpinner size="xl" />
                 <div class="text-base font-medium mt-3 text-gray-400">
-                  Loading service graph...
+                  {{ t("traces.serviceGraph.loading") }}
                 </div>
               </div>
             </div>
@@ -252,7 +254,7 @@
                   class="mt-4"
                   icon-left="refresh"
                 >
-                  Retry
+                  {{ t("traces.serviceGraph.retry") }}
                 </OButton>
               </div>
             </div>
@@ -345,16 +347,16 @@
   <ODialog data-test="service-graph-settings-dialog"
     v-model:open="showSettings"
     size="sm"
-    title="Service Graph Settings"
-    secondary-button-label="Close"
-    primary-button-label="Reset"
+    :title="t('traces.serviceGraph.settingsTitle')"
+    :secondary-button-label="t('traces.serviceGraph.close')"
+    :primary-button-label="t('traces.serviceGraph.reset')"
     @click:secondary="showSettings = false"
     @click:primary="resetSettings"
   >
     <div class="gap-3">
       <div class="text-xs text-gray-400">
-        Stream-based topology - all data persisted to storage
-        <OTooltip content="Service graph uses stream-only architecture with zero in-memory state" />
+        {{ t("traces.serviceGraph.settingsDescription") }}
+        <OTooltip :content="t('traces.serviceGraph.settingsTooltip')" />
       </div>
     </div>
   </ODialog>
@@ -436,6 +438,29 @@ export default defineComponent({
     OToggleGroupItem,
     ServiceGraphNoDataState,
   },
+  props: {
+    // Optional external stream override. When set (e.g. by the standalone
+    // Agent Graph page, which selects by agent → its source_stream), it seeds
+    // the internal streamFilter and keeps it in sync, instead of the component
+    // sourcing the stream from the shared traces store.
+    streamFilter: {
+      type: String,
+      default: undefined,
+    },
+    // Hide the built-in stream dropdown when the parent owns selection.
+    hideStreamSelector: {
+      type: Boolean,
+      default: false,
+    },
+    // Agent-node highlighting (indigo tint, larger size, radar-ping halo) is a
+    // treatment for the dedicated Agent Graph page ONLY. On the regular Service
+    // Graph tab agents are rendered like any other node. The Agent Graph page
+    // sets this true; every other mount leaves it false.
+    agentHighlight: {
+      type: Boolean,
+      default: false,
+    },
+  },
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit }) {
     const store = useStore();
@@ -457,12 +482,30 @@ export default defineComponent({
 
     const searchFilter = ref("");
 
-    // Stream filter — synced from traces page selected stream
+    // Stream filter — an external `streamFilter` prop (Agent Graph page) wins;
+    // otherwise sync from the traces page selected stream / localStorage.
     const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
     const storedStreamFilter = localStorage.getItem(
       "serviceGraph_streamFilter",
     );
-    const streamFilter = ref(tracesStream || storedStreamFilter || "default");
+    const streamFilter = ref(
+      props.streamFilter || tracesStream || storedStreamFilter || "default",
+    );
+    // Keep the internal ref in sync when the parent drives the stream (e.g. the
+    // Agent Graph page selecting by agent → its source_stream) AND reload the
+    // graph. The built-in dropdown delegates reload to its parent via
+    // `request:stream-change`; a parent-driven stream has no such round-trip, so
+    // we refetch here directly. `loadServiceGraph` is hoisted (defined later in
+    // setup) — safe because the watcher callback only runs on later changes.
+    watch(
+      () => props.streamFilter,
+      (next) => {
+        if (next && next !== streamFilter.value) {
+          streamFilter.value = next;
+          loadServiceGraph();
+        }
+      },
+    );
     const availableStreams = ref<string[]>([]);
 
     const graphData = ref<any>({
@@ -554,7 +597,16 @@ export default defineComponent({
     // Count nodes by kind (from backend service_type) for the legend. Nodes with
     // no inferred type are instrumented services; the rest are inferred deps.
     const kindCounts = computed(() => {
-      const counts = { service: 0, database: 0, queue: 0, external: 0, rpc: 0 };
+      const counts = {
+        service: 0,
+        database: 0,
+        queue: 0,
+        external: 0,
+        rpc: 0,
+        agent: 0,
+        tool: 0,
+        model: 0,
+      };
       // Count the RAW backend topology, not the collapsed view — the legend must
       // report the true entity counts regardless of collapse/expand state, and
       // must never count a boundary node (which represents N members) as one.
@@ -565,6 +617,9 @@ export default defineComponent({
         else if (t === "queue") counts.queue++;
         else if (t === "external") counts.external++;
         else if (t === "rpc") counts.rpc++;
+        else if (t === "agent") counts.agent++;
+        else if (t === "tool") counts.tool++;
+        else if (t === "model") counts.model++;
         else counts.service++;
       }
       return counts;
@@ -598,6 +653,9 @@ export default defineComponent({
       { key: "queue", label: t("traces.serviceGraph.kind.queue"), count: kindCounts.value.queue, toggleable: true },
       { key: "external", label: t("traces.serviceGraph.kind.external"), count: kindCounts.value.external, toggleable: true },
       { key: "rpc", label: t("traces.serviceGraph.kind.rpc"), count: kindCounts.value.rpc, toggleable: true },
+      { key: "agent", label: t("traces.serviceGraph.kind.agent"), count: kindCounts.value.agent, toggleable: true },
+      { key: "tool", label: t("traces.serviceGraph.kind.tool"), count: kindCounts.value.tool, toggleable: true },
+      { key: "model", label: t("traces.serviceGraph.kind.model"), count: kindCounts.value.model, toggleable: true },
     ]);
 
     // How many entity types the user has hidden. Non-zero means the graph is
@@ -654,6 +712,8 @@ export default defineComponent({
               // label font + node size to the fit-to-view compression, keeping
               // labels from overlapping on tall (many-leaf) graphs.
               graphContainerRef.value?.clientHeight || 700,
+              // Agent highlighting (tint/size/ping) only on the Agent Graph page.
+              props.agentHighlight,
             )
           : convertServiceGraphToNetwork(
               filteredGraphData.value,
@@ -665,6 +725,8 @@ export default defineComponent({
               undefined,
               graphContainerRef.value?.clientWidth || 1200,
               graphContainerRef.value?.clientHeight || 700,
+              // Agent highlighting (tint/size/ping) only on the Agent Graph page.
+              props.agentHighlight,
             );
 
       // Cache the options for graph view
@@ -1029,6 +1091,14 @@ export default defineComponent({
       chart.on("finished", debouncedBuild);
       // Also try immediately (works if chart already rendered)
       buildEdgeData();
+
+      // NOTE: the agent "radar ping" halo is NOT drawn here. It is baked into
+      // each agent node's own symbol SVG (see getServiceIconDataUrl) as native
+      // SMIL <animate> rings — the graph renders in SVG mode, so they animate.
+      // Doing it in the symbol (rather than an ECharts `graphic` overlay) keeps
+      // the halo perfectly centred on the node and moving/zooming with it; the
+      // overlay approach drifted because `graphic` lives outside the roam
+      // (pan/zoom) transform applied to the series group.
 
       // Use imported helper functions for testability
 
@@ -1399,7 +1469,7 @@ export default defineComponent({
         const orgId = store.state.selectedOrganization.identifier;
 
         if (!orgId) {
-          throw new Error("No organization selected");
+          throw new Error(t("traces.serviceGraph.noOrganizationSelected"));
         }
 
         const { startTime, endTime } = getEffectiveTimeRange(
@@ -1408,14 +1478,17 @@ export default defineComponent({
 
         // Topology, node kinds, edges and latency all come from the
         // pre-aggregated _o2_service_graph stream via /topology/current. The
-        // backend (processor + build_topology) now computes the complete,
-        // classified topology — including async queue consumers and collision
-        // handling — so the UI is a thin renderer with no client-side derivation.
+        // backend hourly job (processor + build_topology) computes the complete,
+        // classified topology — queue consumers, collision handling, GenAI
+        // agent/tool/model edges — incrementally per window, so reading it here
+        // is a cheap small-stream read that scales to TB-level trace volumes
+        // (we do NOT re-scan raw traces per load). The UI is a thin renderer.
+        const streamName =
+          streamFilter.value && streamFilter.value !== "all"
+            ? streamFilter.value
+            : undefined;
         const response = await serviceGraphService.getCurrentTopology(orgId, {
-          streamName:
-            streamFilter.value && streamFilter.value !== "all"
-              ? streamFilter.value
-              : undefined,
+          streamName,
           startTime,
           endTime,
         });
@@ -1490,23 +1563,20 @@ export default defineComponent({
 
         // Provide detailed error messages based on error type
         if (err.message === "Request timeout") {
-          error.value =
-            "Request timed out. The service graph may be processing large amounts of data. Please try again.";
+          error.value = t("traces.serviceGraph.errorRequestTimeout");
         } else if (err.response?.status === 404) {
-          error.value =
-            "Service Graph API endpoint not found. Ensure you're running enterprise version of OpenObserve.";
+          error.value = t("traces.serviceGraph.errorApiNotFound");
         } else if (err.response?.status === 403) {
-          error.value =
-            "Access denied. You may not have permission to view the service graph for this organization.";
+          error.value = t("traces.serviceGraph.errorAccessDenied");
         } else if (err.response?.status === 500) {
-          error.value = "Server error occurred. Check server logs for details.";
+          error.value = t("traces.serviceGraph.errorServerError");
         } else if (err.message === "Network Error" || !navigator.onLine) {
-          error.value = "Network error. Please check your internet connection.";
+          error.value = t("traces.serviceGraph.errorNetwork");
         } else {
           error.value =
             err.response?.data?.message ||
             err.message ||
-            "Failed to load service graph data. Please check server logs.";
+            t("traces.serviceGraph.errorLoadFailed");
         }
       } finally {
         loading.value = false;

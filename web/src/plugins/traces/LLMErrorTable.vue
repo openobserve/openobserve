@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       table-id="llm-recent-errors"
       show-index
       pagination="none"
-      :empty-message="panel.emptyStateText || 'No data'"
+      :empty-message="panel.emptyStateText || t('traces.lLMErrorTable.noData')"
       @row-click="onRowClick"
       data-test="llm-recent-errors-table"
       class="w-full"
@@ -148,7 +148,7 @@ const loading = ref(false);
 const columns: OTableColumnDef[] = [
   {
     id: "time",
-    header: "Time",
+    header: t("traces.lLMErrorTable.time"),
     accessorKey: "_timestamp",
     sortable: false,
     size: COL.createdAt,
@@ -156,7 +156,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "service",
-    header: "Service",
+    header: t("traces.lLMErrorTable.service"),
     accessorKey: "service_name",
     sortable: false,
     // Half the usual stream-name width — service names here are short.
@@ -165,7 +165,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "operation",
-    header: "Operation",
+    header: t("traces.lLMErrorTable.operation"),
     accessorKey: "operation",
     sortable: false,
     // Numeric size + flex: fills the leftover width and stays resizable.
@@ -174,7 +174,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "trace_id",
-    header: "Trace ID",
+    header: t("traces.lLMErrorTable.traceId"),
     accessorKey: "trace_id",
     sortable: false,
     size: COL.url,

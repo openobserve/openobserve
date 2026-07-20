@@ -53,10 +53,10 @@ Usage:
         @click="handleLoadMore"
       >
         <OIcon name="expand-more" size="xs" class="mr-1" />
-        Load more ({{ chunkInfo.loadedSizeKB }}KB / {{ chunkInfo.totalSizeKB }}KB)
+        {{ t('logs.chunkedContent.loadMore', { loaded: chunkInfo.loadedSizeKB, total: chunkInfo.totalSizeKB }) }}
       </OButton>
       <span class="text-sm font-medium text-(--q-primary)">
-        Showing chunk {{ chunkInfo.currentChunk }} of {{ chunkInfo.totalChunks }}
+        {{ t('logs.chunkedContent.showingChunk', { current: chunkInfo.currentChunk, total: chunkInfo.totalChunks }) }}
       </span>
     </div>
   </div>
@@ -64,6 +64,7 @@ Usage:
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useChunkedContent } from "@/composables/useChunkedContent";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -76,6 +77,8 @@ export interface ChunkedContentProps {
   simpleMode?: boolean;
   chunkSizeKB?: number; // Optional: override default chunk size
 }
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<ChunkedContentProps>(), {
   queryString: "",

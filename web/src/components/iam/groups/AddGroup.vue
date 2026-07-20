@@ -103,13 +103,13 @@ const saveGroup = async (value: AddGroupForm) => {
     emits("update:open", false);
 
     toast({
-      message: `User Group "${name}" Created Successfully!`,
+      message: t('iam.addGroupPage.createdSuccessfully', { name }),
       variant: "success",
     });
   } catch (err: any) {
     if (err.response?.status != 403) {
       toast({
-        message: "Error while creating group",
+        message: t('iam.addGroupPage.errorCreating'),
         variant: "error",
       });
     }

@@ -24,12 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="toolMeta"
           value="tool"
           class="mr-2"
-        >{{ `Tool: ${toolMetadata.name}` }}</OTag>
+        >{{ t('traces.lLMContentRenderer.tool', { name: toolMetadata.name }) }}</OTag>
         <OTag
           v-if="toolMetadata.callId"
           type="toolMeta"
           value="callid"
-        >{{ `Call ID: ${toolMetadata.callId}` }}</OTag>
+        >{{ t('traces.lLMContentRenderer.callId', { callId: toolMetadata.callId }) }}</OTag>
       </div>
       <div class="tool-data flex-1">
         <CodeQueryEditor
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-llm-content-renderer-expand-btn"
             @click="isExpanded = true"
           >
-            ...expand ({{ contentStats.remainingChars }} more characters)
+            {{ t('traces.lLMContentRenderer.expandMore', { count: contentStats.remainingChars }) }}
           </OButton>
         </div>
       </div>
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             @click="isExpanded = false"
           >
-            Collapse
+            {{ t('traces.lLMContentRenderer.collapse') }}
           </OButton>
         </div>
       </div>
@@ -262,8 +262,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+
+const { t } = useI18n();
 
 const CodeQueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
@@ -659,10 +662,10 @@ const roleColor = (role: string) => {
 
 const roleLabel = (role: string) => {
   const labels: Record<string, string> = {
-    user: "User",
-    assistant: "Assistant",
-    system: "System",
-    tool: "Tool",
+    user: t("traces.lLMContentRenderer.roleUser"),
+    assistant: t("traces.lLMContentRenderer.roleAssistant"),
+    system: t("traces.lLMContentRenderer.roleSystem"),
+    tool: t("traces.lLMContentRenderer.roleTool"),
   };
   return labels[role] || role;
 };

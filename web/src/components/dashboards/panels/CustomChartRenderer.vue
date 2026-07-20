@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ></div>
 </template>
 
-<script lang="ts">
+<script>
 import {
   defineComponent,
   ref,
@@ -37,11 +37,8 @@ import {
   nextTick,
   inject,
 } from "vue";
-import type { PropType } from "vue";
-// Side-effect import registers all built-in charts/components/renderers.
-import "echarts";
-import { use, init } from "echarts/core";
-import type { EChartsType } from "echarts/core";
+import * as echarts from "echarts";
+import { useI18n } from "vue-i18n";
 
 // Import all components and renderers once for generic usage
 import {
@@ -56,31 +53,8 @@ import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 
 import DOMPurify from "dompurify";
 
-// Shared hovered-series reactive state provided by dashboard renderers.
-interface HoveredSeriesState {
-  panelId: number | string | undefined;
-}
-
-// Chart option object supplied by the parent; may carry an extras.panelId.
-interface CustomChartData {
-  extras?: { panelId?: number | string };
-  [key: string]: unknown;
-}
-
-// Custom-chart option after string->function conversion; o2_events are
-// user-supplied handlers keyed by echarts event name.
-type O2EventHandler = (params: unknown, chart: EChartsType) => void;
-interface CustomChartOption {
-  o2_events?: Record<string, O2EventHandler>;
-  [key: string]: unknown;
-}
-
-function isCustomChartOption(value: unknown): value is CustomChartOption {
-  return typeof value === "object" && value !== null;
-}
-
 // Register necessary components
-use([
+echarts.use([
   TitleComponent,
   TooltipComponent,
   GridComponent,
@@ -97,7 +71,7 @@ export default defineComponent({
   props: {
     data: {
       required: true,
-      type: Object as PropType<CustomChartData>,
+      type: Object,
       default: () => ({}),
     },
     renderType: {
@@ -110,21 +84,18 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const chartRef = ref<HTMLElement | null>(null);
-    let chart: EChartsType | null = null;
+    const { t } = useI18n();
+    const chartRef = ref(null);
+    let chart = null;
 
-    const hoveredSeriesState = inject<HoveredSeriesState | null>(
-      "hoveredSeriesState",
-      null,
-    );
-    const convertStringToFunction = (obj: unknown): unknown => {
+    const hoveredSeriesState = inject("hoveredSeriesState", null);
+    const convertStringToFunction = (obj) => {
       if (typeof obj === "string" && obj.startsWith("function")) {
         try {
           return new Function(`return ${obj}`)(); // Convert string to function
-        } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error);
-          emit("error", {
-            message: `Error while executing the code: ${message}`,
+        } catch (error) {
+          emit({
+            message: t("dashboard.customChartRenderer.errorExecutingCodeWithMessage", { message: error.message }),
             code: "",
           });
         }
@@ -135,17 +106,18 @@ export default defineComponent({
       }
 
       if (typeof obj === "object" && obj !== null) {
-        const result: Record<string, unknown> = {};
-        // Own enumerable keys only — same set as for-in + hasOwnProperty guard.
-        for (const [key, value] of Object.entries(obj)) {
-          result[key] = convertStringToFunction(value); // Recursively handle object properties
+        const result = {};
+        for (const key in obj) {
+          if (obj.hasOwnProperty(key)) {
+            result[key] = convertStringToFunction(obj[key]); // Recursively handle object properties
+          }
         }
         return result;
       }
 
       return obj; // If it's not a function string or an object, return it as is
     };
-    function deepSanitize(obj: unknown): unknown {
+    function deepSanitize(obj) {
       if (typeof obj === "string") {
         return DOMPurify.sanitize(obj);
       } else if (Array.isArray(obj)) {
@@ -161,11 +133,11 @@ export default defineComponent({
     const initChart = async () => {
       if (!chartRef.value) return;
 
-      await import("echarts-gl");
+      const echartsGL = await import("echarts-gl");
 
       // Initialize chart if it doesn't exist, otherwise reuse existing instance
       if (!chart) {
-        chart = init(chartRef.value, undefined, {
+        chart = echarts.init(chartRef.value, undefined, {
           renderer: "canvas",
         });
       } else {
@@ -176,25 +148,20 @@ export default defineComponent({
       try {
         const convertedData = convertStringToFunction(props.data);
         const safeChartOptions = deepSanitize(convertedData);
-        if (isCustomChartOption(safeChartOptions)) {
-          chart.setOption(safeChartOptions);
-        }
+        chart.setOption(safeChartOptions);
 
-        const options = isCustomChartOption(convertedData) ? convertedData : {};
-        const o2Events = options.o2_events;
-        if (o2Events) {
-          const activeChart = chart;
+        if (convertedData.o2_events) {
           // Add event listeners for custom interactions
-          for (const event in o2Events) {
+          for (const event in convertedData.o2_events) {
             chart.off(event);
             chart.on(event, (params) =>
-              o2Events[event](params, activeChart),
+              convertedData.o2_events[event](params, chart),
             );
           }
         }
       } catch (e) {
-        emit("error", {
-          message: "Error while executing the code",
+        emit({
+          message: t("dashboard.customChartRenderer.errorExecutingCode"),
           code: "",
         });
       }

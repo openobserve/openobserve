@@ -353,7 +353,7 @@ export default defineComponent({
           if (res.data.data.passcode == "") {
             toast({
               variant: "error",
-              message: "API Key not found.",
+              message: "Passcode not found.",
               timeout: 5000,
             });
           } else {
@@ -385,7 +385,7 @@ export default defineComponent({
           if (res.data.data.passcode == "") {
             toast({
               variant: "error",
-              message: "API Key not found.",
+              message: "Passcode not found.",
               timeout: 5000,
             });
           } else {

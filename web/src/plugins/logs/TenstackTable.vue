@@ -239,7 +239,7 @@ class="mr-1" />
         v-if="loading && tableRows.length === 0"
         data-test="logs-table-skeleton-body"
         aria-busy="true"
-        aria-label="Loading logs"
+        :aria-label="t('logs.tenstackTable.loadingLogs')"
       >
         <!-- Rows use flex to match the real virtual rows exactly -->
         <tr

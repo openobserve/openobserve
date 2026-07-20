@@ -206,7 +206,7 @@ describe('Template consistency', () => {
     templates.forEach(({ config }) => {
       config.credentialFields?.forEach((field: any) => {
         expect(field).toHaveProperty('key');
-        expect(field).toHaveProperty('label');
+        expect(field).toHaveProperty('labelKey');
         expect(field).toHaveProperty('type');
         expect(field).toHaveProperty('required');
       });

@@ -26,7 +26,7 @@ import {
 import { mount, flushPromises } from "@vue/test-utils";
 import User from "@/components/iam/users/User.vue";
 import { createI18n } from "vue-i18n";
-import enLocale from "@/locales/languages/en.json";
+import enLocale from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import usersService from "@/services/users";

@@ -3,7 +3,7 @@
     <div class="w-60 flex-none">
       <OSelect
         v-model="fields.functionName"
-        label="Select Function"
+        :label="t('dashboard.selectFunction.selectFunction')"
         label-position="inside"
         :options="filteredFunctions"
         data-test="dashboard-function-dropdown"
@@ -45,7 +45,7 @@
             <div class="flex flex-col flex-1 min-w-0">
               <div class="flex items-center gap-x-2">
                 <label :for="'arg-' + argIndex">{{
-                  getParameterLabel(fields.functionName, Number(argIndex))
+                  getParameterLabel(fields.functionName, argIndex)
                 }}</label>
               </div>
               <div class="flex items-start">
@@ -56,13 +56,13 @@
                   :options="
                     getSupportedTypeBasedOnFunctionNameAndIndex(
                       fields.functionName,
-                      Number(argIndex),
+                      argIndex,
                     )
                   "
                   icon-key="icon"
                   label-position="inside"
                   class="o2-custom-select-dashboard arg-type-select mr-0.5 w-fit! flex-none!"
-                  :required="isRequired(fields.functionName, Number(argIndex))"
+                  :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
                   <template #icon-left>
@@ -92,7 +92,7 @@
                   <OInput
                     type="text"
                     v-model="fields.args[argIndex].value"
-                    placeholder="Enter string"
+                    :placeholder="t('dashboard.selectFunction.enterString')"
                     class="w-full"
                     :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
                   />
@@ -102,7 +102,7 @@
                   v-if="fields.args[argIndex]?.type === 'number'"
                   type="number"
                   v-model.number="fields.args[argIndex].value"
-                  placeholder="Enter number"
+                  :placeholder="t('dashboard.selectFunction.enterNumber')"
                   class="w-52"
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
@@ -135,10 +135,10 @@
 
                 <!-- Remove argument button -->
                 <OButton
-                  v-if="canRemoveArgument(fields.functionName, Number(argIndex))"
+                  v-if="canRemoveArgument(fields.functionName, argIndex)"
                   variant="ghost"
                   size="icon"
-                  @click="removeArgument(Number(argIndex))"
+                  @click="removeArgument(argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
                   icon-left="close"
                 >
@@ -159,13 +159,14 @@
       class="mt-3"
       :data-test="`dashboard-function-dropdown-add-argument-button`"
     >
-      + Add
+      + {{ t('dashboard.selectFunction.add') }}
     </OButton>
   </div>
 </template>
 
 <script lang="ts">
-import { ref, watch, inject } from "vue";
+import { ref, watch, toRef, computed, inject } from "vue";
+import { useI18n } from "vue-i18n";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
@@ -206,6 +207,7 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+    const { t } = useI18n();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -434,7 +436,7 @@ export default {
     // watcher on functionName
     watch(
       () => fields.value.functionName,
-      () => {
+      (newVal) => {
         // Save the old args
         const oldArgs = [...fields.value.args];
 
@@ -499,14 +501,13 @@ export default {
         case "histogramInterval":
           return "bar-chart";
       }
-      return undefined;
     };
 
     const getParameterLabel = (functionName: string, argIndex: number) => {
       const funcValidation: any = getValidationForFunction(functionName);
 
       if (!funcValidation) {
-        return `Parameter ${argIndex + 1}`;
+        return t("dashboard.selectFunction.parameter", { n: argIndex + 1 });
       }
 
       const argsValidation = funcValidation?.args || [];
@@ -521,11 +522,13 @@ export default {
 
       // Return the label from validation, or fallback to default
       return (
-        argsValidation[adjustedIndex]?.label || `Parameter ${argIndex + 1}`
+        argsValidation[adjustedIndex]?.label ||
+        t("dashboard.selectFunction.parameter", { n: argIndex + 1 })
       );
     };
 
     return {
+      t,
       fields,
       // availableFunctions,
       getValidationForFunction,

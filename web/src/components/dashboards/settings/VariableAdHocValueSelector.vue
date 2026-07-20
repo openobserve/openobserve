@@ -10,8 +10,8 @@
         v-model="adhocVariables[index].name"
         :debounce="1000"
         data-test="dashboard-variable-adhoc-name-selector"
-        placeholder="Enter Name"
-        @update:model-value="updateModelValueOfSelect(Number(index), $event)"
+        :placeholder="t('dashboard.variableAdHocValueSelector.enterName')"
+        @update:model-value="updateModelValueOfSelect(index, $event)"
         class="flex-1"
       />
       <OSelect
@@ -22,7 +22,7 @@
       />
       <OInput
         v-model="adhocVariables[index].value"
-        placeholder="Enter Value"
+        :placeholder="t('dashboard.variableAdHocValueSelector.enterValue')"
         :debounce="1000"
         style="width: 125px"
         data-test="dashboard-variable-adhoc-value-selector"
@@ -32,7 +32,7 @@
         variant="ghost"
         size="icon"
         class="ml-1"
-        @click="removeField(Number(index))"
+        @click="removeField(index)"
         :data-test="`dashboard-variable-adhoc-close-${index}`"
         icon-left="close"
       >
@@ -47,15 +47,16 @@
       data-test="dashboard-variable-adhoc-add-selector"
     >
       <DynamicFilterIcon />
-      <OTooltip content="Add Dynamic Filter" />
+      <OTooltip :content="t('dashboard.variableAdHocValueSelector.addDynamicFilter')" />
     </OButton>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, toRef, watch, toRefs } from "vue";
+import { defineComponent, ref, toRef, watch, type Ref, toRefs } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -70,6 +71,7 @@ export default defineComponent({
 
   setup(props: any, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const operatorOptions = [
       { label: "=", value: "=" },
       { label: "!=", value: "!=" },
@@ -121,9 +123,8 @@ export default defineComponent({
       adhocVariables,
       removeField,
       updateModelValueOfSelect,
-      // template's value-input @update:model-value calls emitValue directly
-      emitValue,
       store,
+      t,
     };
   },
 });

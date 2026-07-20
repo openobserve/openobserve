@@ -127,7 +127,7 @@ const saveRole = async (value: AddRoleForm) => {
     emits("update:open", false);
     emits("added:role", { role_name: name, startFrom: value.startFrom });
     toast({
-      message: `Role "${name}" Created Successfully!`,
+      message: t("iam.addRolePage.roleCreated", { name }),
       variant: "success",
     });
   } catch (err: any) {

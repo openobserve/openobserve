@@ -30,7 +30,7 @@
                   <template #icon-left>
                     <OIcon name="drag-indicator" size="xs" />
                   </template>
-                  <OTooltip content="Drag to reorder" side="top" />
+                  <OTooltip :content="t('metrics.operationsList.dragToReorder')" side="top" />
                 </OButton>
                 <ODropdown>
                   <template #trigger>
@@ -98,7 +98,7 @@
                           :data-test="`promql-operation-param-${paramIndex}`"
                         >
                           <template #empty>
-                            <span>{{ availableLabels.length ? 'No matching labels' : 'Select a metric first to load labels' }}</span>
+                            <span>{{ availableLabels.length ? t('metrics.operationsList.noMatchingLabels') : t('metrics.operationsList.selectMetricFirst') }}</span>
                           </template>
                         </OSelect>
                       </template>
@@ -127,14 +127,14 @@
           data-test="promql-add-operation"
         >
           <OIcon name="add" size="sm" />
-          <OTooltip content="Add operation" side="top" />
+          <OTooltip :content="t('metrics.operationsList.addOperation')" side="top" />
         </OButton>
       </div>
     </div>
 
     <!-- Operation Selector Dialog -->
-    <ODialog data-test="operations-list-operation-selector-dialog" v-model:open="showOperationSelector" size="sm" title="Add Operation"
-      primary-button-label="Close"
+    <ODialog data-test="operations-list-operation-selector-dialog" v-model:open="showOperationSelector" size="sm" :title="t('metrics.operationsList.addOperationTitle')"
+      :primary-button-label="t('metrics.operationsList.close')"
       @click:primary="showOperationSelector = false"
     >
       <OSearchInput

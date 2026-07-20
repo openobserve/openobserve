@@ -98,7 +98,7 @@ export default defineComponent({
             description,
           };
           await updateFolder(store, props.folderId, payload);
-          showPositiveNotification("Folder updated successfully", {
+          showPositiveNotification(t("dashboard.addFolder.folderUpdated"), {
             timeout: 2000,
           });
           emit("update:modelValue", payload);
@@ -110,7 +110,7 @@ export default defineComponent({
             description,
           });
           emit("update:modelValue", newFolder);
-          showPositiveNotification("Folder added successfully", {
+          showPositiveNotification(t("dashboard.addFolder.folderAdded"), {
             timeout: 2000,
           });
         }
@@ -118,8 +118,8 @@ export default defineComponent({
         showErrorNotification(
           err?.message ??
             (props.editMode
-              ? "Folder updation failed"
-              : "Folder creation failed"),
+              ? t("dashboard.addFolder.folderUpdateFailed")
+              : t("dashboard.addFolder.folderCreateFailed")),
           { timeout: 2000 },
         );
       }

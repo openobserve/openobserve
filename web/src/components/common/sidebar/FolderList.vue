@@ -52,19 +52,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboards-folder-tabs"
       >
           <OTab
-          v-for="(tab, index) in filteredTabs"
+          v-for="tab in filteredTabs"
           :key="tab.folderId"
           :name="tab.folderId"
           class="test-class min-h-[1.5rem]"
           :data-test="`dashboard-folder-tab-${tab.folderId}`"
+          @click="onTabClick(tab.folderId)"
           >
           <div class="folder-item w-full flex items-center justify-between flex-nowrap gap-2 min-h-6 group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
+              <OIcon
+                v-if="tab.folderId === FAVORITES_FOLDER_ID"
+                name="favorite"
+                size="sm"
+                class="shrink-0 text-favorite"
+              />
               <span class="folder-name flex-1 min-w-0 text-left truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
               tab.name
               }}</span>
               <div class="hidden group-hover/row:flex has-[[data-state=open]]:flex items-center shrink-0">
               <ODropdown
-                v-if="index || (searchQuery?.length > 0 && index ==  0 && tab.folderId.toLowerCase() != 'default') "
+                v-if="
+                  tab.folderId.toLowerCase() != 'default' &&
+                  tab.folderId !== FAVORITES_FOLDER_ID
+                "
                 side="bottom"
                 align="start"
               >
@@ -132,7 +142,10 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
   // @ts-nocheck
   import {
     computed,
+    defineAsyncComponent,
     defineComponent,
+    onBeforeMount,
+    onBeforeUnmount,
     onMounted,
     ref,
     watch,
@@ -140,23 +153,52 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
   import { useStore } from "vuex";
   import { useI18n } from "vue-i18n";
 
-  import { useRouter } from "vue-router";
+  import dashboardService from "@/services/dashboards";
+  import QTablePagination from "@/components/shared/grid/Pagination.vue";
+  import NoData from "@/components/shared/grid/NoData.vue";
+  import { useRoute, useRouter } from "vue-router";
+  import { toRaw } from "vue";
+  import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
   import ConfirmDialog from "@/components/ConfirmDialog.vue";
   import {
+    deleteDashboardById,
+    deleteFolderById,
     deleteFolderByIdByType,
+    getAllDashboards,
+    getAllDashboardsByFolderId,
+    getDashboard,
+    getFoldersList,
     getFoldersListByType
   } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from '@/lib/core/Separator/OSeparator.vue';
   import AddFolder from "./AddFolder.vue";
   import useNotifications from "@/composables/useNotifications";
+  import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+  import { filter, forIn } from "lodash-es";
+  import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
+  import { useLoading } from "@/composables/useLoading";
   import { useReo } from "@/services/reodotdev_analytics";
+
+  const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
+    return import("@/components/common/sidebar/MoveAcrossFolders.vue");
+  });
+
+  const AddDashboard = defineAsyncComponent(() => {
+    return import("@/components/dashboards/AddDashboard.vue");
+  });
 
 export default defineComponent({
     name: "FolderList",
     components: {
+      OSeparator,
       OIcon,
+      AddDashboard,
+      QTablePagination,
+      NoData,
       ConfirmDialog,
       AddFolder,
+      MoveDashboardToAnotherFolder,
       OTabs,
       OTab,
       OButton,
@@ -168,6 +210,12 @@ export default defineComponent({
       type: {
         type: String,
         default: "alerts",
+      },
+      // Dashboards-only: prepends a fixed "Favorites" pseudo-folder entry at
+      // the top of the rail. Alerts/Reports keep the plain folder list.
+      showFavorites: {
+        type: Boolean,
+        default: false,
       },
     },
     emits: ['update:folders', 'update:activeFolderId'],
@@ -194,15 +242,19 @@ export default defineComponent({
           await getFoldersListByType(store, props.type);
         }
         if(router.currentRoute.value.query.folder) {
-          activeFolderId.value = router.currentRoute.value.query.folder as string;
+          activeFolderId.value = router.currentRoute.value.query.folder;
         }
-        else {
+        else if (!props.showFavorites) {
           activeFolderId.value = "default";
         }
+        // With showFavorites, the owning view decides the landing folder
+        // (favorites-first) and pushes it to the route; self-assigning
+        // "default" here would race that decision and clobber it. The route
+        // watcher below selects the tab once the owner has pushed.
       });
 
       watch(()=> router.currentRoute.value.query.folder, (newVal)=> {
-        activeFolderId.value = (newVal as string) || "default";
+        activeFolderId.value = newVal || "default";
       })
       const addFolder = () => {
       isFolderEditMode.value = false;
@@ -237,10 +289,9 @@ export default defineComponent({
             timeout: 2000,
           });
         } catch (err) {
-          const e = err as { response?: { data?: { message?: string } }; message?: string };
           showErrorNotification(
-            e?.response?.data?.message ||
-              e?.message ||
+            err?.response?.data?.message ||
+              err?.message ||
               "Folder deletion failed",
             {
               timeout: 2000,
@@ -262,13 +313,33 @@ export default defineComponent({
       emit("update:activeFolderId", newVal);
     })
 
-    const filteredTabs = computed(() => {
-      if(!searchQuery.value || searchQuery.value == ""){
-        return store.state.organizationData.foldersByType[props.type]
+    // The v-model watcher above only fires on CHANGE. Clicking the folder that
+    // is already active must still notify the parent (e.g. the dashboards list
+    // leaves its favorites view on any folder pick), so re-emit for that case.
+    // Consumers treat the event as idempotent.
+    const onTabClick = (folderId: string) => {
+      if (folderId === activeFolderId.value) {
+        emit("update:activeFolderId", folderId);
       }
-      return store.state.organizationData.foldersByType[props.type]?.filter((tab: { name: string }) => {
-        return tab.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-      });
+    };
+
+    const filteredTabs = computed(() => {
+      const folders =
+        store.state.organizationData.foldersByType[props.type] ?? [];
+      // The Favorites pseudo-folder sits above everything, including Default,
+      // and participates in the folder search like any other entry.
+      const tabs = props.showFavorites
+        ? [
+            { folderId: FAVORITES_FOLDER_ID, name: t("dashboard.favorites") },
+            ...folders,
+          ]
+        : folders;
+      if (!searchQuery.value || searchQuery.value == "") {
+        return tabs;
+      }
+      return tabs.filter((tab) =>
+        tab.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
+      );
     });
 
 
@@ -290,6 +361,8 @@ export default defineComponent({
         editFolder,
         filteredTabs,
         searchQuery,
+        onTabClick,
+        FAVORITES_FOLDER_ID,
 
       };
     },

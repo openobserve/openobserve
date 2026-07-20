@@ -579,15 +579,14 @@ export default defineComponent({
         window.history.replaceState({}, document.title, url.toString());
 
         await loadLicenseData();
-      } catch (error: unknown) {
+      } catch (error) {
         console.error("Error updating license:", error);
-        const err = error as { response?: { data?: { message?: string } } };
         toast({
           variant: "error",
           message:
             t("about.failed_to_update_license") +
             " : " +
-            (err?.response?.data?.message || "unexpected error"),
+            (error?.response?.data?.message || t("settings.licensePage.unexpectedError")),
         });
       }
     };
@@ -611,16 +610,15 @@ export default defineComponent({
           variant: "success",
           message: t("about.license_refresh_success"),
         });
-      }catch(error: unknown){
+      }catch(error){
         console.error("Error refreshing license:", error);
-        const err = error as { response?: { data?: { message?: string } } };
         toast({
           variant: "error",
           message:
             t("about.failed_to_refresh_license") +
             " : " +
-            (err?.response?.data?.message || "unexpected error"),
-        });
+            (error?.response?.data?.message || t("settings.licensePage.unexpectedError")),
+        }); 
       }
     }
 
@@ -748,11 +746,11 @@ export default defineComponent({
       );
 
       if (daysUntilExpiry > 1) {
-        return `${daysUntilExpiry} days remaining until your license expires`;
+        return t("settings.licensePage.daysRemaining", { days: daysUntilExpiry });
       } else if (daysUntilExpiry === 1) {
-        return `1 day remaining until your license expires`;
+        return t("settings.licensePage.oneDayRemaining");
       } else {
-        return "Your license has expired";
+        return t("settings.licensePage.licenseExpired");
       }
     };
 

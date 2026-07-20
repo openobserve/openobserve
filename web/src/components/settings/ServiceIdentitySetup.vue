@@ -60,9 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div class="flex-1 min-w-0 text-[13px] leading-tight">
                 <template v-if="serviceNameDetected">
-                  Service name detected from
+                  {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
                   <span class="font-bold text-primary">Service</span>
-                  field alias
+                  {{ t("settings.serviceIdentitySetup.fieldAlias") }}
                   <span class="text-xs opacity-60"
                     >({{
                       detectedServiceFields.length + unseenServiceFields.length
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'text-gray-400'
                 "
               >
-                No fields configured yet
+                {{ t("settings.serviceIdentitySetup.noFieldsConfiguredYet") }}
               </span>
               <OButton
                 variant="outline"
@@ -412,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSelect
                       ref="addFieldSelectRef"
                       v-model="addFieldValue"
-                      :options="getAddFieldOptionsForEnv()"
+                      :options="getAddFieldOptionsForEnv(envKey)"
                       labelKey="label"
                       valueKey="value"
                       searchable
@@ -480,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSelect
                     ref="addFieldSelectRef"
                     v-model="addFieldValue"
-                    :options="getAddFieldOptionsForEnv()"
+                    :options="getAddFieldOptionsForEnv(addingToEnv)"
                     labelKey="label"
                     valueKey="value"
                     searchable
@@ -565,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="border-bottom: 1px solid var(--o2-border-color)"
         >
           <OIcon name="radar" size="sm" class="text-teal-6" />
-          <span class="font-bold text-sm">Workload Detection</span>
+          <span class="font-bold text-sm">{{ t("settings.serviceIdentitySetup.workloadDetection") }}</span>
         </div>
 
         <!-- Collapsible: Workload detected using fields (N) -->
@@ -583,7 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="check-circle" size="sm" />
             <div class="flex-1 min-w-0 text-[13px] leading-tight">
-              Workload detected using fields
+              {{ t("settings.serviceIdentitySetup.workloadDetectedUsingFields") }}
               <span class="text-xs opacity-60"
                 >({{ trackedAliasIds.length }})</span
               >
@@ -624,16 +624,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'text-gray-400'
                 "
               >
-                Only these field alias groups are used for workload detection
-                and recommendations. Fields not in this list will not influence
-                service discovery results. Cannot be empty.
+                {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
                 <a
                   class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded text-xs font-semibold no-underline align-middle border border-blue-500 text-blue-600 bg-blue-500/[.08] transition-[background]"
                   :class="store.state.theme === 'dark' ? 'border-[#60a5fa] text-[#93c5fd] bg-[rgba(96,165,250,0.12)]' : ''"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
-                  >Go to Field Aliases</a
+                  >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</a
                 >
-                to configure individual field mappings.
+                {{ t("settings.serviceIdentitySetup.toConfigureFieldMappings") }}
               </div>
               <div class="flex flex-wrap items-center gap-2">
                 <!-- Pills for tracked aliases -->
@@ -684,7 +682,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     labelKey="label"
                     valueKey="value"
                     searchable
-                    placeholder="Select alias group"
+                    :placeholder="t('settings.serviceIdentitySetup.selectAliasGroup')"
                     style="width: 13.75rem"
                     :dropdown-style="{ minWidth: '18.75rem' }"
                     @update:model-value="onAddTrackedAlias($event)"
@@ -722,7 +720,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="addingTrackedAlias = true"
                   icon-left="add"
                 >
-                  Add field
+                  {{ t("settings.correlation.addField") }}
                 </OButton>
               </div>
               <div class="flex justify-end mt-3">
@@ -747,15 +745,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'
             "
           >
-            We discovered these deployment patterns in your streams. Use them to
-            configure service correlation.
+            {{ t("settings.serviceIdentitySetup.discoveredPatternsHelp") }}
             <a
               class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded text-xs font-semibold no-underline align-middle border border-blue-500 text-blue-600 bg-blue-500/[.08] transition-[background]"
               :class="store.state.theme === 'dark' ? 'border-[#60a5fa] text-[#93c5fd] bg-[rgba(96,165,250,0.12)]' : ''"
               @click.prevent="emit('navigate-to-services')"
-              >Go to Services</a
+              >{{ t("settings.serviceIdentitySetup.goToServices") }}</a
             >
-            <span>to see the actual discovered services.</span>
+            <span>{{ t("settings.serviceIdentitySetup.toSeeDiscoveredServices") }}</span>
           </div>
         </div>
 
@@ -790,7 +787,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 (setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0
               "
               class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-green-500"
-              :title="`${(setDistinguishBy[env.key] ?? []).filter(Boolean).length} field(s) configured`"
+              :title="t('settings.serviceIdentitySetup.fieldsConfigured', { n: (setDistinguishBy[env.key] ?? []).filter(Boolean).length })"
             />
           </div>
         </div>
@@ -938,7 +935,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="w-1.5 h-1.5 rounded-full inline-block bg-blue-500"
               />
-              <span>Found in Logs</span>
+              <span>{{ t("settings.correlation.foundInLogs") }}</span>
             </div>
             <div
               class="flex items-center gap-1 text-[10px]"
@@ -951,7 +948,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="w-1.5 h-1.5 rounded-full inline-block bg-orange-500"
               />
-              <span>Found in Traces</span>
+              <span>{{ t("settings.correlation.foundInTraces") }}</span>
             </div>
             <div
               class="flex items-center gap-1 text-[10px]"
@@ -964,7 +961,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="w-1.5 h-1.5 rounded-full inline-block bg-green-500"
               />
-              <span>Found in Metrics</span>
+              <span>{{ t("settings.correlation.foundInMetrics") }}</span>
             </div>
           </div>
         </div>
@@ -995,19 +992,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'text-gray-100'
                   : 'text-gray-500'
               "
-              >Recommended:</span
+              >{{ t("settings.serviceIdentitySetup.recommended") }}</span
             >
-            {{ " " }}Use
+            {{ " " }}{{ t("settings.serviceIdentitySetup.recommendedUse") }}
             <span class="font-semibold">{{
               suggestedConfig.distinguish_by
                 .map((id) => getGroupByValue(id)?.display ?? id)
                 .join(" + ")
             }}</span>
-            — covers {{ activeEnvCoverage ?? "–" }}% of your telemetry.
+            {{ t("settings.serviceIdentitySetup.coversTelemetry", { coverage: activeEnvCoverage ?? "–" }) }}
           </div>
           <div class="shrink-0 flex items-center gap-1">
             <OButton variant="outline" size="sm" @click="applySuggestion">
-              Apply
+              {{ t("settings.serviceIdentitySetup.apply") }}
             </OButton>
             <OButton
               variant="ghost"
@@ -1063,7 +1060,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="verified" size="xs" class="text-green-500" />
                 <span
-                  >{{ insightData.coverage }}% of services
+                  >{{ t("settings.serviceIdentitySetup.percentOfServices", { coverage: insightData.coverage }) }}
                   <span
                     v-if="
                       insightData.count !== null && insightData.total !== null
@@ -1087,7 +1084,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-[11px] tracking-wide font-medium mb-2"
                 style="color: var(--color-text-primary)"
               >
-                Stream Sources
+                {{ t("settings.serviceIdentitySetup.streamSources") }}
               </div>
               <div style="height: 40vh; min-height: 180px">
                 <CustomChartRenderer :data="insightChartData.options" />
@@ -1140,7 +1137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'text-gray-400'
               "
             >
-              All values ({{ insightData.children.length }})
+              {{ t("settings.serviceIdentitySetup.allValues", { count: insightData.children.length }) }}
             </div>
             <div class="flex flex-col gap-2.5">
               <div
@@ -1208,11 +1205,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="info" size="xs" />
               <span
-                >These are the related
+                >{{ t("settings.serviceIdentitySetup.relatedValuesPre") }}
                 <strong>{{
                   formatDimLabels((insightData as any).relatedDimensions)
                 }}</strong>
-                values co-occurring with
+                {{ t("settings.serviceIdentitySetup.valuesCoOccurringWith") }}
                 <strong>{{ insightData.title }}</strong
                 >.</span
               >
@@ -1223,7 +1220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="dim.label + dimIdx"
                 class="flex-1 min-w-0 flex flex-col px-3"
                 :class="[
-                  Number(dimIdx) > 0
+                  dimIdx > 0
                     ? store.state.theme === 'dark'
                       ? 'border-l border-grey-8'
                       : 'border-l border-grey-3'
@@ -1281,7 +1278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'text-gray-400'
                         : 'text-gray-400'
                     "
-                    >No values</span
+                    >{{ t("settings.serviceIdentitySetup.noValues") }}</span
                   >
                 </div>
               </div>
@@ -1326,24 +1323,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OCardSection class="flex flex-col gap-4 p-0 border-t">
           <!-- Header section with cardinality details -->
           <div class="flex items-center gap-3 p-4 border-b">
-            <span class="font-medium">Cardinality:</span>
+            <span class="font-medium">{{ t("settings.serviceIdentitySetup.cardinality") }}</span>
             <OTag
               type="cardinalityClass"
               :value="
-                dimensionAnalytics[primaryDim?.group_id ?? '']
-                  ?.cardinality_class || 'Unknown'
+                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
+                'Unknown'
               "
             >
-              {{
-                dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality || 0
-              }}
-              unique values
+              {{ t("settings.serviceIdentitySetup.uniqueValues", { n: dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }) }}
             </OTag>
             <OTag
               type="cardinalityClass"
               :value="
-                dimensionAnalytics[primaryDim?.group_id ?? '']
-                  ?.cardinality_class || 'Unknown'
+                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
+                'Unknown'
               "
             />
           </div>
@@ -1371,10 +1365,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{
                   selectedStreamType ||
                   ["logs", "metrics", "traces"].find(
-                    (t) => selectedFieldAnalytics?.sample_values[t],
+                    (t) => selectedFieldAnalytics.sample_values[t],
                   )
                 }}</span>
-                <span class="text-gray-400">Streams</span>
+                <span class="text-gray-400">{{ t("settings.serviceIdentitySetup.streams") }}</span>
               </div>
 
               <!-- Scrollable content -->
@@ -1383,12 +1377,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template
                   v-if="
                     selectedStreamType &&
-                    selectedFieldAnalytics?.sample_values[selectedStreamType]
+                    selectedFieldAnalytics.sample_values[selectedStreamType]
                   "
                 >
                   <div
                     v-for="streamName in Object.keys(
-                      selectedFieldAnalytics?.sample_values[selectedStreamType] ?? {},
+                      selectedFieldAnalytics.sample_values[selectedStreamType],
                     )"
                     :key="streamName"
                     class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"
@@ -1409,7 +1403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'logs',
                       'metrics',
                       'traces',
-                    ].filter((t) => selectedFieldAnalytics?.sample_values[t])"
+                    ].filter((t) => selectedFieldAnalytics.sample_values[t])"
                     :key="typeName"
                   >
                     <div
@@ -1424,7 +1418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-for="streamName in Object.keys(
-                        selectedFieldAnalytics?.sample_values[typeName] ?? {},
+                        selectedFieldAnalytics.sample_values[typeName],
                       )"
                       :key="typeName + '-' + streamName"
                       class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"
@@ -1498,7 +1492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="getPopupColumnValues(colIdx).length === 0"
                     class="text-gray-400 text-xs italic p-2"
                   >
-                    No values
+                    {{ t("settings.serviceIdentitySetup.noValues") }}
                   </div>
                 </div>
               </div>
@@ -1507,13 +1501,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="popupColumns.length === 0"
                 class="flex items-center justify-center flex-1 text-gray-400 text-sm italic"
               >
-                No additional dimensions detected.
+                {{ t("settings.serviceIdentitySetup.noAdditionalDimensions") }}
               </div>
             </div>
           </div>
 
           <div v-else class="text-gray-500 italic p-4 text-center">
-            No sample data available for this field.
+            {{ t("settings.serviceIdentitySetup.noSampleData") }}
           </div>
         </OCardSection>
       </ODialog>
@@ -1549,13 +1543,19 @@ import type {
   FieldAlias,
   ServiceFieldSource,
 } from "@/services/service_streams";
-import { groupEnvKey } from "@/utils/serviceStreamEnvs";
+import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface DetectedEnvironment {
+  environment_type: string;
+  description: string;
+  evidence_groups: string[];
+}
 
 interface SuggestedConfig {
   distinguish_by: string[];
@@ -1630,11 +1630,17 @@ const suggestionAlreadyApplied = computed(() => {
   );
 });
 
+/** Display label for the active environment tab */
+const activeEnvLabel = computed(() =>
+  getIdentitySetLabel(activeEnvironment.value),
+);
+
 /** Field Details Dialog State */
 const detailsDialogVisible = ref(false);
 const selectedField = ref<FoundGroup | null>(null);
 /** When set, the popup right pane highlights this value and scrolls to it */
 const preselectedValue = ref<string>("");
+const valuesScrollContainer = ref<HTMLElement | null>(null);
 /** Selected value per column index in the N-1 hierarchy columns */
 const popupColumnSelections = ref<(string | null)[]>([]);
 /** Selected value for the primary (title-level) dimension */
@@ -1682,6 +1688,22 @@ const trackedAliasIds = ref<string[]>([]);
 
 /** When true, correlation matches streams without requiring the `service` dimension */
 const serviceOptional = ref<boolean>(false);
+
+// Computed value for the right pane based on selected stream
+const activeStreamValues = computed(() => {
+  if (
+    !selectedFieldAnalytics.value?.sample_values ||
+    !activeStreamId.value ||
+    !activeStreamType.value
+  ) {
+    return [];
+  }
+  return (
+    selectedFieldAnalytics.value.sample_values[activeStreamType.value]?.[
+      activeStreamId.value
+    ] || []
+  );
+});
 
 /** Active environment tab - auto-selects first detected environment */
 const activeEnvironment = ref<string>("");
@@ -1838,6 +1860,11 @@ const showFieldMappingDialog = ref(false);
 const editableServiceFields = ref<string[]>([]);
 const savingFieldMappings = ref(false);
 
+function openFieldMappingDialog() {
+  editableServiceFields.value = [...allServiceFieldNames.value];
+  showFieldMappingDialog.value = true;
+}
+
 async function saveFieldMappings() {
   savingFieldMappings.value = true;
   try {
@@ -1853,6 +1880,12 @@ async function saveFieldMappings() {
 /** The FoundGroup for the "service" group (used for stream type chips) */
 const serviceGroup = computed<FoundGroup | undefined>(() =>
   availableGroups.value.find((g) => g.group_id === "service"),
+);
+const serviceGroupDisplay = computed(
+  () => serviceGroup.value?.display ?? "Service",
+);
+const serviceGroupStreamTypes = computed(
+  () => serviceGroup.value?.stream_types ?? [],
 );
 
 /** Service name banner: expanded/collapsed toggle */
@@ -2039,6 +2072,21 @@ function openInsightDialog(
   });
 }
 
+/** When a dimension pill is clicked inside the insight dialog, filter the next column */
+function selectDimValue(dimIdx: number, value: string) {
+  const current = { ...insightSelectedDim.value };
+  if (current[dimIdx] === value) {
+    // Already selected — do nothing (no deselect)
+    return;
+  }
+  current[dimIdx] = value;
+  // Clear downstream selections
+  for (const k of Object.keys(current)) {
+    if (Number(k) > dimIdx) delete current[Number(k)];
+  }
+  insightSelectedDim.value = current;
+}
+
 /** Get filtered values for a dimension column based on upstream selections.
  *  Uses the same approach as getPopupColumnValues — queries dimensionAnalytics directly. */
 function getFilteredDimValues(dimensions: any[], dimIdx: number): string[] {
@@ -2064,6 +2112,15 @@ function getFilteredDimValues(dimensions: any[], dimIdx: number): string[] {
   return dim.values;
 }
 
+/** Format a list of labels into proper English: "A", "A or B", "A, B, or C" */
+function formatSelectableLabels(dims: any[]): string {
+  const labels = dims.slice(0, -1).map((d: any) => d.label);
+  if (labels.length === 0) return "";
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} or ${labels[1]}`;
+  return labels.slice(0, -1).join(", ") + ", or " + labels[labels.length - 1];
+}
+
 /** Format all dimension labels into proper English: "A", "A and B", "A, B, and C" */
 function formatDimLabels(dims: any[]): string {
   const labels = dims.map((d: any) => d.label);
@@ -2071,6 +2128,17 @@ function formatDimLabels(dims: any[]): string {
   if (labels.length === 1) return labels[0];
   if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
   return labels.slice(0, -1).join(", ") + ", and " + labels[labels.length - 1];
+}
+
+/** Returns inline style for selected dimension pill — subtle primary highlight */
+function getDimSelectedStyle(_color: string): Record<string, string> {
+  const isDark = store.state.theme === "dark";
+  return {
+    backgroundColor: isDark ? "rgba(59,130,246,0.15)" : "rgba(59,130,246,0.1)",
+    borderColor: isDark ? "rgba(59,130,246,0.5)" : "rgba(59,130,246,0.4)",
+    color: isDark ? "#93c5fd" : "#1d4ed8",
+    fontWeight: "600",
+  };
 }
 
 /** Build insight data for the currently open popup */
@@ -2099,7 +2167,7 @@ const insightData = computed(() => {
       children.sort((a, b) => b.count - a.count);
       return {
         title: workloadSummary.value.primaryLabel,
-        subtitle: `${allValues.length} unique values detected`,
+        subtitle: t("settings.serviceIdentitySetup.uniqueValuesDetected", { n: allValues.length }),
         coverage: null,
         count: null,
         total: dim?.service_count ?? null,
@@ -2208,7 +2276,7 @@ const insightData = computed(() => {
       children.sort((a, b) => b.count - a.count);
       return {
         title: workloadSummary.value.secondaryLabel,
-        subtitle: `${allVals.length} unique values detected`,
+        subtitle: t("settings.serviceIdentitySetup.uniqueValuesDetected", { n: allVals.length }),
         coverage: null,
         count: null,
         total: dim?.service_count ?? null,
@@ -2300,12 +2368,12 @@ const insightData = computed(() => {
     children.sort((a, b) => b.count - a.count);
     return {
       title: workloadSummary.value.tertiaryLabel,
-      subtitle: `${allVals.length} unique values detected`,
+      subtitle: t("settings.serviceIdentitySetup.uniqueValuesDetected", { n: allVals.length }),
       coverage: null,
       count: null,
       total: dim?.service_count ?? null,
       childLabel: "",
-      childCountLabel: "locations",
+      childCountLabel: t("settings.serviceIdentitySetup.locations"),
       children,
       maxChildCount: Math.max(...children.map((c) => c.count), 1),
       isCardLevel: true,
@@ -2369,6 +2437,15 @@ const insightData = computed(() => {
 });
 
 /** Chart data for insight dialog — stream contribution donut */
+/** Dynamic panel width based on number of related dimension columns */
+const insightPanelWidth = computed(() => {
+  const dims = (insightData.value as any)?.relatedDimensions;
+  const colCount = dims?.length ?? 0;
+  if (colCount <= 2) return "480px";
+  if (colCount === 3) return "640px";
+  return "800px"; // 4+
+});
+
 const insightPanelWidthPct = computed(() => {
   const dims = (insightData.value as any)?.relatedDimensions;
   const colCount = dims?.length ?? 0;
@@ -2511,6 +2588,15 @@ const unseenServiceFields = computed<string[]>(() => {
   return allServiceFieldNames.value.filter((f) => !detectedNames.has(f));
 });
 
+/** Summary text for collapsed banner: first 2 field names + "+N more" */
+const serviceFieldSummary = computed(() => {
+  const fields = detectedServiceFields.value;
+  const shown = fields.slice(0, 2).map((f) => f.name);
+  const remaining =
+    fields.length - shown.length + unseenServiceFields.value.length;
+  return { shown, remaining };
+});
+
 /** Whether service name field is detected in any stream */
 const serviceNameDetected = computed(
   () => detectedServiceFields.value.length > 0,
@@ -2585,6 +2671,54 @@ const totalServices = computed(() => {
     }
   }
   return max;
+});
+
+/**
+ * Logic previously on backend: Detect environment and suggest fields based on available data.
+ * Now dynamic based on the active environment tab.
+ */
+const detectedEnvironment = computed<DetectedEnvironment | null>(() => {
+  if (!activeEnvironment.value) return null;
+
+  const env = activeEnvironment.value;
+  let envType = "General";
+  let description = "General fields detected in your telemetry data.";
+  let evidenceGroups: string[] = [];
+
+  if (env === "kubernetes" || env === "k8s") {
+    envType = "Kubernetes";
+    description = "Kubernetes fields detected in your telemetry data.";
+    evidenceGroups = activeEnvGroups.value
+      .filter((g) => g.group_id.startsWith("k8s-"))
+      .map((g) => g.group_id);
+  } else if (env === "aws") {
+    const isEcs = activeEnvGroups.value.some((g) =>
+      g.group_id.startsWith("aws-ecs-"),
+    );
+    envType = isEcs ? "AWS ECS" : "AWS";
+    description = `${envType} fields detected in your telemetry data.`;
+    evidenceGroups = activeEnvGroups.value
+      .filter((g) => g.group_id.startsWith("aws-"))
+      .map((g) => g.group_id);
+  } else if (env === "gcp") {
+    envType = "GCP";
+    description = "GCP fields detected in your telemetry data.";
+    evidenceGroups = activeEnvGroups.value
+      .filter((g) => g.group_id.startsWith("gcp-"))
+      .map((g) => g.group_id);
+  } else if (env === "azure") {
+    envType = "Azure";
+    description = "Azure fields detected in your telemetry data.";
+    evidenceGroups = activeEnvGroups.value
+      .filter((g) => g.group_id.startsWith("azure-"))
+      .map((g) => g.group_id);
+  }
+
+  return {
+    environment_type: envType,
+    description: description,
+    evidence_groups: evidenceGroups.slice(0, 3),
+  };
 });
 
 /**
@@ -2712,6 +2846,21 @@ const secondaryDim = computed<FoundGroup | undefined>(
   () => rankedDims.value[1],
 );
 const tertiaryDim = computed<FoundGroup | undefined>(() => rankedDims.value[2]);
+
+/**
+ * Hierarchy label, e.g. "K8S CLUSTER → K8S NAMESPACE → K8S DEPLOYMENT"
+ */
+const hierarchyLabel = computed<string | null>(() => {
+  const p = primaryDim.value;
+  const s = secondaryDim.value;
+  const t = tertiaryDim.value;
+  if (!p) return null;
+  const pLabel = p.display.toUpperCase();
+  if (!s) return pLabel;
+  const sLabel = s.display.toUpperCase();
+  if (!t) return `${pLabel} → ${sLabel}`;
+  return `${pLabel} → ${sLabel} → ${t.display.toUpperCase()}`;
+});
 
 /**
  * One entry per unique value of the primary dim.
@@ -2944,6 +3093,36 @@ function deduplicateAndSortGroups(groups: FoundGroup[]): FoundGroup[] {
   });
 }
 
+/**
+ * Returns select options for the disambiguation row at `rowIndex`.
+ * Excludes: the name_field, and any already-selected disambiguation groups
+ * (except the one at the current row, which must remain selectable).
+ */
+function getDisambiguationOptions(rowIndex: number) {
+  const alreadyUsed = new Set<string>([
+    nameField,
+    ...distinguishBy.value.filter((_, i) => i !== rowIndex),
+  ]);
+  return availableGroups.value
+    .filter((g) => !alreadyUsed.has(g.group_id))
+    .map((g) => ({
+      label: g.display,
+      value: g.group_id,
+      streamTypes: g.stream_types,
+      recommended: g.recommended,
+    }));
+}
+
+/** Returns a color token for a stream type chip */
+function streamTypeColor(streamType: string): string {
+  const map: Record<string, string> = {
+    logs: "blue",
+    traces: "orange",
+    metrics: "green",
+  };
+  return map[streamType] ?? "grey-7";
+}
+
 /** Simple pluralization helper for display labels */
 function pluralize(val: string): string {
   if (!val) return "";
@@ -2967,6 +3146,16 @@ function cardinalityColor(cardClass: string): BadgeVariant {
     VeryHigh: "error",
   };
   return map[cardClass] ?? "default";
+}
+
+/** Get the best available cardinality class for a group */
+function getEffectiveCardinalityClass(group?: FoundGroup): string {
+  if (!group) return "Unknown";
+  return (
+    dimensionAnalytics.value[group.group_id]?.cardinality_class ||
+    group.cardinality_class ||
+    "Unknown"
+  );
 }
 
 /** Get which stream types a specific value was found in for a dimension group */
@@ -3016,6 +3205,13 @@ function getGroupValues(group: FoundGroup): string[] {
     }
   }
   return Array.from(all).sort();
+}
+
+/** Return coverage % for a group relative to total services, or null if unknown */
+function getGroupCoverage(group: FoundGroup): number | null {
+  const dim = dimensionAnalytics.value[group.group_id];
+  if (!dim || !totalServices.value) return null;
+  return Math.round((dim.service_count / totalServices.value) * 100);
 }
 
 /**
@@ -3094,8 +3290,15 @@ function getFieldCardinalityTooltip(fieldId: string): string | null {
   const formatted = cardClass
     ? cardClass.replace(/([a-z])([A-Z])/g, "$1 $2")
     : "";
-  const classLabel = formatted ? ` (${formatted} cardinality)` : "";
-  return `${count} unique values${classLabel} — fewer values = better for grouping`;
+  const classLabel = formatted
+    ? t("settings.serviceIdentitySetup.cardinalityClassLabel", {
+        cardinality: formatted,
+      })
+    : "";
+  return t("settings.serviceIdentitySetup.fieldCardinalityTooltip", {
+    count,
+    classLabel,
+  });
 }
 
 /**
@@ -3110,7 +3313,7 @@ const isAutoSuggested = computed(() => {
 });
 
 /** Options for the inline "add field" select for a specific env */
-function getAddFieldOptionsForEnv() {
+function getAddFieldOptionsForEnv(envKey: string) {
   // Exclude fields already added in the current env AND all other envs
   const allUsedFields = Object.values(setDistinguishBy.value)
     .flat()
@@ -3155,13 +3358,99 @@ function applySuggestion() {
   suggestionDismissed.value = true;
   toast({
     variant: "success",
-    message:
-      'Recommended configuration applied. Click "Save Configuration" to save.',
+    message: t("settings.serviceIdentitySetup.recommendedConfigApplied"),
   });
 }
 
 function dismissSuggestion() {
   suggestionDismissed.value = true;
+}
+
+function updateDistinguishByField(idx: number, val: string) {
+  const current = [...distinguishBy.value];
+  current[idx] = val;
+  distinguishBy.value = current;
+}
+
+function addDisambiguationField() {
+  if (distinguishBy.value.length < 5) {
+    const current = [...distinguishBy.value, ""];
+    distinguishBy.value = current;
+  }
+}
+
+function removeDisambiguationField(idx: number) {
+  const current = [...distinguishBy.value];
+  current.splice(idx, 1);
+  distinguishBy.value = current;
+}
+
+function openFieldDetails(
+  field: FoundGroup,
+  streamType: string = "",
+  value: string = "",
+) {
+  selectedField.value = field;
+  selectedStreamType.value = streamType;
+  activeStreamId.value = "";
+  activeStreamType.value = streamType;
+  preselectedValue.value = value;
+  popupPrimaryValue.value = "";
+  popupColumnSelections.value = [];
+
+  // Determine clicked field's position in the hierarchy and pre-select accordingly
+  if (value && primaryDim.value) {
+    const fieldIdx = rankedDims.value.findIndex(
+      (d) => d.group_id === field.group_id,
+    );
+    if (fieldIdx === 0) {
+      // Clicked on primary dim (e.g. cluster) — set as primary value
+      popupPrimaryValue.value = value;
+    } else if (fieldIdx > 0) {
+      // Clicked on secondary/tertiary — pre-select in the matching column (fieldIdx - 1)
+      const selections: (string | null)[] = new Array(
+        rankedDims.value.length - 1,
+      ).fill(null);
+      selections[fieldIdx - 1] = value;
+      popupColumnSelections.value = selections;
+    }
+  }
+
+  // Auto-select a stream — prefer one that contains the preselected value
+  if (selectedFieldAnalytics.value?.sample_values) {
+    const sampleValues = selectedFieldAnalytics.value.sample_values;
+    const types = Object.keys(sampleValues);
+    const typeToUse =
+      streamType && types.includes(streamType) ? streamType : types[0];
+
+    if (typeToUse) {
+      activeStreamType.value = typeToUse;
+      const streamEntries = Object.entries(sampleValues[typeToUse] ?? {});
+
+      // If a specific value was clicked, prefer the stream that contains it
+      const matchingStream = value
+        ? streamEntries.find(([, vals]) => vals.includes(value))
+        : null;
+
+      const streamName = matchingStream
+        ? matchingStream[0]
+        : (streamEntries[0]?.[0] ?? "");
+
+      activeStreamId.value = streamName;
+    }
+  }
+
+  detailsDialogVisible.value = true;
+
+  // Scroll the highlighted value into view after the dialog renders
+  if (value) {
+    nextTick(() => {
+      const el = valuesScrollContainer.value?.querySelector(
+        `[data-val="${CSS.escape(value)}"]`,
+      );
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }
 }
 
 /** True when current setDistinguishBy or trackedAliasIds differ from last saved config */
@@ -3278,6 +3567,26 @@ async function loadData() {
   }
 }
 
+async function loadAnalytics() {
+  try {
+    const res = await serviceStreamsService.getDimensionAnalytics(
+      props.orgIdentifier,
+    );
+    const summary: DimensionAnalyticsSummary = res.data;
+    if (summary.dimensions) {
+      dimensionAnalytics.value = summary.dimensions.reduce(
+        (acc, dim) => {
+          acc[dim.dimension_name] = dim;
+          return acc;
+        },
+        {} as Record<string, DimensionAnalytics>,
+      );
+    }
+  } catch (err) {
+    console.error("Failed to load dimension analytics:", err);
+  }
+}
+
 async function saveConfig() {
   saving.value = true;
   try {
@@ -3309,7 +3618,7 @@ async function saveConfig() {
     if (trackedAliasIds.value.length === 0) {
       toast({
         variant: "warning",
-        message: "Select at least one tracked alias group.",
+        message: t("settings.serviceIdentitySetup.selectAtLeastOneTrackedAlias"),
       });
       return;
     }

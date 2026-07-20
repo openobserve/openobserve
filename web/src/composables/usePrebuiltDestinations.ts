@@ -156,7 +156,7 @@ export function usePrebuiltDestinations() {
     if (!config) {
       return {
         isValid: false,
-        errors: { type: 'Unknown destination type' }
+        errors: { type: t('alerts.prebuilt.unknownDestinationType') }
       };
     }
 
@@ -168,7 +168,9 @@ export function usePrebuiltDestinations() {
 
       // Check required fields
       if (field.required && (!value || value.toString().trim() === '')) {
-        errors[field.key] = `${field.label} is required`;
+        errors[field.key] = t('alerts.validation.credentialFieldRequired', {
+          field: t(field.labelKey)
+        });
         continue;
       }
 
@@ -177,11 +179,12 @@ export function usePrebuiltDestinations() {
         continue;
       }
 
-      // Apply custom validator if present
+      // Apply custom validator if present. Configs are Vue-less and carry i18n
+      // keys, so resolve the returned `{ key, params }` here (see CredentialField).
       if (field.validator && value) {
         const validationResult = field.validator(value.toString());
         if (validationResult !== true) {
-          errors[field.key] = validationResult as string;
+          errors[field.key] = t(validationResult.key, validationResult.params);
         }
       }
     }
@@ -292,7 +295,7 @@ export function usePrebuiltDestinations() {
         const firstError = Object.values(validation.errors)[0];
         const result = {
           success: false,
-          error: `Validation error: ${firstError}`,
+          error: t('alerts.prebuilt.validationError', { error: firstError }),
           timestamp: Date.now()
         };
         lastTestResult.value = result;
@@ -303,7 +306,7 @@ export function usePrebuiltDestinations() {
       if (!config) {
         const result = {
           success: false,
-          error: 'Invalid destination type',
+          error: t('alerts.prebuilt.invalidDestinationType'),
           timestamp: Date.now()
         };
         lastTestResult.value = result;
@@ -428,7 +431,7 @@ export function usePrebuiltDestinations() {
     } catch (error: any) {
       const result: TestResult = {
         success: false,
-        error: error.message || 'Test failed with unknown error',
+        error: error.message || t('alerts.prebuilt.testFailedUnknownError'),
         timestamp: Date.now()
       };
 
@@ -463,12 +466,16 @@ export function usePrebuiltDestinations() {
       // Validate inputs
       const validation = validateCredentials(type, credentials);
       if (!validation.isValid) {
-        throw new Error(`Validation error: ${Object.values(validation.errors).join(', ')}`);
+        throw new Error(
+          t('alerts.prebuilt.validationError', {
+            error: Object.values(validation.errors).join(', '),
+          })
+        );
       }
 
       const config = getPrebuiltConfig(type);
       if (!config) {
-        throw new Error('Invalid destination type');
+        throw new Error(t('alerts.prebuilt.invalidDestinationType'));
       }
 
       // Generate destination data
@@ -595,7 +602,7 @@ export function usePrebuiltDestinations() {
 
       const config = getPrebuiltConfig(type);
       if (!config) {
-        throw new Error('Invalid destination type');
+        throw new Error(t('alerts.prebuilt.invalidDestinationType'));
       }
 
       // Generate destination data
@@ -749,7 +756,7 @@ export function usePrebuiltDestinations() {
 
       const config = getPrebuiltConfig(targetType);
       if (!config) {
-        throw new Error('Invalid target type');
+        throw new Error(t('alerts.prebuilt.invalidTargetType'));
       }
 
       // Ensure system templates exist

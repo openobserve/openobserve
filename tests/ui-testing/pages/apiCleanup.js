@@ -1629,8 +1629,11 @@ class APICleanup {
     }
 
     /**
-     * Clean up all service accounts matching pattern "email*@gmail.com"
-     * Deletes service accounts with emails starting with "email" and ending with "@gmail.com"
+     * Clean up all test-created service accounts:
+     * - legacy pattern "email*@gmail.com" (old email-based creation flow)
+     * - current pattern "sa<digits>x<digits>.*@sa.internal" (name-based flow:
+     *   uniqueSaName() in serviceAccount.spec.js + the synthesized
+     *   `<name>.<org>@sa.internal` identifier)
      */
     async cleanupServiceAccounts() {
         testLogger.info('Starting service accounts cleanup');
@@ -1640,8 +1643,7 @@ class APICleanup {
             const serviceAccounts = await this.fetchServiceAccounts();
             testLogger.info('Fetched service accounts', { total: serviceAccounts.length });
 
-            // Filter service accounts matching pattern: starts with "email" and ends with "@gmail.com"
-            const pattern = /^email.*@gmail\.com$/;
+            const pattern = /^email.*@gmail\.com$|^sa\d+x\d+\..*@sa\.internal$/;
             const matchingAccounts = serviceAccounts.filter(sa => pattern.test(sa.email));
             testLogger.info('Found service accounts matching cleanup pattern', { count: matchingAccounts.length });
 

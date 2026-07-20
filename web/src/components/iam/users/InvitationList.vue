@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Standard page header: title + icon + subtitle, matching the Users page. -->
     <AppPageHeader
       :title="t('invitation.pendingInvitations')"
-      :subtitle="'Pending and sent member invitations'"
+      :subtitle="t('iam.invitationList.subtitle')"
       icon="mail"
       class="shrink-0 px-4 border-b border-border-default"
     />
@@ -165,17 +165,6 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
-interface Invitation {
-  token: string;
-  org_id: string;
-  org_name: string;
-  role?: string;
-  inviter_id?: string;
-  expires_at: number;
-  expiry?: string;
-  "#"?: string | number;
-}
-
 export default defineComponent({
   name: "InvitationList",
   components: {
@@ -200,17 +189,11 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-
-    // Narrow an unknown catch value to the axios error message, if present.
-    const getErrorMessage = (error: unknown): string | undefined => {
-      const err = error as { response?: { data?: { message?: string } } };
-      return err?.response?.data?.message;
-    };
-    const invitations = ref<Invitation[]>([]);
+    const invitations = ref([]);
     const filterQuery = ref("");
     const confirmAccept = ref(false);
     const confirmReject = ref(false);
-    const selectedInvitation = ref<Invitation | null>(null);
+    const selectedInvitation = ref(null);
 
     const columns: OTableColumnDef[] = [
       {
@@ -284,7 +267,7 @@ export default defineComponent({
     const fetchPendingInvitations = async () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Loading pending invitations...",
+        message: t("iam.invitationList.loadingPending"),
               timeout: 0,
 });
 
@@ -293,7 +276,7 @@ export default defineComponent({
         const response = await usersService.getPendingInvites();
 
         let counter = 1;
-        invitations.value = response.data.data.map((invitation: Invitation) => ({
+        invitations.value = response.data.data.map((invitation: any) => ({
           "#": counter <= 9 ? `0${counter++}` : counter++,
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
@@ -304,8 +287,8 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            getErrorMessage(error) ||
-            "Failed to load pending invitations",
+            error.response?.data?.message ||
+            t("iam.invitationList.failedLoadPending"),
           variant: "error",
         });
       } finally {
@@ -334,12 +317,12 @@ export default defineComponent({
       }
     };
 
-    const acceptInvitation = (invitation: Invitation) => {
+    const acceptInvitation = (invitation: any) => {
       selectedInvitation.value = invitation;
       confirmAccept.value = true;
     };
 
-    const rejectInvitation = (invitation: Invitation) => {
+    const rejectInvitation = (invitation: any) => {
       selectedInvitation.value = invitation;
       confirmReject.value = true;
     };
@@ -350,7 +333,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Accepting invitation...",
+        message: t("iam.invitationList.accepting"),
               timeout: 0,
 });
 
@@ -367,7 +350,7 @@ export default defineComponent({
 
         dismiss();
         toast({
-          message: "Invitation accepted successfully!",
+          message: t("iam.invitationList.acceptedSuccess"),
           variant: "success",
         });
 
@@ -386,7 +369,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            getErrorMessage(error) || "Failed to accept invitation",
+            error.response?.data?.message || t("iam.invitationList.failedAccept"),
           variant: "error",
         });
       }
@@ -398,7 +381,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Rejecting invitation...",
+        message: t("iam.invitationList.rejecting"),
               timeout: 0,
 });
 
@@ -408,14 +391,13 @@ export default defineComponent({
         );
         dismiss();
         toast({
-          message: "Invitation rejected successfully!",
+          message: t("iam.invitationList.rejectedSuccess"),
           variant: "success",
         });
 
-        // Remove from list; guarded non-null: early return above ensures it is set.
-        const rejectedToken = selectedInvitation.value!.token;
+        // Remove from list
         invitations.value = invitations.value.filter(
-          (inv: Invitation) => inv.token !== rejectedToken,
+          (inv: any) => inv.token !== selectedInvitation.value.token,
         );
 
         // If no more invitations, emit to parent
@@ -426,7 +408,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            getErrorMessage(error) || "Failed to reject invitation",
+            error.response?.data?.message || t("iam.invitationList.failedReject"),
           variant: "error",
         });
       }

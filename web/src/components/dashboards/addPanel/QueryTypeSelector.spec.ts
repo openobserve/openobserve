@@ -3,9 +3,24 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import QueryTypeSelector from "./QueryTypeSelector.vue";
 import { reactive } from "vue";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
-// Mock i18n
-const mockT = vi.fn((key: string) => key);
+// Mock i18n.
+// The component was migrated to i18n; its dialog copy now comes from
+// `dashboard.queryTypeSelector.*` keys. Resolve those from the real locale so
+// the rendered text matches assertions (e.g. the dialog title "Change Query
+// Mode"). Every other key keeps the key-echo behavior the rest of this file's
+// assertions rely on (e.g. button labels "panel.builder"/"panel.SQL").
+const getNestedMessage = (obj: any, path: string): unknown =>
+  path.split(".").reduce<any>((o, k) => (o == null ? undefined : o[k]), obj);
+
+const mockT = vi.fn((key: string) => {
+  if (key.startsWith("dashboard.queryTypeSelector.")) {
+    const value = getNestedMessage(enLocaleFull, key);
+    if (typeof value === "string") return value;
+  }
+  return key;
+});
 
 // Mock vue-i18n
 vi.mock("vue-i18n", () => ({

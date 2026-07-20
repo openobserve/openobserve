@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import en from "@/locales/languages/en.json";
+import en from "@/locales/languages/en-US.json";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
 
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: vi.fn() }));

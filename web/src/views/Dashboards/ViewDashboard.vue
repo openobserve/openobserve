@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-refresh-btn"
               icon-left="refresh"
             >
-              <OTooltip :content="isVariablesChanged ? 'Refresh to apply latest variable changes' : 'Refresh'" shortcut-id="dashboardRefresh" />
+              <OTooltip :content="isVariablesChanged ? t('dashboard.viewDashboard.refreshToApplyVariables') : t('dashboard.viewDashboard.refresh')" shortcut-id="dashboardRefresh" />
             </OButton>
 
             <ExportDashboard
@@ -462,7 +462,7 @@ export default defineComponent({
         setHomeDashboard(org, {
           dashboardId: id,
           folderId: (folderId.value as string) ?? "default",
-          label: currentDashboardData.data?.title ?? "Dashboard",
+          label: currentDashboardData.data?.title ?? t("dashboard.viewDashboard.dashboard"),
         });
       }
     };
@@ -768,7 +768,7 @@ export default defineComponent({
           !Object.keys(dashboard).length
         ) {
           showErrorNotification(
-            "Dashboard not found or has been deleted. Redirecting to dashboard list.",
+            t("dashboard.viewDashboard.dashboardNotFound"),
           );
           goBackToDashboardList();
           return;
@@ -776,7 +776,7 @@ export default defineComponent({
       } catch (error: any) {
         showErrorNotification(
           error?.message ||
-            "Failed to load dashboard. Redirecting to dashboard list.",
+            t("dashboard.viewDashboard.failedToLoadDashboard"),
         );
         goBackToDashboardList();
         return;
@@ -1638,7 +1638,7 @@ export default defineComponent({
         );
         await loadDashboard();
 
-        showPositiveNotification("Panel deleted successfully", {
+        showPositiveNotification(t("dashboard.viewDashboard.panelDeleted"), {
           timeout: 2000,
         });
       } catch (error: any) {
@@ -1646,10 +1646,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Panel deletion failed",
+              t("dashboard.viewDashboard.panelDeletionFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Panel deletion failed", {
+          showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelDeletionFailed"), {
             timeout: 2000,
           });
         }
@@ -1669,7 +1669,7 @@ export default defineComponent({
         );
         await loadDashboard();
 
-        showPositiveNotification("Panel moved successfully!", {
+        showPositiveNotification(t("dashboard.viewDashboard.panelMoved"), {
           timeout: 2000,
         });
       } catch (error: any) {
@@ -1677,10 +1677,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Panel move failed",
+              t("dashboard.viewDashboard.panelMoveFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Panel move failed", {
+          showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelMoveFailed"), {
             timeout: 2000,
           });
         }
@@ -1745,7 +1745,7 @@ export default defineComponent({
           scheduledReports.value = response.data;
         })
         .catch((error) => {
-          showErrorNotification(error?.message || "Failed to fetch reports");
+          showErrorNotification(error?.message || t("dashboard.viewDashboard.failedToFetchReports"));
           isLoadingReports.value = false;
         })
         .finally(() => {
@@ -1859,12 +1859,12 @@ export default defineComponent({
           await loadDashboard();
         } else {
           showErrorNotification(
-            "Failed to update dashboard JSON: Save method not available",
+            t("dashboard.viewDashboard.failedToUpdateJson"),
           );
         }
       } catch (error) {
         showErrorNotification(
-          error?.message || "Failed to save dashboard changes",
+          error?.message || t("dashboard.viewDashboard.failedToSaveChanges"),
         );
       } finally {
         showJsonEditorDialog.value = false;

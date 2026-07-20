@@ -201,7 +201,7 @@ const jumpTargetSublabel = computed(() => {
   const formatted = DateTime.fromMillis(lastDataUs / 1000)
     .setZone(zone)
     .toFormat("MMM d, yyyy HH:mm:ss");
-  return `Last data: ${formatted} (${zone})`;
+  return t("traces.tracesNoEventsState.lastData", { formatted, zone });
 });
 
 // --- time-range helpers (via shared composable) -----------------------------

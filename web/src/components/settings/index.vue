@@ -329,7 +329,7 @@ export default defineComponent({
         {
           key: "gen_ai_agent_mapping",
           label: t("settings.genAiAgentMapping.tabLabel"),
-          description: "Map GenAI spans to agent identifiers",
+          description: t("settings.index.genAiAgentMappingDesc"),
           icon: "smart-toy",
           to: { name: "genAiAgentMapping", query: { org_identifier: org } },
           visible: (isEnt || isCloud) && !!z.online_evals_enabled,

@@ -36,7 +36,7 @@
                   <OSelect
                     v-model="label.label"
                     :options="availableLabelOptions"
-                    label="Label"
+                    :label="t('metrics.labelFilterEditor.label')"
                     class="label-filter-label-select showLabelOnTop normal-case! mb-2"
                     searchable
                     clearable
@@ -45,8 +45,8 @@
                     <template #empty>
                       <span class="text-text-secondary px-3 py-2">{{
                         loadingLabels
-                          ? "Loading labels..."
-                          : "No labels found"
+                          ? t('metrics.labelFilterEditor.loadingLabels')
+                          : t('metrics.labelFilterEditor.noLabelsFound')
                       }}</span>
                     </template>
                   </OSelect>
@@ -55,7 +55,7 @@
                   <OSelect
                     v-model="label.op"
                     :options="operatorOptions"
-                    label="Operator"
+                    :label="t('metrics.labelFilterEditor.operator')"
                     class="label-filter-operator-select showLabelOnTop mb-2"
                     data-test="promql-operator-select"
                   />
@@ -64,7 +64,7 @@
                   <OSelect
                     v-model="label.value"
                     :options="getLabelValueOptions(label.label)"
-                    label="Value"
+                    :label="t('metrics.labelFilterEditor.value')"
                     class="label-filter-value-select showLabelOnTop"
                     :value-key="'value'"
                     :label-key="'label'"
@@ -76,8 +76,8 @@
                     <template #empty>
                       <span class="text-text-secondary px-3 py-2">{{
                         !label.label
-                          ? 'Select a label first'
-                          : 'No values found'
+                          ? t('metrics.labelFilterEditor.selectLabelFirst')
+                          : t('metrics.labelFilterEditor.noValuesFound')
                       }}</span>
                     </template>
                   </OSelect>
@@ -103,7 +103,7 @@
           data-test="promql-add-label-filter"
         >
           <OIcon name="add" size="sm" />
-          <OTooltip content="Add label filter" side="top" />
+          <OTooltip :content="t('metrics.labelFilterEditor.addLabelFilter')" side="top" />
         </OButton>
       </div>
     </div>
@@ -159,13 +159,13 @@ const operatorOptions = ["=", "!=", "=~", "!~"];
 const availableLabelOptions = computed(() => {
   const selectedLabels = props.labels.map((l) => l.label);
   return availableLabels.value.filter(
-    (label: string) => !selectedLabels.includes(label),
+    (label) => !selectedLabels.includes(label),
   );
 });
 
 const computedLabel = (label: PromqlLabelMatcher): string => {
   if (!label.label) {
-    return "Select label";
+    return t('metrics.labelFilterEditor.selectLabel');
   }
   if (!label.value) {
     return label.label;
@@ -239,4 +239,18 @@ const getLabelValueOptions = (labelKey: string) => {
   return options;
 };
 
+const getOperatorHint = (op: string): string => {
+  switch (op) {
+    case "=":
+      return t('metrics.labelFilterEditor.exactMatch');
+    case "!=":
+      return t('metrics.labelFilterEditor.notEqualTo');
+    case "=~":
+      return t('metrics.labelFilterEditor.regexPattern');
+    case "!~":
+      return t('metrics.labelFilterEditor.regexNotMatching');
+    default:
+      return "";
+  }
+};
 </script>

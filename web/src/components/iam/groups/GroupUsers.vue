@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="iam-users-selection-show-text"
             style="font-size: 14px"
           >
-            Show
+            {{ t("iam.groupUsers.show") }}
           </span>
           <OToggleGroup
             class="ml-1"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-search-input"
           v-model="userSearchKey"
           class="h-[36px] w-[200px]"
-          placeholder="Search User"
+          :placeholder="t('iam.groupUsers.searchUser')"
         />
       </div>
 
@@ -66,14 +66,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.meta_org &&
             usersDisplay == 'all'
           "
-          v-model="(selectedOrg as any)"
+          v-model="selectedOrg"
           :options="orgOptions"
           labelKey="label"
           valueKey="value"
           searchable
           class="organizationlist"
           @update:model-value="updateOrganization"
-          placeholder="Select Organization"
+          :placeholder="t('iam.groupUsers.selectOrganization')"
         />
 
         </div>
@@ -194,19 +194,29 @@ const rows: Ref<any[]> = ref([]);
 const usersDisplay = ref("selected");
 
 const store = useStore();
-const orgOptions = ref([{ label: "All", value: "all" }]);
+const { t } = useI18n();
+const orgOptions = ref([{ label: t("iam.groupUsers.all"), value: "all" }]);
 const selectedOrg = ref(orgOptions.value[0]);
+const orgList = ref([...orgOptions.value]);
 const usersDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.groupUsers.all"),
     value: "all",
   },
   {
-    label: "Selected",
+    label: t("iam.groupUsers.selected"),
     value: "selected",
   },
 ];
-const { t } = useI18n();
+const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
+  // Filter logic
+  update(() => {
+    const needle = val.toLowerCase();
+    orgList.value = orgOptions.value.filter((org) =>
+      org.label.toLowerCase().includes(needle)
+    );
+  });
+};
 
 const userSearchKey = ref("");
 
@@ -247,7 +257,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   if (store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org) {
     baseColumns.push({
       id: "organization",
-      header: "Organizations",
+      header: t("iam.groupUsers.organizations"),
       accessorKey: "org",
       sortable: true,
       resizable: true,
@@ -283,7 +293,7 @@ onBeforeMount(async () => {
     otherOrgOptions.sort((a:any, b:any) => a.label.localeCompare(b.label));
 
     // Prepend "All" option to the sorted list
-    orgOptions.value = [{ label: "All", value: "all" }, ...otherOrgOptions];
+    orgOptions.value = [{ label: t("iam.groupUsers.all"), value: "all" }, ...otherOrgOptions];
   }
   selectedOrg.value = orgOptions.value[0]; // Default to "All"
 });
@@ -337,36 +347,38 @@ const updateOrganization = () => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  const data: any = await usersState.getOrgUsers(
-    store.state.selectedOrganization.identifier , { list_all: true }
-  );
+  return new Promise(async (resolve) => {
+    const data: any = await usersState.getOrgUsers(
+      store.state.selectedOrganization.identifier , { list_all: true }
+    );
 
-  usersState.users = cloneDeep(
-    data.map((user: any, index: number) => {
-      return {
-        email: user.email,
-        "#": index + 1,
-        isInGroup: groupUsersMap.value.has(user.email),
-        org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
-        role: user.role,
-        is_external: user.is_external || false
-      };
-    })
-  );
+    usersState.users = cloneDeep(
+      data.map((user: any, index: number) => {
+        return {
+          email: user.email,
+          "#": index + 1,
+          isInGroup: groupUsersMap.value.has(user.email),
+          org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
+          role: user.role,
+          is_external: user.is_external || false
+        };
+      })
+    );
 
-  users.value = cloneDeep(usersState.users).map(
-    (user: any, index: number) => {
-      return {
-        "#": index + 1,
-        email: user.email,
-        isInGroup: groupUsersMap.value.has(user.email),
-        org: user.org,
-        role: user.role,
-        is_external: user.is_external || false
-      };
-    }
-  );
-  return true;
+    users.value = cloneDeep(usersState.users).map(
+      (user: any, index: number) => {
+        return {
+          "#": index + 1,
+          email: user.email,
+          isInGroup: groupUsersMap.value.has(user.email),
+          org: user.org,
+          role: user.role,
+          is_external: user.is_external || false
+        };
+      }
+    );
+    resolve(true);
+  });
 };
 
 const toggleUserSelection = (user: any) => {

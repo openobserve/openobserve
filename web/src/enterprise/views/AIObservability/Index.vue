@@ -97,6 +97,14 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     group: "Monitor",
   },
   {
+    key: "agentGraph",
+    label: t("aiObservability.nav.agentGraph"),
+    icon: "hub",
+    to: { name: "aiAgentGraph", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-agent-graph",
+    group: "Monitor",
+  },
+  {
     key: "quality",
     label: t("aiObservability.nav.quality"),
     icon: "star-rate",

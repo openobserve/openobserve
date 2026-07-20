@@ -197,16 +197,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-saved-views-pinned"
           class="p-0 element-box-shadow border border-button-outline-border"
         >
-          <OButton
-            data-test="logs-search-bar-saved-views-pinned-list-btn"
-            variant="ghost"
-            size="icon-toolbar"
-            @click="openSavedViewsList"
+          <!-- A real dropdown, not a modal: one click to open, one click to
+               apply. The heavyweight list dialog stays reachable via Manage. -->
+          <ODropdown
+            :open="savedViewsDropdownOpen"
+            side="bottom"
+            align="start"
+            @update:open="onSavedViewsDropdownOpenChange"
           >
-            <OIcon name="saved-search" size="sm" />
-            <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
-            <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
-          </OButton>
+            <template #trigger>
+              <OButton
+                data-test="logs-search-bar-saved-views-pinned-list-btn"
+                variant="ghost"
+                size="icon-toolbar"
+              >
+                <OIcon name="saved-search" size="sm" />
+                <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
+                <OTooltip
+                  :content="t('search.listSavedViews')"
+                  :side-offset="2"
+                />
+              </OButton>
+            </template>
+            <ODropdownGroup :label="t('search.savedViewsLabel')">
+              <div
+                v-if="searchObj.loadingSavedView"
+                class="flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary"
+              >
+                <OSpinner size="xs" />
+                {{ t("confirmDialog.loading") }}
+              </div>
+              <template v-else-if="sortedSavedViews.length">
+                <ODropdownItem
+                  v-for="view in sortedSavedViews"
+                  :key="view.view_id"
+                  :data-test="`logs-search-bar-saved-views-menu-apply-${view.view_name}`"
+                  @select="applySavedView(view)"
+                >
+                  <template #icon-left>
+                    <OIcon
+                      :name="
+                        favoriteViews.includes(view.view_id)
+                          ? 'favorite'
+                          : 'saved-search'
+                      "
+                      size="sm"
+                      :class="
+                        favoriteViews.includes(view.view_id)
+                          ? 'text-favorite'
+                          : ''
+                      "
+                    />
+                  </template>
+                  <span class="truncate max-w-56">{{ view.view_name }}</span>
+                  <template #icon-right>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      icon-left="edit"
+                      class="ms-auto"
+                      :title="t('search.updateSavedViewWithCurrent')"
+                      :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
+                      @click.stop.prevent="quickUpdateSavedView(view)"
+                    />
+                  </template>
+                </ODropdownItem>
+              </template>
+              <ODropdownItem v-else disabled>
+                {{ t("search.savedViewsNotFound") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+            <ODropdownSeparator />
+            <ODropdownItem
+              icon-left="save"
+              data-test="logs-search-bar-saved-views-menu-create"
+              @select="fnSavedView"
+            >
+              {{ t("search.createSavedView") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="settings"
+              data-test="logs-search-bar-saved-views-menu-manage"
+              @select="openSavedViewsList"
+            >
+              {{ t("search.manageSavedViews") }}
+            </ODropdownItem>
+          </ODropdown>
           <OButton
             data-test="logs-search-bar-saved-views-pinned-create-btn"
             variant="ghost"
@@ -569,7 +645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <img
                     :src="customRangeIcon"
-                    alt="Custom Range"
+                    :alt="t('logs.searchBar.customRangeAlt')"
                     class="w-4 h-4"
                   />
                 </span>
@@ -593,7 +669,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <img
                     :src="createScheduledSearchIcon"
-                    alt="Create Scheduled Search"
+                    :alt="t('logs.searchBar.createScheduledSearchAlt')"
                     class="w-4 h-4"
                   />
                 </span>
@@ -612,7 +688,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
                   <img
                     :src="listScheduledSearchIcon"
-                    alt="List Scheduled Search"
+                    :alt="t('logs.searchBar.listScheduledSearchAlt')"
                     class="w-4 h-4"
                   />
                 </span>
@@ -1714,6 +1790,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'favorite-border'
                         "
                         size="xs"
+                        :class="
+                          favoriteViews.includes(row.view_id)
+                            ? 'text-favorite'
+                            : ''
+                        "
                       />
                     </OButton>
                     <OButton
@@ -1796,7 +1877,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="handleFavoriteSavedView(row, true)"
                     >
-                      <OIcon name="favorite" size="xs" />
+                      <OIcon name="favorite" size="xs" class="text-favorite" />
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
@@ -1951,6 +2032,7 @@ import {
   makeSavedViewSchema,
   type SavedViewForm,
 } from "./SearchBar.SavedView.schema";
+import { sortSavedViews } from "./savedViewsSort";
 import {
   makeSavedFunctionSchema,
   type SavedFunctionForm,
@@ -2091,7 +2173,7 @@ export default defineComponent({
       if (this.searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
-          message: "No stream available to update save view.",
+          message: this.t('logs.searchBar.noStreamUpdateView'),
         });
         return;
       }
@@ -2117,14 +2199,14 @@ export default defineComponent({
       let initNumber = parseInt(this.downloadCustomInitialNumber);
       if (initNumber < 0) {
         toast({
-          message: "Initial number must be positive number.",
+          message: this.t('logs.searchBar.initialNumberPositive'),
           variant: "warning",
         });
         return;
       }
       if (!this.searchObj?.data?.customDownloadQueryObj?.query) {
         toast({
-          message: "Please run a query first before downloading.",
+          message: this.t('logs.searchBar.runQueryBeforeDownload'),
           variant: "warning",
         });
         return;
@@ -2149,7 +2231,7 @@ export default defineComponent({
             this.downloadLogs(res.data.hits, this.downloadCustomFileType);
           } else {
             toast({
-              message: "No data found to download.",
+              message: this.t('logs.searchBar.noDataToDownload'),
               variant: "warning",
             });
           }
@@ -2575,8 +2657,8 @@ export default defineComponent({
 
     const transformTypes = computed(() => {
       return [
-        { label: "Function", value: "function" },
-        { label: "Action", value: "action" },
+        { label: t('logs.searchBar.transformTypeFunction'), value: "function" },
+        { label: t('logs.searchBar.transformTypeAction'), value: "action" },
       ];
     });
 
@@ -2637,7 +2719,7 @@ export default defineComponent({
         ) {
           if (!checkFnQuery(searchObj.data.tempFunctionContent)) {
             toast({
-              message: "Job Context have been removed",
+              message: t('logs.searchBar.jobContextRemoved'),
               variant: "info",
             });
             searchObj.meta.jobId = "";
@@ -2653,7 +2735,7 @@ export default defineComponent({
       (val) => {
         if (val == true && searchObj.meta.jobId != "") {
           toast({
-            message: "Histogram is not available for scheduled search",
+            message: t('logs.searchBar.histogramNotAvailableScheduled'),
             variant: "info",
           });
           searchObj.meta.showHistogram = false;
@@ -2712,10 +2794,10 @@ export default defineComponent({
         searchObj.data.selectedTransform?.type === "action" &&
         searchObj.data.selectedTransform?.name
       ) {
-        return `${searchObj.data.selectedTransform?.name} action applied successfully. Run Query to see results.`;
+        return t('logs.searchBar.actionAppliedRunQuery', { name: searchObj.data.selectedTransform?.name });
       }
 
-      return "Select an action to apply";
+      return t('logs.searchBar.selectActionToApply');
     });
 
     const updateAutoComplete = (value) => {
@@ -2974,7 +3056,7 @@ export default defineComponent({
         ) {
           if (!checkQuery(value)) {
             toast({
-              message: "Job Context have been removed",
+              message: t('logs.searchBar.jobContextRemoved'),
               variant: "info",
             });
             searchObj.meta.jobId = "";
@@ -3034,7 +3116,7 @@ export default defineComponent({
           // User-visible warning so the silent rewrite isn't invisible.
           toast({
             variant: "warning",
-            message: `Selected range exceeds the ${searchObj.data.datetime.queryRangeRestrictionInHour}-hour limit. Start time was adjusted to fit.`,
+            message: t('logs.searchBar.rangeExceedsLimit', { hours: searchObj.data.datetime.queryRangeRestrictionInHour }),
           });
 
           value.startTime = newStartTime;
@@ -3165,7 +3247,7 @@ export default defineComponent({
 
       if (!data || data.length === 0) {
         toast({
-          message: "No data found to download.",
+          message: t('logs.searchBar.noDataToDownload'),
           variant: "warning",
         });
         return;
@@ -3206,7 +3288,7 @@ export default defineComponent({
         showDownloadMenu.value = false;
         toast({
           variant: "error",
-          message: "Error downloading logs",
+          message: t('logs.searchBar.errorDownloadingLogs'),
         });
       }
     };
@@ -3285,8 +3367,7 @@ export default defineComponent({
       if (content.trim() == "") {
         toast({
           variant: "warning",
-          message:
-            "The function field must contain a value and cannot be left empty.",
+          message: t('logs.searchBar.functionFieldRequired'),
         });
         return;
       }
@@ -3324,7 +3405,7 @@ export default defineComponent({
             variant: "error",
             message:
               JSON.stringify(err.response.data["message"]) ||
-              "Function creation failed",
+              t('logs.searchBar.functionCreationFailed'),
             timeout: 5000,
           });
         }
@@ -3346,7 +3427,7 @@ export default defineComponent({
         .then(() => {
           toast({
             variant: "success",
-            message: "Function updated successfully.",
+            message: t('logs.searchBar.functionUpdatedSuccess'),
           });
 
           const transformIndex = searchObj.data.transforms.findIndex(
@@ -3369,7 +3450,7 @@ export default defineComponent({
             variant: "error",
             message:
               JSON.stringify(err.response.data["message"]) ||
-              "Function updation failed",
+              t('logs.searchBar.functionUpdationFailed'),
             timeout: 5000,
           });
         });
@@ -3400,7 +3481,7 @@ export default defineComponent({
       if (flag) {
         toast({
           variant: "success",
-          message: `${fnValue.name} function applied successfully.`,
+          message: t('logs.searchBar.functionAppliedSuccess', { name: fnValue.name }),
         });
       }
 
@@ -3422,7 +3503,7 @@ export default defineComponent({
       if (content == "") {
         toast({
           variant: "error",
-          message: "No function definition found.",
+          message: t('logs.searchBar.noFunctionDefinition'),
         });
         return;
       }
@@ -3474,7 +3555,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
-          message: "No stream available to save view.",
+          message: t('logs.searchBar.noStreamSaveView'),
         });
         return;
       }
@@ -3486,6 +3567,33 @@ export default defineComponent({
     const openSavedViewsList = () => {
       loadSavedView();
       savedViewsListDialog.value = true;
+    };
+
+    // ── Saved views quick dropdown (pinned toolbar) ──────────────────────
+    // Controlled open state so a quick update can close the menu itself.
+    const savedViewsDropdownOpen = ref(false);
+    const onSavedViewsDropdownOpenChange = (open: boolean) => {
+      savedViewsDropdownOpen.value = open;
+      // Lazy-fetch the list the first time the menu opens.
+      if (open) loadSavedView();
+    };
+
+    const sortedSavedViews = computed(() =>
+      sortSavedViews(searchObj.data.savedViews, favoriteViews.value),
+    );
+
+    // One-click overwrite of a view with the current search state — no list
+    // dialog, no stacked confirm dialog.
+    const quickUpdateSavedView = (item: any) => {
+      if (searchObj.data.stream.selectedStream.length == 0) {
+        toast({
+          variant: "error",
+          message: t('logs.searchBar.noStreamUpdateView'),
+        });
+        return;
+      }
+      savedViewsDropdownOpen.value = false;
+      updateSavedViews(item.view_id, item.view_name);
     };
 
     // Common function to restore visualization data and sync to URL
@@ -3936,7 +4044,7 @@ export default defineComponent({
             updateEditorWidth();
 
             toast({
-              message: `${item.view_name} view applied successfully.`,
+              message: t('logs.searchBar.viewAppliedSuccess', { name: item.view_name }),
               variant: "success",
             });
             setTimeout(async () => {
@@ -4004,7 +4112,7 @@ export default defineComponent({
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
-            message: `Error while applying saved view.`,
+            message: t('logs.searchBar.errorApplyingSavedView'),
             variant: "error",
           });
           console.log("Error while applying saved view", err);
@@ -4133,7 +4241,7 @@ export default defineComponent({
       try {
         if (viewName.trim() == "") {
           toast({
-            message: `Please provide valid view name.`,
+            message: t('logs.searchBar.provideValidViewName'),
             variant: "warning",
           });
           return;
@@ -4186,7 +4294,7 @@ export default defineComponent({
       } catch (e: any) {
         isSavedViewAction.value = "create";
         toast({
-          message: `Error while saving view: ${e}`,
+          message: t('logs.searchBar.errorSavingView', { e }),
           variant: "error",
         });
         console.log("Error while saving view", e);
@@ -4201,7 +4309,7 @@ export default defineComponent({
         };
 
         const dismiss = toast({
-          message: "Updating saved view...",
+          message: t('logs.searchBar.updatingSavedView'),
           variant: "loading",
           timeout: 0,
         });
@@ -4246,7 +4354,7 @@ export default defineComponent({
       } catch (e: any) {
         isSavedViewAction.value = "create";
         toast({
-          message: `Error while saving view: ${e}`,
+          message: t('logs.searchBar.errorSavingView', { e }),
           variant: "error",
         });
         console.log("Error while saving view", e);
@@ -4465,7 +4573,7 @@ export default defineComponent({
       if (!flag) {
         if (favoriteViews.value.length >= 10) {
           toast({
-            message: "You can only save 10 views.",
+            message: t('logs.searchBar.maxViewsLimit'),
             variant: "warning",
           });
           return;
@@ -4478,14 +4586,14 @@ export default defineComponent({
 
         useLocalSavedView(localSavedView);
         toast({
-          message: "View added to favorites.",
+          message: t('logs.searchBar.viewAddedFavorites'),
           variant: "success",
         });
       } else {
         // alert(favoriteViews.value.length)
         // moveItemsToTop(localSavedView, favoriteViews.value);
         toast({
-          message: "View removed from favorites.",
+          message: t('logs.searchBar.viewRemovedFavorites'),
           variant: "success",
         });
       }
@@ -4842,7 +4950,7 @@ export default defineComponent({
         ) {
           toast({
             variant: "error",
-            message: "Please select a stream before scheduling a job",
+            message: t('logs.searchBar.selectStreamBeforeSchedule'),
           });
           return;
         }
@@ -4939,7 +5047,7 @@ export default defineComponent({
 
     const updateActionSelection = (item: any) => {
       toast({
-        message: `${item?.name} action applied successfully`,
+        message: t('logs.searchBar.actionAppliedSuccess', { name: item?.name }),
         variant: "success",
       });
     };
@@ -5090,6 +5198,10 @@ export default defineComponent({
       fnSavedView,
       openSavedViewsList,
       applySavedView,
+      savedViewsDropdownOpen,
+      onSavedViewsDropdownOpenChange,
+      sortedSavedViews,
+      quickUpdateSavedView,
       isSavedViewAction,
       // Saved-view OForm (schema returned from setup() so the Options-API
       // template resolves :schema; a bare import would be out of scope).
@@ -5271,10 +5383,10 @@ export default defineComponent({
       return this.searchObj.meta.showTransformEditor;
     },
     confirmMessage() {
-      return "Are you sure you want to update the function?";
+      return this.t('logs.searchBar.confirmUpdateFunction');
     },
     confirmMessageSavedView() {
-      return "Are you sure you want to update the saved view?";
+      return this.t('logs.searchBar.confirmUpdateSavedViewMsg');
     },
     resetFunction() {
       return this.searchObj.data.tempFunctionName;

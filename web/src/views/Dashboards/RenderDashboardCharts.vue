@@ -746,18 +746,24 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        showPositiveNotification("Dashboard updated successfully");
+        showPositiveNotification(
+          t("dashboard.renderDashboardCharts.dashboardUpdatedSuccessfully"),
+        );
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Dashboard update failed",
+              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Dashboard update failed", {
-            timeout: 2000,
-          });
+          showErrorNotification(
+            error?.message ??
+              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
+            {
+              timeout: 2000,
+            },
+          );
         }
 
         // refresh dashboard

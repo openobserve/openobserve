@@ -135,7 +135,7 @@
                           size="icon"
                           class="copy-btn-sql ml-2"
                           data-test="search-scheduler-copy-sql-btn"
-                          @click.stop="copyToClipboard(row.sql, { successMessage: `SQL Query ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
+                          @click.stop="copyToClipboard(row.sql, { successMessage: `${t('logs.searchSchedulersList.sqlQuery')} ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
                           <OIcon name="content-copy" size="sm" />
                         </OButton></span
@@ -173,7 +173,7 @@
                           variant="ghost"
                           size="icon"
                           class="copy-btn-function ml-2"
-                          @click.stop="copyToClipboard(row.function, { successMessage: `Function Defination ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
+                          @click.stop="copyToClipboard(row.function, { successMessage: `${t('logs.searchSchedulersList.functionDefinationCopy')} ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
                           <OIcon name="content-copy" size="sm" />
                         </OButton></span
@@ -585,41 +585,41 @@ export default defineComponent({
       let result = "";
 
       if (durationSeconds < 60) {
-        result = `${durationSeconds.toFixed(2)} seconds`;
+        result = t('logs.searchSchedulersList.durationSeconds', { n: durationSeconds.toFixed(2) });
       } else if (durationSeconds < 3600) {
         const minutes = Math.floor(durationSeconds / 60);
         const seconds = durationSeconds % 60;
-        result = `${minutes} minutes`;
+        result = t('logs.searchSchedulersList.durationMinutes', { n: minutes });
         if (seconds > 0) {
-          result += ` and ${seconds.toFixed(2)} seconds`;
+          result += t('logs.searchSchedulersList.durationAndSeconds', { n: seconds.toFixed(2) });
         }
       } else if (durationSeconds < 86400) {
         const hours = Math.floor(durationSeconds / 3600);
         const minutes = Math.floor((durationSeconds % 3600) / 60);
-        result = `${hours} hours`;
+        result = t('logs.searchSchedulersList.durationHours', { n: hours });
         if (minutes > 0) {
-          result += ` and ${minutes} minutes`;
+          result += t('logs.searchSchedulersList.durationAndMinutes', { n: minutes });
         }
       } else if (durationSeconds < 2592000) {
         const days = Math.floor(durationSeconds / 86400);
         const hours = Math.floor((durationSeconds % 86400) / 3600);
-        result = `${days} days`;
+        result = t('logs.searchSchedulersList.durationDays', { n: days });
         if (hours > 0) {
-          result += ` and ${hours} hours`;
+          result += t('logs.searchSchedulersList.durationAndHours', { n: hours });
         }
       } else if (durationSeconds < 31536000) {
         const months = Math.floor(durationSeconds / 2592000);
         const days = Math.floor((durationSeconds % 2592000) / 86400);
-        result = `${months} months`;
+        result = t('logs.searchSchedulersList.durationMonths', { n: months });
         if (days > 0) {
-          result += ` and ${days} days`;
+          result += t('logs.searchSchedulersList.durationAndDays', { n: days });
         }
       } else {
         const years = Math.floor(durationSeconds / 31536000);
         const months = Math.floor((durationSeconds % 31536000) / 2592000);
-        result = `${years} years`;
+        result = t('logs.searchSchedulersList.durationYears', { n: years });
         if (months > 0) {
-          result += ` and ${months} months`;
+          result += t('logs.searchSchedulersList.durationAndMonths', { n: months });
         }
       }
 

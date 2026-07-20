@@ -14,9 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import searchService from "@/services/search";
+import i18n from "@/locales";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // ---------------------------------------------------------------------------
 // vi.mock calls must sit at the top — Vitest hoists them before any imports

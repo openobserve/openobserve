@@ -34,7 +34,7 @@ jobs:
       - id: check
         run: |
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qE '^src/|^proto/|^\.cargo/|^Cargo\.(toml|lock)$|^build\.rs$|^rust-toolchain\.toml$'; then
+          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qE '^src/|^proto/|^\.cargo/|^Cargo\.(toml|lock)$|^build\.rs$|^rust-toolchain\.toml$|^coverage\.sh$|^\.github/workflows/unit-tests\.yml$'; then
             echo "has_backend_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_backend_changes=false" >> $GITHUB_OUTPUT
@@ -45,26 +45,13 @@ jobs:
             echo "has_ui_changes=false" >> $GITHUB_OUTPUT
           fi
 
-  backend_unit_tests:
+  backend_static_checks:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
       labels: ubicloud-standard-8
     permissions:
       contents: read
-
-    services:
-      postgres:
-        image: postgres:17.5-alpine3.22
-        env:
-          POSTGRES_PASSWORD: password
-          POSTGRES_USER: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        # Health check that verifies postgres is ready to accept connections
-        options: --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 10
-
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -76,18 +63,15 @@ jobs:
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: nextest
+
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
           shared-key: unit-tests
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: false
 
       - name: Install Protoc
-        run: |
-          bash ./.github/protoc.sh
+        run: bash ./.github/protoc.sh
 
       - name: Simulate building frontend code
         run: mkdir -p web/dist && touch web/dist/index.html
@@ -101,6 +85,56 @@ jobs:
       - name: Run clippy
         run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
 
+  backend_unit_tests_postgres:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_backend_changes == 'true'
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+    env:
+      ZO_INTERNAL_GRPC_TOKEN: fake
+      ZO_TEXT_DATA_TYPE: text
+      ZO_META_STORE: postgres
+      ZO_META_POSTGRES_DSN: postgres://postgres:password@localhost:5432/postgres
+    services:
+      postgres:
+        image: postgres:17.5-alpine3.22
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 10
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+          targets: x86_64-unknown-linux-gnu
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest,cargo-llvm-cov
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: unit-tests
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Simulate building frontend code
+        run: mkdir -p web/dist && touch web/dist/index.html
+
       - name: Wait for PostgreSQL to be ready
         run: |
           echo "Waiting for PostgreSQL to be fully ready..."
@@ -113,29 +147,85 @@ jobs:
             sleep 2
           done
 
-      - name: Run unit tests
+      - name: Run PostgreSQL unit tests
+        run: ./coverage.sh run-cov
+        env:
+          ZO_DATA_DIR: ${{ runner.temp }}/openobserve-postgres/
+
+      - name: Check PostgreSQL coverage
+        run: ./coverage.sh check
+
+  backend_unit_tests_sqlite:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_backend_changes == 'true'
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+    env:
+      ZO_INTERNAL_GRPC_TOKEN: fake
+      ZO_TEXT_DATA_TYPE: text
+      ZO_META_STORE: sqlite
+      ZO_META_POSTGRES_DSN: ""
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+          targets: x86_64-unknown-linux-gnu
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest,cargo-llvm-cov
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: unit-tests
+          save-if: false
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Simulate building frontend code
+        run: mkdir -p web/dist && touch web/dist/index.html
+
+      - name: Run SQLite unit tests
+        run: ./coverage.sh run-cov
+        env:
+          ZO_DATA_DIR: ${{ runner.temp }}/openobserve-sqlite/
+
+      - name: Check SQLite coverage
+        run: ./coverage.sh check
+
+  backend_unit_tests:
+    name: backend_unit_tests
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs:
+      - check_changes
+      - backend_static_checks
+      - backend_unit_tests_postgres
+      - backend_unit_tests_sqlite
+    if: always() && needs.check_changes.outputs.has_backend_changes == 'true'
+    steps:
+      - name: Check backend test results
         run: |
-          # required for all dbs
-          export ZO_INTERNAL_GRPC_TOKEN=fake
-          export ZO_TEXT_DATA_TYPE=text
-
-          # setup and run with postgres
-          echo "Running with postgres"
-          export ZO_META_STORE=postgres
-          export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
-          ./coverage.sh run-cov
-
-          # cleanup
-          rm -rf data ./json ./src/infra/data ./src/core/data
-
-          # Run with sqlite
-          echo "Running with sqlite"
-          export ZO_META_STORE=sqlite
-          export ZO_META_POSTGRES_DSN=""
-          ./coverage.sh run-cov
-
-          # finally check the coverage data
-          ./coverage.sh check
+          for result in \
+            "${{ needs.backend_static_checks.result }}" \
+            "${{ needs.backend_unit_tests_postgres.result }}" \
+            "${{ needs.backend_unit_tests_sqlite.result }}"; do
+            if [ "$result" != "success" ]; then
+              echo "A backend check failed or was skipped: $result"
+              exit 1
+            fi
+          done
+          echo "All backend checks completed successfully"
 
   ui_unit_tests:
     needs: [check_changes]

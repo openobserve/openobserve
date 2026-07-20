@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import MoveDashboardToAnotherFolder from "./MoveDashboardToAnotherFolder.vue";
 import { createI18n } from "vue-i18n";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock composables
 const mockUseNotifications = {
@@ -57,17 +58,7 @@ vi.mock("../../utils/zincutils", () => ({
 
 const i18n = createI18n({
   locale: "en",
-  messages: {
-    en: {
-      dashboard: {
-        currentFolderLabel: "Current Folder",
-        cancel: "Cancel",
-      },
-      common: {
-        move: "Move",
-      },
-    },
-  },
+  messages: { en: enLocaleFull },
 });
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we

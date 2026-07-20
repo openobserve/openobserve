@@ -448,7 +448,7 @@ export default defineComponent({
     const langList = [
       {
         label: "English",
-        code: "en-gb",
+        code: "en-us",
       },
       {
         label: "Türkçe",
@@ -493,6 +493,18 @@ export default defineComponent({
       {
         label: "Português",
         code: "pt",
+      },
+      {
+        label: "Русский",
+        code: "ru",
+      },
+      {
+        label: "Polski",
+        code: "pl",
+      },
+      {
+        label: "Tiếng Việt",
+        code: "vi",
       },
     ];
 

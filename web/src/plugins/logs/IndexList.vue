@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div
-      class="flex items-center gap-1"
+      class="flex items-center gap-2"
       style="max-width: 100%; overflow: hidden"
     >
       <OButton
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.data.stream.streamType &&
           searchObj.data.stream.streamType !== 'logs'
         "
-        data-test="log-search-index-list-stream-type-badge"
-        variant="ghost"
+        data-test="log-search-index-list-back-to-logs-btn"
+        variant="outline"
         size="icon-sm"
-        class="shrink-0 h-8 w-8 border border-(--o2-border) rounded p-0"
+        class="shrink-0 h-8 w-8 border border-border-default rounded p-0"
         @click="onStreamTypeChange('logs')"
       >
-        <OIcon :name="streamTypeIcon" size="sm" />
-        <OTooltip :content="streamTypeLabel + ' — ' + t('search.switchToLogs')" side="bottom" align="center" />
+        <OIcon name="swap-horiz" size="sm" />
+        <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <div class="flex-1 min-w-0">
         <OSelect
@@ -270,6 +270,8 @@ import {
   type Ref,
   watch,
   computed,
+  onBeforeMount,
+  onBeforeUnmount,
   nextTick,
   defineAsyncComponent,
 } from "vue";
@@ -284,8 +286,12 @@ import {
   formatLargeNumber,
   useLocalInterestingFields,
   generateTraceContext,
+  isStreamingEnabled,
   addSpacesToOperators,
 } from "../../utils/zincutils";
+import streamService from "../../services/stream";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -296,6 +302,7 @@ import {
   removeFieldFromWhereAST,
 } from "@/composables/useLogs/logsUtils";
 import { useSearchBar } from "@/composables/useLogs/useSearchBar";
+import { applyCollapseFilter } from "@/utils/fieldCategories";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
@@ -303,7 +310,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
@@ -311,6 +318,11 @@ import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
+interface Filter {
+  fieldName: string;
+  selectedValues: string[];
+  selectedOperator: string;
+}
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
   props: {
@@ -320,6 +332,8 @@ export default defineComponent({
     },
   },
   components: {
+    EqualIcon,
+    NotEqualIcon,
     GroupedFieldList: defineAsyncComponent(
       () => import("@/components/common/GroupedFieldList.vue"),
     ),
@@ -329,6 +343,9 @@ export default defineComponent({
     FieldExpansion: defineAsyncComponent(
       () => import("@/components/common/FieldExpansion.vue"),
     ),
+    FieldListPagination: defineAsyncComponent(
+      () => import("@/components/common/FieldListPagination.vue"),
+    ),
     GroupedFieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
     ),
@@ -336,12 +353,12 @@ export default defineComponent({
     OSelect,
     OIcon,
     OTooltip,
-    OSkeleton,
+    OSpinner,
     OEmptyState,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
-    handleStreamSelection(value: SelectModelValue) {
+    handleStreamSelection(value: string | string[] | null) {
       if (this.selectionMode === "single") {
         this.searchObj.data.stream.selectedStream = value ? [value as string] : [];
       } else {
@@ -385,7 +402,8 @@ export default defineComponent({
     const { fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField } =
       logsUtils();
 
-    const { sendSearchMessageBasedOnRequestId } = useSearchWebSocket();
+    const { fetchQueryDataWithWebSocket, sendSearchMessageBasedOnRequestId } =
+      useSearchWebSocket();
 
     const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
       useHttpStreaming();
@@ -477,29 +495,6 @@ export default defineComponent({
     const pagination = ref({
       page: 1,
       rowsPerPage: 25,
-    });
-
-    const streamTypes = [
-      { label: t("search.logs"), value: "logs", icon: "search" },
-      { label: t("search.traces"), value: "traces", icon: "account-tree" },
-      { label: t("search.metrics"), value: "metrics", icon: "bar-chart" },
-      {
-        label: t("search.enrichmentTables"),
-        value: "enrichment_tables",
-        icon: "table-view",
-      },
-    ];
-
-    const streamTypeIcon = computed(() => {
-      const current = searchObj.data.stream.streamType;
-      return (
-        streamTypes.find((t) => t.value === current)?.icon ?? "search"
-      );
-    });
-
-    const streamTypeLabel = computed(() => {
-      const current = searchObj.data.stream.streamType;
-      return streamTypes.find((t) => t.value === current)?.label ?? "";
     });
 
     const onStreamTypeChange = async (newType: string) => {
@@ -767,7 +762,7 @@ export default defineComponent({
         showUserDefinedSchemaToggle.value,
         searchObj.meta.useUserDefinedSchemas,
       ],
-      () => {
+      (isActive) => {
         showOnlyInterestingFields.value =
           searchObj.meta.useUserDefinedSchemas === "interesting_fields";
       },
@@ -873,7 +868,7 @@ export default defineComponent({
       }
 
       if (!filtered.length) {
-        return [{ name: "No matching fields found", label: true, group: "__none__" }];
+        return [{ name: t("logs.indexList.noMatchingFields"), label: true, group: "__none__" }];
       }
       return filtered;
     };
@@ -965,7 +960,7 @@ export default defineComponent({
 
     const openFilterCreator = async (
       event: any,
-      { name, ftsKey, streams }: any,
+      { name, ftsKey, isSchemaField, streams }: any,
     ) => {
       if (ftsKey && !showFtsFieldValues.value) {
         event.stopPropagation();
@@ -1100,6 +1095,14 @@ export default defineComponent({
           query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
 
+        let action_id = "";
+        if (
+          searchObj.data.transformType === "action" &&
+          searchObj.data.selectedTransform?.id
+        ) {
+          action_id = searchObj.data.selectedTransform.id;
+        }
+
         resetFieldValues(name, true);
 
         if (whereClause.trim() != "") {
@@ -1108,7 +1111,7 @@ export default defineComponent({
           if (!validationFlag) {
             fieldValues.value[name]["isLoading"] = false;
             fieldValues.value[name]["errMsg"] =
-              "Filter is not valid for selected streams.";
+              t("logs.indexList.filterNotValidForStreams");
             return;
           }
           if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
@@ -1121,6 +1124,7 @@ export default defineComponent({
           }
         }
 
+        let countTotal = streams.length;
         for (const selectedStream of streams) {
           if (streams.length > 1) {
             query_context = "select * from [INDEX_NAME]";
@@ -1200,7 +1204,7 @@ export default defineComponent({
         console.log(err);
         toast({
           variant: "error",
-          message: "Error while fetching field values",
+          message: t("logs.indexList.errorFetchingFieldValues"),
         });
       }
     };
@@ -1221,7 +1225,7 @@ export default defineComponent({
       } else {
         toast({
           variant: "error",
-          message: "Failed to generate filter expression",
+          message: t("logs.indexList.failedToGenerateFilterExpression"),
         });
       }
     };
@@ -1240,7 +1244,7 @@ export default defineComponent({
       if (!expressions.length) {
         toast({
           variant: "error",
-          message: "Failed to generate filter expressions",
+          message: t("logs.indexList.failedToGenerateFilterExpressions"),
         });
         return;
       }
@@ -1537,6 +1541,11 @@ export default defineComponent({
     };
 
     const addInterestingFieldToSelectedStreamFields = (field: any) => {
+      const defaultFields = [
+        store.state.zoConfig?.timestamp_column,
+        store.state.zoConfig?.all_fields_name,
+      ];
+
       let expandKeys = Object.keys(searchObj.data.stream.expandGroupRows);
 
       let index = 0;
@@ -1614,10 +1623,7 @@ export default defineComponent({
       return searchObj.data.stream.selectedStream.some((stream: any) => {
         store.state.zoConfig.user_defined_schemas_enabled &&
           searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
-          Object.prototype.hasOwnProperty.call(
-            stream.settings,
-            "defined_schema_fields",
-          ) &&
+          stream.settings.hasOwnProperty("defined_schema_fields") &&
           (stream.settings?.defined_schema_fields?.slice() || []) > 0;
       });
     };
@@ -1713,8 +1719,7 @@ export default defineComponent({
       if (errorCodes.includes(response.code)) {
         handleSearchError(payload, {
           content: {
-            message:
-              "WebSocket connection terminated unexpectedly. Please check your network and try again",
+            message: t("logs.indexList.websocketTerminated"),
             trace_id: payload.traceId,
             code: response.code,
             error_detail: "",
@@ -1726,11 +1731,11 @@ export default defineComponent({
       removeTraceId(payload.queryReq.fields[0], payload.traceId);
     };
 
-    const handleSearchError = (request: any, _extra?: unknown) => {
+    const handleSearchError = (request: any, err: any) => {
       if (fieldValues.value[request.queryReq?.fields[0]]) {
         fieldValues.value[request.queryReq.fields[0]].isLoading = false;
         fieldValues.value[request.queryReq.fields[0]].errMsg =
-          "Failed to fetch field values";
+          t("logs.indexList.failedToFetchFieldValues");
       }
 
       removeTraceId(request.queryReq.fields[0], request.traceId);
@@ -1854,7 +1859,7 @@ export default defineComponent({
         fieldValues.value[fieldName].isLoading = false;
       } catch (error) {
         console.error("Failed to fetch field values:", error);
-        fieldValues.value[fieldName].errMsg = "Failed to fetch field values";
+        fieldValues.value[fieldName].errMsg = t("logs.indexList.failedToFetchFieldValues");
         fieldValues.value[fieldName].isLoading = false;
       }
     };
@@ -1964,8 +1969,7 @@ export default defineComponent({
         return res;
       } catch (err) {
         console.error("Failed to fetch field values:", err);
-        fieldValues.value[name].errMsg = "Failed to fetch field values";
-        return undefined;
+        fieldValues.value[name].errMsg = t("logs.indexList.failedToFetchFieldValues");
       }
     };
 
@@ -1987,7 +1991,7 @@ export default defineComponent({
       pagination.value = newPagination;
     };
 
-    const setPage = (page: number) => {
+    const setPage = (page) => {
       pagination.value = { ...pagination.value, page };
     };
 
@@ -2009,9 +2013,6 @@ export default defineComponent({
       openFilterCreator,
       addSearchTerm,
       fieldValues,
-      streamTypes,
-      streamTypeIcon,
-      streamTypeLabel,
       onStreamTypeChange,
       "add": "add",
       "visibility-off": "visibility-off",

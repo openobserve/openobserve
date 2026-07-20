@@ -322,7 +322,7 @@ mod tests {
         // db migration steps, since it's separated out
         infra::table::migrate().await.unwrap();
         infra::init().await.unwrap();
-        openobserve::common::infra::init().await.unwrap();
+        openobserve::service::bootstrap::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();
         // init job

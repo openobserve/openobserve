@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="ml-1!"
           size="icon-toolbar"
         >
-          <img :src="functionIconUrl" alt="Function" class="size-4" />
+          <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
           <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
           <OTooltip :content="selectedFunctionTooltip" :side-offset="2" />
         </OButton>

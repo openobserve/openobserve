@@ -3009,3 +3009,65 @@ describe("Field filter isolation: values API vs search/histogram APIs", () => {
     expect(valuesSql).not.toBe(wrapper.vm.searchObj.data.query);
   });
 });
+
+describe("Back to Logs control", () => {
+  let wrapper: any;
+
+  const mountList = async () => {
+    wrapper = mount(IndexList, {
+      attachTo: "#app",
+      global: {
+        provide: { store },
+        plugins: [i18n, router],
+        stubs: {},
+      },
+    });
+    await flushPromises();
+    return wrapper;
+  };
+
+  const BTN = '[data-test="log-search-index-list-back-to-logs-btn"]';
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  it("is hidden when the stream type is logs", async () => {
+    await mountList();
+    wrapper.vm.searchObj.data.stream.streamType = "logs";
+    await nextTick();
+    expect(wrapper.find(BTN).exists()).toBe(false);
+  });
+
+  it("is shown when the stream type is a non-logs type (e.g. metrics)", async () => {
+    await mountList();
+    wrapper.vm.searchObj.data.stream.streamType = "metrics";
+    await nextTick();
+    expect(wrapper.find(BTN).exists()).toBe(true);
+  });
+
+  it("uses the switch (swap-horiz) icon, not the stream-type icon", async () => {
+    await mountList();
+    wrapper.vm.searchObj.data.stream.streamType = "metrics";
+    await nextTick();
+    // The glyph is a fixed switcher affordance regardless of stream type —
+    // assert via the OIcon `name` prop (icon renders as an inline SVG, not text).
+    const icon = wrapper
+      .find(BTN)
+      .findComponent({ name: "OIcon" });
+    expect(icon.exists()).toBe(true);
+    expect(icon.props("name")).toBe("swap-horiz");
+  });
+
+  it("switches back to logs on click (behavior preserved)", async () => {
+    await mountList();
+    wrapper.vm.searchObj.data.stream.streamType = "metrics";
+    await nextTick();
+    const spy = vi
+      .spyOn(wrapper.vm, "onStreamTypeChange")
+      .mockResolvedValue(undefined);
+    await wrapper.find(BTN).trigger("click");
+    expect(spy).toHaveBeenCalledWith("logs");
+  });
+});

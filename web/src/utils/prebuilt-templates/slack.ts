@@ -85,25 +85,26 @@ export const slackConfig: PrebuiltConfig = {
   credentialFields: [
     {
       key: 'webhookUrl',
-      label: 'Slack Webhook URL',
+      labelKey: 'alerts.prebuiltDestinations.slackWebhookUrl',
       type: 'text',
       required: true,
       hint: 'Get your webhook URL from Slack App settings',
       validator: (url: string) => {
+        const invalid = { key: 'alerts.prebuiltDestinations.invalidSlackWebhookUrl' };
         try {
           const parsed = new URL(url);
           const hostname = parsed.hostname.toLowerCase();
           return (parsed.protocol === 'https:' &&
                   (hostname === 'hooks.slack.com' || hostname.endsWith('.hooks.slack.com'))) ||
-                 'Invalid Slack webhook URL';
+                 invalid;
         } catch {
-          return 'Invalid Slack webhook URL';
+          return invalid;
         }
       }
     },
     {
       key: 'channel',
-      label: 'Channel (optional)',
+      labelKey: 'alerts.prebuiltDestinations.slackChannel',
       type: 'text',
       required: false,
       hint: 'e.g., #alerts'

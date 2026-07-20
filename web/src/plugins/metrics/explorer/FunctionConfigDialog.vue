@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="variant in variants"
         :key="variant.id"
-        class="flex grow basis-[280px] max-w-full min-w-0 cursor-pointer flex-col gap-1 rounded-md border p-2"
+        class="flex grow basis-[17.5rem] max-w-full min-w-0 cursor-pointer flex-col gap-1 rounded-md border p-2"
         :class="
           variant.id === selectedId
             ? 'border-primary-600 ring-1 ring-primary-600'
@@ -96,14 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
-          class="truncate font-mono text-[10px] text-text-secondary"
+          class="truncate font-mono text-[0.625rem] text-text-secondary"
           :title="exprOf(variant)"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >
           {{ exprOf(variant) }}
         </div>
 
-        <div class="relative h-[120px]">
+        <div class="relative h-[7.5rem]">
           <div
             v-if="previewOf(variant).status === 'error'"
             class="flex h-full flex-col items-center justify-center gap-1 text-xs text-text-secondary"
@@ -498,7 +498,7 @@ export default defineComponent({
         [variant.id]: {
           status: "error",
           results: [],
-          error: String(error || "Failed to render chart"),
+          error: String(error || t("metrics.functionConfigDialog.failedToRenderChart")),
         },
       };
     };

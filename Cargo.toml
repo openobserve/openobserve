@@ -59,6 +59,7 @@ tokio-console = ["dep:console-subscriber"]
 [profile.release]
 debug = false
 strip = true
+codegen-units = 4
 
 [profile.release-ci]
 inherits = "release"
@@ -79,7 +80,6 @@ lto = "thin"
 inherits = "release"
 debug = true
 strip = false
-codegen-units = 4
 
 # tikv-jemalloc-sys is a link-time dependency: it forces the "profiling"
 # feature on the jemalloc sys crate that jemalloc_pprof requires.
@@ -238,6 +238,7 @@ members = [
     "src/api_management",
     "src/api_query",
     "src/api_common",
+    "src/common",
     "src/core",
     "src/vrl",
     "src/search",
@@ -271,6 +272,7 @@ flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
+common = { path = "src/common" }
 openobserve-vrl = { path = "src/vrl" }
 search = { path = "src/search" }
 promql = { path = "src/promql" }

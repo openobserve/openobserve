@@ -4,11 +4,39 @@ import { ref } from "vue";
 import DashboardJsonEditor from "./DashboardJsonEditor.vue";
 
 // Mock dependencies
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: (key: string) => key,
-  }),
-}));
+// The component was migrated to i18n and now renders its validation/save
+// messages via t("dashboard.dashboardJsonEditor.*"). Resolve those keys against
+// the REAL en locale (with {param} interpolation for failedDuringJsonSave) so
+// the English-text assertions pass, while preserving the original
+// key-passthrough behavior every other test relies on (e.g. the ODrawer
+// title/label assertions that check the raw keys).
+vi.mock("vue-i18n", async () => {
+  const enLocale = (await import("@/locales/languages/en-US.json"))
+    .default as Record<string, any>;
+  const resolve = (key: string): unknown =>
+    key
+      .split(".")
+      .reduce<any>((obj, part) => (obj == null ? undefined : obj[part]), enLocale);
+
+  return {
+    useI18n: () => ({
+      t: (key: string, params?: Record<string, unknown>) => {
+        if (key.startsWith("dashboard.dashboardJsonEditor.")) {
+          const value = resolve(key);
+          if (typeof value === "string") {
+            return params
+              ? value.replace(/\{(\w+)\}/g, (_match, name) =>
+                  params[name] != null ? String(params[name]) : "",
+                )
+              : value;
+          }
+        }
+        // Preserve key-passthrough for all other keys.
+        return key;
+      },
+    }),
+  };
+});
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),

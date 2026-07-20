@@ -5,11 +5,11 @@
     v-model:open="isOpen"
     persistent
     size="lg"
-    :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'"
+    :title="isEditMode ? t('dashboard.addAnnotation.editAnnotation') : t('dashboard.addAnnotation.addAnnotation')"
     form-id="add-annotation-form"
-    :primary-button-label="annotationData.annotation_id ? 'Update' : 'Save'"
-    secondary-button-label="Cancel"
-    :neutral-button-label="annotationData.annotation_id ? 'Delete' : undefined"
+    :primary-button-label="annotationData.annotation_id ? t('dashboard.addAnnotation.update') : t('dashboard.addAnnotation.save')"
+    :secondary-button-label="t('dashboard.addAnnotation.cancel')"
+    :neutral-button-label="annotationData.annotation_id ? t('dashboard.addAnnotation.delete') : undefined"
     neutral-button-variant="destructive"
     @click:secondary="handleClose"
     @click:neutral="handleDeleteWithConfirm"
@@ -18,29 +18,29 @@
     <div class="flex flex-col">
         <OFormInput
           name="title"
-          label="Title"
+          :label="t('dashboard.addAnnotation.titleLabel')"
           required
           data-test="dashboard-add-annotation-title-input"
         />
         <OFormTextarea
           name="text"
-          label="Description"
+          :label="t('dashboard.addAnnotation.description')"
           :rows="3"
           data-test="dashboard-add-annotation-text-input"
         />
 
         <OFormSelect
             name="panels"
-            hint="If no panel is selected, annotations will be applied to all the panels of the dashboard."
+            :hint="t('dashboard.addAnnotation.panelsHint')"
             :options="groupedPanelsOptions"
             multiple
             style="min-width: 150px"
-            label="Select Panels"
+            :label="t('dashboard.addAnnotation.selectPanels')"
             class="textbox flex flex-col no-case showLabelOnTop"
             data-test="dashboard-add-annotation-panels-select"
           />
         <div class="text-xs mt-3">
-          Timestamp: {{ annotationDateString }}
+          {{ t('dashboard.addAnnotation.timestamp') }} {{ annotationDateString }}
         </div>
     </div>
     </OForm>
@@ -48,59 +48,43 @@
     <ODialog data-test="add-annotation-delete-confirm-dialog"
       v-model:open="showDeleteConfirm"
       size="xs"
-      title="Confirm Delete"
-      secondary-button-label="Cancel"
-      primary-button-label="Delete"
+      :title="t('dashboard.addAnnotation.confirmDelete')"
+      :secondary-button-label="t('dashboard.addAnnotation.cancel')"
+      :primary-button-label="t('dashboard.addAnnotation.delete')"
       primary-button-variant="destructive"
       :primary-button-loading="deleteAnnotation.isLoading.value"
       @click:secondary="showDeleteConfirm = false"
       @click:primary="deleteAnnotation.execute()"
     >
-      <p>Are you sure you want to delete this annotation?</p>
+      <p>{{ t('dashboard.addAnnotation.deleteConfirmMessage') }}</p>
     </ODialog>
   </ODialog>
 </template>
 
-<script setup lang="ts">
-import { ref, computed, watch, type PropType } from "vue";
+<script setup>
+import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import { addAnnotationSchema, type AddAnnotationForm } from "./AddAnnotation.schema";
-
-interface DashboardPanelItem {
-  id: string;
-  title: string;
-  tabName?: string;
-}
-
+import { addAnnotationSchema } from "./AddAnnotation.schema";
 const props = defineProps({
   dashboardId: { type: String, required: true },
   annotation: { type: Object, default: null, required: false },
-  panelsList: {
-    type: Array as PropType<DashboardPanelItem[]>,
-    default: () => [],
-    required: true,
-  },
+  panelsList: { type: Array, default: () => [], required: true },
 });
 
 const emit = defineEmits(["remove", "close"]);
 
-const errorMessageOf = (error: unknown): string | undefined => {
-  if (typeof error === "object" && error !== null && "message" in error) {
-    const message: unknown = error.message;
-    if (typeof message === "string") return message;
-  }
-  return undefined;
-};
-
 const store = useStore();
+const { t } = useI18n();
 const isOpen = ref(true);
 const showDeleteConfirm = ref(false);
 
@@ -125,9 +109,7 @@ const addAnnotationDefaults = computed(() => ({
   panels: annotationData.value.panels ?? [],
 }));
 
-type GroupedPanelItem = Pick<DashboardPanelItem, "id" | "title">;
-
-const groupedPanels = ref<Record<string, GroupedPanelItem[]>>({});
+const groupedPanels = ref({});
 
 const groupedPanelsOptions = computed(() =>
   Object.entries(groupedPanels.value).flatMap(([tab, panels]) => [
@@ -141,15 +123,12 @@ const groupedPanelsOptions = computed(() =>
 );
 
 const groupPanels = () => {
-  groupedPanels.value = props.panelsList.reduce(
-    (acc: Record<string, GroupedPanelItem[]>, panel) => {
-      const tabName = panel.tabName || "Unknown Tab";
-      if (!acc[tabName]) acc[tabName] = [];
-      acc[tabName].push({ id: panel.id, title: panel.title });
-      return acc;
-    },
-    {},
-  );
+  groupedPanels.value = props.panelsList.reduce((acc, panel) => {
+    const tabName = panel.tabName || t('dashboard.addAnnotation.unknownTab');
+    if (!acc[tabName]) acc[tabName] = [];
+    acc[tabName].push({ id: panel.id, title: panel.title });
+    return acc;
+  }, {});
 };
 
 watch(
@@ -201,31 +180,29 @@ const handleSave = async () => {
           panels: annotationData.value.panels,
           tags: annotationData.value.tags,
         };
-        await annotationService.update_timed_annotations(
+        const response = await annotationService.update_timed_annotations(
           organization,
           props.dashboardId,
           annotationData.value.annotation_id,
           annotationToUpdate,
         );
-      } catch (error: unknown) {
-        const message = errorMessageOf(error);
+      } catch (error) {
         showErrorNotification(
-          message ?? "Failed to update annotation: " + message,
+          error?.message ?? t('dashboard.addAnnotation.failedUpdateAnnotation', { error: error.message }),
         );
         return;
       }
     } else {
       try {
         // create annotation
-        await annotationService.create_timed_annotations(
+        const response = await annotationService.create_timed_annotations(
           organization,
           props.dashboardId,
           [annotationData.value],
         );
-      } catch (error: unknown) {
-        const message = errorMessageOf(error);
+      } catch (error) {
         showErrorNotification(
-          message ?? "Failed to create annotation: " + message,
+          error?.message ?? t('dashboard.addAnnotation.failedCreateAnnotation', { error: error.message }),
         );
         return;
       }
@@ -254,7 +231,7 @@ const confirmDelete = async () => {
 // those three back onto annotationData so handleSave (and the edit-update path)
 // reads consistent values. Plain async — OForm awaits it, and the ODialog
 // built-in primary button (form-id) auto-shows the Save spinner (no useLoading).
-const saveAnnotation = async (value: AddAnnotationForm) => {
+const saveAnnotation = async (value) => {
   if (value?.title != null) annotationData.value.title = value.title;
   annotationData.value.text = value?.text ?? "";
   annotationData.value.panels = value?.panels ?? [];

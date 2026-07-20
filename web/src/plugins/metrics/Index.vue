@@ -496,7 +496,7 @@ export default defineComponent({
           dashboardData.data.title == null ||
           dashboardData.data.title.trim() == ""
         ) {
-          errors.push("Name of Panel is required");
+          errors.push(t("metrics.index.namePanelRequired"));
         }
       }
 
@@ -505,7 +505,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("metrics.index.errorsFixTryAgain"),
         );
       }
 
@@ -593,7 +593,7 @@ export default defineComponent({
         // set errors into errorData
         errorData.errors = errors;
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("metrics.index.errorsFixTryAgain"),
         );
         return;
       } else {

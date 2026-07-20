@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             searchObj.data.stream.selectedStream.label
                           "
                           as="RouterLink"
-                          >Click here</OButton
+                          >{{ t('traces.index.clickHere') }}</OButton
                         >
                         {{ t("traces.configureFullTextSearch") }}
                       </div>
@@ -297,14 +297,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog
       v-model:open="streamChangeDialog.show"
-      title="Change stream?"
+      :title="t('traces.index.changeStreamTitle')"
       size="sm"
-      primary-button-label="Switch stream"
-      secondary-button-label="Cancel"
+      :primary-button-label="t('traces.index.switchStream')"
+      :secondary-button-label="t('traces.index.cancel')"
       @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
       @click:secondary="streamChangeDialog.show = false"
     >
-      <p>This will also update the stream in the Traces/Spans tab and reset existing query.</p>
+      <p>{{ t('traces.index.changeStreamMessage') }}</p>
     </ODialog>
   </div>
 </template>
@@ -312,6 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 // @ts-nocheck
 import {
+  defineComponent,
   ref,
   onDeactivated,
   onActivated,
@@ -321,6 +322,8 @@ import {
   defineAsyncComponent,
   watch,
 } from "vue";
+import { subtractRelativeTime } from "@/utils/date";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -334,7 +337,10 @@ import {
 import TransformService from "@/services/jstransform";
 import {
   b64EncodeUnicode,
+  verifyOrganizationStatus,
   b64DecodeUnicode,
+  formatTimeWithSuffix,
+  timestampToTimezoneDate,
   escapeSingleQuotes,
   getUUID,
   generateTraceContext,
@@ -353,6 +359,7 @@ import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import {
   applyFieldGrouping,
   buildSemanticIndex,
+  CATEGORY,
   type FieldObj,
 } from "@/utils/fieldCategories";
 import {
@@ -367,6 +374,7 @@ import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -514,7 +522,7 @@ function getQueryTransform() {
     return;
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while getting functions");
+    showErrorNotification(t("traces.index.errorGettingFunctions"));
   }
 }
 
@@ -563,8 +571,7 @@ async function getStreamList() {
         searchObj.loadingStream = false;
         toast({
           variant: "error",
-          message:
-            "Error while pulling index for selected organization" + e.message,
+          message: t("traces.index.errorPullingIndex", { message: e.message }),
         });
       })
       .finally(() => {
@@ -573,7 +580,7 @@ async function getStreamList() {
   } catch (e) {
     searchObj.loadingStream = false;
     console.error("Error while getting streams", e);
-    showErrorNotification("Error while getting streams");
+    showErrorNotification(t("traces.index.errorGettingStreams"));
   }
 }
 
@@ -638,7 +645,79 @@ function loadStreamLists() {
     }
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while loading streams");
+    showErrorNotification(t("traces.index.errorLoadingStreams"));
+  }
+}
+
+function getConsumableDateTime() {
+  try {
+    if (searchObj.data.datetime.tab == "relative") {
+      let period = "";
+      let periodValue = 0;
+      // arithmetic on weeks is not supported; convert to days.
+
+      if (
+        searchObj.data.datetime.relative.period.label.toLowerCase() == "weeks"
+      ) {
+        period = "days";
+        periodValue = searchObj.data.datetime.relative.value * 7;
+      } else {
+        period = searchObj.data.datetime.relative.period.label.toLowerCase();
+        periodValue = searchObj.data.datetime.relative.value;
+      }
+      const subtractObject = '{"' + period + '":' + periodValue + "}";
+
+      let endTimeStamp = new Date();
+      if (searchObj.data.resultGrid.currentPage > 0) {
+        endTimeStamp = searchObj.data.resultGrid.currentDateTime;
+      } else {
+        searchObj.data.resultGrid.currentDateTime = endTimeStamp;
+      }
+
+      const startTimeStamp = subtractRelativeTime(
+        endTimeStamp,
+        JSON.parse(subtractObject),
+      );
+
+      return {
+        start_time: startTimeStamp,
+        end_time: endTimeStamp,
+      };
+    } else {
+      let start, end;
+      if (
+        searchObj.data.datetime.absolute.date.from == "" &&
+        searchObj.data.datetime.absolute.startTime == ""
+      ) {
+        start = new Date();
+      } else {
+        start = new Date(
+          searchObj.data.datetime.absolute.date.from +
+            " " +
+            searchObj.data.datetime.absolute.startTime,
+        );
+      }
+      if (
+        searchObj.data.datetime.absolute.date.to == "" &&
+        searchObj.data.datetime.absolute.endTime == ""
+      ) {
+        end = new Date();
+      } else {
+        end = new Date(
+          searchObj.data.datetime.absolute.date.to +
+            " " +
+            searchObj.data.datetime.absolute.endTime,
+        );
+      }
+      const rVal = {
+        start_time: start,
+        end_time: end,
+      };
+      return rVal;
+    }
+  } catch (e) {
+    searchObj.loading = false;
+    console.error("Error while getting consumable date time");
   }
 }
 
@@ -738,9 +817,7 @@ function buildSearch() {
   } catch (e) {
     console.error("Error while constructing the search query", e);
     searchObj.loading = false;
-    showErrorNotification(
-      "An error occurred while constructing the search query.",
-    );
+    showErrorNotification(t("traces.index.errorConstructingQuery"));
   }
 }
 
@@ -794,17 +871,34 @@ function fetchTracesCount() {
           searchObj.meta.resultGrid.showPagination = count > 0;
         }
       },
-      error: () => {
+      error: (_payload: any, _err: any) => {
         console.error("Failed to fetch traces count");
         currentCountTraceId = null;
       },
-      complete: () => {
+      complete: (_payload: any) => {
         currentCountTraceId = null;
       },
-      reset: () => {},
+      reset: (_payload: any) => {},
     },
   );
 }
+
+const showTraceDetailsError = () => {
+  showErrorNotification(
+    t("traces.index.traceNotFound", {
+      traceId: router.currentRoute.value.query.trace_id,
+    }),
+  );
+  const query = cloneDeep(router.currentRoute.value.query);
+  delete query.trace_id;
+  router.push({
+    name: "traces",
+    query: {
+      ...query,
+    },
+  });
+  return;
+};
 
 const updateFieldValues = (data) => {
   const excludedFields = [
@@ -1083,7 +1177,7 @@ async function getQueryData(
           const { message, trace_id, code, error_detail } = errData ?? {};
 
           let errorMsg =
-            message || err?.message || "Error while processing request";
+            message || err?.message || t("traces.index.errorProcessingRequest");
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
@@ -1111,7 +1205,7 @@ async function getQueryData(
           currentSearchTraceId = null;
           delete tracesPartitionMap[searchTraceId];
         },
-        complete: () => {
+        complete: (_payload: any) => {
           searchObj.loading = false;
           currentSearchTraceId = null;
           delete tracesPartitionMap[searchTraceId];
@@ -1122,7 +1216,7 @@ async function getQueryData(
             .save()
             .catch((e) => console.error("[correlation:save] error:", e));
         },
-        reset: () => {
+        reset: (_payload: any) => {
           searchObj.data.queryResults = {};
           searchObj.data.sortedQueryResults = [];
         },
@@ -1131,7 +1225,7 @@ async function getQueryData(
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
-    searchObj.data.errorMsg = e?.message || "Search request failed";
+    searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
   }
 }
@@ -1175,6 +1269,18 @@ const cancelSearch = () => {
  * @param startTime - start time in microseconds
  * @param endTime - end time in microseconds
  */
+const updateNewDateTime = (startTime: number, endTime: number) => {
+  searchBarRef.value?.updateNewDateTime({
+    startTime: startTime,
+    endTime: endTime,
+  });
+  toast({
+    variant: "success",
+    message: t("traces.timeRangeUpdated"),
+    timeout: 5000,
+  });
+};
+
 async function extractFields() {
   try {
     searchObj.data.stream.selectedStreamFields = [];
@@ -1335,6 +1441,66 @@ async function extractFields() {
   } catch (e) {
     searchObj.loading = false;
     console.error("Error while extracting fields", e);
+  }
+}
+
+function updateGridColumns() {
+  try {
+    searchObj.data.resultGrid.columns = [];
+
+    searchObj.meta.resultGrid.manualRemoveFields = false;
+
+    searchObj.data.resultGrid.columns.push({
+      name: "@timestamp",
+      accessorfn: (row: any) =>
+        timestampToTimezoneDate(
+          row["trace_start_time"],
+          store.state.timezone,
+          "yyyy-MM-dd HH:mm:ss.SSS",
+        ),
+      prop: (row: any) =>
+        timestampToTimezoneDate(
+          row["trace_start_time"],
+          store.state.timezone,
+          "yyyy-MM-dd HH:mm:ss.SSS",
+        ),
+      label: "Start Time",
+      align: "left",
+      sortable: true,
+    });
+
+    searchObj.data.resultGrid.columns.push({
+      name: "operation_name",
+      field: (row: any) => row.operation_name,
+      prop: (row: any) => row.operation_name,
+      label: "Operation",
+      align: "left",
+      sortable: true,
+    });
+
+    searchObj.data.resultGrid.columns.push({
+      name: "service_name",
+      field: (row: any) => row.service_name,
+      prop: (row: any) => row.service_name,
+      label: "Service",
+      align: "left",
+      sortable: true,
+    });
+
+    searchObj.data.resultGrid.columns.push({
+      name: "duration",
+      field: (row: any) => row.duration,
+      prop: (row: any) => row.duration,
+      label: "Duration",
+      align: "left",
+      sortable: true,
+      format: (val) => formatTimeWithSuffix(val),
+    });
+
+    searchObj.loading = false;
+  } catch (e) {
+    searchObj.loading = false;
+    console.error("Error while updating grid columns");
   }
 }
 
@@ -2000,15 +2166,38 @@ const onChildStreamChangeRequest = (newStream: string) => {
   }
 };
 
+const collapseFieldList = () => {
+  if (searchObj.meta.showFields) searchObj.meta.showFields = false;
+  else searchObj.meta.showFields = true;
+};
+
 const showFields = computed(() => {
   return searchObj.meta.showFields;
+});
+const showHistogram = computed(() => {
+  return searchObj.meta.showHistogram;
+});
+const showQuery = computed(() => {
+  return searchObj.meta.showQuery;
 });
 const moveSplitter = computed(() => {
   return searchObj.config.splitterModel;
 });
+const changeStream = computed(() => {
+  return searchObj.data.stream.selectedStream;
+});
+const changeRelativeDate = computed(() => {
+  return (
+    searchObj.data.datetime.relative.value +
+    searchObj.data.datetime.relative.period.value
+  );
+});
 // const updateSelectedColumns = computed(() => {
 //   return searchObj.data.stream.selectedFields.length;
 // });
+const runQuery = computed(() => {
+  return searchObj.runQuery;
+});
 
 watch(
   () => searchObj.data.stream.selectedStream.value,

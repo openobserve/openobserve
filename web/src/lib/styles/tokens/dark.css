@@ -592,6 +592,9 @@
   --color-status-warning-bg: #402929;
   --color-status-error-text: #EB938D;
   --color-status-error-bg: #402929;
+  /* Favorite (filled heart) — lighter rose (rose-400) so it reads clearly on
+     dark surfaces without vibrating the way a saturated rose-500 would. */
+  --color-favorite: #FB7185;
   /* Log-severity colors — aligned with STATUS_COLORS_DARK in statusParser.ts */
   --o2-severity-error-color: #D95C5C;
   --o2-severity-warning-color: #D4944A;

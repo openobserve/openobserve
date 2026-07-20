@@ -630,7 +630,7 @@ export default defineComponent({
               searchObj.data.stream.selectedStream = { label: "", value: "" };
               searchObj.data.stream.selectedStreamFields = [];
               toast({
-                message: "Stream not found",
+                message: t("traces.searchBar.streamNotFound"),
                 variant: "warning",
               });
             }
@@ -890,8 +890,8 @@ export default defineComponent({
 
     // Service Graph toolbar controls
     const serviceGraphVisualizationTabs = [
-      { label: "Tree View", value: "tree" },
-      { label: "Graph View", value: "graph" },
+      { label: t("traces.treeView"), value: "tree" },
+      { label: t("traces.graphView"), value: "graph" },
     ];
 
     const serviceGraphLayoutOptions = computed(() => {

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AppPageHeader
             :title="t('storage_settings.title')"
             icon="cloud"
-            :subtitle="'Per-organization storage configuration'"
+            :subtitle="t('settings.orgStorageSettings.subtitle')"
             class="shrink-0 px-4 border-b border-border-default"
           />
 
@@ -331,12 +331,12 @@ const configTimestamps = computed(() => {
 
 const providerDefinitions = [
   {
-    label: "AWS Credentials",
+    label: t("settings.orgStorageSettings.awsCredentials"),
     value: "AwsCredentials",
     image: getImageURL("images/org_storage/aws_plain_without_bg.png"),
   },
   {
-    label: "Azure Credentials",
+    label: t("settings.orgStorageSettings.azureCredentials"),
     value: "AzureCredentials",
     image: getImageURL("images/org_storage/azure.png"),
   },
@@ -346,7 +346,7 @@ const providerDefinitions = [
   //   image: getImageURL("images/org_storage/gcp.png"),
   // },
   {
-    label: "AWS Role ARN",
+    label: t("settings.orgStorageSettings.awsRoleArn"),
     value: "AwsRoleArn",
     image: getImageURL("images/org_storage/aws_iam.png"),
   },
