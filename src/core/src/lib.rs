@@ -175,9 +175,10 @@ pub mod common {
         pub mod config {
             pub use ::common::infra::config::*;
             pub use common::short_url::SHORT_URLS;
+            pub use openobserve_alerts::REALTIME_ALERT_TRIGGERS;
             pub use openobserve_dashboards::DASHBOARD_ID_TO_ORG;
 
-            pub use crate::service::cache::{REALTIME_ALERT_TRIGGERS, STREAM_EXECUTABLE_PIPELINES};
+            pub use crate::service::cache::STREAM_EXECUTABLE_PIPELINES;
         }
 
         #[cfg(feature = "enterprise")]

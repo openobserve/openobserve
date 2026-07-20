@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::{
+    meta::{authz::Authz, organization::DEFAULT_ORG},
+    utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
+};
 use config::meta::destinations::{Template, TemplateType};
 // The "is this a system-managed template?" check lives next to
 // `get_prebuilt_template` in `config::prebuilt_loader` so the HTTP model, the
@@ -21,13 +25,7 @@ use config::meta::destinations::{Template, TemplateType};
 // callers in this module keep working without a long path.
 pub use config::prebuilt_loader::is_prebuilt_template_name;
 
-use crate::{
-    common::{
-        meta::{authz::Authz, organization::DEFAULT_ORG},
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
-    service::db::{self, alerts::templates::TemplateError},
-};
+use crate::repository::{self, templates::TemplateError};
 
 pub async fn save(
     name: &str,
@@ -68,7 +66,7 @@ pub async fn save(
         }
     }
 
-    match db::alerts::templates::get(&template.org_id, &template.name).await {
+    match repository::templates::get(&template.org_id, &template.name).await {
         Ok(existing) => {
             if create {
                 return Err(TemplateError::AlreadyExists);
@@ -84,7 +82,7 @@ pub async fn save(
     }
 
     template.is_default = template.org_id.eq(DEFAULT_ORG);
-    let saved = db::alerts::templates::set(template).await?;
+    let saved = repository::templates::set(template).await?;
     if name.is_empty() {
         set_ownership(&saved.name, "templates", Authz::new(&saved.name)).await;
     }
@@ -92,14 +90,14 @@ pub async fn save(
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
-    db::alerts::templates::get(org_id, name).await
+    repository::templates::get(org_id, name).await
 }
 
 pub async fn list(
     org_id: &str,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Template>, TemplateError> {
-    Ok(db::alerts::templates::list(org_id)
+    Ok(repository::templates::list(org_id)
         .await?
         .into_iter()
         .filter(|template| {
@@ -120,7 +118,7 @@ pub async fn delete(org_id: &str, name: &str, is_root: bool) -> Result<(), Templ
     if !is_root && is_prebuilt_template_name(name) {
         return Err(TemplateError::PrebuiltReadOnly(name.to_string()));
     }
-    db::alerts::templates::delete(org_id, name).await?;
+    repository::templates::delete(org_id, name).await?;
     remove_ownership(org_id, "templates", Authz::new(name)).await;
     Ok(())
 }
@@ -158,7 +156,7 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
             template.org_id = DEFAULT_ORG.to_string();
 
             // Check if template already exists
-            match db::alerts::templates::get(DEFAULT_ORG, &template.name).await {
+            match repository::templates::get(DEFAULT_ORG, &template.name).await {
                 Ok(existing) => {
                     // System templates are protected from user edits, so the
                     // prebuilt definition is the source of truth. Refresh the
@@ -169,7 +167,7 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
                     {
                         // Preserve the stored id so this is an update, not an insert.
                         template.id = existing.id;
-                        match db::alerts::templates::set(template.clone()).await {
+                        match repository::templates::set(template.clone()).await {
                             Ok(_) => {
                                 updated_count += 1;
                                 log::info!(
@@ -197,7 +195,7 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
                 }
                 Err(TemplateError::NotFound) => {
                     // Template doesn't exist, create it
-                    match db::alerts::templates::set(template.clone()).await {
+                    match repository::templates::set(template.clone()).await {
                         Ok(_) => {
                             created_count += 1;
                             log::info!(

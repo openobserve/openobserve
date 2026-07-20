@@ -20,8 +20,10 @@ use tokio::{
     time,
 };
 
-use super::handlers::handle_triggers;
-use crate::service::db::scheduler::{Trigger, TriggerModule, pull as scheduler_pull};
+use crate::service::{
+    alerts::scheduler::handlers::handle_triggers,
+    db::scheduler::{Trigger, TriggerModule, pull as scheduler_pull},
+};
 
 #[derive(Debug, Clone)]
 pub struct ScheduledJob {
@@ -53,6 +55,7 @@ pub struct ModuleSchedulerConfig {
 
 /// Scheduler worker for processing triggers
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct SchedulerWorker {
     pub id: usize,
     /// Module this worker's lane serves. `None` = shared/legacy pool (all modules).
@@ -78,6 +81,7 @@ struct SchedulerLane {
 }
 
 /// Main scheduler that coordinates workers and the job puller
+#[allow(dead_code)]
 pub struct Scheduler {
     pub config: SchedulerConfig,
     /// Flattened union of every lane's workers (kept for introspection/tests).

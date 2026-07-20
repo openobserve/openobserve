@@ -13,23 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use async_trait::async_trait;
+use common::{
+    infra::config::ALERTS,
+    meta::authz::Authz,
+    utils::{
+        auth::{is_ofga_unsupported, remove_ownership, set_ownership},
+        ssrf_guard::SsrfGuard,
+    },
+};
 use config::{
     get_config,
     meta::destinations::{Destination, DestinationType, Email, Module, Template},
 };
 
-use crate::{
-    common::{
-        infra::config::ALERTS,
-        meta::authz::Authz,
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
-    service::db::{
-        self,
-        alerts::{destinations::DestinationError, templates::TemplateError},
-        user,
-    },
-};
+use crate::repository::{self, destinations::DestinationError, templates::TemplateError};
+
+#[async_trait]
+pub trait DestinationReferences: Send + Sync {
+    async fn user_exists(&self, org_id: &str, email: &str) -> bool;
+
+    async fn pipeline_using_destination(&self, org_id: &str, name: &str) -> Option<String>;
+
+    async fn send_test_email(
+        &self,
+        subject: &str,
+        email: &Email,
+        body: String,
+    ) -> Result<String, String>;
+}
 
 /// Helper function to ensure a prebuilt template exists for the given type.
 /// Returns the template name if successful.
@@ -44,7 +56,7 @@ async fn ensure_prebuilt_template(
     let template_name = format!("prebuilt_{}", prebuilt_type);
 
     // CRITICAL: Check if template already exists (avoid duplicates)
-    match db::alerts::templates::get(org_id, &template_name).await {
+    match repository::templates::get(org_id, &template_name).await {
         Ok(_existing_template) => {
             // Template exists, reuse it
             log::info!(
@@ -78,7 +90,7 @@ async fn ensure_prebuilt_template(
             // Save to database
             // Note: With unique constraint on (org, name), concurrent creates will fail
             // gracefully with a database constraint violation
-            match db::alerts::templates::set(template_def).await {
+            match repository::templates::set(template_def).await {
                 Ok(_) => {}
                 Err(e) => {
                     let error_msg = e.to_string();
@@ -128,10 +140,11 @@ async fn ensure_prebuilt_template(
     }
 }
 
-pub async fn save(
+pub async fn save_with_references(
     name: &str,
     mut destination: Destination,
     create: bool,
+    references: &dyn DestinationReferences,
 ) -> Result<Destination, DestinationError> {
     // First validate the `destination` according to its `destination_type`
     match &mut destination.module {
@@ -149,8 +162,7 @@ pub async fn save(
                 for email in email.recipients.iter() {
                     let email = email.trim().to_lowercase();
                     // Check if the email is part of the org
-                    let res = user::get(Some(&destination.org_id), &email).await;
-                    if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
+                    if !references.user_exists(&destination.org_id, &email).await {
                         return Err(DestinationError::UserNotPermitted);
                     }
                     lowercase_emails.push(email);
@@ -164,12 +176,7 @@ pub async fn save(
                 // SSRF protection: validate the URL (incl. DNS resolution) before
                 // persisting so the alert fire path can't be tricked into reading
                 // internal services via a destination saved with a malicious URL.
-                if let Err(e) =
-                    crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
-                        &endpoint.url,
-                    )
-                    .await
-                {
+                if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
                     return Err(DestinationError::SsrfBlocked(e));
                 }
             }
@@ -183,12 +190,7 @@ pub async fn save(
             if endpoint.url.is_empty() {
                 return Err(DestinationError::EmptyUrl);
             }
-            if let Err(e) =
-                crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
-                    &endpoint.url,
-                )
-                .await
-            {
+            if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
                 return Err(DestinationError::SsrfBlocked(e));
             }
         }
@@ -205,7 +207,7 @@ pub async fn save(
         return Err(DestinationError::InvalidName);
     }
 
-    match db::alerts::destinations::get(&destination.org_id, &destination.name).await {
+    match repository::destinations::get(&destination.org_id, &destination.name).await {
         Ok(_) => {
             if create {
                 return Err(DestinationError::AlreadyExists);
@@ -272,7 +274,7 @@ pub async fn save(
         return Err(DestinationError::TemplateNotFound);
     }
 
-    let saved = db::alerts::destinations::set(destination).await?;
+    let saved = repository::destinations::set(destination).await?;
     if name.is_empty() {
         set_ownership(&saved.org_id, "destinations", Authz::new(&saved.name)).await;
     }
@@ -285,10 +287,11 @@ pub async fn save(
 /// 2. Validates recipients are not empty
 /// 3. Validates each recipient is a user in the org
 /// 4. Sends a test email via the shared send_email_notification function
-pub async fn test_email(
+pub async fn test_email_with_references(
     org_id: &str,
     recipients: &[String],
     body: Option<&str>,
+    references: &dyn DestinationReferences,
 ) -> Result<String, DestinationError> {
     if !get_config().smtp.smtp_enabled {
         return Err(DestinationError::SMTPUnavailable);
@@ -302,8 +305,7 @@ pub async fn test_email(
     let mut validated_recipients = Vec::with_capacity(recipients.len());
     for email in recipients {
         let email = email.trim().to_lowercase();
-        let res = user::get(Some(org_id), &email).await;
-        if res.is_err() || res.is_ok_and(|usr| usr.is_none()) {
+        if !references.user_exists(org_id, &email).await {
             return Err(DestinationError::UserNotPermitted);
         }
         validated_recipients.push(email);
@@ -319,17 +321,14 @@ pub async fn test_email(
         recipients: validated_recipients,
     };
 
-    super::alert::send_email_notification(
-        "OpenObserve - Test Email Destination",
-        &email,
-        email_body,
-    )
-    .await
-    .map_err(|e| DestinationError::EmailSendFailed(e.to_string()))
+    references
+        .send_test_email("OpenObserve - Test Email Destination", &email, email_body)
+        .await
+        .map_err(DestinationError::EmailSendFailed)
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {
-    db::alerts::destinations::get(org_id, name).await
+    repository::destinations::get(org_id, name).await
 }
 
 /// Gets a destination with its optional template.
@@ -341,7 +340,7 @@ pub async fn get_with_template(
     let dest = get(org_id, name).await?;
     if let Module::Alert { template, .. } = &dest.module {
         if let Some(template_name) = template {
-            let template = db::alerts::templates::get(org_id, template_name)
+            let template = repository::templates::get(org_id, template_name)
                 .await
                 .map_err(|_| DestinationError::TemplateNotFound)?;
             Ok((dest, Some(template)))
@@ -360,7 +359,7 @@ pub async fn list(
     module: Option<&str>,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Destination>, DestinationError> {
-    Ok(db::alerts::destinations::list(org_id, module)
+    Ok(repository::destinations::list(org_id, module)
         .await?
         .into_iter()
         .filter(|dest| {
@@ -377,7 +376,11 @@ pub async fn list(
         .collect())
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
+pub async fn delete_with_references(
+    org_id: &str,
+    name: &str,
+    references: &dyn DestinationReferences,
+) -> Result<(), DestinationError> {
     let cacher = ALERTS.read().await;
     for (stream_key, (_, alert)) in cacher.iter() {
         if stream_key.starts_with(&format!("{org_id}/"))
@@ -388,15 +391,11 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
     }
     drop(cacher);
 
-    if let Ok(pls) = db::pipeline::list_by_org(org_id).await {
-        for pl in pls {
-            if pl.contains_remote_destination(name) {
-                return Err(DestinationError::UsedByPipeline(pl.name));
-            }
-        }
+    if let Some(pipeline_name) = references.pipeline_using_destination(org_id, name).await {
+        return Err(DestinationError::UsedByPipeline(pipeline_name));
     }
 
-    db::alerts::destinations::delete(org_id, name).await?;
+    repository::destinations::delete(org_id, name).await?;
     remove_ownership(org_id, "destinations", Authz::new(name)).await;
     Ok(())
 }
@@ -407,6 +406,36 @@ mod tests {
 
     use super::*;
 
+    struct TestReferences;
+
+    #[async_trait]
+    impl DestinationReferences for TestReferences {
+        async fn user_exists(&self, _org_id: &str, _email: &str) -> bool {
+            true
+        }
+
+        async fn pipeline_using_destination(&self, _org_id: &str, _name: &str) -> Option<String> {
+            None
+        }
+
+        async fn send_test_email(
+            &self,
+            _subject: &str,
+            _email: &Email,
+            _body: String,
+        ) -> Result<String, String> {
+            Ok(String::new())
+        }
+    }
+
+    async fn save(
+        name: &str,
+        destination: Destination,
+        create: bool,
+    ) -> Result<Destination, DestinationError> {
+        save_with_references(name, destination, create, &TestReferences).await
+    }
+
     /// Test that ensure_prebuilt_template creates a new template when it doesn't exist
     #[tokio::test]
     #[ignore] // Test requires full infrastructure (NATS/DB)
@@ -415,7 +444,7 @@ mod tests {
         let prebuilt_type = "slack";
 
         // Clean up any existing template
-        let _ = db::alerts::templates::delete(org_id, &format!("prebuilt_{}", prebuilt_type)).await;
+        let _ = repository::templates::delete(org_id, &format!("prebuilt_{}", prebuilt_type)).await;
 
         // Ensure template - should create new one
         let result = ensure_prebuilt_template(org_id, prebuilt_type).await;
@@ -429,11 +458,11 @@ mod tests {
         assert_eq!(template_name, "prebuilt_slack");
 
         // Verify template was created in database
-        let template = db::alerts::templates::get(org_id, &template_name).await;
+        let template = repository::templates::get(org_id, &template_name).await;
         assert!(template.is_ok(), "Template should exist in database");
 
         // Clean up
-        let _ = db::alerts::templates::delete(org_id, &template_name).await;
+        let _ = repository::templates::delete(org_id, &template_name).await;
     }
 
     /// Test that ensure_prebuilt_template reuses existing template
@@ -445,7 +474,7 @@ mod tests {
         let template_name = format!("prebuilt_{}", prebuilt_type);
 
         // Clean up
-        let _ = db::alerts::templates::delete(org_id, &template_name).await;
+        let _ = repository::templates::delete(org_id, &template_name).await;
 
         // Create template first time
         let result1 = ensure_prebuilt_template(org_id, prebuilt_type).await;
@@ -456,7 +485,7 @@ mod tests {
         );
 
         // Get template ID to verify it's the same one later
-        let template1 = db::alerts::templates::get(org_id, &template_name)
+        let template1 = repository::templates::get(org_id, &template_name)
             .await
             .unwrap();
 
@@ -470,14 +499,14 @@ mod tests {
         assert_eq!(result2.unwrap(), template_name);
 
         // Verify it's the same template (not recreated)
-        let template2 = db::alerts::templates::get(org_id, &template_name)
+        let template2 = repository::templates::get(org_id, &template_name)
             .await
             .unwrap();
         assert_eq!(template1.name, template2.name);
         assert_eq!(template1.body, template2.body);
 
         // Clean up
-        let _ = db::alerts::templates::delete(org_id, &template_name).await;
+        let _ = repository::templates::delete(org_id, &template_name).await;
     }
 
     /// Test that multiple destinations of same type share one template
@@ -487,9 +516,9 @@ mod tests {
         let org_id = "test_org_share";
 
         // Clean up
-        let _ = db::alerts::destinations::delete(org_id, "slack_dest_1").await;
-        let _ = db::alerts::destinations::delete(org_id, "slack_dest_2").await;
-        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+        let _ = repository::destinations::delete(org_id, "slack_dest_1").await;
+        let _ = repository::destinations::delete(org_id, "slack_dest_2").await;
+        let _ = repository::templates::delete(org_id, "prebuilt_slack").await;
 
         // Create first Slack destination
         let dest1 = Destination {
@@ -515,7 +544,7 @@ mod tests {
         );
 
         // Verify template was created
-        let template_check1 = db::alerts::templates::get(org_id, "prebuilt_slack").await;
+        let template_check1 = repository::templates::get(org_id, "prebuilt_slack").await;
         assert!(
             template_check1.is_ok(),
             "Template should be created after first destination"
@@ -566,7 +595,7 @@ mod tests {
         }
 
         // Verify only ONE template exists
-        let templates = db::alerts::templates::list(org_id).await.unwrap();
+        let templates = repository::templates::list(org_id).await.unwrap();
         let slack_templates: Vec<_> = templates
             .iter()
             .filter(|t| t.name == "prebuilt_slack")
@@ -578,9 +607,9 @@ mod tests {
         );
 
         // Clean up
-        let _ = db::alerts::destinations::delete(org_id, "slack_dest_1").await;
-        let _ = db::alerts::destinations::delete(org_id, "slack_dest_2").await;
-        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+        let _ = repository::destinations::delete(org_id, "slack_dest_1").await;
+        let _ = repository::destinations::delete(org_id, "slack_dest_2").await;
+        let _ = repository::templates::delete(org_id, "prebuilt_slack").await;
     }
 
     /// Test that template is auto-recreated if manually deleted
@@ -590,8 +619,8 @@ mod tests {
         let org_id = "test_org_recreate";
 
         // Clean up
-        let _ = db::alerts::destinations::delete(org_id, "slack_dest_recreate").await;
-        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+        let _ = repository::destinations::delete(org_id, "slack_dest_recreate").await;
+        let _ = repository::templates::delete(org_id, "prebuilt_slack").await;
 
         // Create first destination (creates template)
         let dest1 = Destination {
@@ -613,17 +642,17 @@ mod tests {
 
         // Verify template exists
         assert!(
-            db::alerts::templates::get(org_id, "prebuilt_slack")
+            repository::templates::get(org_id, "prebuilt_slack")
                 .await
                 .is_ok()
         );
 
         // Force delete the template (simulating manual deletion)
-        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+        let _ = repository::templates::delete(org_id, "prebuilt_slack").await;
 
         // Verify template is gone
         assert!(
-            db::alerts::templates::get(org_id, "prebuilt_slack")
+            repository::templates::get(org_id, "prebuilt_slack")
                 .await
                 .is_err()
         );
@@ -653,16 +682,16 @@ mod tests {
 
         // Verify template was recreated
         assert!(
-            db::alerts::templates::get(org_id, "prebuilt_slack")
+            repository::templates::get(org_id, "prebuilt_slack")
                 .await
                 .is_ok(),
             "Template should be recreated"
         );
 
         // Clean up
-        let _ = db::alerts::destinations::delete(org_id, "slack_dest_recreate").await;
-        let _ = db::alerts::destinations::delete(org_id, "slack_dest_recreate2").await;
-        let _ = db::alerts::templates::delete(org_id, "prebuilt_slack").await;
+        let _ = repository::destinations::delete(org_id, "slack_dest_recreate").await;
+        let _ = repository::destinations::delete(org_id, "slack_dest_recreate2").await;
+        let _ = repository::templates::delete(org_id, "prebuilt_slack").await;
     }
 
     /// Test that custom destination type is skipped from auto-template
@@ -672,7 +701,7 @@ mod tests {
         let org_id = "test_org_custom";
 
         // Clean up
-        let _ = db::alerts::destinations::delete(org_id, "custom_webhook").await;
+        let _ = repository::destinations::delete(org_id, "custom_webhook").await;
 
         // Create custom destination with "custom" type
         let dest = Destination {
@@ -693,14 +722,14 @@ mod tests {
         let _ = save("custom_webhook", dest.clone(), true).await;
 
         // Verify no "prebuilt_custom" template was created
-        let template_check = db::alerts::templates::get(org_id, "prebuilt_custom").await;
+        let template_check = repository::templates::get(org_id, "prebuilt_custom").await;
         assert!(
             template_check.is_err(),
             "Should not create prebuilt template for 'custom' type"
         );
 
         // Clean up
-        let _ = db::alerts::destinations::delete(org_id, "custom_webhook").await;
+        let _ = repository::destinations::delete(org_id, "custom_webhook").await;
     }
 
     /// Test that alert destinations cannot be created without a template
@@ -709,8 +738,8 @@ mod tests {
         let org_id = "test_org_no_template";
 
         // Clean up any leftover state
-        let _ = db::alerts::destinations::delete(org_id, "test_no_template").await;
-        let _ = db::alerts::destinations::delete(org_id, "test_empty_template").await;
+        let _ = repository::destinations::delete(org_id, "test_no_template").await;
+        let _ = repository::destinations::delete(org_id, "test_empty_template").await;
 
         // Try to create an alert destination without a template
         let dest = Destination {

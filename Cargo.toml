@@ -234,6 +234,7 @@ rcgen.workspace = true
 
 [workspace]
 members = [
+    "src/alerts",
     "src/api",
     "src/api_management",
     "src/api_query",
@@ -253,6 +254,7 @@ members = [
     "src/jobs",
     "src/config",
     "src/infra",
+    "src/pipeline",
     "src/ingester",
     "src/wal",
     "src/proto",
@@ -279,6 +281,8 @@ flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
+openobserve-alerts = { path = "src/alerts" }
+openobserve-pipeline = { path = "src/pipeline" }
 openobserve-scheduler = { path = "src/scheduler" }
 openobserve-self-reporting = { path = "src/self_reporting" }
 openobserve-catalog = { path = "src/catalog" }

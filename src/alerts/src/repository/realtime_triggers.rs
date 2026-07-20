@@ -16,8 +16,10 @@
 use std::sync::Arc;
 
 use config::utils::json;
+use infra::db;
+use openobserve_scheduler as scheduler;
 
-use crate::{common::infra::config::REALTIME_ALERT_TRIGGERS, service::db};
+use crate::{REALTIME_ALERT_TRIGGERS, repository};
 
 // Parses the item key from the event key and extracts org_id and module_key
 fn parse_item_key(key_prefix: &str, event_key: &str) -> (String, String, String) {
@@ -46,7 +48,7 @@ async fn handle_format_conversion(
             let alert_name = parts[2];
 
             let alert =
-                db::alerts::alert::get_by_name(org_id, stream_type.into(), stream_name, alert_name)
+                repository::alert::get_by_name(org_id, stream_type.into(), stream_name, alert_name)
                     .await?;
             if let Some(alert) = alert
                 && let Some(id) = alert.id
@@ -67,8 +69,8 @@ async fn handle_format_conversion(
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = format!(
         "{}{}/",
-        db::scheduler::TRIGGERS_KEY,
-        db::scheduler::TriggerModule::Alert
+        scheduler::TRIGGERS_KEY,
+        scheduler::TriggerModule::Alert
     );
     let cluster_coordinator = db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(&key).await?;
@@ -101,7 +103,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 item_key = updated_item_key;
 
                 // Get or parse the trigger value
-                let item_value: db::scheduler::Trigger = if let Some(val) = &ev.value
+                let item_value: scheduler::Trigger = if let Some(val) = &ev.value
                     && !val.is_empty()
                 {
                     match json::from_slice(val) {
@@ -112,7 +114,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     }
                 } else {
-                    match db::scheduler::get(
+                    match scheduler::get(
                         &org_id,
                         config::meta::triggers::TriggerModule::Alert,
                         &alert_id,
@@ -158,7 +160,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    let triggers = db::scheduler::list(Some(db::scheduler::TriggerModule::Alert)).await?;
+    let triggers = scheduler::list(Some(scheduler::TriggerModule::Alert)).await?;
     let mut cache = REALTIME_ALERT_TRIGGERS.write().await;
     for trigger in triggers {
         if trigger.is_realtime {

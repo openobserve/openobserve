@@ -6571,6 +6571,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-alerts"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "common",
+ "config",
+ "infra",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "openobserve-scheduler",
+ "sea-orm",
+ "serde_json",
+ "svix-ksuid",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "openobserve-api"
 version = "0.1.0"
 dependencies = [
@@ -6801,9 +6823,11 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "object_store",
+ "openobserve-alerts",
  "openobserve-catalog",
  "openobserve-compactor",
  "openobserve-dashboards",
+ "openobserve-pipeline",
  "openobserve-reports",
  "openobserve-scheduler",
  "openobserve-search-service",
@@ -6904,6 +6928,23 @@ dependencies = [
  "tokio",
  "tonic",
  "wal",
+]
+
+[[package]]
+name = "openobserve-pipeline"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "common",
+ "config",
+ "infra",
+ "proto",
+ "sea-orm",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]

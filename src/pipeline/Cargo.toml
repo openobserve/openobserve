@@ -1,0 +1,29 @@
+[package]
+name = "openobserve-pipeline"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = ["config/enterprise"]
+cloud = ["enterprise", "common/cloud"]
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+axum.workspace = true
+common.workspace = true
+config.workspace = true
+infra.workspace = true
+proto.workspace = true
+sea-orm.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

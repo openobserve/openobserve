@@ -46,17 +46,100 @@ use crate::service::{
 pub mod alert;
 pub mod backfill;
 #[cfg(feature = "enterprise")]
-pub mod deduplication;
+pub mod deduplication {
+    pub use openobserve_alerts::service::deduplication::*;
+}
 pub mod derived_streams;
-pub mod destinations;
+pub mod destinations {
+    use async_trait::async_trait;
+    use config::meta::destinations::{Destination, Email};
+    pub use openobserve_alerts::service::destinations::*;
+
+    struct CoreDestinationReferences;
+
+    #[async_trait]
+    impl openobserve_alerts::service::destinations::DestinationReferences
+        for CoreDestinationReferences
+    {
+        async fn user_exists(&self, org_id: &str, email: &str) -> bool {
+            crate::db::user::get(Some(org_id), email)
+                .await
+                .is_ok_and(|user| user.is_some())
+        }
+
+        async fn pipeline_using_destination(&self, org_id: &str, name: &str) -> Option<String> {
+            crate::db::pipeline::list_by_org(org_id)
+                .await
+                .ok()?
+                .into_iter()
+                .find(|pipeline| pipeline.contains_remote_destination(name))
+                .map(|pipeline| pipeline.name)
+        }
+
+        async fn send_test_email(
+            &self,
+            subject: &str,
+            email: &Email,
+            body: String,
+        ) -> Result<String, String> {
+            super::alert::send_email_notification(subject, email, body)
+                .await
+                .map_err(|error| error.to_string())
+        }
+    }
+
+    pub async fn save(
+        name: &str,
+        destination: Destination,
+        create: bool,
+    ) -> Result<Destination, openobserve_alerts::repository::destinations::DestinationError> {
+        openobserve_alerts::service::destinations::save_with_references(
+            name,
+            destination,
+            create,
+            &CoreDestinationReferences,
+        )
+        .await
+    }
+
+    pub async fn test_email(
+        org_id: &str,
+        recipients: &[String],
+        body: Option<&str>,
+    ) -> Result<String, openobserve_alerts::repository::destinations::DestinationError> {
+        openobserve_alerts::service::destinations::test_email_with_references(
+            org_id,
+            recipients,
+            body,
+            &CoreDestinationReferences,
+        )
+        .await
+    }
+
+    pub async fn delete(
+        org_id: &str,
+        name: &str,
+    ) -> Result<(), openobserve_alerts::repository::destinations::DestinationError> {
+        openobserve_alerts::service::destinations::delete_with_references(
+            org_id,
+            name,
+            &CoreDestinationReferences,
+        )
+        .await
+    }
+}
 #[cfg(feature = "enterprise")]
 pub mod grouping;
 #[cfg(feature = "enterprise")]
 pub mod incidents;
 #[cfg(feature = "enterprise")]
-pub mod org_config;
+pub mod org_config {
+    pub use openobserve_alerts::service::org_config::*;
+}
 pub mod scheduler;
-pub mod templates;
+pub mod templates {
+    pub use openobserve_alerts::service::templates::*;
+}
 
 #[async_trait]
 pub trait QueryConditionExt: Sync + Send + 'static {

@@ -27,14 +27,7 @@ use crate::service::{
 };
 use crate::{
     common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-    service::{
-        alerts::alert::AlertError,
-        db::{
-            alerts::{destinations::DestinationError, templates::TemplateError},
-            pipeline::PipelineError,
-        },
-        folders::FolderError,
-    },
+    service::{alerts::alert::AlertError, folders::FolderError},
 };
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
@@ -143,37 +136,6 @@ impl From<AlertError> for Response {
     }
 }
 
-impl From<DestinationError> for Response {
-    fn from(value: DestinationError) -> Self {
-        match &value {
-            DestinationError::UsedByAlert(_) | DestinationError::UsedByPipeline(_) => {
-                MetaHttpResponse::conflict(value)
-            }
-            DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            DestinationError::NotFound => MetaHttpResponse::not_found(value),
-            other_err => MetaHttpResponse::bad_request(other_err),
-        }
-    }
-}
-
-impl From<TemplateError> for Response {
-    fn from(value: TemplateError) -> Self {
-        match value {
-            TemplateError::InfraError(e) => {
-                MetaHttpResponse::internal_error(TemplateError::InfraError(e))
-            }
-            TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
-            TemplateError::DeleteWithDestination(e) => {
-                MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(e))
-            }
-            TemplateError::PrebuiltReadOnly(name) => {
-                MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
-            }
-            other_err => MetaHttpResponse::bad_request(other_err),
-        }
-    }
-}
-
 impl From<FolderError> for Response {
     fn from(value: FolderError) -> Self {
         match value {
@@ -200,17 +162,6 @@ impl From<FolderError> for Response {
             FolderError::FolderNameAlreadyExists => MetaHttpResponse::bad_request(
                 "Folder with this name already exists in this organization",
             ),
-        }
-    }
-}
-
-impl From<PipelineError> for Response {
-    fn from(value: PipelineError) -> Self {
-        match value {
-            PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
-            PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
-            error => MetaHttpResponse::bad_request(error),
         }
     }
 }

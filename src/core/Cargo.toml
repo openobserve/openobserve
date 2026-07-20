@@ -20,6 +20,8 @@ enterprise = [
     "config/enterprise",
     "promql/enterprise",
     "search/enterprise",
+    "openobserve-alerts/enterprise",
+    "openobserve-pipeline/enterprise",
     "openobserve-transform/enterprise",
     "openobserve-scheduler/enterprise",
     "openobserve-compactor/enterprise",
@@ -43,6 +45,8 @@ vortex = [
 
 [dependencies]
 common.workspace = true
+openobserve-alerts.workspace = true
+openobserve-pipeline.workspace = true
 openobserve-transform.workspace = true
 openobserve-scheduler.workspace = true
 openobserve-compactor.workspace = true

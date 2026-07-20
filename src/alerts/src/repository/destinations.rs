@@ -15,11 +15,10 @@
 
 use std::sync::Arc;
 
+use common::infra::config::DESTINATIONS;
 use config::meta::destinations::Destination;
-use infra::table;
+use infra::{db, table};
 use itertools::Itertools;
-
-use crate::{common::infra::config::DESTINATIONS, service::db};
 
 // db cache watcher prefix
 const DESTINATION_WATCHER_PREFIX: &str = "/destinations/";

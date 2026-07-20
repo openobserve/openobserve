@@ -1743,7 +1743,7 @@ async fn process_stream_node(
                     ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
                     metadata: None,
                 };
-                match crate::service::ingestion::ingestion_service::ingest(req).await {
+                match openobserve_pipeline::ports::ingest(req).await {
                     Ok(resp) if resp.status_code == 200 => {
                         log::debug!(
                             "[Pipeline] {pl_name} [inv={inv}]: cross-type ingestion successful to {dest_stream_type}:{dest_stream_name}, records: {record_count}",

@@ -13,6 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod handlers;
-#[cfg(feature = "enterprise")]
-pub mod query_optimization_recommendation;
+use std::sync::LazyLock;
+
+use config::{RwAHashMap, meta::triggers::Trigger};
+
+mod http;
+pub mod repository;
+pub mod service;
+
+/// Realtime alert triggers are domain state and therefore live with alerts.
+pub static REALTIME_ALERT_TRIGGERS: LazyLock<RwAHashMap<String, Trigger>> =
+    LazyLock::new(Default::default);

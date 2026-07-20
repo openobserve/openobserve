@@ -17,6 +17,7 @@ use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
+#[cfg(feature = "enterprise")]
 use crate::service;
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -139,7 +140,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
 /// Runs the schedule jobs
 async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
-    service::alerts::scheduler::run().await
+    super::alert_scheduler::run().await
 }
 
 /// Cleanup old alert deduplication state records (enterprise-only feature)

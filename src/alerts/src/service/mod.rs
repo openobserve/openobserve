@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod handlers;
 #[cfg(feature = "enterprise")]
-pub mod query_optimization_recommendation;
+pub mod deduplication;
+pub mod destinations;
+#[cfg(feature = "enterprise")]
+pub mod org_config;
+pub mod templates;

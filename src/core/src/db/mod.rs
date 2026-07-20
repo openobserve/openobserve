@@ -21,7 +21,20 @@ use {
     infra::errors::Error, o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
-pub mod alerts;
+pub mod alerts {
+    pub mod alert {
+        pub use openobserve_alerts::repository::alert::*;
+    }
+    pub mod destinations {
+        pub use openobserve_alerts::repository::destinations::*;
+    }
+    pub mod realtime_triggers {
+        pub use openobserve_alerts::repository::realtime_triggers::*;
+    }
+    pub mod templates {
+        pub use openobserve_alerts::repository::templates::*;
+    }
+}
 pub mod backfill;
 pub mod compact {
     pub mod compactor_manual_jobs {
@@ -75,7 +88,9 @@ pub mod org_storage_providers;
 pub mod org_users;
 pub mod organization;
 pub mod pipeline;
-pub mod pipeline_errors;
+pub mod pipeline_errors {
+    pub use openobserve_pipeline::repository::pipeline_errors::*;
+}
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
 pub mod saved_view;

@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
+use async_trait::async_trait;
 use config::meta::{
     pipeline::{
         Pipeline, PipelineKind,
@@ -34,6 +37,24 @@ use crate::common::{
 };
 
 pub mod batch_execution;
+
+struct CoreRecordSink;
+
+#[async_trait]
+impl openobserve_pipeline::ports::RecordSink for CoreRecordSink {
+    async fn ingest(
+        &self,
+        request: proto::cluster_rpc::IngestionRequest,
+    ) -> anyhow::Result<proto::cluster_rpc::IngestionResponse> {
+        crate::ingestion::ingestion_service::ingest(request)
+            .await
+            .map_err(Into::into)
+    }
+}
+
+pub fn install_record_sink() {
+    let _ = openobserve_pipeline::ports::install_record_sink(Arc::new(CoreRecordSink));
+}
 
 /// Validates that no JavaScript functions are used in the pipeline.
 /// JavaScript functions are restricted from pipelines in ALL organizations (including _meta).

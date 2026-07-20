@@ -13,6 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod handlers;
-#[cfg(feature = "enterprise")]
-pub mod query_optimization_recommendation;
+use axum::response::Response;
+use common::meta::http::HttpResponse;
+
+use crate::repository::PipelineError;
+
+impl From<PipelineError> for Response {
+    fn from(value: PipelineError) -> Self {
+        match value {
+            PipelineError::InfraError(error) => HttpResponse::internal_error(error),
+            PipelineError::NotFound(_) => HttpResponse::not_found(value),
+            PipelineError::Modified(_) => HttpResponse::conflict(value),
+            error => HttpResponse::bad_request(error),
+        }
+    }
+}

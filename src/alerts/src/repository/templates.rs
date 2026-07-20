@@ -15,17 +15,13 @@
 
 use std::sync::Arc;
 
-use config::meta::destinations::{Module, Template};
-use infra::table;
-use itertools::Itertools;
-
-use crate::{
-    common::{
-        infra::config::{ALERTS, ALERTS_TEMPLATES, DESTINATIONS},
-        meta::organization::DEFAULT_ORG,
-    },
-    service::db,
+use common::{
+    infra::config::{ALERTS, ALERTS_TEMPLATES, DESTINATIONS},
+    meta::organization::DEFAULT_ORG,
 };
+use config::meta::destinations::{Module, Template};
+use infra::{db, table};
+use itertools::Itertools;
 
 // db cache watcher prefix
 const TEMPLATE_WATCHER_PREFIX: &str = "/templates/";

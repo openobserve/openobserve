@@ -32,6 +32,7 @@ use crate::{
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_manager;
+mod alert_scheduler;
 #[cfg(feature = "enterprise")]
 mod cipher;
 #[cfg(feature = "cloud")]
@@ -1011,6 +1012,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards
+    crate::service::pipeline::install_record_sink();
     db::pipeline::cache().await.expect("Pipeline cache failed");
 
     // Lightweight dashboard id->org cache for cross-org IDOR checks. Runs on every node.

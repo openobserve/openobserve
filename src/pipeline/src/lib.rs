@@ -13,6 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod handlers;
-#[cfg(feature = "enterprise")]
-pub mod query_optimization_recommendation;
+mod http;
+pub mod ports;
+pub mod repository;
