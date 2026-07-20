@@ -1,6 +1,7 @@
 // sdrPatternsPage.js (formerly regexPatternsPage.js)
 import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
+import { getAuthHeaders, getOrgIdentifier } from '../../playwright-tests/utils/cloud-auth.js';
 
 export class SDRPatternsPage {
   constructor(page) {
@@ -326,30 +327,161 @@ export class SDRPatternsPage {
     return isVisible;
   }
 
+  // ===== Backend API helpers (source of truth for eventual-consistency gating) =====
+  //
+  // WHY: The regex-pattern UI list is rendered client-side and lags the backend by
+  // several seconds under cloud load — create/delete are accepted (drawer/dialog
+  // closes) before the change propagates to the list read-replica, and the rendered
+  // table lags further still. A UI text-count check therefore RACES the backend and
+  // produces false "not found in list" / "Reason: unknown" failures. These helpers
+  // gate on GET /api/{org}/re_patterns, the authoritative store, so readiness is a
+  // deterministic API signal rather than a blind UI-reload retry.
+
+  _sdrApiBaseUrl() {
+    // Mirror the derivation used by playwright-tests/SDR/multipleSDRPatterns.spec.js
+    // (INGESTION_URL is the correct gateway for the re_patterns API on cloud).
+    return (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, '');
+  }
+
+  // Retry ONLY transient connection/timeout failures on a page.request call. A real
+  // HTTP error response is returned to the caller unchanged (never retried here) so
+  // genuine failures still surface. Mirrors requestWithRetry in multipleSDRPatterns.spec.js.
+  async _requestWithRetry(action, label, maxRetries = 3) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await action();
+      } catch (err) {
+        const msg = (err && err.message) || String(err);
+        const retriable = /Connection timeout|ECONNRESET|ECONNREFUSED|socket hang up|Request timed out|net::|timeout/i.test(msg);
+        if (!retriable || attempt === maxRetries) throw err;
+        testLogger.warn(`${label} failed (attempt ${attempt}/${maxRetries}): ${msg} — retrying`);
+        await this.page.waitForTimeout(attempt * 2000);
+      }
+    }
+  }
+
+  // Authoritative list read. Returns an array of pattern names, or null if the request
+  // could not be completed / returned a non-OK status (transient) so callers can keep polling.
+  async _listPatternNamesViaApi() {
+    const baseUrl = this._sdrApiBaseUrl();
+    const org = getOrgIdentifier();
+    const headers = getAuthHeaders();
+    try {
+      const res = await this._requestWithRetry(
+        () => this.page.request.get(`${baseUrl}/api/${org}/re_patterns`, { headers }),
+        'list re_patterns'
+      );
+      if (!res.ok()) {
+        testLogger.warn(`re_patterns list returned HTTP ${res.status()} — treating as indeterminate`);
+        return null;
+      }
+      const body = await res.json();
+      return (body.patterns || []).map((p) => p.name);
+    } catch (err) {
+      testLogger.warn(`re_patterns list request failed after retries: ${(err && err.message) || err}`);
+      return null;
+    }
+  }
+
+  // API-authoritative existence check. Returns the CURRENT state (fast in BOTH
+  // directions — one successful list read is definitive), which is why it is NOT a
+  // poll-until-present loop: several callers use it to confirm ABSENCE (post-delete /
+  // cleanup with unique run-scoped names), and a poll-until-present here would stall
+  // those for the full timeout every run. When you need to WAIT for a create/delete
+  // to propagate, use waitForPatternCreated / waitForPatternDeleted instead.
+  // Falls back to the UI text-count check only if the API is unreachable (e.g. a
+  // misconfigured/self-hosted env), so behaviour never regresses off-cloud.
   async checkPatternExists(patternName, maxRetries = 3) {
-    testLogger.info(`Checking if pattern exists: ${patternName}`);
+    testLogger.info(`Checking if pattern exists (API-authoritative): ${patternName}`);
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      await this.searchPattern(patternName);
-      await this.page.waitForTimeout(1000);
-
-      const count = await this.page.locator(`text="${patternName}"`).count();
-      const exists = count > 0;
-
-      if (exists) {
-        testLogger.info(`Pattern ${patternName} exists: true (found on attempt ${attempt})`);
-        return true;
+      const names = await this._listPatternNamesViaApi();
+      if (names !== null) {
+        const exists = names.includes(patternName);
+        testLogger.info(`Pattern ${patternName} exists: ${exists} (via API, attempt ${attempt})`);
+        return exists;
       }
-
       if (attempt < maxRetries) {
-        testLogger.info(`Pattern ${patternName} not found on attempt ${attempt}, retrying in 2s...`);
-        await this.page.waitForTimeout(2000);
-        // Navigate back to refresh the list
-        await this.navigateToRegexPatterns();
+        await this.page.waitForTimeout(attempt * 2000);
       }
     }
 
-    testLogger.info(`Pattern ${patternName} exists: false (after ${maxRetries} attempts)`);
+    // API indeterminate after retries — fall back to the old UI list check so
+    // non-cloud / misconfigured environments still function.
+    testLogger.warn(`API list unavailable for ${patternName} — falling back to UI list check`);
+    await this.searchPattern(patternName);
+    await this.page.waitForTimeout(1000);
+    const count = await this.page.locator(`text="${patternName}"`).count();
+    const exists = count > 0;
+    testLogger.info(`Pattern ${patternName} exists (UI fallback): ${exists}`);
+    return exists;
+  }
+
+  // Readiness gate for pattern CREATION. Poll the authoritative API until the pattern
+  // is present (eventual consistency on cloud can lag the accepted create by seconds,
+  // worse under load — the reported root cause), then reload the UI list and confirm
+  // it renders so downstream stream-association linking (which drives the UI) is
+  // stable. Returns true once API (and, best-effort, the UI) agree; false only if the
+  // create never propagates within the window — a genuine failure, not swallowed.
+  async waitForPatternCreated(patternName, timeoutMs = 45000) {
+    testLogger.info(`Waiting for pattern to be created (backend-consistent): ${patternName}`);
+    const deadline = Date.now() + timeoutMs;
+    let apiConfirmed = false;
+
+    while (Date.now() < deadline) {
+      const names = await this._listPatternNamesViaApi();
+      if (names !== null && names.includes(patternName)) {
+        apiConfirmed = true;
+        testLogger.info(`Pattern ${patternName} confirmed present via API`);
+        break;
+      }
+      await this.page.waitForTimeout(2000);
+    }
+
+    if (!apiConfirmed) {
+      testLogger.warn(`Pattern ${patternName} did not appear in API within ${timeoutMs}ms`);
+      return false;
+    }
+
+    // API confirms it exists — now make sure the rendered list reflects it (short
+    // retry) so the rest of the test, which interacts with the rendered list, is stable.
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await this.navigateToRegexPatterns();
+      await this.searchPattern(patternName);
+      await this.page.waitForTimeout(1000);
+      const count = await this.page.locator(`text="${patternName}"`).count();
+      if (count > 0) {
+        testLogger.info(`Pattern ${patternName} rendered in UI list (attempt ${attempt})`);
+        await this.searchPatternInput.clear().catch(() => {});
+        await this.page.waitForTimeout(300);
+        return true;
+      }
+      testLogger.info(`Pattern ${patternName} API-present but UI not yet rendered (attempt ${attempt}) — reloading`);
+      await this.page.waitForTimeout(2000);
+    }
+
+    // Backend has it; the UI still hasn't rendered it after retries. Treat as ready —
+    // the API is the source of truth and downstream association resolves by name.
+    testLogger.warn(`Pattern ${patternName} confirmed in API but not rendered in UI after retries — proceeding on API truth`);
+    return true;
+  }
+
+  // Readiness gate for pattern DELETION. Poll the authoritative API until the pattern
+  // is gone. The UI row (and briefly the list replica) can linger after a delete is
+  // accepted; a UI text check here previously produced false "Reason: unknown"
+  // failures. Tolerates transient request failures (indeterminate → keep polling).
+  async waitForPatternDeleted(patternName, timeoutMs = 30000) {
+    testLogger.info(`Waiting for pattern to be deleted (backend-consistent): ${patternName}`);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const names = await this._listPatternNamesViaApi();
+      if (names !== null && !names.includes(patternName)) {
+        testLogger.info(`Pattern ${patternName} confirmed absent via API`);
+        return true;
+      }
+      await this.page.waitForTimeout(2000);
+    }
+    testLogger.warn(`Pattern ${patternName} still present in API after ${timeoutMs}ms`);
     return false;
   }
 
@@ -446,18 +578,20 @@ export class SDRPatternsPage {
       return { success: false, reason: 'in_use', associations };
     }
 
-    // No error message - verify deletion by searching for the pattern
-    testLogger.info(`No error message detected. Verifying deletion by searching for pattern ${patternName}`);
-    await this.searchPattern(patternName);
-    await this.page.waitForTimeout(1500);
+    // No error message - verify deletion against the authoritative API. The UI row
+    // (and the list read-replica) can lag the accepted delete under cloud load; the
+    // previous UI text check here produced false "Reason: unknown" failures (e.g.
+    // "Unable to delete existing pattern PGP Private Key"). Poll the API until the
+    // pattern is gone — but do NOT swallow a genuine failure: if it is still present
+    // after the bounded wait, report unknown so the caller can react.
+    testLogger.info(`No error message detected. Verifying deletion of ${patternName} via API`);
+    const gone = await this.waitForPatternDeleted(patternName);
 
-    const stillExists = await this.checkPatternExists(patternName);
-
-    if (!stillExists) {
-      testLogger.info(`✓ Pattern ${patternName} deleted successfully (verified by search)`);
+    if (gone) {
+      testLogger.info(`✓ Pattern ${patternName} deleted successfully (verified via API)`);
       return { success: true, reason: 'deleted', associations: [] };
     } else {
-      testLogger.warn(`✗ Pattern ${patternName} still exists after deletion attempt`);
+      testLogger.warn(`✗ Pattern ${patternName} still present in API after deletion attempt`);
       return { success: false, reason: 'unknown', associations: [] };
     }
   }
