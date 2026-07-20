@@ -5460,7 +5460,7 @@
     "dangerZone": "Danger Zone",
     "deleteOrganization": "Delete organization",
     "deleteOrganizationTitle": "Delete this organization",
-    "deleteOrganizationDescription": "Schedules {name} for deletion. It becomes inaccessible to everyone — including you — immediately, then is permanently erased once the grace period ends. Restoring it before then requires contacting support.",
+    "deleteOrganizationDescription": "Everyone, including you, loses access to {name} immediately. During the grace period only OpenObserve support can restore it; after that, all data is permanently erased.",
     "deleteOrganizationScopeLoading": "Checking what this organization contains…",
     "deleteOrganizationScope": "{dashboards} dashboards · {streams} streams · {size} data",
     "deleteFactGracePeriod": "Grace period",
