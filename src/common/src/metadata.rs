@@ -13,27 +13,41 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::db;
+async fn db_get(key: &str) -> infra::errors::Result<bytes::Bytes> {
+    infra::db::get_db().await.get(key).await
+}
+
+async fn db_put(key: &str, value: bytes::Bytes) -> infra::errors::Result<()> {
+    infra::db::get_db()
+        .await
+        .put(key, value.clone(), false, None)
+        .await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        o2_enterprise::enterprise::super_cluster::queue::put(key, value, false, None)
+            .await
+            .map_err(|error| infra::errors::Error::Message(error.to_string()))?;
+    }
+    Ok(())
+}
 
 // pub static TANTIVY_INDEX_UPDATED_AT: Lazy<i64> = Lazy::new(get_or_create_idx_updated_at);
 
 pub mod version {
-    use super::db;
+    use super::{db_get, db_put};
 
     pub async fn get() -> Result<String, anyhow::Error> {
-        let ret = db::get("/meta/kv/version").await?;
+        let ret = db_get("/meta/kv/version").await?;
         let version = std::str::from_utf8(&ret).unwrap();
         Ok(version.to_string())
     }
 
     pub async fn set() -> Result<(), anyhow::Error> {
-        db::put(
-            "/meta/kv/version",
-            bytes::Bytes::from(config::VERSION),
-            db::NO_NEED_WATCH,
-            None,
-        )
-        .await?;
+        db_put("/meta/kv/version", bytes::Bytes::from(config::VERSION)).await?;
         Ok(())
     }
 }
@@ -41,10 +55,10 @@ pub mod version {
 pub mod instance {
     use infra::errors::Result;
 
-    use super::db;
+    use super::{db_get, db_put};
 
     pub async fn get() -> Result<Option<String>> {
-        let ret = db::get("/instance/").await?;
+        let ret = db_get("/instance/").await?;
         let loc_value = String::from_utf8_lossy(&ret).to_string();
         let loc_value = loc_value.trim().trim_matches('"').to_string();
         let value = Some(loc_value);
@@ -53,14 +67,14 @@ pub mod instance {
 
     pub async fn set(id: &str) -> Result<()> {
         let data = bytes::Bytes::from(id.to_string());
-        db::put("/instance/", data, db::NO_NEED_WATCH, None).await
+        db_put("/instance/", data).await
     }
 }
 
 pub mod tantivy_index {
     use tokio::sync::OnceCell;
 
-    use super::db;
+    use super::{db_get, db_put};
 
     static TIMESTAMP_UPDATED_AT: OnceCell<i64> = OnceCell::const_new();
     static SECONDARY_INDEX_UPDATED_AT: OnceCell<i64> = OnceCell::const_new();
@@ -74,7 +88,7 @@ pub mod tantivy_index {
 
     async fn get_or_create_idx_updated_at() -> i64 {
         let key = "/tantivy/_timestamp/updated_at";
-        match db::get(key).await {
+        match db_get(key).await {
             Ok(ret) if !ret.is_empty() => String::from_utf8_lossy(&ret)
                 .to_string()
                 .parse::<i64>()
@@ -82,7 +96,7 @@ pub mod tantivy_index {
             _ => {
                 let timestamp = config::utils::time::BASE_TIME.timestamp_micros();
                 let data = bytes::Bytes::from(timestamp.to_string());
-                if let Err(e) = db::put(key, data, db::NO_NEED_WATCH, None).await {
+                if let Err(e) = db_put(key, data).await {
                     log::warn!(
                         "[db::metas] Error storing tantivy _timestamp index updated_at: {e}"
                     );
@@ -101,7 +115,7 @@ pub mod tantivy_index {
 
     async fn get_or_create_secondary_index_updated_at() -> i64 {
         let key = "/tantivy/secondary_index/updated_at";
-        match db::get(key).await {
+        match db_get(key).await {
             Ok(ret) if !ret.is_empty() => String::from_utf8_lossy(&ret)
                 .to_string()
                 .parse::<i64>()
@@ -109,7 +123,7 @@ pub mod tantivy_index {
             _ => {
                 let timestamp = config::utils::time::BASE_TIME.timestamp_micros();
                 let data = bytes::Bytes::from(timestamp.to_string());
-                if let Err(e) = db::put(key, data, db::NO_NEED_WATCH, None).await {
+                if let Err(e) = db_put(key, data).await {
                     log::warn!("[db::metas] Error storing tantivy secondary index updated_at: {e}");
                 }
                 timestamp

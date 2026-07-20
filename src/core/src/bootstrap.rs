@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ::common::infra::wal;
+use ::common::{infra::wal, metadata};
 use config::{cache_instance_id, ider};
-
-use crate::db::metas;
 
 struct CoreEnrichmentRuntime;
 struct CoreCatalogRuntime;
@@ -280,12 +278,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     crate::transform_adapter::install_runtime();
     let _ = openobserve_enrichment::install_runtime(std::sync::Arc::new(CoreEnrichmentRuntime));
 
-    let instance_id = match metas::instance::get().await {
+    let instance_id = match metadata::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {
             log::info!("Generating new instance id");
             let id = ider::generate();
-            let _ = metas::instance::set(&id).await;
+            let _ = metadata::instance::set(&id).await;
             id
         }
     };

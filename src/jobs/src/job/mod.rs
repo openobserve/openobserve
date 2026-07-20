@@ -382,14 +382,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(o2_enterprise::enterprise::cloud::billings::watch());
 
     // check version
-    db::metas::version::set()
+    ::common::metadata::version::set()
         .await
         .expect("db version set failed");
 
     // check tantivy _timestamp update time
-    _ = db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
+    _ = ::common::metadata::tantivy_index::get_ttv_timestamp_updated_at().await;
     // check tantivy secondary index update time
-    _ = db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
+    _ = ::common::metadata::tantivy_index::get_ttv_secondary_index_updated_at().await;
 
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]

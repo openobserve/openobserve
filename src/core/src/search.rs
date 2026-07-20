@@ -218,11 +218,11 @@ impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
     }
 
     async fn tantivy_index_updated_at(&self) -> i64 {
-        crate::db::metas::tantivy_index::get_ttv_timestamp_updated_at().await
+        ::common::metadata::tantivy_index::get_ttv_timestamp_updated_at().await
     }
 
     async fn tantivy_secondary_index_updated_at(&self) -> i64 {
-        crate::db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await
+        ::common::metadata::tantivy_index::get_ttv_secondary_index_updated_at().await
     }
 
     async fn max_promql_series(&self, org_id: &str) -> usize {
