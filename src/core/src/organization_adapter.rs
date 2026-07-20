@@ -18,7 +18,13 @@ impl openobserve_organization::Runtime for CoreOrganizationRuntime {
         fetch_schema: bool,
         permitted_streams: Option<Vec<String>>,
     ) -> Vec<common::meta::stream::Stream> {
-        crate::stream::get_streams(org_id, stream_type, fetch_schema, permitted_streams).await
+        openobserve_catalog::stream::get_streams(
+            org_id,
+            stream_type,
+            fetch_schema,
+            permitted_streams,
+        )
+        .await
     }
 
     async fn transforms(

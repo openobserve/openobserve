@@ -144,9 +144,8 @@ pub use openobserve_organization::session;
 pub mod short_url {
     pub use common::short_url::*;
 }
-pub use openobserve_search_service::sourcemaps;
-pub mod stream;
-pub use openobserve_search_service::stream_utils;
+pub use openobserve_catalog::stream;
+pub use openobserve_search_service::{sourcemaps, stream_utils};
 pub mod synthetics;
 pub mod tls;
 pub use openobserve_ingestion::traces;

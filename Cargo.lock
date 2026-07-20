@@ -6792,7 +6792,9 @@ dependencies = [
  "anyhow",
  "arrow-schema",
  "async-trait",
+ "axum",
  "bytes",
+ "chrono",
  "common",
  "config",
  "dashmap",
@@ -6803,8 +6805,10 @@ dependencies = [
  "log",
  "o2_enterprise",
  "proto",
+ "serde_json",
  "tokio",
  "tonic",
+ "tracing",
 ]
 
 [[package]]

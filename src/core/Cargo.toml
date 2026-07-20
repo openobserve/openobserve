@@ -42,6 +42,7 @@ cloud = [
     "openobserve-alerts/cloud",
     "openobserve-self-reporting/cloud",
     "openobserve-organization/cloud",
+    "openobserve-catalog/cloud",
 ]
 vectorscan = [
     "o2_enterprise/vectorscan",
@@ -49,6 +50,7 @@ vectorscan = [
     "openobserve-enrichment/vectorscan",
     "search/vectorscan",
     "openobserve-search-service/vectorscan",
+    "openobserve-catalog/vectorscan",
 ]
 vortex = [
     "dep:vortex",

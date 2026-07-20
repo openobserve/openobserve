@@ -20,10 +20,11 @@ use o2_enterprise::enterprise::recommendations::{
     meta::{OptimiserRecommendation, Stream},
     service::{QueryRecommendationEngine, QueryRecommendationService},
 };
+use openobserve_catalog::stream::get_streams;
 use openobserve_ingestion::internal as ingestion_service;
 use proto::cluster_rpc::{IngestionData, IngestionRequest, IngestionResponse, IngestionType};
 
-use crate::service::{db::organization, stream::get_streams};
+use crate::service::db::organization;
 
 #[derive(Clone)]
 pub struct QueryOptimizerContext;

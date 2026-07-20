@@ -180,7 +180,7 @@ async fn enforce_usage_stream_retention() {
         && s.data_retention < 32
     {
         s.data_retention = 32;
-        openobserve_core::stream::save_stream_settings(
+        openobserve_catalog::stream::save_stream_settings(
             META_ORG_ID,
             USAGE_STREAM,
             StreamType::Logs,

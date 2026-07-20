@@ -13,13 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+//! Stream schema, settings, retention, and deletion lifecycle.
+//!
+//! Cross-domain side effects are supplied by the application through
+//! [`StreamRuntime`], keeping the catalog independent of service crates.
 
+use std::{
+    io::Error,
+    sync::{Arc, OnceLock},
+};
+
+use arrow_schema::{DataType, Field, Schema};
 use axum::{
     Json, http,
     response::{IntoResponse, Response as HttpResponse},
 };
 use chrono::{TimeZone, Timelike, Utc};
+use common::meta::{
+    authz::Authz,
+    http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
+    stream::{FieldUpdate, Stream, StreamCreate},
+};
 // Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
 // these streams for billing); OSS / self-hosted must not block user streams.
 #[cfg(feature = "cloud")]
@@ -30,15 +44,14 @@ use config::{
     meta::{
         promql,
         stream::{
-            DistinctField, PartitionTimeLevel, StreamField, StreamParams, StreamSettings,
-            StreamStats, StreamType, TimeRange, UpdateStreamSettings,
+            DistinctField, PartitionTimeLevel, StreamField, StreamSettings, StreamStats,
+            StreamType, TimeRange, UpdateStreamSettings,
         },
     },
     utils::{flatten::format_label_name, json, time::now_micros, util::get_distinct_stream_name},
 };
 #[cfg(feature = "enterprise")]
 use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::stats,
@@ -50,26 +63,138 @@ use infra::{
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
 use itertools::chain;
-#[cfg(feature = "vectorscan")]
-use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
-
-use super::db::enrichment_table;
-#[cfg(feature = "vectorscan")]
-use crate::db::re_pattern::process_association_changes;
-use crate::{
-    common::meta::{
-        authz::Authz,
-        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-        stream::{FieldUpdate, Stream, StreamCreate},
-    },
-    service::{
-        db::{self, distinct_values},
-        metrics::get_prom_metadata_from_schema,
-    },
-};
 
 const LOCAL: &str = "disk";
 const S3: &str = "s3";
+
+#[async_trait::async_trait]
+pub trait StreamRuntime: Send + Sync + 'static {
+    async fn add_distinct_value(
+        &self,
+        record: DistinctFieldRecord,
+    ) -> Result<(), infra::errors::Error>;
+
+    async fn delete_enrichment_url_job_if_exists(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+    ) -> anyhow::Result<bool>;
+
+    async fn delete_related_feature_resources(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+    ) -> anyhow::Result<()>;
+
+    async fn schedule_stream_deletion(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+    ) -> anyhow::Result<()>;
+
+    async fn cleanup_enrichment_resources(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+    ) -> anyhow::Result<()>;
+
+    async fn delete_compaction_offset(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+    ) -> anyhow::Result<()>;
+
+    async fn schedule_data_deletion(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        start_time: &str,
+        end_time: &str,
+    ) -> Result<String, infra::errors::Error>;
+
+    async fn enrichment_table_stats(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+    ) -> Option<config::meta::stream::EnrichmentTableMetaStreamStats>;
+
+    async fn update_field_types(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        schema: &Schema,
+        min_ts: i64,
+    ) -> anyhow::Result<()>;
+
+    #[cfg(feature = "vectorscan")]
+    fn pattern_associations(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+    ) -> Vec<config::meta::stream::PatternAssociation>;
+
+    #[cfg(feature = "vectorscan")]
+    async fn process_pattern_association_changes(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        update: config::meta::stream::UpdateSettingsWrapper<
+            config::meta::stream::PatternAssociation,
+        >,
+    ) -> anyhow::Result<()>;
+
+    #[cfg(feature = "vectorscan")]
+    async fn remove_pattern_associations(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+    ) -> anyhow::Result<()>;
+}
+
+static STREAM_RUNTIME: OnceLock<Arc<dyn StreamRuntime>> = OnceLock::new();
+
+pub fn install_stream_runtime(runtime: Arc<dyn StreamRuntime>) -> Result<(), &'static str> {
+    STREAM_RUNTIME
+        .set(runtime)
+        .map_err(|_| "catalog stream runtime is already installed")
+}
+
+fn stream_runtime() -> anyhow::Result<&'static Arc<dyn StreamRuntime>> {
+    STREAM_RUNTIME
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("catalog stream runtime is not installed"))
+}
+
+fn stream_runtime_io() -> Result<&'static Arc<dyn StreamRuntime>, Error> {
+    stream_runtime().map_err(Error::other)
+}
+
+fn get_prom_metadata_from_schema(schema: &Schema) -> Option<promql::Metadata> {
+    let value = schema.metadata.get(promql::METADATA_LABEL)?;
+    let mut metadata: promql::Metadata = match json::from_str(value) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            log::warn!(
+                "failed to parse {} from schema: {e}, input: {value}",
+                promql::METADATA_LABEL
+            );
+            return None;
+        }
+    };
+    let family_name = metadata.metric_family_name.trim();
+    metadata.metric_family_name =
+        json::from_str::<String>(family_name).unwrap_or_else(|_| family_name.to_string());
+    Some(metadata)
+}
 
 pub async fn get_stream(
     org_id: &str,
@@ -101,7 +226,7 @@ pub async fn get_streams(
     fetch_schema: bool,
     permitted_streams: Option<Vec<String>>,
 ) -> Vec<Stream> {
-    let indices = openobserve_catalog::schema::list(org_id, stream_type, fetch_schema)
+    let indices = crate::schema::list(org_id, stream_type, fetch_schema)
         .await
         .unwrap_or_default();
 
@@ -219,10 +344,10 @@ pub fn stream_res(
     // manager. So instead we do it in best-effort-way, where if it is already initialized,
     // we get the patterns, otherwise report them as empty
     #[cfg(feature = "vectorscan")]
-    let pattern_associations = match PATTERN_MANAGER.get() {
-        Some(m) => m.get_associations(_org_id, stream_type, stream_name),
-        None => vec![],
-    };
+    let pattern_associations = STREAM_RUNTIME
+        .get()
+        .map(|runtime| runtime.pattern_associations(_org_id, stream_name, stream_type))
+        .unwrap_or_default();
     let is_derived = unwrap_stream_is_derived(&schema);
 
     Stream {
@@ -389,7 +514,7 @@ pub async fn save_stream_settings(
 ) -> Result<HttpResponse, Error> {
     let cfg = config::get_config();
     // check if we are allowed to ingest
-    if openobserve_catalog::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
+    if crate::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
         return Ok((
             http::StatusCode::BAD_REQUEST,
             [(
@@ -596,7 +721,7 @@ pub async fn save_stream_settings(
     if !metadata.contains_key("created_at") {
         metadata.insert("created_at".to_string(), now_micros().to_string());
     }
-    openobserve_catalog::schema::update_setting(org_id, stream_name, stream_type, metadata)
+    crate::schema::update_setting(org_id, stream_name, stream_type, metadata)
         .await
         .unwrap();
 
@@ -625,7 +750,7 @@ pub async fn save_stream_settings(
                         metadata.insert("created_at".to_string(), now_micros().to_string());
                     }
 
-                    if let Err(e) = openobserve_catalog::schema::update_setting(
+                    if let Err(e) = crate::schema::update_setting(
                         org_id,
                         &distinct_stream,
                         StreamType::Metadata,
@@ -870,7 +995,7 @@ pub async fn update_stream_settings(
                 stream_type.to_string(),
                 f,
             );
-            if let Err(e) = distinct_values::add(record).await {
+            if let Err(e) = stream_runtime_io()?.add_distinct_value(record).await {
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     [(ERROR_HEADER, format!("error in updating settings : {e}"))],
@@ -946,13 +1071,14 @@ pub async fn update_stream_settings(
 
     #[cfg(feature = "vectorscan")]
     {
-        if let Err(e) = process_association_changes(
-            org_id,
-            stream_name,
-            stream_type,
-            new_settings.pattern_associations,
-        )
-        .await
+        if let Err(e) = stream_runtime_io()?
+            .process_pattern_association_changes(
+                org_id,
+                stream_name,
+                stream_type,
+                new_settings.pattern_associations,
+            )
+            .await
         {
             return Ok(MetaHttpResponse::internal_error(format!(
                 "Internal server error while updating pattern associations {e}",
@@ -992,25 +1118,28 @@ pub async fn delete_stream(
         .unwrap();
     if schema.is_empty() {
         // If stream schema doesn't exist, check if this is an enrichment table with a URL job
-        if stream_type == StreamType::EnrichmentTables
-            && let Ok(Some(_job)) = db::enrichment_table::get_url_job(org_id, stream_name).await
-        {
-            // URL job exists - delete it and return success
-            if let Err(e) = db::enrichment_table::delete_url_job(org_id, stream_name).await {
-                return Ok(MetaHttpResponse::internal_error(format!(
-                    "failed to delete URL job: {e}"
-                )));
+        if stream_type == StreamType::EnrichmentTables {
+            match stream_runtime_io()?
+                .delete_enrichment_url_job_if_exists(org_id, stream_name)
+                .await
+            {
+                Ok(true) => {
+                    log::info!(
+                        "Deleted URL job for enrichment table: {}/{}",
+                        org_id,
+                        stream_name
+                    );
+                    return Ok(MetaHttpResponse::ok(
+                        "URL job deleted successfully".to_string(),
+                    ));
+                }
+                Ok(false) => {}
+                Err(e) => {
+                    return Ok(MetaHttpResponse::internal_error(format!(
+                        "failed to delete URL job: {e}"
+                    )));
+                }
             }
-
-            log::info!(
-                "Deleted URL job for enrichment table: {}/{}",
-                org_id,
-                stream_name
-            );
-
-            return Ok(MetaHttpResponse::ok(
-                "URL job deleted successfully".to_string(),
-            ));
         }
 
         // No schema and no URL job - stream not found
@@ -1018,9 +1147,7 @@ pub async fn delete_stream(
     }
 
     // delete stream schema
-    if let Err(e) =
-        openobserve_catalog::schema::delete(org_id, stream_name, Some(stream_type)).await
-    {
+    if let Err(e) = crate::schema::delete(org_id, stream_name, Some(stream_type)).await {
         return Ok((
             http::StatusCode::INTERNAL_SERVER_ERROR,
             [(ERROR_HEADER, format!("failed to delete stream schema: {e}"))],
@@ -1034,57 +1161,26 @@ pub async fn delete_stream(
 
     // delete associated feature resources, i.e. pipelines, alerts
     if del_related_feature_resources {
-        for pipeline in openobserve_pipeline::service::get_by_stream(&StreamParams::new(
-            org_id,
-            stream_name,
-            stream_type,
-        ))
-        .await
+        if let Err(e) = stream_runtime_io()?
+            .delete_related_feature_resources(org_id, stream_name, stream_type)
+            .await
         {
-            if let Err(e) = openobserve_pipeline::service::delete(&pipeline.id).await {
-                return Ok((
+            return Ok((
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
+                Json(MetaHttpResponse::error(
                     http::StatusCode::INTERNAL_SERVER_ERROR,
-                    [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
-                    Json(MetaHttpResponse::error(
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        format!(
-                            "Error: failed to delete the associated pipeline \"{}\": {e}",
-                            pipeline.name
-                        ),
-                    )),
-                )
-                    .into_response());
-            }
-        }
-
-        if let Ok(alerts) =
-            db::alerts::alert::list(org_id, Some(stream_type), Some(stream_name)).await
-        {
-            for alert in alerts {
-                if let Err(e) =
-                    db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, &alert.name)
-                        .await
-                {
-                    return Ok((
-                        http::StatusCode::INTERNAL_SERVER_ERROR,
-                        [(ERROR_HEADER, format!("failed to delete alert: {e}"))],
-                        Json(MetaHttpResponse::error(
-                            http::StatusCode::INTERNAL_SERVER_ERROR,
-                            format!(
-                                "Error: failed to delete the associated alert \"{}\": {e}",
-                                alert.name
-                            ),
-                        )),
-                    )
-                        .into_response());
-                }
-            }
+                    e.to_string(),
+                )),
+            )
+                .into_response());
         }
     }
 
     // create delete for compactor
-    if let Err(e) =
-        db::compact::retention::delete_stream(org_id, stream_type, stream_name, None).await
+    if let Err(e) = stream_runtime_io()?
+        .schedule_stream_deletion(org_id, stream_name, stream_type)
+        .await
     {
         log::error!(
             "Failed to create retention job for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
@@ -1116,12 +1212,12 @@ pub async fn delete_stream(
     // enrichment table cleanup
 
     if stream_type == StreamType::EnrichmentTables {
-        crate::enrichment_table::cleanup_enrichment_table_resources(
-            org_id,
-            stream_name,
-            stream_type,
-        )
-        .await;
+        if let Err(e) = stream_runtime_io()?
+            .cleanup_enrichment_resources(org_id, stream_name, stream_type)
+            .await
+        {
+            log::error!("failed to clean up enrichment resources: {e}");
+        }
     }
 
     // delete ownership
@@ -1138,8 +1234,9 @@ pub async fn stream_delete_inner(
 ) -> Result<(), anyhow::Error> {
     #[cfg(feature = "vectorscan")]
     {
-        use super::db::re_pattern::remove_stream_associations_after_deletion;
-        remove_stream_associations_after_deletion(org_id, stream_name, stream_type).await?;
+        stream_runtime()?
+            .remove_pattern_associations(org_id, stream_name, stream_type)
+            .await?;
     }
 
     // delete stream schema cache
@@ -1164,7 +1261,10 @@ pub async fn stream_delete_inner(
     }
 
     // delete stream compaction offset
-    if let Err(e) = db::compact::files::del_offset(org_id, stream_type, stream_name).await {
+    if let Err(e) = stream_runtime()?
+        .delete_compaction_offset(org_id, stream_name, stream_type)
+        .await
+    {
         log::error!(
             "Failed to delete stream compact offset for stream: {org_id}/{stream_type}/{stream_name}, error: {e}"
         );
@@ -1224,29 +1324,10 @@ pub async fn delete_stream_data_by_time_range(
     };
 
     // Create a job to delete the data by the time range
-    let (key, _created) = match crate::db::compact::retention::delete_stream(
-        org_id,
-        stream_type,
-        stream_name,
-        Some((start_time.as_str(), end_time.as_str())),
-    )
-    .await
-    {
-        Ok(key) => key,
-        Err(e) => {
-            return Err(infra::errors::Error::Message(e.to_string()));
-        }
-    };
-
-    // Create a job in the compact manual jobs table
-    let job = infra::table::compactor_manual_jobs::CompactorManualJob {
-        id: config::ider::uuid(),
-        key,
-        status: infra::table::compactor_manual_jobs::Status::Pending,
-        created_at: Utc::now().timestamp_micros(),
-        ended_at: 0,
-    };
-    crate::db::compact::compactor_manual_jobs::add_job(job).await
+    stream_runtime()
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?
+        .schedule_data_deletion(org_id, stream_name, stream_type, &start_time, &end_time)
+        .await
 }
 
 async fn transform_stats(
@@ -1259,7 +1340,8 @@ async fn transform_stats(
     stats.compressed_size /= SIZE_IN_MB;
     stats.index_size /= SIZE_IN_MB;
     if stream_type == StreamType::EnrichmentTables
-        && let Some(meta) = enrichment_table::get_meta_table_stats(org_id, stream_name).await
+        && let Some(runtime) = STREAM_RUNTIME.get()
+        && let Some(meta) = runtime.enrichment_table_stats(org_id, stream_name).await
     {
         stats.doc_time_min = meta.start_time;
         stats.doc_time_max = meta.end_time;
@@ -1275,7 +1357,7 @@ pub async fn delete_fields(
     if fields.is_empty() {
         return Ok(());
     }
-    openobserve_catalog::schema::delete_fields(
+    crate::schema::delete_fields(
         org_id,
         stream_name,
         stream_type.unwrap_or_default(),
@@ -1332,18 +1414,15 @@ pub async fn update_fields_type(
 
     // update schema in db
     let min_ts = now_micros();
-    let mut schema_map = std::collections::HashMap::new();
-    super::schema::handle_diff_schema(
-        org_id,
-        stream_name,
-        stream_type.unwrap_or_default(),
-        false,
-        &new_schema,
-        min_ts,
-        &mut schema_map,
-        false,
-    )
-    .await?;
+    stream_runtime()?
+        .update_field_types(
+            org_id,
+            stream_name,
+            stream_type.unwrap_or_default(),
+            &new_schema,
+            min_ts,
+        )
+        .await?;
 
     Ok(())
 }
@@ -1438,7 +1517,7 @@ pub async fn get_stream_retention(
 mod tests {
     use std::collections::HashMap;
 
-    use datafusion::arrow::datatypes::{DataType, Field};
+    use arrow_schema::{DataType, Field};
 
     use super::*;
 

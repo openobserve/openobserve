@@ -21,3 +21,4 @@
 pub mod file_list;
 pub mod retention;
 pub mod schema;
+pub mod stream;

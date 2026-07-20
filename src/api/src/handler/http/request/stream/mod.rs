@@ -30,6 +30,7 @@ use infra::table::compactor_manual_jobs::{
     CompactorManualJob, CompactorManualJobResEntry, CompactorManualJobStatusRes,
     Status as CompactorManualJobStatus,
 };
+use openobserve_catalog::stream;
 
 use crate::{
     common::{
@@ -44,7 +45,6 @@ use crate::{
         },
     },
     handler::http::extractors::Headers,
-    service::stream,
 };
 
 /// GetSchema
@@ -745,7 +745,7 @@ pub async fn delete_stream_data_by_time_range(
         }
     };
     let time_range = TimeRange::new(start, end);
-    let job_id = match openobserve_core::stream::delete_stream_data_by_time_range(
+    let job_id = match openobserve_catalog::stream::delete_stream_data_by_time_range(
         &org_id,
         stream_type,
         &stream_name,

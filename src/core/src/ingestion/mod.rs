@@ -129,10 +129,15 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         stream_type: StreamType,
         settings: config::meta::stream::StreamSettings,
     ) -> anyhow::Result<()> {
-        crate::stream::save_stream_settings(org_id, stream_name, stream_type, settings)
-            .await
-            .map(|_| ())
-            .map_err(Into::into)
+        openobserve_catalog::stream::save_stream_settings(
+            org_id,
+            stream_name,
+            stream_type,
+            settings,
+        )
+        .await
+        .map(|_| ())
+        .map_err(Into::into)
     }
 
     async fn stream_retention(
@@ -141,7 +146,7 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         stream_type: StreamType,
         stream_name: &str,
     ) -> Option<i64> {
-        crate::stream::get_stream_retention(org_id, stream_type, stream_name).await
+        openobserve_catalog::stream::get_stream_retention(org_id, stream_type, stream_name).await
     }
 
     #[cfg(feature = "enterprise")]
@@ -193,7 +198,7 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         stream_type: StreamType,
         user_email: Option<&str>,
     ) -> infra::errors::Result<()> {
-        if crate::stream::get_stream(org_id, stream_name, stream_type)
+        if openobserve_catalog::stream::get_stream(org_id, stream_name, stream_type)
             .await
             .is_some()
         {

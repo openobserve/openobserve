@@ -20,6 +20,7 @@ use crate::db::metas;
 
 struct CoreEnrichmentRuntime;
 struct CoreCatalogRuntime;
+struct CoreStreamRuntime;
 
 #[async_trait::async_trait]
 impl openobserve_catalog::schema::SchemaRuntime for CoreCatalogRuntime {
@@ -97,10 +98,228 @@ impl openobserve_enrichment::Runtime for CoreEnrichmentRuntime {
     }
 }
 
+#[async_trait::async_trait]
+impl openobserve_catalog::stream::StreamRuntime for CoreStreamRuntime {
+    async fn add_distinct_value(
+        &self,
+        record: infra::table::distinct_values::DistinctFieldRecord,
+    ) -> Result<(), infra::errors::Error> {
+        openobserve_dashboards::distinct_values::add(record).await
+    }
+
+    async fn delete_enrichment_url_job_if_exists(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+    ) -> anyhow::Result<bool> {
+        if openobserve_enrichment::repository::get_url_job(org_id, stream_name)
+            .await?
+            .is_none()
+        {
+            return Ok(false);
+        }
+        openobserve_enrichment::repository::delete_url_job(org_id, stream_name).await?;
+        Ok(true)
+    }
+
+    async fn delete_related_feature_resources(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+    ) -> anyhow::Result<()> {
+        let stream = config::meta::stream::StreamParams::new(org_id, stream_name, stream_type);
+        for pipeline in openobserve_pipeline::service::get_by_stream(&stream).await {
+            openobserve_pipeline::service::delete(&pipeline.id)
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Error: failed to delete the associated pipeline \"{}\": {e}",
+                        pipeline.name
+                    )
+                })?;
+        }
+
+        if let Ok(alerts) = openobserve_alerts::repository::alert::list(
+            org_id,
+            Some(stream_type),
+            Some(stream_name),
+        )
+        .await
+        {
+            for alert in alerts {
+                openobserve_alerts::repository::alert::delete_by_name(
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    &alert.name,
+                )
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Error: failed to delete the associated alert \"{}\": {e}",
+                        alert.name
+                    )
+                })?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn schedule_stream_deletion(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+    ) -> anyhow::Result<()> {
+        openobserve_compactor::repository::retention::delete_stream(
+            org_id,
+            stream_type,
+            stream_name,
+            None,
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn cleanup_enrichment_resources(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+    ) -> anyhow::Result<()> {
+        openobserve_enrichment::enrichment_table::cleanup_enrichment_table_resources(
+            org_id,
+            stream_name,
+            stream_type,
+        )
+        .await;
+        Ok(())
+    }
+
+    async fn delete_compaction_offset(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+    ) -> anyhow::Result<()> {
+        openobserve_compactor::repository::files::del_offset(org_id, stream_type, stream_name)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn schedule_data_deletion(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+        start_time: &str,
+        end_time: &str,
+    ) -> Result<String, infra::errors::Error> {
+        let (key, _) = openobserve_compactor::repository::retention::delete_stream(
+            org_id,
+            stream_type,
+            stream_name,
+            Some((start_time, end_time)),
+        )
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        let job = infra::table::compactor_manual_jobs::CompactorManualJob {
+            id: config::ider::uuid(),
+            key,
+            status: infra::table::compactor_manual_jobs::Status::Pending,
+            created_at: chrono::Utc::now().timestamp_micros(),
+            ended_at: 0,
+        };
+        openobserve_compactor::repository::compactor_manual_jobs::add_job(job).await
+    }
+
+    async fn enrichment_table_stats(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+    ) -> Option<config::meta::stream::EnrichmentTableMetaStreamStats> {
+        openobserve_enrichment::repository::get_meta_table_stats(org_id, stream_name).await
+    }
+
+    async fn update_field_types(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+        schema: &arrow_schema::Schema,
+        min_ts: i64,
+    ) -> anyhow::Result<()> {
+        let mut schema_map = std::collections::HashMap::new();
+        openobserve_ingestion::schema::handle_diff_schema(
+            org_id,
+            stream_name,
+            stream_type,
+            false,
+            schema,
+            min_ts,
+            &mut schema_map,
+            false,
+        )
+        .await?;
+        Ok(())
+    }
+
+    #[cfg(feature = "vectorscan")]
+    fn pattern_associations(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+    ) -> Vec<config::meta::stream::PatternAssociation> {
+        match o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER.get() {
+            Some(manager) => manager.get_associations(org_id, stream_type, stream_name),
+            None => vec![],
+        }
+    }
+
+    #[cfg(feature = "vectorscan")]
+    async fn process_pattern_association_changes(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+        update: config::meta::stream::UpdateSettingsWrapper<
+            config::meta::stream::PatternAssociation,
+        >,
+    ) -> anyhow::Result<()> {
+        crate::db::re_pattern::process_association_changes(
+            org_id,
+            stream_name,
+            stream_type,
+            update,
+        )
+        .await?;
+        Ok(())
+    }
+
+    #[cfg(feature = "vectorscan")]
+    async fn remove_pattern_associations(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+    ) -> anyhow::Result<()> {
+        crate::db::re_pattern::remove_stream_associations_after_deletion(
+            org_id,
+            stream_name,
+            stream_type,
+        )
+        .await
+    }
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
     let _ = openobserve_catalog::schema::install_schema_runtime(std::sync::Arc::new(
         CoreCatalogRuntime,
     ));
+    let _ =
+        openobserve_catalog::stream::install_stream_runtime(std::sync::Arc::new(CoreStreamRuntime));
     crate::alerts::install_runtime_services();
     crate::dashboards::install_runtime_services();
     crate::ingestion::install_runtime_services();
