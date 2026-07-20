@@ -71,7 +71,7 @@
                 :model-value="activeTab"
                 @update:model-value="(v) => { activeTab = v as string; typeFilter = v === 'all' ? 'all' : (v as string).toUpperCase() }"
               >
-                <OToggleGroupItem v-for="tab in typeTabs" :key="tab.key" :value="tab.key" size="sm">
+                <OToggleGroupItem v-for="tab in typeTabs" :key="tab.key" :value="tab.key" size="sm" :icon-left="tab.icon">
                   {{ tab.label }}
                 </OToggleGroupItem>
               </OToggleGroup>
@@ -230,6 +230,7 @@ import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { mapResponseToBrowserCheck, buildCreateBrowserTestPayload } from '@/utils/synthetics/buildPayload'
 import { SYNTHETIC_CHECK_TYPES, type SyntheticCheckType } from '@/types/synthetics'
+import { CHECK_TYPE_CARDS } from '@/constants/synthetics'
 import { useI18n } from 'vue-i18n'
 import syntheticsService from '@/services/synthetics'
 import { getFoldersListByType } from '@/utils/commons'
@@ -491,10 +492,13 @@ const openDetail = (monitor: any) => {
   });
 };
 
-
 const typeTabs = computed(() => [
-  { key: 'all', label: t('synthetics.tabs.all') },
-  ...SYNTHETIC_CHECK_TYPES.map(ct => ({ key: ct, label: t(`synthetics.tabs.${ct}`) })),
+  { key: 'all', label: t('synthetics.tabs.all'), icon: 'format-list-bulleted' },
+  ...SYNTHETIC_CHECK_TYPES.map(ct => ({
+    key: ct,
+    label: t(`synthetics.tabs.${ct}`),
+    icon: CHECK_TYPE_CARDS.find(c => c.type === ct)?.icon,
+  })),
 ]);
 
 const locationOpts = ref<{ label: string; value: string }[]>([{ label: t('synthetics.filters.allLocations'), value: 'all' }]);
