@@ -246,7 +246,12 @@ describe("StepPickerDialog", () => {
     it("uses the default placeholder and testPrefix-derived data-test", () => {
       wrapper = mountPicker();
       const search = wrapper.findComponent({ name: "OSearchInput" });
-      expect(search.props("placeholder")).toBe("Search…");
+      // Defaults now come from the locale rather than a hardcoded English
+      // string — asserted against the key so a copy change doesn't break this,
+      // and a missing key (which renders the raw path) still fails.
+      const expected = i18n.global.t("common.search") as string;
+      expect(search.props("placeholder")).toBe(expected);
+      expect(expected).not.toBe("common.search");
       expect(search.props("clearable")).toBe(true);
       expect(wrapper.find('[data-test="flow-step-search"]').exists()).toBe(true);
     });
