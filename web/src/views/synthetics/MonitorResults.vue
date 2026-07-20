@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   MonitorResults — Page shell for the Monitor Runs multi-tab page.
 
   Follows the LLMInsightsPage.vue pattern:
-    ROW 1: AppPageHeader (breadcrumb + title + badge + actions)
+    ROW 1: OPageHeader (breadcrumb + title + badge + actions)
     ROW 2: MonitorRuns (chrome-less tabbed content)
 -->
 <template>
-  <PageLayout
+  <OPageLayout
     data-test="synthetic-monitor-results-page"
     :title="monitorName"
     :subtitle="folderName"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @jump-to-window="onJumpToWindow"
       />
     </div>
-  </PageLayout>
+  </OPageLayout>
 
   <!-- ════════════ Run Detail Drawer ════════════ -->
   <ODrawer
@@ -130,7 +130,7 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";

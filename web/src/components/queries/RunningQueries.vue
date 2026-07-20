@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     v-if="isMetaOrg"
     :title="t('queries.runningQueries')"
     icon="query-stats"
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
     </ODrawer>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -167,11 +167,11 @@ import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { PageLayout, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
+  components: { OPageLayout, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
 },
   setup() {
     const store = useStore();

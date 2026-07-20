@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom divider reaches the card edges (like Data Sources / Pipelines) —
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
-    <PageLayout
+    <OPageLayout
       :title="t('menu.home')"
       :subtitle="t('home.subtitle')"
       icon="home"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-    </PageLayout>
+    </OPageLayout>
   </div>
 </template>
 
@@ -145,7 +145,7 @@ import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -363,7 +363,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OTooltip,
-    PageLayout,
+    OPageLayout,
     PinnedDashboardTab,
   },
 });

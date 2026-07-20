@@ -15,35 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  AppPageHeader — the standard page header used across the app (dashboards,
+  OPageHeader — the standard page header used across the app (dashboards,
   pipelines, logs, …). The single header contract (the "TAS law"):
 
     ROW 1 (fixed h-14, never reflows): module icon tile + <h1> current-item
       title + right-aligned actions.
     ROW 2 (fixed h-5 band): EXACTLY ONE of —
       • Level 2 (list w/ peer sections): peer tabs (#tabs slot).
-      • Level 3+ (detail/deeper): ancestor breadcrumb (`breadcrumb` prop or
-        #subtitle slot) — the path back to the parent list.
       • true module index: a plain tagline (`subtitle` prop / #subtitle).
-    Tabs XOR breadcrumb XOR tagline — never two at once.
-
-  Breadcrumb: pass `:breadcrumb="[...]"` (BreadcrumbItem[]) for the common case;
-  it renders an AppBreadcrumb (depth-bounded, auto-collapsing) into the subtitle
-  band so detail views don't re-import it. The #subtitle slot is the escape
-  hatch (e.g. to append a spinner) and takes precedence over the prop.
+    Tabs XOR tagline — never both at once.
 
   Sub-navigation (CRUD add/edit, drill-down editors): pass
   `:back="{ label, to|onClick }"` (or the #back slot). On a sub-page the leading
   module-icon TILE is replaced by a Back button (a ‹ chevron in the same 8×8
   footprint) — so a listing page shows the module icon and its add/edit page
   shows a Back button in the exact same spot, with the title's X position
-  unchanged. The breadcrumb (chrome bar) still shows the full path.
+  unchanged.
 
   NOTE: title/heading font sizes use `!important` because the app defines
   global, *unlayered* h1/h2 rules (styles/app.scss) that otherwise beat
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
-  Props: title | titleDataTest | subtitle | icon | breadcrumb | breadcrumbMaxInline | back | tabsBelow
+  Props: title | titleDataTest | subtitle | icon | back | tabsBelow
   Slots: title-prefix | title | subtitle | actions | tabs | back
 -->
 <template>
@@ -52,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        title block instead. h-14 gives the header a touch more breathing room. -->
   <!-- The header ALWAYS owns its own bottom divider (border-b, inside its own
        h-15 box so the header is exactly 60px whether it's used directly or via
-       PageLayout). Never wrap it in a bordered div and never hand-draw a
+       OPageLayout). Never wrap it in a bordered div and never hand-draw a
        border-b on a wrapper — that adds a second 1px line and makes the header
        61px on some pages and 60px on others. -->
   <header
@@ -111,9 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <slot name="title">{{ title }}</slot>
         </h1>
         <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
-             the subtitle is plain text (listing) or a taller breadcrumb nav
-             (detail view), so the title doesn't appear to shift when navigating
-             between the two. Content is vertically centered within the band. -->
+             the subtitle is present or not, so the title doesn't appear to shift
+             when navigating between views. Content is vertically centered. -->
         <OText
           v-if="hasSubtitle"
           variant="meta"
@@ -121,15 +113,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center h-5 min-w-0 -mt-0.5"
         >
           <slot name="subtitle">
-            <AppBreadcrumb
-              v-if="hasBreadcrumb"
-              :items="breadcrumb!"
-              :max-inline="breadcrumbMaxInline"
-            />
             <!-- leading-normal (not the meta variant's leading-none): truncate
                  sets overflow:hidden, and a 1em line box clips descenders
                  (g/y/p). The h-5 band + items-center leaves room for it. -->
-            <span v-else class="truncate min-w-0 leading-normal">{{ subtitle }}</span>
+            <span class="truncate min-w-0 leading-normal">{{ subtitle }}</span>
           </slot>
         </OText>
       </div>
@@ -174,9 +161,6 @@ import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import AppBreadcrumb, {
-  type BreadcrumbItem,
-} from "@/components/common/AppBreadcrumb.vue";
 
 interface BackTarget {
   label: string;
@@ -193,10 +177,6 @@ const props = withDefaults(
     titleDataTest?: string;
     subtitle?: string;
     icon?: IconName;
-    /** Level-3+ ancestor path; renders an AppBreadcrumb into the subtitle band. */
-    breadcrumb?: BreadcrumbItem[];
-    /** Forwarded to AppBreadcrumb — inline crumbs before middles collapse. */
-    breadcrumbMaxInline?: number;
     /** Overlay/dialog back-pill ("‹ {label}") shown leading, before the icon. */
     back?: BackTarget;
     /** Render the #tabs slot as a full-width strip below row 1 (prototype's
@@ -227,14 +207,8 @@ const slotHasContent = (name: string): boolean => {
   });
 };
 
-const hasBreadcrumb = computed(
-  () => Array.isArray(props.breadcrumb) && props.breadcrumb.length > 0,
-);
 const hasSubtitle = computed(
-  () =>
-    Boolean(props.subtitle) ||
-    hasBreadcrumb.value ||
-    slotHasContent("subtitle"),
+  () => Boolean(props.subtitle) || slotHasContent("subtitle"),
 );
 const hasTabs = computed(() => slotHasContent("tabs"));
 const hasActions = computed(() => slotHasContent("actions"));

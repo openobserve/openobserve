@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="function-list-page"
     class="flex flex-col h-full min-h-0"
   >
-    <PageLayout
+    <OPageLayout
       v-if="!showAddJSTransformDialog"
       :title="t('function.header')"
       icon="function"
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTable>
           </div>
         </div>
-    </PageLayout>
+    </OPageLayout>
     <div v-else class="flex-1 min-h-0">
       <AddFunction
         v-model="formData"
@@ -229,7 +229,7 @@ import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -241,7 +241,7 @@ export default defineComponent({
   name: "functionList",
   components: {
     OEmptyState,
-    PageLayout,
+    OPageLayout,
     PipelineSectionTabs,
     OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),

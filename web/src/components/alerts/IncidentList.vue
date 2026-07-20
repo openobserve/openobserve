@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="incident-list" class="incident-list h-full">
-    <PageLayout
+    <OPageLayout
       bleed
       :title="t('alerts.incidents.title')"
       icon="notifications-active"
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         </OTable>
-    </PageLayout>
+    </OPageLayout>
   </div>
 </template>
 
@@ -212,7 +212,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -234,7 +234,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "IncidentList",
   components: {
-    PageLayout,
+    OPageLayout,
     OEmptyState,
     OButton,
     OSpinner,

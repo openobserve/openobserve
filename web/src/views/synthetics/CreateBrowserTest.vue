@@ -13,7 +13,7 @@ import { getFoldersListByType } from '@/utils/commons'
 import syntheticsService from '@/services/synthetics'
 import destinationService from '@/services/alert_destination'
 import { toast } from '@/lib/feedback/Toast/useToast'
-import PageLayout from '@/components/common/PageLayout.vue'
+import OPageLayout from '@/lib/core/PageLayout/OPageLayout.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OInput from '@/lib/forms/Input/OInput.vue'
@@ -469,7 +469,7 @@ function onClearResults() {
 
 <template>
   <!-- ── Non-loading: shared wrapper with page header ── -->
-  <PageLayout
+  <OPageLayout
     class="bg-surface-base"
     :title="headerTitle"
     :subtitle="folderName"
@@ -807,5 +807,5 @@ function onClearResults() {
       </ODialog>
     </div>
   </template>
-  </PageLayout>
+  </OPageLayout>
 </template>

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="report-list-page" class="h-full">
-    <PageLayout bleed
+    <OPageLayout bleed
       :title="t('reports.header')"
       title-data-test="report-list-title"
       icon="description"
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    </PageLayout>
+    </OPageLayout>
 
     <!-- Single delete confirm -->
     <ConfirmDialog
@@ -311,7 +311,7 @@ import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } f
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";

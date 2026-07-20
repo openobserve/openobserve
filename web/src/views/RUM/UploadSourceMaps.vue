@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     class="bg-surface-base"
     title="Upload Source Maps"
     :back="{ onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >Upload</OButton>
       </div>
     </OForm>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -103,7 +103,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import SourceMapDropzone from "./SourceMapDropzone.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeUploadSourceMapsSchema,

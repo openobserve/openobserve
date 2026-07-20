@@ -177,12 +177,12 @@ describe("EnrichmentTableList", () => {
       expect(wrapper.find('[data-test="enrichment-tables-list-page"]').exists()).toBe(true);
     });
 
-    it("renders the section title in the standard AppPageHeader", async () => {
+    it("renders the section title in the standard OPageHeader", async () => {
       const wrapper = mountComponent();
 
       await flushPromises();
 
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       expect(wrapper.find(".app-page-header h1").exists()).toBe(true);
     });
 

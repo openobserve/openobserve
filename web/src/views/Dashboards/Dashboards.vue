@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <PageLayout bleed
+  <OPageLayout bleed
     :key="store.state.selectedOrganization.identifier"
     :title="t('dashboard.header')"
     icon="dashboard"
@@ -495,11 +495,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:cancel="confirmBulkDelete = false"
             v-model="confirmBulkDelete"
           />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -581,7 +581,7 @@ export default defineComponent({
   components: {
     OUserCell,
     OTimeCell,
-    PageLayout,
+    OPageLayout,
     OEmptyState,
     OButton,
     OIcon,

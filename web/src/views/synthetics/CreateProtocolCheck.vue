@@ -24,7 +24,7 @@ import { getFoldersListByType } from '@/utils/commons'
 import syntheticsService from '@/services/synthetics'
 import destinationService from '@/services/alert_destination'
 import { toast } from '@/lib/feedback/Toast/useToast'
-import PageLayout from '@/components/common/PageLayout.vue'
+import OPageLayout from '@/lib/core/PageLayout/OPageLayout.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue'
@@ -219,7 +219,7 @@ async function saveCheck() {
 </script>
 
 <template>
-  <PageLayout
+  <OPageLayout
     :title="headerTitle"
     :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
     bleed
@@ -274,5 +274,5 @@ async function saveCheck() {
         <p class="py-2">{{ t('synthetics.newCheck.unsavedBody') }}</p>
       </ODialog>
     </template>
-  </PageLayout>
+  </OPageLayout>
 </template>

@@ -4,7 +4,7 @@
     :form="form"
     v-slot="{ isSubmitting }"
   >
-    <PageLayout
+    <OPageLayout
       :back="{
         label: t('onlineEvals.job.backTo'),
         onClick: () => $emit('cancel'),
@@ -209,7 +209,7 @@
         {{ t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
-    </PageLayout>
+    </OPageLayout>
   </OForm>
 </template>
 
@@ -223,7 +223,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
 import onlineEvalsService, {

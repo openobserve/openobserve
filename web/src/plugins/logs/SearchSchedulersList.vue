@@ -1,6 +1,6 @@
 <template>
   <div class="w-full h-full flex flex-col min-h-0">
-    <PageLayout
+    <OPageLayout
       v-if="!showSearchResults"
       :title="t('search_scheduler_job.title')"
       icon="schedule"
@@ -250,7 +250,7 @@
           v-model="confirmCancel"
         />
       </div>
-    </PageLayout>
+    </OPageLayout>
   </div>
 
   <!-- Empty state is rendered via OEmptyState in the table #empty slot -->
@@ -302,7 +302,7 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -330,7 +330,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     OIcon,
-    PageLayout,
+    OPageLayout,
 },
   props: {
     isClicked: {

@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[containerClass]"
     :style="containerStyle"
   >
-    <!-- Header Section — the standard AppPageHeader (back tile + title + actions)
+    <!-- Header Section — the standard OPageHeader (back tile + title + actions)
          used across the app. Hidden when the host page provides its own page
-         header, e.g. the pipeline shell's AppPageHeader (avoids a duplicate). -->
-    <AppPageHeader
+         header, e.g. the pipeline shell's OPageHeader (avoids a duplicate). -->
+    <OPageHeader
       v-if="!hideHeader"
       :title="title"
       :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`${testPrefix}-import-json-btn`"
         >{{ t('dashboard.import') }}</OButton>
       </template>
-    </AppPageHeader>
+    </OPageHeader>
 
     <div class="flex flex-1 min-h-0 px-page-edge" :class="contentWrapperClass">
       <div class="flex w-full min-h-0" :style="contentStyle">
@@ -201,7 +201,7 @@ import {
 import { useI18n } from "vue-i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
-import AppPageHeader from "./AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -219,7 +219,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     AppTabs,
-    AppPageHeader,
+    OPageHeader,
     OButton,
     OInput,
     OIcon,

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
       :title="t('iam.roles')"
       icon="shield" bleed>
       <template #subtitle>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </RoleTable>
       </div>
     </div>
-  </PageLayout>
+  </OPageLayout>
   <AddRole
     v-model:open="showAddGroup"
     @added:role="onRoleAdded"
@@ -90,7 +90,7 @@ import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useI18n } from "vue-i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";

@@ -73,7 +73,7 @@ function makeWrapper() {
   return mount(MonitorResults, {
     global: {
       stubs: {
-        AppPageHeader: {
+        OPageHeader: {
           template: `
             <div data-test="app-page-header">
               <span data-test="app-page-header-title">{{ title }}</span>
@@ -174,7 +174,7 @@ describe("MonitorResults", () => {
       ).toBe(true);
     });
 
-    it("should render AppPageHeader with monitor name from route query", async () => {
+    it("should render OPageHeader with monitor name from route query", async () => {
       wrapper = makeWrapper();
       await flushPromises();
 

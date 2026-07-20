@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :drawer-mode="drawerMode"
     @update-status="emit('update-status', $event)"
   />
-  <PageLayout
+  <OPageLayout
     v-else
     class="run-detail"
     data-test="synthetics-run-detail"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- ════════ HEADER ════════ -->
     <template #header v-if="!drawerMode">
-    <AppPageHeader
+    <OPageHeader
       class=""
       :subtitle="currentRun.timestamp"
       :back="{
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('synthetics.journey.reRun') }}
         </OButton>
       </template>
-    </AppPageHeader>
+    </OPageHeader>
     </template>
 
     <!-- ════════ SUB TABS ════════ -->
@@ -490,7 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
       </OTabPanels>
     </div>
-  </PageLayout>
+  </OPageLayout>
 
   <!-- ════════════ Screenshot Lightbox ════════════ -->
   <ODialog
@@ -575,8 +575,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import JourneySteps from "@/components/synthetics/journey/JourneySteps.vue";
 import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";

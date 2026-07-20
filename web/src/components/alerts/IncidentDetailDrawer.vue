@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="rounded-default p-0" data-test="incident-detail-page">
-    <PageLayout
+    <OPageLayout
       :back="{
         onClick: close,
         label: t('alerts.incidents.goBack'),
@@ -1041,7 +1041,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="loading" class="flex-1 flex items-center justify-center">
       <OSpinner size="md" />
     </div>
-  </PageLayout>
+  </OPageLayout>
   </div>
 </template>
 
@@ -1082,7 +1082,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -1090,7 +1090,7 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 export default defineComponent({
   name: "IncidentDetailDrawer",
   components: {
-    PageLayout,
+    OPageLayout,
     OTabs,
     OTab,
     TelemetryCorrelationDashboard,

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     :back="{
       label: t('pipeline_destinations.header'),
       onClick: () => emit('cancel'),
@@ -42,14 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts" setup>
 import { defineProps, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import CreateDestinationForm from "./NodeForm/CreateDestinationForm.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 const { t } = useI18n();
 

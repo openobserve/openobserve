@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="org-storage-settings h-full">
-      <PageLayout
+      <OPageLayout
         v-if="currentAction === 'list'"
         :title="t('storage_settings.title')"
         icon="cloud"
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OCard>
       </div>
     </div>
-    </PageLayout>
+    </OPageLayout>
     <OrgStorageEditor
       v-else
       :action="currentAction"
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from "vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useI18n } from "vue-i18n";

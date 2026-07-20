@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <PageLayout
+  <OPageLayout
     class="min-h-[inherit]"
     :back="{
       label: t('cipherKey.header'),
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="dialog.okCallback"
       @update:cancel="dialog.show = false"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 <script lang="ts" setup>
 import { ref, computed, onMounted, onActivated } from "vue";
@@ -182,7 +182,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import {
   makeAddCipherKeySchema,
   addCipherKeyDefaults,

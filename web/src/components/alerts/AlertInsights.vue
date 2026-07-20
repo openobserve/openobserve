@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     :title="t('alerts.insights.title')"
     :back="{ onClick: goBack, dataTest: 'alert-insights-back-btn' }"
     tabs-below
@@ -250,14 +250,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @edit-alert="handleEditAlert"
       @view-history="handleViewHistory"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from '@/lib/core/Button/OButton.vue';
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";

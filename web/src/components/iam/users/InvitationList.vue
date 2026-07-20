@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
       :title="t('invitation.pendingInvitations')"
       :subtitle="t('iam.invitationList.subtitle')"
       icon="mail" bleed>
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t('invitation.confirmRejectMsg', { org: selectedInvitation?.org_name }) }}</p>
     </ODialog>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -154,7 +154,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -165,7 +165,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "InvitationList",
   components: {
-    PageLayout,
+    OPageLayout,
     OEmptyState,
     OButton,
     OTooltip,

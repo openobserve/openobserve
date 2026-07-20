@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     data-test="metrics-page"
     :title="t('search.metrics')"
     icon="bar-chart"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardPanelData="dashboardPanelData"
       @save="addPanelToDashboard"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -132,7 +132,7 @@ import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { isEqual, debounce } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
@@ -172,7 +172,7 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
-    PageLayout,
+    OPageLayout,
     DateTimePickerDashboard,
     SyntaxGuideMetrics,
     MetricLegends,

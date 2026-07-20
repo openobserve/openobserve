@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="flex flex-col h-full"
   >
-    <PageLayout bleed
+    <OPageLayout bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
       :subtitle="t('alerts.subtitle')"
@@ -524,7 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    </PageLayout>
+    </OPageLayout>
     <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
         v-model="formData"
@@ -653,7 +653,7 @@ import {
   computed,
   reactive,
 } from "vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -718,7 +718,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "AlertList",
   components: {
-    PageLayout,
+    OPageLayout,
     OSeparator,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),

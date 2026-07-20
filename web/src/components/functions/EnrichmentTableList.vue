@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="enrichment-tables-list-page"
     class="flex flex-col h-full min-h-0"
   >
-    <PageLayout
+    <OPageLayout
       v-if="!showAddJSTransformDialog"
       :title="t('function.enrichmentTables')"
       icon="dataset"
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTable>
           </div>
         </div>
-    </PageLayout>
+    </OPageLayout>
     <div v-else>
       <add-enrichment-table
         v-model="formData"
@@ -384,7 +384,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -399,7 +399,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "EnrichmentTableList",
   components: {
-    PageLayout,
+    OPageLayout,
     PipelineSectionTabs,
     AddEnrichmentTable,
     OEmptyState,

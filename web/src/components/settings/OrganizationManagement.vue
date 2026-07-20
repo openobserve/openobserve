@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col h-full p-0">
-    <PageLayout
+    <OPageLayout
       :title="t('settings.organizationManagement')"
       icon="lan"
       :subtitle="t('settings.organizationManagementPage.subtitle')"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </PageLayout>
+    </OPageLayout>
 
     <!-- Extend Trial Dialog -->
     <ODialog
@@ -247,7 +247,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import {
@@ -261,7 +261,7 @@ import {
 export default defineComponent({
   name: "PageAlerts",
   components: {
-    PageLayout,
+    OPageLayout,
     OEmptyState,
     OButton,
     ODialog,

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col h-full p-0">
 
-    <PageLayout bleed
+    <OPageLayout bleed
       v-if="!showDestinationEditor && !showImportDestination"
       :title="t('alert_destinations.header')"
       title-data-test="alert-destinations-list-title"
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </div>
-    </PageLayout>
+    </OPageLayout>
     <div v-else-if="showDestinationEditor && !showImportDestination" class="flex-1 min-h-0">
       <AddDestination
         :is-alerts="true"
@@ -289,7 +289,7 @@ import OTag from '@/lib/core/Badge/OTag.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -316,7 +316,7 @@ export default defineComponent({
     OTable,
     OToggleGroup,
     OToggleGroupItem,
-    PageLayout,
+    OPageLayout,
   },
   setup() {
     const store = useStore();

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Grouped left rail (prototype admin model) — same shell as IAM. The rail is
        always present; the chosen section renders to the right. -->
-  <PageLayout bleed :sidebar-width="230">
+  <OPageLayout bleed :sidebar-width="230">
     <template #sidebar>
       <SectionRail
         :groups="sectionGroups"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="isConstrainedSection"
       class="h-full min-h-0 flex flex-col"
     >
-      <AppPageHeader
+      <OPageHeader
         :title="activeSectionItem?.label || ''"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
         :subtitle="activeSectionItem?.description || ''"
@@ -48,20 +48,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <router-view title="" />
       </ConstrainedPage>
     </div>
-    <!-- Table/list sections render their own header (PageLayout) inside. Do NOT
-         pass a `title` attr here: these children are PageLayout-rooted, so a
+    <!-- Table/list sections render their own header (OPageLayout) inside. Do NOT
+         pass a `title` attr here: these children are OPageLayout-rooted, so a
          fallthrough `title` would clobber their own `:title` prop and blank the
          header (regression seen on Query Management / Nodes). -->
     <section v-else class="h-full min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
       <router-view />
     </section>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import {
   type SectionHubGroup,
@@ -89,9 +89,9 @@ import { getImageURL } from "@/utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
   components: {
-    AppPageHeader,
+    OPageHeader,
     ConstrainedPage,
-    PageLayout,
+    OPageLayout,
     SectionRail,
   },
   setup() {

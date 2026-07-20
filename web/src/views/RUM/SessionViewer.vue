@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     class="qp-2"
     :title="sessionDetails.id || t('rum.sessionReplay')"
     :back="{ onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :session-id="sessionId"
       :session-details="sessionDetails"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts" setup>
@@ -125,7 +125,7 @@ import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";

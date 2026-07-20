@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <!-- PageLayout owns the whole skeleton (header + body inset/bleed) — search
+  <!-- OPageLayout owns the whole skeleton (header + body inset/bleed) — search
        lives in the table's own toolbar. -->
-  <PageLayout
+  <OPageLayout
     :title="t('organization.header')"
     :subtitle="t('iam.listOrganizations.subtitle')"
     icon="corporate-fare"
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :org-name="cleanupTargetOrg.name"
       @update:open="showCleanupDialog = $event"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -200,7 +200,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -224,7 +224,7 @@ export default defineComponent({
     OTooltip,
     OTag,
     OBadge,
-    PageLayout,
+    OPageLayout,
     OIcon,
     OTable,
     OSearchInput,

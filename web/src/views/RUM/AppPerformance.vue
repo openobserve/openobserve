@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <PageLayout
+  <OPageLayout
     :key="store.state.selectedOrganization.identifier"
     data-test="rum-performance-page"
     :title="t('rum.performanceSummaryLabel')"
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </keep-alive>
     </router-view>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -114,7 +114,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -125,7 +125,7 @@ export default defineComponent({
     DateTimePickerDashboard,
     OButton,
     OTooltip,
-    PageLayout,
+    OPageLayout,
   },
   setup() {
     const { t } = useI18n();

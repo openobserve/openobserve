@@ -61,12 +61,6 @@
       "rawProjectRamp": 1,
       "rawVarInComponent": 2
     },
-    "components/common/AppBreadcrumb.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/common/AppPageHeader.vue": {
-      "rawProjectRamp": 1
-    },
     "components/common/BaseImport.vue": {
       "unscopedStyle": 1
     },
@@ -350,6 +344,9 @@
       "rawVarInComponent": 1
     },
     "lib/core/Navbar/ONavGroup.vue": {
+      "rawProjectRamp": 1
+    },
+    "lib/core/PageHeader/OPageHeader.vue": {
       "rawProjectRamp": 1
     },
     "lib/core/Table/OTable.vue": {

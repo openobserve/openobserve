@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col h-full p-0">
     <template v-if="!showImportRegexPatternDialog">
     <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-    <PageLayout
+    <OPageLayout
       :title="t('regex_patterns.title')"
       icon="pattern"
       :subtitle="t('settings.regexPatternList.subtitle')"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
     </div>
-    </PageLayout>
+    </OPageLayout>
     </template>
     <ImportRegexPattern
       v-else-if="showImportRegexPatternDialog"
@@ -203,7 +203,7 @@ import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -211,7 +211,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "RegexPatternList",
   components: {
-    PageLayout,
+    OPageLayout,
     ConfirmDialog,
     AddRegexPattern,
     ImportRegexPattern,

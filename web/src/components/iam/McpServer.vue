@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import McpServerCard from "@/components/ingestion/ai/McpServerCard.vue";
 import useIngestion from "@/composables/useIngestion";
 import organizationsService from "@/services/organizations";
@@ -68,7 +68,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageLayout
+  <OPageLayout
     data-test="iam-mcp-server"
     :title="t('iam.mcpServerHeader')"
     icon="mcp"
@@ -77,5 +77,5 @@ onMounted(() => {
     pad-y
   >
     <McpServerCard :subs="subs" :doc-url="docUrl" />
-  </PageLayout>
+  </OPageLayout>
 </template>

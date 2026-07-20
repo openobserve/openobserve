@@ -3,7 +3,7 @@
        transform-type fields inline (#tabs) and the action buttons (#actions).
        The name + transType controls are form-owned (OForm*); the parent
        AddFunction.vue provides the <OForm> context they inject. -->
-  <AppPageHeader
+  <OPageHeader
     :title="t('function.addFunction')"
     :back="{ label: t('function.header'), onClick: redirectToFunctions, dataTest: 'add-function-back-btn' }"
   >
@@ -106,7 +106,7 @@
         {{ t('function.save') }}
       </OButton>
     </template>
-  </AppPageHeader>
+  </OPageHeader>
 </template>
 <script setup lang="ts">
 import {
@@ -126,7 +126,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { toggleFullscreen } from "@/utils/dom";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 const { t } = useI18n();

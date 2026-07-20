@@ -246,7 +246,7 @@
 
   /* Page edge inset — THE single horizontal grid line of the app.
      Everything that sits at the edge of a page derives from this one knob: the
-     AppPageHeader/PageLayout header, an OTable's first/last cell content (via
+     OPageHeader/OPageLayout header, an OTable's first/last cell content (via
      --spacing-table-edge below), and the left rails (folder lists, field lists).
      Change it here and the whole app's left/right alignment moves together.
      See SPACING_AUDIT.md §7. */

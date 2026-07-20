@@ -131,7 +131,7 @@ describe("EditGroup Component", () => {
       wrapper.vm.groupDetails.group_name = "test-group";
       await wrapper.vm.$nextTick();
 
-      // Group name now renders as the AppPageHeader title (row 1).
+      // Group name now renders as the OPageHeader title (row 1).
       const titleElement = wrapper.find(".app-page-header h1");
       expect(titleElement.exists()).toBe(true);
       expect(titleElement.text()).toContain("test-group");

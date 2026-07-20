@@ -79,7 +79,7 @@ const createWrapper = (action: "add" | "edit" = "add") =>
       stubs: {
         OStepper: { template: "<div><slot /></div>" },
         OStep: { template: "<div><slot /></div>" },
-        AppPageHeader: { template: "<div><slot name='title' /></div>" },
+        OPageHeader: { template: "<div><slot name='title' /></div>" },
         OIcon: { template: "<span />" },
         OButton: {
           template: `<button :data-test="$attrs['data-test']" :type="type" @click="$emit('click', $event)"><slot /></button>`,

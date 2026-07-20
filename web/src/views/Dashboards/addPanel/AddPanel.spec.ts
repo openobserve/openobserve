@@ -4832,8 +4832,8 @@ describe("AddPanel.vue", () => {
   // prove the title gate actually blocks save when empty — an unwired `:schema`
   // would be caught here.
   describe("Panel title OForm (real form)", () => {
-    const AppPageHeaderStub = {
-      name: "AppPageHeader",
+    const OPageHeaderStub = {
+      name: "OPageHeader",
       template:
         "<div><slot /><slot name='tabs' /><slot name='actions' /></div>",
     };
@@ -4847,7 +4847,7 @@ describe("AddPanel.vue", () => {
             $router: { push: vi.fn(), replace: vi.fn() },
           },
           stubs: {
-            AppPageHeader: AppPageHeaderStub,
+            OPageHeader: OPageHeaderStub,
             PanelEditor: true,
             DateTimePickerDashboard: true,
             QueryInspector: true,

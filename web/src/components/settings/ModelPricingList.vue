@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TestModelMatchDialog v-model="showTestMatchDialog" />
 
     <!-- Main List View -->
-    <PageLayout
+    <OPageLayout
       v-if="!showImportModelPricingPage"
       icon="paid"
       :subtitle="t('settings.modelPricingList.subtitle')"
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </PageLayout>
+    </OPageLayout>
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
@@ -494,7 +494,7 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";

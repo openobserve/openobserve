@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     data-test="add-enrichment-table-page"
     class="h-[calc(100vh-var(--navbar-height)-0.875rem)]"
     :title="isUpdating ? t('function.updateEnrichmentTable') : t('function.addEnrichmentTable')"
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </OForm>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -220,7 +220,7 @@ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import {
   makeAddEnrichmentTableSchema,
   type AddEnrichmentTableForm,
@@ -240,7 +240,7 @@ export const defaultValue: any = () => {
 export default defineComponent({
   name: "AddEnrichmentTable",
   components: { OSeparator, OButton, OForm, OFormInput, OFormFile, OFormOptionGroup, OFormSwitch,
-    OIcon, PageLayout,
+    OIcon, OPageLayout,
 },
   props: {
     modelValue: {

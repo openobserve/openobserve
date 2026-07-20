@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     data-test="ai-agent-graph-page"
     :title="t('aiObservability.nav.agentGraph')"
     :subtitle="t('aiObservability.subtitle.agentGraph')"
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scope control — same Stream/Agent pattern as LLM Insights, so the two
          AI pages read as one product. Stream tab picks a trace stream; Agent
          tab picks a discovered agent and the graph follows its source_stream.
-         Lives in PageLayout's #subnav (which draws the full-bleed divider). -->
+         Lives in OPageLayout's #subnav (which draws the full-bleed divider). -->
     <template #subnav>
     <div class="flex items-center gap-3 px-page-edge py-2">
       <OToggleGroup
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       agent-highlight
       class="flex-1 min-h-0"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -116,7 +116,7 @@ import { defineAsyncComponent, ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";

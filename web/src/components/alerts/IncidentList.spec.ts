@@ -180,7 +180,7 @@ describe("IncidentList.vue", () => {
 
     it("renders the list title", () => {
       wrapper = createWrapper();
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       expect(wrapper.find(".app-page-header h1").text()).toContain("Incident");
     });
 

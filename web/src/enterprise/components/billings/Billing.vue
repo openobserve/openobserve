@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <PageLayout
+  <OPageLayout
     :title="headerBasedOnRoute()"
     icon="paid"
     bleed
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -186,7 +186,7 @@ import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import BillingService from "@/services/billings";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -198,7 +198,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    PageLayout, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
+    OPageLayout, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
     OIcon, OSplitter, OButton, UsageMemberList, DateTimePickerDashboard },
   setup() {
     const { t } = useI18n();

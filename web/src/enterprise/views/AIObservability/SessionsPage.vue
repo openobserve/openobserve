@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     data-test="ai-sessions-page"
     :title="t('aiObservability.nav.sessions')"
     :subtitle="t('aiObservability.subtitle.sessions')"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       detail-route-name="aiSessionDetails"
       class="flex-1 min-h-0"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -70,7 +70,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {

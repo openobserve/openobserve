@@ -24,9 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <PageLayout bleed>
+    <OPageLayout bleed>
       <template #header>
-      <AppPageHeader
+      <OPageHeader
         class="alert-v3-topbar [container-type:inline-size] [container-name:topbar] shrink-0 border-b border-border-default"
         :back="{
           label: activeFolderName || t('alerts.header'),
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
         </template>
-      </AppPageHeader>
+      </OPageHeader>
       </template>
 
       <div class="flex flex-1 min-h-0">
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       </div>
-    </PageLayout>
+    </OPageLayout>
   </OForm>
 
   <ODrawer data-test="add-alert-json-editor-drawer"
@@ -483,8 +483,8 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -514,7 +514,7 @@ export default defineComponent({
   ],
   components: {
     OIcon,
-    PageLayout,
+    OPageLayout,
     JsonEditor,
     QueryConfig,
     AlertSettings,
@@ -538,7 +538,7 @@ export default defineComponent({
     OForm,
     OFormInput,
     OFormSelect,
-    AppPageHeader,
+    OPageHeader,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);

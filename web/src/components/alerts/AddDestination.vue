@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     class="overflow-hidden"
     :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
     title-data-test="add-destination-title"
@@ -496,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :template-content="previewContent"
       data-test="destination-preview-modal"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 <script lang="ts" setup>
 import {
@@ -517,7 +517,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type {
   Template,
   Headers,

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <PageLayout
+  <OPageLayout
     :back="{ label: currentDashboardData.data?.title || t('dashboard.header'), onClick: goBack, dataTest: 'dashboard-back-btn' }"
     :title="editMode ? t('panel.editPanel') : t('panel.addPanel')"
     bleed
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -248,8 +248,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddPanelSchema, type AddPanelForm } from "./AddPanel.schema";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
-import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -263,7 +262,7 @@ export default defineComponent({
     OIcon,
     OButtonGroup,
     OButton,
-    PageLayout,
+    OPageLayout,
     OForm,
     OFormInput,
     ODropdown,
@@ -1823,52 +1822,10 @@ export default defineComponent({
       },
     ]);
 
-    // Breadcrumb root crumb → dashboards list (module root).
-    const goToDashboardList = () => {
-      return router.push({
-        path: "/dashboards",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
-    // Level-4 ancestor path: Dashboards › <Dashboard> › <Panel> (current).
-    // The Dashboard crumb returns to the view (goBack), discarding the
-    // in-session draft like the existing back affordance.
-    const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
-      const items: BreadcrumbItem[] = [
-        {
-          label: t("dashboard.header"),
-          onClick: goToDashboardList,
-          dataTest: "dashboard-back-btn",
-        },
-      ];
-      const dashTitle = currentDashboardData.data?.title;
-      if (dashTitle) {
-        items.push({
-          label: dashTitle,
-          title: dashTitle,
-          onClick: goBack,
-          dataTest: "add-panel-dashboard-crumb",
-        });
-      }
-      const panelTitle =
-        dashboardPanelData.data?.title ||
-        (editMode.value ? t("panel.editPanel") : t("panel.addPanel"));
-      items.push({
-        label: panelTitle,
-        title: panelTitle,
-        dataTest: "add-panel-current",
-      });
-      return items;
-    });
-
     return {
       t,
       updateDateTime,
       goBack,
-      breadcrumbItems,
       savePanelChangesToDashboard,
       runQuery,
       expandedSplitterHeight,

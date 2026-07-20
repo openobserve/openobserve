@@ -5,7 +5,7 @@
 //   • a data-test prefix on the outer page wrapper
 // Search, filters, and the "create" button now live inside each list's
 // OTable #toolbar slot (matching the IncidentList pattern), and per-tab
-// action buttons (Import, "New X") live in OnlineEvals's AppPageHeader.
+// action buttons (Import, "New X") live in OnlineEvals's OPageHeader.
 
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";

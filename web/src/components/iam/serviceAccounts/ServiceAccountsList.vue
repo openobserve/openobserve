@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <PageLayout
+  <OPageLayout
       :title="t('serviceAccounts.header')"
       icon="manage-accounts"
       :subtitle="t('serviceAccounts.headerSubtitle')" bleed>
@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </ODialog>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -409,7 +409,7 @@ import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -452,7 +452,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, PageLayout, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel, OSpinner },
+  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, OPageLayout, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel, OSpinner },
   emits: [],
   setup(props, { emit }) {
     const store = useStore();

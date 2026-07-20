@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       class="h-full"
     >
-      <PageLayout bleed
+      <OPageLayout bleed
         :main-panel="false"
         :header-class="
           isFullscreen || store.state.printMode === true
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :dashboard-data="currentDashboardData.data"
           :save-json-dashboard="saveJsonDashboard"
         />
-      </PageLayout>
+      </OPageLayout>
     </div>
   </div>
 </template>
@@ -350,8 +350,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import PageLayout from "@/components/common/PageLayout.vue";
-import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -383,7 +382,7 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel"],
   components: {
-    PageLayout,
+    OPageLayout,
     OSeparator,
     DateTimePickerDashboard,
     ShareButton,
@@ -1261,17 +1260,7 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // Breadcrumb root crumb → dashboards list (module root; folder defaults).
-    const goToDashboardList = () => {
-      return router.push({
-        path: "/dashboards",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
-    // back button / folder crumb → dashboards list scoped to the current folder.
+    // back button → dashboards list scoped to the current folder.
     const goBackToDashboardList = () => {
       return router.push({
         path: "/dashboards",
@@ -1281,34 +1270,6 @@ export default defineComponent({
         },
       });
     };
-
-    // Level-3 ancestor path: Dashboards › <Folder> › <Dashboard> (current).
-    // The two parent crumbs now have distinct targets (root vs current folder)
-    // and the current dashboard is the terminal, non-interactive crumb.
-    const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
-      const items: BreadcrumbItem[] = [
-        {
-          label: t("dashboard.header"),
-          onClick: goToDashboardList,
-          dataTest: "dashboard-back-btn",
-        },
-        {
-          label: folderNameFromFolderId.value,
-          onClick: goBackToDashboardList,
-          title: folderNameFromFolderId.value,
-          dataTest: "dashboard-view-folder-breadcrumb",
-        },
-      ];
-      const title = currentDashboardData.data?.title;
-      if (title) {
-        items.push({
-          label: title,
-          title,
-          dataTest: "dashboard-view-current",
-        });
-      }
-      return items;
-    });
 
     //add panel
     const addPanelData = () => {
@@ -1967,7 +1928,6 @@ export default defineComponent({
       savePanelLayout,
       renderDashboardChartsRef,
       folderNameFromFolderId,
-      breadcrumbItems,
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
@@ -2012,7 +1972,7 @@ export default defineComponent({
   /* Grow to the dashboard's natural content height and let the app's outer
      scroll wrapper (MainLayout's .o2-content-scroll) do the scrolling — the same
      model the @media print block below relies on. Pinning a viewport height here
-     (100vh or 100%) capped the subtree, and PageLayout's body (overflow-hidden)
+     (100vh or 100%) capped the subtree, and OPageLayout's body (overflow-hidden)
      then clipped the trailing panels, so tall dashboards could never be scrolled
      to the bottom. `overflow: visible` keeps the sticky header pinned to the
      outer scroll wrapper rather than to a dead inner scroll box. */

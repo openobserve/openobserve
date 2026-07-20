@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <!-- TODO: remove the store.state.theme based styling on this page; theming is centralised in app.scss -->
 <template>
-  <PageLayout
+  <OPageLayout
     class="quota-page text-left"
     :class="isDark ? 'dark-theme-page' : 'light-theme-page'"
     :title="t('quota.header')"
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="discardChangesTypeSwitch"
       v-model="showConfirmDialogTypeSwitch"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -400,7 +400,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
 import { useRouter } from "vue-router";
@@ -419,7 +419,7 @@ export default defineComponent({
     OSelect,
     OSearchInput,
     AppTabs,
-    PageLayout,
+    OPageLayout,
     ConfirmDialog,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),

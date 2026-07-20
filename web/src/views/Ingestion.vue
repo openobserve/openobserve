@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <PageLayout
+  <OPageLayout
     class="ingestionPage"
     data-test="ingestion-page"
     :title="t('ingestion.header')"
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </router-view>
     </div>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -177,7 +177,7 @@ import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 // @ts-ignore
 import {
   defineComponent,
@@ -205,7 +205,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { PageLayout, ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput,
+  components: { OPageLayout, ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput,
     OSelect,
 },
   setup() {

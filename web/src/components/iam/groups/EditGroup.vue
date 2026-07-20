@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     data-test="edit-group-section"
     :title="groupDetails.group_name"
     :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="onLeaveConfirm(false)"
       v-model="leaveConfirm.show"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -101,7 +101,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";

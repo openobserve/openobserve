@@ -145,11 +145,11 @@ describe("SettingsIndex.vue", () => {
         },
         stubs: {
           "router-view": true,
-          PageLayout: {
+          OPageLayout: {
             template: '<div><slot name="sidebar" /><slot /></div>',
           },
           SectionRail: true,
-          AppPageHeader: true,
+          OPageHeader: true,
           ConstrainedPage: {
             template: "<div><slot /></div>",
           },

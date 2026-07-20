@@ -60,7 +60,7 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
       </div>
 
-      <AppPageHeader
+      <OPageHeader
         v-if="hideTabBar && embeddedHeader"
         :title="embeddedHeader.title"
         :subtitle="embeddedHeader.subtitle"
@@ -166,7 +166,7 @@ the Free Software Foundation, either version 3 of the License, or
             />
           </div>
         </template>
-      </AppPageHeader>
+      </OPageHeader>
 
       <section class="online-evals__content flex flex-1 flex-col min-h-0 overflow-hidden bg-card-glass-bg">
         <div v-if="!hideTabBar" class="online-evals__tabs flex items-center gap-2 shrink-0 py-0 px-3.5 bg-transparent border-b border-border-default">
@@ -403,7 +403,7 @@ import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
 import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
 import ImportScorer from "./onlineEvals/ImportScorer.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -568,7 +568,7 @@ const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconNam
   },
 );
 
-// Per-tab "create" button label for the embedded AppPageHeader. Quality has
+// Per-tab "create" button label for the embedded OPageHeader. Quality has
 // no list-style create, so it returns an empty string and the button is
 // suppressed via v-if.
 const addButtonLabel = computed<string>(() => {
@@ -591,7 +591,7 @@ const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
 );
 
 // ── Quality tab: date picker + refresh state ─────────────────────────────
-// The picker + refresh button live in the embedded AppPageHeader's #actions
+// The picker + refresh button live in the embedded OPageHeader's #actions
 // slot (matching LLM Insights / Sessions). QualityPage consumes
 // `qualityDateWindow` as a prop and exposes `refreshAll` + `isAnyLoading` for
 // the Refresh button below.

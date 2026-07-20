@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   PipelineSectionTabs — the L2 section switcher (Stream Pipelines / Functions /
   Enrichment Tables) rendered as tabs next to a page title.
-  Drop it into an AppPageHeader's #tabs slot on any pipeline section page; the
+  Drop it into an OPageHeader's #tabs slot on any pipeline section page; the
   active tab is derived from the current route and clicking a tab navigates.
   This mirrors the breadcrumb section dropdown as faster inline navigation.
 -->

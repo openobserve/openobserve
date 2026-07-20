@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="p-0" style="min-height: inherit; height: calc(100vh - 88px);">
-    <PageLayout
+    <OPageLayout
       v-if="!showAddDialog"
       :title="t('aiToolset.header')"
       icon="smart-toy"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </PageLayout>
+    </OPageLayout>
 
     <!-- Add / Edit form -->
     <div v-else>
@@ -142,7 +142,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -155,7 +155,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageAiToolsets",
   components: {
-    PageLayout,
+    OPageLayout,
     OEmptyState,
     ConfirmDialog,
     AddAiToolset,

@@ -65,7 +65,7 @@ afterEach(() => {
 describe('AppRoles - rendering', () => {
   it('renders the section title', async () => {
     const wrapper = await mountAppRoles();
-    // Title now lives in the standard AppPageHeader (row 1).
+    // Title now lives in the standard OPageHeader (row 1).
     expect(wrapper.find('.app-page-header h1').text()).toContain('Roles');
   });
 

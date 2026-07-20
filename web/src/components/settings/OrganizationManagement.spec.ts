@@ -1069,7 +1069,7 @@ describe("OrganizationManagement.vue", () => {
 
     it("should render the title", () => {
       wrapper = createWrapper();
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       const title = wrapper.find(".app-page-header h1");
       expect(title.text()).toBe("Organization Management");
     });

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="rounded-default px-4 pt-3 overflow-auto" style="min-height: inherit">
-    <!-- Page title is supplied by the parent Billing.vue AppPageHeader; no local title here. -->
+    <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
     <!-- Managed billing empty state for child orgs -->
     <div
       v-if="isChildOrg"

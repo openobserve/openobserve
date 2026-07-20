@@ -9,7 +9,7 @@
       @cancel="closeForm"
     />
 
-    <PageLayout
+    <OPageLayout
       v-else
       icon="smart-toy"
       :subtitle="t('settings.llmProvidersSettings.subtitle')"
@@ -147,7 +147,7 @@
           </template>
         </OTable>
       </div>
-    </PageLayout>
+    </OPageLayout>
 
     <ConfirmDialog
       v-model="confirmDeleteOpen"
@@ -183,7 +183,7 @@ import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat"
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";

@@ -389,7 +389,7 @@ describe("ModelPricingList.vue", () => {
     it("should render the list header when not showing the import page", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       expect(wrapper.find(".app-page-header h1").exists()).toBe(true);
     });
 

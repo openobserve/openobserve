@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <PageLayout
+  <OPageLayout
     :title="headerTitle"
     :back="{ label: t('regex_patterns.title'), onClick: arrowBackFn, dataTest: 'regex-pattern-import-back-btn' }"
     bleed
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="built-in-patterns-tab"
       />
     </div>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -194,7 +194,7 @@ import { useRouter } from "vue-router";
 
 
 import AppTabs from "../common/AppTabs.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -545,7 +545,7 @@ export default defineComponent({
     OSeparator,
     BaseImport,
     AppTabs,
-    PageLayout,
+    OPageLayout,
     OButton,
     OInput,
     BuiltInPatternsTab: defineAsyncComponent(

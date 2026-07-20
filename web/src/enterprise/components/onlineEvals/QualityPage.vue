@@ -127,7 +127,7 @@ import type { AgentFilterSelection } from "./utils/agentFilterSql";
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
   // Date window is owned by OnlineEvals (so the picker + refresh button live
-  // in the embedded AppPageHeader). Quality just consumes it as a reactive
+  // in the embedded OPageHeader). Quality just consumes it as a reactive
   // input to its data loaders.
   dateWindow: DateWindow;
   agentFilter?: AgentFilterSelection | null;
@@ -252,7 +252,7 @@ const isAnyLoading = computed(
 );
 
 // Surface refresh + an aggregated loading flag so OnlineEvals can drive the
-// Refresh button it now renders in the embedded AppPageHeader actions slot.
+// Refresh button it now renders in the embedded OPageHeader actions slot.
 defineExpose({ refreshAll, isAnyLoading });
 
 /** Show the KPI skeleton whenever the KPI queries are running — on the initial

@@ -474,7 +474,6 @@ describe("ServiceAccountsList Component", () => {
       await wrapper.vm.getServiceAccountsUsers();
 
       expect(mockServiceAccountsState.service_accounts_users).toHaveLength(3);
-      expect(mockServiceAccountsState.service_accounts_users[2]["#"]).toBe("03");
 
       // Verify system account is properly formatted
       const sreAgent = mockServiceAccountsState.service_accounts_users[0];
@@ -711,14 +710,15 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("has correct column configuration", () => {
-      // columns uses OTableColumnDef with 'id' (not 'name')
-      expect(wrapper.vm.columns).toHaveLength(6);
-      expect(wrapper.vm.columns[0].id).toBe("#");
-      expect(wrapper.vm.columns[1].id).toBe("email");
-      expect(wrapper.vm.columns[2].id).toBe("first_name");
-      expect(wrapper.vm.columns[3].id).toBe("token");
-      expect(wrapper.vm.columns[4].id).toBe("created_at");
-      expect(wrapper.vm.columns[5].id).toBe("actions");
+      // columns uses OTableColumnDef with 'id' (not 'name'). The row-index "#"
+      // column is now auto-injected by OTable's show-index, so it is not part
+      // of the component's own column defs.
+      expect(wrapper.vm.columns).toHaveLength(5);
+      expect(wrapper.vm.columns[0].id).toBe("email");
+      expect(wrapper.vm.columns[1].id).toBe("first_name");
+      expect(wrapper.vm.columns[2].id).toBe("token");
+      expect(wrapper.vm.columns[3].id).toBe("created_at");
+      expect(wrapper.vm.columns[4].id).toBe("actions");
     });
 
     it("has correct per page options", () => {
@@ -1410,7 +1410,7 @@ describe("ServiceAccountsList Component", () => {
   describe("Header subtitle", () => {
     it("renders a subtitle below the header", async () => {
       // The subtitle should be visible
-      const appPageHeader = wrapper.findComponent({ name: "AppPageHeader" });
+      const appPageHeader = wrapper.findComponent({ name: "OPageHeader" });
       if (appPageHeader.exists()) {
         expect(appPageHeader.props("subtitle")).toBe(
           "Programmatic access tokens for APIs"

@@ -1,5 +1,5 @@
 ﻿<template>
-  <PageLayout
+  <OPageLayout
     :title="t('search_history.title')"
     icon="history"
     :back="{ onClick: closeSearchHistory }"
@@ -245,7 +245,7 @@
             </template>
           </OTable>
     </div>
-  </PageLayout>
+  </OPageLayout>
 
   <!-- Show NoData component if there's no data to display -->
 </template>
@@ -278,7 +278,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -307,7 +307,7 @@ export default defineComponent({
     OTooltip,
     OTable,
     OTimeCell,
-    PageLayout,
+    OPageLayout,
 },
   props: {
     isClicked: {

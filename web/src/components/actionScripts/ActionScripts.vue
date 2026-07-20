@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="action-scripts-list-page" class="h-full">
     <div v-if="!showAddActionScriptDialog" class="h-full">
-      <PageLayout
+      <OPageLayout
         bleed
         :title="t('actions.header')"
         icon="code"
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </OTable>
-      </PageLayout>
+      </OPageLayout>
     </div>
     <template v-else>
       <div class="w-full">
@@ -256,7 +256,7 @@ import {
   computed,
 } from "vue";
 import type { Ref } from "vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -313,7 +313,7 @@ interface ActionScriptList {
 export default defineComponent({
   name: "AlertList",
   components: {
-    PageLayout,
+    OPageLayout,
     OIcon,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),

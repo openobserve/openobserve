@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div>
-      <AppPageHeader
+      <OPageHeader
         :back="{ onClick: () => router.back(), dataTest: 'back-button' }"
       >
         <template #title>
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #actions>
           <span>{{ error.timestamp }}</span>
         </template>
-      </AppPageHeader>
+      </OPageHeader>
       <div class="flex items-center flex-nowrap my-1">
         <div
           data-test="error-header-error-type"
@@ -68,7 +68,7 @@ import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 
 const { t } = useI18n();
 const router = useRouter();

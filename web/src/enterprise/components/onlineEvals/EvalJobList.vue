@@ -319,7 +319,7 @@ const hasFilters = computed(
 );
 
 // Wire OEmptyState's action ids back into the existing emit contract.
-// `create` mirrors a click on the AppPageHeader's "New job" button;
+// `create` mirrors a click on the OPageHeader's "New job" button;
 // `clear-filters` resets the search + status filter inline.
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");

@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  PageLayout — THE single page-structure component. Every routed view is a
-  PageLayout: it owns the full-height column, the header, an optional left rail,
+  OPageLayout — THE single page-structure component. Every routed view is an
+  OPageLayout: it owns the full-height column, the header, an optional left rail,
   an optional sub-nav strip, and the body's inset. You plug in data (title,
   actions, tabs, sidebar, body); there is no place to hand-roll a padded <div>,
   so no screen can drift off the grid.
 
   Header — from props (the normal case):
-    :title :subtitle :icon :back :breadcrumb :titleDataTest
+    :title :subtitle :icon :back :titleDataTest
     #actions      — right-aligned header actions (O2 buttons)
     #header-tabs  — inline module tabs in the header row (Level-2 nav)
     #title        — custom title node (when a string title isn't enough)
@@ -53,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col h-full">
-    <!-- ── Header (props → AppPageHeader, or #header escape hatch) ── -->
-    <!-- Just a shrink-0 slot: AppPageHeader draws its OWN border-b (so the header
+    <!-- ── Header (props → OPageHeader, or #header escape hatch) ── -->
+    <!-- Just a shrink-0 slot: OPageHeader draws its OWN border-b (so the header
          is a consistent 60px). Don't add a border here — it would double the
          divider and add 1px. -->
     <div
@@ -62,12 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="headerClass ?? 'shrink-0'"
     >
       <slot name="header">
-        <AppPageHeader
+        <OPageHeader
           :title="title"
           :subtitle="subtitle"
           :icon="icon"
           :back="back"
-          :breadcrumb="breadcrumb"
           :title-data-test="titleDataTest"
           :tabs-below="tabsBelow"
         >
@@ -77,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="!!slots.subtitle" #subtitle><slot name="subtitle" /></template>
           <template v-if="!!slots.actions" #actions><slot name="actions" /></template>
           <template v-if="!!slots['header-tabs']" #tabs><slot name="header-tabs" /></template>
-        </AppPageHeader>
+        </OPageHeader>
       </slot>
     </div>
 
@@ -167,10 +166,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, useSlots } from "vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
 
 interface BackTarget {
   label: string;
@@ -186,7 +184,6 @@ const props = withDefaults(
     subtitle?: string;
     icon?: IconName;
     back?: BackTarget;
-    breadcrumb?: BreadcrumbItem[];
     titleDataTest?: string;
     /** Render #header-tabs on a second row below the title (Level-2 module nav). */
     tabsBelow?: boolean;
@@ -232,7 +229,6 @@ const hasHeader = computed(
     !!props.subtitle ||
     !!props.icon ||
     !!props.back ||
-    !!props.breadcrumb ||
     !!slots.header ||
     !!slots.title ||
     !!slots.subtitle ||

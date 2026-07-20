@@ -211,12 +211,12 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
   },
   provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
   stubs: {
-    PageLayout: {
-      name: "PageLayout",
+    OPageLayout: {
+      name: "OPageLayout",
       template: '<div data-test-stub="page-layout"><slot name="header" /><slot /><slot name="footer" /></div>',
     },
-    AppPageHeader: {
-      name: "AppPageHeader",
+    OPageHeader: {
+      name: "OPageHeader",
       template: '<div data-test-stub="app-page-header"><slot /><slot name="actions" /></div>',
     },
     FolderList: true,

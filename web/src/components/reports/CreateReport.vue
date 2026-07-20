@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     :title="isEditingReport ? t('reports.update') : t('reports.add')"
     title-data-test="add-report-title"
     :back="{
@@ -702,7 +702,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.save") }}
       </OButton>
     </div>
-  </PageLayout>
+  </OPageLayout>
   <ConfirmDialog
     v-model="dialog.show"
     :title="dialog.title"
@@ -727,7 +727,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
 import SelectFolderDropdown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";

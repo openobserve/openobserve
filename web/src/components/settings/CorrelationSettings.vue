@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     icon="group-work"
     :subtitle="t('settings.correlationSettingsPage.subtitle')"
     data-test="correlation-settings-header"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </SemanticFieldGroupsConfig>
       </div>
     </div>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -111,7 +111,7 @@ import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue
 import AppTabs from "@/components/common/AppTabs.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -127,7 +127,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
-    PageLayout,
+    OPageLayout,
   },
   setup() {
     const store = useStore();

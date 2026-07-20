@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="session-details-page h-[calc(100vh-2.6rem)]"
   >
-  <PageLayout
+  <OPageLayout
     class="session-details bg-card-glass-bg"
     data-test="session-detail-header"
     :title="t('traces.sessionDetail.pageTitle')"
@@ -729,7 +729,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     </div>
-  </PageLayout>
+  </OPageLayout>
   </div>
 </template>
 
@@ -754,7 +754,7 @@ import {
 } from "./threadView.utils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

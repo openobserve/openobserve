@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     - Icons in cells (browser logos, location cloud icons, device icons)
     - Icons in filter dropdowns (browser, device, location selects)
 
-  This component is chrome-less — it does NOT render AppPageHeader.
+  This component is chrome-less — it does NOT render OPageHeader.
   The parent (MonitorResults.vue) owns the header. This component is the
   content below it, following the LLMInsightsDashboard pattern.
 -->

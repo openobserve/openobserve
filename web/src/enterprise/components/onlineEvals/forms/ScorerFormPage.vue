@@ -7,7 +7,7 @@
     <!-- Shared page header (same as JobFormPage) so the two eval forms read
          identically: Back pill in the module-icon slot, title, and the
          scorer-type badge + close button in #actions. -->
-    <PageLayout
+    <OPageLayout
       :back="{
         label: t('onlineEvals.scorer.backTo'),
         onClick: () => $emit('cancel'),
@@ -669,7 +669,7 @@
         </div>
       </template>
     </ODialog>
-    </PageLayout>
+    </OPageLayout>
   </OForm>
 </template>
 
@@ -685,7 +685,7 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {

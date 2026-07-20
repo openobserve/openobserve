@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <PageLayout
+  <OPageLayout
     class="h-[calc(100vh-var(--navbar-height))]! overflow-hidden"
     :title="t('dashboard.importDashboard')"
     :back="{ label: t('dashboard.header'), onClick: goBack }"
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div></div>
-  </PageLayout>
+  </OPageLayout>
 </template>
 <script lang="ts">
 // @ts-nocheck
@@ -283,7 +283,7 @@ import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -879,7 +879,7 @@ export default defineComponent({
       form,
     };
   },
-  components: { OSeparator, SelectFolderDropdown, AppTabs, PageLayout, QueryEditor, OButton, OInput, OSelect,
+  components: { OSeparator, SelectFolderDropdown, AppTabs, OPageLayout, QueryEditor, OButton, OInput, OSelect,
     OForm, OFormInput, OFormFile,
     OIcon, OSplitter,
 },

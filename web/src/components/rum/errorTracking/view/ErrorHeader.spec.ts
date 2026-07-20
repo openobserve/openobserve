@@ -88,7 +88,7 @@ describe("ErrorHeader", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      // Assert — AppPageHeader's back button uses the standard "Back" label.
+      // Assert — OPageHeader's back button uses the standard "Back" label.
       expect(wrapper.find('[data-test="back-button"]').attributes("title")).toBe("Back");
     });
 

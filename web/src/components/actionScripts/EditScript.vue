@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     data-test="add-action-script-section"
     :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
     :back="{
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OForm>
-  </PageLayout>
+  </OPageLayout>
 
   <ConfirmDialog
     v-model="dialog.show"
@@ -476,7 +476,7 @@ import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";

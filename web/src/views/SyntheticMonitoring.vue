@@ -1,5 +1,5 @@
 <template>
-  <PageLayout
+  <OPageLayout
     class="relative"
     :title="t('synthetics.pageTitle')"
     :subtitle="t('synthetics.pageSubtitle')"
@@ -190,14 +190,14 @@
       @updated="onMoveUpdated"
       @update:open="showMoveDialog = $event"
     />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

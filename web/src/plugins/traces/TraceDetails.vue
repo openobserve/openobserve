@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <div v-if="showHeader" class="trace-combined-header-wrapper bg-card-glass-bg py-[0.2rem] shrink-0">
-        <!-- Standalone (routed) header: shared AppPageHeader -->
-        <AppPageHeader
+        <!-- Standalone (routed) header: shared OPageHeader -->
+        <OPageHeader
           v-if="mode === 'standalone'"
           :title="traceTree[0]?.operationName || t('traces.loadingTrace')"
           title-data-test="trace-details-operation-name"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('common.cancel')" />
             </OButton>
           </template>
-        </AppPageHeader>
+        </OPageHeader>
 
         <!-- Embedded (logs) header -->
         <header
@@ -926,7 +926,7 @@ import {
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import useTraces from "@/composables/useTraces";
 import TraceDetailsSidebar from "./TraceDetailsSidebar.vue";
@@ -1092,7 +1092,7 @@ export default defineComponent({
   },
   components: {
     ShareButton,
-    AppPageHeader,
+    OPageHeader,
     OTag,
     TraceDetailsSidebar,
     TraceTree,

@@ -1,5 +1,5 @@
 <template>
-  <PageLayout
+  <OPageLayout
     class="h-[calc(100vh-50px)]!"
     data-test="promql-query-builder"
     :title="t('metrics.queryBuilder.title')"
@@ -83,7 +83,7 @@
       </OCardSection>
     </OCard>
     </div>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -98,7 +98,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";

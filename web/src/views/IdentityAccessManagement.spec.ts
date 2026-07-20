@@ -44,7 +44,7 @@ function allItems(sectionGroups: any[]): any[] {
 
 const defaultStubs = {
   RouterView: { template: "<div>Router View</div>" },
-  PageLayout: {
+  OPageLayout: {
     template:
       '<div><slot name="sidebar" /><slot /></div>',
   },

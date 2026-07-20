@@ -4,7 +4,7 @@
     :form="form"
     v-slot="{ isSubmitting }"
   >
-    <PageLayout
+    <OPageLayout
       :subtitle="t('onlineEvals.provider.subtitle')"
       :back="{
         label: t('onlineEvals.provider.backTo'),
@@ -160,7 +160,7 @@
         {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
-    </PageLayout>
+    </OPageLayout>
   </OForm>
 </template>
 
@@ -173,7 +173,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {

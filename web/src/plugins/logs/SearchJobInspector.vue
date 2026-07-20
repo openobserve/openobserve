@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
     class="bg-surface-base"
     :title="t('logs.searchJobInspector.title')"
     :back="{ onClick: goBack, dataTest: 'inspector-close-button' }"
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ><OIcon name="content-copy" size="sm"  class="mr-1" /></OButton>
       </div>
     </ODialog>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -327,7 +327,7 @@ import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import { chartColor } from "@/utils/chartTheme";
 import NoData from "@/components/shared/grid/NoData.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -380,7 +380,7 @@ export default defineComponent({
   name: "SearchJobInspector",
   components: {
     NoData,
-    PageLayout,
+    OPageLayout,
     OButton,
     ODrawer,
     ODialog,

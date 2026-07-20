@@ -1,5 +1,5 @@
 <template>
-  <PageLayout
+  <OPageLayout
     data-test="gen-ai-agent-mapping-settings"
     :subtitle="t('settings.genAiAgentMapping.description')"
     icon="smart-toy"
@@ -121,7 +121,7 @@
         {{ t("settings.genAiAgentMapping.clearRegistryDescription") }}
       </p>
     </ODialog>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -133,7 +133,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import genAiAgentMappingService, {
   fetchDefaultGenAiAgentMapping,

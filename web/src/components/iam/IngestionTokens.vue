@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <PageLayout
+  <OPageLayout
       :title="t('ingestion.tokenManagementTitle')"
       title-data-test="ingestion-tokens-title-text"
       icon="key" bleed>
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </ODialog>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -207,7 +207,7 @@ import { ref, computed, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -243,7 +243,7 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { PageLayout, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OForm, OFormInput, OTable, OCodeCell, OUserCell },
+  components: { OPageLayout, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OForm, OFormInput, OTable, OCodeCell, OUserCell },
   setup() {
     const store = useStore();
     const { t } = useI18n();

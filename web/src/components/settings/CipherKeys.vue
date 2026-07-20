@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="flex flex-col h-full p-0">
-    <PageLayout
+    <OPageLayout
       v-if="!showAddDialog"
       :title="t('cipherKey.header')"
       icon="key"
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </PageLayout>
+    </OPageLayout>
     <div v-else>
       <add-cipher-key @cancel:hideform="hideAddDialog" />
     </div>
@@ -167,7 +167,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -175,7 +175,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    PageLayout,
+    OPageLayout,
     OEmptyState,
     AddCipherKey,
     ConfirmDialog,

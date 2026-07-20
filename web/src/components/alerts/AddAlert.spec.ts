@@ -118,7 +118,7 @@ const stubs = {
   QueryEditor: true,
   JsonEditor: true,
   InlineSelectFolderDropdown: true,
-  AppPageHeader: true,
+  OPageHeader: true,
 };
 
 const mountAlert = (

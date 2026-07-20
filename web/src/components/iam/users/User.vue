@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <PageLayout
+  <OPageLayout
       :title="t('iam.basicUsers')"
       :subtitle="t('user.subtitle')"
       icon="person" bleed>
@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t('user.deleteUsersMsg', { count: selectedUsers.length }) }}</p>
     </ODialog>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -249,7 +249,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
@@ -283,7 +283,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "UserPageOpenSource",
   components: {
-    PageLayout,
+    OPageLayout,
     OTable,
     UpdateUserRole,
     AddUser,

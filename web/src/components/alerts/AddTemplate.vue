@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <PageLayout
+  <OPageLayout
     class="overflow-hidden"
     :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
     title-data-test="add-template-title"
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
-  </PageLayout>
+  </OPageLayout>
 </template>
 <script lang="ts" setup>
 import {
@@ -191,7 +191,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import type { TemplateData } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import {
   validateTemplateBody,

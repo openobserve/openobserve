@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <PageLayout
+  <OPageLayout
     class="min-h-[inherit]"
     :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
     :back="{
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OForm>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -371,7 +371,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -388,7 +388,7 @@ const QueryEditor = defineAsyncComponent(
 export default defineComponent({
   name: "AddAiToolset",
   components: {
-    PageLayout,
+    OPageLayout,
     OTag,
     OButton,
     OIcon,

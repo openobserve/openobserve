@@ -7,8 +7,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
-import AppPageHeader from '@/components/common/AppPageHeader.vue'
-import PageLayout from '@/components/common/PageLayout.vue'
+import OPageHeader from '@/lib/core/PageHeader/OPageHeader.vue'
+import OPageLayout from '@/lib/core/PageLayout/OPageLayout.vue'
 import OBadge from '@/lib/core/Badge/OBadge.vue'
 import OSkeleton from '@/lib/feedback/Skeleton/OSkeleton.vue'
 import OEmptyState from '@/lib/core/EmptyState/OEmptyState.vue'
@@ -164,9 +164,9 @@ const showAssertions = computed(
 </script>
 
 <template>
-  <PageLayout data-test="synthetics-protocol-run-detail" bleed>
+  <OPageLayout data-test="synthetics-protocol-run-detail" bleed>
     <template #header v-if="!drawerMode">
-    <AppPageHeader
+    <OPageHeader
       class=""
       :subtitle="run ? fmtTs(run.timestamp) : ''"
       :back="{
@@ -187,7 +187,7 @@ const showAssertions = computed(
           {{ run.target }}
         </OBadge>
       </template>
-    </AppPageHeader>
+    </OPageHeader>
     </template>
 
     <div class="flex-1 min-h-0 overflow-y-auto px-page-edge py-4">
@@ -337,5 +337,5 @@ const showAssertions = computed(
         </div>
       </div>
     </div>
-  </PageLayout>
+  </OPageLayout>
 </template>
