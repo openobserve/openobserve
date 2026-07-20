@@ -60,15 +60,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onTabClick(tab.folderId)"
           >
           <div class="folder-item w-full flex items-center justify-between flex-nowrap gap-2 min-h-6 group/row" :data-test="`dashboard-folder-tab-name-${tab.name}`">
-              <span class="folder-name flex-1 min-w-0 text-left truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
-              tab.name
-              }}</span>
-              <OIcon
-                v-if="tab.folderId === FAVORITES_FOLDER_ID"
-                name="favorite"
-                size="sm"
-                class="shrink-0 text-favorite"
-              />
+              <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                <span class="folder-name min-w-0 text-left truncate" :title="tab.name" :data-test="`dashboard-folder-name-${tab.name}`">{{
+                tab.name
+                }}</span>
+                <OIcon
+                  v-if="tab.folderId === FAVORITES_FOLDER_ID"
+                  name="favorite"
+                  size="sm"
+                  class="shrink-0 text-favorite"
+                />
+              </div>
               <div
                 v-if="
                   tab.folderId.toLowerCase() != 'default' &&

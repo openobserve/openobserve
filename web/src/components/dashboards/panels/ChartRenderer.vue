@@ -680,6 +680,42 @@ export default defineComponent({
       },
     );
 
+    // Repairs a chart that ECharts initialized while the element had no
+    // layout size (e.g. mounted mid-splitter/flex settle). In that state
+    // ECharts creates zero-width canvas layers but may still record the
+    // final element size internally, so a plain chart.resize() no-ops as
+    // "unchanged" and the chart stays invisible forever. A full re-init on
+    // the first real size is the only reliable repair.
+    let zeroSizeReinitObserver: ResizeObserver | null = null;
+    const reinitWhenSized = () => {
+      if (!chartRef.value || zeroSizeReinitObserver) return;
+      zeroSizeReinitObserver = new ResizeObserver(() => {
+        if (!chartRef.value) {
+          zeroSizeReinitObserver?.disconnect();
+          zeroSizeReinitObserver = null;
+          return;
+        }
+        if (
+          chartRef.value.clientWidth > 0 &&
+          chartRef.value.clientHeight > 0
+        ) {
+          zeroSizeReinitObserver?.disconnect();
+          zeroSizeReinitObserver = null;
+          const theme = isDark.value ? "dark" : "light";
+          cleanupChart();
+          chart = echarts.init(chartRef.value, theme, {
+            renderer: props.renderType,
+          });
+          chart?.setOption(withChartFont(props?.data?.options || {}), {
+            lazyUpdate: true,
+            notMerge: true,
+          });
+          chartInitialSetUp();
+        }
+      });
+      zeroSizeReinitObserver.observe(chartRef.value);
+    };
+
     onMounted(async () => {
       try {
         await nextTick();
@@ -695,6 +731,12 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          if (
+            chartRef.value.clientWidth === 0 ||
+            chartRef.value.clientHeight === 0
+          ) {
+            reinitWhenSized();
+          }
         }
         chart?.setOption(withChartFont(props?.data?.options || {}), {
           lazyUpdate: true,
@@ -711,6 +753,10 @@ export default defineComponent({
     onUnmounted(() => {
       // Clean up event listeners
       window.removeEventListener("resize", windowResizeEventCallback);
+
+      // Clean up the zero-size re-init observer
+      zeroSizeReinitObserver?.disconnect();
+      zeroSizeReinitObserver = null;
 
       // Cancel throttled functions
       throttledSetHoveredSeriesName.cancel();
