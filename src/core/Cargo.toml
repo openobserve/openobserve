@@ -100,7 +100,6 @@ object_store.workspace = true
 vortex = { workspace = true, optional = true }
 flate2.workspace = true
 futures.workspace = true
-hashlink.workspace = true
 hashbrown.workspace = true
 itertools.workspace = true
 jsonwebtoken.workspace = true
@@ -149,10 +148,8 @@ infra.workspace = true
 ingester.workspace = true
 wal.workspace = true
 lettre.workspace = true
-zip.workspace = true
 futures-util.workspace = true
 flight.workspace = true
-sourcemap.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

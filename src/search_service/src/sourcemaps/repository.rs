@@ -28,8 +28,6 @@ use parquet::data_type::AsBytes;
 use serde::Serialize;
 use tokio::sync::RwLock;
 
-use crate::db;
-
 // DBKey to set sourcemaps keys
 pub const SOURCEMAP_PREFIX: &str = "/sourcemaps/";
 
@@ -304,7 +302,7 @@ pub async fn list_values(org_id: &str) -> Result<ParamValues, anyhow::Error> {
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let prefix = SOURCEMAP_PREFIX;
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = get_coordinator().await;
     let mut events = cluster_coordinator.watch(prefix).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching sourcemaps keys");

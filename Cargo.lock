@@ -6860,7 +6860,6 @@ dependencies = [
  "futures",
  "futures-util",
  "hashbrown 0.16.1",
- "hashlink 0.11.0",
  "http 1.4.0",
  "http-body-util",
  "infra",
@@ -6911,7 +6910,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snap",
- "sourcemap",
  "sqlparser",
  "svix-ksuid",
  "thiserror 2.0.18",
@@ -6929,7 +6927,6 @@ dependencies = [
  "wal",
  "webpki-roots 1.0.6",
  "x509-parser",
- "zip 8.2.0",
 ]
 
 [[package]]
@@ -7193,6 +7190,7 @@ dependencies = [
  "enrichment",
  "futures",
  "hashbrown 0.16.1",
+ "hashlink 0.11.0",
  "infra",
  "ingester",
  "itertools 0.14.0",
@@ -7202,15 +7200,18 @@ dependencies = [
  "openobserve-transform",
  "opentelemetry",
  "parking_lot 0.12.5",
+ "parquet",
  "promql",
  "promql-parser",
  "prost 0.14.3",
  "proto",
  "rand 0.10.1",
  "rayon",
+ "sea-orm",
  "search",
  "serde",
  "serde_json",
+ "sourcemap",
  "sqlparser",
  "svix-ksuid",
  "tokio",
@@ -7218,6 +7219,7 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "utoipa",
+ "zip 8.2.0",
 ]
 
 [[package]]

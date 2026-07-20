@@ -144,7 +144,7 @@ pub mod session;
 pub mod short_url {
     pub use common::short_url::*;
 }
-pub mod sourcemaps;
+pub use openobserve_search_service::sourcemaps;
 pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;

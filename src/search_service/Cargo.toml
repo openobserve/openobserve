@@ -37,11 +37,13 @@ ingester.workspace = true
 itertools.workspace = true
 log.workspace = true
 hashbrown.workspace = true
+hashlink.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 opentelemetry.workspace = true
 openobserve-catalog.workspace = true
 openobserve-transform.workspace = true
 parking_lot.workspace = true
+parquet.workspace = true
 promql.workspace = true
 promql-parser.workspace = true
 prost.workspace = true
@@ -51,6 +53,7 @@ rayon.workspace = true
 search.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sourcemap.workspace = true
 sqlparser.workspace = true
 svix-ksuid.workspace = true
 tokio.workspace = true
@@ -59,3 +62,7 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 utoipa.workspace = true
 vector-enrichment.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+sea-orm.workspace = true

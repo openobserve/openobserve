@@ -1,3 +1,18 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 use std::io::Read;
 
 use anyhow::Context;
@@ -18,7 +33,9 @@ use {
     },
 };
 
-use super::db::sourcemaps;
+pub mod repository;
+
+use self::repository as sourcemaps;
 
 const UNKNOWN_STR: &str = "<unknown>";
 // half-window size for returning source. Basically for trace at line l, it will return l-this -> l+
@@ -534,7 +551,7 @@ mod tests {
 
     use std::collections::HashSet;
 
-    use super::{super::db::sourcemaps::*, *};
+    use super::{repository::*, *};
 
     // Unit tests run without `init-db` (which creates the sqlite db dir and runs
     // migrations from the workspace root); create the db dir and the one table

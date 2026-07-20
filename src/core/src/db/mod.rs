@@ -127,7 +127,9 @@ pub mod session;
 pub mod short_url {
     pub use common::short_url::repository::*;
 }
-pub mod sourcemaps;
+pub mod sourcemaps {
+    pub use openobserve_search_service::sourcemaps::repository::*;
+}
 pub mod system_settings {
     pub use common::system_settings::*;
 }

@@ -30,7 +30,7 @@ use infra::{
     },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-use openobserve_core::db::sourcemaps::SOURCEMAP_PREFIX;
+use openobserve_search_service::sourcemaps::repository::SOURCEMAP_PREFIX;
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
