@@ -20,10 +20,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub use crate::db;
 #[cfg(feature = "enterprise")]
-pub use crate::{
-    anomaly_detection, llm_evaluations, ofga, org_storage_providers, providers, ratelimit,
-    search_jobs,
-};
+pub use crate::{llm_evaluations, ofga, org_storage_providers, providers, ratelimit, search_jobs};
 #[cfg(feature = "cloud")]
 pub use crate::{org_usage, trial_quota};
 

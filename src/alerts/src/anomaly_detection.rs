@@ -15,6 +15,10 @@
 
 use anyhow::Result;
 use chrono::Utc;
+use common::{
+    meta::authz::Authz,
+    utils::auth::{remove_ownership, set_ownership},
+};
 use config::{
     meta::{
         destinations::{DestinationType, Module},
@@ -25,18 +29,13 @@ use config::{
     utils::time::now_micros,
 };
 use infra::{db::ORM_CLIENT, table::anomaly_detection::config as anomaly_config_table};
+use openobserve_search_service::service as search;
 use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
 use utoipa::ToSchema;
 
-use crate::{
-    common::{
-        meta::authz::Authz,
-        utils::auth::{remove_ownership, set_ownership},
-    },
-    service::{alerts::destinations, search},
-};
+use crate::service::destinations;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
@@ -113,7 +112,7 @@ async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
             name: "default".to_owned(),
             description: "default".to_owned(),
         };
-        if crate::folders::save_folder(org_id, folder, FolderType::Alerts, true)
+        if crate::ports::create_default_folder(org_id, folder)
             .await
             .is_ok()
         {
@@ -185,7 +184,7 @@ pub async fn list_configs(
 
     // Build a map of anomaly_id → trigger for O(1) lookups.
     let trigger_map: std::collections::HashMap<String, _> =
-        crate::db::scheduler::list_by_org(org_id, Some(TriggerModule::AnomalyDetection))
+        openobserve_scheduler::list_by_org(org_id, Some(TriggerModule::AnomalyDetection))
             .await
             .unwrap_or_default()
             .into_iter()
@@ -437,7 +436,7 @@ pub async fn create_config(
     // same infrastructure as alerts.  The handler will check `is_trained` and skip
     // until training is complete.
     {
-        let trigger = crate::db::scheduler::Trigger {
+        let trigger = openobserve_scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
             module_key: anomaly_id.clone(),
@@ -446,7 +445,7 @@ pub async fn create_config(
             is_silenced: false,
             ..Default::default()
         };
-        if let Err(e) = crate::db::scheduler::push(trigger).await {
+        if let Err(e) = openobserve_scheduler::push(trigger).await {
             log::warn!("[anomaly_detection {anomaly_id}] failed to push detection trigger: {e}");
         }
     }
@@ -637,7 +636,7 @@ pub async fn update_config(
     // Push the trigger AFTER the DB save so the scheduler always sees enabled=true
     // when it picks up the newly inserted trigger row.
     if push_trigger_after_save {
-        let trigger = crate::db::scheduler::Trigger {
+        let trigger = openobserve_scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
             module_key: anomaly_id.to_string(),
@@ -648,7 +647,7 @@ pub async fn update_config(
         };
         // push() is a no-op if the row already exists (ON CONFLICT DO NOTHING);
         // the existing next_run_at is kept, which is fine — it will fire soon.
-        if let Err(e) = crate::db::scheduler::push(trigger).await {
+        if let Err(e) = openobserve_scheduler::push(trigger).await {
             log::warn!("[anomaly_detection {anomaly_id}] failed to push trigger on enable: {e}");
         }
     }
@@ -658,10 +657,11 @@ pub async fn update_config(
     // existing row due to ON CONFLICT DO NOTHING).  Only applicable for enabled configs.
     if reset_trigger_after_save && updated.enabled {
         let now = now_micros();
-        match crate::db::scheduler::get(org_id, TriggerModule::AnomalyDetection, anomaly_id).await {
+        match openobserve_scheduler::get(org_id, TriggerModule::AnomalyDetection, anomaly_id).await
+        {
             Ok(mut trigger) => {
                 trigger.next_run_at = now;
-                if let Err(e) = crate::db::scheduler::update_trigger(trigger, false, "").await {
+                if let Err(e) = openobserve_scheduler::update_trigger(trigger, false, "").await {
                     log::warn!(
                         "[anomaly_detection {anomaly_id}] failed to reset trigger on interval change: {e}"
                     );
@@ -669,7 +669,7 @@ pub async fn update_config(
             }
             Err(_) => {
                 // No trigger row — create one (config is enabled, so one should exist).
-                let trigger = crate::db::scheduler::Trigger {
+                let trigger = openobserve_scheduler::Trigger {
                     org: org_id.to_string(),
                     module: TriggerModule::AnomalyDetection,
                     module_key: anomaly_id.to_string(),
@@ -678,7 +678,7 @@ pub async fn update_config(
                     is_silenced: false,
                     ..Default::default()
                 };
-                if let Err(e) = crate::db::scheduler::push(trigger).await {
+                if let Err(e) = openobserve_scheduler::push(trigger).await {
                     log::warn!(
                         "[anomaly_detection {anomaly_id}] failed to push trigger on interval change: {e}"
                     );
@@ -743,7 +743,7 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
     // Remove the detection trigger from the shared scheduler.
     {
         if let Err(e) =
-            crate::db::scheduler::delete(org_id, TriggerModule::AnomalyDetection, anomaly_id).await
+            openobserve_scheduler::delete(org_id, TriggerModule::AnomalyDetection, anomaly_id).await
         {
             log::warn!("[anomaly_detection {anomaly_id}] failed to delete detection trigger: {e}");
         }
@@ -870,7 +870,7 @@ pub async fn clone_config(
 
     // Register detection trigger for the new config
     {
-        let trigger = crate::db::scheduler::Trigger {
+        let trigger = openobserve_scheduler::Trigger {
             org: org_id.to_string(),
             module: TriggerModule::AnomalyDetection,
             module_key: new_id.clone(),
@@ -879,7 +879,7 @@ pub async fn clone_config(
             is_silenced: false,
             ..Default::default()
         };
-        if let Err(e) = crate::db::scheduler::push(trigger).await {
+        if let Err(e) = openobserve_scheduler::push(trigger).await {
             log::warn!("[anomaly_detection {new_id}] failed to push detection trigger: {e}");
         }
     }
@@ -1184,7 +1184,7 @@ pub async fn recover_detection_triggers_on_startup() {
         let org = &config.org_id;
         let key = &config.anomaly_id;
 
-        match crate::db::scheduler::get(org, TriggerModule::AnomalyDetection, key).await {
+        match openobserve_scheduler::get(org, TriggerModule::AnomalyDetection, key).await {
             Ok(_) => {
                 // Trigger exists — OSS scheduler will fire it when next_run_at passes.
                 // Processing→Waiting recovery is handled by watch_timeout().
@@ -1192,7 +1192,7 @@ pub async fn recover_detection_triggers_on_startup() {
             Err(_) => {
                 // Row missing — create a fresh trigger due immediately.
                 log::info!("[anomaly_detection] Re-creating missing trigger for {key}");
-                let trigger = crate::db::scheduler::Trigger {
+                let trigger = openobserve_scheduler::Trigger {
                     org: org.clone(),
                     module: TriggerModule::AnomalyDetection,
                     module_key: key.clone(),
@@ -1201,7 +1201,7 @@ pub async fn recover_detection_triggers_on_startup() {
                     is_silenced: false,
                     ..Default::default()
                 };
-                if let Err(e) = crate::db::scheduler::push(trigger).await {
+                if let Err(e) = openobserve_scheduler::push(trigger).await {
                     log::warn!("[anomaly_detection] Failed to re-create trigger for {key}: {e}");
                 }
             }

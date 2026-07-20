@@ -17,6 +17,8 @@ use std::sync::LazyLock;
 
 use config::{RwAHashMap, meta::triggers::Trigger};
 
+#[cfg(feature = "enterprise")]
+pub mod anomaly_detection;
 pub mod evaluation;
 pub mod grouping;
 mod http;

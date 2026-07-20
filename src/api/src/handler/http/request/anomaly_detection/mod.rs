@@ -19,7 +19,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-pub use openobserve_core::anomaly_detection::{
+use openobserve_alerts::anomaly_detection as anomaly_service;
+pub use openobserve_alerts::anomaly_detection::{
     CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
 };
 use serde::{Deserialize, Serialize};
@@ -28,7 +29,6 @@ use utoipa::ToSchema;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::extractors::Headers,
-    service::anomaly_detection as anomaly_service,
 };
 
 /// Anomaly detection can be turned off at runtime via O2_ANOMALY_DETECTION_DISABLED.

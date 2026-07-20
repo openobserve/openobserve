@@ -137,7 +137,7 @@ async fn create_anomaly_alert(
     req_body: CreateAlertRequestBody,
     query_folder_id: &str,
 ) -> Response {
-    use openobserve_core::anomaly_detection::CreateAnomalyConfigRequest;
+    use openobserve_alerts::anomaly_detection::CreateAnomalyConfigRequest;
 
     let Some(anomaly_fields) = req_body.anomaly_fields() else {
         return MetaHttpResponse::bad_request(
@@ -183,7 +183,7 @@ async fn create_anomaly_alert(
         owner,
     };
 
-    match openobserve_core::anomaly_detection::create_config(org_id, req).await {
+    match openobserve_alerts::anomaly_detection::create_config(org_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -241,7 +241,8 @@ pub async fn get_alert(Path((org_id, alert_id)): Path<(String, String)>) -> Resp
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection config lookup.
-                match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str).await
+                match openobserve_alerts::anomaly_detection::get_config(&org_id, &alert_id_str)
+                    .await
                 {
                     Ok(Some(mut v)) => {
                         // Tag with alert_type so the caller can discriminate.
@@ -317,7 +318,8 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection config export
-                match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str).await
+                match openobserve_alerts::anomaly_detection::get_config(&org_id, &alert_id_str)
+                    .await
                 {
                     Ok(Some(mut v)) => {
                         // Inject alert_type so consumers know what kind this is
@@ -424,7 +426,7 @@ pub async fn clone_alert(
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection config clone
-                match openobserve_core::anomaly_detection::clone_config(
+                match openobserve_alerts::anomaly_detection::clone_config(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
@@ -546,7 +548,7 @@ async fn build_and_run_anomaly_update(
     fields: UpdateAnomalyAlertFields,
     alert: crate::models::alerts::Alert,
 ) -> Response {
-    use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+    use openobserve_alerts::anomaly_detection::UpdateAnomalyConfigRequest;
 
     let owner = fields
         .owner
@@ -581,7 +583,7 @@ async fn build_and_run_anomaly_update(
         owner,
     };
 
-    match openobserve_core::anomaly_detection::update_config(org_id, anomaly_id, req).await {
+    match openobserve_alerts::anomaly_detection::update_config(org_id, anomaly_id, req).await {
         Ok(v) => MetaHttpResponse::json(v),
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -638,7 +640,7 @@ pub async fn delete_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     // Not a regular alert — try anomaly detection config (enterprise only).
     #[cfg(feature = "enterprise")]
     {
-        match openobserve_core::anomaly_detection::delete_config(&org_id, &alert_id_str).await {
+        match openobserve_alerts::anomaly_detection::delete_config(&org_id, &alert_id_str).await {
             Ok(_) => MetaHttpResponse::ok("Alert deleted"),
             Err(e) => {
                 let msg = e.to_string().to_lowercase();
@@ -731,7 +733,7 @@ pub async fn delete_alert_bulk(
                 Err(format!("alert {id} not found"))
             }
             #[cfg(feature = "enterprise")]
-            openobserve_core::anomaly_detection::delete_config(&org_id, &id)
+            openobserve_alerts::anomaly_detection::delete_config(&org_id, &id)
                 .await
                 .map_err(|e: anyhow::Error| e.to_string())
         };
@@ -853,7 +855,7 @@ pub async fn list_alerts(
     if matches!(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::AnomalyDetection
-    ) && let Ok(configs) = openobserve_core::anomaly_detection::list_configs(
+    ) && let Ok(configs) = openobserve_alerts::anomaly_detection::list_configs(
         &org_id,
         folder_slug.as_deref(),
         name_substring.as_deref(),
@@ -933,12 +935,12 @@ pub async fn enable_alert(
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection config
-                use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+                use openobserve_alerts::anomaly_detection::UpdateAnomalyConfigRequest;
                 let req = UpdateAnomalyConfigRequest {
                     enabled: Some(should_enable),
                     ..Default::default()
                 };
-                match openobserve_core::anomaly_detection::update_config(
+                match openobserve_alerts::anomaly_detection::update_config(
                     &org_id,
                     &alert_id.to_string(),
                     req,
@@ -1041,12 +1043,12 @@ pub async fn enable_alert_bulk(
                 #[cfg(feature = "enterprise")]
                 {
                     // Fall back to anomaly detection config
-                    use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+                    use openobserve_alerts::anomaly_detection::UpdateAnomalyConfigRequest;
                     let req = UpdateAnomalyConfigRequest {
                         enabled: Some(should_enable),
                         ..Default::default()
                     };
-                    match openobserve_core::anomaly_detection::update_config(
+                    match openobserve_alerts::anomaly_detection::update_config(
                         &org_id,
                         &id.to_string(),
                         req,
@@ -1121,7 +1123,7 @@ pub async fn trigger_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
             #[cfg(feature = "enterprise")]
             {
                 // Fall back to anomaly detection — trigger a detection run
-                match openobserve_core::anomaly_detection::detect_anomalies(
+                match openobserve_alerts::anomaly_detection::detect_anomalies(
                     &org_id,
                     &alert_id.to_string(),
                 )
@@ -1196,7 +1198,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
         MetaHttpResponse::bad_request("retrain is only supported for anomaly detection alerts")
     }
     #[cfg(feature = "enterprise")]
-    match openobserve_core::anomaly_detection::train_model(&org_id, &alert_id_str).await {
+    match openobserve_alerts::anomaly_detection::train_model(&org_id, &alert_id_str).await {
         Ok(_) => MetaHttpResponse::ok("Retraining triggered"),
         Err(e) => {
             let msg = e.to_string().to_lowercase();
@@ -1254,13 +1256,14 @@ pub async fn move_alerts(
     // regular alerts have not yet been relocated (reduces partial-move risk).
     #[cfg(feature = "enterprise")]
     for id in anomaly_ids {
-        use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+        use openobserve_alerts::anomaly_detection::UpdateAnomalyConfigRequest;
         let req = UpdateAnomalyConfigRequest {
             folder_id: Some(req_body.dst_folder_id.clone()),
             ..Default::default()
         };
         if let Err(e) =
-            openobserve_core::anomaly_detection::update_config(&org_id, &id.to_string(), req).await
+            openobserve_alerts::anomaly_detection::update_config(&org_id, &id.to_string(), req)
+                .await
         {
             let msg = e.to_string().to_lowercase();
             if msg.contains("not found") {

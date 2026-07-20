@@ -30,6 +30,7 @@ anyhow.workspace = true
 async-trait.workspace = true
 aws-sdk-sns.workspace = true
 axum.workspace = true
+base64.workspace = true
 chrono.workspace = true
 common.workspace = true
 config.workspace = true
@@ -49,12 +50,14 @@ regex.workspace = true
 reqwest.workspace = true
 sea-orm.workspace = true
 search.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 url.workspace = true
+utoipa.workspace = true
 
 [dev-dependencies]
 arrow-schema.workspace = true

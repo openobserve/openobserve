@@ -687,7 +687,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
                 Box::pin(async move {
-                    openobserve_core::anomaly_detection::execute_anomaly_query(
+                    openobserve_alerts::anomaly_detection::execute_anomaly_query(
                         &org_id,
                         &sql,
                         start,
@@ -703,8 +703,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_anomaly_writer(
             |org_id, records| {
                 Box::pin(async move {
-                    openobserve_core::anomaly_detection::write_anomalies_to_stream(&org_id, records)
-                        .await
+                    openobserve_alerts::anomaly_detection::write_anomalies_to_stream(
+                        &org_id, records,
+                    )
+                    .await
                 })
             },
         );
@@ -721,7 +723,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
              window_start_us,
              window_end_us| {
                 Box::pin(async move {
-                    openobserve_core::anomaly_detection::send_anomaly_alert(
+                    openobserve_alerts::anomaly_detection::send_anomaly_alert(
                         org_id,
                         dest_id,
                         cfg_name,
@@ -802,7 +804,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         // Ensure every enabled anomaly config has a live detection trigger after restart.
         // Handles: trigger row missing, or stuck in Processing from a previous crash.
-        openobserve_core::anomaly_detection::recover_detection_triggers_on_startup().await;
+        openobserve_alerts::anomaly_detection::recover_detection_triggers_on_startup().await;
 
         if let Err(e) =
             o2_enterprise::enterprise::anomaly_detection::scheduler::start_scheduler().await

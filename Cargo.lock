@@ -6587,6 +6587,7 @@ dependencies = [
  "async-trait",
  "aws-sdk-sns",
  "axum",
+ "base64 0.22.1",
  "chrono",
  "common",
  "config",
@@ -6606,12 +6607,14 @@ dependencies = [
  "reqwest 0.13.2",
  "sea-orm",
  "search",
+ "serde",
  "serde_json",
  "svix-ksuid",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
  "url",
+ "utoipa",
 ]
 
 [[package]]
