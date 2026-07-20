@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
-                        <label class="text-compact font-[500] text-text-label">
+                        <label class="text-compact font-[500] text-text-heading">
                           Data Retention (days)
                         </label>
                         <OInput
@@ -518,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Max Query Range -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-compact font-[500] text-text-label">
+                        <label class="text-compact font-[500] text-text-heading">
                           Max Query Range (hours)
                         </label>
                         <OInput
@@ -534,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Flatten Level -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-compact font-[500] text-text-label">
+                        <label class="text-compact font-[500] text-text-heading">
                           {{ t("logStream.flattenLevel") }}
                         </label>
                         <OInput

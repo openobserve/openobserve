@@ -37,7 +37,7 @@
 
           <!-- Fields -->
           <div class="mb-2">
-            <label class="block text-sm font-semibold mb-1 text-text-label">{{ t("crossLinks.fields") }}</label>
+            <label class="block text-sm font-semibold mb-1 text-text-heading">{{ t("crossLinks.fields") }}</label>
             <div class="text-xs mb-2 text-text-muted">
               {{ t("crossLinks.fieldsHint") }}
             </div>

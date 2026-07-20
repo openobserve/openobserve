@@ -436,6 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       name="_ui.checkEvery"
                       type="number"
+                      class="min-w-25 max-w-25"
                       min="1"
                       @update:model-value="onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
@@ -774,6 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       name="_ui.checkEvery"
                       type="number"
+                      class="min-w-25 max-w-25"
                       min="1"
                       @update:model-value="onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
