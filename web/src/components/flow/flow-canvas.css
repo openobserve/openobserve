@@ -161,7 +161,7 @@
  * here instead of a `pattern-color` hex prop, and it follows the theme for free.
  * ───────────────────────────────────────────────────────────────────────────── */
 .o2vf_node .vue-flow__background circle {
-  fill: var(--color-grey-400);
+  fill: var(--color-border-strong);
 }
 
 /* ── Dark mode ───────────────────────────────────────────────────────────── */

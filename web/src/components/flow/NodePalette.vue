@@ -50,7 +50,7 @@ export default {
 </script>
 
 <template>
-  <div class="np-sidebar shrink-0 w-[200px] pr-3" :data-test="testPrefix">
+  <div class="np-sidebar shrink-0 w-50 pr-3" :data-test="testPrefix">
     <div
       class="np-header mb-2 mx-2 text-base font-semibold px-1 pb-2 text-center tracking-wide"
       :data-test="`${testPrefix}-title`"
@@ -73,8 +73,7 @@ export default {
             variant="ghost"
             size="md"
             :class="[`o2vf_node_${node.io_type}`, onItemClick ? 'cursor-pointer' : '']"
-            class="p-0 btn-fixed-width relative flex items-center w-full hover:translate-x-[3px] hover:bg-[rgba(255,255,255,0.1)] hover:backdrop-blur-[8px] dark:hover:bg-[rgba(255,255,255,0.08)]! dark:hover:backdrop-blur-[12px]!"
-            style="width: 170px; justify-content: flex-start"
+            class="p-0 btn-fixed-width relative flex items-center w-[10.625rem] justify-start hover:translate-x-[0.1875rem] hover:bg-white/10 hover:backdrop-blur-[0.5rem] dark:hover:bg-white/8! dark:hover:backdrop-blur-[0.75rem]!"
             :data-test="`${testPrefix}-${node.subtype}-${node.io_type}-btn`"
             :draggable="!!onDragStart"
             @dragstart="onDragStart && onDragStart($event, node)"
@@ -83,12 +82,12 @@ export default {
             <OTooltip side="right" :side-offset="10">
               <template #content>
                 <div class="px-2.5 py-1.5">
-                  <div class="font-medium text-[11px] mb-0.5 capitalize">{{ node.label }}</div>
-                  <div v-if="node.tooltip" class="text-[10px] leading-[1.3] capitalize">{{ node.tooltip }}</div>
+                  <div class="font-medium text-[0.6875rem] mb-0.5 capitalize">{{ node.label }}</div>
+                  <div v-if="node.tooltip" class="text-[0.625rem] leading-[1.3] capitalize">{{ node.tooltip }}</div>
                 </div>
               </template>
             </OTooltip>
-            <div class="node-content grid items-center w-full py-1 pr-1.5 gap-2" style="grid-template-columns: auto 1fr auto">
+            <div class="node-content grid grid-cols-[auto_1fr_auto] items-center w-full py-1 pr-1.5 gap-2">
               <div class="node-icon-section flex items-center gap-2">
                 <img
                   v-if="typeof node.icon === 'string' && node.icon.startsWith('img:')"
@@ -99,8 +98,8 @@ export default {
                 <OIcon v-else size="md" :name="node.icon" />
                 <OSeparator vertical class="node-separator h-4" />
               </div>
-              <div class="node-label w-[70px] text-left overflow-hidden text-ellipsis whitespace-nowrap font-medium text-[12px]">{{ node.label }}</div>
-              <div class="drag-dots grid gap-0.5 w-2 h-2" style="grid-template-columns: 1fr 1fr">
+              <div class="node-label w-[4.375rem] text-left overflow-hidden text-ellipsis whitespace-nowrap font-medium text-xs">{{ node.label }}</div>
+              <div class="drag-dots grid grid-cols-2 gap-0.5 w-2 h-2">
                 <span class="dot w-0.5 h-0.5 rounded-full transition-all"></span>
                 <span class="dot w-0.5 h-0.5 rounded-full transition-all"></span>
                 <span class="dot w-0.5 h-0.5 rounded-full transition-all"></span>
@@ -116,130 +115,9 @@ export default {
 </template>
 
 <style>
-/* ── Header: "Nodes" title with a purple underline spanning the column
-      (matches the pipeline editor's purple accent bar) ───────────────────── */
-.np-header {
-  /* Theme tokens — no .body--dark override needed. Underline uses the app's
-     brand accent (primary-600, the active-tab/link colour). */
-  color: var(--color-text-heading);
-  border-bottom: 2px solid var(--color-primary-600);
-}
-
-/* ── Frosted-glass panel wrapping the node cards (the original NodeSidebar
-      look, shared by both palettes) ──────────────────────────────────────── */
-.np-panel {
-  background: rgba(226, 232, 240, 0.9);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  padding: 12px 8px;
-  margin: 4px 2px;
-  transition: all 0.3s ease-in-out;
-}
-.np-panel:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-}
-.body--dark .np-panel {
-  background: rgba(15, 23, 42, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
-}
-.body--dark .np-panel:hover {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-/* Drag-affordance dots. Coloured via `.body--dark` (the app's theme class) — NOT
-   Tailwind's `dark:` variant, which follows the OS `prefers-color-scheme` and so
-   turned the dots white in the app's light mode. */
-.dot {
-  background: rgba(107, 114, 128, 0.6);
-}
-.body--dark .dot {
-  background: rgba(255, 255, 255, 0.5);
-}
-.drag-handle:hover .dot {
-  background: rgba(107, 114, 128, 0.8);
-  transform: scale(1.1);
-}
-
-/* ── Node-role card colours (single source for both palettes) ────────────── */
-.o2vf_node_input {
-  border: 1px solid rgba(96, 165, 250, 0.4);
-  color: #1e40af;
-  border-radius: 8px;
-  background: rgba(239, 246, 255, 0.9);
-  transition: all 0.3s ease;
-}
-.o2vf_node_input:hover {
-  background: rgba(239, 246, 255, 1);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
-  border-color: rgba(96, 165, 250, 0.6);
-}
-
-.o2vf_node_output {
-  border: 1px solid rgba(74, 222, 128, 0.4);
-  color: #181a1b;
-  border-radius: 8px;
-  background: rgba(240, 253, 244, 0.9);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
-  transition: all 0.3s ease;
-  padding: 8px 16px;
-}
-.o2vf_node_output:hover {
-  background: rgba(240, 253, 244, 1);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
-  border-color: rgba(74, 222, 128, 0.6);
-}
-
-.o2vf_node_default {
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  color: #92400e;
-  border-radius: 8px;
-  background: rgba(255, 251, 235, 0.9);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.1);
-  transition: all 0.3s ease;
-}
-.o2vf_node_default:hover {
-  background: rgba(255, 251, 235, 1);
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.2);
-  border-color: rgba(245, 158, 11, 0.6);
-}
-
-.body--dark .o2vf_node_default {
-  background: rgba(120, 53, 15, 0.2) !important;
-  border: 1px solid rgba(251, 146, 60, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-.body--dark .o2vf_node_default:hover {
-  background: rgba(120, 53, 15, 0.3) !important;
-  border-color: rgba(251, 146, 60, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
-}
-
-.body--dark .o2vf_node_input {
-  background: rgba(30, 58, 138, 0.2) !important;
-  border: 1px solid rgba(96, 165, 250, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-.body--dark .o2vf_node_input:hover {
-  background: rgba(30, 58, 138, 0.3) !important;
-  border-color: rgba(96, 165, 250, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
-}
-
-.body--dark .o2vf_node_output {
-  background: rgba(20, 83, 45, 0.2) !important;
-  border: 1px solid rgba(74, 222, 128, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-.body--dark .o2vf_node_output:hover {
-  background: rgba(20, 83, 45, 0.3) !important;
-  border-color: rgba(74, 222, 128, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
-}
-
-.body--dark .drag-handle:hover .dot {
-  background: rgba(255, 255, 255, 0.7) !important;
-}
+/* Palette styling lives in its own token-driven stylesheet (see the note at the
+   top of node-palette.css for why it cannot be scoped). Kept out of the SFC so
+   this component carries no style block of its own — same arrangement as
+   flow-canvas.css for the canvas. */
+@import "@/components/flow/node-palette.css";
 </style>
