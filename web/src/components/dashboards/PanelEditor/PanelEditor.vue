@@ -457,19 +457,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
         >
           <!-- Field List for custom chart -->
+          <!-- Mirror the normal field-list block above: a fixed-height wrapper
+               with NO overflow of its own, so PanelFieldList's inner OFieldList
+               is the single scroller and its stream selectors (before-list)
+               stay sticky above the scrolling field rows. Wrapping it in an
+               overflow-y-auto container stacked a second scrollbar and let the
+               dropdowns scroll away. -->
           <template #before>
-            <div class="w-full h-full">
+            <div :class="fieldListWrapperClass">
               <div
-                class="flex flex-col scroll bg-card-glass-bg"
-                :style="{ height: contentHeight, overflowY: 'auto' }"
+                v-if="dashboardPanelData.layout.showFieldList"
+                class="flex flex-col bg-surface-panel!"
+                :style="fieldListContainerStyle"
               >
-                <div
-                  v-if="dashboardPanelData.layout.showFieldList"
-                  class="column h-full"
-                >
-                  <div class="flex flex-col w-full">
-                    <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
-                  </div>
+                <div class="flex flex-col" :style="fieldListInnerStyle">
+                  <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
                 </div>
               </div>
             </div>
