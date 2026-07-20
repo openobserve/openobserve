@@ -171,7 +171,7 @@ def test_test_endpoint_with_invalid_vrl_returns_400(
     onlytextfunction, testonlyspecialcharfunction) — each was 25-30 LOC
     of copy-paste differing only in one field.
     """
-    payload = {"function": vrl_function, "events": SAMPLE_EVENTS}
+    payload = {"function": vrl_function, "events": SAMPLE_EVENTS, "trans_type":0 }
     resp = client.post("functions/test", json=payload)
     assert resp.status_code == 400, \
         f"{description}: expected 400, got {resp.status_code}: {resp.text}"

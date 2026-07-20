@@ -242,6 +242,10 @@ def test_js_function_in_default_org_returns_400(client: OpenObserveClient):
     the backend opens JS to other orgs, this test starts failing and you
     know to update.
     """
+
+    pytest.skip("JS fns are now allowed in non _meta orgs")
+    return
+
     payload = {
         "function": "row.x = 'js works here';",
         "events": [{"id": 1}],
