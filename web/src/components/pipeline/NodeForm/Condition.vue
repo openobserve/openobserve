@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
     <OForm id="condition-form" :form="form">
-    <div class="w-full rounded-default px-3 stream-routing-container">
+    <div class="w-full rounded-default stream-routing-container">
       <div>
         <div
           class="showLabelOnTop font-bold text-h7"
@@ -782,9 +782,14 @@ const deleteRoute = () => {
    inline margin-left styling) for the pipeline drawer context — not addressable via
    template utilities. */
 
-/* Force the root group box to span the full drawer width (FilterGroup defaults to w-fit) */
+/* Force the root group box to span the full drawer width (FilterGroup defaults to w-fit).
+   Also drop its `mt-4`: as the first element in the drawer body it has no preceding
+   label to space from, and that margin collapses to the body's content edge, adding a
+   16px gap on top of the drawer's own 12px inset. Root box only (`>`) — nested groups
+   and alerts' FilterGroup keep their mt-4. */
 .pipeline-filter-group-wrapper > :deep(.filter-group-box) {
   width: 100% !important;
+  margin-top: 0 !important;
 }
 
 .pipeline-filter-group-wrapper :deep(.group-container) {

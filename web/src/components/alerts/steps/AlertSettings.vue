@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Silence Notification (Cooldown) -->
           <div class="flex justify-start items-start pb-3 mb-4">
             <div
-              class="font-semibold flex items-center w-47.5 h-7"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destinations -->
           <div class="flex items-start pb-4 mb-4">
             <div
-              class="font-semibold flex items-center w-47.5 h-7"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.destination") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Period -->
           <div ref="periodFieldRef" class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center w-47.5 h-7"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.period") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
           <div ref="silenceFieldRef" class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center w-47.5 h-7"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destinations -->
           <div ref="destinationsFieldRef" class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center w-47.5 h-7"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.destination") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Creates Incident toggle — shown for all alert types -->
         <div class="flex items-start mb-4!">
           <div
-            class="font-semibold flex items-center w-47.5 h-7"
+            class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
           >
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />

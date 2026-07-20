@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :theme="store.state.theme"
                         :show-pagination="false"
                         :page-size="50"
+                        search-class="px-0!"
                       >
                         <template #field-row="{ row }">
                           <FieldRow

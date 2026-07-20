@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
 
 
-    <div class="stream-routing-container w-full py-3">
+    <div class="stream-routing-container w-full">
       <!-- Mode toggle — stays a bare UI control OUTSIDE the form: it swaps the
            select-existing form for the AddStream create child. -->
       <OSwitch
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="create-stream-toggle"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
-        class="px-3 mb-3"
+        class="mb-3"
       />
 
       <div>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           id="stream-node-form"
           :form="form"
         >
-          <div class="p-4 flex flex-col gap-3">
+          <div class="flex flex-col gap-3">
             <div data-test="input-node-stream-type-select" class="w-full">
               <OFormSelect
                 name="stream_type"

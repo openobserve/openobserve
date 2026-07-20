@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="isEventBased">
               <!-- Alert if row -->
               <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact" data-test="alert-if-row-logs">
-                <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
                 <div class="flex flex-nowrap items-start gap-2">
                   <div class="min-w-32.5 max-w-45">
                     <OSelect
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- group by row (hidden for count mode) -->
               <div v-if="selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-default text-compact" data-test="alert-group-by-row">
-                <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-22.5 shrink-0">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0">
                   {{ t('alerts.groupBy') }}
                   <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- no. of groups row — visible only when group-by fields are added -->
               <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="flex items-start gap-3 py-2 px-3 rounded-default text-compact" data-test="alert-having-groups-row">
-                <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>
               <!-- Alert if row -->
               <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
-                <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
                 <div class="flex flex-nowrap items-start gap-2">
                   <div class="min-w-32.5 max-w-45">
                     <OSelect
@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- group by row — hidden for count mode -->
               <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-default text-compact">
-                <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-22.5 shrink-0">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0">
                   {{ t('alerts.groupBy') }}
                   <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
@@ -386,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- no. of groups row — visible only when group-by fields are added -->
               <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
-                <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Check every row -->
             <div class="flex items-start
              gap-3 py-2 px-3 rounded-default text-compact">
-              <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-7">
+              <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-7">
                 {{ t('alerts.queryConfig.checkEvery') }} *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
@@ -765,7 +765,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Check every -->
             <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
-              <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-7">
+              <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-7">
                 {{ t('alerts.queryConfig.checkEvery') }} *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
@@ -839,7 +839,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- SQL: Alert if No. of events -->
             <div v-if="localTab === 'sql'" class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
-              <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-8.5">{{ t('alerts.alertIfNoOfEvents') }} *</span>
+              <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-8.5">{{ t('alerts.alertIfNoOfEvents') }} *</span>
               <div class="flex items-start gap-2">
                 <OFormSelect
                   name="trigger_condition.operator"
@@ -878,7 +878,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- PromQL: Alert if the value is + Having series -->
             <template v-if="localTab === 'promql' && promqlCondition">
               <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
-                <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-8.5">{{ t('alerts.alertIfValueIs') }} *
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-8.5">{{ t('alerts.alertIfValueIs') }} *
                   <OTooltip :content="t('alerts.queryConfig.alertIfValueIsTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex items-start gap-2">
@@ -913,7 +913,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
-                <span class="font-bold text-text-body text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-8.5">{{ t('alerts.havingSeries') }} *
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-8.5">{{ t('alerts.havingSeries') }} *
                   <OTooltip :content="t('alerts.queryConfig.havingSeriesTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex items-start gap-2">

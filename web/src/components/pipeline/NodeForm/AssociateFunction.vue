@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="handleDrawerClose"
     :title="t('pipeline.associateFunction')"
     :width="createNewFunction ? 97 : 30"
+    :bleed="createNewFunction"
     @keydown.stop
     :primaryButtonLabel="!createNewFunction ? t('alerts.save') : undefined"
     :secondaryButtonLabel="!createNewFunction ? t('alerts.cancel') : undefined"
@@ -47,9 +48,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="associate-function-routing-container"
-      class="rounded-default w-full pt-3 pb-3 flex flex-col gap-4 flex-1 min-h-0"
+      class="rounded-default w-full flex flex-col gap-4 flex-1 min-h-0"
     >
-      <div class="flex items-center gap-3 px-(--spacing-dialog-header-px)">
+      <!-- In create mode the drawer body is `bleed` (0 inset) so the AddFunction
+           editor can fill edge-to-edge; re-inset just this toggle row to match the
+           header grid line. Select mode keeps the drawer's own 12px body inset. -->
+      <div class="flex items-center gap-3" :class="createNewFunction ? 'px-3 pt-3' : ''">
         <OSwitch
           data-test="create-function-toggle"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
@@ -62,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
       </div>
-      <div class="flex flex-col gap-4" :class="[!createNewFunction ? 'px-3' : 'flex-1 min-h-0']">
+      <div class="flex flex-col gap-4" :class="[!createNewFunction ? '' : 'flex-1 min-h-0']">
         <!-- Select-existing branch — form-owned fields inside <OForm>. -->
         <OForm
           v-if="!createNewFunction"
