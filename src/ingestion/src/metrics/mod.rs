@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use arrow_schema::Schema;
 use config::{
     meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, Metadata, VALUE_LABEL},
     utils::hash::{Sum64, gxhash},
 };
-use datafusion::arrow::datatypes::Schema;
 
 pub mod json;
 pub mod otlp;

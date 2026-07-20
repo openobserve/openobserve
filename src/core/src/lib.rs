@@ -50,7 +50,7 @@ pub mod kv;
 pub mod llm_evaluations;
 pub use openobserve_ingestion::logs;
 pub mod metadata;
-pub mod metrics;
+pub use openobserve_ingestion::metrics;
 pub mod node;
 #[cfg(feature = "enterprise")]
 pub mod ofga;

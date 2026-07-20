@@ -25,6 +25,7 @@ use axum::{
 };
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
+use common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{
@@ -38,6 +39,7 @@ use config::{
     utils::{
         flatten::{self, format_label_name},
         json,
+        schema::format_stream_name,
         schema_ext::SchemaExt,
         time::now_micros,
     },
@@ -54,25 +56,19 @@ use opentelemetry_proto::tonic::{
 };
 use prost::Message;
 
+use super::get_exclude_labels;
 use crate::{
-    common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
+    grpc::{get_exemplar_val, get_metric_val, get_val},
+    ports,
     service::{
-        db, format_stream_name,
-        ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
-            grpc::{get_exemplar_val, get_metric_val, get_val},
-            write_file,
-        },
-        metrics::get_exclude_labels,
-        schema::{check_for_schema, stream_schema_exists},
-        self_reporting::report_request_usage_stats,
+        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
     },
 };
 
 pub async fn otlp_proto(
     org_id: &str,
     body: Bytes,
-    user: openobserve_ingestion::types::IngestUser,
+    user: crate::types::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
@@ -100,7 +96,7 @@ pub async fn otlp_proto(
 pub async fn otlp_json(
     org_id: &str,
     body: Bytes,
-    user: openobserve_ingestion::types::IngestUser,
+    user: crate::types::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let mut body_json = match serde_json::from_slice::<json::Value>(body.as_ref()) {
         Ok(v) => v,
@@ -135,7 +131,7 @@ pub async fn handle_otlp_request(
     org_id: &str,
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
-    user: openobserve_ingestion::types::IngestUser,
+    user: crate::types::IngestUser,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
@@ -246,17 +242,17 @@ pub async fn handle_otlp_request(
                 }
 
                 // check for schema
-                let schema_exists = stream_schema_exists(
+                let schema_exists = ports::stream_schema_exists(
                     org_id,
                     &metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
                 )
-                .await;
+                .await?;
 
                 // get partition keys
                 if !stream_partitioning_map.contains_key(&metric_name) {
-                    let partition_det = crate::ingestion::get_stream_partition_keys(
+                    let partition_det = crate::service::get_stream_partition_keys(
                         org_id,
                         &StreamType::Metrics,
                         &metric_name,
@@ -268,7 +264,7 @@ pub async fn handle_otlp_request(
 
                 // Start get stream alerts
                 let stream_param = StreamParams::new(org_id, &metric_name, StreamType::Metrics);
-                crate::ingestion::get_stream_alerts(
+                crate::service::get_stream_alerts(
                     std::slice::from_ref(&stream_param),
                     &mut stream_alerts_map,
                 )
@@ -276,7 +272,7 @@ pub async fn handle_otlp_request(
                 // End get stream alert
 
                 // get user defined schema
-                crate::ingestion::get_uds_and_original_data_streams(
+                crate::service::get_uds_and_original_data_streams(
                     std::slice::from_ref(&stream_param),
                     &mut user_defined_schema_map,
                     &mut streams_need_original_map,
@@ -295,7 +291,7 @@ pub async fn handle_otlp_request(
                     log::info!(
                         "Metadata for stream {org_id}/metrics/{metric_name} needs to be updated"
                     );
-                    if let Err(e) = db::schema::update_setting(
+                    if let Err(e) = ports::update_schema_setting(
                         org_id,
                         &metric_name,
                         StreamType::Metrics,
@@ -320,17 +316,17 @@ pub async fn handle_otlp_request(
 
                     if local_metric_name != metric_name {
                         // check for schema
-                        stream_schema_exists(
+                        ports::stream_schema_exists(
                             org_id,
                             &local_metric_name,
                             StreamType::Metrics,
                             &mut metric_schema_map,
                         )
-                        .await;
+                        .await?;
 
                         // get partition keys
                         if !stream_partitioning_map.contains_key(&local_metric_name) {
-                            let partition_det = crate::ingestion::get_stream_partition_keys(
+                            let partition_det = crate::service::get_stream_partition_keys(
                                 org_id,
                                 &StreamType::Metrics,
                                 &local_metric_name,
@@ -343,14 +339,14 @@ pub async fn handle_otlp_request(
                         // Start get stream alerts
                         let stream_param =
                             StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
-                        crate::ingestion::get_stream_alerts(
+                        crate::service::get_stream_alerts(
                             std::slice::from_ref(&stream_param),
                             &mut stream_alerts_map,
                         )
                         .await;
                         // End get stream alert
 
-                        crate::ingestion::get_uds_and_original_data_streams(
+                        crate::service::get_uds_and_original_data_streams(
                             std::slice::from_ref(&stream_param),
                             &mut user_defined_schema_map,
                             &mut streams_need_original_map,
@@ -369,7 +365,7 @@ pub async fn handle_otlp_request(
                         let stream_param =
                             StreamParams::new(org_id, &local_metric_name, StreamType::Metrics);
                         let pipeline_params =
-                            crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
+                            crate::service::get_stream_executable_pipelines(&stream_param).await;
                         stream_executable_pipelines
                             .insert(local_metric_name.clone(), pipeline_params);
                     }
@@ -392,7 +388,7 @@ pub async fn handle_otlp_request(
 
                         if let Some(Some(fields)) = user_defined_schema_map.get(&local_metric_name)
                         {
-                            local_val = crate::ingestion::refactor_map(local_val, fields);
+                            local_val = crate::service::refactor_map(local_val, fields);
                         }
 
                         json_data_by_stream
@@ -448,7 +444,7 @@ pub async fn handle_otlp_request(
 
                         // add partition keys
                         if !stream_partitioning_map.contains_key(&destination_stream) {
-                            let partition_det = crate::ingestion::get_stream_partition_keys(
+                            let partition_det = crate::service::get_stream_partition_keys(
                                 org_id,
                                 &StreamType::Metrics,
                                 &destination_stream,
@@ -467,7 +463,7 @@ pub async fn handle_otlp_request(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
+                                local_val = crate::service::refactor_map(local_val, fields);
                             }
 
                             // buffer to downstream processing directly
@@ -489,7 +485,7 @@ pub async fn handle_otlp_request(
                 };
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
-                    local_val = crate::ingestion::refactor_map(local_val, fields);
+                    local_val = crate::service::refactor_map(local_val, fields);
                 }
 
                 json_data_by_stream
@@ -511,7 +507,7 @@ pub async fn handle_otlp_request(
         // check for schema evolution
         let min_timestamp = batch_min_timestamp(&json_data, Utc::now().timestamp_micros());
 
-        let _ = check_for_schema(
+        let _ = ports::check_for_schema(
             org_id,
             &local_metric_name,
             StreamType::Metrics,
@@ -542,7 +538,7 @@ pub async fn handle_otlp_request(
                 .with_metadata(HashMap::new());
             let schema_key = schema.hash_key();
             // get hour key
-            let hour_key = crate::ingestion::get_write_partition_key(
+            let hour_key = crate::service::get_write_partition_key(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
@@ -626,7 +622,7 @@ pub async fn handle_otlp_request(
         } else {
             Some(email_str)
         };
-        report_request_usage_stats(
+        ports::report_request_usage_stats(
             req_stats,
             org_id,
             &stream_name,

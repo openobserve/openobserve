@@ -18,8 +18,13 @@ use std::{
     sync::Arc,
 };
 
+use arrow_schema::Schema;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
+use common::{
+    infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
+    meta::stream::SchemaRecords,
+};
 use config::{
     FxIndexMap, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -35,11 +40,11 @@ use config::{
     utils::{
         flatten::format_label_name,
         json,
+        schema::format_stream_name,
         schema_ext::SchemaExt,
         time::{now_micros, parse_i64_to_timestamp_micros},
     },
 };
-use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     errors::{Error, Result},
@@ -52,18 +57,11 @@ use prost::Message;
 use proto::prometheus_rpc;
 
 use crate::{
-    common::{
-        infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::{ingestion::IngestUser, stream::SchemaRecords},
-    },
+    ports,
     service::{
-        db, format_stream_name,
-        ingestion::{
-            TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
-        },
-        schema::{check_for_schema, stream_schema_exists},
-        self_reporting::report_request_usage_stats,
+        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
     },
+    types::IngestUser,
 };
 
 pub async fn remote_write(
@@ -135,7 +133,7 @@ pub async fn remote_write(
         );
         log::info!("Metadata for stream {org_id}/metrics/{metric_name} needs to be updated");
         if let Err(e) =
-            db::schema::update_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
+            ports::update_schema_setting(org_id, &metric_name, StreamType::Metrics, extra_metadata)
                 .await
         {
             log::error!("Error updating metadata for stream: {metric_name}, err: {e}");
@@ -207,8 +205,7 @@ pub async fn remote_write(
         for stream in &streams {
             let stream_name_str: &str = stream.stream_name.as_ref();
             if !stream_executable_pipelines.contains_key(stream_name_str) {
-                let pipeline_params =
-                    crate::ingestion::get_stream_executable_pipelines(stream).await;
+                let pipeline_params = crate::service::get_stream_executable_pipelines(stream).await;
                 stream_executable_pipelines.insert(stream.stream_name.to_string(), pipeline_params);
             }
         }
@@ -216,7 +213,7 @@ pub async fn remote_write(
 
         // Preload UDS
         let t = std::time::Instant::now();
-        crate::ingestion::get_uds_and_original_data_streams(
+        crate::service::get_uds_and_original_data_streams(
             &streams,
             &mut user_defined_schema_map,
             &mut streams_need_original_map,
@@ -230,13 +227,13 @@ pub async fn remote_write(
         for stream in &streams {
             let stream_name_str: &str = stream.stream_name.as_ref();
             if !metric_schema_map.contains_key(stream_name_str) {
-                let _schema_exists = stream_schema_exists(
+                ports::stream_schema_exists(
                     &stream.org_id,
                     &stream.stream_name,
                     stream.stream_type,
                     &mut metric_schema_map,
                 )
-                .await;
+                .await?;
             }
         }
         preload_schema_time = t.elapsed().as_micros();
@@ -245,7 +242,7 @@ pub async fn remote_write(
         for stream in &streams {
             let stream_name_str: &str = stream.stream_name.as_ref();
             if !stream_partitioning_map.contains_key(stream_name_str) {
-                let partition_det = crate::ingestion::get_stream_partition_keys(
+                let partition_det = crate::service::get_stream_partition_keys(
                     &stream.org_id,
                     &stream.stream_type,
                     &stream.stream_name,
@@ -257,7 +254,7 @@ pub async fn remote_write(
 
         // Preload alerts
         let t = std::time::Instant::now();
-        crate::ingestion::get_stream_alerts(&streams, &mut stream_alerts_map).await;
+        crate::service::get_stream_alerts(&streams, &mut stream_alerts_map).await;
         preload_alerts_time = t.elapsed().as_micros();
     }
     let total_preload_time = preload_start.elapsed().as_micros();
@@ -390,7 +387,7 @@ pub async fn remote_write(
                 };
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(&metric_name) {
-                    local_val = crate::ingestion::refactor_map(local_val, fields);
+                    local_val = crate::service::refactor_map(local_val, fields);
                 }
 
                 // buffer to downstream processing directly
@@ -462,7 +459,7 @@ pub async fn remote_write(
 
                         // add partition keys
                         if !stream_partitioning_map.contains_key(&destination_stream) {
-                            let partition_det = crate::ingestion::get_stream_partition_keys(
+                            let partition_det = crate::service::get_stream_partition_keys(
                                 org_id,
                                 &StreamType::Metrics,
                                 &destination_stream,
@@ -481,7 +478,7 @@ pub async fn remote_write(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
+                                local_val = crate::service::refactor_map(local_val, fields);
                             }
 
                             // buffer to downstream processing directly
@@ -503,7 +500,7 @@ pub async fn remote_write(
                 };
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
-                    local_val = crate::ingestion::refactor_map(local_val, fields);
+                    local_val = crate::service::refactor_map(local_val, fields);
                 }
 
                 json_data_by_stream
@@ -551,7 +548,7 @@ pub async fn remote_write(
             }
             drop(schema_fields);
             if need_schema_check {
-                let (schema_evolution, _infer_schema) = check_for_schema(
+                let (schema_evolution, _infer_schema) = ports::check_for_schema(
                     org_id,
                     &stream_name,
                     StreamType::Metrics,
@@ -576,7 +573,7 @@ pub async fn remote_write(
             let schema_key = schema.hash_key();
 
             // get hour key
-            let hour_key = crate::ingestion::get_write_partition_key(
+            let hour_key = crate::service::get_write_partition_key(
                 timestamp,
                 &partition_keys,
                 partition_time_level,
@@ -684,7 +681,7 @@ pub async fn remote_write(
             Some(email_str)
         };
         let t = std::time::Instant::now();
-        report_request_usage_stats(
+        ports::report_request_usage_stats(
             req_stats,
             org_id,
             &stream_name,
@@ -775,7 +772,7 @@ pub async fn get_metadata(org_id: &str, req: RequestMetadata) -> Result<Response
         return Ok(resp);
     }
 
-    match db::schema::list(org_id, Some(stream_type), true).await {
+    match ports::list_stream_schemas(org_id, Some(stream_type), true).await {
         Err(error) => {
             tracing::error!(%stream_type, ?error, "failed to get metrics' stream schemas");
             Err(Error::Message(format!(
@@ -948,10 +945,11 @@ pub async fn get_labels(
     end: i64,
 ) -> Result<Vec<String>> {
     let opt_metric_name = selector.as_ref().and_then(try_into_metric_name);
-    let stream_schemas = match db::schema::list(org_id, Some(StreamType::Metrics), true).await {
-        Err(_) => return Ok(vec![]),
-        Ok(schemas) => schemas,
-    };
+    let stream_schemas =
+        match ports::list_stream_schemas(org_id, Some(StreamType::Metrics), true).await {
+            Err(_) => return Ok(vec![]),
+            Ok(schemas) => schemas,
+        };
     let mut label_names = hashbrown::HashSet::new();
     for schema in stream_schemas {
         if let Some(ref metric_name) = opt_metric_name
@@ -1032,7 +1030,7 @@ pub async fn get_label_values(
         // This special case doesn't require any SQL to be executed. All we have
         // to do is to collect stream names that satisfy selection criteria
         // (i.e., `selector` and `start`/`end`) and return them.
-        let stream_schemas = db::schema::list(org_id, Some(stream_type), true)
+        let stream_schemas = ports::list_stream_schemas(org_id, Some(stream_type), true)
             .await
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
@@ -1242,7 +1240,7 @@ async fn prom_ha_handler(
     drop(lock);
 
     if !replica_list_db.is_empty() {
-        let _ = db::metrics::set_prom_cluster_info(cluster_name, &replica_list_db).await;
+        let _ = ports::set_prom_cluster_info(cluster_name, &replica_list_db).await;
     }
 
     _accept_record

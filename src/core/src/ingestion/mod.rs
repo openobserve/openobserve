@@ -7,9 +7,9 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use arrow_schema::Schema;
+use arrow_schema::{Field, Schema};
 use async_trait::async_trait;
-use common::meta::stream::SchemaEvolution;
+use common::meta::stream::{SchemaEvolution, StreamSchema};
 use config::{
     META_ORG_ID, get_config,
     meta::{
@@ -129,6 +129,44 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         crate::db::organization::get_org_setting_toggle_ingestion_logs(META_ORG_ID)
             .await
             .unwrap_or(false)
+    }
+
+    async fn merge_schema(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        schema: &Schema,
+        min_ts: Option<i64>,
+    ) -> anyhow::Result<Option<(Schema, Vec<Field>)>> {
+        crate::db::schema::merge(org_id, stream_name, stream_type, schema, min_ts).await
+    }
+
+    async fn update_schema_setting(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        metadata: HashMap<String, String>,
+    ) -> anyhow::Result<()> {
+        crate::db::schema::update_setting(org_id, stream_name, stream_type, metadata).await
+    }
+
+    async fn list_stream_schemas(
+        &self,
+        org_id: &str,
+        stream_type: Option<StreamType>,
+        fetch_schema: bool,
+    ) -> anyhow::Result<Vec<StreamSchema>> {
+        crate::db::schema::list(org_id, stream_type, fetch_schema).await
+    }
+
+    async fn set_prom_cluster_info(
+        &self,
+        cluster_name: &str,
+        members: &[String],
+    ) -> anyhow::Result<()> {
+        crate::db::metrics::set_prom_cluster_info(cluster_name, members).await
     }
 
     #[cfg(feature = "cloud")]

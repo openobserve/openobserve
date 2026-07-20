@@ -10,9 +10,9 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use arrow_schema::Schema;
+use arrow_schema::{Field, Schema};
 use async_trait::async_trait;
-use common::meta::stream::SchemaEvolution;
+use common::meta::stream::{SchemaEvolution, StreamSchema};
 use config::meta::{
     self_reporting::usage::{RequestStats, TriggerData, UsageType},
     stream::StreamType,
@@ -69,6 +69,36 @@ pub trait RuntimeServices: Send + Sync + 'static {
     ) -> infra::errors::Result<()>;
 
     async fn ingestion_log_enabled(&self) -> bool;
+
+    async fn merge_schema(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        schema: &Schema,
+        min_ts: Option<i64>,
+    ) -> anyhow::Result<Option<(Schema, Vec<Field>)>>;
+
+    async fn update_schema_setting(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        metadata: HashMap<String, String>,
+    ) -> anyhow::Result<()>;
+
+    async fn list_stream_schemas(
+        &self,
+        org_id: &str,
+        stream_type: Option<StreamType>,
+        fetch_schema: bool,
+    ) -> anyhow::Result<Vec<StreamSchema>>;
+
+    async fn set_prom_cluster_info(
+        &self,
+        cluster_name: &str,
+        members: &[String],
+    ) -> anyhow::Result<()>;
 
     #[cfg(feature = "cloud")]
     async fn report_stream_created_if_new(
@@ -180,6 +210,45 @@ pub async fn ingestion_log_enabled() -> bool {
         Some(runtime) => runtime.ingestion_log_enabled().await,
         None => false,
     }
+}
+
+pub async fn merge_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    schema: &Schema,
+    min_ts: Option<i64>,
+) -> anyhow::Result<Option<(Schema, Vec<Field>)>> {
+    runtime_services()?
+        .merge_schema(org_id, stream_name, stream_type, schema, min_ts)
+        .await
+}
+
+pub async fn update_schema_setting(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    metadata: HashMap<String, String>,
+) -> anyhow::Result<()> {
+    runtime_services()?
+        .update_schema_setting(org_id, stream_name, stream_type, metadata)
+        .await
+}
+
+pub async fn list_stream_schemas(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    fetch_schema: bool,
+) -> anyhow::Result<Vec<StreamSchema>> {
+    runtime_services()?
+        .list_stream_schemas(org_id, stream_type, fetch_schema)
+        .await
+}
+
+pub async fn set_prom_cluster_info(cluster_name: &str, members: &[String]) -> anyhow::Result<()> {
+    runtime_services()?
+        .set_prom_cluster_info(cluster_name, members)
+        .await
 }
 
 #[cfg(feature = "cloud")]

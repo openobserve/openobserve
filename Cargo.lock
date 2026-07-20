@@ -6974,6 +6974,7 @@ dependencies = [
  "openobserve-catalog",
  "openobserve-pipeline",
  "openobserve-scheduler",
+ "openobserve-search-service",
  "openobserve-transform",
  "opentelemetry",
  "opentelemetry-proto",
@@ -6983,7 +6984,9 @@ dependencies = [
  "proto",
  "serde",
  "serde_json",
+ "snap",
  "tokio",
+ "tracing",
  "utoipa",
 ]
 
