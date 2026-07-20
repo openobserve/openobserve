@@ -35,123 +35,56 @@
           </OButton>
         </template>
       </div>
-        <!-- FORM MODE (namePrefix + an injected OForm context): the three
-             controls are name=-owned by the TanStack form — no v-model, no
-             manual error refs; schema errors surface post-submit via the
-             OForm* wrappers (R3). Bare mode below stays byte-compatible
-             (pipeline's NodeForm consumes these bare — permanent, sanctioned). -->
-        <template v-if="formMode">
-          <div class="ml-0">
-            <OFormSelect
-              :name="`${namePrefix}.column`"
-              :options="filteredFields"
-              :dropdownStyle="{ textTransform: 'lowercase' }"
-              searchable
-              :searchDebounce="400"
-              labelKey="label"
-              valueKey="value"
-              width="xs"
-              :placeholder="t('alerts.column')"
-              :creatable="props.allowCustomColumns"
-              :class="[inputWidth ? inputWidth : '']"
-              data-test="alert-conditions-select-column"
-              @search="filterColumns"
-              @update:model-value="() => emits('input:update', 'conditions', condition)"
-            /><!-- No @create here, unlike bare mode below: `onColumnCreate`
-                 assigns `props.condition.column`, which is the BARE model. In
-                 form mode TanStack owns the value via `name=`, so that write
-                 would add the option but leave the field unset. The two never
-                 meet today — FilterGroup defaults allowCustomColumns to false
-                 and the only consumer that enables it (JobFilterBuilder) passes
-                 no name-prefix — so wiring it here would be inert now and wrong
-                 later. Make onColumnCreate form-aware before enabling it. -->
-            <OTooltip v-if="condition.column && store.state.isAiChatEnabled" :content="condition.column" />
-          </div>
-          <div class="ml-0">
-            <OFormSelect
-              :name="`${namePrefix}.operator`"
-              :options="triggerOperators"
-              :dropdownStyle="{ textTransform: 'capitalize' }"
-              :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[70px]' : computedInputWidth)]"
-              :searchable="false"
-              data-test="alert-conditions-operator-select"
-              @update:model-value="() => emits('input:update', 'conditions', condition)"
-            />
-            <OTooltip v-if="condition.operator && store.state.isAiChatEnabled" :content="condition.operator" />
-          </div>
-          <div class="ml-0">
-            <OFormInput
-              :name="`${namePrefix}.value`"
-              :placeholder="t('common.value')"
-              :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[110px]' : computedValueWidth)]"
-              data-test="alert-conditions-value-input"
-              @update:model-value="() => emits('input:update', 'conditions', condition)"
-            />
-            <OTooltip v-if="condition.value && store.state.isAiChatEnabled" :content="condition.value" />
-          </div>
-        </template>
-        <!-- BARE MODE (no namePrefix / no OForm context) — today's markup,
-             unchanged. Do NOT degrade: pipeline consumes it permanently. -->
-        <template v-else>
-          <div class="ml-0">
-            <OSelect
-              v-model="condition.column"
-              :options="filteredFields"
-              :dropdownStyle="{ textTransform: 'lowercase' }"
-              searchable
-              :searchDebounce="400"
-              labelKey="label"
-              valueKey="value"
-              width="xs"
-              :placeholder="t('alerts.column')"
-              :creatable="props.allowCustomColumns"
-              :class="[inputWidth ? inputWidth : '']"
-              :error="!!columnError"
-              :error-message="columnError"
-              data-test="alert-conditions-select-column"
-              @search="filterColumns"
-              @create="onColumnCreate"
-              @update:model-value="() => { columnError = ''; emits('input:update', 'conditions', condition) }"
-              @blur="validateColumn"
-            />
-            <OTooltip v-if="condition.column && store.state.isAiChatEnabled" :content="condition.column" />
-          </div>
-          <div class="ml-0">
-            <OSelect
-              v-model="condition.operator"
-              :options="triggerOperators"
-              :dropdownStyle="{ textTransform: 'capitalize' }"
-              :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[70px]' : computedInputWidth)]"
-              :error="!!operatorError"
-              :searchable="false"
-              :error-message="operatorError"
-              data-test="alert-conditions-operator-select"
-              @update:model-value="() => { operatorError = ''; emits('input:update', 'conditions', condition) }"
-              @blur="validateOperator"
-            />
-            <OTooltip v-if="condition.operator && store.state.isAiChatEnabled" :content="condition.operator" />
-          </div>
-          <div class="ml-0">
-            <OInput
-              v-model="condition.value"
-              :placeholder="t('common.value')"
-              :error="!!valueError"
-              :error-message="valueError"
-              :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[110px]' : computedValueWidth)]"
-              data-test="alert-conditions-value-input"
-              @update:model-value="() => { valueError = ''; emits('input:update', 'conditions', condition) }"
-              @blur="validateValue"
-            />
-            <OTooltip v-if="condition.value && store.state.isAiChatEnabled" :content="condition.value" />
-          </div>
-        </template>
+        <!-- All consumers render in FORM MODE: the three controls are name=-owned
+             by the TanStack form — no v-model, no manual error refs; schema errors
+             surface post-submit via the OForm* wrappers (R3). -->
+        <div class="ml-0">
+          <OFormSelect
+            :name="`${namePrefix}.column`"
+            :options="filteredFields"
+            :dropdownStyle="{ textTransform: 'lowercase' }"
+            searchable
+            :searchDebounce="400"
+            labelKey="label"
+            valueKey="value"
+            width="xs"
+            :placeholder="t('alerts.column')"
+            :creatable="props.allowCustomColumns"
+            :class="[inputWidth ? inputWidth : '']"
+            data-test="alert-conditions-select-column"
+            @search="filterColumns"
+            @create="onColumnCreate"
+            @update:model-value="() => emits('input:update', 'conditions', condition)"
+          />
+          <OTooltip v-if="condition.column && store.state.isAiChatEnabled" :content="condition.column" />
+        </div>
+        <div class="ml-0">
+          <OFormSelect
+            :name="`${namePrefix}.operator`"
+            :options="triggerOperators"
+            :dropdownStyle="{ textTransform: 'capitalize' }"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[70px]' : computedInputWidth)]"
+            :searchable="false"
+            data-test="alert-conditions-operator-select"
+            @update:model-value="() => emits('input:update', 'conditions', condition)"
+          />
+          <OTooltip v-if="condition.operator && store.state.isAiChatEnabled" :content="condition.operator" />
+        </div>
+        <div class="ml-0">
+          <OFormInput
+            :name="`${namePrefix}.value`"
+            :placeholder="t('common.value')"
+            :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[110px]' : computedValueWidth)]"
+            data-test="alert-conditions-value-input"
+            @update:model-value="() => emits('input:update', 'conditions', condition)"
+          />
+          <OTooltip v-if="condition.value && store.state.isAiChatEnabled" :content="condition.value" />
+        </div>
     </div>
   </template>
 
   <script setup lang="ts">
   import OButton from '@/lib/core/Button/OButton.vue';
-  import OSelect from '@/lib/forms/Select/OSelect.vue';
-  import OInput from '@/lib/forms/Input/OInput.vue';
   import OFormSelect from '@/lib/forms/Select/OFormSelect.vue';
   import OFormInput from '@/lib/forms/Input/OFormInput.vue';
   import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
@@ -256,36 +189,9 @@ const store = useStore();
 
 const { t } = useI18n();
 
-// Dual-mode: form mode only when BOTH a namePrefix is passed AND an OForm
-// context is actually available (a standalone/spec mount without <OForm>
-// auto-falls-back to bare mode, by design).
+// The injected OForm — condition values are name-bound to it (form mode is the
+// only mode now); also used to write the AND/OR toggle below.
 const form = inject(FORM_CONTEXT_KEY, null);
-const formMode = computed(() => !!(props.namePrefix && form));
-
-// Inline error state — BARE MODE ONLY. In form mode the schema owns validation
-// and the OForm* wrappers surface errors (R3).
-const columnError = ref('');
-const operatorError = ref('');
-const valueError = ref('');
-
-const validateColumn = () => {
-  columnError.value = !props.condition.column ? t('alerts.validation.fieldRequired') : '';
-};
-const validateOperator = () => {
-  operatorError.value = !props.condition.operator ? t('alerts.validation.fieldRequired') : '';
-};
-const validateValue = () => {
-  valueError.value = !props.condition.value ? t('alerts.validation.fieldRequired') : '';
-};
-
-defineExpose({
-  validate: () => {
-    validateColumn();
-    validateOperator();
-    validateValue();
-    return !columnError.value && !operatorError.value && !valueError.value;
-  },
-});
 
 const deleteApiHeader = (field: any) => {
   emits("remove", field);
@@ -313,18 +219,13 @@ const computedLabel = computed(() => {
   return props.label;
 });
 
-// Toggle operator between AND/OR for this condition. In FORM mode (alerts) the
-// condition is the READONLY form read-view, so mutating it in place silently
-// fails ("target is readonly") — write through the injected form by its name
-// path instead. In BARE mode (pipeline) it's plain reactive, so mutate in place.
+// Toggle operator between AND/OR for this condition. The condition is the
+// READONLY form read-view, so mutating it in place silently fails ("target is
+// readonly") — write through the injected form by its name path instead.
 const toggleOperator = () => {
   if (!props.condition.logicalOperator) return;
   const next = props.condition.logicalOperator === 'AND' ? 'OR' : 'AND';
-  if (formMode.value && form) {
-    form.setFieldValue(`${props.namePrefix}.logicalOperator`, next);
-  } else {
-    props.condition.logicalOperator = next;
-  }
+  form?.setFieldValue(`${props.namePrefix}.logicalOperator`, next);
   emits('input:update', 'conditions', props.condition);
 };
 
@@ -351,20 +252,24 @@ const filterColumns = (val: string) => {
   }
 };
 
-// Custom column: when `allowCustomColumns` is on, OSelect is `creatable` and
-// emits `create` with the typed term on Enter — but only emits, it doesn't set
+// Custom column: when `allowCustomColumns` is on, the select is `creatable` and
+// emits `create` with the typed term on Enter — but only EMITS, it does not set
 // the value. Add the typed column to the options so it renders, then select it.
+//
+// Form mode is now the only mode, so the value MUST be written through the
+// injected form by its name path: `condition` is the readonly form read-view and
+// assigning to it silently fails ("target is readonly"). Consumers that enable
+// this: pipeline's Condition node (its guidelines tell users to press Enter),
+// the workflow Condition node, and enterprise JobFilterBuilder.
 const onColumnCreate = (term: string) => {
   const value = String(term ?? "").trim();
   if (!value) return;
-  const exists = allColumns().some((c: any) => c.value === value);
-  if (!exists) {
+  if (!allColumns().some((c: any) => c.value === value)) {
     const col = { label: value, value, type: "custom" };
     customColumns.value = [...customColumns.value, col];
     filteredFields.value = [...filteredFields.value, col];
   }
-  props.condition.column = value;
-  columnError.value = "";
+  form?.setFieldValue(`${props.namePrefix}.column`, value);
   emits("input:update", "conditions", props.condition);
 };
 

@@ -2242,20 +2242,8 @@ describe('FilterGroup.vue Form Mode (namePrefix + OForm)', () => {
     expect(onSubmit.mock.calls[0][0].tree.conditions[0].value).toBe(0);
   });
 
-  it('stays BARE without a namePrefix — even inside an OForm (pipeline safety)', () => {
-    const { wrapper } = mountFormHost(
-      [makeLeaf('a', 'field1', '=', 'va')],
-      { namePrefix: '' },
-    );
-
-    // No OForm* wrappers anywhere in the tree: a form-owning consumer
-    // (pipeline's Condition.vue) keeps its bare bridge untouched until it
-    // opts in by passing a prefix.
-    expect(wrapper.findAllComponents(OFormSelect)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OFormInput)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OSelect).length).toBeGreaterThan(0);
-    expect(wrapper.findComponent(OInput).exists()).toBe(true);
-  });
+  // Bare-mode test removed: FilterCondition is now form-mode only (all
+  // FilterGroup consumers pass a name-prefix inside an OForm); no bare v-else.
 
   // ── nesting indent ──────────────────────────────────────────────────────────
   // The per-level indent is a COMPUTED inline style. The flow drawer used to

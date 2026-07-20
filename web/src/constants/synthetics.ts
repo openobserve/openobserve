@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { StepAction, SelectorType } from "@/types/synthetics";
+import type { StepAction, SelectorType, SyntheticCheckType } from "@/types/synthetics";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 // ── Action labels (capitalized) ──────────────────────────────────────────
@@ -85,6 +85,48 @@ export const VALUE_LABELS: Record<string, string> = {
 export const VALUE_WIDTH_MAP: Record<string, string> = {
   wait: "w-50!",
 };
+
+// ── Check type picker cards ───────────────────────────────────────────────
+
+export interface CheckTypeCard {
+  type: SyntheticCheckType;
+  icon: IconName;
+  labelKey: string;
+  descKey: string;
+}
+
+export const CHECK_TYPE_CARDS: CheckTypeCard[] = [
+  {
+    type: "browser",
+    icon: "open-in-browser",
+    labelKey: "synthetics.newCheck.browser",
+    descKey: "synthetics.newCheck.browserDesc",
+  },
+  {
+    type: "http",
+    icon: "network-check",
+    labelKey: "synthetics.newCheck.http",
+    descKey: "synthetics.newCheck.httpDesc",
+  },
+  {
+    type: "tcp",
+    icon: "bolt",
+    labelKey: "synthetics.newCheck.tcp",
+    descKey: "synthetics.newCheck.tcpDesc",
+  },
+  {
+    type: "tls",
+    icon: "shield",
+    labelKey: "synthetics.newCheck.tls",
+    descKey: "synthetics.newCheck.tlsDesc",
+  },
+  {
+    type: "ssh",
+    icon: "keyboard",
+    labelKey: "synthetics.newCheck.ssh",
+    descKey: "synthetics.newCheck.sshDesc",
+  },
+];
 
 // ── Value field tooltips ─────────────────────────────────────────────────
 export const VALUE_TOOLTIP_MAP: Record<string, string> = {

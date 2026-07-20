@@ -137,13 +137,12 @@
         <label class="sc-field__label o-input-label">
           {{ t("onlineEvals.scoreConfig.categoriesLabel") }}
         </label>
-        <!-- Shared TagInput (a genuine non-OForm* widget) bridged into the one
-             form via setFieldValue; read back through formValues. -->
-        <TagInput
-          :model-value="formValues.categories"
+        <!-- Categories are a `string[]` OForm field — OFormTagInput binds it by
+             name (read/write through the form; no manual setFieldValue bridge). -->
+        <OFormTagInput
+          name="categories"
           :placeholder="t('onlineEvals.scoreConfig.addCategoryPlaceholder')"
           data-test="score-config-categories-input"
-          @update:model-value="form.setFieldValue('categories', $event)"
         />
       </div>
 
@@ -305,7 +304,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import TagInput from "@/components/alerts/TagInput.vue";
+import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -368,12 +367,12 @@ const scoreConfigSchema = makeScoreConfigSchema(t, props.mode);
 // with useOForm and reads it reactively via form.useStore — a SINGLE source of
 // truth, NO mirror ref. `formValues` drives the parent-side reads: the
 // `dataType`/`categories` `v-if` branches and the `defaultGte/LteValue`
-// computeds. The bespoke choice controls (the dataType ORadioGroup, the
-// healthy-threshold radios/checkboxes) and the categories TagInput are genuine
-// non-`OForm*` widgets, so they bridge into the one form via `form.setFieldValue`
-// and read back through `formValues` (the sanctioned non-input bridge); the
-// scalar inputs are plain `name=` fields. The @submit handler reads the
-// validated `value`.
+// computeds. The bespoke choice controls (the dataType ORadioGroup and the
+// healthy-threshold radios/checkboxes) are genuine non-`OForm*` widgets, so they
+// bridge into the one form via `form.setFieldValue` and read back through
+// `formValues` (the sanctioned non-input bridge); the scalar inputs and the
+// categories OFormTagInput are plain `name=` fields. The @submit handler reads
+// the validated `value`.
 const form = useOForm<ScoreConfigForm>({
   defaultValues: initForm(props.row),
   schema: scoreConfigSchema,
@@ -448,7 +447,7 @@ function initForm(row: ScoreConfig | null): ScoreConfigForm {
   };
 }
 
-// TagInput owns add/remove of categories. Keep the healthy-category selection in
+// The categories OFormTagInput owns add/remove of categories. Keep the healthy-category selection in
 // sync: whenever a category disappears, drop it from the healthy set too. Reads
 // the form reactively and writes back via setFieldValue (no mirror).
 watch(

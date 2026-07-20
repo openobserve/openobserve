@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :stream-fields="fields"
           :group="conditionGroup"
           :depth="0"
+          name-prefix="conditions"
           condition-input-width="w-[8.125rem]"
           :allow-custom-columns="allowCustomColumns"
           :indent-rem="0.625"
@@ -92,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
+import { cloneDeep } from "lodash-es";
 import { getUUID } from "@/utils/zincutils";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -196,30 +198,36 @@ const initGroup = () => {
   return emptyGroup();
 };
 
-const conditionGroup = ref<any>(initGroup());
+// Initial tree — seeds the form; after creation the FORM owns it.
+const initialGroup = initGroup();
 
 // ── OForm wiring (OWNER pattern) ─────────────────────────────────────────────
-// This component owns <OForm>, so it can surface the form-level `conditions`
-// error under the FilterGroup. The composite FilterGroup has no OForm*
-// equivalent, so its model (`conditionGroup`) is bridged INTO the form's
-// `conditions` field with a direct setFieldValue from FilterGroup's own change
-// handlers — not a watch on a mirror ref. The schema's superRefine ("at least
-// one complete condition") then gates submit.
+// This component owns <OForm>. FilterGroup renders in FORM MODE (name-prefix=
+// "conditions"): FilterCondition name-binds each leaf's column/operator/value
+// straight into the form, and structural changes (add/remove/toggle) are written
+// back with setFieldValue below. SINGLE source of truth (form.useStore) — no
+// mirror ref, no value-sync bridge. The schema's superRefine ("at least one
+// complete condition") gates submit.
 const validated = ref<ConditionForm | null>(null);
 
 const form = useOForm<ConditionForm>({
-  defaultValues: { conditions: conditionGroup.value },
+  defaultValues: { conditions: initialGroup },
   schema: makeConditionSchema(t),
   onSubmit: (values) => {
     validated.value = values;
   },
 });
 
-const syncConditionsToForm = () => {
-  form.setFieldValue("conditions", conditionGroup.value, {
-    dontUpdateMeta: true,
-  });
-};
+// Reactive READ-VIEW of the form-owned tree, exposed as a WRITABLE computed:
+// reads drive FilterGroup's `:group`, writes go through the form. Still one
+// source of truth — no copy.
+const conditionGroupStore = form.useStore(
+  (s: any) => s.values.conditions ?? initialGroup,
+);
+const conditionGroup = computed({
+  get: () => conditionGroupStore.value,
+  set: (v: any) => form.setFieldValue("conditions", v),
+});
 
 // Reactive view of the SAME form (no mirror) — rendered under the FilterGroup.
 const conditionsErrors = form.useStore(
@@ -233,34 +241,39 @@ const conditionsError = computed(() =>
 
 // FilterGroup edits flow through the shared alert utilities, which expect a
 // context shaped like { formData: { query_condition: { conditions } } }.
+// The transform utils MUTATE their context in place and the form store is
+// readonly, so run them on a CLONE of the form's current tree, then write the
+// result back with setFieldValue.
 const updateGroup = (updatedGroup: any) => {
-  const ctx = { formData: { query_condition: { conditions: conditionGroup.value } } };
+  const cloned = cloneDeep((form.state.values as any).conditions);
+  const ctx = { formData: { query_condition: { conditions: cloned } } };
   updateGroupUtil(updatedGroup, ctx as any);
-  conditionGroup.value = ctx.formData.query_condition.conditions;
-  syncConditionsToForm();
+  form.setFieldValue("conditions", ctx.formData.query_condition.conditions);
 };
 const removeGroup = (groupId: string) => {
-  const ctx = { formData: { query_condition: { conditions: conditionGroup.value } } };
-  removeConditionGroupUtil(groupId, conditionGroup.value, ctx as any);
-  conditionGroup.value = ctx.formData.query_condition.conditions;
-  syncConditionsToForm();
+  const cloned = cloneDeep((form.state.values as any).conditions);
+  const ctx = { formData: { query_condition: { conditions: cloned } } };
+  removeConditionGroupUtil(groupId, cloned, ctx as any);
+  form.setFieldValue("conditions", ctx.formData.query_condition.conditions);
 };
 
-// FilterGroup mutates `conditionGroup` in place and emits this on every field
-// edit — bridge the live model in so the schema's superRefine sees column /
-// operator / value changes (and the error clears as the user fixes it).
 const onInputUpdate = (_name?: string, _field?: any) => {
-  syncConditionsToForm();
+  // Leaf values are name-bound in form mode (FilterCondition writes them
+  // straight into the form), so there is no bridge to run here. Kept for the
+  // template's @input:update wiring.
 };
 
 // Host bridge: validate through the schema and return { version, conditions },
 // or null when invalid (the error renders inline under the FilterGroup).
+// Detach from the readonly form read-view before handing the tree to the host.
 const submit = async () => {
   validated.value = null;
-  syncConditionsToForm();
   await form.handleSubmit();
   if (!validated.value) return null;
-  return { version: 2, conditions: conditionGroup.value };
+  return {
+    version: 2,
+    conditions: cloneDeep((form.state.values as any).conditions),
+  };
 };
 
 defineExpose({ submit, conditionGroup, form });

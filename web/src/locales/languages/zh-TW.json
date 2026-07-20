@@ -5440,7 +5440,7 @@
     "dangerZone": "危險區域",
     "deleteOrganization": "刪除組織",
     "deleteOrganizationTitle": "刪除此組織",
-    "deleteOrganizationDescription": "將 {name} 排定刪除。所有人（包括您）將立即無法存取該組織，寬限期結束後將被永久清除。在此之前如需復原，請聯絡支援團隊。",
+    "deleteOrganizationDescription": "所有人（包括您）將立即失去對 {name} 的存取權限。在寬限期內，只有 OpenObserve 支援團隊可以復原；之後，所有資料將被永久清除。",
     "deleteOrganizationScopeLoading": "正在檢查該組織包含的內容…",
     "deleteOrganizationScope": "{dashboards} 個儀表板 · {streams} 個資料流 · {size} 資料",
     "deleteFactGracePeriod": "寬限期",
