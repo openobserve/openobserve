@@ -457,6 +457,88 @@ describe("useRoutes (router.ts)", () => {
       expect(routeGuard).toHaveBeenCalledTimes(1);
     });
 
+    // The back-compat redirect and its Visualize exception. routeGuard is mocked
+    // to pass its next() straight through, so a redirect surfaces as next() being
+    // called with a `{ name: "metricsEditor" }` target, and a plain admit as
+    // next() with no args.
+    it("redirects a legacy metrics_data deep link (no mode) to the editor route", () => {
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter(
+        { query: { metrics_data: "abc" }, hash: "" },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "metricsEditor",
+          query: { metrics_data: "abc" },
+          replace: true,
+        }),
+      );
+    });
+
+    it("redirects other editor params (e.g. stream_name) to the editor route", () => {
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter(
+        { query: { stream_name: "cpu" }, hash: "" },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "metricsEditor" }),
+      );
+    });
+
+    it("keeps a mode=visualize link in the explorer — no editor redirect", () => {
+      // The explorer's in-page Visualize owns metrics_data and rehydrates it
+      // itself; redirecting would kick the user out on every refresh.
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter(
+        { query: { metrics_data: "abc", mode: "visualize" }, hash: "" },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(next).toHaveBeenCalledWith(); // admitted, not redirected
+    });
+
+    it("does not redirect a plain /metrics visit", () => {
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter({ query: {}, hash: "" }, {}, next);
+
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("does not redirect an explore/workspace link (no editor params)", () => {
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter(
+        { query: { mode: "workspace", sort_by: "z-a" }, hash: "" },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith();
+    });
+
     it("should include promqlBuilder route", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "promqlBuilder");
