@@ -54,7 +54,9 @@ use crate::service::{
     self_reporting::report_request_usage_stats,
 };
 
-mod cache;
+mod cache {
+    pub use openobserve_search_service::promql::cache::*;
+}
 pub mod grpc;
 pub use cache::get_cache_stats;
 

@@ -337,7 +337,7 @@ pub async fn set(
 
     // convert RangeValue to proto::cluster_rpc::MetricsQueryResponse then encode to vec
     let mut resp = proto::cluster_rpc::MetricsQueryResponse::default();
-    super::grpc::add_value(&mut resp, Value::Matrix(range_values));
+    super::add_value(&mut resp, Value::Matrix(range_values));
     let bytes_data = resp.encode_to_vec();
 
     // store the series to disk cache

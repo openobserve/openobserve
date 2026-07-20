@@ -52,7 +52,7 @@ use tracing::Instrument;
 
 use crate::{
     common::{
-        meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
+        meta::search::{MultiCachedQueryResponse, QueryDelta},
         utils::{functions, http::get_work_group},
     },
     service::{
@@ -67,8 +67,12 @@ use crate::{
     },
 };
 
-pub mod cacher;
-pub mod multi;
+pub mod cacher {
+    pub use openobserve_search_service::cache::cacher::*;
+}
+pub mod multi {
+    pub use openobserve_search_service::cache::multi::*;
+}
 pub mod result_utils {
     pub use openobserve_search_service::cache::result_utils::*;
 }

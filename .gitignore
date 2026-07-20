@@ -20,6 +20,7 @@ flamegraph.html
 /src/infra/data/
 /src/core/data/
 /src/search/data/
+/src/search_service/data/
 /.idea/
 /.vscode
 /.env

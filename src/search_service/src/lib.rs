@@ -22,5 +22,6 @@ pub mod cache;
 #[cfg(feature = "enterprise")]
 pub mod jobs;
 pub mod partition;
+pub mod promql;
 pub mod repository;
 pub mod streaming;

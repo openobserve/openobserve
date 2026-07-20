@@ -25,19 +25,12 @@ use infra::cache::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::cache::streaming_agg::STREAMING_AGGS_CACHE_DIR;
-
-use crate::{
-    common::meta::search::{
-        CacheQueryRequest, CachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
-    },
-    service::search::{
-        cache::{
-            MultiCachedQueryResponse,
-            result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field},
-        },
-        sql::Sql,
-    },
+use search::{
+    CacheQueryRequest, CachedQueryResponse, MultiCachedQueryResponse, QueryDelta,
+    ResultCacheSelectionStrategy, sql::Sql,
 };
+
+use super::result_utils::{get_ts_value, has_non_timestamp_ordering, is_timestamp_field};
 
 /// Invalidate cached response by stream min ts
 /// This is done to ensure that any stale data which is no longer retained in the stream is not
@@ -979,9 +972,9 @@ mod tests {
     use datafusion::common::TableReference;
     use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
     use proto::cluster_rpc::SearchQuery;
+    use search::{CachedQueryResponse, sql::Sql};
 
     use super::*;
-    use crate::{common::meta::search::CachedQueryResponse, service::search::Sql};
 
     #[test]
     fn test_parse_cache_file_timestamps_valid() {

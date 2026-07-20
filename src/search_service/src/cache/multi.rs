@@ -15,11 +15,9 @@
 
 use infra::cache::file_data::disk::QUERY_RESULT_CACHE;
 use itertools::Itertools;
+use search::{CacheQueryRequest, CachedQueryResponse, ResultCacheSelectionStrategy};
 
-use crate::{
-    common::meta::search::{CacheQueryRequest, ResultCacheSelectionStrategy},
-    service::search::cache::{CachedQueryResponse, cacher::select_cache_meta},
-};
+use super::cacher::select_cache_meta;
 
 pub async fn get_cached_results(
     trace_id: &str,
