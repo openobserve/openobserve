@@ -6657,6 +6657,7 @@ dependencies = [
  "openobserve-api-common",
  "openobserve-api-management",
  "openobserve-api-query",
+ "openobserve-catalog",
  "openobserve-compactor",
  "openobserve-core",
  "openobserve-ingestion",
@@ -6793,7 +6794,11 @@ dependencies = [
  "hashbrown 0.16.1",
  "infra",
  "ingester",
+ "log",
+ "o2_enterprise",
+ "proto",
  "tokio",
+ "tonic",
 ]
 
 [[package]]
@@ -7058,6 +7063,7 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "openobserve-alerts",
+ "openobserve-catalog",
  "openobserve-compactor",
  "openobserve-core",
  "openobserve-ingestion",

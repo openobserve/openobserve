@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::cluster;
-use openobserve_core::db::file_list::broadcast;
+use openobserve_catalog::file_list::broadcast;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     loop {

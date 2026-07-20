@@ -16,6 +16,7 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "openobserve-alerts/enterprise",
+    "openobserve-catalog/enterprise",
     "openobserve-core/enterprise",
     "openobserve-pipeline/enterprise",
 ]
@@ -31,6 +32,7 @@ vortex = ["openobserve-core/vortex"]
 [dependencies]
 common.workspace = true
 openobserve-alerts.workspace = true
+openobserve-catalog.workspace = true
 openobserve-compactor.workspace = true
 openobserve-core.workspace = true
 openobserve-ingestion.workspace = true

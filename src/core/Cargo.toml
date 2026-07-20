@@ -22,6 +22,7 @@ enterprise = [
     "search/enterprise",
     "openobserve-alerts/enterprise",
     "openobserve-ingestion/enterprise",
+    "openobserve-catalog/enterprise",
     "openobserve-enrichment/enterprise",
     "openobserve-organization/enterprise",
     "openobserve-pipeline/enterprise",

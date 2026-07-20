@@ -46,6 +46,7 @@ use infra::{
     storage,
 };
 use ingester::WAL_PARQUET_METADATA;
+use openobserve_catalog::file_list as catalog_file_list;
 use openobserve_compactor::tantivy::create_tantivy_index;
 use tokio::{
     fs::remove_file,
@@ -80,7 +81,7 @@ static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::ne
 
 pub async fn run() -> Result<(), anyhow::Error> {
     // add the pending delete files to processing set
-    let pending_delete_files = db::file_list::local::get_pending_delete().await;
+    let pending_delete_files = catalog_file_list::local::get_pending_delete().await;
     for file in pending_delete_files {
         PROCESSING_FILES.write().await.insert(file);
     }
@@ -194,7 +195,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
     let cfg = get_config();
 
     let wal_dir = Path::new(&cfg.common.data_wal_dir).canonicalize().unwrap();
-    let pending_delete_files = db::file_list::local::get_pending_delete().await;
+    let pending_delete_files = catalog_file_list::local::get_pending_delete().await;
     let files_num = pending_delete_files.len();
     for file_key in pending_delete_files {
         if wal::lock_files_exists(&file_key) {
@@ -214,7 +215,7 @@ async fn scan_pending_delete_files() -> Result<(), anyhow::Error> {
         // need release the file
         PROCESSING_FILES.write().await.remove(&file_key);
         // delete from pending delete list
-        if let Err(e) = db::file_list::local::remove_pending_delete(&file_key).await {
+        if let Err(e) = catalog_file_list::local::remove_pending_delete(&file_key).await {
             log::error!("[INGESTER:JOB] Failed to remove pending delete file: {file_key}, {e}");
         }
         // deleted successfully then update metrics
@@ -554,7 +555,7 @@ async fn move_files(
         // write file list to storage
         let new_file_min_ts = new_file_meta.min_ts;
         if let Err(e) =
-            db::file_list::set(&account, &new_file_name, Some(new_file_meta), false).await
+            catalog_file_list::set(&account, &new_file_name, Some(new_file_meta), false).await
         {
             log::error!(
                 "[INGESTER:JOB] Failed write parquet file meta: {new_file_name}, error: {e}"
@@ -584,7 +585,8 @@ async fn move_files(
                 );
                 // add to pending delete list
                 if let Err(e) =
-                    db::file_list::local::add_pending_delete(&org_id, &file.account, file_key).await
+                    catalog_file_list::local::add_pending_delete(&org_id, &file.account, file_key)
+                        .await
                 {
                     log::error!(
                         "[INGESTER:JOB:{thread_id}] Failed to add pending delete file: {file_key}, {e}",
@@ -592,7 +594,7 @@ async fn move_files(
                 }
                 false
             } else {
-                db::file_list::local::add_removing(file_key).await?;
+                catalog_file_list::local::add_removing(file_key).await?;
                 true
             };
 
@@ -606,7 +608,7 @@ async fn move_files(
                             "[INGESTER:JOB:{thread_id}] Failed to remove parquet file from disk, set to pending delete list: {file_key}, {e}",
                         );
                         // add to pending delete list
-                        if let Err(e) = db::file_list::local::add_pending_delete(
+                        if let Err(e) = catalog_file_list::local::add_pending_delete(
                             &org_id,
                             &file.account,
                             file_key,
@@ -629,7 +631,7 @@ async fn move_files(
                 }
 
                 // remove the file from removing set
-                db::file_list::local::remove_removing(file_key).await?;
+                catalog_file_list::local::remove_removing(file_key).await?;
             }
 
             // metrics

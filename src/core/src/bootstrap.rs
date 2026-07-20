@@ -28,7 +28,7 @@ impl openobserve_enrichment::Runtime for CoreEnrichmentRuntime {
         key: &str,
         meta: config::meta::stream::FileMeta,
     ) -> Result<(), infra::errors::Error> {
-        crate::db::file_list::set(account, key, Some(meta), false).await
+        openobserve_catalog::file_list::set(account, key, Some(meta), false).await
     }
 }
 

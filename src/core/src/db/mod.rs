@@ -71,7 +71,22 @@ pub mod distinct_values {
 pub mod enrichment_table {
     pub use openobserve_enrichment::repository::*;
 }
-pub mod file_list;
+pub mod file_list {
+    pub use openobserve_catalog::file_list::{BLOCKED_ORGS, DEDUPLICATE_FILES, DELETED_FILES, set};
+
+    pub mod broadcast {
+        pub use openobserve_catalog::file_list::broadcast::*;
+    }
+
+    pub mod local {
+        pub use openobserve_catalog::file_list::local::*;
+    }
+
+    pub async fn cache_stats() -> infra::errors::Result<()> {
+        let orgs = crate::db::schema::list_organizations_from_cache().await;
+        openobserve_catalog::file_list::cache_stats(&orgs).await
+    }
+}
 pub mod functions {
     pub use openobserve_transform::repository::*;
 }

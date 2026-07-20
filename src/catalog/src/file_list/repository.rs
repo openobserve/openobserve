@@ -20,12 +20,8 @@ use o2_enterprise::enterprise::{
     common::config::get_config as get_o2_config,
     super_cluster::stream::client::super_cluster_cache_stats,
 };
-pub mod broadcast;
-pub mod local {
-    pub use openobserve_catalog::file_list::local::*;
-}
 
-pub use openobserve_catalog::file_list::{BLOCKED_ORGS, DEDUPLICATE_FILES, DELETED_FILES};
+use super::broadcast;
 
 pub async fn set(account: &str, key: &str, meta: Option<FileMeta>, deleted: bool) -> Result<()> {
     let mut file_data = FileKey::new(
@@ -88,7 +84,7 @@ async fn progress(account: &str, key: &str, data: Option<&FileMeta>, delete: boo
     Ok(id)
 }
 
-pub async fn cache_stats() -> Result<()> {
+pub async fn cache_stats(orgs: &[String]) -> Result<()> {
     // super cluster
     #[cfg(feature = "enterprise")]
     {
@@ -98,7 +94,7 @@ pub async fn cache_stats() -> Result<()> {
             }
         } else {
             // single cluster
-            if let Err(err) = single_cache_stats().await {
+            if let Err(err) = single_cache_stats(orgs).await {
                 log::error!("single_cache_stats error: {err}")
             }
         }
@@ -107,15 +103,14 @@ pub async fn cache_stats() -> Result<()> {
     #[cfg(not(feature = "enterprise"))]
     {
         // single cluster
-        if let Err(err) = single_cache_stats().await {
+        if let Err(err) = single_cache_stats(orgs).await {
             log::error!("single_cache_stats error: {err}")
         }
     }
 
     Ok(())
 }
-async fn single_cache_stats() -> Result<()> {
-    let orgs = crate::db::schema::list_organizations_from_cache().await;
+async fn single_cache_stats(orgs: &[String]) -> Result<()> {
     for org_id in orgs {
         let ret = match infra::file_list::get_stream_stats(&org_id, None, None).await {
             Ok(v) => v,
@@ -142,6 +137,7 @@ mod tests {
     use config::meta::stream::FileMeta;
 
     use super::*;
+    use crate::file_list::{BLOCKED_ORGS, DEDUPLICATE_FILES, DELETED_FILES};
 
     fn create_test_file_meta() -> FileMeta {
         FileMeta {
@@ -287,7 +283,7 @@ mod tests {
         #[tokio::test]
         async fn test_cache_stats_without_enterprise() {
             // Test that cache_stats works without enterprise features
-            let result = cache_stats().await;
+            let result = cache_stats(&[]).await;
             assert!(result.is_ok());
         }
     }
@@ -299,7 +295,7 @@ mod tests {
         #[tokio::test]
         async fn test_cache_stats_with_enterprise() {
             // Test that cache_stats works with enterprise features
-            let result = cache_stats().await;
+            let result = cache_stats(&[]).await;
             assert!(result.is_ok());
         }
     }

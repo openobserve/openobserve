@@ -37,7 +37,7 @@ impl FileListBroadcaster for CoreFileListBroadcaster {
         &self,
         events: &[config::meta::stream::FileKey],
     ) -> Result<(), anyhow::Error> {
-        crate::service::db::file_list::broadcast::send(events).await
+        openobserve_catalog::file_list::broadcast::send(events).await
     }
 }
 

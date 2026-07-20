@@ -88,7 +88,8 @@ async fn cache_stream_stats() -> Option<tokio::task::JoinHandle<()>> {
         "cache_stream_stats",
         std::cmp::max(60, get_config().limit.calculate_stats_interval),
         {
-            if let Err(e) = db::file_list::cache_stats().await {
+            let orgs = db::schema::list_organizations_from_cache().await;
+            if let Err(e) = openobserve_catalog::file_list::cache_stats(&orgs).await {
                 log::error!("[STATS] run cached stream stats error: {e}");
             } else {
                 log::debug!("[STATS] run cached stream stats success");

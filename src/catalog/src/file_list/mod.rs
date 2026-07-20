@@ -18,7 +18,11 @@ use std::{collections::HashSet, sync::LazyLock};
 use config::{RwHashMap, RwHashSet, meta::stream::FileMeta};
 use dashmap::{DashMap, DashSet};
 
+pub mod broadcast;
 pub mod local;
+mod repository;
+
+pub use repository::{cache_stats, set};
 
 /// Files currently being deduplicated by file-list workers.
 pub static DEDUPLICATE_FILES: LazyLock<RwHashSet<String>> =

@@ -29,7 +29,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     // load pending delete files to memory cache
-    openobserve_core::db::file_list::local::load_pending_delete().await?;
+    openobserve_catalog::file_list::local::load_pending_delete().await?;
 
     tokio::task::spawn(parquet::run());
     tokio::task::spawn(broadcast::run());
