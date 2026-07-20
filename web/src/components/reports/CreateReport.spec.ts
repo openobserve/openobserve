@@ -884,27 +884,29 @@ describe("CreateReport", () => {
 
   // ── Dashboard variables ──────────────────────────────────────────────────
 
-  describe("addDashboardVariable / removeDashboardVariable", () => {
-    it("should add a new variable entry", async () => {
+  // `variables` are now form-owned (VariablesInput renders in form mode,
+  // name-prefix="variables"). The old component-owned add/remove handlers are
+  // gone — coverage now proves the form owns the value and it reaches the
+  // saved dashboards[0].variables payload in the {key,value} shape (Rule ④).
+  describe("dashboard variables (form-owned)", () => {
+    it("defaults variables to an empty array on the form", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      const before = (wrapper.vm as any).dashboardVariables.length;
-      (wrapper.vm as any).addDashboardVariable();
-      expect((wrapper.vm as any).dashboardVariables).toHaveLength(before + 1);
+      expect((wrapper.vm as any).form.state.values.variables).toEqual([]);
     });
 
-    it("should remove a variable by id", async () => {
+    it("includes form-owned variables in the saved dashboards[0].variables payload", async () => {
       ({ wrapper } = mountComponent());
       await flushPromises();
-      (wrapper.vm as any).addDashboardVariable();
-      const vars = (wrapper.vm as any).dashboardVariables;
-      const added = vars[vars.length - 1];
-      (wrapper.vm as any).removeDashboardVariable(added);
-      expect(
-        (wrapper.vm as any).dashboardVariables.find(
-          (v: any) => v.id === added.id,
-        ),
-      ).toBeUndefined();
+      await fillValidForm(wrapper);
+      setField(wrapper, "variables", [{ key: "env", value: "prod" }]);
+      await submitForm(wrapper);
+
+      expect(reports.createReportV2).toHaveBeenCalledTimes(1);
+      const payload = vi.mocked(reports.createReportV2).mock.calls[0][1] as any;
+      expect(payload.dashboards[0].variables).toEqual([
+        { key: "env", value: "prod" },
+      ]);
     });
   });
 });
