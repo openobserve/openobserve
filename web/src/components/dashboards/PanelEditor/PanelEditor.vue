@@ -138,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.meta.dateTime.start_time &&
                           dashboardPanelData.meta.dateTime.end_time))
                     "
+                    class="pl-3"
                     :variablesConfig="dashboardData?.variables"
                     :showDynamicFilters="
                       dashboardData?.variables?.showDynamicFilters
