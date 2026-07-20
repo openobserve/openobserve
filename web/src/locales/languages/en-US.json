@@ -518,7 +518,8 @@
     },
     "condition": {
       "empty": "Please add at least one condition",
-      "loading": "Loading conditions..."
+      "loading": "Loading conditions...",
+      "loadError": "The saved condition could not be read and has been reset. Saving now will overwrite it."
     },
     "destination": {
       "createNew": "Create New Destination",

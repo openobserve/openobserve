@@ -53,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :depth="0"
           condition-input-width="w-[8.125rem]"
           :allow-custom-columns="allowCustomColumns"
+          :indent-rem="0.625"
           :module="module"
           @add-condition="(g) => updateGroup(g)"
           @add-group="(g) => updateGroup(g)"
@@ -60,6 +61,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @input:update="onInputUpdate"
         />
         <div v-else class="p-3 text-gray-400">{{ t("flow.condition.loading") }}</div>
+      </div>
+
+      <!-- The saved condition could not be parsed, so the builder reset to an
+           empty group. Warn BEFORE the user saves over it. -->
+      <div
+        v-if="loadError"
+        class="text-xs text-input-error-text mt-1"
+        data-test="condition-builder-load-error"
+      >
+        {{ t("flow.condition.loadError") }}
       </div>
 
       <!-- Schema error for the bridged FilterGroup model (no OForm* field
@@ -157,6 +168,11 @@ const emptyGroup = () => ({
   ],
 });
 
+// A saved condition that fails to parse falls back to an EMPTY group. That is
+// silently destructive — the user sees a blank builder and, on save, overwrites
+// whatever was stored. Surface it so the reset is a visible, informed choice.
+const loadError = ref(false);
+
 // Load a saved rule into V2, auto-converting V0/V1; else start empty.
 const initGroup = () => {
   const saved = props.initialConditions;
@@ -174,6 +190,7 @@ const initGroup = () => {
       return props.normalizeOperators ? normalizeConditionOperators(group) : group;
     } catch (e) {
       console.error("Error loading condition:", e);
+      loadError.value = true;
     }
   }
   return emptyGroup();
@@ -250,6 +267,14 @@ defineExpose({ submit, conditionGroup, form });
 </script>
 
 <style>
+/* Unscoped BY NECESSITY: these target FilterGroup's INTERNALS (`.el-border`,
+   `.group-container`, …) to fit it into the narrow flow drawer. A scoped block
+   would add a data-attribute those child elements never carry.
+   The old `[style*="margin-left"] { margin-left: 10px !important }` rule is
+   gone — it patched FilterGroup's computed inline indent from the outside and
+   would have hit any other inline margin-left. The child now takes an
+   `indent-rem` prop instead (see the FilterGroup usage above). */
+
 /* Force the FilterGroup box to span the full drawer width (defaults to w-fit). */
 .flow-filter-group-wrapper > .el-border {
   width: 100% !important;
@@ -260,14 +285,11 @@ defineExpose({ submit, conditionGroup, form });
   max-width: 100%;
   pointer-events: auto;
 }
-.flow-filter-group-wrapper [style*="margin-left"] {
-  margin-left: 10px !important;
-}
 .flow-filter-group-wrapper .conditions-input {
-  min-width: 120px !important;
-  max-width: 200px;
+  min-width: 7.5rem !important;
+  max-width: 12.5rem;
 }
 .flow-filter-group-wrapper .group-border {
-  max-width: calc(100% - 20px);
+  max-width: calc(100% - 1.25rem);
 }
 </style>
