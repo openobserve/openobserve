@@ -34,6 +34,7 @@ impl openobserve_enrichment::Runtime for CoreEnrichmentRuntime {
 
 pub async fn init() -> Result<(), anyhow::Error> {
     crate::alerts::install_runtime_services();
+    crate::dashboards::install_runtime_services();
     crate::ingestion::install_runtime_services();
     crate::self_reporting_adapter::install_runtime();
     crate::organization_adapter::install_runtime();

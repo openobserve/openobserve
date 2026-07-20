@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ::common::{
-    meta::authz::Authz,
+use axum::response::Response;
+use common::{
+    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     utils::auth::{remove_ownership, set_ownership},
 };
 use config::{
@@ -83,6 +84,36 @@ pub enum FolderError {
     /// enterprise mode using the validator.
     #[error("PermittedFoldersValidator# {0}")]
     PermittedFoldersValidator(String),
+}
+
+impl From<FolderError> for Response {
+    fn from(value: FolderError) -> Self {
+        match value {
+            FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            FolderError::TableReportsError(err) => MetaHttpResponse::internal_error(err),
+            FolderError::MissingName => {
+                MetaHttpResponse::bad_request("Folder name cannot be empty")
+            }
+            FolderError::UpdateDefaultFolder => {
+                MetaHttpResponse::bad_request("Can't update default folder")
+            }
+            FolderError::DeleteWithDashboards => MetaHttpResponse::bad_request(
+                "Folder contains dashboards, please move/delete dashboards from folder",
+            ),
+            FolderError::DeleteWithAlerts => MetaHttpResponse::bad_request(
+                "Folder contains alerts, please move/delete alerts from folder",
+            ),
+            FolderError::DeleteWithReports => MetaHttpResponse::bad_request(
+                "Folder contains reports, please move/delete reports from folder",
+            ),
+            FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
+            FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
+            FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
+            FolderError::FolderNameAlreadyExists => MetaHttpResponse::bad_request(
+                "Folder with this name already exists in this organization",
+            ),
+        }
+    }
 }
 
 #[tracing::instrument(skip(folder))]
@@ -339,7 +370,7 @@ async fn permitted_folders(
 
     // Get the list of folders that the user has `GET` permission on.
     let mut folder_list =
-        crate::authz::list_objects_for_user(org_id, user_id, "GET", folder_ofga_model)
+        crate::permitted_folder_objects(org_id, user_id, "GET", folder_ofga_model)
             .await
             .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
 
@@ -347,7 +378,7 @@ async fn permitted_folders(
     // So, we need to check if the user has `GET` permission on any of the dashboards
     // inside the folder.
 
-    let permitted_dashboards = crate::authz::list_objects_for_user(
+    let permitted_dashboards = crate::permitted_folder_objects(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",

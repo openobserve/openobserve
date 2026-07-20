@@ -20,10 +20,7 @@ use axum::{
 };
 use infra::errors;
 
-use crate::{
-    common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-    service::folders::FolderError,
-};
+use crate::common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
 #[cfg(feature = "enterprise")]
 use crate::{
     llm_evaluations::eval_jobs::EvalJobError, providers::ProviderError,
@@ -92,36 +89,6 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
-    }
-}
-
-impl From<FolderError> for Response {
-    fn from(value: FolderError) -> Self {
-        match value {
-            FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            FolderError::TableReportsError(err) => MetaHttpResponse::internal_error(err),
-            FolderError::MissingName => {
-                MetaHttpResponse::bad_request("Folder name cannot be empty")
-            }
-            FolderError::UpdateDefaultFolder => {
-                MetaHttpResponse::bad_request("Can't update default folder")
-            }
-            FolderError::DeleteWithDashboards => MetaHttpResponse::bad_request(
-                "Folder contains dashboards, please move/delete dashboards from folder",
-            ),
-            FolderError::DeleteWithAlerts => MetaHttpResponse::bad_request(
-                "Folder contains alerts, please move/delete alerts from folder",
-            ),
-            FolderError::DeleteWithReports => MetaHttpResponse::bad_request(
-                "Folder contains reports, please move/delete reports from folder",
-            ),
-            FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
-            FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
-            FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
-            FolderError::FolderNameAlreadyExists => MetaHttpResponse::bad_request(
-                "Folder with this name already exists in this organization",
-            ),
-        }
     }
 }
 

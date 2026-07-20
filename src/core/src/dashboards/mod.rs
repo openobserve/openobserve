@@ -19,6 +19,8 @@
 //! composition retained here is user-specific authorization filtering because
 //! the current authz/user services are still owned by `openobserve-core`.
 
+use std::sync::Arc;
+
 use config::meta::{
     dashboards::{Dashboard, ListDashboardsParams},
     folder::Folder,
@@ -30,6 +32,25 @@ pub mod reports {
 }
 pub mod timed_annotations {
     pub use openobserve_dashboards::timed_annotations::*;
+}
+
+struct CoreFolderRuntime;
+
+#[async_trait::async_trait]
+impl openobserve_dashboards::FolderRuntime for CoreFolderRuntime {
+    async fn permitted_objects(
+        &self,
+        org_id: &str,
+        user_id: &str,
+        permission: &str,
+        object_type: &str,
+    ) -> anyhow::Result<Option<Vec<String>>> {
+        crate::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
+    }
+}
+
+pub fn install_runtime_services() {
+    let _ = openobserve_dashboards::install_folder_runtime(Arc::new(CoreFolderRuntime));
 }
 
 #[tracing::instrument]

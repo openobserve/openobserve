@@ -23,7 +23,7 @@ pub use crate::{
     anomaly_detection, llm_evaluations, ofga, org_storage_providers, providers, ratelimit,
     search_jobs,
 };
-pub use crate::{db, enrichment, folders, metrics, organization};
+pub use crate::{db, enrichment, metrics, organization};
 #[cfg(feature = "cloud")]
 pub use crate::{org_usage, trial_quota};
 
