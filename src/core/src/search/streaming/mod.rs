@@ -42,6 +42,7 @@ use o2_enterprise::enterprise::{
     },
     log_patterns::{PatternAccumulator, PatternExtractionConfig},
 };
+use openobserve_search_service::cache as search_cache;
 use sqlparser::ast::VisitMut;
 use tokio::sync::mpsc;
 use tracing::Instrument;
@@ -54,7 +55,6 @@ use crate::{
         utils::stream::get_max_query_range,
     },
     service::search::{
-        cache as search_cache,
         inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         sql::visitor::histogram_interval::{
             HistogramIntervalVisitor, validate_and_adjust_histogram_interval,

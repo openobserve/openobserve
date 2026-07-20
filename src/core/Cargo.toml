@@ -36,7 +36,11 @@ cloud = [
     "o2_enterprise/cloud",
     "common/cloud",
 ]
-vectorscan = ["o2_enterprise/vectorscan", "search/vectorscan"]
+vectorscan = [
+    "o2_enterprise/vectorscan",
+    "search/vectorscan",
+    "openobserve-search-service/vectorscan",
+]
 vortex = [
     "dep:vortex",
     "config/vortex",

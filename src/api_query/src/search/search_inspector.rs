@@ -272,7 +272,8 @@ pub async fn get_search_profile(
     }
 
     // run search with cache
-    let res = openobserve_core::search::cache::search(
+    let res = openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         &trace_id,
         org_id,
         stream_type,

@@ -488,7 +488,8 @@ pub async fn search(
     }
 
     // run search with cache
-    let res = SearchService::cache::search(
+    let res = openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         &trace_id,
         &org_id,
         stream_type,
@@ -1351,7 +1352,8 @@ async fn values_v1(
             req.query.sql = sql;
         }
 
-        let search_res = SearchService::cache::search(
+        let search_res = openobserve_search_service::cache::search(
+            openobserve_core::search::CoreSearchRuntime,
             &trace_id,
             org_id,
             actual_stream_type,

@@ -60,6 +60,7 @@ openobserve-pipeline.workspace = true
 openobserve-scheduler.workspace = true
 openobserve-api-management.workspace = true
 openobserve-api-query.workspace = true
+openobserve-search-service.workspace = true
 openobserve-api-common.workspace = true
 axum.workspace = true
 axum-extra.workspace = true

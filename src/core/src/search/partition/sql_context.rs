@@ -24,11 +24,10 @@ use config::{
     },
 };
 use infra::errors::Error;
+use openobserve_search_service::cache::cacher::get_ts_col_order_by;
 use proto::cluster_rpc;
 
-use crate::search::{
-    cache::cacher::get_ts_col_order_by, partition::aggregate::is_streaming_aggregate, sql::Sql,
-};
+use crate::search::{partition::aggregate::is_streaming_aggregate, sql::Sql};
 
 /// SQL-derived context for a search partition request.
 ///

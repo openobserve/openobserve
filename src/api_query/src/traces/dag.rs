@@ -29,7 +29,6 @@ use crate::{
     },
     extractors::Headers,
     search::error_utils::map_error_to_http_response,
-    service::search as SearchService,
 };
 
 /// GetTraceDAG
@@ -243,7 +242,8 @@ pub async fn get_trace_dag(
     let stream_type = StreamType::Traces;
     let user_id_opt = Some(user_id.to_string());
 
-    let search_res = SearchService::cache::search(
+    let search_res = openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         &internal_trace_id,
         &org_id,
         stream_type,

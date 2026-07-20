@@ -15,7 +15,13 @@
 
 use std::str::FromStr;
 
+use ::search::{
+    MultiCachedQueryResponse, QueryDelta,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    sql::RE_SELECT_FROM,
+};
 use chrono::{TimeZone, Utc};
+use common::utils::http::get_work_group;
 #[cfg(feature = "vectorscan")]
 use config::meta::projections::ProjectionColumnMapping;
 use config::{
@@ -26,7 +32,7 @@ use config::{
         dashboards::usage_report::DashboardInfo,
         function::RESULT_ARRAY_SKIP_VRL,
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, ResponseTook},
-        self_reporting::usage::{RequestStats, UsageType},
+        self_reporting::usage::RequestStats,
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
     },
@@ -46,35 +52,49 @@ use infra::{
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
+use openobserve_transform::{get_all_transform_keys, init_vrl_runtime};
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
 
-use crate::{
-    common::{
-        meta::search::{MultiCachedQueryResponse, QueryDelta},
-        utils::{functions, http::get_work_group},
-    },
-    service::{
-        search::{
-            self as SearchService,
-            cache::{cacher::check_cache, result_utils::extract_timestamp_range},
-            init_vrl_runtime,
-            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-            sql::RE_SELECT_FROM,
-        },
-        self_reporting::{http_report_metrics, report_request_usage_stats},
-    },
+use super::{
+    cacher::{self, check_cache},
+    result_utils::{self, extract_timestamp_range},
 };
 
-pub mod cacher {
-    pub use openobserve_search_service::cache::cacher::*;
-}
-pub mod multi {
-    pub use openobserve_search_service::cache::multi::*;
-}
-pub mod result_utils {
-    pub use openobserve_search_service::cache::result_utils::*;
+/// Application capabilities used by result-cache orchestration.
+///
+/// Keeping these operations behind a port lets this crate own cache behavior without depending
+/// on `openobserve-core`, which still composes cluster search and usage reporting.
+#[async_trait::async_trait]
+pub trait CacheRuntime: Send + Sync {
+    async fn execute_search(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        user_id: Option<String>,
+        req: &search::Request,
+    ) -> Result<search::Response, Error>;
+
+    fn report_search_metrics(
+        &self,
+        start: std::time::Instant,
+        org_id: &str,
+        stream_type: StreamType,
+        search_type: &str,
+        search_group: &str,
+    );
+
+    async fn report_search_usage(
+        &self,
+        stats: RequestStats,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        num_functions: u16,
+        timestamp: i64,
+    );
 }
 
 // Define cache version
@@ -82,7 +102,8 @@ const CACHE_VERSION: &str = "v3";
 
 #[tracing::instrument(name = "service:search:cacher:search", skip_all)]
 #[allow(clippy::too_many_arguments)]
-pub async fn search(
+pub async fn search<R>(
+    runtime: R,
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -92,7 +113,10 @@ pub async fn search(
     is_http2_streaming: bool,
     dashboard_info: Option<DashboardInfo>,
     is_multi_stream_search: bool,
-) -> Result<search::Response, Error> {
+) -> Result<search::Response, Error>
+where
+    R: CacheRuntime + Clone + Send + Sync + 'static,
+{
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
@@ -186,7 +210,7 @@ pub async fn search(
         }
         req.query.query_fn = query_fn;
 
-        for fn_name in functions::get_all_transform_keys(org_id).await {
+        for fn_name in get_all_transform_keys(org_id).await {
             if req.query.sql.contains(&format!("{fn_name}(")) {
                 req.query.uses_zo_fn = true;
                 break;
@@ -242,6 +266,7 @@ pub async fn search(
                 format!("{trace_id}-{i}")
             };
             let user_id = user_id.clone();
+            let runtime = runtime.clone();
 
             let enter_span = tracing::span::Span::current();
             let task = tokio::task::spawn(
@@ -262,7 +287,9 @@ pub async fn search(
                         );
                     }
 
-                    SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
+                    runtime
+                        .execute_search(&trace_id, &org_id, stream_type, user_id, &req)
+                        .await
                 })
                 .instrument(enter_span),
             );
@@ -337,15 +364,7 @@ pub async fn search(
         .map(|t| t.to_string())
         .unwrap_or("".to_string());
     let search_group = work_group.clone().unwrap_or("".to_string());
-    http_report_metrics(
-        start,
-        org_id,
-        stream_type,
-        "200",
-        "_search",
-        &search_type,
-        &search_group,
-    );
+    runtime.report_search_metrics(start, org_id, stream_type, &search_type, &search_group);
 
     res.set_trace_id(trace_id.to_string());
     res.set_took(took_time as usize);
@@ -385,16 +404,16 @@ pub async fn search(
         peak_memory_usage: res.peak_memory_usage,
         ..Default::default()
     };
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        &all_streams,
-        stream_type,
-        UsageType::Search,
-        num_fn,
-        started_at,
-    )
-    .await;
+    runtime
+        .report_search_usage(
+            req_stats,
+            org_id,
+            &all_streams,
+            stream_type,
+            num_fn,
+            started_at,
+        )
+        .await;
 
     if res.is_partial {
         let partial_err = PARTIAL_ERROR_RESPONSE_MESSAGE;
@@ -481,7 +500,7 @@ pub async fn search(
     // result cache save changes Ends
 
     #[cfg(feature = "vectorscan")]
-    crate::search::cache::apply_regex_to_response(
+    apply_regex_to_response(
         &req,
         org_id,
         &stream_name,
@@ -548,7 +567,7 @@ pub async fn prepare_cache_response(
 
     // Parse SQL first to get metadata needed for normalization
     let query: SearchQuery = req.query.clone().into();
-    let sql = match crate::search::Sql::new(&query, org_id, stream_type, req.search_type).await {
+    let sql = match ::search::sql::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {e}");
@@ -572,7 +591,7 @@ pub async fn prepare_cache_response(
             } else {
                 sql.time_range
             };
-        crate::search::sql::histogram::handle_histogram(
+        ::search::sql::histogram::handle_histogram(
             &mut origin_sql,
             q_time_range,
             req.query.histogram_interval,
@@ -1032,7 +1051,7 @@ pub async fn write_results(
     let query_key = file_path.replace('/', "_");
     let trace_id = trace_id.to_string();
     tokio::spawn(async move {
-        match SearchService::cache::cacher::cache_results_to_disk(
+        match cacher::cache_results_to_disk(
             &trace_id,
             &file_path,
             &file_name,
@@ -1220,8 +1239,7 @@ pub async fn apply_regex_to_response(
     let pattern_manager = get_pattern_manager().await?;
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
-    let sql = match crate::search::sql::Sql::new(&query, org_id, stream_type, req.search_type).await
-    {
+    let sql = match ::search::sql::Sql::new(&query, org_id, stream_type, req.search_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {e}");
@@ -1230,8 +1248,7 @@ pub async fn apply_regex_to_response(
     };
 
     let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
-        crate::search::datafusion::plan::regex_projections::get_columns_from_projections(sql)
-            .await?;
+        ::search::datafusion::plan::regex_projections::get_columns_from_projections(sql).await?;
     if projections.is_empty() {
         return Ok(());
     }

@@ -35,10 +35,7 @@ use crate::{
         CachedQueryResponse, MultiCachedQueryResponse, QueryDelta, SearchResultType,
     },
     service::{
-        search::{
-            cache,
-            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        },
+        search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
         self_reporting::report_request_usage_stats,
     },
 };
@@ -75,7 +72,7 @@ pub async fn write_results_to_cache(
         }
     }
 
-    let merged_response = cache::merge_response(
+    let merged_response = openobserve_search_service::cache::merge_response(
         &c_resp.trace_id,
         &mut cached_responses,
         &mut search_responses,
@@ -102,7 +99,7 @@ pub async fn write_results_to_cache(
                 .map(|(field, _)| field != &c_resp.ts_column)
                 .unwrap_or(false);
 
-        cache::write_results(
+        openobserve_search_service::cache::write_results(
             &c_resp.trace_id,
             &c_resp.ts_column,
             start_time,
@@ -420,7 +417,7 @@ async fn send_cached_responses(
     );
 
     #[cfg(feature = "vectorscan")]
-    crate::search::cache::apply_regex_to_response(
+    openobserve_search_service::cache::apply_regex_to_response(
         req,
         org_id,
         all_streams,
@@ -432,7 +429,7 @@ async fn send_cached_responses(
     .await?;
 
     if is_result_array_skip_vrl {
-        cached.cached_response.hits = crate::search::cache::apply_vrl_to_response(
+        cached.cached_response.hits = openobserve_search_service::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
             &mut cached.cached_response,
             org_id,

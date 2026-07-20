@@ -16,26 +16,31 @@ enterprise = [
     "search/enterprise",
 ]
 cloud = ["enterprise", "o2_enterprise/cloud"]
+vectorscan = ["enterprise", "o2_enterprise/vectorscan", "search/vectorscan"]
 
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
+common.workspace = true
 config.workspace = true
 infra.workspace = true
 itertools.workspace = true
 log.workspace = true
 hashbrown.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
+openobserve-transform.workspace = true
 promql.workspace = true
 prost.workspace = true
 proto.workspace = true
 search.workspace = true
 serde_json.workspace = true
+svix-ksuid.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
+vector-enrichment.workspace = true
 
 [dev-dependencies]
 arrow-schema.workspace = true

@@ -57,7 +57,8 @@ impl Search for Searcher {
         let request = json::from_slice::<search::Request>(&req.request)
             .map_err(|e| Status::internal(format!("failed to parse search request: {e}")))?;
         let stream_type = StreamType::from(req.stream_type.as_str());
-        let ret = SearchService::cache::search(
+        let ret = openobserve_search_service::cache::search(
+            crate::search::CoreSearchRuntime,
             &req.trace_id,
             &req.org_id,
             stream_type,

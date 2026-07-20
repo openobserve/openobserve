@@ -34,7 +34,6 @@ use crate::{
     },
     extractors::Headers,
     search::error_utils::map_error_to_http_response,
-    service::search as SearchService,
 };
 
 /// GetLatestUsers
@@ -256,7 +255,8 @@ pub async fn get_latest_users(
         ..Default::default()
     };
 
-    let resp_search = match SearchService::cache::search(
+    let resp_search = match openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         &trace_id,
         &org_id,
         stream_type,
@@ -355,7 +355,8 @@ pub async fn get_latest_users(
     req.query.size = all_trace_ids.len() as i64;
 
     let mut trace_details: HashMap<String, TraceDetail> = HashMap::new();
-    let resp = match SearchService::cache::search(
+    let resp = match openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         &trace_id,
         &org_id,
         stream_type,

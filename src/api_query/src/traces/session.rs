@@ -35,7 +35,7 @@ use crate::{
     },
     extractors::Headers,
     search::error_utils::map_error_to_http_response,
-    service::{search as SearchService, traces},
+    service::traces,
 };
 
 /// GetLatestSessions
@@ -294,7 +294,8 @@ pub async fn get_latest_sessions(
         ..Default::default()
     };
 
-    let resp_search = match SearchService::cache::search(
+    let resp_search = match openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         &trace_id,
         &org_id,
         stream_type,
@@ -478,7 +479,8 @@ pub async fn get_latest_sessions(
     req.query.size = all_trace_ids.len() as i64;
 
     let mut trace_details: HashMap<String, TraceDetail> = HashMap::new();
-    let resp = match SearchService::cache::search(
+    let resp = match openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         &trace_id,
         &org_id,
         stream_type,
@@ -812,7 +814,8 @@ pub async fn get_session_details(
         ..Default::default()
     };
 
-    let resp_search = match SearchService::cache::search(
+    let resp_search = match openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         &trace_id,
         &org_id,
         stream_type,
@@ -993,7 +996,8 @@ async fn fetch_session_trace_hits(
     req.query.start_time = start_time;
     req.query.end_time = end_time;
 
-    let resp = SearchService::cache::search(
+    let resp = openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         req_trace_id,
         org_id,
         stream_type,
@@ -1041,7 +1045,8 @@ async fn fetch_session_trace_hits(
         req.query.start_time = start_time;
         req.query.end_time = end_time;
 
-        let svc_res = SearchService::cache::search(
+        let svc_res = openobserve_search_service::cache::search(
+            openobserve_core::search::CoreSearchRuntime,
             req_trace_id,
             org_id,
             stream_type,

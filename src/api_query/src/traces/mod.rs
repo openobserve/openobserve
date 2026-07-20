@@ -484,7 +484,8 @@ pub async fn get_latest_traces(
     let stream_type = StreamType::Traces;
     let user_id_opt = Some(user_id.to_string());
 
-    let search_res = SearchService::cache::search(
+    let search_res = openobserve_search_service::cache::search(
+        openobserve_core::search::CoreSearchRuntime,
         &trace_id,
         &org_id,
         stream_type,
@@ -684,7 +685,8 @@ pub async fn get_latest_traces(
         // request fetches everything.
         req.query.size = multi_service_total;
 
-        let search_res = SearchService::cache::search(
+        let search_res = openobserve_search_service::cache::search(
+            openobserve_core::search::CoreSearchRuntime,
             &trace_id,
             &org_id,
             stream_type,
@@ -1425,7 +1427,8 @@ async fn process_latest_traces_stream(
         req1.query.from = 0;
         req1.query.size = fetch_size;
 
-        let agg_res = match SearchService::cache::search(
+        let agg_res = match openobserve_search_service::cache::search(
+            openobserve_core::search::CoreSearchRuntime,
             &trace_id,
             &org_id,
             stream_type,
@@ -1904,7 +1907,8 @@ async fn run_q2_for_traces(
         if sender.is_closed() {
             return None;
         }
-        let svc_res = match SearchService::cache::search(
+        let svc_res = match openobserve_search_service::cache::search(
+            openobserve_core::search::CoreSearchRuntime,
             req_trace_id,
             org_id,
             stream_type,

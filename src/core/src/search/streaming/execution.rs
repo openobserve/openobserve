@@ -26,6 +26,8 @@ use config::meta::{
 use log;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
+#[cfg(feature = "enterprise")]
+use openobserve_search_service::cache::cacher::delete_cache;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 
@@ -33,8 +35,6 @@ use super::{
     sorting::{TopKHeap, order_search_results},
     utils::{calculate_progress_percentage, get_top_k_values},
 };
-#[cfg(feature = "enterprise")]
-use crate::search::cache::cacher::delete_cache;
 use crate::{
     common::meta::search::{QueryDelta, SearchResultType},
     service::search::{self as SearchService},
@@ -285,7 +285,7 @@ pub async fn do_partitioned_search(
             log::debug!("Top k values for partition {idx} took {duration:?}");
         }
         #[cfg(feature = "vectorscan")]
-        crate::search::cache::apply_regex_to_response(
+        openobserve_search_service::cache::apply_regex_to_response(
             &req,
             org_id,
             stream_name,
@@ -297,7 +297,7 @@ pub async fn do_partitioned_search(
         .await?;
 
         if is_result_array_skip_vrl {
-            search_res.hits = crate::search::cache::apply_vrl_to_response(
+            search_res.hits = openobserve_search_service::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
                 &mut search_res,
                 org_id,
@@ -386,7 +386,7 @@ pub async fn do_partitioned_search(
         }
 
         #[cfg(feature = "vectorscan")]
-        crate::search::cache::apply_regex_to_response(
+        openobserve_search_service::cache::apply_regex_to_response(
             req,
             org_id,
             stream_name,
@@ -398,7 +398,7 @@ pub async fn do_partitioned_search(
         .await?;
 
         if is_result_array_skip_vrl {
-            final_res.hits = crate::search::cache::apply_vrl_to_response(
+            final_res.hits = openobserve_search_service::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
                 &mut final_res,
                 org_id,
@@ -500,7 +500,8 @@ pub async fn do_search(
     let mut req = req.clone();
 
     req.use_cache = use_cache;
-    let res = SearchService::cache::search(
+    let res = openobserve_search_service::cache::search(
+        crate::search::CoreSearchRuntime,
         trace_id,
         org_id,
         stream_type,
@@ -690,7 +691,7 @@ pub async fn process_delta(
             search_res.hits = top_k_values;
         }
         #[cfg(feature = "vectorscan")]
-        crate::search::cache::apply_regex_to_response(
+        openobserve_search_service::cache::apply_regex_to_response(
             &req,
             org_id,
             stream_name,
@@ -702,7 +703,7 @@ pub async fn process_delta(
         .await?;
 
         if is_result_array_skip_vrl {
-            search_res.hits = crate::search::cache::apply_vrl_to_response(
+            search_res.hits = openobserve_search_service::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
                 &mut search_res,
                 org_id,
@@ -852,7 +853,7 @@ async fn send_partial_search_resp(
         ..Default::default()
     };
     #[cfg(feature = "vectorscan")]
-    crate::search::cache::apply_regex_to_response(
+    openobserve_search_service::cache::apply_regex_to_response(
         _req,
         org_id,
         stream_name,
@@ -863,7 +864,7 @@ async fn send_partial_search_resp(
     )
     .await?;
     if is_result_array_skip_vrl {
-        s_resp.hits = crate::search::cache::apply_vrl_to_response(
+        s_resp.hits = openobserve_search_service::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
             &mut s_resp,
             org_id,

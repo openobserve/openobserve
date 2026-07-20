@@ -391,7 +391,8 @@ pub async fn search_multi(
 
         let trace_id = trace_id.clone();
         // do search
-        let search_res = SearchService::cache::search(
+        let search_res = openobserve_search_service::cache::search(
+            openobserve_core::search::CoreSearchRuntime,
             &trace_id,
             &org_id,
             stream_type,

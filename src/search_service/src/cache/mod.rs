@@ -16,3 +16,6 @@
 pub mod cacher;
 pub mod multi;
 pub mod result_utils;
+mod service;
+
+pub use service::*;

@@ -64,7 +64,6 @@ use crate::{
     },
 };
 
-pub mod cache;
 #[cfg(feature = "enterprise")]
 pub mod cardinality;
 pub mod cluster;
@@ -80,6 +79,64 @@ pub mod work_group;
 
 pub use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
 pub use searcher::Searcher;
+
+/// Core's composition adapter for cache-owned search orchestration.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CoreSearchRuntime;
+
+#[async_trait::async_trait]
+impl openobserve_search_service::cache::CacheRuntime for CoreSearchRuntime {
+    async fn execute_search(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        user_id: Option<String>,
+        req: &search::Request,
+    ) -> Result<search::Response, Error> {
+        crate::search::search(trace_id, org_id, stream_type, user_id, req).await
+    }
+
+    fn report_search_metrics(
+        &self,
+        start: std::time::Instant,
+        org_id: &str,
+        stream_type: StreamType,
+        search_type: &str,
+        search_group: &str,
+    ) {
+        crate::self_reporting::http_report_metrics(
+            start,
+            org_id,
+            stream_type,
+            "200",
+            "_search",
+            search_type,
+            search_group,
+        );
+    }
+
+    async fn report_search_usage(
+        &self,
+        stats: RequestStats,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        num_functions: u16,
+        timestamp: i64,
+    ) {
+        crate::self_reporting::report_request_usage_stats(
+            stats,
+            org_id,
+            stream_name,
+            stream_type,
+            UsageType::Search,
+            num_functions,
+            timestamp,
+        )
+        .await;
+    }
+}
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
