@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use arrow_schema::{Field, Schema};
 use async_trait::async_trait;
-use common::meta::stream::{SchemaEvolution, StreamSchema};
+use common::meta::stream::StreamSchema;
 use config::{
     META_ORG_ID, get_config,
     meta::{
@@ -17,12 +17,7 @@ use config::{
         stream::StreamType,
     },
 };
-use infra::schema::SchemaCache;
-use openobserve_ingestion::{
-    ports::{DistinctValue, TraceListValue},
-    types::StreamSchemaChk,
-};
-use serde_json::{Map, Value};
+use openobserve_ingestion::ports::{DistinctValue, TraceListValue};
 
 pub mod grpc {
     pub use openobserve_ingestion::grpc::*;
@@ -41,46 +36,6 @@ struct CoreIngestionRuntime;
 impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
     fn publish_trigger_usage(&self, trigger: TriggerData) {
         crate::self_reporting::publish_triggers_usage(trigger);
-    }
-
-    async fn check_for_schema(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        stream_schema_map: &mut HashMap<String, SchemaCache>,
-        record_vals: Vec<&Map<String, Value>>,
-        record_ts: i64,
-        is_derived: bool,
-    ) -> anyhow::Result<(SchemaEvolution, Option<Schema>)> {
-        crate::schema::check_for_schema(
-            org_id,
-            stream_name,
-            stream_type,
-            stream_schema_map,
-            record_vals,
-            record_ts,
-            is_derived,
-        )
-        .await
-    }
-
-    async fn stream_schema_exists(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        stream_schema_map: &mut HashMap<String, SchemaCache>,
-    ) -> anyhow::Result<StreamSchemaChk> {
-        Ok(
-            crate::schema::stream_schema_exists(
-                org_id,
-                stream_name,
-                stream_type,
-                stream_schema_map,
-            )
-            .await,
-        )
     }
 
     async fn report_request_usage_stats(
@@ -193,6 +148,19 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         metadata: HashMap<String, String>,
     ) -> anyhow::Result<()> {
         crate::db::schema::update_setting(org_id, stream_name, stream_type, metadata).await
+    }
+
+    async fn save_stream_settings(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        settings: config::meta::stream::StreamSettings,
+    ) -> anyhow::Result<()> {
+        crate::stream::save_stream_settings(org_id, stream_name, stream_type, settings)
+            .await
+            .map(|_| ())
+            .map_err(Into::into)
     }
 
     async fn list_stream_schemas(

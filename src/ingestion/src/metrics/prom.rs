@@ -227,13 +227,13 @@ pub async fn remote_write(
         for stream in &streams {
             let stream_name_str: &str = stream.stream_name.as_ref();
             if !metric_schema_map.contains_key(stream_name_str) {
-                ports::stream_schema_exists(
+                crate::schema::stream_schema_exists(
                     &stream.org_id,
                     &stream.stream_name,
                     stream.stream_type,
                     &mut metric_schema_map,
                 )
-                .await?;
+                .await;
             }
         }
         preload_schema_time = t.elapsed().as_micros();
@@ -548,7 +548,7 @@ pub async fn remote_write(
             }
             drop(schema_fields);
             if need_schema_check {
-                let (schema_evolution, _infer_schema) = ports::check_for_schema(
+                let (schema_evolution, _infer_schema) = crate::schema::check_for_schema(
                     org_id,
                     &stream_name,
                     StreamType::Metrics,

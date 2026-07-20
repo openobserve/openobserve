@@ -290,13 +290,13 @@ async fn write_logs(
     let log_ingest_errors = ingestion_log_enabled().await;
     // get schema and stream settings
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let stream_schema = ports::stream_schema_exists(
+    let stream_schema = crate::schema::stream_schema_exists(
         org_id,
         stream_name,
         StreamType::Logs,
         &mut stream_schema_map,
     )
-    .await?;
+    .await;
 
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
@@ -334,7 +334,7 @@ async fn write_logs(
 
     // start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let (schema_evolution, infer_schema) = ports::check_for_schema(
+    let (schema_evolution, infer_schema) = crate::schema::check_for_schema(
         org_id,
         stream_name,
         StreamType::Logs,

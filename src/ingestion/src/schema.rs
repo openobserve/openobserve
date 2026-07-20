@@ -19,8 +19,12 @@ use std::{
 };
 
 use anyhow::Result;
-use common::utils::schema_fields::{
-    check_schema_for_defined_schema_fields, generate_schema_for_defined_schema_fields,
+use arrow_schema::{Field, Schema};
+use common::{
+    meta::{authz::Authz, stream::SchemaEvolution},
+    utils::schema_fields::{
+        check_schema_for_defined_schema_fields, generate_schema_for_defined_schema_fields,
+    },
 };
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
@@ -37,19 +41,14 @@ use config::{
         time::now_micros,
     },
 };
-use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
     unwrap_stream_settings,
 };
-use openobserve_ingestion::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use serde_json::{Map, Value};
 
-use crate::{
-    common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
-    service::db,
-};
+use crate::{logs::bulk::SCHEMA_CONFORMANCE_FAILED, ports, types::StreamSchemaChk};
 
 pub(crate) fn get_request_columns_limit_error(
     stream_name: &str,
@@ -222,7 +221,7 @@ pub async fn get_merged_schema(
 // 3. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
 // 4. if db_schema is not identical to inferred_schema, merge schema and update db
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn handle_diff_schema(
+pub async fn handle_diff_schema(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -278,7 +277,7 @@ pub(crate) async fn handle_diff_schema(
         } else {
             inferred_schema
         };
-        match db::schema::merge(
+        match ports::merge_schema(
             org_id,
             stream_name,
             stream_type,
@@ -403,13 +402,9 @@ pub(crate) async fn handle_diff_schema(
         );
 
         // save the new settings
-        if let Err(e) = super::stream::save_stream_settings(
-            org_id,
-            stream_name,
-            stream_type,
-            stream_setting.clone(),
-        )
-        .await
+        if let Err(e) =
+            ports::save_stream_settings(org_id, stream_name, stream_type, stream_setting.clone())
+                .await
         {
             log::error!("save_stream_settings [{org_id}/{stream_type}/{stream_name}] error: {e}");
         }
@@ -518,9 +513,17 @@ pub async fn stream_schema_exists(
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
         None => {
-            let schema_cache = infra::schema::get_cache(org_id, stream_name, stream_type)
+            let schema_cache = match infra::schema::get_cache(org_id, stream_name, stream_type)
                 .await
-                .unwrap();
+            {
+                Ok(schema) => schema,
+                Err(error) => {
+                    log::warn!(
+                        "failed to load schema for {org_id}/{stream_type}/{stream_name}: {error}"
+                    );
+                    SchemaCache::new(Schema::empty())
+                }
+            };
             let db_schema = schema_cache.schema().clone();
             stream_schema_map.insert(stream_name.to_string(), schema_cache);
             db_schema
@@ -546,8 +549,8 @@ pub async fn stream_schema_exists(
 mod tests {
     use std::str::FromStr;
 
+    use arrow_schema::DataType;
     use config::meta::promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL};
-    use datafusion::arrow::datatypes::DataType;
 
     use super::*;
 

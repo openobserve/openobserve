@@ -242,13 +242,13 @@ pub async fn handle_otlp_request(
                 }
 
                 // check for schema
-                let schema_exists = ports::stream_schema_exists(
+                let schema_exists = crate::schema::stream_schema_exists(
                     org_id,
                     &metric_name,
                     StreamType::Metrics,
                     &mut metric_schema_map,
                 )
-                .await?;
+                .await;
 
                 // get partition keys
                 if !stream_partitioning_map.contains_key(&metric_name) {
@@ -316,13 +316,13 @@ pub async fn handle_otlp_request(
 
                     if local_metric_name != metric_name {
                         // check for schema
-                        ports::stream_schema_exists(
+                        crate::schema::stream_schema_exists(
                             org_id,
                             &local_metric_name,
                             StreamType::Metrics,
                             &mut metric_schema_map,
                         )
-                        .await?;
+                        .await;
 
                         // get partition keys
                         if !stream_partitioning_map.contains_key(&local_metric_name) {
@@ -507,7 +507,7 @@ pub async fn handle_otlp_request(
         // check for schema evolution
         let min_timestamp = batch_min_timestamp(&json_data, Utc::now().timestamp_micros());
 
-        let _ = ports::check_for_schema(
+        let _ = crate::schema::check_for_schema(
             org_id,
             &local_metric_name,
             StreamType::Metrics,

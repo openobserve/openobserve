@@ -460,7 +460,7 @@ pub async fn ingest(
             }
 
             // check for schema evolution
-            let (_schema_evolution, _infer_schema) = ports::check_for_schema(
+            let (_schema_evolution, _infer_schema) = crate::schema::check_for_schema(
                 org_id,
                 &stream_name,
                 StreamType::Metrics,

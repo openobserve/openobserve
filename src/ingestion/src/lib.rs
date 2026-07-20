@@ -18,6 +18,7 @@ pub mod logs;
 pub mod metrics;
 pub mod ports;
 pub mod repository;
+pub mod schema;
 pub mod service;
 pub mod tokens;
 pub mod traces;

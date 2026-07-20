@@ -67,7 +67,7 @@ pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod runtime_metrics;
-pub mod schema;
+pub use openobserve_ingestion::schema;
 pub mod search;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs {

@@ -12,15 +12,12 @@ use std::{
 
 use arrow_schema::{Field, Schema};
 use async_trait::async_trait;
-use common::meta::stream::{SchemaEvolution, StreamSchema};
+use common::meta::stream::StreamSchema;
 use config::meta::{
     self_reporting::usage::{RequestStats, TriggerData, UsageType},
     stream::StreamType,
 };
-use infra::schema::SchemaCache;
 use serde_json::{Map, Value};
-
-use crate::types::StreamSchemaChk;
 
 pub struct DistinctValue {
     pub stream_type: StreamType,
@@ -38,25 +35,6 @@ pub struct TraceListValue {
 #[async_trait]
 pub trait RuntimeServices: Send + Sync + 'static {
     fn publish_trigger_usage(&self, trigger: TriggerData);
-
-    async fn check_for_schema(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        stream_schema_map: &mut HashMap<String, SchemaCache>,
-        record_vals: Vec<&Map<String, Value>>,
-        record_ts: i64,
-        is_derived: bool,
-    ) -> anyhow::Result<(SchemaEvolution, Option<Schema>)>;
-
-    async fn stream_schema_exists(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        stream_schema_map: &mut HashMap<String, SchemaCache>,
-    ) -> anyhow::Result<StreamSchemaChk>;
 
     async fn report_request_usage_stats(
         &self,
@@ -115,6 +93,14 @@ pub trait RuntimeServices: Send + Sync + 'static {
         metadata: HashMap<String, String>,
     ) -> anyhow::Result<()>;
 
+    async fn save_stream_settings(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        settings: config::meta::stream::StreamSettings,
+    ) -> anyhow::Result<()>;
+
     async fn list_stream_schemas(
         &self,
         org_id: &str,
@@ -165,39 +151,6 @@ fn runtime_services() -> infra::errors::Result<&'static Arc<dyn RuntimeServices>
     RUNTIME_SERVICES.get().ok_or_else(|| {
         infra::errors::Error::Message("ingestion runtime services are not installed".to_string())
     })
-}
-
-pub async fn check_for_schema(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    stream_schema_map: &mut HashMap<String, SchemaCache>,
-    record_vals: Vec<&Map<String, Value>>,
-    record_ts: i64,
-    is_derived: bool,
-) -> anyhow::Result<(SchemaEvolution, Option<Schema>)> {
-    runtime_services()?
-        .check_for_schema(
-            org_id,
-            stream_name,
-            stream_type,
-            stream_schema_map,
-            record_vals,
-            record_ts,
-            is_derived,
-        )
-        .await
-}
-
-pub async fn stream_schema_exists(
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    stream_schema_map: &mut HashMap<String, SchemaCache>,
-) -> anyhow::Result<StreamSchemaChk> {
-    runtime_services()?
-        .stream_schema_exists(org_id, stream_name, stream_type, stream_schema_map)
-        .await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -289,6 +242,17 @@ pub async fn update_schema_setting(
 ) -> anyhow::Result<()> {
     runtime_services()?
         .update_schema_setting(org_id, stream_name, stream_type, metadata)
+        .await
+}
+
+pub async fn save_stream_settings(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    settings: config::meta::stream::StreamSettings,
+) -> anyhow::Result<()> {
+    runtime_services()?
+        .save_stream_settings(org_id, stream_name, stream_type, settings)
         .await
 }
 

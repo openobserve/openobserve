@@ -1286,14 +1286,13 @@ async fn write_traces(
     let cfg = get_config();
     // get schema and stream settings
     let mut traces_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let stream_schema = ports::stream_schema_exists(
+    let stream_schema = crate::schema::stream_schema_exists(
         org_id,
         stream_name,
         StreamType::Traces,
         &mut traces_schema_map,
     )
-    .await
-    .map_err(|e| std::io::Error::other(e.to_string()))?;
+    .await;
 
     let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
         .await
@@ -1331,7 +1330,7 @@ async fn write_traces(
 
     // Start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let (_schema_evolution, _infer_schema) = ports::check_for_schema(
+    let (_schema_evolution, _infer_schema) = crate::schema::check_for_schema(
         org_id,
         stream_name,
         StreamType::Traces,
