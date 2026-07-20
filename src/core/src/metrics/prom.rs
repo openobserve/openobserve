@@ -82,7 +82,6 @@ pub async fn remote_write(
     let cfg = get_config();
     let dedup_enabled = cfg.common.metrics_dedup_enabled;
     let election_interval = cfg.limit.metrics_leader_election_interval * 1000000;
-    let mut has_entry = false;
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -278,12 +277,10 @@ pub async fn remote_write(
             .drain(..)
             .filter(|label| {
                 if label.name == cfg.prom.ha_replica_label {
-                    if !has_entry {
-                        replica_label = label.value.clone();
-                    }
+                    replica_label = label.value.clone();
                     false
                 } else if label.name == cfg.prom.ha_cluster_label {
-                    if !has_entry && cluster_name.is_empty() {
+                    if cluster_name.is_empty() {
                         cluster_name = format!("{}/{}", org_id, label.value.clone());
                     }
                     false
@@ -316,7 +313,6 @@ pub async fn remote_write(
             // replica sending only unusable data cannot retain leadership
             if first_line && dedup_enabled && !cluster_name.is_empty() {
                 first_line = false;
-                has_entry = true;
                 if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
                     // do not accept any entries for this request
                     observe_rejected_request(org_id, &start);
@@ -350,54 +346,65 @@ pub async fn remote_write(
 
         // native histograms degrade into classic `_count`/`_sum`/`le` `_bucket`
         // records so existing PromQL works on them unchanged
-        for hp in &event.histograms {
-            sample_count += 1;
-            let records = expand_native_histogram(hp);
-            if records.is_empty() {
-                // unsupported schema or stale marker: nothing will be written
-                continue;
-            }
-
-            // same first-writable-record election as the samples loop
-            if first_line && dedup_enabled && !cluster_name.is_empty() {
-                first_line = false;
-                has_entry = true;
-                if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
-                    observe_rejected_request(org_id, &start);
-                    return Ok(());
-                }
-            }
-
-            let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
-            for (suffix, le, value) in records {
-                let Some(value) = super::sanitize_metric_value(value) else {
-                    continue;
-                };
+        if !event.histograms.is_empty() {
+            // one stream name + label template per derived stream, shared by every
+            // record of the event instead of cloned per record
+            let mut derived_streams = CLASSIC_HISTOGRAM_SUFFIXES.map(|suffix| {
                 let mut hist_labels = labels.clone();
                 if let Some(name) = hist_labels.get_mut(NAME_LABEL) {
                     name.push_str(suffix);
                 }
-                if let Some(le) = le {
-                    hist_labels.insert(BUCKET_LABEL.to_string(), le);
+                (format!("{metric_name}{suffix}"), hist_labels)
+            });
+            for hp in &event.histograms {
+                sample_count += 1;
+                let records = expand_native_histogram(hp, cfg.prom.native_histogram_max_buckets);
+                if records.is_empty() {
+                    // unsupported schema or stale marker: nothing will be written
+                    continue;
                 }
-                let metric = Metric {
-                    labels: &hist_labels,
-                    value,
-                };
-                let mut value: json::Value = json::to_value(&metric).unwrap();
-                value.as_object_mut().unwrap().insert(
-                    TIMESTAMP_COL_NAME.to_string(),
-                    json::Value::Number(timestamp.into()),
-                );
-                buffer_metric_record(
-                    &format!("{metric_name}{suffix}"),
-                    value,
-                    timestamp,
-                    &stream_executable_pipelines,
-                    &user_defined_schema_map,
-                    &mut stream_pipeline_inputs,
-                    &mut json_data_by_stream,
-                );
+
+                // same first-writable-record election as the samples loop
+                if first_line && dedup_enabled && !cluster_name.is_empty() {
+                    first_line = false;
+                    if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
+                        observe_rejected_request(org_id, &start);
+                        return Ok(());
+                    }
+                }
+
+                let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
+                for (suffix, le, value) in records {
+                    let Some(value) = super::sanitize_metric_value(value) else {
+                        continue;
+                    };
+                    let idx = CLASSIC_HISTOGRAM_SUFFIXES
+                        .iter()
+                        .position(|s| *s == suffix)
+                        .unwrap();
+                    let (stream_name, hist_labels) = &mut derived_streams[idx];
+                    if let Some(le) = le {
+                        hist_labels.insert(BUCKET_LABEL.to_string(), le);
+                    }
+                    let metric = Metric {
+                        labels: hist_labels,
+                        value,
+                    };
+                    let mut value: json::Value = json::to_value(&metric).unwrap();
+                    value.as_object_mut().unwrap().insert(
+                        TIMESTAMP_COL_NAME.to_string(),
+                        json::Value::Number(timestamp.into()),
+                    );
+                    buffer_metric_record(
+                        stream_name,
+                        value,
+                        timestamp,
+                        &stream_executable_pipelines,
+                        &user_defined_schema_map,
+                        &mut stream_pipeline_inputs,
+                        &mut json_data_by_stream,
+                    );
+                }
             }
         }
         sample_processing_time += sample_start.elapsed().as_micros();
