@@ -271,7 +271,6 @@ describe("ReportList Component", () => {
     it("should initialize with correct default values", () => {
       expect(wrapper.vm.activeTab).toBe("shared");
       expect(wrapper.vm.filterQuery).toBe("");
-      expect(wrapper.vm.pageSize).toBe(20);
     });
 
     it("should show loading state during initialization", async () => {

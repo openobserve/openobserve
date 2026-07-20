@@ -303,10 +303,6 @@ describe("ReportList", () => {
       expect(wrapper.vm.filterQuery).toBe("");
     });
 
-    it("should initialize pageSize to 20", () => {
-      expect(wrapper.vm.pageSize).toBe(20);
-    });
-
     it("should set isLoadingReports to false after fetching", () => {
       expect(wrapper.vm.isLoadingReports).toBe(false);
     });

@@ -507,7 +507,7 @@ describe("SearchResult Component", () => {
 
     it("should handle column sizes update with empty previous sizes", async () => {
       wrapper.vm.searchObj.data.resultGrid.colSizes = {};
-      wrapper.vm.searchObj.data.stream.selectedStream = "new-stream";
+      wrapper.vm.searchObj.data.stream.selectedStream = ["new-stream"];
 
       const newSizes = { col1: 100 };
       await wrapper.vm.handleColumnSizesUpdate(newSizes);

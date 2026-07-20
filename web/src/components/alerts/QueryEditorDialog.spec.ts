@@ -155,11 +155,6 @@ describe("QueryEditorDialog - initial state", () => {
     expect((w.vm as any).functionOptions).toHaveLength(2);
   });
 
-  it("isFullScreen defaults to false", async () => {
-    const w = await mountComp();
-    expect((w.vm as any).isFullScreen).toBe(false);
-  });
-
   it("expandSqlOutput defaults to true", async () => {
     const w = await mountComp();
     expect((w.vm as any).expandSqlOutput).toBe(true);

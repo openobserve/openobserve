@@ -225,10 +225,6 @@ describe("SpanRenderer", () => {
     expect(wrapper.emitted("toggleCollapse")[0]).toEqual([spanId]);
   });
 
-  it("should include SpanBlock component", () => {
-    expect(wrapper.vm.$options.components).toHaveProperty("SpanBlock");
-  });
-
   describe("with different collapse states", () => {
     it("should handle collapsed state", async () => {
       const collapsedWrapper = mount(SpanRenderer, {

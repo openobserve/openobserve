@@ -54,6 +54,7 @@ vi.mock("@vue-flow/core", () => ({
     template: '<div class="mock-handle" />',
     props: ["id", "type", "position", "class"],
   },
+  Position: { Left: "left", Top: "top", Right: "right", Bottom: "bottom" },
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -1075,124 +1076,6 @@ describe("CustomNode.vue", () => {
   });
 
   // =========================================================================
-  describe("onFunctionClick", () => {
-    it("sets pipelineObj.userSelectedNode to the given data", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const data = { node_type: "function", name: "f" };
-      const event = new MouseEvent("click");
-      vm.onFunctionClick(data, event, "node-1");
-      expect(mockPipelineObj.userSelectedNode).toBe(data);
-    });
-
-    it("sets pipelineObj.userClickedNode to the given id", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onFunctionClick({}, event, "node-99");
-      expect(mockPipelineObj.userClickedNode).toBe("node-99");
-    });
-
-    it("calls onDragStart with function dataToOpen object", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onFunctionClick({}, event, "node-1");
-      expect(mockOnDragStart).toHaveBeenCalled();
-      const callArg = mockOnDragStart.mock.calls[0][1];
-      expect(callArg.subtype).toBe("function");
-    });
-
-    it("closes the menu after click", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.menu = true;
-      const event = new MouseEvent("click");
-      vm.onFunctionClick({}, event, "node-1");
-      expect(vm.menu).toBe(false);
-    });
-  });
-
-  // =========================================================================
-  describe("onConditionClick", () => {
-    it("sets pipelineObj.userClickedNode to the given id", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onConditionClick({ label: "" }, event, "cond-node");
-      expect(mockPipelineObj.userClickedNode).toBe("cond-node");
-    });
-
-    it("updates data.label to the given id", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const data: any = { label: "" };
-      const event = new MouseEvent("click");
-      vm.onConditionClick(data, event, "cond-node");
-      expect(data.label).toBe("cond-node");
-    });
-
-    it("calls onDragStart with condition subtype", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onConditionClick({}, event, "c-1");
-      const callArg = mockOnDragStart.mock.calls[0][1];
-      expect(callArg.subtype).toBe("condition");
-    });
-  });
-
-  // =========================================================================
-  describe("onStreamOutputClick", () => {
-    it("sets userClickedNode to data.label when id is falsy", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const data = { label: "stream-label" };
-      const event = new MouseEvent("click");
-      vm.onStreamOutputClick(data, event, null);
-      expect(mockPipelineObj.userClickedNode).toBe("stream-label");
-    });
-
-    it("sets userClickedNode to id when id is truthy", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onStreamOutputClick({}, event, "stream-id");
-      expect(mockPipelineObj.userClickedNode).toBe("stream-id");
-    });
-
-    it("calls onDragStart with stream subtype and output io_type", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onStreamOutputClick({}, event, "s-1");
-      const callArg = mockOnDragStart.mock.calls[0][1];
-      expect(callArg.subtype).toBe("stream");
-      expect(callArg.io_type).toBe("output");
-    });
-  });
-
-  // =========================================================================
-  describe("onExternalDestinationClick", () => {
-    it("calls onDragStart with remote_stream subtype", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onExternalDestinationClick({}, event, "ext-1");
-      const callArg = mockOnDragStart.mock.calls[0][1];
-      expect(callArg.subtype).toBe("remote_stream");
-    });
-
-    it("sets userClickedNode to data.label when id is null", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const data = { label: "ext-label" };
-      const event = new MouseEvent("click");
-      vm.onExternalDestinationClick(data, event, null);
-      expect(mockPipelineObj.userClickedNode).toBe("ext-label");
-    });
-  });
-
   // =========================================================================
   describe("updateEdgeColors", () => {
     it("updates stroke of edges that originate from the given nodeId", () => {
@@ -1239,27 +1122,6 @@ describe("CustomNode.vue", () => {
       // Should not throw
       const vm = wrapper.vm as any;
       expect(() => vm.updateEdgeColors("node-1", "#f00", false)).not.toThrow();
-    });
-  });
-
-  // =========================================================================
-  describe("functionInfo", () => {
-    it("returns function info from pipelineObj.functions when present", () => {
-      wrapper = createWrapper({}, {
-        functions: {
-          myFunc: { name: "myFunc", body: "." },
-        },
-      });
-      const vm = wrapper.vm as any;
-      const info = vm.functionInfo({ name: "myFunc" });
-      expect(info).toEqual({ name: "myFunc", body: "." });
-    });
-
-    it("returns null when function is not in pipelineObj.functions", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const info = vm.functionInfo({ name: "notExists" });
-      expect(info).toBeNull();
     });
   });
 

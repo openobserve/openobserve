@@ -27,6 +27,7 @@ vi.mock("@vue-flow/core", () => ({
     template: '<div class="handle" />',
     props: ["id", "type", "position"],
   },
+  Position: { Left: "left", Top: "top", Right: "right", Bottom: "bottom" },
 }));
 
 // Mock useDnD composable

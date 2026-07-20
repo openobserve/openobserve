@@ -71,7 +71,7 @@ const path = computed(() => getBezierPath(props))
 // These handlers are no longer used but kept for backwards compatibility
 </script>
 
-<script>
+<script lang="ts">
 export default {
   inheritAttrs: false,
 }

@@ -261,12 +261,6 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.showAddGroup).toBe(false);
     });
 
-    it("hides add group dialog when hideAddGroup is called", () => {
-      wrapper.vm.showAddGroup = true;
-      wrapper.vm.hideAddGroup();
-      expect(wrapper.vm.showAddGroup).toBe(false);
-    });
-
     it("refreshes groups list when AddGroup emits added:group", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockClear();

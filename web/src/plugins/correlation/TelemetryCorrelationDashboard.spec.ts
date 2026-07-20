@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
 import store from "@/test/unit/helpers/store";

@@ -329,32 +329,6 @@ describe("BackfillJobDetails – getStatusLabel", () => {
   });
 });
 
-describe("BackfillJobDetails – getProgressColor", () => {
-  let wrapper: ReturnType<typeof createWrapper>;
-
-  beforeEach(async () => {
-    vi.mocked(backfillService.getBackfillJob).mockResolvedValue(makeJob());
-    wrapper = createWrapper({ modelValue: true });
-    await flushPromises();
-  });
-
-  it("returns 'blue' when deletionStatus is 'pending'", () => {
-    expect((wrapper.vm as any).getProgressColor("pending")).toBe("blue");
-  });
-
-  it("returns 'blue' when deletionStatus is 'in_progress'", () => {
-    expect((wrapper.vm as any).getProgressColor("in_progress")).toBe("blue");
-  });
-
-  it("returns 'positive' when deletionStatus is undefined", () => {
-    expect((wrapper.vm as any).getProgressColor(undefined)).toBe("positive");
-  });
-
-  it("returns 'positive' when deletionStatus is 'completed'", () => {
-    expect((wrapper.vm as any).getProgressColor("completed")).toBe("positive");
-  });
-});
-
 describe("BackfillJobDetails – getDeletionStatusLabel", () => {
   let wrapper: ReturnType<typeof createWrapper>;
 

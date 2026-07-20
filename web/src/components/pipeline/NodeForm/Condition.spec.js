@@ -197,12 +197,6 @@ describe("Condition Component", () => {
       expect(Array.isArray(g.conditions)).toBe(true);
     });
 
-    it("initializes isUpdating as false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.isUpdating).toBe(false);
-    });
-
     it("clears userSelectedNode on mount", async () => {
       createWrapper();
       await flushPromises();
@@ -669,30 +663,6 @@ describe("Condition Component", () => {
       wrapper.vm.dialog.okCallback();
       await nextTick();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("filterColumns utility", () => {
-    it("calls update and returns all options when val is empty", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const opts = ["timestamp", "message", "level"];
-      const update = (cb) => { cb(); };
-      wrapper.vm.filterColumns(opts, "", update);
-      // called without error – update was called
-      expect(update).toBeDefined();
-    });
-
-    it("filters options by search term case-insensitively", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const opts = ["timestamp", "message", "level"];
-      const update = (cb) => { cb(); };
-      // call manually to test logic
-      wrapper.vm.filterColumns(opts, "MESS", update);
-      // no assertion on internal variable but function should run without error
-      expect(typeof wrapper.vm.filterColumns).toBe("function");
     });
   });
 

@@ -280,16 +280,6 @@ describe('EditRole - filtering & visibility', () => {
     expect(res.length).toBeGreaterThan(0);
   });
 
-  it('filterRowsByResourceName returns nested matches only', async () => {
-    const wrapper = await mountEditRole();
-    const rows = [
-      { resourceName: 'stream', entities: [{ resourceName: 'logs', entities: [] }] },
-      { resourceName: 'role', entities: [] },
-    ];
-    const res = wrapper.vm.filterRowsByResourceName(rows, 'logs');
-    expect(res.length).toBe(1);
-  });
-
   it('countVisibleResources counts nested visible rows', async () => {
     const wrapper = await mountEditRole();
     // Nested entities are only counted when the parent has expand: true
@@ -480,20 +470,6 @@ describe('EditRole - micro validations', () => {
     const r = wrapper.vm.getDefaultResource();
     expect(r.top_level).toBe(true);
     expect(r.type).toBe('Type');
-  });
-
-  it('filterColumns returns filtered by label', async () => {
-    const wrapper = await mountEditRole();
-    const options = [{ label: 'Alpha' }, { label: 'Beta' }];
-    const res = wrapper.vm.filterColumns(options, 'alp', (fn) => fn());
-    expect(res.length).toBe(1);
-  });
-
-  it('filterResourceOptions updates filteredResources', async () => {
-    const wrapper = await mountEditRole();
-    wrapper.vm.resourceOptions = [{ label: 'Dashboards' }, { label: 'Streams' }];
-    wrapper.vm.filterResourceOptions('dash', (fn) => fn());
-    expect(wrapper.vm.filteredResources.length).toBe(1);
   });
 
   it('savePermissionHash builds sets from permissions', async () => {

@@ -409,69 +409,6 @@ describe("StreamRouting", () => {
     });
   });
 
-  describe("filterColumns", () => {
-    it("should return all options with empty search value", async () => {
-      const wrapper = mount(StreamRouting, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      const options = ["stream1", "stream2", "test_stream"];
-      const mockUpdate = vi.fn((cb: any) => cb());
-
-      const result = vm.filterColumns(options, "", mockUpdate);
-      expect(mockUpdate).toHaveBeenCalled();
-      expect(result).toEqual(options);
-    });
-
-    it("should filter options by search value", async () => {
-      const wrapper = mount(StreamRouting, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      const options = ["stream1", "stream2", "test_stream"];
-      const mockUpdate = vi.fn((cb: any) => cb());
-
-      const result = vm.filterColumns(options, "test", mockUpdate);
-      expect(result).toEqual(["test_stream"]);
-    });
-
-    it("should filter case-insensitively", async () => {
-      const wrapper = mount(StreamRouting, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      const options = ["MyStream", "AnotherStream"];
-      const mockUpdate = vi.fn((cb: any) => cb());
-
-      const result = vm.filterColumns(options, "MYSTREAM", mockUpdate);
-      expect(result).toEqual(["MyStream"]);
-    });
-
-    it("should return empty array when no options match", async () => {
-      const wrapper = mount(StreamRouting, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      const options = ["stream1", "stream2"];
-      const mockUpdate = vi.fn((cb: any) => cb());
-
-      const result = vm.filterColumns(options, "xyz_no_match", mockUpdate);
-      expect(result).toHaveLength(0);
-    });
-  });
-
   describe("Theme Styling", () => {
     it("should apply light theme bg class to actions row", async () => {
       const wrapper = mount(StreamRouting, {

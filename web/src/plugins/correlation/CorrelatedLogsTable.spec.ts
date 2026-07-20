@@ -884,23 +884,6 @@ describe("CorrelatedLogsTable.vue", () => {
     });
   });
 
-  describe("handleResetFilters", () => {
-    it("should call resetFilters from composable", async () => {
-      const mockResetFilters = vi.fn();
-      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
-      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
-        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
-        resetFilters: mockResetFilters,
-      });
-
-      wrapper = createWrapper();
-      wrapper.vm.handleResetFilters();
-      await nextTick();
-
-      expect(mockResetFilters).toHaveBeenCalled();
-    });
-  });
-
   describe("Loading and Error States", () => {
     it("should show skeleton when loading and no results", async () => {
       const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");

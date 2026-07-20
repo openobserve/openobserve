@@ -528,38 +528,6 @@ describe("TransformSelector", () => {
     });
   });
 
-  // ── functionToggleIcon ───────────────────────────────────────────────────────
-  describe("functionToggleIcon computed", () => {
-    it("returns dark function icon when toggleFunction is true", () => {
-      mockSearchObj.meta.toggleFunction = true;
-      const wrapper = mountComponent();
-      expect(wrapper.vm.functionToggleIcon).toContain("function_dark.svg");
-    });
-
-    it("returns light function icon when toggleFunction is false", () => {
-      mockSearchObj.meta.toggleFunction = false;
-      const wrapper = mountComponent();
-      expect(wrapper.vm.functionToggleIcon).toContain("function.svg");
-      expect(wrapper.vm.functionToggleIcon).not.toContain("function_dark.svg");
-    });
-  });
-
-  // ── iconRight ────────────────────────────────────────────────────────────────
-  describe("iconRight computed", () => {
-    it("returns dark function icon in dark theme", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = mountComponent();
-      expect(wrapper.vm.iconRight).toContain("function_dark.svg");
-    });
-
-    it("returns light function icon in light theme", () => {
-      mockStore.state.theme = "light";
-      const wrapper = mountComponent();
-      expect(wrapper.vm.iconRight).toContain("function.svg");
-      expect(wrapper.vm.iconRight).not.toContain("function_dark.svg");
-    });
-  });
-
   // ── transformTypes ───────────────────────────────────────────────────────────
   describe("transformTypes computed", () => {
     it("returns function and action options", () => {

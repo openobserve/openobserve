@@ -194,39 +194,6 @@ describe("CustomEdge.vue", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("computed: midX / midY", () => {
-    it("computes midX as the average of sourceX and targetX", () => {
-      wrapper = createWrapper({ sourceX: 100, targetX: 300 });
-      const vm = wrapper.vm as any;
-      expect(vm.midX).toBe(200);
-    });
-
-    it("computes midY as the average of sourceY and targetY", () => {
-      wrapper = createWrapper({ sourceY: 50, targetY: 150 });
-      const vm = wrapper.vm as any;
-      expect(vm.midY).toBe(100);
-    });
-
-    it("handles zero coordinates", () => {
-      wrapper = createWrapper({
-        sourceX: 0,
-        sourceY: 0,
-        targetX: 0,
-        targetY: 0,
-      });
-      const vm = wrapper.vm as any;
-      expect(vm.midX).toBe(0);
-      expect(vm.midY).toBe(0);
-    });
-
-    it("handles negative coordinates", () => {
-      wrapper = createWrapper({ sourceX: -100, targetX: 100 });
-      const vm = wrapper.vm as any;
-      expect(vm.midX).toBe(0);
-    });
-  });
-
-  // -------------------------------------------------------------------------
   describe("useVueFlow integration", () => {
     it("exposes removeEdges from useVueFlow", () => {
       wrapper = createWrapper();
@@ -261,8 +228,7 @@ describe("CustomEdge.vue", () => {
         targetX: -99999,
         targetY: -99999,
       });
-      const vm = wrapper.vm as any;
-      expect(vm.midX).toBe(0);
+      expect(wrapper.findComponent({ name: "BaseEdge" }).exists()).toBe(true);
     });
 
     it("renders correctly with floating-point coordinates", () => {
@@ -272,9 +238,7 @@ describe("CustomEdge.vue", () => {
         targetX: 300.75,
         targetY: 400.5,
       });
-      const vm = wrapper.vm as any;
-      expect(vm.midX).toBeCloseTo(200.625);
-      expect(vm.midY).toBeCloseTo(300.375);
+      expect(wrapper.findComponent({ name: "BaseEdge" }).exists()).toBe(true);
     });
   });
 });

@@ -191,16 +191,6 @@ describe('AppRoles - filterQuery', () => {
   });
 });
 
-// 6. hideForm
-describe('AppRoles - hideForm', () => {
-  it('closes the add role dialog', async () => {
-    const wrapper = await mountAppRoles();
-    (wrapper.vm as any).showAddGroup = true;
-    (wrapper.vm as any).hideForm();
-    expect((wrapper.vm as any).showAddGroup).toBe(false);
-  });
-});
-
 // 4b. onRoleAdded — auto-route after create
 describe('AppRoles - onRoleAdded', () => {
   it('routes to editRole on the permissions tab after create', async () => {

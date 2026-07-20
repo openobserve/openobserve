@@ -229,7 +229,7 @@ describe("vrlLanguageDefinition.ts", () => {
     it("should have function invoke rules", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
       const functionInvokeRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("([a-zA-Z_!]+)(\\!)(\\()")
+        rule[0] instanceof RegExp && rule[0].toString().includes("([a-zA-Z_!]+)(!)(\\()")
       );
       expect(functionInvokeRule).toBeDefined();
     });
@@ -261,7 +261,7 @@ describe("vrlLanguageDefinition.ts", () => {
     it("should have field access rules", () => {
       const rootRules = vrlLanguageDefinition.tokenizer.root;
       const fieldAccessRule = rootRules.find((rule: any) => 
-        rule[0] instanceof RegExp && rule[0].toString().includes("(\\.[^\\ \\=]+)")
+        rule[0] instanceof RegExp && rule[0].toString().includes("(\\.[^ =]+)")
       );
       expect(fieldAccessRule).toBeDefined();
     });

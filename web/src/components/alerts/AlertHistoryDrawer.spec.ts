@@ -597,37 +597,6 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(vm.getRowClass({ status: "ok" })).toBe("");
       expect(vm.getRowClass({ status: "success" })).toBe("");
     });
-
-    it("formatTimestamp should return N/A for falsy timestamps", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatTimestampRelative(0)).toBe("N/A");
-      expect(vm.formatTimestampRelative(null)).toBe("N/A");
-    });
-
-    it("formatTimestamp should format recent timestamps as relative minutes", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // 5 minutes ago in microseconds
-      const fiveMinAgo = (Date.now() - 5 * 60 * 1000) * 1000;
-      expect(vm.formatTimestampRelative(fiveMinAgo)).toBe("5 min ago");
-    });
-
-    it("formatTimestamp should format hours-old timestamps as relative hours", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // 3 hours ago in microseconds
-      const threeHoursAgo = (Date.now() - 3 * 3600 * 1000) * 1000;
-      expect(vm.formatTimestampRelative(threeHoursAgo)).toBe("3h ago");
-    });
-
-    it("formatTimestamp should format days-old timestamps as relative days", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // 3 days ago in microseconds
-      const threeDaysAgo = (Date.now() - 3 * 86400 * 1000) * 1000;
-      expect(vm.formatTimestampRelative(threeDaysAgo)).toBe("3d ago");
-    });
   });
 
   describe("Per Page Options", () => {

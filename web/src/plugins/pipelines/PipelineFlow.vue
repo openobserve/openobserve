@@ -142,8 +142,15 @@ export default {
     } = useDragAndDrop();
     const store = useStore();
 
-    // Hook doesn't return isDragOver, so it was always undefined here; preserved.
-    const isDragOver = undefined;
+    // Mirror the hook's drag-over state (pipelineObj.isDragOver) into a local
+    // ref so the dropzone highlight and "Drop here" hint react to dragging.
+    const isDragOver = ref(pipelineObj.isDragOver);
+    watch(
+      () => pipelineObj.isDragOver,
+      (value) => {
+        isDragOver.value = value;
+      },
+    );
     const vueFlowRef: Ref<VueFlowStore | null> = ref(null);
     const isCanvasEmpty = computed(() => pipelineObj.currentSelectedPipeline.nodes.length === 0);
     const showEdgeHelpNotification = ref(false);

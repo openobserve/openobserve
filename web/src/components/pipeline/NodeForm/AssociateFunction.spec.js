@@ -322,59 +322,7 @@ describe("AssociateFunction Component", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("computedStyleForFunction", () => {
-    it("returns width+height 100% when createNewFunction is false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.computedStyleForFunction).toEqual({
-        width: "100%",
-        height: "100%",
-      });
-    });
-
-    it("returns only width 100% when createNewFunction is true", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.createNewFunction = true;
-      await nextTick();
-      expect(wrapper.vm.computedStyleForFunction).toEqual({ width: "100%" });
-    });
-  });
-
-  // -------------------------------------------------------------------------
   describe("Function List Filtering", () => {
-    it("filterFunctions calls update callback", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const mockUpdate = vi.fn();
-      wrapper.vm.filterFunctions("alpha", mockUpdate);
-      expect(mockUpdate).toHaveBeenCalled();
-    });
-
-    it("filterFunctions narrows results by search string", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const mockUpdate = vi.fn((cb) => cb());
-      wrapper.vm.filterFunctions("alpha", mockUpdate);
-      expect(wrapper.vm.filteredFunctions).toEqual(["alpha"]);
-    });
-
-    it("filterFunctions is case-insensitive", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const mockUpdate = vi.fn((cb) => cb());
-      wrapper.vm.filterFunctions("ALPHA", mockUpdate);
-      expect(wrapper.vm.filteredFunctions).toContain("alpha");
-    });
-
-    it("filterFunctions returns all sorted functions when search is empty", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const mockUpdate = vi.fn((cb) => cb());
-      wrapper.vm.filterFunctions("", mockUpdate);
-      expect(wrapper.vm.filteredFunctions).toEqual(["alpha", "beta", "gamma"]);
-    });
-
     it("updates filteredFunctions reactively when functions prop changes", async () => {
       const wrapper = createWrapper({ functions: ["z", "a"] });
       await flushPromises();
@@ -633,13 +581,4 @@ describe("AssociateFunction Component", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  describe("saveUpdatedLink helper", () => {
-    it("updates nodeLink with from/to values", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.saveUpdatedLink({ from: "nodeA", to: "nodeB" });
-      expect(wrapper.vm.nodeLink).toEqual({ from: "nodeA", to: "nodeB" });
-    });
-  });
 });

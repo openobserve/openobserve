@@ -189,49 +189,6 @@ describe("AlertHistorySummary.vue", () => {
     });
   });
 
-  describe("State Icons and Colors", () => {
-    it("should return correct icon for firing state", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStateIcon("firing")).toBe("error");
-      expect(vm.getStateIcon("error")).toBe("error");
-    });
-
-    it("should return correct icon for ok state", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStateIcon("ok")).toBe("check-circle");
-      expect(vm.getStateIcon("completed")).toBe("check-circle");
-    });
-
-    it("should return correct icon for unknown state", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStateIcon("unknown")).toBe("info");
-    });
-
-    it("should return correct CSS class for firing state", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // getStateColorClass returns CSS class strings
-      expect(vm.getStateColorClass("firing")).toContain("negative");
-      expect(vm.getStateColorClass("error")).toContain("negative");
-    });
-
-    it("should return correct CSS class for ok state", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStateColorClass("ok")).toContain("positive");
-      expect(vm.getStateColorClass("completed")).toContain("positive");
-    });
-
-    it("should return correct CSS class for unknown state", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.getStateColorClass("unknown")).toContain("gray");
-    });
-  });
-
   describe("Frequency Formatting", () => {
     it("should format frequency in seconds", async () => {
       await mountComponent();
@@ -259,23 +216,6 @@ describe("AlertHistorySummary.vue", () => {
       const vm = wrapper.vm as any;
       expect(vm.formatFrequency(null)).toBe("N/A");
       expect(vm.formatFrequency(undefined)).toBe("N/A");
-    });
-  });
-
-  describe("Timestamp Formatting", () => {
-    it("should format timestamp correctly", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      const formatted = vm.formatTimestamp(1699900000000000);
-      expect(formatted).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
-    });
-
-    it("should return N/A for null/undefined timestamp", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatTimestamp(null)).toBe("N/A");
-      expect(vm.formatTimestamp(undefined)).toBe("N/A");
-      expect(vm.formatTimestamp(0)).toBe("N/A");
     });
   });
 

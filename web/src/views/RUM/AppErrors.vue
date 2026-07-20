@@ -261,6 +261,7 @@ import useErrorIssuesData from "@/composables/rum/useErrorIssuesData";
 import { issueKey, formatRelativeTime } from "@/utils/rum/errorIssueUtils";
 import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
+import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
