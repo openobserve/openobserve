@@ -16,6 +16,7 @@ pub mod auth;
 pub mod org_cleanup;
 pub mod organization;
 pub mod repository;
+pub mod session;
 pub mod status;
 pub mod users;
 
@@ -36,6 +37,9 @@ pub mod db {
     }
     pub mod saved_view {
         pub use crate::repository::saved_view::*;
+    }
+    pub mod session {
+        pub use crate::repository::session::*;
     }
     pub mod org_status {
         pub use crate::status::*;

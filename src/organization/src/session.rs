@@ -15,10 +15,10 @@
 
 use base64::Engine;
 
-use super::db;
+use crate::repository::session;
 
 pub async fn get_session(session_id: &str) -> Option<String> {
-    db::session::get(session_id).await.ok()
+    session::get(session_id).await.ok()
 }
 
 /// Extracts JWT expiry time from a Bearer token
@@ -77,7 +77,7 @@ fn extract_jwt_expiry(access_token: &str) -> i64 {
 
 pub async fn set_session(session_id: &str, val: &str) -> Option<()> {
     let expires_at = extract_jwt_expiry(val);
-    match db::session::set_with_expiry(session_id, val, expires_at).await {
+    match session::set_with_expiry(session_id, val, expires_at).await {
         Ok(()) => Some(()),
         Err(e) => {
             log::error!("Failed to write session {} to database: {}", session_id, e);
@@ -87,7 +87,7 @@ pub async fn set_session(session_id: &str, val: &str) -> Option<()> {
 }
 
 pub async fn remove_session(session_id: &str) {
-    let _ = db::session::delete(session_id).await;
+    let _ = session::delete(session_id).await;
 }
 
 #[cfg(test)]

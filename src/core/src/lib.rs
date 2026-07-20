@@ -138,7 +138,7 @@ pub mod search_jobs {
 pub use openobserve_self_reporting as self_reporting;
 mod self_reporting_adapter;
 mod service;
-pub mod session;
+pub use openobserve_organization::session;
 pub mod short_url {
     pub use common::short_url::*;
 }

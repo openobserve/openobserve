@@ -127,7 +127,9 @@ pub mod search_job {
 }
 #[cfg(feature = "enterprise")]
 pub mod service_graph;
-pub mod session;
+pub mod session {
+    pub use openobserve_organization::repository::session::*;
+}
 pub mod short_url {
     pub use common::short_url::repository::*;
 }
