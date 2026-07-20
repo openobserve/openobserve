@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use alert::to_float;
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use common::utils::conditions::{ConditionExt, ConditionListExt, build_expr};
@@ -22,7 +23,7 @@ use config::{
     meta::{
         alerts::{
             AggFunction, AlertConditionParams, Operator, QueryCondition, QueryType,
-            TriggerCondition, TriggerEvalResults,
+            TriggerCondition, TriggerEvalResults, alert::Alert,
         },
         cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
@@ -34,6 +35,7 @@ use config::{
         json::{Map, Value},
     },
 };
+use openobserve_alerts::service::alert::to_float;
 use tracing::Instrument;
 
 use super::promql;
@@ -43,7 +45,6 @@ use crate::{
     service::setup_tracing_with_trace_id,
 };
 
-pub mod alert;
 #[cfg(feature = "enterprise")]
 pub mod deduplication {
     pub use openobserve_alerts::service::deduplication::*;
@@ -81,7 +82,7 @@ pub mod destinations {
             email: &Email,
             body: String,
         ) -> Result<String, String> {
-            super::alert::send_email_notification(subject, email, body)
+            openobserve_alerts::service::alert::send_email_notification(subject, email, body)
                 .await
                 .map_err(|error| error.to_string())
         }
@@ -131,9 +132,10 @@ pub mod destinations {
 pub mod grouping {
     use async_trait::async_trait;
     use config::{meta::alerts::alert::Alert, utils::json};
-    use openobserve_alerts::grouping::{NotificationSender, PendingBatch};
-
-    use super::alert::AlertExt;
+    use openobserve_alerts::{
+        grouping::{NotificationSender, PendingBatch},
+        service::alert::AlertExt,
+    };
 
     struct CoreNotificationSender;
 
@@ -167,6 +169,155 @@ pub mod org_config {
 pub mod scheduler;
 pub mod templates {
     pub use openobserve_alerts::service::templates::*;
+}
+
+struct CoreRuntimeServices;
+
+#[async_trait]
+impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
+    async fn create_default_folder(
+        &self,
+        org_id: &str,
+        folder: config::meta::folder::Folder,
+    ) -> anyhow::Result<config::meta::folder::Folder> {
+        Ok(crate::folders::save_folder(
+            org_id,
+            folder,
+            config::meta::folder::FolderType::Alerts,
+            true,
+        )
+        .await?)
+    }
+
+    async fn evaluate_alert(
+        &self,
+        alert: &Alert,
+        row: Option<&Map<String, Value>>,
+        time_range: (Option<i64>, i64),
+        trace_id: Option<String>,
+    ) -> anyhow::Result<TriggerEvalResults> {
+        if alert.is_real_time {
+            alert.query_condition.evaluate_realtime(row).await
+        } else {
+            let mut search_event_ctx = SearchEventContext::with_alert(Some(format!(
+                "/alerts/{}/{}/{}/{}",
+                alert.org_id, alert.stream_type, alert.stream_name, alert.name
+            )));
+            search_event_ctx.alert_name = Some(alert.name.clone());
+            alert
+                .query_condition
+                .evaluate_scheduled(
+                    &alert.org_id,
+                    Some(&alert.stream_name),
+                    alert.stream_type,
+                    &alert.trigger_condition,
+                    time_range,
+                    Some(SearchEventType::Alerts),
+                    Some(search_event_ctx),
+                    trace_id,
+                )
+                .await
+        }
+    }
+
+    async fn build_sql(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        query_condition: &QueryCondition,
+        conditions: &AlertConditionParams,
+    ) -> anyhow::Result<String> {
+        build_sql(
+            org_id,
+            stream_name,
+            stream_type,
+            query_condition,
+            conditions,
+        )
+        .await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn route_incident(
+        &self,
+        alert: &Alert,
+        row: &Map<String, Value>,
+        notify_rows: &[Map<String, Value>],
+        timestamp: i64,
+    ) -> anyhow::Result<Option<openobserve_alerts::ports::IncidentRoute>> {
+        Ok(crate::alerts::incidents::correlate_alert_to_incident(
+            alert,
+            row,
+            notify_rows,
+            timestamp,
+        )
+        .await?
+        .map(|outcome| openobserve_alerts::ports::IncidentRoute {
+            incident_id: outcome.incident_id().to_string(),
+            service_name: outcome.service_name().to_string(),
+        }))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn permitted_alerts(
+        &self,
+        org_id: &str,
+        user_id: Option<&str>,
+        folder_id: Option<&str>,
+    ) -> Result<Option<Vec<String>>, openobserve_alerts::ports::PermissionError> {
+        use common::utils::auth::AuthExtractor;
+        use o2_openfga::{config::get_config, meta::mapping::OFGA_MODELS};
+        use openobserve_alerts::ports::PermissionError;
+
+        let Some(user_id) = user_id else {
+            return Err(PermissionError::MissingUser);
+        };
+        if !get_config().list_only_permitted {
+            return Ok(None);
+        }
+        if let Some(folder_id) = folder_id {
+            let user_role = match crate::db::user::get(Some(org_id), user_id).await {
+                Ok(Some(user)) => user.role,
+                _ => return Err(PermissionError::UserNotFound),
+            };
+            if crate::authz::check_permissions(
+                user_id,
+                AuthExtractor {
+                    org_id: org_id.to_string(),
+                    o2_type: format!(
+                        "{}:{folder_id}",
+                        OFGA_MODELS.get("alert_folders").unwrap().key,
+                    ),
+                    method: "GET".to_string(),
+                    bypass_check: false,
+                    parent_id: String::new(),
+                    use_all_org: false,
+                    use_self_context: false,
+                    use_self_parent: true,
+                    auth: String::new(),
+                },
+                user_role,
+                false,
+            )
+            .await
+            {
+                return Ok(None);
+            }
+        }
+        crate::authz::list_objects_for_user(
+            org_id,
+            user_id,
+            "GET_INDIVIDUAL_FROM_ROLE",
+            OFGA_MODELS.get("alerts").unwrap().key,
+        )
+        .await
+        .map_err(|error| PermissionError::Other(error.to_string()))
+    }
+}
+
+pub fn install_runtime_services() {
+    let _ = openobserve_alerts::ports::install_runtime_services(Arc::new(CoreRuntimeServices));
 }
 
 #[async_trait]

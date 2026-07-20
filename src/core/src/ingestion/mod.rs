@@ -38,6 +38,7 @@ use infra::{
     errors::{Error, Result},
     schema::STREAM_RECORD_ID_GENERATOR,
 };
+use openobserve_alerts::service::alert::AlertExt;
 use openobserve_pipeline::{batch_execution::ExecutablePipeline, service as pipeline};
 use proto::cluster_rpc::IngestionType;
 
@@ -47,10 +48,7 @@ use crate::{
         infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
     },
-    service::{
-        alerts::alert::AlertExt,
-        db::{self, alerts::alert::scheduler_key},
-    },
+    service::db::{self, alerts::alert::scheduler_key},
 };
 
 pub mod grpc {

@@ -19,6 +19,8 @@ use config::{cache_instance_id, ider};
 use crate::db::metas;
 
 pub async fn init() -> Result<(), anyhow::Error> {
+    crate::alerts::install_runtime_services();
+
     let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {

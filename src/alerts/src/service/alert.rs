@@ -16,16 +16,26 @@
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
+    sync::LazyLock,
 };
 
-#[cfg(feature = "enterprise")]
-use ::common::utils::auth::check_permissions;
-#[cfg(feature = "enterprise")]
-use ::common::utils::http::get_or_create_trace_id;
 use async_trait::async_trait;
 #[cfg(feature = "enterprise")]
 use axum::http::HeaderMap;
+use axum::response::Response;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
+#[cfg(feature = "enterprise")]
+use common::utils::auth::check_permissions;
+#[cfg(feature = "enterprise")]
+use common::utils::http::get_or_create_trace_id;
+use common::{
+    infra::config::ORGANIZATIONS,
+    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+    utils::{
+        auth::{is_ofga_unsupported, remove_ownership, set_ownership},
+        ssrf_guard::SsrfGuard,
+    },
+};
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -37,7 +47,7 @@ use config::{
             AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
-        search::{SearchEventContext, SearchEventType},
+        search::SearchEventType,
         sql::resolve_stream_names,
         stream::StreamType,
     },
@@ -66,22 +76,11 @@ use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use tracing::{Level, span};
 
-use crate::{
-    common::{
-        infra::config::ORGANIZATIONS,
-        meta::authz::Authz,
-        utils::{
-            auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-            ssrf_guard::SsrfGuard,
-        },
-    },
-    service::{
-        alerts::{QueryConditionExt, build_sql, destinations},
-        db, folders,
-        search::sql::RE_ONLY_SELECT,
-        short_url,
-    },
-};
+use super::destinations;
+use crate::{ports, repository};
+
+static RE_ONLY_SELECT: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"(?i)select[ ]+\*").unwrap());
 
 /// Errors that can occur when interacting with alerts.
 #[derive(Debug, thiserror::Error)]
@@ -153,7 +152,7 @@ pub enum AlertError {
     SendNotificationError { error_message: String },
 
     #[error(transparent)]
-    GetDestinationWithTemplateError(#[from] db::alerts::destinations::DestinationError),
+    GetDestinationWithTemplateError(#[from] repository::destinations::DestinationError),
 
     #[error(
         "No template configured for alert destination {dest}. Either set a template on the alert or on the destination."
@@ -195,6 +194,47 @@ pub enum AlertError {
     NotSupportedAlertDestinationType(Module),
 }
 
+impl From<AlertError> for Response {
+    fn from(value: AlertError) -> Self {
+        match &value {
+            AlertError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            AlertError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
+            AlertError::AlertNameMissing
+            | AlertError::AlertNameOfgaUnsupported
+            | AlertError::AlertNameContainsForwardSlash
+            | AlertError::AlertDestinationMissing
+            | AlertError::TemplateNotConfigured { .. }
+            | AlertError::RealtimeMissingCustomQuery
+            | AlertError::SqlMissingQuery
+            | AlertError::SqlContainsSelectStar
+            | AlertError::PromqlMissingQuery
+            | AlertError::PeriodExceedsMaxQueryRange { .. }
+            | AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
+            AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
+            AlertError::CreateFolderNotFound
+            | AlertError::MoveDestinationFolderNotFound
+            | AlertError::AlertNotFound
+            | AlertError::AlertDestinationNotFound { .. }
+            | AlertError::AlertTemplateNotFound { .. }
+            | AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),
+            AlertError::DecodeVrl(err) => MetaHttpResponse::bad_request(err),
+            AlertError::ParseCron(err) => MetaHttpResponse::bad_request(err),
+            AlertError::SendNotificationError { .. } | AlertError::ResolveStreamNameError(_) => {
+                MetaHttpResponse::internal_error(value)
+            }
+            AlertError::GetDestinationWithTemplateError(err) => {
+                MetaHttpResponse::internal_error(err)
+            }
+            AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
+            AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
+            AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
+            AlertError::PermissionDenied | AlertError::UserNotFound => {
+                MetaHttpResponse::forbidden("Unauthorized access")
+            }
+        }
+    }
+}
+
 pub async fn save(
     org_id: &str,
     stream_name: &str,
@@ -213,7 +253,7 @@ pub async fn save(
 
     // save the alert
     // TODO: Get the folder id
-    match db::alerts::alert::set(org_id, alert, create).await {
+    match repository::alert::set(org_id, alert, create).await {
         Ok(alert) => {
             if name.is_empty() {
                 set_ownership(
@@ -239,7 +279,7 @@ async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError
         name: "default".to_owned(),
         description: "default".to_owned(),
     };
-    folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
+    ports::create_default_folder(org_id, default_folder)
         .await
         .map_err(|_| AlertError::CreateDefaultFolderError)
 }
@@ -333,7 +373,7 @@ async fn prepare_alert(
     // Validate alert-level template if specified
     if let Some(ref template_name) = alert.template
         && !template_name.is_empty()
-        && db::alerts::templates::get(org_id, template_name)
+        && repository::templates::get(org_id, template_name)
             .await
             .is_err()
     {
@@ -347,7 +387,7 @@ async fn prepare_alert(
         return Err(AlertError::AlertDestinationMissing);
     }
     for dest in alert.destinations.iter() {
-        match db::alerts::destinations::get(org_id, dest).await {
+        match repository::destinations::get(org_id, dest).await {
             Ok(d) => {
                 if !d.is_alert_destinations() {
                     return Err(AlertError::NotSupportedAlertDestinationType(d.module));
@@ -491,7 +531,7 @@ pub async fn create<C: TransactionTrait>(
     )
     .await?;
 
-    let alert = db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite).await?;
+    let alert = repository::alert::create(conn, org_id, folder_id, alert, overwrite).await?;
 
     set_ownership(
         org_id,
@@ -518,7 +558,7 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
         let _alert_id_str = alert_id.to_string();
 
         let Some((curr_folder, alert)) =
-            db::alerts::alert::get_by_id(conn, org_id, *alert_id).await?
+            repository::alert::get_by_id(conn, org_id, *alert_id).await?
         else {
             return Err(AlertError::AlertNotFound);
         };
@@ -602,7 +642,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
 
-    let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+    let alert = repository::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     #[cfg(feature = "enterprise")]
     if let Some((curr_folder_id, dst_folder_id)) = _folder_info
         && get_openfga_config().enabled
@@ -632,7 +672,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(Folder, Alert), AlertError> {
-    match db::alerts::alert::get_by_id(conn, org_id, alert_id).await? {
+    match repository::alert::get_by_id(conn, org_id, alert_id).await? {
         Some(f_a) => Ok(f_a),
         None => Err(AlertError::AlertNotFound),
     }
@@ -660,7 +700,7 @@ pub async fn get_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, AlertError> {
-    let alert = db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await?;
+    let alert = repository::alert::get_by_name(org_id, stream_type, stream_name, name).await?;
     Ok(alert)
 }
 
@@ -671,7 +711,7 @@ pub async fn list(
     permitted: Option<Vec<String>>,
     filter: AlertListFilter,
 ) -> Result<Vec<Alert>, AlertError> {
-    match db::alerts::alert::list(org_id, stream_type, stream_name).await {
+    match repository::alert::list(org_id, stream_type, stream_name).await {
         Ok(alerts) => {
             let owner = filter.owner;
             let enabled = filter.enabled;
@@ -707,7 +747,7 @@ pub async fn list_with_folders_db(
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, AlertError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    db::alerts::alert::list_with_folders(conn, params)
+    repository::alert::list_with_folders(conn, params)
         .await
         .map_err(|e| e.into())
 }
@@ -726,7 +766,7 @@ pub async fn list_v2<C: ConnectionTrait>(
             None => (vec![], true),
         };
 
-    let alerts = db::alerts::alert::list_with_folders(conn, params)
+    let alerts = repository::alert::list_with_folders(conn, params)
         .await?
         .into_iter()
         .filter(|(f, a)| {
@@ -749,7 +789,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
-    if db::alerts::alert::get_by_id(conn, org_id, alert_id)
+    if repository::alert::get_by_id(conn, org_id, alert_id)
         .await?
         .is_none()
     {
@@ -757,7 +797,7 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     };
 
     let alert_id_str = alert_id.to_string();
-    match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
+    match repository::alert::delete_by_id(conn, org_id, alert_id).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
             Ok(())
@@ -772,13 +812,13 @@ pub async fn delete_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<(), AlertError> {
-    if db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
+    if repository::alert::get_by_name(org_id, stream_type, stream_name, name)
         .await
         .is_err()
     {
         return Err(AlertError::AlertNotFound);
     }
-    match db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, name).await {
+    match repository::alert::delete_by_name(org_id, stream_type, stream_name, name).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(name)).await;
             Ok(())
@@ -794,7 +834,7 @@ pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait>(
     alert_id: Ksuid,
     should_enable: bool,
 ) -> Result<(), AlertError> {
-    let Some((_, mut alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+    let Some((_, mut alert)) = repository::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Err(AlertError::AlertNotFound);
     };
     alert.enabled = should_enable;
@@ -810,14 +850,14 @@ pub async fn enable_by_name(
     value: bool,
 ) -> Result<(), AlertError> {
     let mut alert =
-        match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
+        match repository::alert::get_by_name(org_id, stream_type, stream_name, name).await {
             Ok(Some(alert)) => alert,
             _ => {
                 return Err(AlertError::AlertNotFound);
             }
         };
     alert.enabled = value;
-    db::alerts::alert::set(org_id, alert, false).await?;
+    repository::alert::set(org_id, alert, false).await?;
     Ok(())
 }
 
@@ -827,7 +867,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(String, String), AlertError> {
-    let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+    let Some((_, alert)) = repository::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Err(AlertError::AlertNotFound);
     };
     let now = Utc::now().timestamp_micros();
@@ -850,20 +890,13 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         let synthetic_row = synthetic_row.as_object().unwrap();
         let notify = std::slice::from_ref(synthetic_row);
 
-        match crate::alerts::incidents::correlate_alert_to_incident(
-            &alert,
-            synthetic_row,
-            notify,
-            now,
-        )
-        .await
-        {
+        match ports::route_incident(&alert, synthetic_row, notify, now).await {
             Ok(Some(outcome)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    outcome.incident_id,
+                    outcome.service_name,
                 );
                 true
             }
@@ -903,7 +936,7 @@ pub async fn trigger_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<(String, String), AlertError> {
-    let alert = match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
+    let alert = match repository::alert::get_by_name(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
             return Err(AlertError::AlertNotFound);
@@ -928,20 +961,13 @@ pub async fn trigger_by_name(
         let synthetic_row = synthetic_row.as_object().unwrap();
         let notify = std::slice::from_ref(synthetic_row);
 
-        match crate::alerts::incidents::correlate_alert_to_incident(
-            &alert,
-            synthetic_row,
-            notify,
-            now,
-        )
-        .await
-        {
+        match ports::route_incident(&alert, synthetic_row, notify, now).await {
             Ok(Some(outcome)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    outcome.incident_id,
+                    outcome.service_name,
                 );
                 true
             }
@@ -1005,28 +1031,7 @@ impl AlertExt for Alert {
         (start_time, end_time): (Option<i64>, i64),
         trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error> {
-        if self.is_real_time {
-            self.query_condition.evaluate_realtime(row).await
-        } else {
-            let mut search_event_ctx = SearchEventContext::with_alert(Some(format!(
-                "/alerts/{}/{}/{}/{}",
-                self.org_id, self.stream_type, self.stream_name, self.name
-            )));
-            search_event_ctx.alert_name = Some(self.name.clone());
-
-            self.query_condition
-                .evaluate_scheduled(
-                    &self.org_id,
-                    Some(&self.stream_name),
-                    self.stream_type,
-                    &self.trigger_condition,
-                    (start_time, end_time),
-                    Some(SearchEventType::Alerts),
-                    Some(search_event_ctx),
-                    trace_id,
-                )
-                .await
-        }
+        ports::evaluate_alert(self, row, (start_time, end_time), trace_id).await
     }
 
     async fn send_notification(
@@ -1043,7 +1048,7 @@ impl AlertExt for Alert {
         // Get alert-level template if specified (takes precedence over destination templates)
         let alert_template = if let Some(ref template_name) = self.template {
             Some(
-                db::alerts::templates::get(&self.org_id, template_name)
+                repository::templates::get(&self.org_id, template_name)
                     .await
                     .map_err(|_| AlertError::AlertTemplateNotFound {
                         template: template_name.clone(),
@@ -1061,7 +1066,7 @@ impl AlertExt for Alert {
             } = dest.module
             else {
                 return Err(AlertError::GetDestinationWithTemplateError(
-                    db::alerts::destinations::DestinationError::UnsupportedType,
+                    repository::destinations::DestinationError::UnsupportedType,
                 ));
             };
 
@@ -1636,7 +1641,7 @@ async fn process_dest_template(
             }
             QueryType::Custom => {
                 if let Some(conditions) = &alert.query_condition.conditions
-                    && let Ok(v) = build_sql(
+                    && let Ok(v) = ports::build_sql(
                         &alert.org_id,
                         &alert.stream_name,
                         alert.stream_type,
@@ -1668,7 +1673,7 @@ async fn process_dest_template(
     };
 
     // Shorten the alert url
-    let alert_url = match short_url::shorten(&alert.org_id, &alert_url).await {
+    let alert_url = match common::short_url::shorten(&alert.org_id, &alert_url).await {
         Ok(short_url) => short_url,
         Err(e) => {
             log::error!("Error shortening alert url: {e}");
@@ -2097,7 +2102,7 @@ fn format_variable_value(val: String) -> String {
         .collect::<String>()
 }
 
-pub(super) fn to_float(val: &Value) -> f64 {
+pub fn to_float(val: &Value) -> f64 {
     if val.is_number() {
         val.as_f64().unwrap_or_default()
     } else {
@@ -2159,74 +2164,13 @@ async fn permitted_alerts(
     user_id: Option<&str>,
     folder_id: Option<&str>,
 ) -> Result<Option<Vec<String>>, AlertError> {
-    let Some(user_id) = user_id else {
-        return Err(AlertError::PermittedAlertsMissingUser);
-    };
-
-    // If the list_only_permitted is true, then we will only return the alerts that the user has
-    // `GET` permission on.
-    if !get_openfga_config().list_only_permitted {
-        return Ok(None);
-    }
-
-    // This function assumes the user already has `LIST` permission on the folder.
-    // Otherwise, the user will not be able to see the folder in the first place.
-
-    // So, we check for the `GET` permission on the folder.
-    // If the user has `GET` permission on the folder, then they will be able to see the folder and
-    // all its contents. This includes the dashboards inside the folder.
-
-    use o2_openfga::meta::mapping::OFGA_MODELS;
-
-    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
-
-    if let Some(folder_id) = folder_id {
-        let user_role = match get_user(Some(org_id), user_id).await {
-            Ok(Some(user)) => user.role,
-            _ => return Err(AlertError::UserNotFound),
-        };
-        let permitted = crate::authz::check_permissions(
-            user_id,
-            AuthExtractor {
-                org_id: org_id.to_string(),
-                o2_type: format!(
-                    "{}:{folder_id}",
-                    OFGA_MODELS.get("alert_folders").unwrap().key,
-                ),
-                method: "GET".to_string(),
-                bypass_check: false,
-                parent_id: "".to_string(),
-                use_all_org: false,
-                use_self_context: false,
-                use_self_parent: true,
-                auth: "".to_string(), // We don't need to pass the auth token here.
-            },
-            user_role,
-            false,
-        )
-        .await;
-        if permitted {
-            // The user has `GET` permission on the folder.
-            // So, they will be able to see all the dashboards inside the folder.
-            return Ok(None);
-        }
-    }
-
-    // We also check for the `GET_INDIVIDUAL_FROM_ROLE` permission on the dashboards.
-    // If the user has `GET_INDIVIDUAL_FROM_ROLE` permission on a dashboard, then they will be able
-    // to see the dashboard. This is used to check if the user has permission to see a specific
-    // dashboard.
-
-    let permitted_objects = crate::authz::list_objects_for_user(
-        org_id,
-        user_id,
-        "GET_INDIVIDUAL_FROM_ROLE",
-        OFGA_MODELS.get("alerts").unwrap().key,
-    )
-    .await
-    .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
-
-    Ok(permitted_objects)
+    ports::permitted_alerts(org_id, user_id, folder_id)
+        .await
+        .map_err(|error| match error {
+            ports::PermissionError::MissingUser => AlertError::PermittedAlertsMissingUser,
+            ports::PermissionError::UserNotFound => AlertError::UserNotFound,
+            ports::PermissionError::Other(error) => AlertError::PermittedAlertsValidator(error),
+        })
 }
 
 #[cfg(test)]

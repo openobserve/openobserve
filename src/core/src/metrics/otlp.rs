@@ -43,6 +43,7 @@ use config::{
     },
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
+use openobserve_alerts::service::alert::AlertExt;
 use openobserve_pipeline::batch_execution::ExecutablePipeline;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -56,7 +57,6 @@ use prost::Message;
 use crate::{
     common::meta::{http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
-        alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
             TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,

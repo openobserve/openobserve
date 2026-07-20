@@ -45,6 +45,7 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use openobserve_alerts::service::alert::AlertExt;
 use openobserve_pipeline::batch_execution::ExecutablePipeline;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
@@ -56,7 +57,6 @@ use crate::{
         meta::{ingestion::IngestUser, stream::SchemaRecords},
     },
     service::{
-        alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
             TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,

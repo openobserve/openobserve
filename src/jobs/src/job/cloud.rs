@@ -24,6 +24,7 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::table::org_users::get_admin;
+use openobserve_alerts::service::alert::send_email_notification;
 
 use crate::{
     common::{infra::config::ORGANIZATIONS, meta::telemetry},
@@ -234,8 +235,7 @@ async fn check_all_orgs_ai_quota() {
             recipients: vec![admin.email.clone()],
         };
 
-        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
-        {
+        match send_email_notification(&subject, &email, body).await {
             Ok(_) => {
                 log::info!(
                     "[AI_QUOTA] Sent {}% checkpoint email to {} for org={org_id}",
@@ -460,8 +460,7 @@ async fn check_external_contract_expiry() {
             recipients: vec![admin.email.clone()],
         };
 
-        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
-        {
+        match send_email_notification(&subject, &email, body).await {
             Ok(_) => {
                 log::info!(
                     "[EXT_CONTRACT] Sent {stage:?} expiry warning to {} for org={org_id}",

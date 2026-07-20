@@ -41,6 +41,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
+use openobserve_alerts::service::alert::AlertExt;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::{
@@ -66,7 +67,6 @@ use crate::{
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
     service::{
-        alerts::alert::AlertExt,
         format_stream_name,
         ingestion::{
             TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,

@@ -12,6 +12,7 @@ path = "src/lib.rs"
 default = []
 enterprise = [
     "dep:o2_enterprise",
+    "dep:o2_openfga",
     "common/enterprise",
     "config/enterprise",
     "openobserve-scheduler/enterprise",
@@ -21,19 +22,30 @@ cloud = ["enterprise", "o2_enterprise/cloud", "common/cloud"]
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+aws-sdk-sns.workspace = true
 axum.workspace = true
 chrono.workspace = true
 common.workspace = true
 config.workspace = true
+cron.workspace = true
 dashmap.workspace = true
 infra.workspace = true
 itertools.workspace = true
+hashbrown.workspace = true
+lettre.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
 openobserve-scheduler.workspace = true
+regex.workspace = true
+reqwest.workspace = true
 sea-orm.workspace = true
 serde_json.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+arrow-schema.workspace = true

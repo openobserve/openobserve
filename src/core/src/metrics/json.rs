@@ -40,6 +40,7 @@ use config::{
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::schema::{SchemaCache, get_partition_time_level};
+use openobserve_alerts::service::alert::AlertExt;
 use openobserve_pipeline::batch_execution::ExecutablePipeline;
 
 use super::get_exclude_labels;
@@ -50,7 +51,6 @@ use crate::{
         stream::SchemaRecords,
     },
     service::{
-        alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
             TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,

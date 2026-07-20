@@ -72,9 +72,12 @@ pub async fn notify_check_result(n: CheckNotification) {
                     n.monitor_name,
                     n.status.to_uppercase()
                 );
-                if let Err(e) =
-                    crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
-                        .await
+                if let Err(e) = openobserve_alerts::service::alert::dispatch_notification(
+                    destination_type,
+                    &subject,
+                    msg,
+                )
+                .await
                 {
                     log::error!(
                         "[synthetics] notify dest={dest_name} monitor={}: {e}",

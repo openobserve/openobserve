@@ -343,7 +343,7 @@ async fn delete_org_alerts(org_id: &str) -> Result<(), anyhow::Error> {
     let alerts = crate::db::alerts::alert::list(org_id, None, None).await?;
     for alert in alerts {
         let Some(alert_id) = alert.id else { continue };
-        crate::alerts::alert::delete_by_id(conn, org_id, alert_id)
+        openobserve_alerts::service::alert::delete_by_id(conn, org_id, alert_id)
             .await
             .map_err(|e| anyhow::anyhow!("alert {alert_id}: {e}"))?;
     }

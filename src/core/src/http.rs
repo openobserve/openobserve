@@ -22,7 +22,7 @@ use infra::errors;
 
 use crate::{
     common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-    service::{alerts::alert::AlertError, folders::FolderError},
+    service::folders::FolderError,
 };
 #[cfg(feature = "enterprise")]
 use crate::{
@@ -92,47 +92,6 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
-    }
-}
-
-impl From<AlertError> for Response {
-    fn from(value: AlertError) -> Self {
-        match &value {
-            AlertError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            AlertError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
-            AlertError::AlertNameMissing
-            | AlertError::AlertNameOfgaUnsupported
-            | AlertError::AlertNameContainsForwardSlash
-            | AlertError::AlertDestinationMissing
-            | AlertError::TemplateNotConfigured { .. }
-            | AlertError::RealtimeMissingCustomQuery
-            | AlertError::SqlMissingQuery
-            | AlertError::SqlContainsSelectStar
-            | AlertError::PromqlMissingQuery
-            | AlertError::PeriodExceedsMaxQueryRange { .. }
-            | AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
-            AlertError::CreateAlreadyExists => MetaHttpResponse::conflict(value),
-            AlertError::CreateFolderNotFound
-            | AlertError::MoveDestinationFolderNotFound
-            | AlertError::AlertNotFound
-            | AlertError::AlertDestinationNotFound { .. }
-            | AlertError::AlertTemplateNotFound { .. }
-            | AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),
-            AlertError::DecodeVrl(err) => MetaHttpResponse::bad_request(err),
-            AlertError::ParseCron(err) => MetaHttpResponse::bad_request(err),
-            AlertError::SendNotificationError { .. } | AlertError::ResolveStreamNameError(_) => {
-                MetaHttpResponse::internal_error(value)
-            }
-            AlertError::GetDestinationWithTemplateError(err) => {
-                MetaHttpResponse::internal_error(err)
-            }
-            AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
-            AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
-            AlertError::NotSupportedAlertDestinationType(err) => MetaHttpResponse::forbidden(err),
-            AlertError::PermissionDenied | AlertError::UserNotFound => {
-                MetaHttpResponse::forbidden("Unauthorized access")
-            }
-        }
     }
 }
 

@@ -40,13 +40,13 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use openobserve_alerts::service::alert::AlertExt;
 
 #[cfg(feature = "cloud")]
 use crate::stream::get_stream;
 use crate::{
     common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
-        alerts::alert::AlertExt,
         db,
         ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
         metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},

@@ -28,6 +28,7 @@ use config::meta::{
 };
 use hashbrown::HashMap;
 use infra::db::{ORM_CLIENT, connect_to_orm};
+use openobserve_alerts::service::alert::{self, AlertError};
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
@@ -58,13 +59,7 @@ use crate::{
         BulkDeleteRequest, BulkDeleteResponse,
         dashboards::{get_folder, is_overwrite},
     },
-    service::{
-        alerts::{
-            alert::{self, AlertError},
-            build_sql,
-        },
-        db::scheduler,
-    },
+    service::{alerts::build_sql, db::scheduler},
 };
 
 pub mod dedup_stats;
@@ -1435,7 +1430,8 @@ pub async fn generate_sql(
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
-    use openobserve_core::alerts::alert::AlertError;
+
+    use super::AlertError;
 
     fn status(err: AlertError) -> StatusCode {
         Response::from(err).status()

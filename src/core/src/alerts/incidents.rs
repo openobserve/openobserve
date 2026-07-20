@@ -375,7 +375,7 @@ async fn send_incident_notifications(
                     err_parts.push(format!("{dest_name}: not an alert destination"));
                     continue;
                 };
-                match crate::alerts::alert::dispatch_notification(
+                match openobserve_alerts::service::alert::dispatch_notification(
                     &destination_type,
                     &subject,
                     msg.clone(),

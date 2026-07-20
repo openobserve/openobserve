@@ -6580,23 +6580,32 @@ name = "openobserve-alerts"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrow-schema",
  "async-trait",
+ "aws-sdk-sns",
  "axum",
  "chrono",
  "common",
  "config",
+ "cron",
  "dashmap",
+ "hashbrown 0.16.1",
  "infra",
  "itertools 0.14.0",
+ "lettre",
  "log",
  "o2_enterprise",
+ "o2_openfga",
  "openobserve-scheduler",
+ "regex",
+ "reqwest 0.13.2",
  "sea-orm",
  "serde_json",
  "svix-ksuid",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "url",
 ]
 
 [[package]]
