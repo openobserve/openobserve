@@ -15,19 +15,42 @@ on:
         type: boolean
         default: false
 
-concurrency:
-  group: ai-review-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
-  cancel-in-progress: true
-
 jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # Concurrency is per-job (not workflow-level) so it can see `matrix`: keyed per-PR AND
+    # per-provider, the glm and deepseek legs get independent groups and don't cancel each other.
+    concurrency:
+      group: ai-review-${{ matrix.provider.name }}-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
       issues: write
       actions: read
+    strategy:
+      # Run both providers even if one fails, and let one provider's failure not sink the other.
+      fail-fast: false
+      matrix:
+        # One-week head-to-head: GLM-5.2 vs DeepSeek-V4-Pro, each posting its own PR comment.
+        # Adding a provider? Also add its `marker` to ALL_REVIEW_MARKERS in run-review.mjs,
+        # or the other legs will claim and overwrite this one's comment.
+        provider:
+          - name: glm
+            label: GLM-5.2
+            provider_id: zai
+            model_id: glm-5.2
+            model_variant: max
+            api_key_env: GLM_API_KEY
+            marker: "<!-- ai-code-review -->"
+          - name: deepseek
+            label: DeepSeek-V4-Pro
+            provider_id: deepseek-review
+            model_id: deepseek-v4-pro
+            model_variant: ""
+            api_key_env: DEEPSEEK_API_KEY
+            marker: "<!-- ai-code-review-deepseek -->"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -99,7 +122,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           FORCE_FULL: ${{ steps.skip.outputs.force_full }}
+          # Provider selection for this matrix leg (see run-review.mjs for how these are used).
+          REVIEW_PROVIDER_ID: ${{ matrix.provider.provider_id }}
+          REVIEW_MODEL_ID: ${{ matrix.provider.model_id }}
+          REVIEW_MODEL_VARIANT: ${{ matrix.provider.model_variant }}
+          REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
+          REVIEW_LABEL: ${{ matrix.provider.label }}
+          REVIEW_MARKER: ${{ matrix.provider.marker }}
+          # Both keys are provided; run-review.mjs reads only the one named by REVIEW_API_KEY_ENV.
           GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
           O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
           O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}
