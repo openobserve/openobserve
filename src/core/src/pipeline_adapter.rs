@@ -18,7 +18,7 @@ impl openobserve_pipeline::ports::RecordSink for CoreRecordSink {
         &self,
         request: proto::cluster_rpc::IngestionRequest,
     ) -> anyhow::Result<proto::cluster_rpc::IngestionResponse> {
-        crate::ingestion::ingestion_service::ingest(request)
+        openobserve_ingestion::internal::ingest(request)
             .await
             .map_err(Into::into)
     }

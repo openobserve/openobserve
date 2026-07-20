@@ -128,7 +128,9 @@ pub mod search_job {
     }
 }
 #[cfg(feature = "enterprise")]
-pub mod service_graph;
+pub mod service_graph {
+    pub use openobserve_ingestion::repository::service_graph::*;
+}
 pub mod session {
     pub use openobserve_organization::repository::session::*;
 }

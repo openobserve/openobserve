@@ -35,7 +35,9 @@ pub mod file_list;
 pub use openobserve_dashboards::folders;
 pub use openobserve_transform::management as functions;
 pub mod github;
-pub mod grpc;
+pub mod grpc {
+    pub use openobserve_ingestion::internal::get_ingester_channel;
+}
 pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens {
@@ -147,7 +149,7 @@ pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
 pub mod tls;
-pub mod traces;
+pub use openobserve_ingestion::traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;
 pub use openobserve_organization::users;

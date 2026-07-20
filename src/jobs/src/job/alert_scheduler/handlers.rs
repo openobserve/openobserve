@@ -46,6 +46,7 @@ use o2_enterprise::enterprise::recommendations::service::QueryRecommendationServ
 use openobserve_alerts::service::alert::{
     AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map,
 };
+use openobserve_ingestion::internal as ingestion_service;
 use openobserve_pipeline::{
     batch_execution::ExecutablePipeline, derived_streams::DerivedStreamExt,
 };
@@ -58,7 +59,6 @@ use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
     dashboards::reports::SendReport,
     db::{self, alerts::alert::set_without_updating_trigger},
-    ingestion::ingestion_service,
     self_reporting::publish_triggers_usage,
 };
 

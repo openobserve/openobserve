@@ -15,3 +15,4 @@
 
 pub mod model_pricing;
 pub mod org_ingestion_tokens;
+pub mod service_graph;

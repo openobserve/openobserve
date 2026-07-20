@@ -33,7 +33,9 @@ use hashbrown::HashMap;
 #[cfg(feature = "cloud")]
 use openobserve_core::ingestion::check_ingestion_allowed;
 // Re-export service graph API handlers
-pub use openobserve_core::traces::service_graph::{self, get_current_topology, get_edge_history};
+pub use openobserve_ingestion::traces::service_graph::{
+    self, get_current_topology, get_edge_history,
+};
 use openobserve_search_service::{service as SearchService, streaming::sorting::TopKHeap};
 use serde::Serialize;
 use tokio::sync::mpsc;

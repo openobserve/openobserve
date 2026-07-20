@@ -13,13 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::cluster::get_internal_grpc_token;
+use config::{meta::cluster::get_internal_grpc_token, utils::rand::get_rand_element};
 use infra::errors::{Error, Result};
 use proto::cluster_rpc;
-use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
+use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue, transport::Channel};
 
-use crate::grpc::get_ingester_channel;
+/// Select an online ingester and return its cached gRPC channel.
+pub async fn get_ingester_channel() -> std::result::Result<(String, Channel), tonic::Status> {
+    let nodes = infra::cluster::get_cached_schedulable_ingester_nodes().await;
+    let Some(nodes) = nodes.filter(|nodes| !nodes.is_empty()) else {
+        return Err(tonic::Status::internal("No online ingester nodes"));
+    };
+    let grpc_addr = get_rand_element(&nodes).grpc_addr.to_string();
+    infra::client::grpc::get_cached_channel(&grpc_addr)
+        .await
+        .map(|channel| (grpc_addr, channel))
+}
 
+/// Write an internal ingestion request through the normal ingester routing path.
 pub async fn ingest(req: cluster_rpc::IngestionRequest) -> Result<cluster_rpc::IngestionResponse> {
     let cfg = config::get_config();
     let token: MetadataValue<_> = get_internal_grpc_token()

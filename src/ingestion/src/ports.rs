@@ -106,6 +106,17 @@ pub trait RuntimeServices: Send + Sync + 'static {
         fetch_schema: bool,
     ) -> anyhow::Result<Vec<StreamSchema>>;
 
+    #[cfg(feature = "enterprise")]
+    async fn search_service_graph_usage(
+        &self,
+        sql: String,
+        start_time: i64,
+        end_time: i64,
+    ) -> anyhow::Result<Vec<Value>>;
+
+    #[cfg(feature = "enterprise")]
+    async fn list_organization_ids(&self) -> anyhow::Result<Vec<String>>;
+
     async fn set_prom_cluster_info(
         &self,
         cluster_name: &str,
@@ -309,6 +320,22 @@ pub async fn list_stream_schemas(
     runtime_services()?
         .list_stream_schemas(org_id, stream_type, fetch_schema)
         .await
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn search_service_graph_usage(
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+) -> anyhow::Result<Vec<Value>> {
+    runtime_services()?
+        .search_service_graph_usage(sql, start_time, end_time)
+        .await
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn list_organization_ids() -> anyhow::Result<Vec<String>> {
+    runtime_services()?.list_organization_ids().await
 }
 
 pub async fn set_prom_cluster_info(cluster_name: &str, members: &[String]) -> anyhow::Result<()> {

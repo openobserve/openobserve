@@ -7030,6 +7030,7 @@ dependencies = [
  "snap",
  "tiktoken-rs",
  "tokio",
+ "tonic",
  "tracing",
  "url",
  "utoipa",

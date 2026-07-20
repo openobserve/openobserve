@@ -21,7 +21,9 @@ use config::{
 pub mod grpc {
     pub use openobserve_ingestion::grpc::*;
 }
-pub mod ingestion_service;
+pub mod ingestion_service {
+    pub use openobserve_ingestion::internal::ingest;
+}
 
 pub use openobserve_ingestion::service::*;
 pub use openobserve_transform::{
@@ -144,6 +146,23 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         fetch_schema: bool,
     ) -> anyhow::Result<Vec<StreamSchema>> {
         crate::db::schema::list(org_id, stream_type, fetch_schema).await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn search_service_graph_usage(
+        &self,
+        sql: String,
+        start_time: i64,
+        end_time: i64,
+    ) -> anyhow::Result<Vec<serde_json::Value>> {
+        crate::self_reporting::search::get_usage(sql, start_time, end_time, false).await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn list_organization_ids(&self) -> anyhow::Result<Vec<String>> {
+        crate::organization::list_all_orgs(None)
+            .await
+            .map(|orgs| orgs.into_iter().map(|org| org.identifier).collect())
     }
 
     async fn set_prom_cluster_info(

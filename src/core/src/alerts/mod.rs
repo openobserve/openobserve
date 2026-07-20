@@ -365,7 +365,7 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
     #[cfg(feature = "enterprise")]
     async fn service_graph_edges(&self, org_id: &str) -> anyhow::Result<Vec<Value>> {
         Ok(
-            crate::traces::service_graph::query_edges_from_stream_internal(
+            openobserve_ingestion::traces::service_graph::query_edges_from_stream_internal(
                 org_id, None, None, None,
             )
             .await?,

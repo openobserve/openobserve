@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::db;
+use bytes::Bytes;
 
 fn mk_key() -> String {
     "/service_graph/node/offsets".to_string()
@@ -21,7 +21,8 @@ fn mk_key() -> String {
 
 pub async fn get_offset() -> (i64, String) {
     let key = mk_key();
-    let mut value = match db::get(&key).await {
+    let db = infra::db::get_db().await;
+    let mut value = match db.get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
@@ -45,7 +46,27 @@ pub async fn set_offset(offset: i64, node: Option<&str>) -> Result<(), anyhow::E
     } else {
         offset.to_string()
     };
-    Ok(db::put(&key, val.into(), db::NO_NEED_WATCH, None).await?)
+    let val = Bytes::from(val);
+    infra::db::get_db()
+        .await
+        .put(&key, val.clone(), infra::db::NO_NEED_WATCH, None)
+        .await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        o2_enterprise::enterprise::super_cluster::queue::put(
+            &key,
+            val,
+            infra::db::NO_NEED_WATCH,
+            None,
+        )
+        .await
+        .map_err(|err| anyhow::anyhow!(err.to_string()))?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

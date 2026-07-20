@@ -1047,15 +1047,16 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                     }
                 };
 
-                let (_addr, channel) = match openobserve_core::grpc::get_ingester_channel().await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");
-                        return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                            format!("No ingester available: {e}"),
-                        ));
-                    }
-                };
+                let (_addr, channel) =
+                    match openobserve_ingestion::internal::get_ingester_channel().await {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");
+                            return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                                format!("No ingester available: {e}"),
+                            ));
+                        }
+                    };
 
                 let client = opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient::with_interceptor(
                     channel,

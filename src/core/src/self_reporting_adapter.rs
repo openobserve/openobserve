@@ -54,7 +54,7 @@ impl openobserve_self_reporting::Runtime for CoreSelfReportingRuntime {
             ingestion_type: Some(cluster_rpc::IngestionType::Usage.into()),
             metadata: None,
         };
-        let response = crate::ingestion::ingestion_service::ingest(request).await?;
+        let response = openobserve_ingestion::internal::ingest(request).await?;
         if response.status_code == 200 {
             Ok(())
         } else {
@@ -67,7 +67,7 @@ impl openobserve_self_reporting::Runtime for CoreSelfReportingRuntime {
         &self,
         request: cluster_rpc::IngestionRequest,
     ) -> infra::errors::Result<cluster_rpc::IngestionResponse> {
-        crate::ingestion::ingestion_service::ingest(request).await
+        openobserve_ingestion::internal::ingest(request).await
     }
 
     async fn dashboard_context(

@@ -651,7 +651,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         metadata: None,
                     };
 
-                    match openobserve_core::ingestion::ingestion_service::ingest(req).await {
+                    match openobserve_ingestion::internal::ingest(req).await {
                         Ok(resp) if resp.status_code == 200 => Ok(()),
                         Ok(resp) => Err(anyhow::anyhow!(
                             "_llm_scores ingestion failed with status {}: {}",

@@ -55,6 +55,7 @@ use serde_json::Map;
 pub mod inferred;
 pub mod otel;
 pub mod schema_compat;
+pub mod service_graph;
 
 use common::meta::{
     http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},

@@ -15,7 +15,7 @@
 
 use config::meta::cluster::get_internal_grpc_token;
 use infra::client::grpc::MetadataMap;
-use openobserve_core::grpc::get_ingester_channel;
+use openobserve_ingestion::internal::get_ingester_channel;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_client::LogsServiceClient,
     logs_service_server::LogsService,

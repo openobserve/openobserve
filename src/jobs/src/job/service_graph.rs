@@ -37,7 +37,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             {
                 log::debug!("[SERVICE_GRAPH::JOB] Running service graph processing");
                 if let Err(e) =
-                    openobserve_core::traces::service_graph::process_service_graph().await
+                    openobserve_ingestion::traces::service_graph::process_service_graph().await
                 {
                     log::error!("[SERVICE_GRAPH::JOB] Processing failed: {e}");
                 }
