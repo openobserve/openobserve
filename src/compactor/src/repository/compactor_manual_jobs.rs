@@ -23,7 +23,7 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
-use crate::service::db::compact::retention::mk_key;
+use crate::repository::retention::mk_key;
 
 pub async fn list_jobs_by_key(
     org_id: &str,

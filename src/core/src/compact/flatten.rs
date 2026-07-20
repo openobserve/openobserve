@@ -39,6 +39,7 @@ use infra::{
     cluster::get_node_from_consistent_hash, file_list as infra_file_list,
     schema::get_stream_setting_bloom_filter_fields, storage,
 };
+pub use openobserve_compactor::flatten::generate_flatten_file_key;
 use parking_lot::RwLock;
 use tokio::sync::{Semaphore, mpsc};
 
@@ -148,21 +149,6 @@ pub async fn generate_by_stream(
     }
 
     Ok(())
-}
-
-/// Generates the storage key of the flattened version of a data file.
-pub fn generate_flatten_file_key(file_key: &str) -> String {
-    let key = file_key.strip_prefix("files/").unwrap_or(file_key);
-    let key = match FileFormat::from_extension(key) {
-        Some(format) => key.strip_suffix(format.extension()).unwrap_or(key),
-        None => key,
-    };
-    format!(
-        "files{}/{}{}",
-        get_config().common.column_all,
-        key,
-        FileFormat::Parquet.extension()
-    )
 }
 
 pub async fn generate_file(file: &FileKey) -> Result<(), anyhow::Error> {

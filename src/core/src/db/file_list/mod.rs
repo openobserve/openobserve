@@ -21,7 +21,9 @@ use o2_enterprise::enterprise::{
     super_cluster::stream::client::super_cluster_cache_stats,
 };
 pub mod broadcast;
-pub mod local;
+pub mod local {
+    pub use openobserve_catalog::file_list::local::*;
+}
 
 pub use openobserve_catalog::file_list::{BLOCKED_ORGS, DEDUPLICATE_FILES, DELETED_FILES};
 

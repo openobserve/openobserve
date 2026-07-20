@@ -239,13 +239,16 @@ members = [
     "src/api_query",
     "src/api_common",
     "src/common",
+    "src/compactor",
     "src/core",
+    "src/dashboards",
     "src/scheduler",
     "src/self_reporting",
     "src/catalog",
     "src/transform",
     "src/search",
     "src/promql",
+    "src/reports",
     "src/jobs",
     "src/config",
     "src/infra",
@@ -278,6 +281,9 @@ openobserve-core = { path = "src/core" }
 openobserve-scheduler = { path = "src/scheduler" }
 openobserve-self-reporting = { path = "src/self_reporting" }
 openobserve-catalog = { path = "src/catalog" }
+openobserve-compactor = { path = "src/compactor" }
+openobserve-dashboards = { path = "src/dashboards" }
+openobserve-reports = { path = "src/reports" }
 common = { path = "src/common" }
 openobserve-transform = { path = "src/transform" }
 search = { path = "src/search" }

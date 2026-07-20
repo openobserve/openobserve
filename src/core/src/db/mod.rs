@@ -23,8 +23,36 @@ use {
 
 pub mod alerts;
 pub mod backfill;
-pub mod compact;
-pub mod dashboards;
+pub mod compact {
+    pub mod compactor_manual_jobs {
+        pub use openobserve_compactor::repository::compactor_manual_jobs::*;
+    }
+    pub mod downsampling {
+        pub use openobserve_compactor::repository::downsampling::*;
+    }
+    pub mod files {
+        pub use openobserve_compactor::repository::files::*;
+    }
+    pub mod organization {
+        pub use openobserve_compactor::repository::organization::*;
+    }
+    pub mod retention {
+        pub use openobserve_compactor::repository::retention::*;
+    }
+    pub mod stats {
+        pub use openobserve_compactor::repository::stats::*;
+    }
+    pub mod stream {
+        pub use openobserve_compactor::repository::stream::*;
+    }
+}
+pub mod dashboards {
+    pub use openobserve_dashboards::repository::*;
+
+    pub mod reports {
+        pub use openobserve_reports::repository::*;
+    }
+}
 pub mod distinct_values;
 pub mod enrichment_table;
 pub mod file_list;
@@ -51,15 +79,21 @@ pub mod pipeline_errors;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
 pub mod saved_view;
-pub mod scheduler;
+pub mod scheduler {
+    pub use openobserve_scheduler::*;
+}
 pub mod schema;
 pub mod search_job;
 #[cfg(feature = "enterprise")]
 pub mod service_graph;
 pub mod session;
-pub mod short_url;
+pub mod short_url {
+    pub use common::short_url::repository::*;
+}
 pub mod sourcemaps;
-pub mod system_settings;
+pub mod system_settings {
+    pub use common::system_settings::*;
+}
 pub mod user;
 
 pub(crate) use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
@@ -130,20 +164,6 @@ pub(crate) async fn delete(
     let db = infra_db::get_db().await;
     db.delete(key, with_prefix, need_watch, start_dt).await?;
     Ok(())
-}
-
-#[inline]
-pub(crate) async fn delete_if_exists(key: &str, with_prefix: bool, need_watch: bool) -> Result<()> {
-    // super cluster
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        o2_enterprise::enterprise::super_cluster::queue::delete(key, with_prefix, need_watch, None)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-    }
-
-    let db = infra_db::get_db().await;
-    db.delete_if_exists(key, with_prefix, need_watch).await
 }
 
 #[inline]

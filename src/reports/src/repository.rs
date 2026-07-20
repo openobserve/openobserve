@@ -16,6 +16,7 @@
 use std::str::FromStr;
 
 use chrono::FixedOffset;
+use common::{meta::authz::Authz, utils::auth::set_ownership};
 use config::meta::{
     dashboards::reports::{ListReportsParams, Report, ReportFrequencyType},
     folder::{DEFAULT_FOLDER, Folder, FolderType},
@@ -24,7 +25,7 @@ use cron::Schedule;
 use infra::table;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 
-use crate::service::{dashboards::reports::ReportError, db, folders};
+use crate::ReportError;
 
 pub async fn get<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
@@ -74,14 +75,14 @@ pub async fn create<C: ConnectionTrait + TransactionTrait>(
     };
 
     let report_id = create_without_updating_trigger(conn, folder_snowflake_id, report).await?;
-    let trigger = db::scheduler::Trigger {
+    let trigger = openobserve_scheduler::Trigger {
         org,
-        module: db::scheduler::TriggerModule::Report,
+        module: openobserve_scheduler::TriggerModule::Report,
         module_key: report_id.clone(),
         next_run_at,
         ..Default::default()
     };
-    db::scheduler::push(trigger)
+    openobserve_scheduler::push(trigger)
         .await
         .inspect_err(|e| log::error!("Failed to save trigger: {e}"))?;
     Ok(report_id)
@@ -115,22 +116,26 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let report_id =
         update_without_updating_trigger(conn, folder_snowflake_id, new_folder_snowflake_id, report)
             .await?;
-    let scheduler_exists =
-        db::scheduler::exists(&org_id, db::scheduler::TriggerModule::Report, &report_id).await;
+    let scheduler_exists = openobserve_scheduler::exists(
+        &org_id,
+        openobserve_scheduler::TriggerModule::Report,
+        &report_id,
+    )
+    .await;
 
-    let trigger = db::scheduler::Trigger {
+    let trigger = openobserve_scheduler::Trigger {
         org: org_id.clone(),
-        module: db::scheduler::TriggerModule::Report,
+        module: openobserve_scheduler::TriggerModule::Report,
         module_key: report_id,
         next_run_at,
         ..Default::default()
     };
     if scheduler_exists {
-        db::scheduler::update_trigger(trigger, false, "")
+        openobserve_scheduler::update_trigger(trigger, false, "")
             .await
             .inspect_err(|e| log::error!("Failed to update trigger: {e}"))?;
     } else {
-        db::scheduler::push(trigger)
+        openobserve_scheduler::push(trigger)
             .await
             .inspect_err(|e| log::error!("Failed to save trigger: {e}"))?;
     }
@@ -168,9 +173,30 @@ async fn create_default_reports_folder(org_id: &str) -> Result<Folder, ReportErr
         name: "default".to_owned(),
         description: "default".to_owned(),
     };
-    folders::save_folder(org_id, default_folder, FolderType::Reports, true)
+    let (_id, folder) = table::folders::put(org_id, None, default_folder, FolderType::Reports)
         .await
-        .map_err(|_| ReportError::CreateDefaultFolderError)
+        .map_err(|_| ReportError::CreateDefaultFolderError)?;
+
+    set_ownership(org_id, "report_folders", Authz::new(&folder.folder_id)).await;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        o2_enterprise::enterprise::super_cluster::queue::folders_create(
+            org_id,
+            _id,
+            &folder.folder_id,
+            FolderType::Reports,
+            &folder.name,
+            Some(folder.description.as_str()).filter(|description| !description.is_empty()),
+        )
+        .await
+        .map_err(|_| ReportError::CreateDefaultFolderError)?;
+    }
+
+    Ok(folder)
 }
 
 pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(
@@ -227,21 +253,22 @@ pub async fn update_by_id<C: ConnectionTrait + TransactionTrait>(
         update_by_id_without_updating_trigger(conn, report_id, new_folder_snowflake_id, report)
             .await?;
 
-    let trigger = db::scheduler::Trigger {
+    let trigger = openobserve_scheduler::Trigger {
         org: org_id.clone(),
-        module: db::scheduler::TriggerModule::Report,
+        module: openobserve_scheduler::TriggerModule::Report,
         module_key: id.clone(),
         next_run_at,
         ..Default::default()
     };
     let scheduler_exists =
-        db::scheduler::exists(&org_id, db::scheduler::TriggerModule::Report, &id).await;
+        openobserve_scheduler::exists(&org_id, openobserve_scheduler::TriggerModule::Report, &id)
+            .await;
     if scheduler_exists {
-        db::scheduler::update_trigger(trigger, false, "")
+        openobserve_scheduler::update_trigger(trigger, false, "")
             .await
             .inspect_err(|e| log::error!("Failed to update trigger: {e}"))?;
     } else {
-        db::scheduler::push(trigger)
+        openobserve_scheduler::push(trigger)
             .await
             .inspect_err(|e| log::error!("Failed to save trigger: {e}"))?;
     }
@@ -272,9 +299,13 @@ pub async fn delete_by_id<C: ConnectionTrait + TransactionTrait>(
         .await
         .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))?;
     if !id.is_empty() {
-        let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, &id)
-            .await
-            .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
+        let _ = openobserve_scheduler::delete(
+            org_id,
+            openobserve_scheduler::TriggerModule::Report,
+            &id,
+        )
+        .await
+        .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
         #[cfg(feature = "enterprise")]
         super_cluster::emit_delete_event(org_id, "", &id).await?;
     }
@@ -291,9 +322,13 @@ pub async fn delete<C: ConnectionTrait + TransactionTrait>(
     let report_id = table::reports::delete_by_name(conn, org_id, folder_snowflake_id, name)
         .await
         .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))?;
-    let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, &report_id)
-        .await
-        .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
+    let _ = openobserve_scheduler::delete(
+        org_id,
+        openobserve_scheduler::TriggerModule::Report,
+        &report_id,
+    )
+    .await
+    .inspect_err(|e| log::error!("Failed to delete trigger: {e}"));
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, folder_snowflake_id, name).await?;
     Ok(report_id)

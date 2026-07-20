@@ -34,10 +34,14 @@ use tokio::sync::mpsc;
 
 use crate::service::db;
 
-pub mod deleted;
+pub mod deleted {
+    pub use openobserve_compactor::deleted::*;
+}
 pub mod dump;
 pub mod flatten;
-pub mod incremental;
+pub mod incremental {
+    pub use openobserve_compactor::incremental::*;
+}
 pub mod merge;
 pub mod retention;
 pub mod stats;

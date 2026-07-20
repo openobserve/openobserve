@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod reports;
-
 use std::sync::Arc;
 
 use infra::{
@@ -23,7 +21,7 @@ use infra::{
     table,
 };
 
-use crate::common::infra::config::DASHBOARD_ID_TO_ORG;
+use crate::DASHBOARD_ID_TO_ORG;
 
 /// Returns true iff `dashboard_id` exists in `org_id`. Reads from the in-memory
 /// `DASHBOARD_ID_TO_ORG` cache; on a cache miss falls back to a scoped `get_by_id`

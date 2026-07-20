@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::service::db;
+use crate::metadata as db;
 
 pub async fn get_offset() -> (i64, String) {
     let key = "/compact/stream_stats/offset";

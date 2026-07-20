@@ -31,7 +31,6 @@ use config::{
 };
 use dashmap::DashMap;
 use hashbrown::HashMap;
-use infra::table::short_urls::ShortUrlRecord;
 pub use openobserve_transform::{QUERY_FUNCTIONS, enrichment::ENRICHMENT_TABLES};
 
 use crate::meta::{
@@ -75,13 +74,8 @@ pub static SCHEDULED_PIPELINES: Lazy<RwAHashMap<String, Pipeline>> = Lazy::new(D
 // Populated by the pipeline `cache()` startup hook and kept in sync by `watch()`.
 pub static PIPELINE_ID_TO_ORG: Lazy<RwAHashMap<String, String>> = Lazy::new(Default::default);
 
-// Maps every dashboard_id to its owning org for O(1) cross-org IDOR checks in HTTP
-// handlers (e.g. timed annotations). Populated at startup by the dashboard
-// `cache_id_to_org()` hook and kept in sync by a coordinator-driven watch loop.
-pub static DASHBOARD_ID_TO_ORG: Lazy<RwAHashMap<String, String>> = Lazy::new(Default::default);
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static USER_SESSIONS_EXPIRY: Lazy<RwHashMap<String, i64>> = Lazy::new(Default::default);
-pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
 pub static USER_ROLES_CACHE: Lazy<RwAHashMap<String, CachedUserRoles>> =
     Lazy::new(Default::default);
 /// Org ingestion token cache — key format: "org_id/token", value = token name.

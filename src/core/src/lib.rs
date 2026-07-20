@@ -73,7 +73,9 @@ pub mod search_jobs;
 pub mod self_reporting;
 pub mod service;
 pub mod session;
-pub mod short_url;
+pub mod short_url {
+    pub use common::short_url::*;
+}
 pub mod sourcemaps;
 pub mod stream;
 pub mod stream_utils;
@@ -110,6 +112,8 @@ pub mod common {
 
         pub mod config {
             pub use ::common::infra::config::*;
+            pub use common::short_url::SHORT_URLS;
+            pub use openobserve_dashboards::DASHBOARD_ID_TO_ORG;
 
             pub use crate::service::cache::{REALTIME_ALERT_TRIGGERS, STREAM_EXECUTABLE_PIPELINES};
         }

@@ -130,7 +130,7 @@ mod super_cluster {
         Ok(())
     }
 
-    /// Sends event to super cluster queue for a new timed annotation entry.    
+    /// Sends event to super cluster queue for a new timed annotation entry.
     pub async fn emit_timed_annotation_put_event(
         dashboard_id: &str,
         timed_annotation: TimedAnnotation,

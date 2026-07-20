@@ -1,0 +1,27 @@
+[package]
+name = "openobserve-compactor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise", "config/enterprise"]
+cloud = ["enterprise", "o2_enterprise/cloud"]
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+config.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+ingester.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+openobserve-catalog.workspace = true
+tokio.workspace = true

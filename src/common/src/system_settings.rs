@@ -22,9 +22,13 @@
 use std::sync::Arc;
 
 use config::meta::system_settings::{SettingScope, SystemSetting};
-use infra::{errors::Result, table::system_settings as db};
+use infra::{
+    db::{Event, get_coordinator},
+    errors::Result,
+    table::system_settings as db,
+};
 
-use crate::common::infra::config::SYSTEM_SETTINGS;
+use crate::infra::config::SYSTEM_SETTINGS;
 
 /// Watcher prefix for system settings events
 const SYSTEM_SETTINGS_WATCHER_PREFIX: &str = "/system_settings/";
@@ -286,7 +290,7 @@ pub async fn cache() -> Result<()> {
 
 /// Watch for system settings changes from other cluster nodes
 pub async fn watch() -> Result<()> {
-    let cluster_coordinator = super::get_coordinator().await;
+    let cluster_coordinator = get_coordinator().await;
     let mut events = cluster_coordinator
         .watch(SYSTEM_SETTINGS_WATCHER_PREFIX)
         .await
@@ -302,7 +306,7 @@ pub async fn watch() -> Result<()> {
             }
         };
         match ev {
-            super::Event::Put(ev) => {
+            Event::Put(ev) => {
                 let cache_k = match ev.key.strip_prefix(SYSTEM_SETTINGS_WATCHER_PREFIX) {
                     Some(k) => k,
                     None => {
@@ -352,7 +356,7 @@ pub async fn watch() -> Result<()> {
                     }
                 }
             }
-            super::Event::Delete(ev) => {
+            Event::Delete(ev) => {
                 let cache_k = match ev.key.strip_prefix(SYSTEM_SETTINGS_WATCHER_PREFIX) {
                     Some(k) => k,
                     None => {
@@ -363,7 +367,7 @@ pub async fn watch() -> Result<()> {
                 SYSTEM_SETTINGS.write().await.remove(cache_k);
                 log::debug!("Removed system setting from cache: {}", cache_k);
             }
-            super::Event::Empty => {}
+            Event::Empty => {}
         }
     }
     Ok(())

@@ -19,7 +19,7 @@ use config::meta::stream::StreamType;
 pub use openobserve_catalog::retention::{is_deleting_stream, key as mk_key};
 use openobserve_catalog::retention::{mark_deleting, try_mark_deleting, unmark_deleting};
 
-use crate::service::db;
+use crate::metadata as db;
 
 // delete data from stream
 // if date_range is empty, delete all data

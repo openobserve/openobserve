@@ -14,13 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::Utc;
-use config::{get_config, utils::md5};
+use config::{RwHashMap, get_config, utils::md5};
+use dashmap::DashMap;
 use infra::{
     errors::{DbError, Error},
     table::short_urls::ShortUrlRecord,
 };
 
-use crate::service::db;
+pub mod repository;
+
+/// Process-wide short URL cache owned by the short URL domain.
+pub static SHORT_URLS: std::sync::LazyLock<RwHashMap<String, ShortUrlRecord>> =
+    std::sync::LazyLock::new(DashMap::default);
 
 const SHORT_URL_WEB_PATH: &str = "short/";
 
@@ -46,7 +51,7 @@ async fn store_short_url(
     original_url: &str,
 ) -> Result<String, anyhow::Error> {
     let entry = ShortUrlRecord::new(short_id, original_url, org_id);
-    db::short_url::set(short_id, entry).await?;
+    repository::set(short_id, entry).await?;
     Ok(construct_short_url(org_id, short_id))
 }
 
@@ -64,7 +69,7 @@ fn generate_short_id(original_url: &str, timestamp: Option<i64>) -> String {
 pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow::Error> {
     let mut short_id = generate_short_id(original_url, None);
 
-    if let Ok(existing_url) = db::short_url::get(&short_id, org_id).await
+    if let Ok(existing_url) = repository::get(&short_id, org_id).await
         && existing_url == original_url
     {
         return Ok(construct_short_url(org_id, &short_id));
@@ -92,7 +97,7 @@ pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow:
 
 /// Retrieves the original URL corresponding to the given short ID, scoped to org_id.
 pub async fn retrieve(org_id: &str, short_id: &str) -> Option<String> {
-    db::short_url::get(short_id, org_id).await.ok()
+    repository::get(short_id, org_id).await.ok()
 }
 
 #[cfg(test)]

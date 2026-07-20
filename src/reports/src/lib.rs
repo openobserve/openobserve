@@ -16,8 +16,13 @@
 use std::{str::FromStr, time::Duration};
 
 use async_trait::async_trait;
+use axum::response::Response;
 use chromiumoxide::{Page, browser::Browser, cdp::browser_protocol::page::PrintToPdfParams};
 use chrono::Timelike;
+use common::{
+    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+    utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
+};
 use config::{
     SMTP_CLIENT, get_chrome_launch_options, get_config,
     meta::{
@@ -46,13 +51,8 @@ use lettre::{
 };
 use reqwest::Client;
 
-use crate::{
-    common::{
-        meta::authz::Authz,
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
-    service::{db, short_url},
-};
+pub mod repository;
+use common::short_url;
 
 /// Errors that can occur when interacting with reports.
 #[derive(Debug, thiserror::Error)]
@@ -112,6 +112,32 @@ pub enum ReportError {
     FolderNotFound,
 }
 
+impl From<ReportError> for Response {
+    fn from(value: ReportError) -> Self {
+        match &value {
+            ReportError::SmtpNotEnabled | ReportError::ChromeNotEnabled => {
+                MetaHttpResponse::internal_error(value)
+            }
+            ReportError::ReportUsernamePasswordNotSet
+            | ReportError::NameContainsOpenFgaUnsupportedCharacters
+            | ReportError::NameIsEmpty
+            | ReportError::NameContainsForwardSlash
+            | ReportError::CreateReportNameAlreadyUsed
+            | ReportError::NoDashboards
+            | ReportError::InlineAttachmentTypeNotSupportedForPdf
+            | ReportError::NoDashboardTabs
+            | ReportError::NoDestinations => MetaHttpResponse::bad_request(value),
+            ReportError::ReportNotFound
+            | ReportError::DashboardTabNotFound
+            | ReportError::FolderNotFound => MetaHttpResponse::not_found(value),
+            ReportError::ParseCronError(error) => MetaHttpResponse::bad_request(error),
+            ReportError::DbError(error) => MetaHttpResponse::internal_error(error),
+            ReportError::SendReportError(error) => MetaHttpResponse::internal_error(error),
+            ReportError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
+        }
+    }
+}
+
 pub async fn save(
     org_id: &str,
     folder_id: &str,
@@ -164,7 +190,7 @@ pub async fn save(
         report.frequency.interval = 1;
     }
 
-    match db::dashboards::reports::get(conn, org_id, folder_id, &report.name).await {
+    match repository::get(conn, org_id, folder_id, &report.name).await {
         Ok(old_report) => {
             if create {
                 return Err(ReportError::CreateReportNameAlreadyUsed);
@@ -229,7 +255,7 @@ pub async fn save(
     }
 
     if create {
-        let report_id = db::dashboards::reports::create(conn, folder_id, report)
+        let report_id = repository::create(conn, folder_id, report)
             .await
             .map_err(ReportError::DbError)?;
         set_ownership(
@@ -243,7 +269,7 @@ pub async fn save(
         )
         .await;
     } else {
-        db::dashboards::reports::update(conn, folder_id, None, report)
+        repository::update(conn, folder_id, None, report)
             .await
             .map_err(ReportError::DbError)?;
     }
@@ -253,7 +279,7 @@ pub async fn save(
 
 pub async fn get(org_id: &str, folder_id: &str, name: &str) -> Result<Report, ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    db::dashboards::reports::get(conn, org_id, folder_id, name)
+    repository::get(conn, org_id, folder_id, name)
         .await
         .map_err(|_| ReportError::ReportNotFound)
 }
@@ -274,7 +300,7 @@ pub async fn list(
 ) -> Result<Vec<table::reports::ListReportsQueryResult>, ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let params = filters.into_params(org_id);
-    let reports = db::dashboards::reports::list(conn, &params)
+    let reports = repository::list(conn, &params)
         .await
         .map_err(ReportError::DbError)?;
     let result = reports
@@ -298,7 +324,7 @@ pub async fn delete(org_id: &str, folder_id: &str, name: &str) -> Result<(), Rep
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // Existence check — db::delete returns empty string if not found.
-    if db::dashboards::reports::get(conn, org_id, folder_id, name)
+    if repository::get(conn, org_id, folder_id, name)
         .await
         .is_err()
     {
@@ -306,7 +332,7 @@ pub async fn delete(org_id: &str, folder_id: &str, name: &str) -> Result<(), Rep
     }
 
     // db::delete now returns the KSUID of the deleted report.
-    let report_id = db::dashboards::reports::delete(conn, org_id, folder_id, name)
+    let report_id = repository::delete(conn, org_id, folder_id, name)
         .await
         .map_err(ReportError::DbError)?;
 
@@ -329,7 +355,7 @@ pub async fn delete_by_id(org_id: &str, report_id: &str) -> Result<(), ReportErr
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let (folder, _) = get_by_id(org_id, report_id).await?;
 
-    db::dashboards::reports::delete_by_id(conn, org_id, report_id)
+    repository::delete_by_id(conn, org_id, report_id)
         .await
         .map_err(ReportError::DbError)?;
 
@@ -348,7 +374,7 @@ pub async fn delete_by_id(org_id: &str, report_id: &str) -> Result<(), ReportErr
 
 pub async fn trigger(org_id: &str, folder_id: &str, name: &str) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let report = match db::dashboards::reports::get(conn, org_id, folder_id, name).await {
+    let report = match repository::get(conn, org_id, folder_id, name).await {
         Ok(report) => report,
         _ => {
             return Err(ReportError::ReportNotFound);
@@ -373,14 +399,14 @@ pub async fn enable(
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // TODO: The "get" and "update" operations should be in a transaction.
-    let mut report = match db::dashboards::reports::get(conn, org_id, folder_id, name).await {
+    let mut report = match repository::get(conn, org_id, folder_id, name).await {
         Ok(report) => report,
         _ => {
             return Err(ReportError::ReportNotFound);
         }
     };
     report.enabled = value;
-    db::dashboards::reports::update(conn, folder_id, None, report)
+    repository::update(conn, folder_id, None, report)
         .await
         .map_err(ReportError::DbError)
 }
@@ -389,7 +415,7 @@ pub async fn enable_by_id(org_id: &str, report_id: &str, value: bool) -> Result<
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let (_, mut report) = get_by_id(org_id, report_id).await?;
     report.enabled = value;
-    db::dashboards::reports::update_by_id(conn, report_id, None, report)
+    repository::update_by_id(conn, report_id, None, report)
         .await
         .map_err(ReportError::DbError)
 }
@@ -450,7 +476,7 @@ pub async fn update_by_id(
     report.owner = old_report.owner;
     report.updated_at = Some(datetime_now());
 
-    db::dashboards::reports::update_by_id(conn, report_id, new_folder_id, report)
+    repository::update_by_id(conn, report_id, new_folder_id, report)
         .await
         .map_err(ReportError::DbError)?;
 
@@ -489,7 +515,7 @@ pub async fn move_to_folder(
     for report_id in report_ids {
         let (curr_folder, report) = get_by_id(org_id, report_id).await?;
 
-        db::dashboards::reports::update_by_id(conn, report_id, Some(dst_folder_id), report)
+        repository::update_by_id(conn, report_id, Some(dst_folder_id), report)
             .await
             .map_err(ReportError::DbError)?;
 

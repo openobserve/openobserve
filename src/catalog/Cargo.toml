@@ -12,6 +12,7 @@ path = "src/lib.rs"
 default = []
 
 [dependencies]
+anyhow.workspace = true
 config.workspace = true
 dashmap.workspace = true
 hashbrown.workspace = true

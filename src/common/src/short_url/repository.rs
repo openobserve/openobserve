@@ -20,7 +20,7 @@ use chrono::Utc;
 use config::get_config;
 use infra::{db::Event, table::short_urls};
 
-use crate::{common::infra::config::SHORT_URLS, service::db};
+use super::SHORT_URLS;
 
 // DBKey to set short URL's
 pub const SHORT_URL_KEY: &str = "/short_urls/";
@@ -62,7 +62,7 @@ pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<()
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = SHORT_URL_KEY;
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching short URLs");

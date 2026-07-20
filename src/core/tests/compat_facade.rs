@@ -38,16 +38,22 @@ fn common_compatibility_paths_remain_public() {
 fn service_compatibility_paths_remain_public() {
     assert_public_type::<service::alerts::alert::AlertError>();
     assert_public_type::<service::dashboards::DashboardError>();
+    assert_public_type::<service::dashboards::reports::ReportError>();
     assert_public_type::<service::db::scheduler::Trigger>();
     assert_public_type::<service::ingestion_types::IngestionRequest>();
     assert_public_type::<service::pipeline::batch_execution::ExecutablePipeline>();
     assert_public_type::<service::search::Searcher>();
 
     let _ = service::compact::run_retention;
+    let _ = service::compact::incremental::incr_pending_file;
     let _ = service::db::compact::retention::is_deleting_stream;
+    let _ = service::db::compact::files::get_offset;
+    let _ = service::db::dashboards::dashboard_in_org;
     let _ = service::db::file_list::local::exist_pending_delete;
     let _ = service::db::scheduler::update_cron_expression;
+    let _ = service::dashboards::timed_annotations::get_timed_annotations;
     let _ = service::ingestion::apply_vrl_fn;
     let _ = service::ingestion::ingestion_service::ingest;
     let _ = service::search::search;
+    let _ = service::short_url::shorten;
 }

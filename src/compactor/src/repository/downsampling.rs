@@ -17,39 +17,43 @@ use std::sync::LazyLock as Lazy;
 
 use config::{RwAHashMap, cluster::LOCAL_NODE, meta::stream::StreamType};
 
-use crate::service::db;
+use crate::metadata as db;
 
 static CACHES: Lazy<RwAHashMap<String, (i64, String)>> = Lazy::new(Default::default);
 
-fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str) -> String {
-    format!("/compact/files/{org_id}/{stream_type}/{stream_name}")
+fn mk_key(org_id: &str, stream_type: StreamType, stream_name: &str, rule: (i64, i64)) -> String {
+    let (offset, step) = rule;
+    format!("/compact/downsampling/{org_id}/{stream_type}/{stream_name}/{offset}/{step}")
 }
 
 pub async fn get_offset_from_cache(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    rule: (i64, i64),
 ) -> Option<(i64, String)> {
-    let key = mk_key(org_id, stream_type, stream_name);
+    let key = mk_key(org_id, stream_type, stream_name, rule);
     let r = CACHES.read().await;
     r.get(&key).cloned()
 }
 
-pub async fn get_offset(org_id: &str, stream_type: StreamType, stream_name: &str) -> (i64, String) {
-    let key = mk_key(org_id, stream_type, stream_name);
+pub async fn get_offset(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    rule: (i64, i64),
+) -> (i64, String) {
+    let key = mk_key(org_id, stream_type, stream_name, rule);
     let r = CACHES.read().await;
     if let Some(val) = r.get(&key) {
         return val.clone();
     }
     drop(r);
 
-    let mut value = match db::get(&key).await {
+    let value = match db::get(&key).await {
         Ok(ret) => String::from_utf8_lossy(&ret).to_string(),
         Err(_) => String::from("0"),
     };
-    if value.is_empty() {
-        value = String::from("0");
-    }
     let (offset, node) = if value.contains(';') {
         let mut parts = value.split(';');
         let offset: i64 = parts.next().unwrap().parse().unwrap();
@@ -71,10 +75,11 @@ pub async fn set_offset(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    rule: (i64, i64),
     offset: i64,
     node: Option<&str>,
 ) -> Result<(), anyhow::Error> {
-    let key = mk_key(org_id, stream_type, stream_name);
+    let key = mk_key(org_id, stream_type, stream_name, rule);
     let Some(node) = node else {
         // release this key from this node
         db::put(&key, offset.to_string().into(), db::NO_NEED_WATCH, None).await?;
@@ -95,8 +100,9 @@ pub async fn del_offset(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    rule: (i64, i64),
 ) -> Result<(), anyhow::Error> {
-    let key = mk_key(org_id, stream_type, stream_name);
+    let key = mk_key(org_id, stream_type, stream_name, rule);
     let mut w = CACHES.write().await;
     w.remove(&key);
     drop(w);
@@ -105,25 +111,9 @@ pub async fn del_offset(
         .map_err(Into::into)
 }
 
-pub async fn reset_offset(time: i64, stream: Option<&str>) -> Result<u64, anyhow::Error> {
-    let prefix = match stream {
-        Some(s) => format!("/compact/files/{s}"),
-        None => "/compact/files/".to_string(),
-    };
-    let ret = db::list(&prefix).await?;
-    let count = ret.len() as u64;
-    for key in ret.keys() {
-        db::put(key, time.to_string().into(), db::NO_NEED_WATCH, None).await?;
-    }
-    let mut w = CACHES.write().await;
-    w.clear();
-    drop(w);
-    Ok(count)
-}
-
 pub async fn list_offset() -> Result<Vec<(String, i64)>, anyhow::Error> {
     let mut items = Vec::new();
-    let key = "/compact/files/";
+    let key = "/compact/downsampling/";
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
@@ -160,23 +150,25 @@ mod tests {
 
     #[test]
     fn test_mk_key_format() {
-        let key = mk_key("myorg", StreamType::Logs, "app_logs");
-        assert_eq!(key, "/compact/files/myorg/logs/app_logs");
+        let key = mk_key("myorg", StreamType::Metrics, "cpu_usage", (0, 100));
+        assert_eq!(key, "/compact/downsampling/myorg/metrics/cpu_usage/0/100");
     }
 
     #[test]
-    fn test_mk_key_metrics_stream() {
-        let key = mk_key("org1", StreamType::Metrics, "cpu_usage");
-        assert_eq!(key, "/compact/files/org1/metrics/cpu_usage");
+    fn test_mk_key_different_stream_types() {
+        let key = mk_key("org1", StreamType::Logs, "app_logs", (50, 200));
+        assert_eq!(key, "/compact/downsampling/org1/logs/app_logs/50/200");
     }
 
     #[tokio::test]
-    async fn test_compact_files() {
+    #[ignore = "requires an initialized metadata database"]
+    async fn test_downsampling() {
         const OFFSET: i64 = 100;
         set_offset(
             "default",
-            "logs".into(),
+            StreamType::Metrics,
             "compact_file",
+            (0, 100),
             OFFSET,
             Some("LOCAL"),
         )
@@ -184,7 +176,7 @@ mod tests {
         .unwrap();
         sync_cache_to_db().await.unwrap();
         assert_eq!(
-            get_offset("default", "logs".into(), "compact_file").await,
+            get_offset("default", StreamType::Metrics, "compact_file", (0, 100)).await,
             (OFFSET, "LOCAL".to_string())
         );
         assert!(!list_offset().await.unwrap().is_empty());

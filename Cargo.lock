@@ -6727,11 +6727,29 @@ dependencies = [
 name = "openobserve-catalog"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "config",
  "dashmap",
  "hashbrown 0.16.1",
  "infra",
  "ingester",
+ "tokio",
+]
+
+[[package]]
+name = "openobserve-compactor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "config",
+ "hashbrown 0.16.1",
+ "infra",
+ "ingester",
+ "log",
+ "o2_enterprise",
+ "openobserve-catalog",
  "tokio",
 ]
 
@@ -6751,7 +6769,6 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "bytes",
- "chromiumoxide",
  "chrono",
  "common",
  "config",
@@ -6785,6 +6802,9 @@ dependencies = [
  "o2_openfga",
  "object_store",
  "openobserve-catalog",
+ "openobserve-compactor",
+ "openobserve-dashboards",
+ "openobserve-reports",
  "openobserve-scheduler",
  "openobserve-self-reporting",
  "openobserve-transform",
@@ -6834,6 +6854,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-dashboards"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "common",
+ "config",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-catalog",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "openobserve-jobs"
 version = "0.1.0"
 dependencies = [
@@ -6862,6 +6903,33 @@ dependencies = [
  "tokio",
  "tonic",
  "wal",
+]
+
+[[package]]
+name = "openobserve-reports"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "bytes",
+ "chromiumoxide",
+ "chrono",
+ "common",
+ "config",
+ "cron",
+ "futures",
+ "infra",
+ "itertools 0.14.0",
+ "lettre",
+ "log",
+ "o2_enterprise",
+ "openobserve-scheduler",
+ "reqwest 0.13.2",
+ "sea-orm",
+ "thiserror 2.0.18",
+ "tokio",
+ "url",
 ]
 
 [[package]]

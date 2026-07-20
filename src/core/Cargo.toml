@@ -22,6 +22,9 @@ enterprise = [
     "search/enterprise",
     "openobserve-transform/enterprise",
     "openobserve-scheduler/enterprise",
+    "openobserve-compactor/enterprise",
+    "openobserve-dashboards/enterprise",
+    "openobserve-reports/enterprise",
 ]
 cloud = [
     "infra/cloud",
@@ -41,6 +44,9 @@ vortex = [
 common.workspace = true
 openobserve-transform.workspace = true
 openobserve-scheduler.workspace = true
+openobserve-compactor.workspace = true
+openobserve-dashboards.workspace = true
+openobserve-reports.workspace = true
 openobserve-self-reporting.workspace = true
 openobserve-catalog.workspace = true
 promql.workspace = true
@@ -119,7 +125,6 @@ config.workspace = true
 infra.workspace = true
 ingester.workspace = true
 wal.workspace = true
-chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
 tantivy_utils.workspace = true
