@@ -78,7 +78,7 @@ use proto::cluster_rpc::{
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
 };
-use tokio::{net::TcpListener, sync::oneshot};
+use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataMap, MetadataValue},
@@ -735,13 +735,22 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             .await?;
     } else {
         // Non-TLS server
-        let listener = TcpListener::bind(haddr).await?;
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+        let handle = axum_server::Handle::new();
+        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
+
+        // Spawn task to handle shutdown signal
+        tokio::spawn({
+            let handle = handle.clone();
+            async move {
+                shutdown_signal().await;
+                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
+            }
+        });
+
+        axum_server::bind(haddr)
+            .handle(handle)
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .await?;
     }
 
     Ok(())
@@ -813,13 +822,22 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
             .await?;
     } else {
         // Non-TLS server
-        let listener = TcpListener::bind(haddr).await?;
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+        let handle = axum_server::Handle::new();
+        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
+
+        // Spawn task to handle shutdown signal
+        tokio::spawn({
+            let handle = handle.clone();
+            async move {
+                shutdown_signal().await;
+                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
+            }
+        });
+
+        axum_server::bind(haddr)
+            .handle(handle)
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .await?;
     }
 
     Ok(())
@@ -1456,13 +1474,22 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
             .await?;
     } else {
         // Non-TLS server
-        let listener = TcpListener::bind(haddr).await?;
-        axum::serve(
-            listener,
-            app.into_make_service_with_connect_info::<SocketAddr>(),
-        )
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+        let handle = axum_server::Handle::new();
+        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
+
+        // Spawn task to handle shutdown signal
+        tokio::spawn({
+            let handle = handle.clone();
+            async move {
+                shutdown_signal().await;
+                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
+            }
+        });
+
+        axum_server::bind(haddr)
+            .handle(handle)
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .await?;
     }
 
     log::info!("HTTP server stopped");
