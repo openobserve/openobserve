@@ -15,9 +15,15 @@
 
 use std::{path::Path, sync::Arc};
 
+use ::search::{
+    datafusion::table_provider::memtable::NewMemTable,
+    index::IndexCondition,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+};
 use arrow::array::{ArrayRef, new_null_array};
 use arrow_schema::{DataType, Field};
 use chrono::DateTime;
+use common::infra::wal;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -49,18 +55,8 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::{
-    common::infra::wal,
-    service::{
-        file_list,
-        search::{
-            datafusion::table_provider::memtable::NewMemTable,
-            generate_filter_from_equal_items, generate_search_schema_diff,
-            index::IndexCondition,
-            inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-            match_source,
-        },
-    },
+use crate::query_utils::{
+    generate_filter_from_equal_items, generate_search_schema_diff, match_source,
 };
 
 /// search in local WAL, which haven't been sync to object storage
@@ -159,7 +155,11 @@ pub async fn search_parquet(
         return Ok((vec![], scan_stats, HashSet::new()));
     }
 
-    let scan_stats = match file_list::calculate_files_size(&files).await {
+    let scan_stats = match crate::grpc_runtime()
+        .map_err(|e| Error::Message(e.to_string()))?
+        .calculate_files_size(&files)
+        .await
+    {
         Ok(size) => size,
         Err(err) => {
             // release all files

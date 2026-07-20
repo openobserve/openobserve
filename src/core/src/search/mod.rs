@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
-use arrow_schema::{DataType, Field, Schema};
 use chrono::Utc;
 use config::{
     TIMESTAMP_COL_NAME,
@@ -28,12 +28,13 @@ use config::{
         search::{self},
         self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, resolve_stream_names},
-        stream::{FileKey, StreamParams, StreamPartition, StreamType},
+        stream::StreamType,
     },
-    utils::{base64, json, schema::filter_source_by_partition_key, time::now_micros},
+    utils::{base64, json, time::now_micros},
 };
-use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes};
+use infra::errors::Error;
+#[cfg(feature = "enterprise")]
+use infra::errors::ErrorCodes;
 #[cfg(feature = "enterprise")]
 use openobserve_search_service::SEARCH_SERVER;
 use openobserve_search_service::partition::{
@@ -41,6 +42,8 @@ use openobserve_search_service::partition::{
     generate_partitions_for_context, sql_context::PartitionSqlContext,
     stream_files::collect_stream_files,
 };
+#[cfg(feature = "enterprise")]
+use openobserve_search_service::query_utils::server_internal_error;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::SearchQuery;
 use sql::Sql;
@@ -65,7 +68,6 @@ use crate::{
 };
 
 pub mod cluster;
-pub mod grpc;
 pub mod grpc_search;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
@@ -203,6 +205,34 @@ impl openobserve_search_service::partition::PartitionRuntime for CoreSearchRunti
 
 #[async_trait::async_trait]
 impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
+    async fn query_file_keys_by_ids(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: Option<(i64, i64)>,
+        ids: &[i64],
+    ) -> Result<Vec<config::meta::stream::FileKey>, Error> {
+        crate::file_list::query_by_ids(trace_id, org_id, stream_type, stream_name, time_range, ids)
+            .await
+    }
+
+    async fn calculate_files_size(
+        &self,
+        files: &[config::meta::stream::FileKey],
+    ) -> Result<search::ScanStats, Error> {
+        crate::file_list::calculate_files_size(files).await
+    }
+
+    async fn tantivy_index_updated_at(&self) -> i64 {
+        crate::db::metas::tantivy_index::get_ttv_timestamp_updated_at().await
+    }
+
+    async fn tantivy_secondary_index_updated_at(&self) -> i64 {
+        crate::db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await
+    }
+
     async fn cached_search(
         &self,
         trace_id: &str,
@@ -1105,111 +1135,6 @@ pub async fn cancel_query(
     })
 }
 
-/// match a source is a valid file or not
-#[allow(clippy::too_many_arguments)]
-pub async fn match_file(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    time_range: Option<(i64, i64)>,
-    source: &FileKey,
-    partition_keys: &[StreamPartition],
-    equal_items: &[(String, String)],
-) -> bool {
-    // fast path
-    if partition_keys.is_empty()
-        || !source.key.contains('=')
-        || stream_type == StreamType::EnrichmentTables
-    {
-        return true;
-    }
-
-    // slow path
-    let mut filters = generate_filter_from_equal_items(equal_items);
-    let partition_keys: HashMap<&String, &StreamPartition> =
-        partition_keys.iter().map(|v| (&v.field, v)).collect();
-    for (key, value) in filters.iter_mut() {
-        if let Some(partition_key) = partition_keys.get(key) {
-            for val in value.iter_mut() {
-                *val = partition_key.get_partition_value(val);
-            }
-        }
-    }
-    match_source(
-        Arc::new(StreamParams::new(org_id, stream_name, stream_type)),
-        time_range,
-        &filters,
-        source,
-    )
-    .await
-}
-
-/// before [("a", "3"), ("b", "5"), ("a", "4"), ("b", "6")]
-/// after [("a", ["3", "4"]), ("b", ["5", "6"])]
-pub fn generate_filter_from_equal_items(
-    equal_items: &[(String, String)],
-) -> Vec<(String, Vec<String>)> {
-    let mut filters: HashMap<String, Vec<String>> = HashMap::new();
-    for (field, value) in equal_items {
-        filters
-            .entry(field.to_string())
-            .or_default()
-            .push(value.to_string());
-    }
-    filters.into_iter().collect()
-}
-
-/// match a source is a valid file or not
-pub async fn match_source(
-    stream: Arc<StreamParams>,
-    time_range: Option<(i64, i64)>,
-    filters: &[(String, Vec<String>)],
-    source: &FileKey,
-) -> bool {
-    // match org_id & table
-    if !source.key.starts_with(
-        format!(
-            "files/{}/{}/{}/",
-            stream.org_id, stream.stream_type, stream.stream_name
-        )
-        .as_str(),
-    ) {
-        return false;
-    }
-
-    // check partition key
-    if !filter_source_by_partition_key(&source.key, filters) {
-        return false;
-    }
-
-    // check time range
-    if source.meta.min_ts == 0 || source.meta.max_ts == 0 {
-        return true;
-    }
-    log::trace!(
-        "time range: {:?}, file time: {}-{}, {}",
-        time_range,
-        source.meta.min_ts,
-        source.meta.max_ts,
-        source.key
-    );
-
-    // match partition clause
-    if let Some((time_min, time_max)) = time_range {
-        if time_min > 0 && time_min > source.meta.max_ts {
-            return false;
-        }
-        if time_max > 0 && time_max < source.meta.min_ts {
-            return false;
-        }
-    }
-    true
-}
-
-pub fn server_internal_error(error: impl ToString) -> Error {
-    Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
-}
-
 #[tracing::instrument(name = "service:search_partition_multi", skip(req))]
 pub async fn search_partition_multi(
     trace_id: &str,
@@ -1264,25 +1189,6 @@ pub async fn search_partition_multi(
     Ok(res)
 }
 
-// generate parquet file search schema
-pub fn generate_search_schema_diff(
-    schema: &Schema,
-    latest_schema_map: &HashMap<&String, &Arc<Field>>,
-) -> HashMap<String, DataType> {
-    // calculate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
-
-    for field in schema.fields().iter() {
-        if let Some(latest_field) = latest_schema_map.get(field.name())
-            && field.data_type() != latest_field.data_type()
-        {
-            diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
-        }
-    }
-
-    diff_fields
-}
-
 #[inline]
 pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), Error> {
     #[cfg(feature = "enterprise")]
@@ -1307,100 +1213,7 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use arrow_schema::{DataType, Field, Schema};
-    use hashbrown::HashMap;
-
     use super::*;
-
-    #[test]
-    fn test_generate_filter_from_equal_items_empty() {
-        let result = generate_filter_from_equal_items(&[]);
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_generate_filter_from_equal_items_single_pair() {
-        let items = vec![("field1".to_string(), "val1".to_string())];
-        let result = generate_filter_from_equal_items(&items);
-        assert_eq!(result.len(), 1);
-        let (field, values) = &result[0];
-        assert_eq!(field, "field1");
-        assert_eq!(values, &["val1"]);
-    }
-
-    #[test]
-    fn test_generate_filter_from_equal_items_groups_by_field() {
-        let items = vec![
-            ("a".to_string(), "3".to_string()),
-            ("b".to_string(), "5".to_string()),
-            ("a".to_string(), "4".to_string()),
-            ("b".to_string(), "6".to_string()),
-        ];
-        let mut result = generate_filter_from_equal_items(&items);
-        result.sort_by(|x, y| x.0.cmp(&y.0));
-        assert_eq!(result.len(), 2);
-        let (_, a_vals) = result.iter().find(|(f, _)| f == "a").unwrap();
-        let mut a_vals = a_vals.clone();
-        a_vals.sort();
-        assert_eq!(a_vals, vec!["3", "4"]);
-        let (_, b_vals) = result.iter().find(|(f, _)| f == "b").unwrap();
-        let mut b_vals = b_vals.clone();
-        b_vals.sort();
-        assert_eq!(b_vals, vec!["5", "6"]);
-    }
-
-    #[test]
-    fn test_generate_filter_from_equal_items_single_field_multiple_values() {
-        let items = vec![
-            ("status".to_string(), "200".to_string()),
-            ("status".to_string(), "404".to_string()),
-            ("status".to_string(), "500".to_string()),
-        ];
-        let result = generate_filter_from_equal_items(&items);
-        assert_eq!(result.len(), 1);
-        let (_, values) = &result[0];
-        let mut v = values.clone();
-        v.sort();
-        assert_eq!(v, vec!["200", "404", "500"]);
-    }
-
-    #[test]
-    fn test_generate_search_schema_diff_no_diff() {
-        let field = Arc::new(Field::new("col1", DataType::Utf8, false));
-        let schema = Schema::new(vec![field.clone()]);
-        let map: HashMap<&String, &Arc<Field>> = [(field.name(), &field)].into_iter().collect();
-        let diff = generate_search_schema_diff(&schema, &map);
-        assert!(diff.is_empty());
-    }
-
-    #[test]
-    fn test_generate_search_schema_diff_detects_type_change() {
-        let old_field = Arc::new(Field::new("col1", DataType::Utf8, false));
-        let new_field = Arc::new(Field::new("col1", DataType::Int64, false));
-        let schema = Schema::new(vec![old_field.clone()]);
-        let map: HashMap<&String, &Arc<Field>> =
-            [(new_field.name(), &new_field)].into_iter().collect();
-        let diff = generate_search_schema_diff(&schema, &map);
-        assert_eq!(diff.len(), 1);
-        assert_eq!(diff.get("col1").unwrap(), &DataType::Int64);
-    }
-
-    #[test]
-    fn test_generate_search_schema_diff_missing_in_latest() {
-        let field = Arc::new(Field::new("col1", DataType::Utf8, false));
-        let schema = Schema::new(vec![field]);
-        let map: HashMap<&String, &Arc<Field>> = HashMap::new();
-        let diff = generate_search_schema_diff(&schema, &map);
-        assert!(diff.is_empty());
-    }
-
-    #[test]
-    fn test_server_internal_error_contains_message() {
-        let err = server_internal_error("disk full");
-        assert!(err.to_string().contains("disk full"));
-    }
 
     #[test]
     fn test_check_search_allowed_non_enterprise_always_ok() {

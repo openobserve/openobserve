@@ -35,6 +35,13 @@ use infra::{
     schema::{get_partition_time_level, get_stream_setting_index_fields, unwrap_stream_settings},
 };
 use itertools::Itertools;
+use openobserve_search_service::{
+    grpc::{
+        QueryParams,
+        storage::{cache_files, calc_target_partitions, tantivy_search},
+    },
+    query_utils::match_source,
+};
 use promql_parser::label::{MatchOp, Matchers};
 use tracing::Instrument;
 
@@ -43,12 +50,7 @@ use crate::{
     promql::search::grpc::Context,
     search::{
         datafusion::exec::register_metrics_table,
-        grpc::{
-            QueryParams,
-            storage::{cache_files, calc_target_partitions, tantivy_search},
-        },
         index::{Condition, IndexCondition},
-        match_source,
     },
 };
 

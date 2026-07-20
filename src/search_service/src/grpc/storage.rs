@@ -15,7 +15,15 @@
 
 use std::sync::Arc;
 
-pub use ::search::file_cache::{cache_files, calc_target_partitions};
+use ::search::{
+    bloom_pruner,
+    index::IndexCondition,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+};
+pub use ::search::{
+    file_cache::{cache_files, calc_target_partitions},
+    tantivy::tantivy_search,
+};
 use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE,
@@ -36,16 +44,6 @@ use infra::{
 };
 use itertools::Itertools;
 use tracing::Instrument;
-
-pub use crate::search::tantivy::tantivy_search;
-use crate::{
-    file_list,
-    search::{
-        bloom_pruner,
-        index::IndexCondition,
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    },
-};
 
 /// search in remote object storage
 #[tracing::instrument(name = "service:search:grpc:storage", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
@@ -154,7 +152,11 @@ pub async fn search(
     }
 
     let cfg = get_config();
-    let mut scan_stats = match file_list::calculate_files_size(&files).await {
+    let mut scan_stats = match crate::grpc_runtime()
+        .map_err(|e| Error::Message(e.to_string()))?
+        .calculate_files_size(&files)
+        .await
+    {
         Ok(size) => size,
         Err(err) => {
             log::error!("[trace_id {trace_id}] calculate files size error: {err}",);

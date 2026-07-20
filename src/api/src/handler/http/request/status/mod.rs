@@ -46,6 +46,7 @@ use infra::{
         STREAM_STATS_EXISTS,
     },
 };
+use openobserve_search_service::grpc::tantivy_result_cache;
 use serde::Serialize;
 use time;
 use utoipa::ToSchema;
@@ -86,10 +87,7 @@ use crate::{
     handler::http::extractors::Headers,
     service::{
         db,
-        search::{
-            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-            grpc::tantivy_result_cache,
-        },
+        search::datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
     },
 };
 

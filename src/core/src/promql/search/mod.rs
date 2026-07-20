@@ -40,6 +40,7 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
     runtime::DATAFUSION_RUNTIME,
 };
+use openobserve_search_service::query_utils::server_internal_error;
 use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 #[cfg(feature = "enterprise")]
@@ -49,10 +50,7 @@ use {
     openobserve_search_service::SEARCH_SERVER,
 };
 
-use crate::{
-    promql::MetricsQueryRequest, search::server_internal_error,
-    self_reporting::report_request_usage_stats,
-};
+use crate::{promql::MetricsQueryRequest, self_reporting::report_request_usage_stats};
 
 mod cache {
     pub use openobserve_search_service::promql::cache::*;

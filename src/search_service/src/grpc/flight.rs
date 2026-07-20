@@ -19,6 +19,22 @@ use ::datafusion::{
     common::tree_node::TreeNode, datasource::TableProvider, physical_plan::ExecutionPlan,
     prelude::SessionContext,
 };
+use ::search::{
+    datafusion::{
+        distributed_plan::{
+            NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
+            rewrite::aggregate_optimize_rewrite,
+        },
+        exec::{DataFusionContextBuilder, register_udf},
+        optimizer::physical_optimizer::{
+            index::IndexRule, index_optimizer::FollowerIndexOptimizerRule,
+            rewrite_match::RewriteMatchPhysical,
+        },
+        table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
+    },
+    index::IndexCondition,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+};
 use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE,
@@ -54,27 +70,8 @@ use o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_fi
 use parking_lot::Mutex;
 use rayon::slice::ParallelSliceMut;
 
-use crate::{
-    db,
-    search::{
-        datafusion::{
-            distributed_plan::{
-                NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
-                rewrite::aggregate_optimize_rewrite,
-            },
-            exec::{DataFusionContextBuilder, register_udf},
-            optimizer::physical_optimizer::{
-                index::IndexRule, index_optimizer::FollowerIndexOptimizerRule,
-                rewrite_match::RewriteMatchPhysical,
-            },
-            table_provider::{enrich_table::EnrichTable, uniontable::NewUnionTable},
-        },
-        grpc::QueryParams,
-        index::IndexCondition,
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        match_file,
-    },
-};
+use super::QueryParams;
+use crate::query_utils::match_file;
 
 #[tracing::instrument(name = "service:search:grpc:flight:do_get::search", skip_all, fields(org_id = req.query_identifier.org_id))]
 pub async fn search(
@@ -339,7 +336,7 @@ pub async fn search(
             Ok(v) => v,
             Err(e) => {
                 // clear session data
-                super::super::datafusion::storage::file_list::clear(&trace_id);
+                ::search::datafusion::storage::file_list::clear(&trace_id);
                 log::error!(
                     "[trace_id {trace_id}] flight->search: search storage parquet error: {e}"
                 );
@@ -411,7 +408,7 @@ pub async fn search(
             Ok(v) => v,
             Err(e) => {
                 // clear session data
-                super::super::datafusion::storage::file_list::clear(&trace_id);
+                ::search::datafusion::storage::file_list::clear(&trace_id);
                 log::error!("[trace_id {trace_id}] flight->search: search wal parquet error: {e}");
                 return Err(e);
             }
@@ -692,9 +689,10 @@ async fn get_file_list_by_ids(
         .await
         .unwrap_or_default();
     let partition_keys = stream_settings.partition_keys;
-    let file_list =
-        crate::file_list::query_by_ids(trace_id, org_id, stream_type, stream_name, time_range, ids)
-            .await?;
+    let file_list = crate::grpc_runtime()
+        .map_err(|e| Error::Message(e.to_string()))?
+        .query_file_keys_by_ids(trace_id, org_id, stream_type, stream_name, time_range, ids)
+        .await?;
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
@@ -769,15 +767,26 @@ async fn update_index_updated_at(
     idx_optimize_rule: &Option<IndexOptimizeMode>,
     index_updated_at: i64,
 ) -> i64 {
-    let ttv_timestamp_updated_at = db::metas::tantivy_index::get_ttv_timestamp_updated_at().await;
+    let ttv_timestamp_updated_at = match crate::grpc_runtime() {
+        Ok(runtime) => runtime.tantivy_index_updated_at().await,
+        Err(error) => {
+            log::error!("failed to load Tantivy index watermark: {error}");
+            0
+        }
+    };
     let index_updated_at = index_updated_at.max(ttv_timestamp_updated_at);
 
     if matches!(
         idx_optimize_rule,
         Some(IndexOptimizeMode::SimpleTopN(..)) | Some(IndexOptimizeMode::SimpleMultiHistogram(..))
     ) {
-        let ttv_secondary_index_updated_at =
-            db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await;
+        let ttv_secondary_index_updated_at = match crate::grpc_runtime() {
+            Ok(runtime) => runtime.tantivy_secondary_index_updated_at().await,
+            Err(error) => {
+                log::error!("failed to load Tantivy secondary-index watermark: {error}");
+                0
+            }
+        };
         return index_updated_at.max(ttv_secondary_index_updated_at);
     }
 
@@ -813,6 +822,13 @@ fn collect_stats(files: &[FileKey]) -> ScanStats {
 mod tests {
     use std::sync::Arc;
 
+    use ::search::{
+        datafusion::{
+            optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram,
+            table_provider::empty_table::NewEmptyTable, udf::histogram_udf,
+        },
+        index::Condition,
+    };
     use arrow_schema::{DataType, Field, Schema};
     use config::meta::stream::{FileKey, FileMeta};
     use datafusion::{
@@ -821,13 +837,6 @@ mod tests {
     };
 
     use super::*;
-    use crate::search::{
-        datafusion::{
-            optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram,
-            table_provider::empty_table::NewEmptyTable, udf::histogram_udf,
-        },
-        index::Condition,
-    };
 
     fn make_file(min_ts: i64, max_ts: i64, index_size: i64) -> FileKey {
         FileKey {

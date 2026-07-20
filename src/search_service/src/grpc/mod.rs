@@ -15,20 +15,19 @@
 
 use std::sync::Arc;
 
+use ::search::{datafusion::exec::TableBuilder, index::IndexCondition};
 use arrow_schema::Schema;
 use config::meta::{search::ScanStats, stream::FileKey};
 use datafusion::{datasource::TableProvider, execution::cache::cache_manager::FileStatisticsCache};
 use hashbrown::HashSet;
 use infra::errors::Result;
 
-use super::{datafusion::exec::TableBuilder, index::IndexCondition};
-
 pub mod flight;
 pub mod storage;
 pub mod wal;
-pub use ::search::{file_cache::calc_target_partitions, types::QueryParams};
-
-pub use super::tantivy::cache as tantivy_result_cache;
+pub use ::search::{
+    file_cache::calc_target_partitions, tantivy::cache as tantivy_result_cache, types::QueryParams,
+};
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, HashSet<u64>)>;
 

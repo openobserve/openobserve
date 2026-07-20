@@ -25,11 +25,13 @@ use infra::errors::Error;
 
 pub mod cache;
 pub mod cardinality;
+pub mod grpc;
 pub mod grpc_server;
 #[cfg(feature = "enterprise")]
 pub mod jobs;
 pub mod partition;
 pub mod promql;
+pub mod query_utils;
 pub mod repository;
 mod searcher;
 pub mod streaming;
@@ -41,6 +43,25 @@ pub static SEARCH_SERVER: LazyLock<Searcher> = LazyLock::new(Searcher::new);
 
 #[async_trait::async_trait]
 pub trait GrpcRuntime: Send + Sync {
+    async fn query_file_keys_by_ids(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_range: Option<(i64, i64)>,
+        ids: &[i64],
+    ) -> Result<Vec<config::meta::stream::FileKey>, Error>;
+
+    async fn calculate_files_size(
+        &self,
+        files: &[config::meta::stream::FileKey],
+    ) -> Result<search::ScanStats, Error>;
+
+    async fn tantivy_index_updated_at(&self) -> i64;
+
+    async fn tantivy_secondary_index_updated_at(&self) -> i64;
+
     async fn cached_search(
         &self,
         trace_id: &str,

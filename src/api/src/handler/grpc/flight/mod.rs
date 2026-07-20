@@ -31,7 +31,7 @@ use datafusion::{
 use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
-use openobserve_search_service::work_group::DeferredLock;
+use openobserve_search_service::{grpc::flight as grpcFlight, work_group::DeferredLock};
 use prost::Message;
 use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
@@ -53,10 +53,7 @@ use crate::{
             },
         },
     },
-    service::search::{
-        grpc::flight as grpcFlight,
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    },
+    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
 mod partition_encoder;

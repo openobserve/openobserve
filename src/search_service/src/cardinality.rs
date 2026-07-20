@@ -501,9 +501,6 @@ mod tests {
         // Use unique test keys to avoid conflicts with other tests
         let test_prefix = format!("test_get_cache_stats_{}", now_micros());
 
-        // Get initial cache state (there might be entries from other tests)
-        let (initial_total, initial_expired) = get_cache_stats().await;
-
         let now = now_micros();
 
         // Add some fresh entries with unique keys
@@ -537,15 +534,17 @@ mod tests {
         };
         CARDINALITY_CACHE.insert(expired_key2.clone(), expired_entry2);
 
-        // Check cache stats - should have added 4 entries (2 fresh + 2 expired)
+        // Check that the cache includes this test's entries. Other tests share the global cache
+        // and can remove their own entries concurrently, so comparing two global snapshots is
+        // inherently racy.
         let (total, expired) = get_cache_stats().await;
         assert!(
-            total >= initial_total + 4,
-            "Total entries should be initial_total + 4, but got total={total}, initial_total={initial_total}"
+            total >= 4,
+            "Total entries should include this test's 4 entries, but got total={total}"
         );
         assert!(
-            expired >= initial_expired + 2,
-            "Expired entries should be initial_expired + 2, but got expired={expired}, initial_expired={initial_expired}"
+            expired >= 2,
+            "Expired entries should include this test's 2 entries, but got expired={expired}"
         );
 
         // Add one more fresh entry
@@ -559,12 +558,12 @@ mod tests {
         // Check cache stats again - should have added 1 more fresh entry
         let (total, expired) = get_cache_stats().await;
         assert!(
-            total >= initial_total + 5,
-            "Total entries should be initial_total + 5, but got total={total}, initial_total={initial_total}"
+            total >= 5,
+            "Total entries should include this test's 5 entries, but got total={total}"
         );
         assert!(
-            expired >= initial_expired + 2,
-            "Expired entries should be initial_expired + 2, but got expired={expired}, initial_expired={initial_expired}"
+            expired >= 2,
+            "Expired entries should include this test's 2 expired entries, but got expired={expired}"
         );
 
         // Clean up test entries
