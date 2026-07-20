@@ -37,7 +37,7 @@
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="absolute top-7.5 left-1.25">
+              <div class="absolute top-7.5 left-1.25 text-text-secondary">
                 <SubTaskArrow />
               </div>
             </div>
