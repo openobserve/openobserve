@@ -196,6 +196,7 @@ pub async fn exec(
                     &f.key,
                     f.meta.compressed_size,
                     f.meta.max_ts,
+                    f.meta.records,
                 )
             })
             .collect_vec(),
