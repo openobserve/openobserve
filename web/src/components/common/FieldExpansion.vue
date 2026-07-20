@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OFieldRow>
     </template>
 
-    <div class="pl-4 pr-0 py-0">
+    <div class="pl-4 pr-2 py-0">
         <slot name="body">
           <FieldValuesPanel
             ref="fieldValuesPanelRef"
