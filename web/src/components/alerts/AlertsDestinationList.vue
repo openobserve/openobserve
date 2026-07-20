@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </div>
     </PageLayout>
-    <div v-else-if="showDestinationEditor && !showImportDestination">
+    <div v-else-if="showDestinationEditor && !showImportDestination" class="flex-1 min-h-0">
       <AddDestination
         :is-alerts="true"
         :destination="editingDestination"

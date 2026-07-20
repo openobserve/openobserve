@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <PageLayout
-    class="overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))] h-[calc(100vh-3rem)]! min-h-[inherit]"
+    class="overflow-hidden"
     :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
     title-data-test="add-template-title"
     :back="{
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <OSplitter class="h-[calc(100vh-6.625rem)]"
+    <OSplitter class="h-full"
       v-model="splitterModel"
       unit="%"
       :horizontal="false"

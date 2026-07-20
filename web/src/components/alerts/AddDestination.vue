@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <PageLayout
-    class="overflow-hidden [background:linear-gradient(to_bottom_right,var(--color-theme-body-bg-primary),var(--color-theme-body-bg-secondary))] h-[calc(100vh-3rem)]! min-h-[inherit]"
+    class="overflow-hidden"
     :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
     title-data-test="add-destination-title"
     :back="{

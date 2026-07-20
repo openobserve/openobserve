@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTable>
       </div>
     </PageLayout>
-    <div v-else-if="!showImportTemplate && showTemplateEditor">
+    <div v-else-if="!showImportTemplate && showTemplateEditor" class="flex-1 min-h-0">
       <AddTemplate
         :template="editingTemplate"
         :is-clone="cloningTemplate"
