@@ -185,8 +185,7 @@ pub async fn remote_write(
         if let Some(name_label) = event.labels.iter().find(|l| l.name == NAME_LABEL) {
             let metric_name = format_stream_name(name_label.value.to_string());
             if !event.histograms.is_empty() {
-                // native histograms degrade into classic histogram streams (see the
-                // `event.histograms` loop below), so preload those streams too
+                // native histograms degrade into classic streams; preload those too
                 for suffix in CLASSIC_HISTOGRAM_SUFFIXES {
                     unique_metrics.insert(format!("{metric_name}{suffix}"));
                 }
@@ -304,9 +303,8 @@ pub async fn remote_write(
         // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
         // before the loop to avoid repeated async queries
 
-        // HA leader election decides whether this replica's request is accepted at all. It
-        // runs on the first timeseries that carries any data -- checking `samples` alone
-        // would never elect for a request that carries only native histograms.
+        // HA leader election runs on the first timeseries carrying any data --
+        // checking `samples` alone would never elect for a histogram-only request
         if first_line
             && dedup_enabled
             && !cluster_name.is_empty()
@@ -397,11 +395,8 @@ pub async fn remote_write(
             );
         }
 
-        // parse native histograms: there is no native storage or query support yet, so
-        // each native histogram sample degrades into its classic representation --
-        // `_count`, `_sum` and cumulative `le` `_bucket` records, the same shape the
-        // OTLP exponential-histogram path writes -- so existing PromQL
-        // (histogram_quantile etc.) works on it unchanged.
+        // native histograms degrade into classic `_count`/`_sum`/`le` `_bucket`
+        // records so existing PromQL works on them unchanged
         for hp in &event.histograms {
             sample_count += 1;
             let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);

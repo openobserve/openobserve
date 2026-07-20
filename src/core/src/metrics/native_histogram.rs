@@ -13,45 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Degrades Prometheus native (sparse) histograms into their classic representation.
+//! Degrades Prometheus native (sparse) histograms into their classic representation:
+//! `_count`, `_sum` and cumulative `le` `_bucket` records, so existing PromQL
+//! (`histogram_quantile` etc.) works on them unchanged.
 //!
-//! There is no native histogram storage or query support yet, so a remote-write native
-//! histogram sample becomes `_count`, `_sum` and cumulative `le` `_bucket` records --
-//! the same shape the OTLP exponential-histogram path writes -- so existing PromQL
-//! (`histogram_quantile` etc.) works on it unchanged.
-//!
-//! Known limitation, inherited from classic-histogram semantics: `sum by (le)`
-//! aggregation is only sound across series that share a bucket layout. Each native
-//! series carries `le`s only for its own populated value range, so quantiles
-//! aggregated across series with similar distributions (e.g. one handler across
-//! instances) are exact, but mixing series whose observations span different ranges
-//! understates the cumulative tail and skews high quantiles -- the aggregation
-//! problem native histograms were designed to remove. Per-series quantiles and
-//! `_count`/`_sum` rates are always exact.
+//! Known limitation, inherited from classic semantics: `sum by (le)` is only sound
+//! across series sharing a bucket layout. Each native series carries `le`s only for
+//! its own value range, so quantiles aggregated across series with different ranges
+//! understate the cumulative tail. Per-series quantiles, homogeneous-group
+//! aggregations and `_count`/`_sum` rates are exact.
 
 use proto::prometheus_rpc;
 
 /// The classic streams a native histogram degrades into.
 pub const CLASSIC_HISTOGRAM_SUFFIXES: [&str; 3] = ["_bucket", "_count", "_sum"];
 
-/// Exponential native histogram schemas (`base = 2^(2^-schema)`). Anything outside --
-/// notably `-53`, a classic histogram with custom bounds carried in native form (NHCB) --
-/// cannot be converted: our wire type does not even decode the `custom_values` field.
+/// Exponential schemas (`base = 2^(2^-schema)`). Anything outside -- notably NHCB,
+/// schema -53 -- cannot be converted: our wire type does not decode `custom_values`.
 const SCHEMA_RANGE: std::ops::RangeInclusive<i32> = -4..=8;
 
-/// One classic-histogram record derived from a native histogram sample:
-/// the `__name__` suffix, the `le` label (`None` for `_count`/`_sum`), and the value.
+/// The `__name__` suffix, the `le` label (`None` for `_count`/`_sum`), and the value.
 pub type ClassicHistogramRecord = (&'static str, Option<String>, f64);
 
-/// The exact bit pattern Prometheus uses (in `sum`) to mark a stale histogram --
-/// an ordinary NaN is NOT a stale marker. cf. prometheus `model/value/value.go`.
+/// Prometheus's stale-marker bit pattern in `sum`; an ordinary NaN is NOT stale.
 const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
 
-/// Degrades one native histogram sample into classic histogram records.
-///
-/// Buckets become cumulative `le` buckets, ordered negative -> zero bucket -> positive,
-/// with `le="inf"` carrying the total count -- the invariants `histogram_quantile`
-/// relies on. Returns nothing for unsupported schemas.
+/// Degrades one native histogram sample into classic records: cumulative `le` buckets
+/// closed by `le="inf"`. Empty for unsupported schemas and stale markers.
 pub fn expand_native_histogram(hp: &prometheus_rpc::Histogram) -> Vec<ClassicHistogramRecord> {
     expand_with_bucket_limit(hp, config::get_config().prom.native_histogram_max_buckets)
 }
@@ -69,8 +57,7 @@ fn expand_with_bucket_limit(
     }
 
     // a stale marker terminates the series; expanding it would write a spurious
-    // `_count = 0` that reads as a counter reset. Dropping the whole sample matches how
-    // the scalar path treats stale markers (stale NaN value -> no record).
+    // `_count = 0` that reads as a counter reset
     if hp.sum.to_bits() == STALE_NAN_BITS {
         return vec![];
     }
@@ -89,9 +76,8 @@ fn expand_with_bucket_limit(
     let mut pos = span_buckets(&hp.positive_spans, &hp.positive_deltas, &hp.positive_counts);
     let mut neg = span_buckets(&hp.negative_spans, &hp.negative_deltas, &hp.negative_counts);
 
-    // Every populated bucket becomes a distinct `le` series, so a high-resolution
-    // sample is downscaled -- adjacent bucket pairs merged, halving the resolution --
-    // until it fits the cardinality budget. No observations are lost.
+    // every populated bucket becomes a `le` series, so merge adjacent buckets
+    // (halving resolution) until the sample fits the cardinality budget
     let mut schema = hp.schema;
     while pos.len() + neg.len() > max_buckets.max(1) && schema > *SCHEMA_RANGE.start() {
         schema -= 1;
@@ -99,9 +85,7 @@ fn expand_with_bucket_limit(
         neg = downscale(neg);
     }
 
-    // bucket index `idx` covers `(base^(idx-1), base^idx]` on the positive side and its
-    // mirror `[-base^idx, -base^(idx-1))` on the negative side, where
-    // `base = 2^(2^-schema)`
+    // bucket `idx` covers `(base^(idx-1), base^idx]`, mirrored on the negative side
     let mut buckets: Vec<(f64, f64, f64)> = Vec::new(); // (lower, upper, count)
     for &(idx, c) in &pos {
         buckets.push((bucket_bound(schema, idx - 1), bucket_bound(schema, idx), c));
@@ -128,12 +112,9 @@ fn expand_with_bucket_limit(
     let mut cumulative = 0.0;
     let mut prev_upper = f64::NEG_INFINITY;
     for (lower, upper, c) in buckets {
-        // sparse layouts leave gaps between populated buckets; a zero-increment record
-        // at the lower bound preserves each bucket's true extent, so classic quantile
-        // interpolation matches Prometheus's native interpolation instead of smearing
-        // the count across the gap. `lower < upper` guards the clamped extremes, where
-        // both bounds collapse to the same value and the marker would duplicate the
-        // bucket's own `le`.
+        // a zero-increment record at the lower bound of each bucket run pins sparse
+        // gaps, so quantile interpolation cannot smear counts across them.
+        // `lower < upper` skips the marker when clamping collapsed both bounds.
         if lower > prev_upper && lower < upper {
             push_le_point(&mut points, format_le(lower), cumulative);
         }
@@ -148,26 +129,22 @@ fn expand_with_bucket_limit(
     recs
 }
 
-/// `le` label for a bucket bound: rounded to 4 significant digits and rendered as the
-/// shortest decimal ("0.5946", "8", "0.02628"). Full precision would be 17 digits per
-/// label for no practical gain; 4 digits cannot collide adjacent buckets, since even
-/// the finest schema (8) spaces bounds 0.271% apart -- above the 0.1% worst-case
-/// resolution of 4 significant digits.
+/// `le` label: 4 significant digits, shortest decimal ("0.5946", "8"). Cannot collide
+/// adjacent buckets -- the finest schema spaces bounds 0.271% apart vs the 0.1%
+/// worst-case label resolution.
 fn format_le(v: f64) -> String {
     let rounded: f64 = format!("{v:.3e}").parse().unwrap();
     if rounded.is_finite() || !v.is_finite() {
         rounded.to_string()
     } else {
-        // rounding up overflowed f64 (v is around f64::MAX, the clamped last bucket);
-        // keep the full-precision label so it stays distinct from `le="inf"`
+        // rounding f64::MAX (the clamped last bucket) overflows to infinity and would
+        // collide with `le="inf"`; keep the full-precision label
         v.to_string()
     }
 }
 
-/// Appends a cumulative `le` point, merging with the previous point when rounding
-/// collapsed two distinct bounds onto one label (an arbitrary `zero_threshold` can
-/// round onto a neighboring bucket bound) -- two records sharing one `le` on the same
-/// series and timestamp would otherwise overwrite each other nondeterministically.
+/// Appends a cumulative `le` point, merging points whose labels collide after rounding
+/// (an arbitrary `zero_threshold` can round onto a neighboring bucket bound).
 fn push_le_point(points: &mut Vec<(String, f64)>, le: String, cumulative: f64) {
     match points.last_mut() {
         Some((last_le, last_v)) if *last_le == le => *last_v = cumulative.max(*last_v),
@@ -175,20 +152,17 @@ fn push_le_point(points: &mut Vec<(String, f64)>, le: String, cumulative: f64) {
     }
 }
 
-/// Upper bound of native bucket `idx`: `2^(idx * 2^-schema)`, computed through `exp2`
-/// so that bounds landing on powers of two are exact (`le="8"`, not
-/// `"7.999999999999995"` as iterated multiplication yields) and bounds shared between
-/// schemas produce identical `le` strings. Clamped to the finite range: the algebraic
-/// bound of the last representable bucket overflows f64, and letting it become
-/// infinity would collide with the dedicated `le="inf"` bucket.
+/// Upper bound of bucket `idx`: `2^(idx * 2^-schema)` via `exp2`, so powers of two are
+/// exact and a boundary shared between schemas is the identical f64 (downscaling keeps
+/// surviving `le`s in the same series). Clamped finite so the last representable
+/// bucket cannot collide with `le="inf"`.
 fn bucket_bound(schema: i32, idx: i64) -> f64 {
     let bound = ((idx as f64) * 2f64.powi(-schema)).exp2();
     bound.clamp(f64::MIN_POSITIVE, f64::MAX)
 }
 
-/// Halving the schema merges each pair of adjacent buckets: native bucket `idx` at
-/// schema `s` maps to bucket `ceil(idx / 2)` at schema `s - 1`. Input and output are
-/// ascending in `idx`.
+/// Merges adjacent bucket pairs: `idx` at schema `s` maps to `ceil(idx / 2)` at
+/// schema `s - 1`.
 fn downscale(buckets: Vec<(i64, f64)>) -> Vec<(i64, f64)> {
     let mut out: Vec<(i64, f64)> = Vec::with_capacity(buckets.len() / 2 + 1);
     for (idx, c) in buckets {
@@ -201,8 +175,7 @@ fn downscale(buckets: Vec<(i64, f64)>) -> Vec<(i64, f64)> {
     out
 }
 
-/// Decodes a native histogram's sparse bucket layout -- spans plus either integer deltas
-/// (regular histogram) or absolute float counts (float histogram) -- into
+/// Decodes the sparse layout (spans + integer deltas or absolute float counts) into
 /// `(bucket index, absolute count)` pairs for every populated bucket.
 fn span_buckets(
     spans: &[prometheus_rpc::BucketSpan],
@@ -230,8 +203,7 @@ fn span_buckets(
                 cumulative_delta as f64
             };
             pos += 1;
-            // sparse layouts routinely carry zero-count buckets; NaN float counts are
-            // unusable -- both are skipped
+            // skips zero-count buckets and NaN float counts
             if count > 0.0 {
                 buckets.push((idx, count));
             }
@@ -264,9 +236,8 @@ mod tests {
         recs.iter().find(|(s, ..)| *s == suffix).unwrap().2
     }
 
-    /// Invariants every expansion must satisfy for `histogram_quantile` to be sound:
-    /// strictly increasing `le` (no duplicate labels colliding on one series+timestamp),
-    /// non-decreasing cumulative counts, and a closing `inf` bucket.
+    /// Strictly increasing `le`, non-decreasing cumulative counts, closing `inf` --
+    /// what `histogram_quantile` needs to be sound.
     fn assert_bucket_invariants(recs: &[ClassicHistogramRecord]) {
         let buckets = bucket_records(recs);
         for w in buckets.windows(2) {
@@ -276,11 +247,8 @@ mod tests {
         assert_eq!(buckets.last().unwrap().0, f64::INFINITY);
     }
 
-    /// The span/delta worked example from the native-histograms design doc (§3.4):
-    /// spans `[{0,2},{1,1}]` + deltas `[3,1,-1]` decode to buckets `{0:3, 1:4, 3:3}`
-    /// with index 2 an implicit gap. With `schema = 0` (base 2) and a populated zero
-    /// bucket, the classic expansion must be cumulative in `le` order and close with
-    /// `le="inf"` equal to `_count`.
+    /// Integer histogram: spans `[{0,2},{1,1}]` + deltas `[3,1,-1]` decode to buckets
+    /// `{0:3, 1:4, 3:3}` with idx 2 an implicit gap.
     #[test]
     fn test_expand_native_histogram_integer() {
         let hp = prometheus_rpc::Histogram {
@@ -305,10 +273,7 @@ mod tests {
         let recs = expand_native_histogram(&hp);
         assert_eq!(scalar_record(&recs, "_count"), 12.0);
         assert_eq!(scalar_record(&recs, "_sum"), 100.0);
-        // idx 0 -> (0.5,1], idx 1 -> (1,2], idx 3 -> (4,8]; idx 2 is a gap, so a
-        // zero-increment marker at le=4 pins the (2,4] hole, and each run of buckets
-        // opens with a marker at its lower bound (le=-0.001 for the zero bucket,
-        // le=0.5 after it)
+        // gap markers: le=4 pins the empty (2,4], le=-0.001/0.5 open each bucket run
         assert_eq!(
             bucket_records(&recs),
             vec![
@@ -322,15 +287,12 @@ mod tests {
                 (f64::INFINITY, 12.0),
             ]
         );
-        // `le` for the overflow bucket must parse back to infinity and be formatted
-        // exactly like the OTLP writer's ("inf")
+        // "inf", matching the OTLP writer's formatting
         assert_eq!(recs.last().unwrap().1.as_deref(), Some("inf"));
     }
 
-    /// Float histograms carry absolute counts (no delta decoding) and can populate the
-    /// negative side: negative bucket `idx` covers `[-base^idx, -base^(idx-1))`, so its
-    /// classic upper bound is `-base^(idx-1)` and cumulation starts from the most
-    /// negative bucket.
+    /// Float histogram (absolute counts) with negative buckets: cumulation starts from
+    /// the most negative bucket.
     #[test]
     fn test_expand_native_histogram_float_with_negative_buckets() {
         let hp = prometheus_rpc::Histogram {
@@ -363,9 +325,7 @@ mod tests {
         );
     }
 
-    /// NHCB (`schema = -53`) and any other non-exponential schema cannot be converted --
-    /// the wire type does not even decode `custom_values` -- so the sample is dropped
-    /// rather than stored as a corrupt histogram.
+    /// Non-exponential schemas (NHCB, -53) are dropped, not stored corrupt.
     #[test]
     fn test_expand_native_histogram_rejects_unsupported_schema() {
         let hp = prometheus_rpc::Histogram {
@@ -376,10 +336,8 @@ mod tests {
         assert!(expand_native_histogram(&hp).is_empty());
     }
 
-    /// A stale marker (the exact StaleNaN bit pattern in `sum`) must drop the whole
-    /// sample: expanding it would write `_count = 0`, which reads as a counter reset.
-    /// An ordinary NaN sum is NOT stale -- its count/buckets are real observations and
-    /// only the `_sum` record is dropped (by the caller's NaN sanitization).
+    /// A stale marker drops the whole sample; an ordinary NaN sum keeps count/buckets
+    /// (only `_sum` is dropped later by NaN sanitization).
     #[test]
     fn test_expand_native_histogram_stale_marker_vs_plain_nan() {
         let stale = prometheus_rpc::Histogram {
@@ -407,17 +365,14 @@ mod tests {
         );
     }
 
-    /// A histogram with no populated buckets still yields `_count`, `_sum` and the
-    /// `le="inf"` bucket, and a zero-count oneof that disagrees with the buckets is
-    /// repaired so `le="inf"` stays >= the cumulative bucket count.
+    /// An empty histogram still yields `_count`/`_sum`/`inf`; a missing count falls
+    /// back to the bucket total so `le="inf"` stays monotonic.
     #[test]
     fn test_expand_native_histogram_empty_and_short_count() {
         let empty = expand_native_histogram(&native_histogram_base());
         assert_eq!(scalar_record(&empty, "_count"), 0.0);
         assert_eq!(bucket_records(&empty), vec![(f64::INFINITY, 0.0)]);
 
-        // count oneof absent but buckets populated: inf bucket falls back to the sum of
-        // bucket counts instead of a non-monotonic 0
         let hp = prometheus_rpc::Histogram {
             positive_spans: vec![prometheus_rpc::BucketSpan {
                 offset: 0,
@@ -433,10 +388,8 @@ mod tests {
         );
     }
 
-    /// A larger reference vector cross-checked against an independent decoder
-    /// implementation: spans `[{0,4},{2,1}]` + deltas `[2,-1,2,-1,1]` decode to
-    /// buckets `(0.5,1]:2, (1,2]:1, (2,4]:3, (4,8]:2, (32,64]:3`, reproduced here as
-    /// cumulative `le` records (note the two-bucket gap at idx 4-5).
+    /// Reference vector cross-checked against an independent decoder implementation,
+    /// including a two-bucket gap at idx 4-5.
     #[test]
     fn test_expand_native_histogram_reference_vector() {
         let hp = prometheus_rpc::Histogram {
@@ -478,9 +431,8 @@ mod tests {
         );
     }
 
-    /// schema 8 is the finest resolution (base = 2^(1/256) ~ 1.0027): adjacent bucket
-    /// bounds are ~0.27% apart, and each must survive `to_string` as a distinct `le` --
-    /// colliding labels would merge two buckets into one series.
+    /// schema 8 (finest, ~0.27% bucket spacing): adjacent bounds must stay distinct
+    /// `le` labels.
     #[test]
     fn test_expand_native_histogram_schema8_adjacent_bounds_distinct() {
         let hp = prometheus_rpc::Histogram {
@@ -502,16 +454,12 @@ mod tests {
             buckets.iter().map(|(_, c)| *c).collect::<Vec<_>>(),
             vec![0.0, 5.0, 8.0, 8.0]
         );
-        // 2^(250/256) = 1.96777... and 2^(251/256) = 1.97310... stay distinct at
-        // 4-significant-digit precision
         assert_eq!(buckets[1].0, 1.968);
         assert_eq!(buckets[2].0, 1.973);
     }
 
-    /// Bounds landing on powers of two must be exact -- iterated multiplication
-    /// (`base.powi`) yields `7.999999999999995`-style `le` labels, which are both ugly
-    /// and misaligned with the grid of other schemas. Also asserts cross-schema grid
-    /// alignment: the same boundary reached at different schemas gets the same `le`.
+    /// Power-of-two bounds are exact and a boundary shared between schemas is the
+    /// identical f64.
     #[test]
     fn test_bucket_bounds_are_exact_and_schema_aligned() {
         assert_eq!(bucket_bound(2, 12), 8.0); // 2^(12/4)
@@ -540,9 +488,8 @@ mod tests {
         );
     }
 
-    /// An arbitrary `zero_threshold` can round onto a neighboring bucket bound; the
-    /// two points must merge into one record (keeping the larger cumulative) instead
-    /// of emitting two records with the same `le` on one series and timestamp.
+    /// A `zero_threshold` that rounds onto a neighboring bucket bound merges into one
+    /// record instead of emitting two records with the same `le`.
     #[test]
     fn test_expand_native_histogram_merges_le_rounding_collisions() {
         let hp = prometheus_rpc::Histogram {
@@ -558,17 +505,14 @@ mod tests {
         };
         let recs = expand_native_histogram(&hp);
         assert_bucket_invariants(&recs);
-        // bucket (0.5, 1]:3 sorts first, zero bucket (-1.0001, 1.0001):2 second; both
-        // uppers format to "1" and merge, keeping the full cumulative 5
+        // both uppers format to "1" and merge, keeping the full cumulative 5
         assert_eq!(
             bucket_records(&recs),
             vec![(0.5, 0.0), (1.0, 5.0), (f64::INFINITY, 5.0)]
         );
     }
 
-    /// Over-limit samples are downscaled, not truncated: adjacent bucket pairs merge
-    /// (schema - 1) until the populated-bucket count fits, preserving every
-    /// observation at coarser resolution.
+    /// Over-limit samples are downscaled (bucket pairs merged), not truncated.
     #[test]
     fn test_expand_native_histogram_downscales_to_bucket_limit() {
         let hp = prometheus_rpc::Histogram {
@@ -604,9 +548,8 @@ mod tests {
         assert_eq!(scalar_record(&scaled, "_count"), 36.0);
     }
 
-    /// schema -4 is the coarsest (base = 2^16): a wide zero bucket can overlap the
-    /// first populated bucket's algebraic lower bound. No gap marker may be emitted
-    /// inside the zero bucket -- the `le` sequence must stay strictly increasing.
+    /// A wide zero bucket overlapping the first bucket's lower bound must not emit a
+    /// gap marker inside it -- `le` stays strictly increasing.
     #[test]
     fn test_expand_native_histogram_zero_bucket_overlapping_first_bucket() {
         let hp = prometheus_rpc::Histogram {
@@ -671,9 +614,8 @@ mod tests {
         );
     }
 
-    /// Malformed wire data promising more buckets than it carries (Prometheus rejects
-    /// the whole request): decoding truncates at the last real delta and keeps the
-    /// buckets decoded so far rather than dropping the sample.
+    /// Spans promising more buckets than the data carries: decode truncates, keeping
+    /// the buckets seen so far.
     #[test]
     fn test_expand_native_histogram_truncated_deltas() {
         let hp = prometheus_rpc::Histogram {
@@ -693,8 +635,7 @@ mod tests {
         );
     }
 
-    /// A count field larger than the bucket total is kept as-is on `_count` and
-    /// `le="inf"` -- classic semantics allow observations outside any finite bucket.
+    /// A count larger than the bucket total is kept on `_count` and `le="inf"`.
     #[test]
     fn test_expand_native_histogram_count_exceeds_buckets() {
         let hp = prometheus_rpc::Histogram {
@@ -715,9 +656,8 @@ mod tests {
         );
     }
 
-    /// A bucket index so high that both its algebraic bounds overflow f64: both clamp
-    /// to `f64::MAX`, the gap marker is suppressed (it would duplicate the bucket's own
-    /// `le`), and the record stays distinct from the `le="inf"` bucket.
+    /// Both bounds of an extreme bucket clamp to `f64::MAX`: the gap marker is
+    /// suppressed and the record stays distinct from `le="inf"`.
     #[test]
     fn test_expand_native_histogram_bound_overflow_clamps() {
         let hp = prometheus_rpc::Histogram {
@@ -750,8 +690,7 @@ mod tests {
         );
     }
 
-    /// NaN float counts are unusable and skipped; the remaining buckets keep their
-    /// positions.
+    /// NaN float counts are skipped; the remaining buckets keep their positions.
     #[test]
     fn test_expand_native_histogram_nan_float_count_skipped() {
         let hp = prometheus_rpc::Histogram {
@@ -772,8 +711,8 @@ mod tests {
         );
     }
 
-    /// A delta sequence that returns to zero mid-span leaves an interior empty bucket:
-    /// it is skipped, and the gap marker pins the next bucket's true lower bound.
+    /// An interior empty bucket is skipped; the gap marker pins the next bucket's
+    /// lower bound.
     #[test]
     fn test_expand_native_histogram_interior_zero_bucket_gap() {
         let hp = prometheus_rpc::Histogram {
