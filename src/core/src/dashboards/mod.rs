@@ -81,9 +81,9 @@ async fn filter_permitted_dashboards(
     dashboards: Vec<(Folder, Dashboard)>,
     folder_id: Option<String>,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
+    use common::utils::auth::AuthExtractor;
     use o2_openfga::meta::mapping::OFGA_MODELS;
-
-    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
+    use openobserve_organization::repository::user::get as get_user;
 
     if let Some(folder_id) = folder_id {
         let user_role = match get_user(Some(org_id), user_id).await {

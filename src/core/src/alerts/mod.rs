@@ -244,7 +244,7 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
         trace_id: &str,
         span: tracing::Span,
     ) -> tracing::Span {
-        crate::service::setup_tracing_with_trace_id(trace_id, span).await
+        common::utils::tracing::setup_tracing_with_trace_id(trace_id, span).await
     }
 
     fn report_search_metrics(

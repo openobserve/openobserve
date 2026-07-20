@@ -104,8 +104,6 @@ md5.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
-opentelemetry.workspace = true
-opentelemetry-proto.workspace = true
 parking_lot.workspace = true
 promql-parser.workspace = true
 prost.workspace = true
@@ -126,7 +124,6 @@ tiktoken-rs.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
-tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
 version-compare.workspace = true
