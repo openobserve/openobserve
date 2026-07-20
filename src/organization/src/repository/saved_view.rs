@@ -13,15 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::saved_view::{
+    CreateViewRequest, UpdateViewRequest, View, ViewWithoutData, ViewsWithoutData,
+};
 use config::utils::json;
 use infra::errors::Error;
 
-use crate::{
-    common::meta::saved_view::{
-        CreateViewRequest, UpdateViewRequest, View, ViewWithoutData, ViewsWithoutData,
-    },
-    service::db,
-};
+use crate::db;
 
 pub const SAVED_VIEWS_KEY_PREFIX: &str = "/organization/savedviews";
 

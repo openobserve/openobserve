@@ -87,7 +87,9 @@ pub mod ofga;
 pub mod org_ingestion_tokens {
     pub use openobserve_ingestion::repository::org_ingestion_tokens::*;
 }
-pub mod org_status;
+pub mod org_status {
+    pub use openobserve_organization::status::*;
+}
 #[cfg(feature = "enterprise")]
 pub mod org_storage_providers;
 pub mod org_users {
@@ -101,7 +103,9 @@ pub mod pipeline_errors {
 }
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
-pub mod saved_view;
+pub mod saved_view {
+    pub use openobserve_organization::repository::saved_view::*;
+}
 pub mod scheduler {
     pub use openobserve_scheduler::*;
 }
@@ -205,12 +209,6 @@ pub(crate) async fn delete(
 pub(crate) async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
     let db = infra_db::get_db().await;
     db.list(prefix).await
-}
-
-#[inline]
-pub(crate) async fn list_values(prefix: &str) -> Result<Vec<Bytes>> {
-    let db = infra_db::get_db().await;
-    db.list_values(prefix).await
 }
 
 #[inline]

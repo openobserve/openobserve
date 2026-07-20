@@ -238,7 +238,9 @@ async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
 async fn emit_failed_alert(org_id: &str, _step: &str) {
     #[cfg(feature = "cloud")]
     {
-        use crate::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
+        use openobserve_self_reporting::cloud_events::{
+            CloudEvent, EventType, enqueue_cloud_event,
+        };
         enqueue_cloud_event(CloudEvent {
             event: EventType::OrgCleanupFailed,
             org_id: org_id.to_string(),
@@ -279,7 +281,7 @@ async fn execute_step(org_id: &str, org_name: &str, step: &str) -> Result<(), an
 }
 
 async fn step_delete_streams(org_id: &str, org_name: &str) -> Result<(), anyhow::Error> {
-    let streams = crate::db::schema::list(org_id, None, false).await?;
+    let streams = crate::stream_schemas(org_id).await?;
 
     // Enqueue one sub-task per stream
     let sub_tasks: Vec<org_cleanup_tasks::NewCleanupTask> = streams
@@ -319,7 +321,7 @@ async fn step_delete_stream(org_id: &str, type_and_name: &str) -> Result<(), any
     openobserve_compactor::retention::delete_all(org_id, stream_type, stream_name).await?;
 
     // Delete the schema entry (delete_all removes data, not the stream definition).
-    crate::db::schema::delete(org_id, stream_name, Some(stream_type)).await?;
+    crate::delete_stream_schema(org_id, stream_name, stream_type).await?;
 
     Ok(())
 }
@@ -340,7 +342,7 @@ async fn step_delete_file_list(org_id: &str) -> Result<(), anyhow::Error> {
 async fn delete_org_alerts(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::db::{ORM_CLIENT, connect_to_orm};
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let alerts = crate::db::alerts::alert::list(org_id, None, None).await?;
+    let alerts = openobserve_alerts::repository::alert::list(org_id, None, None).await?;
     for alert in alerts {
         let Some(alert_id) = alert.id else { continue };
         openobserve_alerts::service::alert::delete_by_id(conn, org_id, alert_id)
@@ -367,7 +369,7 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
         };
         let keys = infra::table::cipher::list_filtered(filter, None).await?;
         for key in keys {
-            crate::db::keys::remove(org_id, EntryKind::CipherKey, &key.name)
+            crate::delete_cipher_key(org_id, EntryKind::CipherKey, &key.name)
                 .await
                 .map_err(|e| anyhow::anyhow!("cipher key {}: {e}", key.name))?;
         }
@@ -482,7 +484,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // leave those side effects (and stale cache entries) behind.
     let pipelines = infra::pipeline::list_by_org(org_id).await?;
     for p in pipelines {
-        crate::pipeline::delete_pipeline(&p.id)
+        openobserve_pipeline::management::delete_pipeline(&p.id)
             .await
             .map_err(|e| anyhow::anyhow!("step_delete_db_resources/pipeline {}: {e}", p.id))?;
     }
@@ -493,7 +495,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     let db = infra::db::get_db().await;
     let prefix = format!(
         "{}/{org_id}/",
-        crate::db::saved_view::SAVED_VIEWS_KEY_PREFIX
+        crate::repository::saved_view::SAVED_VIEWS_KEY_PREFIX
     );
     // with_prefix=true (bulk delete all of the org's views); NO_NEED_WATCH matches
     // saved_view::delete_view — no point emitting watch events for a disappearing org.
@@ -515,7 +517,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // so once the rows are gone the objects can no longer be located and would leak.
     // (search_jobs service is enterprise-only; OSS just drops the rows below.)
     #[cfg(feature = "enterprise")]
-    crate::search_jobs::delete_org_result_files(org_id)
+    openobserve_search_service::jobs::delete_org_result_files(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
     infra::table::search_job::search_jobs::delete_by_org(org_id)
@@ -612,7 +614,7 @@ async fn step_delete_users(org_id: &str) -> Result<(), anyhow::Error> {
 async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     #[cfg(feature = "enterprise")]
     {
-        use crate::self_reporting::{audit, auditor};
+        use openobserve_self_reporting::{audit, auditor};
         audit(auditor::AuditMessage {
             user_email: actor.to_string(),
             org_id: org_id.to_string(),
@@ -633,7 +635,7 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
 }
 
 pub async fn initiate_deletion(org_id: &str, initiated_by: &str) -> Result<(), anyhow::Error> {
-    use crate::db::org_status;
+    use crate::status as org_status;
 
     // The `default` and `_meta` orgs are system orgs and must never be deleted.
     // Guard here, at the single entry point, BEFORE any status mutation — otherwise
@@ -720,7 +722,7 @@ async fn step_delete_org_record(org_id: &str) -> Result<(), anyhow::Error> {
     // delete handler ever grows a new side effect, this path inherits it for free.
     crate::organization::remove_org(org_id).await?;
     let _ = infra::table::org_cleanup_tasks::delete_by_org(org_id).await;
-    crate::db::org_status::evict(org_id).await?;
+    crate::status::evict(org_id).await?;
     emit_status_audit(org_id, "system", "deleting", "gone").await;
     Ok(())
 }
@@ -729,7 +731,7 @@ async fn step_delete_org_record(org_id: &str) -> Result<(), anyhow::Error> {
 /// any cleanup tasks, and unblock it across the cluster. No data was ever touched.
 /// `actor` is the email of the _meta/root user performing the resurrection (for audit).
 pub async fn resurrect_org(org_id: &str, actor: &str) -> Result<(), anyhow::Error> {
-    use crate::db::org_status;
+    use crate::status as org_status;
 
     let won = infra::table::organizations::set_status_if_with_deleted_at(
         org_id,
@@ -754,7 +756,7 @@ pub async fn resurrect_org(org_id: &str, actor: &str) -> Result<(), anyhow::Erro
 /// Promote every pending_deletion org whose grace window has elapsed to `deleting`
 /// and enqueue its cleanup tasks. Returns the number promoted.
 pub async fn promote_expired() -> Result<usize, anyhow::Error> {
-    use crate::db::org_status;
+    use crate::status as org_status;
 
     let grace_days = grace_period_days();
     if grace_days <= 0 {

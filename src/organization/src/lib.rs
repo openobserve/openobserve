@@ -9,19 +9,21 @@
 
 use std::sync::{Arc, OnceLock};
 
-use common::meta::stream::Stream;
+use common::meta::stream::{Stream, StreamSchema};
 use config::meta::{function::Transform, stream::StreamType};
 
 pub mod auth;
+pub mod org_cleanup;
 pub mod organization;
 pub mod repository;
+pub mod status;
 pub mod users;
 
 pub mod db {
     use bytes::Bytes;
     use hashbrown::HashMap;
     use infra::{db as infra_db, errors::Result};
-    pub use infra_db::{Event, NEED_WATCH, get_coordinator};
+    pub use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
 
     pub mod org_users {
         pub use crate::repository::org_users::*;
@@ -31,6 +33,12 @@ pub mod db {
     }
     pub mod user {
         pub use crate::repository::user::*;
+    }
+    pub mod saved_view {
+        pub use crate::repository::saved_view::*;
+    }
+    pub mod org_status {
+        pub use crate::status::*;
     }
     pub mod org_ingestion_tokens {
         pub use openobserve_ingestion::repository::org_ingestion_tokens::*;
@@ -91,6 +99,10 @@ pub mod db {
     pub async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
         infra_db::get_db().await.list(prefix).await
     }
+
+    pub async fn list_values(prefix: &str) -> Result<Vec<Bytes>> {
+        infra_db::get_db().await.list_values(prefix).await
+    }
 }
 
 #[async_trait::async_trait]
@@ -104,6 +116,23 @@ pub trait Runtime: Send + Sync {
     ) -> Vec<Stream>;
 
     async fn transforms(&self, org_id: &str) -> anyhow::Result<Vec<Transform>>;
+
+    async fn stream_schemas(&self, org_id: &str) -> anyhow::Result<Vec<StreamSchema>>;
+
+    async fn delete_stream_schema(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+    ) -> anyhow::Result<()>;
+
+    #[cfg(feature = "enterprise")]
+    async fn delete_cipher_key(
+        &self,
+        org_id: &str,
+        kind: infra::table::cipher::EntryKind,
+        name: &str,
+    ) -> anyhow::Result<()>;
 }
 
 static RUNTIME: OnceLock<Arc<dyn Runtime>> = OnceLock::new();
@@ -135,6 +164,38 @@ pub(crate) async fn transforms(org_id: &str) -> anyhow::Result<Vec<Transform>> {
         .get()
         .ok_or_else(|| anyhow::anyhow!("organization runtime is not installed"))?;
     runtime.transforms(org_id).await
+}
+
+pub(crate) async fn stream_schemas(org_id: &str) -> anyhow::Result<Vec<StreamSchema>> {
+    let runtime = RUNTIME
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("organization runtime is not installed"))?;
+    runtime.stream_schemas(org_id).await
+}
+
+pub(crate) async fn delete_stream_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> anyhow::Result<()> {
+    let runtime = RUNTIME
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("organization runtime is not installed"))?;
+    runtime
+        .delete_stream_schema(org_id, stream_name, stream_type)
+        .await
+}
+
+#[cfg(feature = "enterprise")]
+pub(crate) async fn delete_cipher_key(
+    org_id: &str,
+    kind: infra::table::cipher::EntryKind,
+    name: &str,
+) -> anyhow::Result<()> {
+    let runtime = RUNTIME
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("organization runtime is not installed"))?;
+    runtime.delete_cipher_key(org_id, kind, name).await
 }
 
 #[cfg(feature = "cloud")]

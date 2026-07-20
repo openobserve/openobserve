@@ -53,7 +53,7 @@ pub use openobserve_ingestion::metrics;
 pub mod node;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
-pub mod org_cleanup;
+pub use openobserve_organization::org_cleanup;
 #[cfg(feature = "enterprise")]
 pub mod org_storage_providers;
 #[cfg(feature = "cloud")]

@@ -7,4 +7,5 @@
 
 pub mod org_users;
 pub mod organization;
+pub mod saved_view;
 pub mod user;

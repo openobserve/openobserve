@@ -27,6 +27,34 @@ impl openobserve_organization::Runtime for CoreOrganizationRuntime {
     ) -> anyhow::Result<Vec<config::meta::function::Transform>> {
         crate::db::functions::list(org_id).await
     }
+
+    async fn stream_schemas(
+        &self,
+        org_id: &str,
+    ) -> anyhow::Result<Vec<common::meta::stream::StreamSchema>> {
+        crate::db::schema::list(org_id, None, false).await
+    }
+
+    async fn delete_stream_schema(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: config::meta::stream::StreamType,
+    ) -> anyhow::Result<()> {
+        crate::db::schema::delete(org_id, stream_name, Some(stream_type)).await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn delete_cipher_key(
+        &self,
+        org_id: &str,
+        kind: infra::table::cipher::EntryKind,
+        name: &str,
+    ) -> anyhow::Result<()> {
+        crate::db::keys::remove(org_id, kind, name)
+            .await
+            .map_err(Into::into)
+    }
 }
 
 pub(crate) fn install_runtime() {

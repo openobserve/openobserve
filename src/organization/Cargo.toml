@@ -16,7 +16,9 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "openobserve-alerts/enterprise",
+    "openobserve-compactor/enterprise",
     "openobserve-pipeline/enterprise",
+    "openobserve-search-service/enterprise",
     "openobserve-self-reporting/enterprise",
 ]
 cloud = [
@@ -24,7 +26,9 @@ cloud = [
     "common/cloud",
     "o2_enterprise/cloud",
     "openobserve-alerts/cloud",
+    "openobserve-compactor/cloud",
     "openobserve-pipeline/cloud",
+    "openobserve-search-service/cloud",
     "openobserve-self-reporting/cloud",
 ]
 
@@ -43,8 +47,10 @@ log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
 openobserve-alerts.workspace = true
+openobserve-compactor.workspace = true
 openobserve-ingestion.workspace = true
 openobserve-pipeline.workspace = true
+openobserve-search-service.workspace = true
 openobserve-self-reporting.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
