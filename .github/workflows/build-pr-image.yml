@@ -63,6 +63,9 @@ jobs:
       - name: Lint styles (stylelint — bans legacy --o2-* tokens)
         run: cd web && npm run lint:styles
 
+      - name: Check token-file purity (token files contain tokens only)
+        run: cd web && npm run lint:token-purity
+
       - name: Build frontend code
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"

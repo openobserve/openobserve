@@ -7,7 +7,7 @@ feel like one product.
 
 ## Table of contents
 
-- [Every page = OPageHeader + body](#every-page--apppageheader--body)
+- [Every page = OPageHeader + body](#every-page--opageheader--body)
 - [Where a new page goes in navigation](#where-a-new-page-goes-in-navigation)
 - [The listing-page skeleton (flush table, fixed height)](#the-listing-page-skeleton-flush-table-fixed-height)
 - [Recipe: listing / table page](#recipe-listing--table-page)
