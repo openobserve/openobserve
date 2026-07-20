@@ -7126,11 +7126,13 @@ dependencies = [
  "openobserve-pipeline",
  "openobserve-search-service",
  "openobserve-self-reporting",
+ "sea-orm",
  "serde",
  "serde_json",
  "tokio",
  "url",
  "utoipa",
+ "version-compare",
 ]
 
 [[package]]

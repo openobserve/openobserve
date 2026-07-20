@@ -14,6 +14,8 @@ use config::meta::{function::Transform, stream::StreamType};
 
 pub mod auth;
 pub mod authz;
+#[cfg(feature = "enterprise")]
+pub mod ofga;
 pub mod org_cleanup;
 #[cfg(feature = "cloud")]
 pub mod org_usage;

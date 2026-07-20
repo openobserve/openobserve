@@ -5,6 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+#[cfg(feature = "enterprise")]
+pub mod ofga;
 pub mod org_users;
 pub mod organization;
 pub mod saved_view;

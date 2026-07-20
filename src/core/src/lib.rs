@@ -49,7 +49,7 @@ pub use ::common::kv;
 pub use openobserve_ingestion::{logs, metadata, metrics};
 pub mod node;
 #[cfg(feature = "enterprise")]
-pub mod ofga;
+pub use openobserve_organization::ofga;
 pub use openobserve_organization::org_cleanup;
 #[cfg(feature = "enterprise")]
 pub mod org_storage_providers;
@@ -163,8 +163,5 @@ mod common {
         pub mod config {
             pub use ::common::infra::config::*;
         }
-
-        #[cfg(feature = "enterprise")]
-        pub use crate::ofga;
     }
 }

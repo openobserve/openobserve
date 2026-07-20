@@ -17,6 +17,10 @@ mod migrations;
 
 use std::cmp::Ordering;
 
+use common::{
+    infra::config::{ORG_USERS, ORGANIZATIONS, USERS},
+    meta::organization::DEFAULT_ORG,
+};
 use config::meta::{folder::DEFAULT_FOLDER, user::UserRole};
 use hashbrown::HashSet;
 use infra::dist_lock;
@@ -37,13 +41,7 @@ use o2_openfga::{
     },
 };
 
-use crate::{
-    common::{
-        infra::config::{ORG_USERS, ORGANIZATIONS, USERS},
-        meta::organization::DEFAULT_ORG,
-    },
-    service::db,
-};
+use crate::repository as db;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     use o2_openfga::get_all_init_tuples;
