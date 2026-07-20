@@ -66,7 +66,7 @@ pub fn start() {
 pub fn start_trial_quota_jobs() {
     tokio::spawn(async move { run_trial_quota_flush().await });
     tokio::spawn(async move {
-        openobserve_core::trial_quota::subscribe_ha_queue().await;
+        openobserve_organization::trial_quota::subscribe_ha_queue().await;
     });
 }
 
@@ -159,7 +159,7 @@ async fn run_trial_quota_flush() {
     interval.tick().await; // skip first immediate tick
     loop {
         interval.tick().await;
-        openobserve_core::trial_quota::flush_to_db().await;
+        openobserve_organization::trial_quota::flush_to_db().await;
     }
 }
 
@@ -175,7 +175,7 @@ async fn run_ai_quota_check() {
 }
 
 async fn check_all_orgs_ai_quota() {
-    use openobserve_core::trial_quota;
+    use openobserve_organization::trial_quota;
 
     let orgs = openobserve_catalog::schema::list_organizations_from_cache().await;
 

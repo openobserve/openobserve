@@ -379,23 +379,26 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
 
     #[cfg(feature = "cloud")]
     async fn record_new_incident_ai_usage(&self, org_id: &str, incident_id: &str) {
-        use crate::trial_quota::{AiUsageContext, TrialQuotaFeature};
+        use openobserve_organization::trial_quota::{AiUsageContext, TrialQuotaFeature};
 
-        let deduction =
-            crate::trial_quota::try_deduct(org_id, TrialQuotaFeature::NewIncident).await;
+        let deduction = openobserve_organization::trial_quota::try_deduct(
+            org_id,
+            TrialQuotaFeature::NewIncident,
+        )
+        .await;
         let usage_ctx = AiUsageContext {
             user_email: "system@openobserve.ai".to_string(),
             incident_id: Some(incident_id.to_string()),
             ..Default::default()
         };
         if deduction.is_ok() {
-            crate::trial_quota::record_free_ai_usage(
+            openobserve_organization::trial_quota::record_free_ai_usage(
                 org_id,
                 &usage_ctx,
                 TrialQuotaFeature::NewIncident,
             );
-        } else if crate::trial_quota::org_has_active_subscription(org_id).await {
-            crate::trial_quota::record_billable_ai_usage(
+        } else if openobserve_organization::trial_quota::org_has_active_subscription(org_id).await {
+            openobserve_organization::trial_quota::record_billable_ai_usage(
                 org_id,
                 &usage_ctx,
                 TrialQuotaFeature::NewIncident,
@@ -410,16 +413,21 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
         user_email: &str,
         incident_id: &str,
     ) -> bool {
-        use crate::trial_quota::{AiUsageContext, TrialQuotaFeature};
+        use openobserve_organization::trial_quota::{AiUsageContext, TrialQuotaFeature};
 
         let usage_ctx = AiUsageContext {
             user_email: user_email.to_string(),
             incident_id: Some(incident_id.to_string()),
             ..Default::default()
         };
-        match crate::trial_quota::try_deduct(org_id, TrialQuotaFeature::IncidentReAnalysis).await {
+        match openobserve_organization::trial_quota::try_deduct(
+            org_id,
+            TrialQuotaFeature::IncidentReAnalysis,
+        )
+        .await
+        {
             Ok(_) => {
-                crate::trial_quota::record_free_ai_usage(
+                openobserve_organization::trial_quota::record_free_ai_usage(
                     org_id,
                     &usage_ctx,
                     TrialQuotaFeature::IncidentReAnalysis,
@@ -427,8 +435,9 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
                 true
             }
             Err(error) => {
-                if crate::trial_quota::org_has_active_subscription(org_id).await {
-                    crate::trial_quota::record_billable_ai_usage(
+                if openobserve_organization::trial_quota::org_has_active_subscription(org_id).await
+                {
+                    openobserve_organization::trial_quota::record_billable_ai_usage(
                         org_id,
                         &usage_ctx,
                         TrialQuotaFeature::IncidentReAnalysis,

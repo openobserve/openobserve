@@ -57,7 +57,7 @@ pub use openobserve_organization::org_cleanup;
 #[cfg(feature = "enterprise")]
 pub mod org_storage_providers;
 #[cfg(feature = "cloud")]
-pub mod org_usage;
+pub use openobserve_organization::org_usage;
 pub use openobserve_organization::organization;
 pub mod pipeline {
     pub use openobserve_pipeline::management::*;
@@ -150,7 +150,7 @@ pub mod synthetics;
 pub mod tls;
 pub use openobserve_ingestion::traces;
 #[cfg(feature = "cloud")]
-pub mod trial_quota;
+pub use openobserve_organization::trial_quota;
 pub use openobserve_organization::users;
 mod organization_adapter;
 mod transform_adapter;

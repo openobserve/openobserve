@@ -25,6 +25,7 @@ cloud = [
     "common/cloud",
     "o2_enterprise/cloud",
     "openobserve-core/cloud",
+    "openobserve-organization/cloud",
 ]
 vectorscan = ["openobserve-core/vectorscan"]
 vortex = ["openobserve-core/vortex"]
@@ -36,6 +37,7 @@ openobserve-catalog.workspace = true
 openobserve-compactor.workspace = true
 openobserve-core.workspace = true
 openobserve-ingestion.workspace = true
+openobserve-organization.workspace = true
 openobserve-pipeline.workspace = true
 openobserve-scheduler.workspace = true
 anyhow.workspace = true

@@ -19,11 +19,12 @@ use axum::{
 };
 use hashbrown::HashMap;
 use o2_enterprise::enterprise::cloud::{billing_group, billings};
+use openobserve_organization::org_usage;
 
 use super::IntoHttpResponse;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    handler::http::models::billings::GetOrgUsageResponseBody, service::org_usage,
+    handler::http::models::billings::GetOrgUsageResponseBody,
 };
 
 /// GetUsageData

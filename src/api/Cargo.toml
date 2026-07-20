@@ -29,6 +29,7 @@ cloud = [
     "openobserve-api-management/cloud",
     "openobserve-api-query/cloud",
     "openobserve-core/cloud",
+    "openobserve-organization/cloud",
 ]
 vectorscan = [
     "openobserve-api-query/vectorscan",
@@ -58,6 +59,7 @@ openobserve-catalog.workspace = true
 openobserve-compactor.workspace = true
 openobserve-core.workspace = true
 openobserve-ingestion.workspace = true
+openobserve-organization.workspace = true
 openobserve-pipeline.workspace = true
 openobserve-scheduler.workspace = true
 openobserve-api-management.workspace = true

@@ -14,10 +14,14 @@ use config::meta::{function::Transform, stream::StreamType};
 
 pub mod auth;
 pub mod org_cleanup;
+#[cfg(feature = "cloud")]
+pub mod org_usage;
 pub mod organization;
 pub mod repository;
 pub mod session;
 pub mod status;
+#[cfg(feature = "cloud")]
+pub mod trial_quota;
 pub mod users;
 
 pub mod db {

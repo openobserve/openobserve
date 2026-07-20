@@ -6665,6 +6665,7 @@ dependencies = [
  "openobserve-compactor",
  "openobserve-core",
  "openobserve-ingestion",
+ "openobserve-organization",
  "openobserve-pipeline",
  "openobserve-scheduler",
  "openobserve-search-service",
@@ -7080,6 +7081,7 @@ dependencies = [
  "openobserve-compactor",
  "openobserve-core",
  "openobserve-ingestion",
+ "openobserve-organization",
  "openobserve-pipeline",
  "openobserve-scheduler",
  "openobserve-transform",
@@ -7119,8 +7121,10 @@ dependencies = [
  "openobserve-pipeline",
  "openobserve-search-service",
  "openobserve-self-reporting",
+ "serde",
  "serde_json",
  "tokio",
+ "utoipa",
 ]
 
 [[package]]

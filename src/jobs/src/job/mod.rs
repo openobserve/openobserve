@@ -958,7 +958,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Initialize AI credits from DB, start quota jobs, and other cloud tasks
     #[cfg(feature = "cloud")]
     {
-        openobserve_core::trial_quota::init_from_db().await;
+        openobserve_organization::trial_quota::init_from_db().await;
         cloud::start_trial_quota_jobs();
 
         // OpenFGA migration

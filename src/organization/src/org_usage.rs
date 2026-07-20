@@ -23,10 +23,9 @@ use o2_enterprise::enterprise::{
     },
     metering::MeteringEventName,
 };
+use openobserve_self_reporting::search::get_usage;
 use serde::Serialize;
 use utoipa::ToSchema;
-
-use crate::self_reporting::search::get_usage;
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct GetOrgUsageResponseBody {

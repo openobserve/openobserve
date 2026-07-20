@@ -53,5 +53,7 @@ openobserve-ingestion.workspace = true
 openobserve-pipeline.workspace = true
 openobserve-search-service.workspace = true
 openobserve-self-reporting.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+utoipa.workspace = true
