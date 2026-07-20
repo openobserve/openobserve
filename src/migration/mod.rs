@@ -44,8 +44,10 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
         }
     };
     if db_schema_version == DB_SCHEMA_VERSION {
-        // if version matches, we do not need to run update commands
-        log::info!("DB_SCHEMA_VERSION match, skipping db upgrade");
+        // Cloud migrations use an independent migration table and may still be pending.
+        #[cfg(feature = "cloud")]
+        o2_enterprise::enterprise::cloud::migrate().await?;
+        log::info!("DB_SCHEMA_VERSION match, skipping shared db upgrade");
         return Ok(());
     }
     log::info!(
@@ -69,14 +71,14 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
         infra::dist_lock::unlock(&lock).await?;
         return Err(e);
     }
-    if let Err(e) = infra::set_db_schema_version().await {
+    // cloud-related migrations
+    #[cfg(feature = "cloud")]
+    if let Err(e) = o2_enterprise::enterprise::cloud::migrate().await {
         infra::dist_lock::unlock(&lock).await?;
         return Err(e);
     }
 
-    // cloud-related migrations
-    #[cfg(feature = "cloud")]
-    if let Err(e) = o2_enterprise::enterprise::cloud::migrate().await {
+    if let Err(e) = infra::set_db_schema_version().await {
         infra::dist_lock::unlock(&lock).await?;
         return Err(e);
     }

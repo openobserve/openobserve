@@ -26,7 +26,10 @@ import {
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createWebHistory } from "vue-router";
 import OrganizationManagement from "./OrganizationManagement.vue";
-import { extendTrialSchema } from "./OrganizationManagement.schema";
+import {
+  aiCreditsSchema,
+  extendTrialSchema,
+} from "./OrganizationManagement.schema";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import enLocaleFull from "@/locales/languages/en-US.json";
@@ -66,6 +69,7 @@ vi.mock("@/services/organizations", () => ({
     create_external_contract: vi.fn(),
     extend_external_contract: vi.fn(),
     revoke_external_contract: vi.fn(),
+    set_ai_usage_limit: vi.fn(),
   },
 }));
 
@@ -191,6 +195,7 @@ describe("OrganizationManagement.vue", () => {
   let mockCreateExternalContract: any;
   let mockExtendExternalContract: any;
   let mockRevokeExternalContract: any;
+  let mockSetAiUsageLimit: any;
 
   // Global setup to ensure consistent timestamp behavior across environments
   beforeAll(() => {
@@ -218,6 +223,7 @@ describe("OrganizationManagement.vue", () => {
       .extend_external_contract;
     mockRevokeExternalContract = (mockedOrgService as any)
       .revoke_external_contract;
+    mockSetAiUsageLimit = (mockedOrgService as any).set_ai_usage_limit;
 
     // Setup default mock responses
     mockGetAdminOrg.mockResolvedValue({ data: { data: [] } });
@@ -225,6 +231,9 @@ describe("OrganizationManagement.vue", () => {
     mockCreateExternalContract?.mockResolvedValue?.({ data: true });
     mockExtendExternalContract?.mockResolvedValue?.({ data: true });
     mockRevokeExternalContract?.mockResolvedValue?.({ data: true });
+    mockSetAiUsageLimit?.mockResolvedValue?.({
+      data: { credits_used: 0, credits_limit: 1000 },
+    });
 
     // Setup default store state
     store.state.selectedOrganization = {
@@ -292,6 +301,7 @@ describe("OrganizationManagement.vue", () => {
       wrapper = createWrapper();
       await flushPromises();
       expect(wrapper.vm.extendTrialPrompt).toBe(false);
+      expect(wrapper.vm.aiCreditsPrompt).toBe(false);
       expect(wrapper.vm.extendedTrial).toBe(1);
       expect(Array.isArray(wrapper.vm.tabledata)).toBe(true);
       expect(wrapper.vm.resultTotal).toBe(0);
@@ -300,15 +310,17 @@ describe("OrganizationManagement.vue", () => {
     it("should have correct column configuration", () => {
       wrapper = createWrapper();
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(8);
+      expect(columns).toHaveLength(10);
       expect(columns[0].id).toBe("name");
       expect(columns[1].id).toBe("identifier");
       expect(columns[2].id).toBe("subscription_status");
       expect(columns[3].id).toBe("billing_provider");
-      expect(columns[4].id).toBe("created_on");
-      expect(columns[5].id).toBe("trial_expiry");
-      expect(columns[6].id).toBe("contract_end_date");
-      expect(columns[7].id).toBe("actions");
+      expect(columns[4].id).toBe("ai_credits_used");
+      expect(columns[5].id).toBe("ai_credits_total");
+      expect(columns[6].id).toBe("created_on");
+      expect(columns[7].id).toBe("trial_expiry");
+      expect(columns[8].id).toBe("contract_end_date");
+      expect(columns[9].id).toBe("actions");
     });
 
     it("should have subscription plans mapping", () => {
@@ -424,6 +436,8 @@ describe("OrganizationManagement.vue", () => {
               name: "Test Org 1",
               identifier: "test-org-1",
               plan: "1",
+              credits_used: 125,
+              credits_limit: 5000,
               created_at: 1234567890000000,
               trial_expires_at: 1234567890000000,
             },
@@ -450,6 +464,8 @@ describe("OrganizationManagement.vue", () => {
         identifier: "test-org-1",
         plan: "Pay as you go",
         billing_provider: "-",
+        credits_used: 125,
+        credits_limit: 5000,
         created_at: "2023-12-01",
         trial_expires_at: "2023-12-01",
         contract_end_date: 0,
@@ -978,6 +994,9 @@ describe("OrganizationManagement.vue", () => {
       expect(
         wrapper.find('[data-test="otg-management-extend-trial-btn"]').exists(),
       ).toBe(true);
+      expect(
+        wrapper.find('[data-test="org-management-set-ai-credits-btn"]').exists(),
+      ).toBe(true);
       // Add contract button should show when billing_provider is "-"
       expect(
         wrapper.find('[data-test="org-management-add-contract-btn"]').exists(),
@@ -1179,6 +1198,79 @@ describe("OrganizationManagement.vue", () => {
         "default",
         expect.objectContaining({ org_id: "acme-id" }),
       );
+    });
+  });
+
+  describe("AI credit allowance dialog", () => {
+    it("opens with the selected organization's current credit limit", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.toggleAiCreditsDialog({
+        name: "Acme",
+        identifier: "acme",
+        credits_used: 125,
+        credits_limit: 5000,
+      });
+      await nextTick();
+
+      expect(wrapper.vm.aiCreditsPrompt).toBe(true);
+      expect(wrapper.vm.aiCreditsFormDefaults).toEqual({ creditsLimit: 5000 });
+      const dialog = wrapper
+        .findAll('[data-test="o-dialog-stub"]')
+        .find((item: any) =>
+          (item.attributes("data-title") || "").startsWith("Set AI Credits"),
+        );
+      expect(dialog?.attributes("data-title")).toBe("Set AI Credits for Acme");
+      expect(dialog?.attributes("data-primary-label")).toBe("Save Credits");
+    });
+
+    it("sends the target org and updates the row from the response", async () => {
+      mockSetAiUsageLimit.mockResolvedValue({
+        data: { credits_used: 125, credits_limit: 7500 },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleAiCreditsDialog({
+        name: "Acme",
+        identifier: "acme",
+        credits_used: 125,
+        credits_limit: 5000,
+      });
+
+      await wrapper.vm.submitAiCredits({ creditsLimit: "7500" } as any);
+
+      expect(mockSetAiUsageLimit).toHaveBeenCalledWith("default", {
+        org_id: "acme",
+        credits_limit: 7500,
+      });
+      expect(wrapper.vm.aiCreditsDataRow.credits_used).toBe(125);
+      expect(wrapper.vm.aiCreditsDataRow.credits_limit).toBe(7500);
+      expect(wrapper.vm.aiCreditsPrompt).toBe(false);
+      expect(mockToastFn).toHaveBeenCalledWith({
+        variant: "success",
+        message: "AI credits updated successfully.",
+      });
+    });
+
+    it("keeps the dialog open and reports an API error", async () => {
+      mockSetAiUsageLimit.mockRejectedValue({
+        response: { data: { message: "limit update failed" } },
+      });
+      wrapper = createWrapper();
+      wrapper.vm.toggleAiCreditsDialog({
+        name: "Acme",
+        identifier: "acme",
+        credits_used: 125,
+        credits_limit: 5000,
+      });
+
+      await wrapper.vm.submitAiCredits({ creditsLimit: 7500 });
+
+      expect(wrapper.vm.aiCreditsPrompt).toBe(true);
+      expect(wrapper.vm.loading).toBe(false);
+      expect(mockToastFn).toHaveBeenCalledWith({
+        variant: "error",
+        message: "limit update failed",
+        timeout: 5000,
+      });
     });
   });
 
@@ -1908,5 +2000,22 @@ describe("extendTrialSchema", () => {
         true,
       );
     }
+  });
+});
+
+describe("aiCreditsSchema", () => {
+  it("accepts a non-negative whole-number credit limit", () => {
+    const result = aiCreditsSchema.safeParse({ creditsLimit: "5000" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.creditsLimit).toBe(5000);
+  });
+
+  it("rejects negative and fractional credit limits", () => {
+    expect(aiCreditsSchema.safeParse({ creditsLimit: -1 }).success).toBe(false);
+    expect(aiCreditsSchema.safeParse({ creditsLimit: 1.5 }).success).toBe(false);
+  });
+
+  it("rejects an empty credit limit instead of coercing it to zero", () => {
+    expect(aiCreditsSchema.safeParse({ creditsLimit: "" }).success).toBe(false);
   });
 });

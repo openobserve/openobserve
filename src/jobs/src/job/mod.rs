@@ -440,6 +440,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     }
 
+    // Routers serve AI usage and organization-management requests, so their
+    // quota cache must be populated and kept in sync even though they skip the
+    // remaining background jobs below.
+    #[cfg(feature = "cloud")]
+    {
+        crate::service::trial_quota::init_from_db().await;
+        cloud::start_trial_quota_jobs();
+    }
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -946,12 +955,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         });
     }
 
-    // Initialize AI credits from DB, start quota jobs, and other cloud tasks
+    // Initialize the remaining cloud tasks. AI quota state and synchronization
+    // are initialized above because single-role routers also serve quota APIs.
     #[cfg(feature = "cloud")]
     {
-        crate::service::trial_quota::init_from_db().await;
-        cloud::start_trial_quota_jobs();
-
         // OpenFGA migration
         o2_enterprise::enterprise::cloud::ofga_migrate()
             .await

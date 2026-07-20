@@ -3937,6 +3937,7 @@
     "aiModePayAsYouGo": "Pay as you go",
     "aiModeExhausted": "Exhausted",
     "aiExhaustedMessage": "Subscribe to continue using AI features",
+    "aiContractExhaustedMessage": "Contact your account manager to add more AI credits",
     "aiPaygMessage": "Free credits exhausted — usage billed to subscription",
     "billingGroup": {
       "tabLabel": "Billing Group",

@@ -72,6 +72,7 @@ pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
+#[cfg(feature = "cloud")]
 pub mod trial_quota_usage;
 pub mod users;
 

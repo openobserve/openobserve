@@ -35,6 +35,7 @@ pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), 
             org_id: sea_orm::ActiveValue::Set(org_id),
             feature: sea_orm::ActiveValue::Set(feature),
             usage_count: sea_orm::ActiveValue::Set(delta),
+            usage_limit: sea_orm::ActiveValue::NotSet,
             updated_at: sea_orm::ActiveValue::Set(now),
             notified_checkpoint: sea_orm::ActiveValue::Set(0),
         };
@@ -89,6 +90,79 @@ pub async fn get_total_usage_for_org(org_id: &str) -> Result<i64, sea_orm::DbErr
     Ok(result.flatten().unwrap_or(0))
 }
 
+/// Get the explicitly configured shared usage limit for an organization.
+/// A missing value means the deployment-wide default still applies.
+pub async fn get_usage_limit_for_org(org_id: &str) -> Result<Option<i64>, sea_orm::DbErr> {
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let result = trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .select_only()
+        .column_as(trial_quota_usage::Column::UsageLimit.max(), "usage_limit")
+        .into_tuple::<Option<i64>>()
+        .one(db)
+        .await?;
+    Ok(result.flatten())
+}
+
+pub async fn load_all_usage_limits() -> Result<Vec<(String, i64)>, sea_orm::DbErr> {
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let results: Vec<(String, Option<i64>)> = trial_quota_usage::Entity::find()
+        .select_only()
+        .column(trial_quota_usage::Column::OrgId)
+        .column_as(trial_quota_usage::Column::UsageLimit.max(), "usage_limit")
+        .filter(trial_quota_usage::Column::UsageLimit.is_not_null())
+        .group_by(trial_quota_usage::Column::OrgId)
+        .into_tuple()
+        .all(db)
+        .await?;
+    Ok(results
+        .into_iter()
+        .filter_map(|(org_id, limit)| limit.map(|limit| (org_id, limit)))
+        .collect())
+}
+
+/// Set one shared limit on every feature row for an organization. The AI chat
+/// row is upserted first so organizations without prior usage can be configured.
+pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(), sea_orm::DbErr> {
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let now = config::utils::time::now_micros();
+    let active_model = trial_quota_usage::ActiveModel {
+        org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+        feature: sea_orm::ActiveValue::Set("ai_chat".to_string()),
+        usage_count: sea_orm::ActiveValue::Set(0),
+        usage_limit: sea_orm::ActiveValue::Set(Some(usage_limit)),
+        updated_at: sea_orm::ActiveValue::Set(now),
+        notified_checkpoint: sea_orm::ActiveValue::Set(0),
+    };
+
+    trial_quota_usage::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::columns([
+                trial_quota_usage::Column::OrgId,
+                trial_quota_usage::Column::Feature,
+            ])
+            .value(
+                trial_quota_usage::Column::UsageLimit,
+                Expr::value(usage_limit),
+            )
+            .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+            .to_owned(),
+        )
+        .exec(db)
+        .await?;
+
+    trial_quota_usage::Entity::update_many()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .col_expr(
+            trial_quota_usage::Column::UsageLimit,
+            Expr::value(usage_limit),
+        )
+        .col_expr(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
 /// Get quota record for a specific org and feature.
 /// Used by the usage API endpoint.
 pub async fn get_for_org_feature(
@@ -137,6 +211,19 @@ pub async fn update_notified_checkpoint(
         .await?;
     // If rows_affected > 0, this pod won the update (no other pod set it first)
     Ok(result.rows_affected > 0)
+}
+
+pub async fn reset_notified_checkpoint(org_id: &str) -> Result<(), sea_orm::DbErr> {
+    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    trial_quota_usage::Entity::update_many()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .col_expr(
+            trial_quota_usage::Column::NotifiedCheckpoint,
+            Expr::value(0),
+        )
+        .exec(db)
+        .await?;
+    Ok(())
 }
 
 /// Load all notified checkpoints (one per org, max across features).
