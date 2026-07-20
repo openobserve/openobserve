@@ -34,9 +34,9 @@ defineSlots<TooltipSlots>();
 const slots = useSlots();
 const hasDefaultSlot = computed(() => !!slots.default);
 
-// ΓöÇΓöÇΓöÇ Child mode (placed inside a parent like q-tooltip) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-// When no default slot is provided, OTooltip acts like q-tooltip: it finds its
-// parent element via a hidden DOM anchor span and attaches hover listeners to it.
+// ─── Child mode (placed inside a parent element as its tooltip) ───────────────
+// When no default slot is provided, OTooltip attaches to its parent: it finds
+// its parent element via a hidden DOM anchor span and attaches hover listeners to it.
 const childAnchorRef = ref<HTMLSpanElement | null>(null);
 const parentEl = ref<Element | null>(null);
 const childOpen = ref(false);
@@ -208,7 +208,7 @@ const contentClasses = computed(() => [
     </TooltipRoot>
   </TooltipProvider>
 
-  <!-- ΓöÇΓöÇ Child mode: no default slot, attaches to parent element like q-tooltip -->
+  <!-- ── Child mode: no default slot, attaches to parent element as its tooltip -->
   <template v-else>
     <TooltipProvider>
       <TooltipRoot

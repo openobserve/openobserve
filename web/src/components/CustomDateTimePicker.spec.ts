@@ -39,14 +39,7 @@ describe('CustomDateTimePicker.vue', () => {
       props,
       global: {
         plugins: [currentStore],
-        stubs: {
-          'q-btn': true,
-          'q-menu': true,
-          'q-tab-panels': true,
-          'q-tab-panel': true,
-          'q-input': true,
-          'q-select': true
-        }
+        stubs: {}
       }
     });
   };

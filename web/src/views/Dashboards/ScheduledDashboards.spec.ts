@@ -169,27 +169,15 @@ describe('ScheduledDashboards', () => {
             name: 'NoData',
             template: '<div data-test="no-data-mock" class="no-data-mock">No data available</div>'
           },
-          'q-input': {
-            name: 'q-input',
-            template: '<input data-test="q-input-mock" class="q-input-mock" />',
-            props: ['modelValue', 'borderless', 'filled', 'dense', 'placeholder'],
-            emits: ['update:modelValue']
-          },
           'OInput': {
             name: 'OInput',
-            template: '<input class="q-input-mock" :data-test="$attrs[\'data-test\'] || \'q-input-mock\'" />',
+            template: '<input class="o-input-mock" :data-test="$attrs[\'data-test\'] || \'o-input-mock\'" />',
             props: ['modelValue', 'placeholder'],
             emits: ['update:modelValue']
           },
-          'q-btn': {
-            name: 'q-btn',
-            template: '<button data-test="q-btn-mock" class="q-btn-mock"><slot /></button>',
-            props: ['class', 'padding', 'color', 'no-caps', 'label', 'round', 'flat', 'icon'],
-            emits: ['click']
-          },
           'OButton': {
             name: 'OButton',
-            template: '<button class="o-btn-mock q-btn-mock" :data-test="$attrs[\'data-test\'] || \'q-btn-mock\'" @click="$emit(\'click\')"><slot /></button>',
+            template: '<button class="o-btn-mock" :data-test="$attrs[\'data-test\'] || \'o-btn-mock\'" @click="$emit(\'click\')"><slot /></button>',
             props: ['variant', 'size', 'disabled', 'loading', 'active'],
             emits: ['click']
           },

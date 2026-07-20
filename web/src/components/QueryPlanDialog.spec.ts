@@ -135,17 +135,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         OTabPanel: oTabPanelStub,
         QueryPlanTree: queryPlanTreeStub,
         MetricsSummaryCard: metricsSummaryCardStub,
-        "q-splitter": {
-          template:
-            '<div data-test="q-splitter"><slot name="before" /><slot name="after" /></div>',
-        },
-        "q-separator": true,
         "OIcon": true,
-        "q-space": true,
-        "q-tooltip": true,
-        "q-banner": { template: "<div><slot /></div>" },
-        "q-card": { template: "<div><slot /></div>" },
-        "q-card-section": { template: "<div><slot /></div>" },
       },
     },
     props: {

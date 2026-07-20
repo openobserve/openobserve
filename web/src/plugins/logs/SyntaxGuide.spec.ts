@@ -141,7 +141,7 @@ describe("SyntaxGuide.vue", () => {
   it("should have theme-dark class when store theme is dark", () => {
     store.state.theme = "dark";
     wrapper = createWrapper();
-    // q-menu was replaced by ODropdown; verify the wrapper exists.
+    // ODropdown wrapper exists.
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
     expect(dropdown.exists()).toBe(true);
     // The theme class is bound on the content wrapper div inside the dropdown.
@@ -178,8 +178,7 @@ describe("SyntaxGuide.vue", () => {
   // Test 16: Menu content structure exists
   it("should have menu with card components", () => {
     wrapper = createWrapper({ sqlmode: false });
-    // The migrated component drops q-card/q-card-section in favor of native
-    // divs inside the ODropdown default slot.
+    // The migrated component uses native divs inside the ODropdown default slot.
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
     expect(dropdown.exists()).toBe(true);
   });
@@ -291,7 +290,7 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ sqlmode: false });
     const button = wrapper.findComponent({ name: "OButton" });
 
-    // OButton uses normal-mode class; syntax-guide-button and q-pa-xs were removed in migration
+    // OButton uses normal-mode class; syntax-guide-button and the legacy padding class were removed in migration
     expect(button.classes()).toContain("normal-mode");
   });
 

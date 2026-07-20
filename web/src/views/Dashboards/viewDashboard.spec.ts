@@ -920,7 +920,7 @@ describe("ViewDashboard", () => {
   });
 
   describe("Migrated ODialog/ODrawer Dialogs", () => {
-    // After migration q-dialog/q-drawer wrappers were removed; the modal
+    // After migration the legacy overlay wrappers were removed; the modal
     // children (DashboardSettings, PanelLayoutSettings, ScheduledDashboards,
     // DashboardJsonEditor) now own their ODialog/ODrawer internally and
     // accept v-model:open from the parent. These tests verify that contract.
@@ -1132,21 +1132,6 @@ describe("ViewDashboard", () => {
         await wrapper.vm.$nextTick();
         expect(wrapper.vm.showJsonEditorDialog).toBe(false);
       }
-    });
-
-    it("should NOT render any q-dialog wrappers after migration", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // The migration removed all q-dialog/q-drawer wrappers; modal children
-      // own their ODialog/ODrawer internally.
-      expect(wrapper.findComponent({ name: "QDialog" }).exists()).toBe(false);
-      expect(wrapper.findComponent({ name: "QDrawer" }).exists()).toBe(false);
-
-      // And no element should carry the legacy test id of the wrapper.
-      expect(
-        wrapper.find('[data-test="dashboard-settings-dialog"]').exists(),
-      ).toBe(false);
     });
 
     it("should keep dialog state defaults isolated per mount", async () => {

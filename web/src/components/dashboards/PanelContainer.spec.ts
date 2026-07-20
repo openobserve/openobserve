@@ -246,21 +246,21 @@ describe("PanelContainer", () => {
           },
           'PanelErrorButtons': {
             template: `<div>
-              <q-btn v-if="error" data-test="panel-error-data" class="warning">
-                <q-tooltip data-test="panel-error-tooltip">{{ error }}</q-tooltip>
-              </q-btn>
-              <q-btn v-if="maxQueryRangeWarning" data-test="panel-max-duration-warning" class="warning">
-                <q-tooltip>{{ maxQueryRangeWarning }}</q-tooltip>
-              </q-btn>
-              <q-btn v-if="limitNumberOfSeriesWarningMessage" data-test="panel-limit-number-of-series-warning" class="warning">
-                <q-tooltip>{{ limitNumberOfSeriesWarningMessage }}</q-tooltip>
-              </q-btn>
-              <q-btn v-if="isCachedDataDifferWithCurrentTimeRange" data-test="panel-is-cached-data-differ-with-current-time-range-warning">
-                <q-tooltip>The data shown is cached</q-tooltip>
-              </q-btn>
-              <q-btn v-if="isPartialData && !isPanelLoading" data-test="panel-partial-data-warning" class="warning">
-                <q-tooltip>Partial data</q-tooltip>
-              </q-btn>
+              <button v-if="error" data-test="panel-error-data" class="warning">
+                <span data-test="panel-error-tooltip">{{ error }}</span>
+              </button>
+              <button v-if="maxQueryRangeWarning" data-test="panel-max-duration-warning" class="warning">
+                <span>{{ maxQueryRangeWarning }}</span>
+              </button>
+              <button v-if="limitNumberOfSeriesWarningMessage" data-test="panel-limit-number-of-series-warning" class="warning">
+                <span>{{ limitNumberOfSeriesWarningMessage }}</span>
+              </button>
+              <button v-if="isCachedDataDifferWithCurrentTimeRange" data-test="panel-is-cached-data-differ-with-current-time-range-warning">
+                <span>The data shown is cached</span>
+              </button>
+              <button v-if="isPartialData && !isPanelLoading" data-test="panel-partial-data-warning" class="warning">
+                <span>Partial data</span>
+              </button>
               <span
                 v-if="lastTriggeredAt && !viewOnly"
                 class="lastRefreshedAt"

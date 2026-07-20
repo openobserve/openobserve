@@ -2437,7 +2437,7 @@ export default defineComponent({
     };
     //this function is used to check if the option is present in the default env
     //if present then we will return true else false
-    //this is used to show the tooltip in the q-select for disabled options
+    //this is used to show the tooltip in the select for disabled options
     //why there are disabled
     const checkIfOptionPresentInDefaultEnv = (name, option) => {
       if (

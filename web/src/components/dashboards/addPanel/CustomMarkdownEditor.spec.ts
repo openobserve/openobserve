@@ -51,11 +51,6 @@ describe("CustomMarkdownEditor", () => {
         stubs: {
           'CodeQueryEditor': true,
           'MarkdownRenderer': true,
-          'q-splitter': {
-            template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-            props: ['modelValue'],
-            emits: ['update:modelValue']
-          },
         },
         mocks: {
           $t: (key: string) => key
@@ -168,11 +163,6 @@ describe("CustomMarkdownEditor", () => {
             stubs: {
               'CodeQueryEditor': true,
               'MarkdownRenderer': true,
-              'q-splitter': {
-                template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-                props: ['modelValue'],
-                emits: ['update:modelValue']
-              },
             },
             mocks: {
               $t: (key: string) => key
@@ -218,11 +208,6 @@ describe("CustomMarkdownEditor", () => {
             stubs: {
               'CodeQueryEditor': true,
               'MarkdownRenderer': true,
-              'q-splitter': {
-                template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-                props: ['modelValue'],
-                emits: ['update:modelValue']
-              },
             },
             mocks: {
               $t: (key: string) => key
@@ -843,11 +828,6 @@ And some more content.
             stubs: {
               'CodeQueryEditor': true,
               'MarkdownRenderer': true,
-              'q-splitter': {
-                template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-                props: ['modelValue'],
-                emits: ['update:modelValue']
-              },
             },
             mocks: {
               $t: (key: string) => key

@@ -61,7 +61,7 @@ vi.mock("@/components/cipherkeys/AddCipherKey.vue", () => ({
 vi.mock("@/components/shared/grid/Pagination.vue", () => ({
   default: {
     name: "QTablePagination",
-    template: "<div data-test='q-table-pagination'></div>",
+    template: "<div data-test='table-pagination'></div>",
     props: ["scope", "pageTitle", "resultTotal", "perPageOptions", "position"],
     emits: ["update:changeRecordPerPage"],
   },
@@ -136,56 +136,6 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-                QTable: {
-          template: `<div data-test-stub='q-table'>
-            <slot name='top'></slot>
-            <slot name='header'></slot>
-            <div v-if='rows && rows.length > 0'>
-              <div v-for='(row, index) in rows' :key='row["#"] || index' class='table-row'>
-                <span>{{ row.name }}</span>
-              </div>
-            </div>
-            <div v-else class='no-data'>No data</div>
-            <slot name='no-data' v-if='!rows || rows.length === 0'></slot>
-            <slot name='bottom'></slot>
-          </div>`,
-          props: ["rows", "columns", "pagination", "filter", "filterMethod"],
-          data() {
-            return {
-              mockScope: { pagination: { page: 1, rowsPerPage: 20 } },
-              mockCols: [
-                { name: "name", label: "Name" },
-                { name: "actions", label: "Actions" },
-              ],
-            };
-          },
-          methods: {
-            setPagination: vi.fn(),
-          },
-        },
-        QBtn: {
-          template: `<button 
-            data-test-stub='q-btn' 
-            :data-test='$attrs["data-test"]'
-            @click='$emit("click", $event)'
-            :disabled='disable'
-          >
-            <slot></slot>
-            {{ label }}
-          </button>`,
-          props: ["label", "disable", "icon", "color", "class", "padding"],
-          emits: ["click"],
-        },
-        QInput: {
-          template: `<input
-            data-test-stub='q-input'
-            :value='modelValue'
-            @input='$emit("update:modelValue", $event.target.value)'
-            :placeholder='placeholder'
-          />`,
-          props: ["modelValue", "placeholder", "filled", "dense", "clearable"],
-          emits: ["update:modelValue"],
-        },
         OInput: {
           template: `<input
             data-test-stub='o-input'
@@ -196,28 +146,12 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["modelValue", "placeholder", "class"],
           emits: ["update:modelValue"],
         },
-        QIcon: {
-          template: "<span data-test-stub='OIcon'></span>",
-          props: ["name"],
-        },
-        QTh: {
-          template: "<th data-test-stub='q-th'><slot></slot></th>",
-          props: ["props", "class", "style"],
-        },
-        QTr: {
-          template: "<tr data-test-stub='q-tr'><slot></slot></tr>",
-          props: ["props"],
-        },
-        QTd: {
-          template: "<td data-test-stub='q-td'><slot></slot></td>",
-          props: ["props"],
-        },
         AddCipherKey: {
           template: "<div data-test-stub='add-cipher-key'></div>",
           emits: ["cancel:hideform"],
         },
         QTablePagination: {
-          template: "<div data-test-stub='q-table-pagination'></div>",
+          template: "<div data-test-stub='table-pagination'></div>",
           props: ["scope", "pageTitle", "resultTotal", "perPageOptions", "position"],
           emits: ["update:changeRecordPerPage"],
         },

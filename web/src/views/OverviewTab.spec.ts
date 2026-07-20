@@ -88,7 +88,7 @@ import serviceGraphService from "@/services/service_graph";
 import config from "@/aws-exports";
 import OverviewTab from "./OverviewTab.vue";
 
-// No installQuasar() — OverviewTab renders only O2 `lib` components, no q-*.
+// OverviewTab renders only O2 `lib` components.
 
 // ── Local helpers ────────────────────────────────────────────────────────────
 

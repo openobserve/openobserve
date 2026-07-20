@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Unit tests for the AddFunction Zod schema — the restored Quasar BEFORE rules
+// Unit tests for the AddFunction Zod schema — the previous validation rules
 // for the function `name` (required + method-name regex) and the optional
 // `transType`.
 

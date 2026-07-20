@@ -34,7 +34,7 @@ import {
  *
  * header_rows = max(1, pivot_count + (y_count > 1 ? 1 : 0))
  *
- * When header_rows === 1 (1 pivot + 1 Y), returns [] to use standard q-table headers.
+ * When header_rows === 1 (1 pivot + 1 Y), returns [] to use standard table headers.
  * Otherwise returns an array of header level objects with cells[] and isLeaf flag.
  */
 function buildPivotHeaderLevels(

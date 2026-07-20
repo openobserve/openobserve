@@ -18,8 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import { createStore } from "vuex";
 
-// PerformanceFieldsDialog now wraps content in <ODialog> (migrated from
-// <q-dialog>). The dialog exposes:
+// PerformanceFieldsDialog now wraps content in <ODialog>. The dialog exposes:
 //   - prop  : open (v-model:open), persistent, size, title,
 //             primary-button-label, secondary-button-label
 //   - emits : update:open, click:primary, click:secondary

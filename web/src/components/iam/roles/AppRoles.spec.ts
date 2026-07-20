@@ -436,7 +436,7 @@ describe('AppRoles - RoleTable integration', () => {
 });
 
 // 13. ODialog/ODrawer Migration
-// After migration the q-dialog wrapper around AddRole was removed; AddRole
+// After migration the dialog wrapper around AddRole was removed; AddRole
 // now owns its own drawer/dialog and accepts v-model:open from the parent.
 // These tests verify the new contract.
 describe('AppRoles - ODialog/ODrawer Migration', () => {
@@ -539,11 +539,4 @@ describe('AppRoles - ODialog/ODrawer Migration', () => {
     expect(getRoles).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
   });
 
-  it('does not render AddRole inside a q-dialog wrapper (post-migration)', async () => {
-    const wrapper = await mountAppRolesWithAddRoleStub();
-    // The legacy template wrapped AddRole in <q-dialog>. After migration AddRole
-    // owns its own dialog, so no q-dialog wrapper should be rendered around it
-    // by the parent template.
-    expect(wrapper.find('.q-dialog').exists()).toBe(false);
-  });
 });

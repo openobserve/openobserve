@@ -154,9 +154,6 @@ describe("AppPerformance.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-                    QSeparator: {
-            template: '<hr class="q-separator" />',
-          },
           OButton: {
             template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
             props: ["variant", "size", "disabled"],

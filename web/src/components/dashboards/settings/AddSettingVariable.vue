@@ -1515,7 +1515,7 @@ export default defineComponent({
       }));
     });
 
-    // Merged stream options: variables + streams for q-select
+    // Merged stream options: variables + streams for the select
     const mergedStreamOptions = computed(() => {
       const variableItems = dashboardVariablesFilterItems.value.map(
         (v: any) => ({ name: v.value }),

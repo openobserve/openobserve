@@ -35,7 +35,7 @@ const componentStubs = {
   OButton: {
     name: "OButton",
     template:
-      '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click.stop="$emit(\'click\', $event)"><slot /></button>',
+      '<button :data-test="$attrs[\'data-test\']" @click.stop="$emit(\'click\', $event)"><slot /></button>',
     props: ["icon", "size", "round"],
     emits: ["click"],
   },

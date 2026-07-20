@@ -407,10 +407,7 @@ function mountServicesCatalog(
           ],
           emits: ["close", "view-traces"],
         },
-        "q-input": false,
-        "q-btn": false,
         "OIcon": false,
-        "q-tooltip": false,
       },
     },
   });

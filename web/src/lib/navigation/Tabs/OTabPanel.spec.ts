@@ -165,12 +165,4 @@ describe('OTabPanel', () => {
     const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', stretch: true })
     expect(wrapper.find('[role="tabpanel"]').classes()).toContain('h-full')
   })
-
-  // --- No default padding (legacy check) ---
-
-  it('does not add q-tab-panel class', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
-    const panel = wrapper.find('[role="tabpanel"]')
-    expect(panel.classes()).not.toContain('q-tab-panel')
-  })
 })

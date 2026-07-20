@@ -36,14 +36,8 @@ describe("PanelSidebar", () => {
             props: ["name"],
             inheritAttrs: false,
           },
-          "q-btn": {
-            template: '<button @click="$emit(\'click\', $event)" :data-test="$attrs[\'data-test\']" class="q-btn" :class="$attrs.class" :icon="icon"><slot /></button>',
-            props: ["square", "icon"],
-            emits: ["click"],
-            inheritAttrs: false,
-          },
           "OSeparator": {
-            template: '<div class="q-separator"></div>',
+            template: '<div class="o-separator"></div>',
           },
         },
       },
@@ -368,7 +362,7 @@ describe("PanelSidebar", () => {
   });
 
   describe("Separator Rendering", () => {
-    it("should render q-separator", () => {
+    it("should render the separator", () => {
       wrapper = createWrapper();
       
       expect(wrapper.find('[data-test="panel-sidebar-separator"]').exists()).toBe(true);
@@ -406,8 +400,6 @@ describe("PanelSidebar", () => {
           plugins: [],
           stubs: {
             "OIcon": true,
-            "q-btn": true,
-            "q-separator": true,
           },
         },
       });

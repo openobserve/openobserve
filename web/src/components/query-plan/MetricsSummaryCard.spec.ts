@@ -48,7 +48,7 @@ describe("MetricsSummaryCard", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render a q-card element", () => {
+    it("should render the summary card element", () => {
       wrapper = mountComponent();
       expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(true);
     });

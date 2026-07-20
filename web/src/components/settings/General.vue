@@ -663,7 +663,7 @@ export default defineComponent({
     // Color picker dialog state
     const showColorPicker = ref(false); // Controls dialog visibility
     const currentPickerMode = ref<"light" | "dark">("light"); // Which mode is being edited
-    const tempColor = ref(DEFAULT_LIGHT_COLOR); // Bound to q-color component
+    const tempColor = ref(DEFAULT_LIGHT_COLOR); // Bound to the color picker component
 
     /**
      * Update theme colors from Vuex store

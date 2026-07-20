@@ -127,13 +127,6 @@ describe("DashboardSankeyChartBuilder", () => {
           DashboardJoinsOption: true,
           DynamicFunctionPopUp: true,
           "OIcon": true,
-          "q-tooltip": true,
-          "q-btn-group": true,
-          "q-btn": true,
-          "q-menu": true,
-          "q-input": true,
-          "q-select": true,
-          "q-separator": true,
         },
         mocks: {
           $t: (key: string) => key,

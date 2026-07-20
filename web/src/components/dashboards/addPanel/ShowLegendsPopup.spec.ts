@@ -85,20 +85,6 @@ describe("ShowLegendsPopup Component", () => {
         stubs: {
           ODialog: ODialogStub,
           OButton: OButtonStub,
-          "q-card": {
-            template: '<div class="q-card" :data-test="$attrs[\'data-test\']"><slot /></div>',
-          },
-          "q-card-section": {
-            template: '<div class="q-card-section"><slot /></div>',
-          },
-          "q-btn": {
-            template:
-              '<button @click="$emit(\'click\', $event)" :data-test="$attrs[\'data-test\']" :icon="$attrs.icon"><slot /></button>',
-            emits: ["click"],
-          },
-          "q-tooltip": {
-            template: '<span class="q-tooltip"><slot /></span>',
-          },
           "OIcon": {
             template: '<span class="OIcon">{{ $attrs.name }}</span>',
           },

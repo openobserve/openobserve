@@ -371,7 +371,7 @@ describe("QueryEditorDialog - onBlurFunctionEditor", () => {
   });
 });
 
-// Coverage for the q-dialog → ODrawer migration. The template now renders
+// Coverage for the dialog → ODrawer migration. The template now renders
 // <ODrawer v-model:open="isOpen" size="full" :show-close="false"> where
 // isOpen is a computed get/set bound to the modelValue prop.
 describe("QueryEditorDialog - ODrawer Migration", () => {
@@ -540,11 +540,9 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
     ).toBe(true);
   });
 
-  it("no longer renders any q-dialog wrapper (migration completed)", async () => {
+  it("renders ODrawer as the migration wrapper (migration completed)", async () => {
     const w = await mountWithDrawerStub();
     await flushPromises();
-    // q-dialog renders as .q-dialog in DOM; ODrawer replaces it entirely.
-    expect(w.find(".q-dialog").exists()).toBe(false);
     expect(w.findComponent(ODrawerStub).exists()).toBe(true);
   });
 });

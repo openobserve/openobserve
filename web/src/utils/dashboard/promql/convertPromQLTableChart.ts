@@ -49,7 +49,7 @@ export class TableConverter implements PromQLChartConverter {
     const rows = this.buildRows(processedData, panelSchema, store);
 
     // Return the same structure as SQL tables (convertTableData)
-    // TableRenderer component (q-table) handles pagination, sorting, filtering automatically
+    // TableRenderer component (table) handles pagination, sorting, filtering automatically
     const result = {
       rows,
       columns,

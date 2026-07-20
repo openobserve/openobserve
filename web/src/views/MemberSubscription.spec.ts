@@ -82,10 +82,6 @@ describe('MemberSubscription.vue', () => {
           $store: store,
         },
         stubs: {
-                    'q-btn': {
-            template: '<button class="q-btn"><slot /></button>',
-            props: ['label'],
-          },
           'SanitizedHtmlRenderer': {
             template: '<div class="sanitized-html" data-test="sanitized-html">{{ htmlContent }}</div>',
             props: ['htmlContent'],

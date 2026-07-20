@@ -43,17 +43,8 @@ describe("AIIntegrations", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          "q-input": true,
           "OIcon": true,
           "router-view": true,
-          "q-tabs": {
-            template: '<div class="q-tabs-stub"><slot /></div>',
-          },
-          "q-tab": {
-            template:
-              '<div class="q-tab-stub" :data-test="$attrs[\'data-test\']">{{ $attrs.label }}</div>',
-            inheritAttrs: false,
-          },
         },
       },
     });

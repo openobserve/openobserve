@@ -147,25 +147,25 @@ describe("DetailTable Component", () => {
         plugins: [i18n, router],
         stubs: {
           'OTabs': {
-            template: '<div class="q-tabs"><slot /></div>',
+            template: '<div><slot /></div>',
             props: ['modelValue'],
             emits: ['update:modelValue']
           },
           'OTab': {
-            template: '<div class="q-tab" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
+            template: '<div :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
             props: ['name', 'label'],
             emits: ['click']
           },
           'OTabPanels': {
-            template: '<div class="q-tab-panels" :data-test="$attrs[\'data-test\']"><slot /></div>',
+            template: '<div :data-test="$attrs[\'data-test\']"><slot /></div>',
             props: ['modelValue']
           },
           'OTabPanel': {
-            template: '<div class="q-tab-panel"><slot /></div>',
+            template: '<div><slot /></div>',
             props: ['name']
           },
           'OSwitch': {
-            template: '<div class="q-toggle" :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
+            template: '<div :data-test="$attrs[\'data-test\']" @click="toggle"><slot /></div>',
             props: ['modelValue', 'label'],
             methods: {
               toggle() {
@@ -311,7 +311,7 @@ describe("DetailTable Component", () => {
     expect(wrapper.vm.tab).toBe("json");
     const jsonTab = wrapper.find('[data-test="log-detail-json-tab"]');
     expect(jsonTab.exists()).toBe(true);
-    // OTab uses Tailwind classes for active state, not q-tab--active
+    // OTab uses Tailwind classes for active state
   });
 
   it("should switch to table tab when clicked", async () => {

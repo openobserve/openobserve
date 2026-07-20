@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Metrics Tab Panel -->
         <OTabPanel name="metrics" layout="flex-col" stretch class="min-h-0">
-          <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
+          <!-- Two-column body: sidebar + charts (splitter matching TracesAnalysisDashboard style) -->
           <OSplitter
             v-model="splitterModel"
             class="flex-1 min-h-0 h-full max-h-full overflow-hidden w-full"
@@ -668,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="activeTab == 'metrics'"
         class="h-full flex flex-col overflow-hidden min-h-0 metrics-correlation-dashboard"
       >
-        <!-- Two-column body: sidebar + charts (q-splitter matching TracesAnalysisDashboard style) -->
+        <!-- Two-column body: sidebar + charts (splitter matching TracesAnalysisDashboard style) -->
         <OSplitter
           v-model="splitterModel"
           class="flex-1 min-h-0 h-full max-h-full overflow-hidden w-full"

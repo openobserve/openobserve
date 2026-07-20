@@ -91,14 +91,7 @@ describe("Billing Component", () => {
           store,
         },
         stubs: {
-                    'q-separator': true,
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-          },
-          'q-tabs': true,
-          'q-route-tab': true,
           'router-view': true,
-          'q-select': true,
           'OIcon': true,
           'ConfirmDialog': true,
           'Usage': true,
@@ -196,14 +189,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true,
-            'q-select': true,
             'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
@@ -238,14 +224,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true,
-            'q-select': true,
             'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
@@ -307,14 +286,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true,
-            'q-select': true,
             'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
@@ -521,14 +493,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true,
-            'q-select': true,
             'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
@@ -555,14 +520,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true,
-            'q-select': true,
             'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,
@@ -589,14 +547,7 @@ describe("Billing Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-                        'q-separator': true,
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true,
-            'q-select': true,
             'OIcon': true,
             'ConfirmDialog': true,
             'Usage': true,

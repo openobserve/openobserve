@@ -33,13 +33,6 @@ const i18n = createI18n({
 });
 
 // Stubs for components not under test
-const qBtnStub = {
-  template:
-    "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\">{{ label }}</button>",
-  props: ["label", "stack", "padding", "outline", "icon"],
-  emits: ["click"],
-};
-
 const oBtnStub = {
   template:
     "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click')\"><slot></slot></button>",
@@ -52,7 +45,6 @@ function mountNoPanel(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n],
       stubs: {
-        "q-btn": qBtnStub,
         OButton: oBtnStub,
       },
     },

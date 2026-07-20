@@ -2,7 +2,7 @@
 //
 // Unit tests for the AddEnrichmentTable Zod schema, focused on the conditional
 // file/url rules that branch on `source` + `updateMode` + `isUpdating`. These
-// assert the restored Quasar BEFORE rules (name required, CSV file required, URL
+// assert the restored validation rules (name required, CSV file required, URL
 // required + http(s):// prefix).
 
 import { describe, it, expect } from "vitest";

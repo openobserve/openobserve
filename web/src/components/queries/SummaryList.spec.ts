@@ -263,7 +263,7 @@ describe("SummaryList.vue", () => {
 
   // Test 29: Test "cancel" icon
   it('should render "cancel" icon in the page', () => {
-    // After q-icon → OIcon migration, "cancel" is the OIcon name prop
+    // "cancel" is the OIcon name prop
     const cancelIcons = wrapper
       .findAllComponents({ name: "OIcon" })
       .filter((i: any) => i.props("name") === "cancel");

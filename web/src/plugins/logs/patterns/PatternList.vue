@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Bottom spacer so the last row isn't flush with the container edge -->
     <div v-if="!loading && patterns?.length > 0" class="h-4" />
 
-    <!-- Wildcard hover popover (outside q-virtual-scroll to avoid DOM recycling conflicts) -->
+    <!-- Wildcard hover popover (outside the virtual scroller to avoid DOM recycling conflicts) -->
     <WildcardValuePopover
       :visible="!!hoveredToken"
       :token="hoveredToken?.token ?? ''"
@@ -222,7 +222,7 @@ const props = defineProps<{
   loading: boolean;
   totalLogsAnalyzed?: number;
   wrap?: boolean;
-  /** External scroll container passed to q-virtual-scroll's scroll-target. */
+  /** External scroll container passed to the virtual scroller's scroll-target. */
   scrollTarget?: HTMLElement | null;
   /** Selected stream's doc time range (µs) — from the logs Index. */
   streamDocTimeRange?: { min: number; max: number };

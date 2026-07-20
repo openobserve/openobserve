@@ -140,59 +140,6 @@ const OButtonStub = {
   `,
 };
 
-const QInputStub = {
-  name: "QInput",
-  props: [
-    "modelValue",
-    "type",
-    "min",
-    "label",
-    "placeholder",
-    "error",
-    "errorMessage",
-    "dense",
-    "borderless",
-    "step",
-  ],
-  emits: ["update:modelValue", "blur"],
-  template: `
-    <input
-      data-test-stub="q-input"
-      :data-test="$attrs['data-test']"
-      :data-error="String(error)"
-      :data-error-message="errorMessage"
-      :value="modelValue"
-      :type="type"
-      :placeholder="placeholder"
-      @input="$emit('update:modelValue', type === 'number' ? Number($event.target.value) : $event.target.value)"
-      @blur="$emit('blur', $event)"
-    />
-  `,
-};
-
-const QSelectStub = {
-  name: "QSelect",
-  props: ["modelValue", "options", "displayValue"],
-  emits: ["update:modelValue"],
-  template: `<div data-test-stub="q-select" :data-display="displayValue"></div>`,
-};
-
-const QIconStub = {
-  name: "QIcon",
-  props: ["name", "size"],
-  template: `<span data-test-stub="OIcon" :data-name="name"><slot /></span>`,
-};
-
-const QTooltipStub = {
-  name: "QTooltip",
-  template: `<span data-test-stub="q-tooltip"><slot /></span>`,
-};
-
-const QPageStub = {
-  name: "QPage",
-  template: `<div data-test-stub="q-page"><slot /></div>`,
-};
-
 const createWrapper = (overrides: { query?: Record<string, any> } = {}) => {
   mockRouteQuery = overrides.query || {};
   return mount(ModelPricingEditor, {
@@ -205,11 +152,6 @@ const createWrapper = (overrides: { query?: Record<string, any> } = {}) => {
         store: mockStore,
       },
       stubs: {
-        QPage: QPageStub,
-        QInput: QInputStub,
-        QSelect: QSelectStub,
-        QIcon: QIconStub,
-        QTooltip: QTooltipStub,
         ODialog: ODialogStub,
         OButton: OButtonStub,
       },

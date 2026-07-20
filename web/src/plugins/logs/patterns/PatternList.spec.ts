@@ -87,7 +87,7 @@ describe("PatternList", () => {
   });
 
   describe("Pattern Display", () => {
-    it("should render q-virtual-scroll when patterns are available", () => {
+    it("should render the virtual scroll when patterns are available", () => {
       const virtualScroll = wrapper.findComponent({ name: "OVirtualScroll" });
       expect(virtualScroll.exists()).toBe(true);
     });

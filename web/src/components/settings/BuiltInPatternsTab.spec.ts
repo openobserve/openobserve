@@ -162,13 +162,6 @@ function mountComponent() {
       provide: { store: mockStore },
       stubs: {
         ODialog: ODialogStub,
-        "q-list": { template: "<div><slot /></div>", props: ["bordered", "separator"] },
-        "q-item": { template: "<div class='q-item'><slot /></div>", props: ["class"] },
-        "q-item-section": { template: "<div class='q-item-section'><slot /></div>", props: ["side"] },
-        "q-item-label": { template: "<div><slot /></div>", props: ["caption", "lines", "class"] },
-        "q-checkbox": { template: "<input type='checkbox' />", props: ["modelValue"], emits: ["update:modelValue"] },
-        "q-tooltip": { template: "<span><slot /></span>" },
-        "q-input": { template: "<input />", props: ["modelValue", "readonly", "outlined", "dense", "rows", "type"] },
       },
     },
   });

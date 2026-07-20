@@ -793,7 +793,7 @@ describe("IndexList Component", () => {
     });
 
     it("should update selectedStream on stream change", async () => {
-      // onStreamChange now takes a string value (post q-select → OSelect migration)
+      // onStreamChange now takes a string value (post OSelect migration)
       // and looks up the stream from streamLists
       const newStream = { label: "new_stream", value: "new_stream" };
       wrapper.vm.searchObj.data.stream.streamLists = [newStream];

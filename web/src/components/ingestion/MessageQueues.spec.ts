@@ -101,10 +101,6 @@ describe("MessageQueues.vue", () => {
           $t: (key: string) => key,
         },
         stubs: {
-          "q-splitter": true,
-          "q-input": true,
-          "q-tabs": true,
-          "q-route-tab": true,
           "OIcon": true,
           "router-view": true,
         },

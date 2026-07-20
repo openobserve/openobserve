@@ -131,9 +131,6 @@ const createWrapper = (props: Record<string, any> = {}) =>
           template: '<i data-test-stub="OIcon" :data-name="name"></i>',
           props: ["name", "size"],
         },
-        "q-tooltip": {
-          template: '<div data-test-stub="q-tooltip"><slot /></div>',
-        },
       },
     },
   });

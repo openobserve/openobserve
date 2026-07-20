@@ -60,9 +60,6 @@ describe("NoOrganizationSelected", () => {
     expect(wrapper.classes()).toContain('w-full');
     expect(wrapper.classes()).toContain('flex');
     expect(wrapper.classes()).toContain('flex-col');
-    // `flex-center` was a Quasar class; Quasar is uninstalled, so it stopped
-    // centering anything. Replaced with the Tailwind utilities that actually do.
-    expect(wrapper.classes()).not.toContain('flex-center');
     expect(wrapper.classes()).toContain('items-center');
     expect(wrapper.classes()).toContain('justify-center');
     expect(wrapper.classes()).toContain('gap-2');

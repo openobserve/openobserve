@@ -26,7 +26,7 @@ export interface CheckboxProps {
    * of the group's checked-values array.
    */
   value?: CheckboxPrimitive;
-  /** q-checkbox compatibility alias for `value` */
+  /** Compatibility alias for `value` */
   val?: CheckboxPrimitive;
   /** Accessible label rendered next to the checkbox */
   label?: string;

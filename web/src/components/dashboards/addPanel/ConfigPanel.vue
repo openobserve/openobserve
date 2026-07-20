@@ -2547,7 +2547,7 @@ export default defineComponent({
     );
     // When pivot mode activates: disable conflicting features and
     // initialize pivot config values (undefined ? false defaults).
-    // Without this, q-toggle shows undefined as OFF but conversion
+    // Without this, the toggle shows undefined as OFF but conversion
     // may treat undefined differently — causing a mismatch.
     watch(
       () => isPivotMode.value,

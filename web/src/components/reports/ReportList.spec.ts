@@ -798,7 +798,7 @@ describe("ReportList", () => {
   });
 
   // ── Move to folder (ODrawer migration) ───────────────────────────────────
-  // q-dialog → ODrawer: v-model:open, size="lg", show-close="false",
+  // ODrawer: v-model:open, size="lg", show-close="false",
   // @close=showMoveDialog=false. Drawer hosts <MoveAcrossFolders /> which
   // emits @updated (-> onMoveUpdated) and @close (-> closes drawer).
 

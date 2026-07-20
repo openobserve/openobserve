@@ -115,7 +115,7 @@ export default defineComponent({
         console.warn("No rows found in table data");
         return [];
       }
-      // Add unique ID to each row for q-table
+      // Add unique ID to each row for the table
       const rows = props.data.rows.map((row: any, index: number) => ({
         id: `row_${index}`,
         ...row,

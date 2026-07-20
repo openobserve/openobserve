@@ -37,7 +37,7 @@ describe("OForm", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  describe("q-form compatibility ref methods", () => {
+  describe("legacy-compatibility ref methods", () => {
     function mountWithRequiredField(
       initial = "",
       onSubmit?: (_v: unknown) => unknown,

@@ -5678,7 +5678,7 @@ export default defineComponent({
 /* ── .logs-search-bar-component: the root modifier this file puts on its own
    wrapper. The rest of the former global block (18 nested rules — .reset-filters,
    .toggle-container, .ddlWrapper/.listWrapper, .savedview-dropdown, #logsQueryEditor,
-   #fnEditor, the Quasar-era `> .row` rules, …) targeted DOM that no longer exists
+   #fnEditor, the legacy `> .row` rules, …) targeted DOM that no longer exists
    and was deleted rather than moved. */
 .logs-search-bar-component {
   height: 100%;

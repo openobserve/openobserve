@@ -138,8 +138,6 @@ const globalConfig = {
       emits: ["update:modelValue"],
     },
     "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },
-    "q-item": { template: "<div class='q-item-stub'><slot /></div>" },
-    "q-item-section": { template: "<div><slot /></div>" },
   },
   mocks: { $store: store },
   provide: { store },
@@ -363,9 +361,9 @@ describe("SelectFolderDropDown.vue", () => {
   // ─── Dropdown options ─────────────────────────────────────────────────────────
 
   describe("Dropdown options", () => {
-    it("q-select receives options from foldersByType mapped to {label, value}", () => {
+    it("the select receives options from foldersByType mapped to {label, value}", () => {
       wrapper = createWrapper();
-      // The q-select stub receives the mapped options array; we verify via vm
+      // The select stub receives the mapped options array; we verify via vm
       const vm = wrapper.vm as any;
       // Verify store folders are accessible
       expect(vm.store.state.organizationData.foldersByType["alerts"]).toEqual(MOCK_FOLDERS);

@@ -190,7 +190,7 @@ const setRelativeDate = (period, item) => {
   emit("update:modelValue", `${item}${period.value}`);
 };
 
-// Function to update custom period when selecting from q-select
+// Function to update custom period when selecting from the select
 const updateCustomPeriod = (newPeriod) => {
   picker.data.selectedDate.relative.label = getPeriodLabelFromValue(newPeriod);
   emit(

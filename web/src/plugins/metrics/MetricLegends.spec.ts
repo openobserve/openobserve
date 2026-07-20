@@ -222,7 +222,7 @@ describe("MetricLegends", () => {
     });
 
     it("should render title and legends sections", () => {
-      // The migrated component uses native divs instead of <q-card-section>
+      // The migrated component uses native section divs
       const title = wrapper.find('.metric-legends-title');
       const legends = wrapper.find('.legends');
       expect(title.exists()).toBe(true);
@@ -240,7 +240,7 @@ describe("MetricLegends", () => {
     });
 
     it("should render separator", () => {
-      // The migrated component uses a native border div instead of <q-separator>
+      // The migrated component uses a native top-border div as the separator
       const separator = wrapper.find('.border-t');
       expect(separator.exists()).toBe(true);
     });
@@ -564,8 +564,8 @@ describe("MetricLegends", () => {
     });
 
     it("should maintain semantic HTML structure", () => {
-      // The migrated component drops <q-card>/<q-card-section> in favor of
-      // native divs (content wrapper + title + legends sections). The wrapper
+      // The migrated component uses native divs for the card surface
+      // (content wrapper + title + legends sections). The wrapper
       // carries no per-theme class — theming is `.dark` + --color-* tokens.
       const button = wrapper.find('[data-cy="metric-legends-button"]');
       const content = dropdownContent(wrapper);

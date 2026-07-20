@@ -79,9 +79,6 @@ describe("TabList", () => {
           selectedTabId: selectedTabIdRef,
         },
         stubs: {
-          "q-tooltip": {
-            template: "<span data-test='tooltip-wrapper'><slot /></span>",
-          },
           "OIcon": {
             template: "<span data-test='OIcon'></span>",
           },
@@ -452,9 +449,6 @@ describe("TabList", () => {
             selectedTabId: customSelectedTabIdRef,
           },
           stubs: {
-            "q-tooltip": {
-              template: "<span data-test='tooltip-wrapper'><slot /></span>",
-            },
             "OIcon": {
               template: "<span data-test='OIcon'></span>",
             },

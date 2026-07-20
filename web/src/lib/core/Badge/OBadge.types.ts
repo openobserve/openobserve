@@ -70,14 +70,14 @@ export interface BadgeProps {
   /**
    * Numeric count rendered in a trailing segment on the right.
    * Overridden by the `#trailing` slot when provided.
-   * NOTE: `count: 0` still renders the `0` chip (different from q-badge which
-   * hid empty counts). To hide an empty count, pass `count: undefined` or use
+   * NOTE: `count: 0` still renders the `0` chip (different from the previous badge
+   * which hid empty counts). To hide an empty count, pass `count: undefined` or use
    * `hideZeroCount`.
    */
   count?: number;
   /**
    * When true and `count` is 0, the trailing segment is suppressed
-   * (q-badge-compatible behavior).
+   * (matches the previous badge behavior).
    */
   hideZeroCount?: boolean;
   /**

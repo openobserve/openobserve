@@ -120,7 +120,7 @@ async function mountInvitationList(props = {}) {
         QTablePagination: {
           props: ['scope', 'resultTotal', 'perPageOptions', 'position'],
           emits: ['update:changeRecordPerPage'],
-          template: '<div data-test="q-table-pagination-stub" />',
+          template: '<div data-test="table-pagination-stub" />',
         },
         ODialog: ODialogStub,
       },

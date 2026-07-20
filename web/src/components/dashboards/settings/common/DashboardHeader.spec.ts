@@ -149,7 +149,7 @@ describe("DashboardHeader", () => {
 
       expect(backButton.props('variant')).toBe('outline');
       expect(backButton.props('size')).toBe('icon-xs');
-      // Migration replaced q-mr-sm with mr-2.
+      // Migration replaced the legacy margin class with mr-2.
       expect(backButton.classes().some((c) => c.includes("mr-2"))).toBe(true);
     });
 

@@ -114,7 +114,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
       props: ["data", "columns", "rowKey", "pagination", "pageSize", "loading"],
       emits: ["update:expandedIds"],
       template:
-        '<div data-test-stub="q-table" :data-rows="data ? data.length : 0"><slot name="empty" /></div>',
+        '<div data-test-stub="o-table" :data-rows="data ? data.length : 0"><slot name="empty" /></div>',
     },
     OButton: {
       name: "OButton",
@@ -344,14 +344,14 @@ describe("SourceMaps.vue", () => {
       // OTable is always rendered; when data is empty it renders #empty slot with OEmptyState.
       // The i18n keys are not translated in the test environment, so we verify the
       // empty state component is rendered rather than checking for translated text.
-      expect(wrapper.find('[data-test-stub="q-table"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test-stub="q-table"]').text()).toContain("emptyState");
+      expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain("emptyState");
     });
 
     it("shows OTable when grouped source maps exist", async () => {
       wrapper = await mountComponent();
 
-      expect(wrapper.find('[data-test-stub="q-table"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
     });
   });
 

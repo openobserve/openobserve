@@ -188,28 +188,6 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["modelValue"],
           emits: ["update:modelValue"],
         },
-        // Legacy stubs kept for safety (no longer rendered, harmless)
-        QCard: {
-          template: '<div data-test-stub="q-card"><slot></slot></div>',
-        },
-        QCardSection: {
-          template: '<div data-test-stub="q-card-section"><slot></slot></div>',
-        },
-        QBtn: {
-          template:
-            '<button data-test-stub="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot></button>',
-        },
-        QIcon: {
-          template: '<i data-test-stub="OIcon"></i>',
-        },
-        QTooltip: {
-          template: '<div data-test-stub="q-tooltip"><slot></slot></div>',
-        },
-        QColor: {
-          template: '<div data-test-stub="q-color"></div>',
-          props: ["modelValue"],
-          emits: ["update:modelValue"],
-        },
       },
       ...options,
     },

@@ -623,7 +623,7 @@ const getFilterOptions = (
     }
   }
 
-  // Convert to { label, value } format for q-select with map-options
+  // Convert to { label, value } format for the select with map-options
   return Array.from(uniqueValues).map((val) => ({
     label: val === SELECT_ALL_VALUE ? "All Values" : val,
     value: val,

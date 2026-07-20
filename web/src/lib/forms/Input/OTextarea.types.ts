@@ -65,7 +65,7 @@ export interface TextareaSlots {
   append?: () => unknown;
   /**
    * Tooltip content rendered inside an info icon in the label area.
-   * Provide a `<q-tooltip>` element as the slot content.
+   * Provide a tooltip element as the slot content.
    */
   tooltip?: () => unknown;
 }

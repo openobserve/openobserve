@@ -1171,7 +1171,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   // Focus the first field showing a validation message. This used to query
-  // `.q-field--error` — a Quasar class with no producer left in the app after the
+  // a legacy error class — one with no producer left in the app after the
   // OForm migration, so it silently matched nothing and the "fix the highlighted
   // fields" toast pointed at a field we never actually focused. OInput/OSelect
   // render their message as [role="alert"] inside the field wrapper, so walk up
@@ -1242,7 +1242,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     });
   };
 
-  // Focus a topbar q-select/q-input by its Vue component ref
+  // Focus a topbar select/input by its Vue component ref
   const focusTopbarField = (fieldRef: any) => {
     nextTick(() => {
       const el = fieldRef?.value?.$el as HTMLElement | null;

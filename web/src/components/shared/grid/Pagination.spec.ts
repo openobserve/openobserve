@@ -57,23 +57,7 @@ describe("Pagination", () => {
         provide: {
           store,
         },
-        stubs: {
-          'q-input': {
-            template: '<input @blur="$emit(\'blur\', $event)" />',
-          },
-          'q-select': {
-            template: '<select @update:modelValue="$emit(\'update:modelValue\', $event)"><option value="10">10</option><option value="20">20</option></select>',
-          },
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')"><slot /></button>'
-          },
-          'q-btn-group': {
-            template: '<div class="q-btn-group"><slot /></div>'
-          },
-          'q-separator': {
-            template: '<div class="q-separator"></div>'
-          }
-        }
+        stubs: {},
       },
     });
   };

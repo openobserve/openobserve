@@ -73,7 +73,6 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
     e.preventDefault();
     return;
   }
-  clearBodyValidation();
   handleOpenChange(false);
 }
 
@@ -99,7 +98,6 @@ function handleInteractOutside(e: Event) {
     e.preventDefault();
     return;
   }
-  clearBodyValidation();
 }
 
 // Stacking support: each nested ODrawer gets a higher z-index layer
@@ -197,37 +195,6 @@ const contentStyle = computed(() => {
   return style;
 });
 
-// ── Validation reset on cancel-path close ───────────────────────────────────
-/** Reset q-field validation for every field in the body slot so that
- *  cancel-path closes (Cancel button, ×, Escape, overlay click) never surface
- *  lazy-rules validation errors to the user. */
-function clearBodyValidation() {
-  const body = bodyRef.value;
-  if (!body) return;
-  body.querySelectorAll<HTMLElement>('.q-field').forEach((el) => {
-    const vm = (el as any).__vueParentComponent;
-    if (vm?.ctx?.resetValidation) {
-      vm.ctx.resetValidation();
-    } else if (typeof vm?.exposed?.resetValidation === 'function') {
-      vm.exposed.resetValidation();
-    }
-  });
-}
-
-/** When focus moves to a non-form element inside the body (e.g. an action
- *  button), reset all field validation so sibling fields never show
- *  premature errors before the user clicks Save. */
-function handleBodyFocusIn(e: FocusEvent) {
-  const target = e.target as HTMLElement | null;
-  if (!target) return;
-  const isFormField =
-    target.matches('input, textarea, select') ||
-    !!target.closest('.q-field, .q-input, .q-select');
-  if (!isFormField) {
-    clearBodyValidation();
-  }
-}
-
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
@@ -244,7 +211,7 @@ function handleOpenAutoFocus(event: Event) {
         ].join(', ')
       );
       const firstField = Array.from(candidates).find(
-        (el) => !el.closest('.q-select, .o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]')
+        (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]')
       );
       if (firstField) {
         firstField.focus();
@@ -489,7 +456,6 @@ watch(internalOpen, (open) => {
             canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollUp && canScrollDown && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
-          @focusin="handleBodyFocusIn"
         >
           <template v-if="!props.lazy || internalOpen">
             <slot />

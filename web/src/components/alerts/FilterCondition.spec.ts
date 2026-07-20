@@ -243,7 +243,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
     });
   });
 
-  // TODO: filterColumns internal API was removed when q-select was replaced with OSelect.
+  // TODO: filterColumns internal API was removed when the select was replaced with OSelect.
   // These tests need rewriting against the new OSelect filter API.
   describe.skip('Filter Functionality Branch Coverage', () => {
     it('should reset filtered fields when filter value is empty', async () => {
@@ -368,7 +368,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
         },
       });
 
-      // Test column update event — OSelect replaces QSelect post-migration
+      // Test column update event — OSelect replaces the old select post-migration
       const columnSelect = wrapper.findComponent({ name: 'OSelect' });
       await columnSelect.vm.$emit('update:model-value', 'field1');
 

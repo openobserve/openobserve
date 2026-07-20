@@ -54,14 +54,7 @@ describe("proPlan.vue", () => {
         plugins: [i18n],
         provide: { store },
         stubs: {
-          "q-card": true,
-          "q-separator": true,
           "OIcon": true,
-          "q-btn": {
-            template:
-              '<button @click="$emit(\'click\')" v-bind="$attrs"><slot/></button>',
-            emits: ["click"],
-          },
         },
       },
     });

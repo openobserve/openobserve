@@ -145,14 +145,6 @@ function mountDashboard(
           template: "<button @click=\"$emit('click')\"><slot /></button>",
           emits: ["click"],
         },
-        // Primitives the dashboard renders.
-        QSelect: {
-          template: "<div data-test=\"q-select\" />",
-          props: ["modelValue", "options", "disable"],
-          emits: ["update:model-value"],
-        },
-        QTooltip: { template: "<div />" },
-        QIcon: { template: "<i />" },
       },
     },
   });
@@ -333,7 +325,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
 });
 
 // ===========================================================================
-// onStreamChange — the q-select v-model handler
+// onStreamChange — the OSelect v-model handler
 // ===========================================================================
 
 describe("LLMInsightsDashboard — onStreamChange", () => {

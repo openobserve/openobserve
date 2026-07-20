@@ -92,15 +92,15 @@ describe("JsonPreview", () => {
   describe("copy button visibility", () => {
     it("should show the copy button when showCopyButton is true (default)", () => {
       wrapper = mountJsonPreview({ showCopyButton: true });
-      // The copy button is a q-btn with an icon; it renders when showCopyButton is true.
+      // The copy button renders when showCopyButton is true.
       // We locate it by its click handler binding — the element with icon="content_copy" exists.
       expect(wrapper.find("button").exists()).toBe(true);
     });
 
     it("should hide the copy button when showCopyButton is false", () => {
       wrapper = mountJsonPreview({ showCopyButton: false });
-      // With showCopyButton false the q-btn is removed from the DOM entirely.
-      // The only remaining button-like elements would belong to q-btn-dropdown if present,
+      // With showCopyButton false the copy button is removed from the DOM entirely.
+      // Any remaining button-like elements would belong to the field-dropdown slot,
       // but with no field-dropdown slot there are none either.
       const buttons = wrapper.findAll("button");
       // None of the buttons should be the copy button — identified by the content_copy icon text.

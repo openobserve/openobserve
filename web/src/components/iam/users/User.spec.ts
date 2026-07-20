@@ -170,7 +170,7 @@ const QTablePaginationStub = {
   name: "QTablePagination",
   props: ["scope", "resultTotal", "perPageOptions", "position"],
   emits: ["update:changeRecordPerPage"],
-  template: `<div class="q-table-pagination-stub" />`,
+  template: `<div class="table-pagination-stub" />`,
 };
 
 const mountUser = () =>
@@ -185,27 +185,7 @@ const mountUser = () =>
         MemberInvitation: MemberInvitationStub,
         NoData: NoDataStub,
         QTablePagination: QTablePaginationStub,
-        // Keep the table components shallow so we don't depend on real
-        // table internals; we still render their slots.
-        "q-page": { template: "<div><slot /></div>" },
-        "q-table": {
-          props: ["rows", "columns", "selected"],
-          template: '<div class="q-table-stub"><slot /></div>',
-        },
-        "q-input": {
-          props: ["modelValue"],
-          template: '<div class="q-input-stub"><slot name="prepend" /></div>',
-          emits: ["update:modelValue"],
-        },
         "OIcon": { template: "<i />" },
-        "q-td": { template: "<div><slot /></div>" },
-        "q-th": { template: "<div><slot /></div>" },
-        "q-tr": { template: "<div><slot /></div>" },
-        "q-checkbox": {
-          props: ["modelValue"],
-          template: '<div class="q-checkbox-stub" />',
-          emits: ["update:modelValue"],
-        },
         OButton: {
           props: ["variant", "size", "disabled", "loading"],
           template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',

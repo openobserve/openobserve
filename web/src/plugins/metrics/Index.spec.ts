@@ -244,12 +244,6 @@ const createWrapper = (props: Record<string, any> = {}) => {
           props: ["modelValue", "trigger", "minRefreshInterval"],
           emits: ["update:modelValue", "trigger"],
         },
-        QBtn: {
-          template:
-            "<button class='q-btn' :data-test='$attrs[\"data-test\"]' :disabled='disable || loading' @click='$emit(\"click\", $event)'><slot /></button>",
-          props: ["label", "loading", "disable", "color", "noCaps", "padding"],
-          emits: ["click"],
-        },
       },
     },
   });

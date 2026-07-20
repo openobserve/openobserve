@@ -31,7 +31,7 @@ const isOIcon = computed<boolean>(() =>
 
 /** True when the right trailing area should render (slot OR count prop).
  *  When hideZeroCount is set and count is 0, the trailing area is suppressed
- *  (q-badge-compatible behavior). */
+ *  (matches the previous badge behavior). */
 const hasTrailing = computed(() => {
   if (slots.trailing) return true;
   if (props.count === undefined) return false;

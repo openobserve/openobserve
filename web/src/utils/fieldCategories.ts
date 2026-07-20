@@ -355,7 +355,7 @@ export function shouldApplyFieldGrouping(opts: {
  *
  * Rules:
  * - Label (header) rows are always kept.
- * - When `filterTerm` is non-empty, bypass collapse entirely so the q-table
+ * - When `filterTerm` is non-empty, bypass collapse entirely so the table
  *   filter-method can match fields inside collapsed groups.
  * - When a field's group is not tracked in `expandGroupRows`, it is visible
  *   (flat / ungrouped list behaviour).

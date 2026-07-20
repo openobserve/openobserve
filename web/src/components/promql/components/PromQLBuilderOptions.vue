@@ -174,7 +174,7 @@ export default defineComponent({
       currentQuery.config.query_type = "range";
     }
 
-    // Query type options for q-select
+    // Query type options for the select
     const queryTypeOptions = [
       {
         label: t("metrics.promQLBuilderOptions.range"),

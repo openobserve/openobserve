@@ -59,7 +59,7 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
 
 // ---------------------------------------------------------------------------
 // ODrawer stub — replaces the migrated trace filters drawer
-// (q-dialog/q-card -> ODrawer with v-model:open). Renders default + footer
+// (-> ODrawer with v-model:open). Renders default + footer
 // slots and exposes migrated props/emits so we can assert wiring without
 // going through the real Reka portal/teleport.
 // ---------------------------------------------------------------------------
@@ -209,7 +209,6 @@ describe("TraceDetails", () => {
         plugins: [i18n, router],
         provide: { store },
         stubs: {
-          "q-resize-observer": true,
           ODrawer: ODrawerStub,
           CodeQueryEditor: {
             name: "CodeQueryEditor",
@@ -646,7 +645,6 @@ describe("TraceDetails", () => {
             plugins: [i18n, router],
             provide: { store },
             stubs: {
-              "q-resize-observer": true,
               ODrawer: ODrawerStub,
               CodeQueryEditor: {
                 name: "CodeQueryEditor",
@@ -811,7 +809,6 @@ describe("TraceDetails", () => {
           plugins: [i18n, router],
           provide: { store },
           stubs: {
-            "q-resize-observer": true,
             ODrawer: ODrawerStub,
             CodeQueryEditor: {
               name: "CodeQueryEditor",
@@ -954,7 +951,6 @@ describe("TraceDetails", () => {
             plugins: [i18n, router],
             provide: { store },
             stubs: {
-              "q-resize-observer": true,
               ODrawer: ODrawerStub,
               CodeQueryEditor: {
                 name: "CodeQueryEditor",
@@ -1014,7 +1010,6 @@ describe("TraceDetails", () => {
             plugins: [i18n, router],
             provide: { store },
             stubs: {
-              "q-resize-observer": true,
               ODrawer: ODrawerStub,
               CodeQueryEditor: {
                 name: "CodeQueryEditor",
@@ -1085,7 +1080,6 @@ describe("TraceDetails", () => {
             plugins: [i18n, router],
             provide: { store },
             stubs: {
-              "q-resize-observer": true,
               ODrawer: ODrawerStub,
               CodeQueryEditor: {
                 name: "CodeQueryEditor",
@@ -1147,7 +1141,6 @@ describe("TraceDetails", () => {
             plugins: [i18n, router],
             provide: { store },
             stubs: {
-              "q-resize-observer": true,
               ODrawer: ODrawerStub,
               CodeQueryEditor: {
                 name: "CodeQueryEditor",
@@ -1217,7 +1210,6 @@ describe("TraceDetails", () => {
             plugins: [i18n, router],
             provide: { store },
             stubs: {
-              "q-resize-observer": true,
               ODrawer: ODrawerStub,
               CodeQueryEditor: {
                 name: "CodeQueryEditor",
@@ -1308,7 +1300,6 @@ describe("TraceDetails", () => {
           plugins: [i18n, router],
           provide: { store },
           stubs: {
-            "q-resize-observer": true,
             ODrawer: ODrawerStub,
             CodeQueryEditor: {
               name: "CodeQueryEditor",
@@ -1359,7 +1350,6 @@ describe("TraceDetails", () => {
           plugins: [i18n, router],
           provide: { store },
           stubs: {
-            "q-resize-observer": true,
             ODrawer: ODrawerStub,
             CodeQueryEditor: {
               name: "CodeQueryEditor",
@@ -1412,7 +1402,6 @@ describe("TraceDetails", () => {
           plugins: [i18n, router],
           provide: { store },
           stubs: {
-            "q-resize-observer": true,
             ODrawer: ODrawerStub,
             CodeQueryEditor: {
               name: "CodeQueryEditor",
@@ -1749,7 +1738,6 @@ describe("TraceDetails", () => {
           plugins: [i18n, router],
           provide: { store },
           stubs: {
-            "q-resize-observer": true,
             ODrawer: ODrawerStub,
             CodeQueryEditor: {
               name: "CodeQueryEditor",
@@ -1852,7 +1840,6 @@ describe("TraceDetails", () => {
           plugins: [i18n, router],
           provide: { store },
           stubs: {
-            "q-resize-observer": true,
             ODrawer: ODrawerStub,
             CodeQueryEditor: {
               name: "CodeQueryEditor",
@@ -2322,7 +2309,6 @@ describe("TraceDetails", () => {
           plugins: [i18n, router],
           provide: { store },
           stubs: {
-            "q-resize-observer": true,
             ODrawer: ODrawerStub,
             CodeQueryEditor: {
               name: "CodeQueryEditor",

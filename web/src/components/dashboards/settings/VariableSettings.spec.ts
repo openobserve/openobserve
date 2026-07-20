@@ -179,22 +179,10 @@ describe("VariableSettings", () => {
       global: {
         plugins: [],
         stubs: {
-          'q-btn': {
-            name: 'QBtn',
-            template: '<button @click="$emit(\'click\')"><slot /></button>',
-            props: ['icon', 'label', 'color', 'class'],
-            emits: ['click']
-          },
           'OIcon': {
-            name: 'QIcon',
+            name: 'OIcon',
             template: '<span class="OIcon"><slot /></span>',
             props: ['name', 'color']
-          },
-          'q-dialog': {
-            name: 'QDialog',
-            template: '<div v-if="modelValue" class="q-dialog"><slot /></div>',
-            props: ['modelValue'],
-            emits: ['update:modelValue']
           },
           ODialog: {
             name: 'ODialog',
@@ -202,22 +190,6 @@ describe("VariableSettings", () => {
             template: '<div v-if="open" data-test="o-dialog-stub" class="o-dialog"><div data-test="o-dialog-title">{{ title }}</div><slot /></div>',
             props: ['open', 'width', 'title', 'subTitle', 'persistent', 'size', 'showClose'],
             emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral']
-          },
-          'q-card': {
-            name: 'QCard',
-            template: '<div class="q-card"><slot /></div>'
-          },
-          'q-toolbar': {
-            name: 'QToolbar',
-            template: '<div class="q-toolbar"><slot /></div>'
-          },
-          'q-toolbar-title': {
-            name: 'QToolbarTitle',
-            template: '<div class="q-toolbar-title"><slot /></div>'
-          },
-          'q-card-section': {
-            name: 'QCardSection',
-            template: '<div class="q-card-section"><slot /></div>'
           }
         }
       }

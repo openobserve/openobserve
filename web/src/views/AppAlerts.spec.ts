@@ -512,7 +512,7 @@ describe("AppAlerts", () => {
   });
 
   describe("Component Template Structure", () => {
-    it("should render main q-page element", () => {
+    it("should render main page element", () => {
       const wrapper = createWrapper();
       const qPage = wrapper.find('[data-test="alerts-page"]');
       expect(qPage.exists()).toBe(true);

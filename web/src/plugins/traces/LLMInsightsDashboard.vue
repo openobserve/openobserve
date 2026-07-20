@@ -333,7 +333,7 @@ const {
   streamsLoaded,
 } = useLLMInsights();
 
-// activeStream is component-local (drives the q-select v-model), but its
+// activeStream is component-local (drives the select v-model), but its
 // initial value falls back to localStorage / parent prop. Once the streams
 // list is reconciled, it's clamped to a valid option.
 const activeStream = ref<string>(

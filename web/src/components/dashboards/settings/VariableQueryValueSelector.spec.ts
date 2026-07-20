@@ -79,7 +79,7 @@ describe("VariableQueryValueSelector", () => {
     template: `
       <div
         data-test="dashboard-variable-query-value-selector"
-        class="q-select o-select"
+        class="o-select"
       >
         <input
           :value="modelValue"
