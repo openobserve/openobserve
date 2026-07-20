@@ -150,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :placeholder="t('dashboard.conditionThreshold')"
               class="w-full"
+              :data-test="`o2-format-cond-threshold-${col.field}-${ruleIdx}`"
             />
           </div>
           <OButton
