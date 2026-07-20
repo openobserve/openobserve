@@ -1240,7 +1240,8 @@ async fn prom_ha_handler(
     drop(lock);
 
     if !replica_list_db.is_empty() {
-        let _ = ports::set_prom_cluster_info(cluster_name, &replica_list_db).await;
+        let _ =
+            crate::metrics::cluster::set_prom_cluster_info(cluster_name, &replica_list_db).await;
     }
 
     _accept_record

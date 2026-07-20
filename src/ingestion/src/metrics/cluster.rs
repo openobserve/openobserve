@@ -16,19 +16,28 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use common::infra::config::METRIC_CLUSTER_LEADER;
 use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader, utils::json};
 
-use crate::{common::infra::config::METRIC_CLUSTER_LEADER, service::db};
+async fn put(key: &str, value: Bytes, need_watch: bool) -> Result<(), anyhow::Error> {
+    infra::db::get_db()
+        .await
+        .put(key, value.clone(), need_watch, None)
+        .await?;
+
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        o2_enterprise::enterprise::super_cluster::queue::put(key, value, need_watch, None).await?;
+    }
+    Ok(())
+}
 
 pub async fn set_prom_cluster_info(cluster: &str, members: &[String]) -> Result<(), anyhow::Error> {
     let key = format!("/metrics_members/{cluster}");
-    Ok(db::put(
-        &key,
-        Bytes::from(members.join(",")),
-        db::NO_NEED_WATCH,
-        None,
-    )
-    .await?)
+    put(&key, Bytes::from(members.join(",")), false).await
 }
 
 pub async fn set_prom_cluster_leader(
@@ -36,14 +45,7 @@ pub async fn set_prom_cluster_leader(
     leader: &ClusterLeader,
 ) -> Result<(), anyhow::Error> {
     let key = format!("/metrics_leader/{cluster}");
-    match db::put(
-        &key,
-        json::to_vec(&leader).unwrap().into(),
-        db::NEED_WATCH,
-        None,
-    )
-    .await
-    {
+    match put(&key, json::to_vec(&leader).unwrap().into(), true).await {
         Ok(_) => {}
         Err(e) => {
             log::error!("Error updating cluster_leader: {e}");
@@ -55,7 +57,7 @@ pub async fn set_prom_cluster_leader(
 
 pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
     let key = "/metrics_leader/";
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::coordinator::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching prometheus cluster leader");
@@ -68,9 +70,9 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            db::Event::Put(ev) => {
+            infra::db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: ClusterLeader = match db::get(&ev.key).await {
+                let item_value: ClusterLeader = match infra::db::get_db().await.get(&ev.key).await {
                     Ok(val) => match json::from_slice(&val) {
                         Ok(val) => val,
                         Err(e) => {
@@ -90,11 +92,11 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
                         .insert(item_key.to_owned(), item_value);
                 }
             }
-            db::Event::Delete(ev) => {
+            infra::db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 METRIC_CLUSTER_LEADER.write().await.remove(item_key);
             }
-            db::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
     Ok(())
@@ -102,7 +104,7 @@ pub async fn watch_prom_cluster_leader() -> Result<(), anyhow::Error> {
 
 pub async fn cache_prom_cluster_leader() -> Result<(), anyhow::Error> {
     let key = "/metrics_leader/";
-    let ret = db::list(key).await?;
+    let ret = infra::db::get_db().await.list(key).await?;
     for (item_key, item_value) in ret {
         let item_key_str = item_key.strip_prefix(key).unwrap();
         let json_val: ClusterLeader = json::from_slice(&item_value).unwrap();

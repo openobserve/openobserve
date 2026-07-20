@@ -19,6 +19,7 @@ use config::{
     utils::hash::{Sum64, gxhash},
 };
 
+pub mod cluster;
 pub mod json;
 pub mod otlp;
 mod otlp_json_compat;

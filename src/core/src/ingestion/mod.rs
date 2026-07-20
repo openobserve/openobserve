@@ -182,14 +182,6 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
             .map(|orgs| orgs.into_iter().map(|org| org.identifier).collect())
     }
 
-    async fn set_prom_cluster_info(
-        &self,
-        cluster_name: &str,
-        members: &[String],
-    ) -> anyhow::Result<()> {
-        crate::db::metrics::set_prom_cluster_info(cluster_name, members).await
-    }
-
     #[cfg(feature = "cloud")]
     async fn report_stream_created_if_new(
         &self,

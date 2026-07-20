@@ -117,12 +117,6 @@ pub trait RuntimeServices: Send + Sync + 'static {
     #[cfg(feature = "enterprise")]
     async fn list_organization_ids(&self) -> anyhow::Result<Vec<String>>;
 
-    async fn set_prom_cluster_info(
-        &self,
-        cluster_name: &str,
-        members: &[String],
-    ) -> anyhow::Result<()>;
-
     #[cfg(feature = "cloud")]
     async fn report_stream_created_if_new(
         &self,
@@ -336,12 +330,6 @@ pub async fn search_service_graph_usage(
 #[cfg(feature = "enterprise")]
 pub async fn list_organization_ids() -> anyhow::Result<Vec<String>> {
     runtime_services()?.list_organization_ids().await
-}
-
-pub async fn set_prom_cluster_info(cluster_name: &str, members: &[String]) -> anyhow::Result<()> {
-    runtime_services()?
-        .set_prom_cluster_info(cluster_name, members)
-        .await
 }
 
 #[cfg(feature = "cloud")]

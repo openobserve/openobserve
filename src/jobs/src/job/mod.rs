@@ -477,7 +477,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(openobserve_catalog::schema::watch());
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
-    tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
+    tokio::task::spawn(openobserve_ingestion::metrics::cluster::watch_prom_cluster_leader());
     tokio::task::spawn(db::system_settings::watch());
     tokio::task::spawn(db::model_pricing::watch());
     tokio::task::spawn(db::alerts::templates::watch());
@@ -530,7 +530,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::compact::retention::cache()
         .await
         .expect("compact delete cache failed");
-    db::metrics::cache_prom_cluster_leader()
+    openobserve_ingestion::metrics::cluster::cache_prom_cluster_leader()
         .await
         .expect("prom cluster leader cache failed");
 

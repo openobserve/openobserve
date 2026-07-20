@@ -150,10 +150,4 @@ mod common {
     pub mod meta {
         pub use ::common::meta::*;
     }
-
-    pub mod infra {
-        pub mod config {
-            pub use ::common::infra::config::*;
-        }
-    }
 }

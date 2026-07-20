@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use bytes::Bytes;
-use hashbrown::HashMap;
 use infra::{db as infra_db, errors::Result};
 #[cfg(feature = "enterprise")]
 use {
@@ -98,7 +97,9 @@ pub mod kv {
 #[cfg(feature = "enterprise")]
 pub mod license;
 pub mod metas;
-pub mod metrics;
+pub mod metrics {
+    pub use openobserve_ingestion::metrics::cluster::*;
+}
 pub mod model_pricing {
     pub use openobserve_ingestion::repository::model_pricing::*;
 }
@@ -165,7 +166,9 @@ pub mod user {
     pub use openobserve_organization::repository::user::*;
 }
 
-pub(crate) use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
+pub(crate) use infra_db::NO_NEED_WATCH;
+#[cfg(feature = "enterprise")]
+pub(crate) use infra_db::get_coordinator;
 
 #[inline]
 pub(crate) async fn get(key: &str) -> Result<Bytes> {
@@ -208,12 +211,6 @@ pub(crate) async fn put(
     }
 
     Ok(())
-}
-
-#[inline]
-pub(crate) async fn list(prefix: &str) -> Result<HashMap<String, Bytes>> {
-    let db = infra_db::get_db().await;
-    db.list(prefix).await
 }
 
 #[cfg(test)]

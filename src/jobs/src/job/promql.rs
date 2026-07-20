@@ -16,7 +16,7 @@
 use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader, spawn_pausable_job};
 use hashbrown::HashMap;
 
-use crate::{common::infra::config::METRIC_CLUSTER_LEADER, service::db};
+use crate::common::infra::config::METRIC_CLUSTER_LEADER;
 
 pub fn run() -> Option<tokio::task::JoinHandle<()>> {
     if !LOCAL_NODE.is_ingester() {
@@ -39,7 +39,9 @@ pub fn run() -> Option<tokio::task::JoinHandle<()>> {
                     }
                 }
 
-                let result = db::metrics::set_prom_cluster_leader(key, value).await;
+                let result =
+                    openobserve_ingestion::metrics::cluster::set_prom_cluster_leader(key, value)
+                        .await;
                 match result {
                     Ok(_) => {
                         let _ = last_leaders.insert(key.to_string(), value.clone());
