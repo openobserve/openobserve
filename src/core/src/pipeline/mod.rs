@@ -147,7 +147,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         derived_stream.org_id = pipeline.org.clone();
         // save derived_stream to triggers table
-        if let Err(e) = super::alerts::derived_streams::save(
+        if let Err(e) = openobserve_pipeline::derived_streams::save(
             derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
@@ -218,7 +218,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
             PipelineSource::Scheduled(derived_stream) => {
                 if pipeline.source.is_realtime() {
                     // source changed, delete prev. trigger
-                    if let Err(error) = super::alerts::derived_streams::delete(
+                    if let Err(error) = openobserve_pipeline::derived_streams::delete(
                         &derived_stream,
                         &existing_pipeline.name,
                         &existing_pipeline.id,
@@ -241,7 +241,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     // Save DerivedStream details if there's any
     if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
-        if let Err(e) = super::alerts::derived_streams::save(
+        if let Err(e) = openobserve_pipeline::derived_streams::save(
             derived_stream.clone(),
             &pipeline.name,
             &pipeline.id,
@@ -379,10 +379,14 @@ pub async fn enable_pipeline(
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         if enable {
             if starts_from_now {
-                super::alerts::derived_streams::delete(derived_stream, &pipeline.name, pipeline_id)
-                    .await
-                    .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
-                super::alerts::derived_streams::save(
+                openobserve_pipeline::derived_streams::delete(
+                    derived_stream,
+                    &pipeline.name,
+                    pipeline_id,
+                )
+                .await
+                .map_err(|e| PipelineError::DeleteDerivedStream(e.to_string()))?;
+                openobserve_pipeline::derived_streams::save(
                     derived_stream.clone(),
                     &pipeline.name,
                     pipeline_id,
@@ -391,7 +395,7 @@ pub async fn enable_pipeline(
                 .await
                 .map_err(|e| PipelineError::InvalidDerivedStream(e.to_string()))?;
             } else {
-                super::alerts::derived_streams::save(
+                openobserve_pipeline::derived_streams::save(
                     derived_stream.clone(),
                     &pipeline.name,
                     pipeline_id,
@@ -426,7 +430,7 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
 
     // delete DerivedStream details if there's any
     if let PipelineSource::Scheduled(derived_stream) = existing_pipeline.source
-        && let Err(error) = super::alerts::derived_streams::delete(
+        && let Err(error) = openobserve_pipeline::derived_streams::delete(
             &derived_stream,
             &existing_pipeline.name,
             &existing_pipeline.id,

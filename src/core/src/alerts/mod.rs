@@ -30,7 +30,6 @@ use openobserve_alerts::evaluation::QueryConditionExt;
 pub mod deduplication {
     pub use openobserve_alerts::service::deduplication::*;
 }
-pub mod derived_streams;
 pub mod destinations {
     use async_trait::async_trait;
     use config::meta::destinations::{Destination, Email};

@@ -29,8 +29,7 @@ use config::{
 };
 use cron::Schedule;
 use openobserve_alerts::evaluation::QueryConditionExt;
-
-use crate::db;
+use openobserve_scheduler::{self as scheduler, Trigger, TriggerModule};
 
 pub async fn save(
     mut derived_stream: DerivedStream,
@@ -160,30 +159,30 @@ pub async fn save(
         chrono::Utc::now().timestamp_micros()
     };
     // Save the trigger to db
-    match db::scheduler::get(
+    match scheduler::get(
         &derived_stream.org_id,
-        db::scheduler::TriggerModule::DerivedStream,
+        TriggerModule::DerivedStream,
         &trigger_module_key,
     )
     .await
     {
         Ok(mut existing_trigger) => {
             existing_trigger.next_run_at = next_run_at;
-            db::scheduler::update_trigger(existing_trigger, false, "")
+            scheduler::update_trigger(existing_trigger, false, "")
                 .await
                 .map_err(|_| anyhow::anyhow!("Trigger already exists, but failed to update"))
         }
         Err(_) => {
-            let trigger = db::scheduler::Trigger {
+            let trigger = Trigger {
                 org: derived_stream.org_id.to_string(),
-                module: db::scheduler::TriggerModule::DerivedStream,
+                module: TriggerModule::DerivedStream,
                 module_key: trigger_module_key,
                 next_run_at,
                 is_realtime: false,
                 is_silenced: false,
                 ..Default::default()
             };
-            db::scheduler::push(trigger)
+            scheduler::push(trigger)
                 .await
                 .map_err(|e| anyhow::anyhow!("Error save DerivedStream trigger: {}", e))
         }
@@ -195,9 +194,9 @@ pub async fn delete(
     pipeline_name: &str,
     pipeline_id: &str,
 ) -> Result<(), anyhow::Error> {
-    db::scheduler::delete(
+    scheduler::delete(
         &derived_stream.org_id,
-        db::scheduler::TriggerModule::DerivedStream,
+        TriggerModule::DerivedStream,
         &derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id),
     )
     .await

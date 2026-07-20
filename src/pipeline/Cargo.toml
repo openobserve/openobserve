@@ -13,9 +13,15 @@ default = []
 enterprise = [
     "config/enterprise",
     "dep:o2_enterprise",
+    "openobserve-alerts/enterprise",
     "openobserve-scheduler/enterprise",
 ]
-cloud = ["enterprise", "common/cloud", "o2_enterprise/cloud"]
+cloud = [
+    "enterprise",
+    "common/cloud",
+    "o2_enterprise/cloud",
+    "openobserve-alerts/cloud",
+]
 
 [dependencies]
 anyhow.workspace = true
@@ -24,11 +30,13 @@ axum.workspace = true
 chrono.workspace = true
 common.workspace = true
 config.workspace = true
+cron.workspace = true
 futures.workspace = true
 infra.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 openobserve-scheduler.workspace = true
+openobserve-alerts.workspace = true
 openobserve-transform.workspace = true
 proto.workspace = true
 rand.workspace = true

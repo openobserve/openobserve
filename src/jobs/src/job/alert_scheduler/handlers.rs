@@ -46,7 +46,9 @@ use o2_enterprise::enterprise::recommendations::service::QueryRecommendationServ
 use openobserve_alerts::service::alert::{
     AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map,
 };
-use openobserve_pipeline::batch_execution::ExecutablePipeline;
+use openobserve_pipeline::{
+    batch_execution::ExecutablePipeline, derived_streams::DerivedStreamExt,
+};
 use proto::cluster_rpc;
 
 #[cfg(feature = "enterprise")]
@@ -54,7 +56,6 @@ use crate::service::alerts::scheduler::query_optimization_recommendation::QueryO
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
 use crate::service::{
-    alerts::derived_streams::DerivedStreamExt,
     dashboards::reports::SendReport,
     db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
