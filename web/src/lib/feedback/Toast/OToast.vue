@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import type { ToastProps, ToastEmits } from "./OToast.types"
-import { computed, ref } from "vue"
+import { computed, ref, onUnmounted } from "vue"
 import OIcon from "@/lib/core/Icon/OIcon.vue"
+import OBadge from "@/lib/core/Badge/OBadge.vue"
 import { pauseTimer, resumeTimer, isPageVisible } from "./useToast"
 import {
   ToastRoot,
   ToastTitle,
   ToastDescription,
-  ToastAction,
   ToastClose,
 } from "reka-ui"
 
@@ -131,6 +131,28 @@ const screenReaderTitle = computed(() =>
 const isTopPosition = computed(() =>
   props.position.startsWith("top-"),
 )
+
+const detailsExpanded = ref(false)
+
+// Temporary success state for the action button (e.g. "Copied!")
+const actionSucceeded = ref(false)
+let actionResetTimer: ReturnType<typeof setTimeout> | undefined
+
+function handleActionClick() {
+  if (!props.action) return
+  props.action.handler()
+  if (props.action.successLabel) {
+    actionSucceeded.value = true
+    clearTimeout(actionResetTimer)
+    actionResetTimer = setTimeout(() => {
+      actionSucceeded.value = false
+    }, 2000)
+  }
+}
+
+onUnmounted(() => {
+  clearTimeout(actionResetTimer)
+})
 </script>
 
 <template>
@@ -139,7 +161,8 @@ const isTopPosition = computed(() =>
     :duration="0"
     :class="[
       'tw:relative tw:pointer-events-auto',
-      'tw:w-[22rem] tw:max-w-[calc(100vw-2rem)]',
+      details && details.length > 0 ? 'tw:w-[28rem]' : 'tw:w-[22rem]',
+      'tw:max-w-[calc(100vw-2rem)]',
       'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
       isTopPosition ? 'tw:data-[state=open]:slide-in-from-top-4' : 'tw:data-[state=open]:slide-in-from-bottom-4',
       'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
@@ -193,15 +216,22 @@ const isTopPosition = computed(() =>
 
       <!-- Content -->
       <div class="tw:flex-1 tw:min-w-0">
-        <!-- Title — visible when provided, sr-only otherwise (carries message text for screen readers) -->
-        <ToastTitle
+        <!-- Title row: text + optional count badge side-by-side -->
+        <div
           :class="[
-            'tw:text-sm tw:font-semibold tw:text-toast-fg tw:leading-snug',
-            !title ? 'tw:sr-only' : ''
+            'tw:flex tw:items-center tw:gap-2',
+            !title ? 'tw:sr-only' : '',
           ]"
         >
-          {{ title ?? screenReaderTitle }}
-        </ToastTitle>
+          <ToastTitle class="tw:text-sm tw:font-semibold tw:text-toast-fg tw:leading-snug">
+            {{ title ?? screenReaderTitle }}
+          </ToastTitle>
+          <OBadge
+            v-if="title && titleCount !== undefined"
+            variant="error"
+            size="sm"
+          >{{ titleCount }}</OBadge>
+        </div>
 
         <!-- Message + inline action -->
         <div
@@ -220,20 +250,184 @@ const isTopPosition = computed(() =>
             {{ message }}
           </ToastDescription>
 
-          <!-- Action button -->
-          <ToastAction
+          <!-- Action button — plain <button>, NOT wrapped in ToastAction.
+               reka-ui's ToastAction wraps ToastClose internally, which means
+               any click on a ToastAction automatically dismisses the toast.
+               Using a plain button preserves click behaviour without closing. -->
+          <button
             v-if="action"
-            :alt-text="action.label"
-            as-child
+            type="button"
+            :class="[
+              'tw:inline-flex tw:items-center tw:gap-1 tw:justify-center tw:rounded tw:px-2.5 tw:py-0.5 tw:text-xs tw:font-semibold tw:shadow-sm tw:transition-all tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1',
+              actionSucceeded
+                ? 'tw:bg-toast-success-icon tw:text-white tw:focus-visible:ring-toast-success-icon'
+                : 'tw:bg-toast-action-text tw:text-white tw:hover:bg-toast-action-hover tw:focus-visible:ring-toast-action-text',
+            ]"
+            @click.stop="handleActionClick"
           >
-            <button
-              type="button"
-              class="tw:inline-flex tw:items-center tw:justify-center tw:rounded tw:bg-toast-action-text tw:px-2.5 tw:py-0.5 tw:text-xs tw:font-semibold tw:text-white tw:shadow-sm tw:transition-colors tw:hover:bg-toast-action-hover tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1 tw:focus-visible:ring-toast-action-text"
-              @click="action.handler"
+            <OIcon v-if="actionSucceeded" name="check" size="sm" class="tw:size-3.5" aria-hidden="true" />
+            {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
+          </button>
+        </div>
+
+        <!-- Expandable affected-sections list -->
+        <div
+          v-if="details && details.length > 0"
+          class="tw:mt-2 tw:w-full"
+          data-test="o-toast-details"
+        >
+          <button
+            type="button"
+            class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:transition-colors tw:cursor-pointer"
+            :aria-expanded="detailsExpanded"
+            data-test="o-toast-details-toggle"
+            @click.stop="detailsExpanded = !detailsExpanded"
+          >
+            <OIcon
+              :name="detailsExpanded ? 'expand-less' : 'expand-more'"
+              size="sm"
+              class="tw:size-3.5"
+              aria-hidden="true"
+            />
+            Affected Sections
+          </button>
+          <ul
+            v-if="detailsExpanded"
+            class="tw:mt-1.5 tw:space-y-1.5"
+            data-test="o-toast-details-list"
+          >
+            <li
+              v-for="detail in details"
+              :key="detail.url"
+              class="tw:flex tw:items-baseline tw:justify-between tw:gap-2 tw:text-xs"
             >
-              {{ action.label }}
-            </button>
-          </ToastAction>
+              <span class="tw:font-medium tw:text-toast-fg tw:shrink-0">{{ detail.label }}</span>
+              <span
+                class="tw:text-toast-fg-secondary tw:truncate tw:font-mono tw:text-right"
+                :title="detail.url"
+              >{{ detail.url }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Expandable affected-sections list -->
+        <div
+          v-if="details && details.length > 0"
+          class="tw:mt-2 tw:w-full"
+          data-test="o-toast-details"
+        >
+          <button
+            type="button"
+            class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:transition-colors tw:cursor-pointer"
+            :aria-expanded="detailsExpanded"
+            data-test="o-toast-details-toggle"
+            @click.stop="detailsExpanded = !detailsExpanded"
+          >
+            <OIcon
+              :name="detailsExpanded ? 'expand-less' : 'expand-more'"
+              size="sm"
+              class="tw:size-3.5"
+              aria-hidden="true"
+            />
+            Affected Sections
+          </button>
+          <ul
+            v-if="detailsExpanded"
+            class="tw:mt-1.5 tw:space-y-1.5"
+            data-test="o-toast-details-list"
+          >
+            <li
+              v-for="detail in details"
+              :key="detail.url"
+              class="tw:flex tw:items-baseline tw:justify-between tw:gap-2 tw:text-xs"
+            >
+              <span class="tw:font-medium tw:text-toast-fg tw:shrink-0">{{ detail.label }}</span>
+              <span
+                class="tw:text-toast-fg-secondary tw:truncate tw:font-mono tw:text-right"
+                :title="detail.url"
+              >{{ detail.url }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Expandable affected-sections list -->
+        <div
+          v-if="details && details.length > 0"
+          class="tw:mt-2 tw:w-full"
+          data-test="o-toast-details"
+        >
+          <button
+            type="button"
+            class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:transition-colors tw:cursor-pointer"
+            :aria-expanded="detailsExpanded"
+            data-test="o-toast-details-toggle"
+            @click.stop="detailsExpanded = !detailsExpanded"
+          >
+            <OIcon
+              :name="detailsExpanded ? 'expand-less' : 'expand-more'"
+              size="sm"
+              class="tw:size-3.5"
+              aria-hidden="true"
+            />
+            Affected Sections
+          </button>
+          <ul
+            v-if="detailsExpanded"
+            class="tw:mt-1.5 tw:space-y-1.5"
+            data-test="o-toast-details-list"
+          >
+            <li
+              v-for="detail in details"
+              :key="detail.url"
+              class="tw:flex tw:items-baseline tw:justify-between tw:gap-2 tw:text-xs"
+            >
+              <span class="tw:font-medium tw:text-toast-fg tw:shrink-0">{{ detail.label }}</span>
+              <span
+                class="tw:text-toast-fg-secondary tw:truncate tw:font-mono tw:text-right"
+                :title="detail.url"
+              >{{ detail.url }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Expandable affected-sections list -->
+        <div
+          v-if="details && details.length > 0"
+          class="tw:mt-2 tw:w-full"
+          data-test="o-toast-details"
+        >
+          <button
+            type="button"
+            class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:transition-colors tw:cursor-pointer"
+            :aria-expanded="detailsExpanded"
+            data-test="o-toast-details-toggle"
+            @click.stop="detailsExpanded = !detailsExpanded"
+          >
+            <OIcon
+              :name="detailsExpanded ? 'expand-less' : 'expand-more'"
+              size="sm"
+              class="tw:size-3.5"
+              aria-hidden="true"
+            />
+            Affected Sections
+          </button>
+          <ul
+            v-if="detailsExpanded"
+            class="tw:mt-1.5 tw:space-y-1.5"
+            data-test="o-toast-details-list"
+          >
+            <li
+              v-for="detail in details"
+              :key="detail.url"
+              class="tw:flex tw:items-baseline tw:justify-between tw:gap-2 tw:text-xs"
+            >
+              <span class="tw:font-medium tw:text-toast-fg tw:shrink-0">{{ detail.label }}</span>
+              <span
+                class="tw:text-toast-fg-secondary tw:truncate tw:font-mono tw:text-right"
+                :title="detail.url"
+              >{{ detail.url }}</span>
+            </li>
+          </ul>
         </div>
       </div>
 
