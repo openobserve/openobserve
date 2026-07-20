@@ -347,8 +347,13 @@ async fn prepare_alert(
         });
     }
 
+    #[cfg(feature = "enterprise")]
+    let destination_missing = alert.destinations.is_empty() && alert.workflows.is_empty();
+    #[cfg(not(feature = "enterprise"))]
+    let destination_missing = alert.destinations.is_empty();
+
     // before saving alert check alert destination
-    if alert.destinations.is_empty() && alert.workflows.is_empty() {
+    if destination_missing {
         return Err(AlertError::AlertDestinationMissing);
     }
     for dest in alert.destinations.iter() {
