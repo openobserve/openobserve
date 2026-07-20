@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              open-in-new is the web's idiom for "leaves this page / new tab",
              which this does not do. -->
         <OButton
-          variant="ghost-primary"
+          variant="ghost"
           size="icon"
           icon-left="edit"
           :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
