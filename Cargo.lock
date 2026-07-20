@@ -2115,6 +2115,7 @@ dependencies = [
  "http 1.4.0",
  "http-body-util",
  "infra",
+ "itertools 0.14.0",
  "jsonwebtoken",
  "log",
  "maxminddb",
@@ -2125,8 +2126,11 @@ dependencies = [
  "opentelemetry",
  "parking_lot 0.12.5",
  "prost 0.14.3",
+ "rcgen",
  "regex",
  "reqwest 0.13.2",
+ "rustls",
+ "rustls-native-certs",
  "segment",
  "serde",
  "serde_json",
@@ -2141,6 +2145,8 @@ dependencies = [
  "uaparser",
  "url",
  "utoipa",
+ "webpki-roots 1.0.6",
+ "x509-parser",
 ]
 
 [[package]]
@@ -6883,7 +6889,6 @@ dependencies = [
  "http-body-util",
  "infra",
  "ingester",
- "itertools 0.14.0",
  "jsonwebtoken",
  "lettre",
  "log",
@@ -6918,11 +6923,7 @@ dependencies = [
  "proto",
  "rand 0.10.1",
  "rayon",
- "rcgen",
  "regex",
- "reqwest 0.13.2",
- "rustls",
- "rustls-native-certs",
  "sea-orm",
  "search",
  "serde",
@@ -6943,8 +6944,6 @@ dependencies = [
  "vortex",
  "vrl",
  "wal",
- "webpki-roots 1.0.6",
- "x509-parser",
 ]
 
 [[package]]

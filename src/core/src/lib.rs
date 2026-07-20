@@ -137,12 +137,11 @@ pub mod short_url {
     pub use common::short_url::*;
 }
 pub use openobserve_catalog::stream;
-pub use openobserve_search_service::{sourcemaps, stream_utils};
-pub mod tls;
 pub use openobserve_ingestion::traces;
 #[cfg(feature = "cloud")]
 pub use openobserve_organization::trial_quota;
 pub use openobserve_organization::users;
+pub use openobserve_search_service::{sourcemaps, stream_utils};
 mod organization_adapter;
 mod transform_adapter;
 
