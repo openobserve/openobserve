@@ -616,7 +616,7 @@
   --color-datepicker-disabled-border: var(--color-border-default);
   --color-datepicker-text: var(--color-text-heading);
   --color-datepicker-placeholder: var(--color-text-disabled);
-  --color-datepicker-label: var(--color-text-primary);
+  --color-datepicker-label: var(--color-text-label);
   --color-datepicker-icon: var(--color-text-secondary);
   --color-datepicker-error-text: var(--color-error-600);
   --color-datepicker-error-border: var(--color-error-500);

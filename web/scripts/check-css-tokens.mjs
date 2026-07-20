@@ -67,10 +67,30 @@ const VAR_RE = /var\(\s*(--[A-Za-z0-9_-]+)\s*(,[^)]*)?\)/g;
 // Requires a utility prefix (`bg`, `text`, `border-t`, …) before the `-(`, which
 // is what distinguishes the shorthand from an ordinary `var(` / `calc(` call.
 const TW_SHORTHAND_RE = /[A-Za-z0-9\]]-\(\s*(--[A-Za-z0-9_-]+)\s*(,[^)]*)?\)/g;
-// ANY --o2-* occurrence, in any syntax (var(), Tailwind `[var(--o2-x)]` /
-// `(--o2-x)` shorthand, `:style` keys, raw text). The whole vocabulary is banned,
-// so a fallback does NOT make it acceptable — unlike the undefined-ref check.
+// ANY --o2-* occurrence used AS A CSS CUSTOM PROPERTY, in any syntax (var(),
+// Tailwind `[var(--o2-*)]` / `(--o2-*)` shorthand, `[--o2-*]` arbitrary,
+// `:style` keys, template-literal CSS). The whole vocabulary is banned, so a
+// fallback does NOT make it acceptable — unlike the undefined-ref check.
 const O2_RE = /--o2-[A-Za-z0-9-]+/g;
+
+// The `--o2-` prefix collides with the OpenObserve collector's CLI flags (e.g.
+// the k8s install command's `--o2-<flag>=<value>` URL flag) and with
+// prose/comments that name those flags. Those are NOT CSS custom properties, so
+// they must not trip the ban. A `--o2-*` is a CSS custom property only when used
+// as one: inside var(), a Tailwind shorthand/arbitrary bracket, or as a
+// declaration / `:style` key (immediately followed by `:`). Everything else (a
+// bare flag in a shell-command string, or a backticked mention in a comment) is
+// ignored.
+function isO2CssUsage(line, index, name) {
+  const before = line.slice(Math.max(0, index - 6), index);
+  const after = line.slice(index + name.length);
+  return (
+    /var\(\s*$/.test(before) || // var(--o2-*
+    /[A-Za-z0-9\]]-\(\s*$/.test(before) || // bg-(--o2-*  (Tailwind shorthand)
+    /\[\s*$/.test(before) || // [--o2-*  (arbitrary property/value)
+    /^\s*['"]?\s*:/.test(after) // --o2-*:  or  '--o2-*':  (decl / :style key)
+  );
+}
 
 const defined = new Set();
 const referenced = new Map(); // name -> [{file, line}]
@@ -91,6 +111,7 @@ for (const file of walk(SRC_DIR)) {
     }
     for (const m of line.matchAll(O2_RE)) {
       const name = m[0];
+      if (!isO2CssUsage(line, m.index, name)) continue; // CLI flag / prose, not a CSS token
       if (!bannedO2.has(name)) bannedO2.set(name, []);
       bannedO2.get(name).push({ file: file.replace(SRC_DIR + "/", "src/"), line: i + 1 });
     }

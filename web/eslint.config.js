@@ -9,7 +9,7 @@ import fs from "fs";
 
 // Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue/.ts
 // file's raw text — catches Tailwind arbitrary-value usages in templates
-// (e.g. class="bg-[var(--o2-card-bg)]"), <style> blocks, and JS string literals.
+// (e.g. class="bg-[var(--o2-*)]"), <style> blocks, and JS string literals.
 // This is the enforcing gate for the --o2- ban (stylelint can't allowlist values).
 //
 // ALLOWLIST: EMPTY on purpose. Every `--o2-*` custom property is a hard error —
@@ -20,6 +20,23 @@ import fs from "fs";
 // fixing the underlying usage is the only way to make this rule pass.
 const O2_ALLOWLIST = new Set([]);
 const O2_ALLOW_PREFIXES = [];
+
+// A `--o2-*` is a banned CSS custom property only when USED as one: inside var(),
+// a Tailwind shorthand/arbitrary bracket, or as a declaration / `:style` key
+// (immediately followed by `:`). The `--o2-` prefix also collides with the
+// OpenObserve collector's CLI flags (e.g. the k8s installer's `--o2-<flag>=<value>`
+// URL flag) and with prose/comments that name them — those are NOT CSS tokens and
+// must not trip the ban. This is the same discrimination as scripts/check-css-tokens.mjs.
+const isO2CssUsage = (text, index, name) => {
+  const before = text.slice(Math.max(0, index - 8), index);
+  const after = text.slice(index + name.length, index + name.length + 4);
+  return (
+    /var\(\s*$/.test(before) || // var(--o2-*
+    /[A-Za-z0-9\]]-\(\s*$/.test(before) || // bg-(--o2-*  (Tailwind shorthand)
+    /\[\s*$/.test(before) || // [--o2-*  (arbitrary property/value)
+    /^\s*['"]?\s*:/.test(after) // --o2-*:  or  '--o2-*':  (decl / :style key)
+  );
+};
 
 const noLegacyO2Tokens = {
   rules: {
@@ -36,6 +53,7 @@ const noLegacyO2Tokens = {
             let match;
             while ((match = re.exec(text))) {
               if (allowed(match[0])) continue;
+              if (!isO2CssUsage(text, match.index, match[0])) continue; // CLI flag / prose
               const start = match.index;
               const end = start + match[0].length;
               context.report({
