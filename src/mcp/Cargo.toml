@@ -1,0 +1,21 @@
+[package]
+name = "openobserve-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+bytes.workspace = true
+config.workspace = true
+futures-util.workspace = true
+log.workspace = true
+reqwest.workspace = true
+rmcp-openapi.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tantivy.workspace = true
+tokio.workspace = true
+url.workspace = true
+utoipa.workspace = true
