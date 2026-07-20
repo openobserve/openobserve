@@ -34,6 +34,8 @@ jobs:
       fail-fast: false
       matrix:
         # One-week head-to-head: GLM-5.2 vs DeepSeek-V4-Pro, each posting its own PR comment.
+        # Adding a provider? Also add its `marker` to ALL_REVIEW_MARKERS in run-review.mjs,
+        # or the other legs will claim and overwrite this one's comment.
         provider:
           - name: glm
             label: GLM-5.2

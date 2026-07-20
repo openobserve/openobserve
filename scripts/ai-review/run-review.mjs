@@ -31,16 +31,27 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "zai";
 const MODEL_ID = process.env.REVIEW_MODEL_ID || "glm-5.2";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "max";
-const API_KEY_ENV = process.env.REVIEW_API_KEY_ENV || "GLM_API_KEY";
+const API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "GLM_API_KEY";
 const AGENT_PREFIX = process.env.REVIEW_AGENT_PREFIX || "ai-review";
 const MODEL_LABEL = process.env.REVIEW_LABEL || "GLM-5.2";
 const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
 
 function apiKey() {
-  return process.env[API_KEY_ENV];
+  return process.env[API_KEY_VAR_NAME];
 }
 
 const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
+
+// Every marker any provider leg may post. findExistingReviewComment matches on substring, so a
+// comment carrying a foreign marker gets claimed — and overwritten — by that other provider's
+// leg. The coordinator prompt is now told not to emit markers at all, but models don't reliably
+// obey formatting instructions, so sanitizeReviewBody strips all of these and re-prepends only
+// REVIEW_MARKER: exactly one marker per comment, enforced in code rather than by the prompt.
+// Keep in sync with the `marker` values in .github/workflows/ai-code-review.yml.
+const ALL_REVIEW_MARKERS = [
+  "<!-- ai-code-review -->",
+  "<!-- ai-code-review-deepseek -->",
+];
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 20 * 60 * 1000;
@@ -527,7 +538,7 @@ class OpencodeServer {
     if (this.starting) return this.starting;
 
     this.starting = (async () => {
-      if (!apiKey()) throw new Error(`${API_KEY_ENV} not set`);
+      if (!apiKey()) throw new Error(`${API_KEY_VAR_NAME} not set`);
 
       const proc = spawn("opencode", ["serve", "--hostname", "127.0.0.1", "--port", "0"], {
         cwd: resolve(__dirname, "../.."),
@@ -740,12 +751,12 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
   }, parentSpan);
 
   if (!apiKey()) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — ${API_KEY_ENV} not set`);
+    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — ${API_KEY_VAR_NAME} not set`);
     TRACE.endSpan(reviewerSpan, {
       "review.skipped": true,
-      "review.error": `${API_KEY_ENV} not set`,
+      "review.error": `${API_KEY_VAR_NAME} not set`,
     });
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `${API_KEY_ENV} not set`, genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
   }
 
   const systemPrompt = readPrompt("shared-rules.md");
@@ -854,15 +865,29 @@ function sanitizeReviewBody(body) {
   const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
   cleaned = cleaned.replace(boundaryPattern, "");
 
-  // Ensure the marker is at the very start
-  if (!cleaned.trimStart().startsWith(REVIEW_MARKER)) {
-    cleaned = REVIEW_MARKER + "\n" + cleaned.replace(REVIEW_MARKER, "");
+  // Strip EVERY known marker (not just ours) wherever it appears. The coordinator prompt's
+  // output template used to hardcode the GLM marker, so a DeepSeek run would carry both and
+  // be matched — and overwritten — by the GLM leg's findExistingReviewComment.
+  for (const marker of ALL_REVIEW_MARKERS) {
+    cleaned = cleaned.split(marker).join("");
   }
 
+  // Drop any preamble the model emitted before the review proper ("Now I have all the
+  // context. Let me produce the consolidated review."). Runs after marker stripping so a
+  // leading marker can't anchor the search at index 0 and mask the preamble behind it.
+  const headingAt = cleaned.search(/^#{1,3}[ \t]*AI Code Review\b/mi);
+  if (headingAt > 0) cleaned = cleaned.slice(headingAt);
+
+  // Re-prepend exactly one marker — ours.
+  cleaned = `${REVIEW_MARKER}\n${cleaned.trimStart()}`;
+
   // Tag the review header with the model label so the GLM and DeepSeek comments are
-  // visually distinguishable on the PR. Matches the coordinator's "## AI Code Review"
-  // heading (and the fallback's) but not an already-labelled one, so re-runs stay idempotent.
-  cleaned = cleaned.replace(/^(#{1,3}\s*AI Code Review)(?!\s*\()(.*)$/m, `$1 (${MODEL_LABEL})$2`);
+  // visually distinguishable on the PR. Tolerates trailing words ("AI Code Review Summary")
+  // and any case; the negative lookahead for "(" keeps re-runs idempotent.
+  cleaned = cleaned.replace(
+    /^(#{1,3}[ \t]*AI Code Review\b)(?![ \t]*\()([ \t]*[^\n(]*)$/mi,
+    `$1 (${MODEL_LABEL})$2`,
+  );
 
   return cleaned.trim();
 }
@@ -1112,10 +1137,10 @@ async function main() {
       // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
       // dropping to zero can't slip by as a green check. Also post to the PR so it's
       // visible without digging into Actions logs.
-      const message = `${API_KEY_ENV} is not set. AI Code Review (${MODEL_LABEL}) did not run for this PR — this is a CI misconfiguration, not a skip.`;
+      const message = `${API_KEY_VAR_NAME} is not set. AI Code Review (${MODEL_LABEL}) did not run for this PR — this is a CI misconfiguration, not a skip.`;
       console.error(`[${isoNow()}] ${message}`);
       try {
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review (${MODEL_LABEL})\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`${API_KEY_ENV}\` secret is provisioned.`);
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review (${MODEL_LABEL})\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`${API_KEY_VAR_NAME}\` secret is provisioned.`);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
