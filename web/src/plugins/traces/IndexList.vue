@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col w-full index-menu py-1.5! bg-surface-panel!">
-    <!-- Stream selector sits on the same 6px rail inset as the field list below it. -->
-    <div class="px-1.5">
+    <!-- Stream selector sits on the same page-edge rail inset as the field list below it. -->
+    <div class="px-page-edge">
       <OSelect
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
