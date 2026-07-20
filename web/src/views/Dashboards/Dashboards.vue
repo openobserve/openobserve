@@ -753,7 +753,7 @@ export default defineComponent({
             );
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
-            if (!error.name === "AbortError") {
+            if (error.name !== "AbortError") {
               filteredResults.value = [];
               // Handle error state
             }
