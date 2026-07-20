@@ -315,10 +315,29 @@ class SchemaLoadPage {
             // (before this test's stream existed). The reload triggers a fresh
             // streams-list API call.
             await this.navigateToLogs();
+
+            // Gate the stream-selector readiness on the REAL signal: the fresh
+            // streams-list API call the logs page fires on (re)load. The OSelect
+            // wrapper only mounts once the SearchBar has this list, so on a heavy
+            // (large-schema) stream under load the wrapper can lag well past a bare
+            // 30s wait while the SPA is still bootstrapping/fetching. Arm the listener
+            // BEFORE reload() so we capture the post-reload request (not the stale one
+            // from the first /web/logs visit). If it never arrives, fall through — the
+            // OSelect wait below still guards correctness (and surfaces genuine
+            // streams-API slowness rather than masking it).
+            const streamsListLoaded = this.page.waitForResponse(
+                (resp) => resp.url().includes('/streams?type=logs') && resp.status() === 200,
+                { timeout: 60000 }
+            ).catch(() => {
+                testLogger.debug('streams?type=logs response not observed within timeout - continuing to OSelect wait');
+                return null;
+            });
+
             await this.page.reload();
             await this.page.waitForLoadState('domcontentloaded');
+            await streamsListLoaded;
 
-            // Wait for the OSelect to mount
+            // Wait for the OSelect to mount now that the streams list has been fetched
             await this.logSearchIndexSelectStream.waitFor({ state: 'visible', timeout: 30000 });
 
             // Open the stream dropdown
