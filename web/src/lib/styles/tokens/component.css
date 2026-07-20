@@ -3901,6 +3901,20 @@ button.date-time-button {
   border-bottom: 1px solid gray;
 }
 
+.logs-table th {
+  text-align: left;
+
+  .column-actions {
+    background: var(--o2-log-table-header-bg);
+  }
+
+  &:hover {
+    .column-actions {
+      visibility: visible !important;
+    }
+  }
+}
+
 .logs-table td {
   /* Brand monospace (Geist Mono), not the OS-default `monospace` keyword. */
   font-family: var(--font-mono);
