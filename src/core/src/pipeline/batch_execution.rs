@@ -24,6 +24,7 @@ use std::{
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use chrono::Utc;
+use common::utils::conditions::{ConditionExt, ConditionGroupExt};
 use config::{
     meta::{
         function::{Transform, VRLResultResolver},
@@ -50,13 +51,7 @@ use proto::cluster_rpc;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
 
-use crate::{
-    common::infra::config::QUERY_FUNCTIONS,
-    service::{
-        alerts::{ConditionExt, ConditionGroupExt},
-        self_reporting::publish_error,
-    },
-};
+use crate::{common::infra::config::QUERY_FUNCTIONS, service::self_reporting::publish_error};
 
 // Global batch buffer for accumulating remote stream records
 #[cfg(feature = "enterprise")]

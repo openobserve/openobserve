@@ -21,6 +21,7 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use common::utils::conditions::ConditionListExt;
 use config::meta::{
     alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
     triggers::{Trigger, TriggerModule},
@@ -59,7 +60,6 @@ use crate::{
     },
     service::{
         alerts::{
-            ConditionListExt,
             alert::{self, AlertError},
             build_sql,
         },

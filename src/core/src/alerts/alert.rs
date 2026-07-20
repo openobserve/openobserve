@@ -2232,10 +2232,11 @@ async fn permitted_alerts(
 #[cfg(test)]
 mod tests {
     use arrow_schema::DataType;
+    use common::utils::conditions::build_expr;
+    use config::meta::alerts::Condition;
     use serde_json::json;
 
     use super::*;
-    use crate::alerts::{Condition, build_expr};
 
     #[test]
     fn test_format_variable_value() {

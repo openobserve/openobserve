@@ -24,6 +24,7 @@ axum.workspace = true
 http.workspace = true
 http-body-util.workspace = true
 anyhow.workspace = true
+async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 dashmap.workspace = true

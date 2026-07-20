@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod auth;
+pub mod conditions;
 pub mod functions;
 pub mod http;
 pub use openobserve_transform::js;
