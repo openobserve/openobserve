@@ -282,8 +282,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Composite mode: term cards + expression + notifications -->
                 <CompositeAlert
                   v-if="isComposite"
-                  :composite="formData.composite"
-                  :triggerCondition="formData.trigger_condition"
+                  :composite="composite"
+                  :triggerCondition="compositeTrigger"
                   :destinations="getFormattedDestinations"
                   :folderId="activeFolderId"
                   :selfId="formData.id || ''"
@@ -487,10 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
               <template v-if="isComposite">
-                <CompositePreview
-                  :composite="formData.composite"
-                  :triggerCondition="formData.trigger_condition"
-                />
+                <CompositePreview :composite="composite" :triggerCondition="compositeTrigger" />
               </template>
               <template v-else-if="isAnomalyMode">
                 <!-- editor-height is QueryEditor's own API for this; a class cannot
@@ -543,8 +540,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isComposite"
                 class="h-full"
                 :name="formData.name"
-                :composite="formData.composite"
-                :triggerCondition="formData.trigger_condition"
+                :composite="composite"
+                :triggerCondition="compositeTrigger"
               />
               <AnomalySummary
                 class="h-full overflow-auto"
@@ -602,7 +599,7 @@ import AlertSettings from "./steps/AlertSettings.vue";
 import CompareWithPast from "./steps/CompareWithPast.vue";
 import Deduplication from "./steps/Deduplication.vue";
 import Advanced from "./steps/Advanced.vue";
-import CompositeAlert, { makeDefaultComposite } from "./composite/CompositeAlert.vue";
+import CompositeAlert from "./composite/CompositeAlert.vue";
 import CompositePreview from "./composite/CompositePreview.vue";
 import CompositeSummary from "./composite/CompositeSummary.vue";
 import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDropdown.vue";
@@ -709,19 +706,12 @@ export default defineComponent({
     );
 
     // Composite alerts: a self-scheduled alert owning an ordered set of terms.
-    const isComposite = computed(
-      () => alertForm.formData.value.composite != null,
-    );
+    // State lives in useAlertForm on a local mutable model (the OForm read-view
+    // is immutable), exposed here for the Simple|Composite toggle.
+    const isComposite = alertForm.isComposite;
     const toggleComposite = (mode: string) => {
-      if (mode === "composite") {
-        if (!alertForm.formData.value.composite) {
-          alertForm.formData.value.composite = makeDefaultComposite();
-          // A composite is scheduled and has no single top-level stream.
-          alertForm.formData.value.is_real_time = "false";
-        }
-      } else {
-        alertForm.formData.value.composite = null;
-      }
+      if (mode === "composite") alertForm.enableComposite();
+      else alertForm.disableComposite();
     };
 
     // Info banner visibility, persisted so repeat authors aren't shown it. The
