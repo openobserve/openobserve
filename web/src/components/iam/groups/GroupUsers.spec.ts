@@ -392,7 +392,6 @@ describe("GroupUsers Component", () => {
 
       expect(wrapper.vm.users).toHaveLength(3);
       expect(wrapper.vm.users[0]).toEqual({
-        "#": 1,
         email: "user1@example.com",
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
@@ -400,7 +399,6 @@ describe("GroupUsers Component", () => {
         is_external: false,
       });
       expect(wrapper.vm.users[1]).toEqual({
-        "#": 2,
         email: "admin@example.com",
         isInGroup: true,
         org: "TestOrg1",
@@ -408,7 +406,6 @@ describe("GroupUsers Component", () => {
         is_external: false,
       });
       expect(wrapper.vm.users[2]).toEqual({
-        "#": 3,
         email: "root@example.com",
         isInGroup: false,
         org: "",
@@ -442,7 +439,6 @@ describe("GroupUsers Component", () => {
       expect(mockUsersState.users).toHaveLength(3);
       expect(mockUsersState.users[0]).toEqual({
         email: "user1@example.com",
-        "#": 1,
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
         role: "user",

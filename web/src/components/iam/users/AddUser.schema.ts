@@ -7,20 +7,6 @@
 // validates a different subset of fields, so the rules live in a `superRefine`
 // keyed off a context object the component supplies via this factory.
 //
-// Restores the pre-migration (BEFORE) rules that the earlier O-component
-// migration had weakened into manual `emailError`/`roleError`/`passwordError`
-// refs + toast checks:
-//   • email     — required + valid-email regex (add-existing mode)
-//   • role      — required (add-existing, non-self, non-member)
-//   • password  — required + strong policy (create-new). The policy already
-//                 enforces the BEFORE min-length-8 (and more).
-//   • old/new_password — required when changing. old_password is required-only
-//                 (it is an EXISTING credential that predates the strong policy,
-//                 so it is never re-validated for length/strength — matches the
-//                 upstream "enforce strong password policy" baseline); new keeps
-//                 the current strong policy.
-//   • other_organization — must start with a letter (alphanumeric, _ or -).
-//
 // Messages are i18n-driven (the factory takes useI18n's `t`).
 
 import { z } from "zod";
@@ -51,8 +37,8 @@ export interface AddUserSchemaContext {
   organization: string;
 }
 
-// Every control inside <OForm> is form-owned (R1-strict); base fields are
-// optional and the real, mode-dependent requireds are enforced in superRefine.
+// Base fields are optional; the real, mode-dependent requireds are enforced in
+// superRefine.
 export const addUserBaseSchema = z.object({
   email: z.string().optional().default(""),
   password: z.string().optional().default(""),
@@ -74,8 +60,8 @@ export const makeAddUserSchema = (
 ) =>
   addUserBaseSchema.superRefine((val, zctx) => {
     // Read the live context on every run so a single stable schema instance
-    // follows mode flips (e.g. the 422 add-existing → create-new switch) WITHOUT
-    // a remount — the OWNER (AddUser.vue) holds one form via useOForm. (Rule ③)
+    // follows mode flips (e.g. the 422 add-existing → create-new switch) without
+    // a remount.
     const ctx = getCtx();
     // ── Add an existing user (enter an email to invite) ──────────────────────
     if (ctx.existingUser && !ctx.beingUpdated) {

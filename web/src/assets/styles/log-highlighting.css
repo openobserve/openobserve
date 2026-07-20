@@ -1,8 +1,8 @@
 /* Log Highlighting CSS Classes */
 /* Base highlighting classes */
 .log-highlight {
-  font-family: monospace;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   word-break: break-word;
   display: inline;
 
@@ -32,6 +32,13 @@
 .log-separator {
   color: #9ca3af;
 
+}
+/* `.log-key`/`.log-separator` are applied to generated log HTML injected via
+   v-html (useLogsHighlighter.ts, JsonPreview.vue), so they live in this global
+   stylesheet rather than any component scope. */
+.log-key,
+.log-separator {
+  font-weight: normal;
 }
 .log-object-brace {
   color: #9ca3af;
@@ -92,6 +99,9 @@
 .dark .log-string {
   color: #6EE7B7; /* Soft mint green */
 
+}
+.dark .log-separator {
+  color: #999;
 }
 .dark .log-number {
   color: #60A5FA; /* Light blue for numbers */
@@ -174,8 +184,8 @@
 
 /* Special classes for performance optimization */
 .log-simple-text {
-  font-family: monospace;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   word-break: break-word;
 
 }

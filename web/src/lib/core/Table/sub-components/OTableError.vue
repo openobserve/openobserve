@@ -27,7 +27,7 @@ defineSlots<{
         <template v-if="message" #actions>
           <button
             data-test="o2-table-error-retry-btn"
-            class="px-3 py-1 text-sm rounded bg-white/20 hover:bg-white/30 transition-colors"
+            class="px-3 py-1 text-sm rounded-default bg-white/20 hover:bg-white/30 transition-colors"
             @click="$emit('retry')"
           >
             Retry

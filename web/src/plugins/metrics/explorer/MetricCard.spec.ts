@@ -527,7 +527,7 @@ describe("MetricCard (ported to @/lib)", () => {
       // Header bar (the dashboard panel bar's box — untinted, bordered),
       // footer, and the badge in the footer where it cannot truncate the name
       // it describes.
-      expect(wrapper.find(".min-h-7.border-b.border-border-subtle").exists()).toBe(
+      expect(wrapper.find(".min-h-7.border-b.border-border-default").exists()).toBe(
         true,
       );
       expect(

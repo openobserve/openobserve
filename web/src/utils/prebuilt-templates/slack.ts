@@ -17,7 +17,7 @@ import { PrebuiltConfig } from './types';
 /**
  * Slack prebuilt destination configuration
  * Provides predefined configuration for Slack webhook notifications
- * Note: Template body is now managed by backend, this is just for fallback/reference
+ * Note: Template body is managed by the backend; this is just a fallback/reference.
  */
 const slackTemplateBody = JSON.stringify({
   text: "🚨 *Alert: {alert_name}*",

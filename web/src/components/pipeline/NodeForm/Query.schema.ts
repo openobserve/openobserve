@@ -1,44 +1,16 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for the pipeline Query node drawer (Query.vue OWNS the
-// <OForm>; ScheduledPipeline.vue renders the fields as a DESCENDANT). It models
-// the `streamRoute` shape that Query's save reads, and replaces the imperative
-// `ScheduledPipeline.validateInputs()` gate (pattern → schema, Rule ③).
-//
-// Because Query renders ScheduledPipeline with `disableThreshold=true`, the
-// threshold / having branches of the old validateInputs() are NOT applicable to
-// this usage — so they are intentionally NOT modelled here. The rules that DO
-// apply (mirroring validateInputs + validateFrequency for the disableThreshold
-// path) are:
+// Validation schema for the pipeline Query node drawer. Models the `streamRoute`
+// shape that Query's save reads. Validated rules:
 //   • trigger_condition.period ≥ 1  ("Period should be greater than 0").
 //   • frequency / cron validity (superRefine):
-//       – frequency_type === "cron": cron required + interval ≥ min seconds
-//         (reuses getCronIntervalDifferenceInSeconds / isAboveMinRefreshInterval,
-//          the SAME util logic validateFrequency used). Message matches
-//          validateFrequency: `Frequency should be greater than ${min-1} seconds.`
-//          or the i18n invalidCronExpression message.
-//       – frequency_type === "minutes": frequency ≥ ceil(min/60)
-//         ("Minimum frequency should be N minutes").
+//       – frequency_type === "cron": cron required + interval ≥ min seconds.
+//       – frequency_type === "minutes": frequency ≥ ceil(min/60).
 //   • query_condition.aggregation.group_by (superRefine): when aggregation is
-//     enabled (aggregation object present), every group_by row is non-empty —
-//     the restored §5 #3 rule (message t('pipeline.fieldRequired')). The
-//     group_by ARRAY UI stays in ScheduledPipeline (deferred); its value is
-//     bridged into the form so this superRefine can see it.
+//     enabled, every group_by row must be non-empty.
 //
 // SQL validity is NOT modelled here — the Monaco SQL editor is bare, so
 // `validateSqlQuery()` stays a pre-submit guard inside Query's onSubmit.
-//
-// The stream-name regex (`isValidStreamName`) is intentionally NOT a schema
-// field: the live drawer never edits `streamRoute.name` and `saveQueryData`
-// never gated on it (it was an exposed computed only), so — like Condition's
-// omitted stream_name — there is nothing to validate at submit. The computed is
-// kept in Query.vue for the existing unit tests.
-//
-// `trigger_condition.operator` was required in the older BEFORE baseline, but
-// with disableThreshold=true validateInputs() never enforced it for this drawer
-// (the operator lives behind the `!disableThreshold` threshold branch). To match
-// CURRENT behavior and keep the happy-path tests green, operator is left
-// unvalidated here (documented choice).
 
 import { z } from "zod";
 import {
@@ -54,10 +26,9 @@ type Translate = (_key: string, _params?: Record<string, unknown>) => string;
 const aggregationShape = z
   .object({
     group_by: z.array(z.any()).optional().nullable(),
-    // aggregation function + having.{column,operator,value} are OForm* `name=`
-    // fields in ScheduledPipeline (rendered only when disableThreshold=false).
-    // Modelled loosely (passthrough round-trips them) so their values are owned
-    // by the form and survive the payload build.
+    // aggregation function + having.{column,operator,value} are form fields in
+    // ScheduledPipeline; modelled loosely (passthrough) so their values survive
+    // the payload build.
     function: z.any().optional().nullable(),
     having: z
       .object({
@@ -94,10 +65,8 @@ export function makeQuerySchema(min: number, t: Translate = (k) => k) {
           frequency: z.any().optional(),
           cron: z.string().optional().nullable(),
           timezone: z.any().optional(),
-          // operator / threshold are OForm* `name=` fields in ScheduledPipeline
-          // (rendered only when disableThreshold=false — the Query drawer passes
-          // disableThreshold=true so they never render there). Left unvalidated
-          // (optional) to match CURRENT behavior; passthrough round-trips them.
+          // operator / threshold are form fields in ScheduledPipeline; left
+          // optional (passthrough round-trips them).
           operator: z.any().optional(),
           threshold: z.any().optional(),
         })
@@ -112,7 +81,7 @@ export function makeQuerySchema(min: number, t: Translate = (k) => k) {
     .superRefine((val: any, ctx) => {
       const trigger = val?.trigger_condition ?? {};
 
-      // ── frequency / cron validity (mirrors validateFrequency) ─────────────
+      // ── frequency / cron validity ─────────────────────────────────────────
       if (trigger.frequency_type === "cron") {
         const cron = trigger.cron;
         if (!cron || !String(cron).trim()) {
@@ -158,7 +127,7 @@ export function makeQuerySchema(min: number, t: Translate = (k) => k) {
         }
       }
 
-      // ── group_by rows required when aggregation enabled (restored §5 #3) ───
+      // ── group_by rows required when aggregation enabled ───────────────────
       const aggregation = val?.query_condition?.aggregation;
       if (aggregation && Array.isArray(aggregation.group_by)) {
         aggregation.group_by.forEach((col: any, index: number) => {

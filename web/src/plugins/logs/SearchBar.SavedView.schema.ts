@@ -1,19 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for the Saved View dialog in SearchBar.vue (row 58).
-// Built via a factory so all messages stay i18n-driven (pass `t`); the keys
-// resolve to the exact strings the component used before migration.
+// Validation schema for the Saved View dialog in SearchBar.vue.
+// Built via a factory so all messages stay i18n-driven (pass `t`).
 //
 // Mode-aware (conditional on `isSavedViewAction`, which is form-owned so the
 // superRefine can branch on it):
 //   • create → savedViewName required + alphanumeric regex;
 //   • update → savedViewSelectedName required.
-//
-// Restored from the current SearchBar code (preserve the regex in use TODAY,
-// per the brief's BEFORE-vs-current reconciliation note):
-//   savedViewName — `!!v.trim() || 'This field is required'`
-//                ;  `/^[A-Za-z0-9 _-]+$/.test(v) || 'Input must be alphanumeric'`
-//   savedViewSelectedName — `!!v || 'Field is required!'` (update mode).
 
 import { z } from "zod";
 

@@ -1,3 +1,5 @@
+import { canvasFont } from "@/utils/fonts";
+
 // Cached 2D context for text measurement — canvas measureText is the same
 // browser API ECharts measures its labels with, and it avoids the
 // DOM-append + forced-reflow cost of measuring with a <span>, which adds up
@@ -31,8 +33,9 @@ export const calculateWidthText = (
     }
   }
   if (measureTextCtx) {
-    // sans-serif matches the font ECharts renders axis labels with
-    measureTextCtx.font = `${fontSize || "12px"} sans-serif`;
+    // Must match the family ECharts renders axis labels with (set globally by
+    // registerO2EChartsTheme), otherwise nameGap/width come out wrong.
+    measureTextCtx.font = canvasFont(fontSize || "12px", "sans");
     return Math.ceil(measureTextCtx.measureText(String(text)).width);
   }
 
@@ -199,11 +202,8 @@ export const calculateRotatedLabelBottomSpace = (
     // Only add if totalNeeded exceeds a reasonable base (e.g., 40px)
     return Math.max(0, Math.ceil(totalNeededSpace - 40));
   } else {
-    // Without axis name, containLabel: true in grid config handles the space automatically
-    // for rotated labels. No additional bottom spacing is needed because:
-    // 1. containLabel: true makes ECharts automatically expand grid to fit labels
-    // 2. The grid.bottom value already provides base spacing
-    // 3. Adding extra space here causes unnecessary whitespace
+    // Without an axis name, grid's containLabel: true expands the grid to fit
+    // rotated labels, so no extra bottom spacing is needed.
     return 10; // Let ECharts handle it with containLabel
   }
 };

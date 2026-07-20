@@ -137,6 +137,18 @@ jobs:
       - name: Lint frontend code
         run: cd web && npm ci && npm run lint:ci
 
+      - name: Check for undefined CSS custom properties
+        run: cd web && npm run lint:tokens
+
+      - name: Lint styles (stylelint — bans legacy --o2-* tokens)
+        run: cd web && npm run lint:styles
+
+      - name: Check token-file purity (token files contain tokens only)
+        run: cd web && npm run lint:token-purity
+
+      - name: Check design-consistency ratchet (strict — hardcoded/arbitrary/raw-token, no slack)
+        run: cd web && npm run lint:design:strict
+
       - name: Build binary and frontend
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"

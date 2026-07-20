@@ -1,22 +1,16 @@
 <template>
   <div
-    class="quality-page flex flex-col gap-[14px] p-[14px_16px_18px] min-h-0 flex-1"
+    class="quality-page flex flex-col gap-3.5 pt-3.5 pb-4 min-h-0 flex-1"
     data-test="quality-page"
   >
     <!-- Agent filter — right-aligned at the top of the content container so it
          sits with the KPIs + table it scopes (matches LLM Insights). -->
-    <div class="flex items-center justify-end px-4">
+    <div class="flex items-center justify-end px-page-edge">
       <div class="w-[17rem] flex-shrink-0">
         <!-- While the agent list is loading we swap the select for a skeleton
              of the same height so the control reads as "loading" (and can't be
              opened on an empty list) instead of showing an empty dropdown. -->
-        <SkeletonBox
-          v-if="agentsLoading"
-          width="100%"
-          height="2.125rem"
-          rounded
-          data-test="quality-agent-filter-skeleton"
-        />
+        <OSkeleton type="text" v-if="agentsLoading" data-test="quality-agent-filter-skeleton" class="w-full h-8.5" />
         <OSelect
           v-else
           v-model="agentModel"
@@ -26,7 +20,7 @@
           :options="agentOptions || []"
           labelKey="label"
           valueKey="value"
-          class="rounded"
+          class="rounded-default"
           data-test="quality-agent-filter"
         />
       </div>
@@ -35,23 +29,20 @@
     <QualityKpiSkeleton
       v-if="showKpiSkeleton"
       :count="visibleKpis.length"
-      class="px-4"
+      class="px-page-edge"
     />
-    <section v-else class="quality-page__kpis grid gap-[10px] px-4" aria-label="Tier 1 KPIs"
-      style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))"
-    >
+    <KpiCardRow v-else class="quality-page__kpis px-page-edge" aria-label="Tier 1 KPIs">
       <QualityKpiCard
         v-for="kpi in visibleKpis"
         :key="kpi.id"
         :kpi="kpi"
         :delta="deltaByKpi[kpi.id] ?? null"
       />
-    </section>
+    </KpiCardRow>
 
-    <!-- Tier 2: the configs table is now the persistent view; selecting a
-         row opens the detail in a right-side ODrawer (70% width) instead
-         of replacing the whole page. The user keeps full context of the
-         list behind the drawer. -->
+    <!-- Tier 2: the configs table is the persistent view; selecting a
+         row opens the detail in a right-side ODrawer (70% width). The user
+         keeps full context of the list behind the drawer. -->
     <div class="quality-page__tier2 grid gap-3 min-h-0 flex-1"
       style="grid-template-columns: minmax(0, 1fr)"
     >
@@ -64,6 +55,7 @@
     </div>
 
     <ODrawer
+      bleed
       v-model:open="detailDrawerOpen"
       side="right"
       :width="70"
@@ -74,20 +66,15 @@
            the drawer chrome owns the entire identification block;
            the inner panel no longer renders its own title row. -->
       <template #header-right>
-        <span
-          class="qpd-type inline-flex py-0 px-1 rounded-[2px] font-bold text-[13px] leading-[1.4] tracking-[0.02em]"
-          :class="{
-            'bg-[color-mix(in_srgb,var(--color-indigo-500)_14%,transparent)] text-[var(--color-indigo-700)]': detailDataType === 'numeric',
-            'bg-[color-mix(in_srgb,var(--color-purple-600)_14%,transparent)] text-[var(--color-purple-700)]': detailDataType === 'categorical',
-            'bg-[color-mix(in_srgb,var(--color-success-600)_14%,transparent)] text-[var(--color-success-700)]': detailDataType === 'boolean',
-          }"
+        <OTag
+          v-if="detailDataType === 'numeric' || detailDataType === 'categorical' || detailDataType === 'boolean'"
+          type="evalDataType"
+          :value="detailDataType"
           data-test="quality-detail-type-badge"
-        >
-          {{ shortType(detailDataType) }}
-        </span>
+        />
         <span
           v-if="selectedConfig?.version"
-          class="qpd-version ml-[6px] text-[11px] text-(--color-text-secondary) [font-variant-numeric:tabular-nums]"
+          class="qpd-version ml-1.5 text-2xs text-text-secondary [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
           >v{{ selectedConfig.version }}</span
         >
@@ -126,19 +113,21 @@ import {
 } from "./composables/useQualityScoreConfigs";
 import { useQualityConfigDetail } from "./composables/useQualityConfigDetail";
 import { useQualityDetailCharts } from "./composables/useQualityDetailCharts";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import QualityKpiCard from "./quality/QualityKpiCard.vue";
 import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
 import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { AgentFilterSelection } from "./utils/agentFilterSql";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
   // Date window is owned by OnlineEvals (so the picker + refresh button live
-  // in the embedded AppPageHeader). Quality just consumes it as a reactive
+  // in the embedded OPageHeader). Quality just consumes it as a reactive
   // input to its data loaders.
   dateWindow: DateWindow;
   agentFilter?: AgentFilterSelection | null;
@@ -184,12 +173,8 @@ const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(
   agentFilterRef,
 );
 
-// Evaluation cost is intentionally hidden until the backend writes cost data.
-// To restore it, remove this filter and re-add `kpis` to the v-for.
-// Now that `gen_ai_usage_cost` on `_evaluator` is populated, the
-// Evaluation Cost card is sourced live (see useQualityData) — no longer
-// hidden. Keep the set in place so future placeholder KPIs can be
-// hidden the same way without touching the render loop.
+// Placeholder KPIs can be hidden here without touching the render loop — add
+// their ids to this set to filter them out of the v-for.
 const HIDDEN_KPI_IDS = new Set<string>();
 const visibleKpis = computed(() =>
   kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)),
@@ -267,7 +252,7 @@ const isAnyLoading = computed(
 );
 
 // Surface refresh + an aggregated loading flag so OnlineEvals can drive the
-// Refresh button it now renders in the embedded AppPageHeader actions slot.
+// Refresh button it now renders in the embedded OPageHeader actions slot.
 defineExpose({ refreshAll, isAnyLoading });
 
 /** Show the KPI skeleton whenever the KPI queries are running — on the initial
@@ -333,14 +318,4 @@ const detailDrawerOpen = computed<boolean>({
     if (!open) clearSelection();
   },
 });
-
-// Used by the drawer header's #header-right slot — same mapping the
-// detail panel used for its in-panel badge so type/version chrome looks
-// identical, just relocated into the drawer header.
-function shortType(type: string): string {
-  if (type === "numeric") return "Num";
-  if (type === "categorical") return "Cat";
-  if (type === "boolean") return "Bool";
-  return "—";
-}
 </script>

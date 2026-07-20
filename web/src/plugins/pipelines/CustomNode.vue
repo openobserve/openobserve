@@ -95,12 +95,21 @@ const getNodeErrorInfo = computed(() => {
   return null;
 });
 
-// Edge color mapping for different node types
+// Edge color mapping for different node types.
+//
+// TODO(design-tokens): these are the same three node-TYPE roles the handle CSS
+// below now takes from --color-status-{info,positive,warning} — but they CANNOT
+// be CSS custom-property references here. vue-flow builds its arrowhead marker
+// id from this value (getMarkerId → `color=<value>&type=…`) and then references
+// it as `url(#<id>)`; a custom-property reference puts parentheses inside that
+// url(), which terminates it early and breaks the arrowhead. Resolving the token
+// to a literal (getComputedStyle on :root) at call time is the fix, and would
+// also give these edges the dark-mode step they currently lack.
 const getNodeColor = (ioType) => {
   const colorMap = {
-    input: "#3b82f6", // Blue
-    output: "#22c55e", // Green
-    default: "#f59e0b", // Orange/Amber
+    input: "#3b82f6", // Blue    — pairs with --color-status-info-text
+    output: "#22c55e", // Green   — pairs with --color-status-positive
+    default: "#f59e0b", // Amber   — pairs with --color-status-warning-text
   };
   return colorMap[ioType] || "#6b7280";
 };
@@ -487,17 +496,9 @@ function getIcon(data, ioType) {
 
     <div
       v-if="data.node_type == 'function'"
-      class="p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-function-node`"
       data-node-type="function"
-      style="
-        padding: 5px 0px;
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-      "
+      class="btn-fixed-width py-1.25 px-0 w-fit flex items-center border-none cursor-pointer"
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
@@ -515,16 +516,10 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
+          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
           align="left"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
         >
           {{ data.name }} -
           <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
@@ -535,7 +530,7 @@ function getIcon(data, ioType) {
       <div
         v-if="hasNodeError"
         data-test="pipeline-node-error-badge"
-        class="absolute top-[-12px] right-[-12px] w-[20px] h-[20px] bg-[#ef4444] border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_2px_6px_rgba(239,68,68,0.5)] transition-all duration-200 error-badge"
+        class="absolute -top-3 -right-3 w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-error-500)_50%,transparent)] transition-all duration-200 hover:scale-120 hover:shadow-[0_0.1875rem_0.625rem_color-mix(in_srgb,var(--color-error-500)_70%,transparent)] hover:z-20"
         @click.stop="navigateToFunction(data.name)"
       >
         <OIcon name="error" size="sm" />
@@ -545,7 +540,7 @@ function getIcon(data, ioType) {
             pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
               ?.error_count
           "
-          class="absolute top-[-6px] right-[-6px] bg-[#dc2626] text-white text-[9px] font-bold min-w-[14px] h-[14px] rounded-[7px] flex items-center justify-center px-[3px] border-[1.5px] border-solid border-white shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
+          class="absolute -top-1.5 -right-1.5 bg-status-negative text-button-destructive-foreground text-3xs font-bold min-w-3.5 h-3.5 rounded-full flex items-center justify-center px-0.75 border-[1.5px] border-solid border-white shadow-[0_1px_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         >
           {{
             pipelineObj.currentSelectedPipeline.last_error.node_errors[id]
@@ -554,7 +549,7 @@ function getIcon(data, ioType) {
         </span>
         <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
           <template #content>
-            <div style="max-height: 300px; overflow-y: auto">
+            <div class="max-h-75 overflow-y-auto">
               {{ getNodeErrorInfo || "Error occurred" }}
             </div>
           </template>
@@ -563,7 +558,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -573,7 +568,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -582,28 +577,19 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
-          style="left: 15px"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
-          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
+          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
         </div>
       </div>
     </div>
 
     <div
       v-if="data.node_type == 'stream'"
-      class="p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-stream-node`"
       data-node-type="stream"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-        padding: 5px 0px;
-      "
+      class="btn-fixed-width py-1.25 px-0 w-fit flex items-center border-none cursor-pointer"
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
@@ -621,35 +607,23 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
           v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
           {{ data.stream_type }} - {{ data.stream_name.label }}
         </div>
         <div
           v-else
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
       </div>
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -659,7 +633,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -668,27 +642,18 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
-          style="left: 15px"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
-          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
+          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
         </div>
       </div>
     </div>
     <div
       v-if="data.node_type == 'remote_stream'"
-      class="p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-remote-stream-node`"
       data-node-type="remote_stream"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-        padding: 5px 0px;
-      "
+      class="btn-fixed-width py-1.25 px-0 w-fit flex items-center border-none cursor-pointer"
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
@@ -706,22 +671,16 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
           {{ data.destination_name }}
         </div>
       </div>
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -731,7 +690,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -740,28 +699,19 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
-          style="left: 15px"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
-          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
+          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
         </div>
       </div>
     </div>
 
     <div
       v-if="data.node_type == 'query'"
-      class="p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-query-node`"
       data-node-type="query"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-        padding: 5px 0px;
-      "
+      class="btn-fixed-width py-1.25 px-0 w-fit flex items-center border-none cursor-pointer"
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
@@ -779,15 +729,9 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
@@ -795,7 +739,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -805,7 +749,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -814,27 +758,19 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
-          style="left: 15px"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
-          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
+          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
         </div>
       </div>
     </div>
 
     <div
       v-if="data.node_type == 'condition'"
-      class="p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-condition-node`"
       data-node-type="condition"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-      "
+      class="p-0 btn-fixed-width w-fit flex items-center border-none cursor-pointer"
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
@@ -852,15 +788,9 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
-          class="text-[15px]! font-bold! leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          class="text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
           {{ getTruncatedConditions(data.condition || data.conditions) }}
         </div>
@@ -868,7 +798,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -878,7 +808,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -887,11 +817,10 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
-          style="left: 15px"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
-          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
+          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
         </div>
       </div>
     </div>
@@ -899,16 +828,9 @@ function getIcon(data, ioType) {
     <!-- LLM Evaluation Node -->
     <div
       v-if="data.node_type == 'llm_evaluation'"
-      class="p-0 btn-fixed-width"
       :data-test="`pipeline-node-${io_type}-llm-evaluation-node`"
       data-node-type="llm_evaluation"
-      style="
-        width: fit-content;
-        display: flex;
-        align-items: center;
-        border: none;
-        cursor: pointer;
-      "
+      class="p-0 btn-fixed-width w-fit flex items-center border-none cursor-pointer"
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
       @click="editNode(id)"
@@ -926,20 +848,14 @@ function getIcon(data, ioType) {
       <OSeparator vertical class="mr-2" />
 
       <!-- Label -->
-      <div class="o2-scroll-container">
+      <div class="o2-scroll-container overflow-auto rounded-default">
         <div
-          class="text-[15px]! font-bold! leading-[1.4]!"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
+          class="text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
           <span>{{ data.name || "LLM Evaluation" }}</span>
           <span
             v-if="data.sampling_rate"
-            style="font-size: 0.85em; color: #666; margin-left: 8px"
+            class="text-[0.85em] text-text-secondary ml-2"
           >
             ({{ (data.sampling_rate * 100).toFixed(0) }}%)
           </span>
@@ -967,7 +883,7 @@ function getIcon(data, ioType) {
                   <strong>{{ t("pipeline.samplingLabel") }}:</strong>
                   {{ t("pipeline.samplingAllTraces") }}
                 </div>
-                <div class="mt-2 text-xs text-gray-400">
+                <div class="mt-2 text-xs text-text-secondary">
                   {{ t("pipeline.llmEvaluationDescription") }}
                 </div>
               </div>
@@ -978,7 +894,7 @@ function getIcon(data, ioType) {
 
       <div
         v-show="showButtons"
-        class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+        class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
         :data-test="`pipeline-node-${io_type}-actions`"
         :style="{ '--node-color': getNodeColor(io_type) }"
         @mouseenter="handleActionButtonsEnter"
@@ -988,7 +904,7 @@ function getIcon(data, ioType) {
           variant="ghost"
           size="icon"
           @click.stop="deleteNode(id)"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-[color-mix(in_srgb,var(--color-white)_95%,transparent)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! hover:bg-error-500! hover:border-error-500! hover:text-white! hover:scale-110! hover:shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-error-500)_30%,transparent)]!"
           :data-test="`pipeline-node-${io_type}-delete-btn`"
           @mouseenter="handleDeleteTooltipEnter"
           @mouseleave="handleDeleteTooltipLeave"
@@ -997,11 +913,10 @@ function getIcon(data, ioType) {
         </OButton>
         <div
           v-if="showDeleteTooltip"
-          class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
-          style="left: 15px"
+          class="fixed left-3.75 bg-status-negative text-button-destructive-foreground py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap"
         >
           Delete Node
-          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
+          <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-status-negative"></div>
         </div>
       </div>
     </div>
@@ -1026,14 +941,18 @@ function getIcon(data, ioType) {
   />
 </template>
 
-<style>
+<style scoped>
+/* keep(lib-override:vue-flow): styles vue-flow Handle DOM (classes are built dynamically as `handle_${io_type}`, also targeted by PipelineView's tooltip preview) and the vue-flow-generated .vue-flow__node-custom wrapper; !important is required to beat vue-flow core CSS */
+/* Node-TYPE colours use the SAME status tokens PipelineView's read-only tooltip
+   preview already applies to these exact classes (see its :deep(.handle_input)
+   rules): input = info, output = positive/success, transform = warning. */
 .node_handle_custom {
-  width: 16px !important;
-  height: 16px !important;
-  border: 3px solid rgba(255, 255, 255, 0.9);
+  width: 1rem !important;
+  height: 1rem !important;
+  border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
   border-radius: 50% !important;
-  background: #6b7280;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  background: var(--color-border-strong);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
   transition: all 0.3s ease;
 }
 
@@ -1043,114 +962,50 @@ function getIcon(data, ioType) {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 8px;
-  height: 8px;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 50%;
-  background: #374151;
+  background: var(--color-text-secondary);
   transition: all 0.3s ease;
 }
 
-/* Input nodes - Blue theme */
+/* Input nodes - info theme */
 .handle_input {
-  background: #dbeafe !important;
+  background: var(--color-status-info-bg) !important;
 }
 
 .handle_input::before {
-  background: #3b82f6 !important;
+  background: var(--color-status-info-text) !important;
 }
 
-/* Output nodes - Green theme */
+/* Output nodes - success theme */
 .handle_output {
-  background: #dcfce7 !important;
+  background: var(--color-status-success-bg) !important;
 }
 
 .handle_output::before {
-  background: #22c55e !important;
+  background: var(--color-status-positive) !important;
 }
 
-/* Transform nodes (default) - Orange theme */
+/* Transform nodes (default) - warning theme */
 .handle_default {
-  background: #fef3c7 !important;
+  background: var(--color-status-warning-bg) !important;
 }
 
 .handle_default::before {
-  background: #f59e0b !important;
+  background: var(--color-status-warning-text) !important;
 }
 
-.vue-flow__node-custom {
-  padding: 10px;
-  border-radius: 3px;
-  width: 150px;
-  font-size: 12px;
+:global(.vue-flow__node-custom) {
+  padding: 0.625rem;
+  border-radius: 0.1875rem;
+  width: 9.375rem;
+  font-size: var(--text-xs);
   text-align: center;
   border-width: 1px;
   border-style: solid;
   color: var(--vf-node-text);
   background-color: var(--vf-node-bg);
   border-color: var(--vf-node-color);
-}
-
-.node-action-btn:hover {
-  background: var(--node-color) !important;
-  color: white !important;
-  transform: scale(1.1) !important;
-}
-
-.delete-btn:hover {
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
-  background: #ef4444 !important;
-  border-color: #ef4444 !important;
-}
-
-.error-badge:hover {
-  transform: scale(1.2);
-  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.7);
-  z-index: 20;
-}
-
-/* Pipeline error tooltip styling - increased specificity to override global theme styles */
-.body--dark .pipeline-error-tooltip,
-.body--light .pipeline-error-tooltip,
-.pipeline-error-tooltip {
-  background-color: #ef4444 !important;
-  color: white !important;
-  font-size: 12px !important;
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  line-height: 1.5 !important;
-  padding: 10px 14px !important;
-}
-
-.body--dark .pipeline-error-tooltip div,
-.body--light .pipeline-error-tooltip div,
-.pipeline-error-tooltip div {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar,
-.pipeline-error-tooltip div::-webkit-scrollbar {
-  width: 6px;
-}
-
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-track,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar-track,
-.pipeline-error-tooltip div::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-}
-
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
-.pipeline-error-tooltip div::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-}
-
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
-.pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
 }
 </style>

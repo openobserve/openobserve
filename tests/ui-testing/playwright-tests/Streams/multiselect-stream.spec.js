@@ -185,7 +185,7 @@ async function multistreamselect(page) {
   //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
 
   //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
+  //     .locator('[data-test="date-time-relative-6-w-btn"] button')
   //     .click({
   //       force: true,
   //     });
@@ -196,16 +196,16 @@ async function multistreamselect(page) {
   //     force: true,
   //   });
   //   await page.waitForTimeout(1000);
-  //   await expect(page.locator(".q-notification__message")).toContainText(
+  //   await expect(page.locator('[role="alert"]')).toContainText(
   //     "Live mode is enabled"
   //   );
   //   await page.waitForTimeout(5000);
   //   await page
-  //     .locator(".q-pl-sm > .q-btn > .q-btn__content")
+  //     .locator('[data-test="logs-search-off-refresh-interval"] button')
   //     .click({ force: true });
   //   await page
   //     .locator(
-  //       '[data-test="logs-search-off-refresh-interval"] > .q-btn__content'
+  //       '[data-test="logs-search-off-refresh-interval"] button'
   //     )
   //     .click({ force: true });
   //   await applyQueryButton(page);

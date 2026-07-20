@@ -15,6 +15,7 @@
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { getGridLineStyle } from "../../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 import { TOOLTIP_SCROLL_STYLE } from "./types";
 
 /**
@@ -34,7 +35,6 @@ export function buildTooltip(
   const decimals = config.decimals ?? 2;
   const unit = config.unit;
   const unitCustom = config.unit_custom;
-  const isDark = store?.state?.theme === "dark";
 
   return {
     trigger: triggerType,
@@ -43,12 +43,12 @@ export function buildTooltip(
     appendToBody: true,
     className: "o2-echarts-tooltip",
     textStyle: {
-      color: isDark ? "#fff" : "#000",
+      color: chartColor("--color-tooltip-text"),
       fontSize: 12,
     },
     enterable: true,
-    backgroundColor: isDark ? "rgba(22,23,25,0.97)" : "rgba(255,255,255,0.97)",
-    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
+    backgroundColor: chartColor("--color-tooltip-bg"),
+    borderColor: chartColor("--color-tooltip-border"),
     borderWidth: 1,
     padding: [8, 12],
     extraCssText: TOOLTIP_SCROLL_STYLE,

@@ -9,12 +9,12 @@
     <div class="p-8 flex flex-col gap-8 bg-surface-base min-h-screen">
       <div class="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 class="text-2xl font-semibold text-text-primary">
+          <h1 class="text-2xl font-semibold text-text-heading">
             Empty states — full set for review
           </h1>
           <p class="text-sm text-text-secondary mt-1 max-w-2xl">
             Every preset below is a real
-            <code class="text-text-primary">&lt;OEmptyState&gt;</code> with its
+            <code class="text-text-body">&lt;OEmptyState&gt;</code> with its
             production copy, illustration, and action. Each detailed scene has its
             own character micro-animation and pauses under OS "reduce motion".
             Nothing is wired into real pages yet.
@@ -41,9 +41,9 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               {{ p.label }}
             </span>
-            <code class="text-[0.7rem] text-text-disabled">preset="{{ p.preset }}"</code>
+            <code class="text-2xs text-text-disabled">preset="{{ p.preset }}"</code>
           </div>
-          <div class="rounded-xl border border-border-default h-110 overflow-hidden">
+          <div class="rounded-default border border-border-default h-110 overflow-hidden">
             <OEmptyState
               :preset="p.preset"
               size="hero"
@@ -56,15 +56,15 @@
       </div>
 
       <div>
-        <h2 class="text-lg font-semibold text-text-primary mb-1">
+        <h2 class="text-lg font-semibold text-text-heading mb-1">
           Character — optional, only where it adds value
         </h2>
         <p class="text-sm text-text-secondary mb-3 max-w-2xl">
           The illustration is just a named choice, so a scene can opt into a
           character (e.g. a prominent first-run hero) while everything else stays
-          object-only. Same component, <code class="text-text-primary">illustration="explorer"</code>.
+          object-only. Same component, <code class="text-text-body">illustration="explorer"</code>.
         </p>
-        <div class="rounded-xl border border-border-default h-110 overflow-hidden">
+        <div class="rounded-default border border-border-default h-110 overflow-hidden">
           <OEmptyState
             size="hero"
             variant="create"
@@ -79,7 +79,7 @@
       </div>
 
       <div>
-        <h2 class="text-lg font-semibold text-text-primary mb-3">
+        <h2 class="text-lg font-semibold text-text-heading mb-3">
           Sizes — the same system at block &amp; inline scale
         </h2>
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -87,7 +87,7 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               size="block" (inside a card / dashboard panel)
             </span>
-            <div class="rounded-xl border border-border-default overflow-hidden">
+            <div class="rounded-default border border-border-default overflow-hidden">
               <OEmptyState preset="no-search-results" size="block" @action="onAction('block')" />
             </div>
           </section>
@@ -95,7 +95,7 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               size="inline" (table body / dropdown)
             </span>
-            <div class="rounded-xl border border-border-default overflow-hidden">
+            <div class="rounded-default border border-border-default overflow-hidden">
               <OEmptyState preset="no-search-results" size="inline" @action="onAction('inline')" />
             </div>
           </section>

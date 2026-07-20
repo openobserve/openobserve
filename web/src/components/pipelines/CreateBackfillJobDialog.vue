@@ -27,12 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-left>
       <span
-        :class="[
-          'font-semibold px-2 py-1 rounded-md inline-block',
-          store.state.theme === 'dark'
-            ? 'text-blue-400 bg-blue-900/50'
-            : 'text-blue-600 bg-blue-50'
-        ]"
+        class="font-semibold px-2 py-1 rounded-default inline-block text-badge-blue-soft-text bg-badge-blue-soft-bg"
       >
         {{ pipelineName }}
         <OTooltip v-if="pipelineName && pipelineName.length > 25" :content="pipelineName" />
@@ -51,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="flex items-center gap-4">
               <div class="text-sm font-medium whitespace-nowrap">
-                Time Range <span class="text-red-600">*</span>
+                Time Range <span class="text-status-error-text">*</span>
               </div>
               <OFormDateTimeRange
                 name="timerange"
@@ -63,16 +58,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="timerangeError"
-              class="text-xs text-red-600 mt-1"
+              class="text-xs text-status-error-text mt-1"
             >
               {{ timerangeError }}
             </div>
           </div>
 
           <!-- Advanced Options -->
-          <div class="collapsible-section card-container flex flex-col transition-all overflow-hidden bg-(--o2-card-bg) rounded-md shadow-[0_0_5px_1px_var(--o2-hover-shadow)] border border-[var(--o2-border-color,rgba(0,0,0,0.08))]" data-test="advanced-options-section">
+          <div class="collapsible-section flex flex-col transition-all overflow-hidden bg-card-glass-bg rounded-default shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border" data-test="advanced-options-section">
             <div
-              class="section-header flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-[rgba(0,0,0,0.08)] transition-all rounded-t-md select-none hover:bg-[rgba(0,0,0,0.04)] active:bg-[rgba(0,0,0,0.06)]"
+              class="section-header flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-border-default transition-all rounded-t-default select-none hover:bg-interactive-hover-bg active:bg-interactive-hover-bg"
               @click="showAdvanced = !showAdvanced"
             >
               <div class="flex items-center gap-2">
@@ -96,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-sm font-medium mb-1">
                     Chunk Period (minutes)
                   </div>
-                  <div :class="['text-xs', store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600']">
+                  <div class="text-xs text-text-secondary">
                     Size of each processing chunk
                   </div>
                 </div>
@@ -121,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-sm font-medium mb-1">
                     Delay Between Chunks (seconds)
                   </div>
-                  <div :class="['text-xs', store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600']">
+                  <div class="text-xs text-text-secondary">
                     Wait time between processing chunks
                   </div>
                 </div>
@@ -150,22 +145,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-if="deleteBeforeBackfill"
-                  :class="[
-                    'mt-3 p-4 rounded-lg border',
-                    store.state.theme === 'dark'
-                      ? 'bg-orange-900/20 border-orange-700'
-                      : 'bg-orange-50 border-orange-400'
-                  ]"
+                  class="mt-3 p-4 rounded-default border bg-banner-warning-bg border-banner-warning-border"
                 >
                   <div class="flex items-start gap-3">
-                    <OIcon name="warning" size="md" class="mt-0.5 text-orange-500 dark:text-orange-400" />
+                    <OIcon name="warning" size="md" class="mt-0.5 text-banner-warning-text" />
                     <div>
-                      <div :class="['font-semibold mb-2', store.state.theme === 'dark' ? 'text-orange-200' : 'text-orange-900']">Warning: Irreversible Data Deletion</div>
-                      <div :class="['text-xs mb-3', store.state.theme === 'dark' ? 'text-orange-300' : 'text-orange-800']">
+                      <div class="font-semibold mb-2 text-banner-warning-text">Warning: Irreversible Data Deletion</div>
+                      <div class="text-xs mb-3 text-banner-warning-text">
                         This will permanently delete all data in the destination stream for the specified time range before running the backfill. This action cannot be undone.
                       </div>
-                      <div :class="['font-semibold text-sm mb-1', store.state.theme === 'dark' ? 'text-orange-200' : 'text-orange-900']">Time Alignment Requirements (UTC):</div>
-                      <ul :class="['text-xs ml-5 space-y-1 list-disc', store.state.theme === 'dark' ? 'text-orange-300' : 'text-orange-800']">
+                      <div class="font-semibold text-sm mb-1 text-banner-warning-text">Time Alignment Requirements (UTC):</div>
+                      <ul class="text-xs ml-5 space-y-1 list-disc text-banner-warning-text">
                         <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
                         <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
                       </ul>
@@ -180,14 +170,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Estimated Info -->
           <div
             v-if="estimatedInfo"
-            :class="[
-              'p-3 rounded-lg border',
-              store.state.theme === 'dark'
-                ? 'bg-blue-900/20 border-blue-700'
-                : 'bg-blue-50 border-blue-200'
-            ]"
+            class="p-3 rounded-default border bg-banner-info-bg border-banner-info-border"
           >
-            <div :class="store.state.theme === 'dark' ? 'text-blue-200' : 'text-blue-800'">
+            <div class="text-banner-info-text">
               <div class="flex items-center gap-2 font-medium mb-1">
                 <OIcon name="schedule" size="sm" />
                 <span>Estimated Processing Time: {{ estimatedInfo.time }}</span>
@@ -199,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Error Message -->
-          <div v-if="errorMessage" class="text-red-500">
+          <div v-if="errorMessage" class="text-status-error-text">
             <OIcon name="error" size="sm" class="mr-2" />
             {{ errorMessage }}
           </div>
@@ -221,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <p class="mb-4">
       You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range.
     </p>
-    <p class="font-semibold text-red-600">
+    <p class="font-semibold text-status-error-text">
       This action CANNOT be undone or cancelled once the job is created.
     </p>
     <p class="mt-4">Are you sure you want to proceed?</p>

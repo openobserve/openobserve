@@ -18,23 +18,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="tag-input-container" class="w-full h-full">
     <div
       data-test="tag-input-wrapper"
-      class="tag-input-wrapper relative flex flex-col px-[5px] py-0 border border-(--o2-border-color,rgba(0,0,0,0.12)) rounded bg-(--o2-card-bg) min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden"
-      :class="{ 'has-content': hasContent }"
+      class="group relative flex flex-col px-1.25 py-0 border border-card-glass-border rounded-default bg-card-glass-bg min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden focus-within:border-theme-accent"
     >
       <label
         v-if="label"
         data-test="tag-input-label"
-        class="tag-input-label absolute top-4 left-3 text-base text-[rgba(0,0,0,0.6)] pointer-events-none transition-all duration-300 bg-transparent px-1 -ml-1"
-        style="transition-timing-function: cubic-bezier(0.25, 0.8, 0.5, 1); transform-origin: left top;"
+        class="absolute top-4 left-3 text-base pointer-events-none transition-all duration-300 bg-transparent px-1 -ml-1 group-focus-within:text-theme-accent ease-[cubic-bezier(0.25,0.8,0.5,1)] origin-top-left"
+        :class="hasContent ? '-translate-y-2 scale-75 text-theme-accent' : 'text-text-secondary'"
       >{{ label }}</label>
-      <div data-test="tags-and-input" class="flex flex-wrap items-start gap-1 mt-[5px] w-full overflow-hidden">
+      <div data-test="tags-and-input" class="flex flex-wrap items-start gap-1 mt-1.25 w-full overflow-hidden">
         <OTag
           v-for="(tag, index) in modelValue"
           :key="index"
           :data-test="`tag-chip-${index}`"
           type="selectionChip"
-          class="tag-chip m-0! shrink-0 grow-0 basis-auto"
-          style="background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%)"
+          class="tag-chip m-0! shrink-0 grow-0 basis-auto bg-[color-mix(in_srgb,var(--color-button-primary)_20%,white_10%)]"
         >
           {{ tag }}
           <template #trailing>
@@ -54,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="inputValue"
           type="text"
           :placeholder="modelValue.length > 0 ? '' : placeholder"
-          class="tag-input [flex:1_1_100px] min-w-[100px] border-0 outline-none bg-transparent p-1 text-sm text-(--q-color-text-primary)"
+          class="[flex:1_1_100px] min-w-25 border-0 outline-none bg-transparent p-1 text-sm text-text-body placeholder:text-text-secondary"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"
@@ -132,22 +130,3 @@ const handleBackspace = () => {
   }
 };
 </script>
-
-<style>
-.tag-input-wrapper:focus-within {
-  border-color: var(--q-primary);
-}
-
-.tag-input-wrapper:focus-within .tag-input-label {
-  color: var(--q-primary);
-}
-
-.tag-input-wrapper.has-content .tag-input-label {
-  transform: translateY(-8px) scale(0.75);
-  color: var(--q-primary);
-}
-
-.tag-input::placeholder {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-</style>

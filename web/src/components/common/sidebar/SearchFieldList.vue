@@ -2,7 +2,7 @@
 
 <template>
   <div class="flex flex-col w-full index-menu default-index-menu h-full!">
-    <div class="index-table logs-index-menu h-full! w-full">
+    <div class="index-table h-full! w-full">
       <OFieldList
         ref="fieldListRef"
         :fields="fieldListItems"
@@ -21,7 +21,7 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header h-full w-full flex justify-between items-center rounded-[0.25rem]"
+            class="field-group-header h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs leading-7 cursor-pointer bg-surface-subtle text-field-list-group-text"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
@@ -45,9 +45,9 @@
         <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
           <OFieldRow>
-            <span class="field-type-container w-[0.55rem] shrink-0 flex items-center justify-center">
+            <span class="field-type-container relative w-[0.55rem] h-4 mr-[0.3rem] ml-[0.2rem] shrink-0 flex items-center justify-center">
               <OIcon
-                class="field-expand-icon inline-flex items-center justify-center shrink-0 w-4 text-[var(--o2-text-muted)]"
+                class="field-expand-icon absolute inline-flex items-center justify-center shrink-0 w-4 text-text-muted"
                 :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
                 size="sm"
               />
@@ -104,52 +104,52 @@
           >
             <!-- Group 1 header -->
             <div class="h-7 flex items-center justify-between px-2">
-              <OSkeleton type="rect" class="h-3 w-24 rounded-sm" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-24 rounded-default" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 1 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <!-- Group 2 header -->
             <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-16 rounded-sm" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-16 rounded-default" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 2 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
             <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-32 rounded-sm" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-32 rounded-default" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 3 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
           </div>
@@ -169,7 +169,7 @@
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
               @click="bottomProps.firstPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded! overflow-visible!"
+              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-default! overflow-visible!"
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
@@ -182,7 +182,7 @@
                   bottomProps.currentPage === page ? 'primary' : 'ghost'
                 "
                 size="icon-panel"
-                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-(--o2-text-primary)! rounded! overflow-visible!"
+                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-body! rounded-default! overflow-visible!"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >
@@ -192,7 +192,7 @@
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
               @click="bottomProps.lastPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded! overflow-visible!"
+              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-default! overflow-visible!"
             >
               <OIcon name="fast-forward" size="sm" />
             </OButton>
@@ -694,6 +694,10 @@ const copyContentValue = (value: string) => {
 </script>
 
 <style lang="scss" scoped>
+/* keep(lib-override:o2-field-list): reaches into OFieldList/FieldValuesPanel internals
+   via :deep() — those elements are owned by the child component, so no utility on this
+   template can reach them. */
+
 // Expanded field values should read as inline content, not a selected card —
 // drop the bordered/rounded panel treatment so no border or background lingers
 // once the row is expanded and the pointer moves away.
@@ -712,70 +716,4 @@ const copyContentValue = (value: string) => {
   padding-bottom: 0;
 }
 
-.field-list-pagination {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-left: auto;
-}
-
-.pagination-nav-btn {
-  padding: 0.375rem 0.25rem !important;
-  margin: 0 !important;
-  min-width: 1.5rem !important;
-  width: 1.5rem !important;
-  min-height: 1.375rem !important;
-  height: 1.375rem !important;
-  border-radius: 0.25rem !important;
-  overflow: visible !important;
-}
-
-.pagination-page-btn {
-  padding: 0.375rem 0.25rem !important;
-  margin: 0 !important;
-  min-width: 1.5rem !important;
-  width: 1.5rem !important;
-  min-height: 1.375rem !important;
-  height: 1.375rem !important;
-  font-size: 0.75rem !important;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--o2-text-primary) !important;
-  border-radius: 0.25rem !important;
-  overflow: visible !important;
-}
-
-.field-group-header {
-  font-weight: 600;
-  font-size: 0.75rem;
-  padding: 0 0.325rem;
-  cursor: pointer;
-  background-color: var(--color-surface-subtle);
-  color: var(--color-field-list-group-text);
-}
-
-.index-menu {
-  width: 100%;
-
-  .index-table {
-    width: 100%;
-  }
-
-  .field-type-container {
-    width: 0.55rem;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .field-expand-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 1rem;
-    color: var(--o2-text-muted);
-  }
-}
 </style>

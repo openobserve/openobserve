@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 //
-// OTimeCell — the ONE timestamp renderer for every table (audit §2.1).
+// OTimeCell — the ONE timestamp renderer for every table.
 // Default display is relative ("2m ago"); set mode="absolute" to show the full
 // timezone-aware datetime instead. Relative cells get a hover tooltip (OTooltip,
 // not the native browser title) revealing the full absolute datetime; absolute/
@@ -167,7 +167,7 @@ const tooltip = computed(() => {
 <template>
   <span
     v-if="display === null"
-    class="text-text-primary text-xs"
+    class="text-text-body text-xs"
   >{{ emptyLabel }}</span>
   <template v-else>
     <span class="tabular-nums whitespace-nowrap">{{ display }}</span>

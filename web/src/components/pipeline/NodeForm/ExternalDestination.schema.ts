@@ -3,14 +3,11 @@
 // Validation schema for ExternalDestination.vue (the remote_stream output-node
 // drawer, select-existing branch).
 //
-// Field ownership (R1-strict): `selectedDestination` is the only editable
-// control on the select-existing branch and is required. This replaces the old
-// imperative `@click:primary` toast guard ("Please select External destination
-// from the list") with schema validation + submit gating (R3/R4).
+// `selectedDestination` is the only editable control on the select-existing
+// branch and is required.
 //
-// `createNewDestination` stays a bare UI mode-toggle OUTSIDE the form (it swaps
-// the select-existing form for the already-migrated CreateDestinationForm), so
-// it is not a field.
+// `createNewDestination` is a bare UI mode-toggle OUTSIDE the form (it swaps
+// the select-existing form for CreateDestinationForm), so it is not a field.
 
 import { z } from "zod";
 

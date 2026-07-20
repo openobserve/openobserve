@@ -15,21 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="add-action-script-section" class="w-full h-full flex flex-col">
-    <AppPageHeader
-      :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
-      :back="{
-        onClick: () => router.back(),
-        dataTest: 'add-action-script-back-btn',
-      }"
-      class="px-4 border-b border-border-default"
-    >
+  <OPageLayout
+    data-test="add-action-script-section"
+    :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
+    :back="{
+      onClick: () => router.back(),
+      dataTest: 'add-action-script-back-btn',
+    }"
+    bleed
+  >
       <template #title>
         <span data-test="add-action-script-title">{{
           isEditingActionScript ? t("actions.update") : t("actions.add")
         }}</span>
       </template>
-    </AppPageHeader>
 
     <!-- Inline (full-page) form. The footer Save lives INSIDE the <OForm>, so it
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
@@ -40,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="w-full flex-1 min-h-0 px-2.5 pb-2.5 pt-1">
         <div
-          class="card-container overflow-auto"
+          class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
           <div
@@ -53,8 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 data-test="add-action-script-name-input-wrapper"
-                class="report-name-input"
-                style="padding-top: 12px"
+                class="report-name-input pt-3"
               >
                 <OFormInput
                   data-test="add-action-script-name-input"
@@ -86,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="actionTypes"
                   labelKey="label"
                   valueKey="value"
-                  class="showLabelOnTop no-case w-[400px]"
+                  class="showLabelOnTop no-case w-100"
                   :disabled="isEditingActionScript"
                 />
               </div>
@@ -178,13 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="my-2 px-2">
                     <div
-                      style="font-size: 14px"
-                      class="font-bold text-gray-500 mb-2"
+                      style="font-size: var(--text-sm)"
+                      class="font-bold text-text-secondary mb-2"
                       data-test="add-action-script-frequency-title"
                     >
                       {{ t("actions.frequency") }} *
                     </div>
-                    <div class="p-1 el-border-radius el-border w-fit">
+                    <div class="p-1 rounded-default border border-card-glass-border w-fit">
                       <template
                         v-for="visual in frequencyTabs"
                         :key="visual.value"
@@ -207,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-frequency-info"
                     >
                       <OIcon name="event" size="sm" class="mr-2" />
-                      <div style="font-size: 14px">
+                      <div style="font-size: var(--text-sm)">
                         The script will be triggered immediately after it is saved
                       </div>
                     </div>
@@ -216,11 +214,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex">
                         <div
                           data-test="add-action-script-cron-input"
-                          class="mr-2"
-                          style="padding-top: 8px; width: 320px"
+                          class="mr-2 pt-2"
+                          style="width: 320px"
                         >
                           <div
-                            class="mb-1 font-bold text-gray-500"
+                            class="mb-1 font-bold text-text-secondary"
                             data-test="add-action-script-cron-expression-title"
                           >
                             {{ t("reports.cronExpression") + " *" }}
@@ -228,11 +226,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="add-action-script-cron-info"
                               name="info"
                               size="sm"
-                              class="ml-1 cursor-pointer text-gray-400"
+                              class="ml-1 cursor-pointer text-text-muted"
                             >
                               <OTooltip side="right" align="center">
                                 <template #content>
-                                  <span style="font-size: 14px">
+                                  <span style="font-size: var(--text-sm)">
                                     Pattern: * * * * * means every minute .
                                     <br />
                                     Format: [Minute 0-59] [Hour 0-23] [Day of Month
@@ -252,10 +250,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                           <OFormInput
                             name="cron"
-                            class="showLabelOnTop"
+                            class="showLabelOnTop w-full"
                             type="text"
                             debounce="300"
-                            style="width: 100%"
                             :disabled="isEditingActionScript"
                             :readonly="isEditingActionScript"
                           />
@@ -306,17 +303,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       <div
                         data-test="add-action-script-service-account-title"
-                        class="mb-1 font-bold text-gray-500"
+                        class="mb-1 font-bold text-text-secondary"
                       >
                         {{ t("actions.serviceAccount") + " *" }}
                         <OIcon
                           name="info"
                           size="sm"
-                          class="ml-1 cursor-pointer text-gray-400"
+                          class="ml-1 cursor-pointer text-text-muted"
                         >
                           <OTooltip side="right" align="center">
                             <template #content>
-                              <span style="font-size: 14px">
+                              <span style="font-size: var(--text-sm)">
                                 Make sure service account has permissions to access
                                 Actions.
                               </span>
@@ -362,11 +359,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :done="step > 4"
                   class="mt-3"
                 >
-                  <!-- Env vars are a dynamic key/value array (DEFERRED per the
-                       migration brief): they carry no validation today and the
-                       form-array pattern is not yet live, so these stay bare
-                       OInput bound to the component-owned `environmentalVariables`
-                       and are NOT part of the form schema. -->
+                  <!-- Env vars are a dynamic key/value array bound to the
+                       component-owned `environmentalVariables`, not part of the
+                       form schema (no validation today). -->
                   <div
                     v-for="(header, index) in environmentalVariables"
                     :key="header.uuid"
@@ -427,8 +422,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="mx-2">
         <div
-          class="flex justify-end gap-2 px-3 w-full py-[0.625rem] card-container"
-          style="position: sticky; bottom: 0px; z-index: 2"
+          class="flex justify-end gap-2 px-3 w-full py-2.5 bg-card-glass-bg sticky"
+          style="bottom: 0px; z-index: 2"
         >
           <OButton
             data-test="add-action-script-cancel-btn"
@@ -449,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OForm>
-  </div>
+  </OPageLayout>
 
   <ConfirmDialog
     v-model="dialog.show"
@@ -481,7 +476,7 @@ import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import CronExpressionParser from "cron-parser";
 import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";

@@ -6,7 +6,9 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
+import { chartColor } from "@/utils/chartTheme";
 import type { TrendPoint } from "../composables/useQualityDetailCharts";
+import { withChartFont } from "@/utils/fonts";
 
 const props = defineProps<{
   points: TrendPoint[];
@@ -23,9 +25,8 @@ let chart: echarts.ECharts | null = null;
 const store = useStore();
 
 function buildOption(): echarts.EChartsOption {
-  const isDark = store.state.theme === "dark";
-  const text = isDark ? "#d4d4d4" : "#374151";
-  const grid = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const text = chartColor("--color-text-secondary");
+  const grid = chartColor("--color-border-subtle");
 
   const avgSeries = props.points.map((p) => [p.t, p.avg ?? null]);
   const p95Series = props.points.map((p) => [p.t, p.p95 ?? null]);
@@ -111,7 +112,7 @@ function buildOption(): echarts.EChartsOption {
 
 function render() {
   if (!chart) return;
-  chart.setOption(buildOption(), true);
+  chart.setOption(withChartFont(buildOption()), true);
 }
 
 onMounted(() => {

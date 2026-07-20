@@ -28,44 +28,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t('search.syntaxGuideLabel') }}
       </OButton>
     </template>
-    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+    <div>
       <div v-if="!sqlmode">
-        <div class="syntax-guide-title w-[26.25rem]">
-          <div class="label text-[0.9375rem] font-bold">{{ t("search.syntaxGuideLabel") }}</div>
+        <div class="w-105">
+          <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="mb-[0.3125rem]">
-            <div class="text-xs ml-[0.3125rem]">
-              <ul class="px-[0.625rem] mt-[0.625rem] mb-0 text-[0.875rem] leading-[1.4375rem]">
+          <div class="mb-1.25">
+            <div class="text-xs ml-1.25">
+              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
                 <!-- The prose is translated; the PromQL samples beside it are
                      NOT — they are syntax, and a translated `rate(...)` would be
                      a query that does not run. -->
                 <li>
                   {{ t("metrics.syntaxGuide.instantVector") }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >metric_name{label1="value1", label2="value2"}</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.rangeVector") }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >metric_name[5m]</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.aggregate") }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >sum by (label)(metric_name)</span
                   >
                   {{ t("metrics.syntaxGuide.or") }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >avg by (label)(metric_name)</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.rate") }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >rate(metric_name[5m])</span
                   >
                 </li>
@@ -75,39 +75,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div v-else>
-        <div class="syntax-guide-title w-[26.25rem]">
-          <div class="label text-[0.9375rem] font-bold">
+        <div class="w-105">
+          <div class="label text-sm font-bold">
             {{ t("metrics.syntaxGuide.sqlTitle") }}
           </div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="mb-[0.3125rem]">
-            <div class="text-xs ml-[0.3125rem]">
-              <ul class="px-[0.625rem] mt-[0.625rem] mb-0 text-[0.875rem] leading-[1.4375rem]">
+          <div class="mb-1.25">
+            <div class="text-xs ml-1.25">
+              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
                 <!-- As above: prose translated, SQL samples left literal. -->
                 <li>
                   {{ t("metrics.syntaxGuide.sqlFullText") }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.sqlColumn") }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.sqlCode") }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.sqlStream") }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{
                     t("metrics.syntaxGuide.sqlFunction", { fn: "extract_ip" })
                   }}
-                  <span class="bg-surface-subtle px-[0.3125rem] rounded-sm"
+                  <span class="bg-highlight-bg px-1.25 rounded-default"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >

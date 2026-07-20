@@ -88,16 +88,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- presenting arm (gestures toward the board) -->
       <g class="es-present">
         <path d="M292 207 Q282 203 276 194 Q274 190 278 189 Q282 188 284 192 Q289 200 298 202 Z" fill="var(--color-primary-500)" />
-        <ellipse cx="278" cy="191" rx="4" ry="3.5" fill="#f0c29a" />
+        <ellipse cx="278" cy="191" rx="4" ry="3.5" fill="var(--color-illustration-sand)" />
       </g>
       <!-- head facing the board -->
       <g class="es-head">
-        <rect x="299" y="190" width="8" height="9" rx="3" fill="#e8b48c" />
-        <ellipse cx="302" cy="180" rx="11" ry="12" fill="#f0c29a" />
-        <circle cx="296" cy="181" r="2.2" fill="#e8b48c" />
-        <path d="M313 177 Q315 166 302 165 Q289 166 291 177 Q291 171 297 170 Q294 173 295 177 Q300 171 306 172 Q310 173 312 178 Q313 175 313 177 Z" fill="#5b4a3a" />
-        <circle cx="297" cy="180" r="1.4" fill="#3a2f25" />
-        <path d="M294 185 Q297 188 300 185" stroke="#b5764a" stroke-width="1.4" stroke-linecap="round" fill="none" />
+        <rect x="299" y="190" width="8" height="9" rx="3" fill="var(--color-illustration-tan)" />
+        <ellipse cx="302" cy="180" rx="11" ry="12" fill="var(--color-illustration-sand)" />
+        <circle cx="296" cy="181" r="2.2" fill="var(--color-illustration-tan)" />
+        <path d="M313 177 Q315 166 302 165 Q289 166 291 177 Q291 171 297 170 Q294 173 295 177 Q300 171 306 172 Q310 173 312 178 Q313 175 313 177 Z" fill="var(--color-illustration-umber)" />
+        <circle cx="297" cy="180" r="1.4" fill="var(--color-illustration-espresso)" />
+        <path d="M294 185 Q297 188 300 185" stroke="var(--color-illustration-clay)" stroke-width="1.4" stroke-linecap="round" fill="none" />
       </g>
     </g>
   </svg>
@@ -110,7 +110,13 @@ withDefaults(
 );
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies from unscoped blocks — a global name collision where the
+   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
+   keyframe names per component, which ends the collision. All selectors and the
+   es-static gate live in this file's own template. */
 .es-slot {
   transform-box: fill-box;
   transform-origin: center;

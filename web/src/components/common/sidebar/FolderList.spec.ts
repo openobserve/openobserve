@@ -804,7 +804,7 @@ describe('FolderList.vue', () => {
 
     it('should render AddFolder with v-model:open bound to showAddFolderDialog', async () => {
       // After migration, AddFolder owns the overlay surface itself via
-      // v-model:open — there is no q-dialog wrapper anymore.
+      // v-model:open — there is no dialog wrapper anymore.
       const addFolder = wrapper.find('[data-test="add-folder-stub"]')
       expect(addFolder.exists()).toBe(true)
       expect(addFolder.attributes('data-open')).toBe('false')

@@ -19,8 +19,8 @@ import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 // Forward the consumer's `data-test` from <ODrawer data-test="…"> onto the
-// rendered panel so e2e selectors can scope to the specific drawer instance
-// using the audit pattern: [data-test="<parent>"] [data-test="o-drawer-*-btn"].
+// rendered panel so e2e selectors can scope to the specific drawer instance via
+// [data-test="<parent>"] [data-test="o-drawer-*-btn"].
 // (DialogRoot is renderless, so default attribute inheritance would lose it.)
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
@@ -28,6 +28,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   persistent: false,
   side: "right",
   size: "md",
+  bleed: false,
   showClose: true,
   width: undefined,
   seamless: false,
@@ -72,7 +73,6 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
     e.preventDefault();
     return;
   }
-  clearBodyValidation();
   handleOpenChange(false);
 }
 
@@ -98,7 +98,6 @@ function handleInteractOutside(e: Event) {
     e.preventDefault();
     return;
   }
-  clearBodyValidation();
 }
 
 // Stacking support: each nested ODrawer gets a higher z-index layer
@@ -132,6 +131,12 @@ const hasFooter = computed(
 );
 const hasTrigger = computed(() => !!slots.trigger);
 const isRight = computed(() => props.side !== "left");
+
+// Fixed body inset (same token as ODialog's body) unless `bleed` is set. One
+// value app-wide → every drawer's content aligns identically. See the `bleed` prop.
+const bodyPaddingClass = computed(() =>
+  props.bleed ? "" : "px-dialog-content-px py-dialog-content-py",
+);
 
 // The primary button is loading when the consumer says so OR a nested OForm is
 // mid-submit (auto). Kept as a computed so the disabled logic below picks it up.
@@ -190,37 +195,6 @@ const contentStyle = computed(() => {
   return style;
 });
 
-// ── Validation reset on cancel-path close ───────────────────────────────────
-/** Reset q-field validation for every field in the body slot so that
- *  cancel-path closes (Cancel button, ×, Escape, overlay click) never surface
- *  lazy-rules validation errors to the user. */
-function clearBodyValidation() {
-  const body = bodyRef.value;
-  if (!body) return;
-  body.querySelectorAll<HTMLElement>('.q-field').forEach((el) => {
-    const vm = (el as any).__vueParentComponent;
-    if (vm?.ctx?.resetValidation) {
-      vm.ctx.resetValidation();
-    } else if (typeof vm?.exposed?.resetValidation === 'function') {
-      vm.exposed.resetValidation();
-    }
-  });
-}
-
-/** When focus moves to a non-form element inside the body (e.g. an action
- *  button), reset all field validation so sibling fields never show
- *  premature errors before the user clicks Save. */
-function handleBodyFocusIn(e: FocusEvent) {
-  const target = e.target as HTMLElement | null;
-  if (!target) return;
-  const isFormField =
-    target.matches('input, textarea, select') ||
-    !!target.closest('.q-field, .q-input, .q-select');
-  if (!isFormField) {
-    clearBodyValidation();
-  }
-}
-
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
@@ -237,7 +211,7 @@ function handleOpenAutoFocus(event: Event) {
         ].join(', ')
       );
       const firstField = Array.from(candidates).find(
-        (el) => !el.closest('.q-select, .o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]')
+        (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]')
       );
       if (firstField) {
         firstField.focus();
@@ -354,7 +328,7 @@ watch(internalOpen, (open) => {
           isRight
             ? 'border-s border-t border-dialog-border'
             : 'border-e border-t border-dialog-border',
-          'shadow-xl',
+          'shadow-lg',
           // Focus ring
           'outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring',
           // Slide-in animation — direction matches side.
@@ -388,7 +362,7 @@ watch(internalOpen, (open) => {
           v-if="hasHeader"
           :class="[
             'flex items-center gap-2 shrink-0',
-            'px-(--spacing-dialog-header-px) py-(--spacing-dialog-header-py)',
+            'px-dialog-header-px py-dialog-header-py',
             'bg-dialog-header-bg text-dialog-header-text',
             'border-b border-dialog-header-border',
           ]"
@@ -442,7 +416,7 @@ watch(internalOpen, (open) => {
               @mousedown.prevent
               :class="[
                 'shrink-0 flex items-center justify-center',
-                'h-7 w-7 rounded-md',
+                'h-7 w-7 rounded-default',
                 'text-dialog-close-text',
                 'hover:bg-dialog-close-hover-bg',
                 'active:bg-dialog-close-active-bg',
@@ -477,11 +451,11 @@ watch(internalOpen, (open) => {
           :class="[
             'flex-1 min-h-0 overflow-y-auto overflow-x-hidden',
             'text-dialog-content-text',
+            bodyPaddingClass,
             canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollUp && canScrollDown && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
-          @focusin="handleBodyFocusIn"
         >
           <template v-if="!props.lazy || internalOpen">
             <slot />
@@ -493,7 +467,7 @@ watch(internalOpen, (open) => {
           v-if="hasFooter"
           :class="[
             'shrink-0',
-            'px-(--spacing-dialog-footer-px) py-(--spacing-dialog-footer-py)',
+            'px-dialog-footer-px py-dialog-footer-py',
             'bg-dialog-footer-bg',
             'border-t border-dialog-footer-border',
             'border-b border-dialog-footer-border',

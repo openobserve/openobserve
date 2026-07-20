@@ -16,14 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="scroll"
+    class="scroll w-full h-full overflow-auto"
     data-test="markdown-renderer-scroll-container"
-    style="width: 100%; height: 100%; overflow: auto"
   >
     <div
       :class="[
         'prose prose-sm max-w-none px-2 py-1',
-        store.state?.theme === 'dark' && 'prose-invert',
+        isDark && 'prose-invert',
       ]"
       v-html="DOMPurify.sanitize(marked(processedContent))"
       data-test="markdown-renderer"
@@ -33,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent } from "vue";
-import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
@@ -59,7 +58,7 @@ export default defineComponent({
     },
   },
   setup(props): any {
-    const store = useStore();
+    const { isDark } = useTheme();
 
     const processedContent = computed(() => {
       const context = {
@@ -72,7 +71,7 @@ export default defineComponent({
     return {
       DOMPurify,
       marked,
-      store,
+      isDark,
       processedContent,
     };
   },

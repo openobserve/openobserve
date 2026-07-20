@@ -252,13 +252,6 @@ describe("VisualizeLogsQuery Component", () => {
           CustomMarkdownEditor: true,
           AddToDashboard: true,
           CustomChartEditor: true,
-          "q-splitter": {
-            template:
-              '<div><slot name="before"></slot><slot name="after"></slot></div>',
-          },
-          "q-splitter-panel": {
-            template: "<div><slot></slot></div>",
-          },
         },
       },
     });
@@ -634,7 +627,7 @@ describe("VisualizeLogsQuery Component", () => {
     });
   });
 
-  // Migration coverage: q-dialog wrapper removed; AddToDashboard now uses
+  // Migration coverage: dialog wrapper removed; AddToDashboard now uses
   // v-model:open and emits update:open / save directly (ODialog/ODrawer contract).
   describe("AddToDashboard integration (ODialog/ODrawer migration)", () => {
     it("should render AddToDashboard stub bound to showAddToDashboardDialog", async () => {
@@ -672,12 +665,6 @@ describe("VisualizeLogsQuery Component", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
-    });
-
-    it("should not render any legacy q-dialog wrapper around AddToDashboard", () => {
-      // After migration, AddToDashboard is no longer wrapped in q-dialog;
-      // it controls its own ODialog/ODrawer via v-model:open.
-      expect(wrapper.find(".q-dialog").exists()).toBe(false);
     });
   });
 

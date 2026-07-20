@@ -15,20 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="incident-list" class="h-full">
-    <PageLayout
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
+  <div data-test="incident-list" class="incident-list h-full">
+    <OPageLayout
+      bleed
+      :title="t('alerts.incidents.title')"
+      icon="notifications-active"
+      :subtitle="t('alerts.incidents.subtitle')"
     >
-      <!-- Row 1: standard header — title + actions only. Search moved into the
-           table's own toolbar below. -->
-      <template #header>
-        <AppPageHeader
-          :title="t('alerts.incidents.title')"
-          icon="notifications-active"
-          :subtitle="t('alerts.incidents.subtitle')"
-        >
-        </AppPageHeader>
-      </template>
       <OTable
         ref="qTableRef"
         :data="visibleIncidents"
@@ -42,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        show-index
         :show-global-filter="false"
         :enable-column-resize="true"
         :persist-columns="true"
@@ -200,14 +194,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Bottom -->
         <template #bottom>
-          <div class="flex w-full justify-between items-center h-[48px]">
-            <div class="o2-table-footer-title flex items-center w-[100px] mr-md">
+          <div class="flex w-full justify-between items-center h-12">
+            <div class="text-xs font-normal flex items-center w-25 mr-md">
               {{ visibleIncidents.length }} {{ visibleIncidents.length === 1 ? 'Incident' : 'Incidents' }}
             </div>
           </div>
         </template>
         </OTable>
-    </PageLayout>
+    </OPageLayout>
   </div>
 </template>
 
@@ -218,8 +212,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -236,13 +229,12 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "IncidentList",
   components: {
-    PageLayout,
-    AppPageHeader,
+    OPageLayout,
     OEmptyState,
     OButton,
     OSpinner,
@@ -276,13 +268,6 @@ export default defineComponent({
     const pageSize = ref(20);
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "center" },
-      },
       {
         id: "title",
         header: t("alerts.incidents.title_field"),
@@ -378,7 +363,7 @@ export default defineComponent({
         filtered = filtered.filter((incident) => incident.status === statusFilter.value);
       }
       filtered = applyFrontendSearch(filtered, searchQuery.value);
-      return filtered.map((incident, i) => ({ ...incident, "#": i + 1 }));
+      return filtered;
     });
 
     const loadIncidents = async () => {
@@ -651,86 +636,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Status badge styling */
-.status-open {
-  border: 1px solid #dc2626;
-}
-
-.status-acknowledged {
-  border: 1px solid #d97706;
-}
-
-.status-resolved {
-  border: 1px solid #065f46;
-}
-
-.status-default {
-  border: 1px solid #6b7280;
-}
-
-/* Severity badge styling */
-.severity-p1 {
-  border: 1px solid #991b1b;
-}
-
-.severity-p2 {
-  border: 1px solid #c2410c;
-}
-
-.severity-p3 {
-  border: 1px solid #92400e;
-}
-
-.severity-p4 {
-  border: 1px solid #6b7280;
-}
-
-.severity-default {
-  border: 1px solid #6b7280;
-}
-
-/* Dark mode adjustments for status and severity badges */
-body.body--dark .status-open { border: 1px solid #fca5a5; }
-body.body--dark .status-acknowledged { border: 1px solid #fbbf24; }
-body.body--dark .status-resolved { border: 1px solid #6ee7b7; }
-body.body--dark .status-default { border: 1px solid #d1d5db; }
-body.body--dark .severity-p1 { border: 1px solid #fca5a5; }
-body.body--dark .severity-p2 { border: 1px solid #fdba74; }
-body.body--dark .severity-p3 { border: 1px solid #fcd34d; }
-body.body--dark .severity-p4 { border: 1px solid #d1d5db; }
-body.body--dark .severity-default { border: 1px solid #d1d5db; }
-
-/* Color scheme matching schema.scss type badges */
-.badge-blue { border: 1px solid #1d4ed8; }
-.badge-green { border: 1px solid #065f46; }
-.badge-yellow { border: 1px solid #92400e; }
-.badge-pink { border: 1px solid #9f1239; }
-.badge-purple { border: 1px solid #7c3aed; }
-.badge-orange { border: 1px solid #c2410c; }
-.badge-cyan { border: 1px solid #0e7490; }
-.badge-indigo { border: 1px solid #4f46e5; }
-.badge-teal { border: 1px solid #0f766e; }
-.badge-red { border: 1px solid #dc2626; }
-.badge-gray { border: 1px solid #4b5563; }
-.badge-amber { border: 1px solid #d97706; }
-.badge-violet { border: 1px solid #7c3aed; }
-.badge-rose { border: 1px solid #e11d48; }
-
-/* Dark mode adjustments */
-body.body--dark .badge-blue { border: 1px solid #93c5fd; }
-body.body--dark .badge-green { border: 1px solid #6ee7b7; }
-body.body--dark .badge-yellow { border: 1px solid #fcd34d; }
-body.body--dark .badge-pink { border: 1px solid #f9a8d4; }
-body.body--dark .badge-purple { border: 1px solid #c4b5fd; }
-body.body--dark .badge-orange { border: 1px solid #fdba74; }
-body.body--dark .badge-cyan { border: 1px solid #67e8f9; }
-body.body--dark .badge-indigo { border: 1px solid #a5b4fc; }
-body.body--dark .badge-teal { border: 1px solid #5eead4; }
-body.body--dark .badge-red { border: 1px solid #fca5a5; }
-body.body--dark .badge-gray { border: 1px solid #d1d5db; }
-body.body--dark .badge-amber { border: 1px solid #fbbf24; }
-body.body--dark .badge-violet { border: 1px solid #c4b5fd; }
-body.body--dark .badge-rose { border: 1px solid #fda4af; }
-</style>

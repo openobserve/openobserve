@@ -18,14 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <OSelect
       ref="selectRef"
-      style="min-width: 9.375rem; max-width: 40rem"
       :model-value="oSelectModelValue"
       :label="variableItem?.label || variableItem?.name"
       label-position="inside"
       :options="computedOptions"
       labelKey="label"
       valueKey="value"
-      class="textbox flex flex-col no-case o2-custom-select-dashboard"
+      class="textbox flex flex-col no-case o2-custom-select-dashboard min-w-37.5 max-w-160"
       :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
@@ -83,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop="handleCustomValue(currentSearchTerm)"
           >
             {{ currentSearchTerm }}
-            <span class="text-gray-400 text-xs italic">{{ t('dashboard.variableQueryValueSelector.custom') }}</span>
+            <span class="text-text-secondary text-xs italic">{{ t('dashboard.variableQueryValueSelector.custom') }}</span>
           </div>
         </template>
         <div
@@ -104,9 +103,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
-          <span class="text-gray-400 text-xs italic">{{ t('dashboard.variableQueryValueSelector.custom') }}</span>
+          <span class="text-text-secondary text-xs italic">{{ t('dashboard.variableQueryValueSelector.custom') }}</span>
         </div>
-        <div v-else class="italic text-gray-500 flex justify-center items-center py-3" data-test="variable-query-value-selector-no-data">
+        <div v-else class="italic text-text-muted flex justify-center items-center py-3" data-test="variable-query-value-selector-no-data">
           {{ t('dashboard.variableQueryValueSelector.noDataFound') }}
         </div>
       </template>
