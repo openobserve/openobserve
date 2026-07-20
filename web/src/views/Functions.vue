@@ -15,12 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Sections that bring their OWN page header (Functions, Enrichment Tables
+       each render a full OPageLayout) are rendered DIRECTLY — exactly like any
+       normal top-level page. Wrapping them in the shell's OPageLayout too nested
+       two page layouts and pushed their header down (a top gap). Pipelines and
+       the pipeline detail sub-pages have no own-header, so the shell owns theirs. -->
+  <RouterView v-if="sectionOwnsHeader" v-slot="{ Component }">
+    <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+  </RouterView>
+
   <!-- Pipelines is a frequently-used workspace, so it has NO landing hub (that
        would add a click every visit). It lands straight on the default section
        and uses the same breadcrumb section-switcher for fast lateral nav:
          Stream Pipelines ▾            (› Edit Pipeline on a detail page)
        Page actions (and the detail-view teleport target) live in the bar. -->
-  <OPageLayout bleed>
+  <OPageLayout v-else bleed>
     <template #header v-if="showPipelineActions || isDetailView">
     <!-- This row hosts page actions: the pipelines-list buttons or the detail
          teleport target. Section pages (functions/enrichment/eval) render
@@ -233,6 +242,15 @@ export default defineComponent({
     // Header actions live on the Pipelines index page only.
     const showPipelineActions = computed(() => routeName.value === "pipelines");
 
+    // Sections that render their OWN OPageLayout header (Functions, Enrichment
+    // Tables). They're rendered directly instead of nested inside the shell's
+    // OPageLayout, so their header sits flush at the top like any normal page.
+    const sectionOwnsHeader = computed(
+      () =>
+        routeName.value === "functionList" ||
+        routeName.value === "enrichmentTables",
+    );
+
     // Responsive: collapse secondary actions into an overflow menu when narrow.
     const windowWidth = ref(window.innerWidth);
     const onWindowResize = () => {
@@ -291,6 +309,7 @@ export default defineComponent({
       breadcrumbLabel,
       detailBack,
       showPipelineActions,
+      sectionOwnsHeader,
       shouldCollapseActions,
       goToAddPipeline,
       goToImportPipeline,
