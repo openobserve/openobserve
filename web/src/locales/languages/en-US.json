@@ -9382,6 +9382,7 @@
       "passRateByBrowser": "Pass Rate by Browser",
       "passRateByDevice": "Pass Rate by Device",
       "passRateByLocation": "Pass Rate by Location",
+      "durationByLocation": "Duration by Location (Avg)",
       "retryRate": "Retry Rate",
       "statusTimeline": "Status Timeline",
       "tabOverview": "Overview",
