@@ -1012,11 +1012,8 @@ impl Default for StreamSettings {
 }
 
 impl StreamSettings {
-    /// Internal columns that are implicitly part of the user-defined schema for
-    /// a stream with these settings. They are never persisted in
-    /// `defined_schema_fields` and are exempt from the
-    /// `user_defined_schema_max_fields` limit; consumers of the UDS (effective
-    /// schema, search, field list) merge them in on the fly.
+    /// Internal columns implicitly included in the user-defined schema for a
+    /// stream with these settings.
     pub fn uds_internal_columns(&self) -> Vec<String> {
         let mut columns = vec![
             crate::TIMESTAMP_COL_NAME.to_string(),

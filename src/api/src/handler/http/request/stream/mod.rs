@@ -102,8 +102,7 @@ pub async fn schema(
             .iter()
             .map(|f| (&f.name, f))
             .collect::<HashMap<_, _>>();
-        // internal columns (_timestamp, _all, ...) are implicitly part of the
-        // user-defined schema even when not persisted in defined_schema_fields
+        // internal columns are implicit in the UDS even when not persisted
         let internal_columns = schema.settings.uds_internal_columns();
         schema.uds_schema = schema
             .settings

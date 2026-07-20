@@ -112,10 +112,8 @@ pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
 
-/// Internal columns are implicitly part of every user-defined schema: they are
-/// merged in wherever the UDS is consumed (effective schema, search, field
-/// list), are never persisted in `defined_schema_fields`, and are exempt from
-/// the `user_defined_schema_max_fields` limit.
+/// Internal columns are implicitly part of every user-defined schema:
+/// never persisted in `defined_schema_fields` and exempt from the UDS limit.
 pub fn is_uds_internal_column(name: &str) -> bool {
     name == TIMESTAMP_COL_NAME
         || name == ID_COL_NAME

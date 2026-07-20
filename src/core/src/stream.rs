@@ -467,9 +467,7 @@ pub async fn save_stream_settings(
         fields.retain(|field| schema_fields.contains_key(field));
         settings.defined_schema_fields = fields;
     }
-    // internal columns (_timestamp, _all, _o2_id, _original, _all_values) are
-    // implicitly part of the user-defined schema, so they don't count toward
-    // the limit
+    // internal columns are implicit in the UDS and don't count toward the limit
     let uds_user_fields = settings
         .defined_schema_fields
         .iter()

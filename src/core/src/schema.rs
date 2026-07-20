@@ -350,10 +350,8 @@ pub(crate) async fn handle_diff_schema(
     // 2. log ingestion
     // 3. user defined schema is not already enabled
     // 4. final schema fields count exceeds schema_max_fields_to_enable_uds
-    // Internal columns (_timestamp, _all, _o2_id, _original, _all_values) are
-    // implicitly part of the user-defined schema: they are merged in wherever
-    // the UDS is consumed, so they are never persisted here and never occupy
-    // slots in the field list (see is_uds_internal_column).
+    // Internal columns are implicit in the UDS: never persisted and never
+    // occupy slots in the field list (see is_uds_internal_column).
     if cfg.common.allow_user_defined_schemas
         && cfg.limit.schema_max_fields_to_enable_uds > 0
         && stream_type.support_uds()
@@ -362,8 +360,7 @@ pub(crate) async fn handle_diff_schema(
     {
         let mut uds_fields = HashSet::with_capacity(cfg.limit.schema_max_fields_to_enable_uds);
 
-        // Fields that must survive auto-enable: stream-type mandatory fields
-        // plus everything FTS/secondary-index related
+        // Fields that must survive auto-enable
         let mut keep_fields =
             check_schema_for_defined_schema_fields(stream_type, &final_schema, vec![]);
         // add FTS fields (default SQL FTS fields)
