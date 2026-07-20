@@ -23,8 +23,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 //   provider/model registered in opencode.jsonc).
 // - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (GLM uses "max"; empty ⇒ omit).
 // - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
-// - REVIEW_AGENT_PREFIX: opencode agent name prefix; each reviewer is `<prefix>-<key>` and the
-//   coordinator is `<prefix>-coordinator`, all registered in opencode.jsonc.
 // - REVIEW_LABEL: short human label used in the posted comment header (e.g. "GLM-5.2").
 // - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
 //   the two providers post/update independent comments and never clobber each other.
@@ -32,7 +30,6 @@ const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "zai";
 const MODEL_ID = process.env.REVIEW_MODEL_ID || "glm-5.2";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "max";
 const API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "GLM_API_KEY";
-const AGENT_PREFIX = process.env.REVIEW_AGENT_PREFIX || "ai-review";
 const MODEL_LABEL = process.env.REVIEW_LABEL || "GLM-5.2";
 const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
 
@@ -71,44 +68,44 @@ const NOISE_GENERATED_MARKERS = ["@generated", "auto-generated", "DO NOT EDIT", 
 // ─── Agent definitions ─────────────────────────────────────────────────────
 // Model/agent execution is delegated to `opencode serve` (see OpencodeServer below).
 // Each key here maps to an agent of the same name (`ai-review-<key>`) registered in
-// opencode.jsonc, all running GLM-5.2 at max reasoning effort with read-only repo tools.
-// opencodeAgent names are derived from AGENT_PREFIX so the same definitions drive both the
-// GLM (`ai-review-*`) and DeepSeek (`ai-review-deepseek-*`) agent sets in opencode.jsonc.
+// opencode.jsonc, all running with read-only repo tools.
+// One shared agent set serves every provider: the model is overridden per-call from env
+// (see callOpencode), so these names are provider-agnostic by design.
 const AGENTS = {
   security: {
     name: "Security Reviewer",
     promptFile: "agents/security.md",
-    opencodeAgent: `${AGENT_PREFIX}-security`,
+    opencodeAgent: "ai-review-security",
     fileFocus: f => /\.rs$|\.toml$|auth|authz|oauth|token|crypto|secret|password|unsafe/.test(f),
   },
   "code-quality": {
     name: "Code Quality Reviewer",
     promptFile: "agents/code-quality.md",
-    opencodeAgent: `${AGENT_PREFIX}-code-quality`,
+    opencodeAgent: "ai-review-code-quality",
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.js$/.test(f),
   },
   performance: {
     name: "Performance Reviewer",
     promptFile: "agents/performance.md",
-    opencodeAgent: `${AGENT_PREFIX}-performance`,
+    opencodeAgent: "ai-review-performance",
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.sql$/.test(f),
   },
   documentation: {
     name: "Documentation Reviewer",
     promptFile: "agents/documentation.md",
-    opencodeAgent: `${AGENT_PREFIX}-documentation`,
+    opencodeAgent: "ai-review-documentation",
     fileFocus: () => true,
   },
   release: {
     name: "Release Reviewer",
     promptFile: "agents/release.md",
-    opencodeAgent: `${AGENT_PREFIX}-release`,
+    opencodeAgent: "ai-review-release",
     fileFocus: f => /Cargo\.toml|package\.json|\.sql$|migration|Migration|\.yml$|Dockerfile|docker/.test(f),
   },
 };
 
 // ─── Risk tiers ────────────────────────────────────────────────────────────
-const COORDINATOR_AGENT = `${AGENT_PREFIX}-coordinator`;
+const COORDINATOR_AGENT = "ai-review-coordinator";
 const RISK_TIERS = {
   trivial: {
     maxLines: 10,
@@ -1268,10 +1265,49 @@ async function main() {
     });
     console.log(`[${isoNow()}] All reviewers complete. Total findings: ${totalFindings}, Failures: ${failedAgents.length}`);
 
-    // 7. Coordinator pass
-    const coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
-    let finalReview = coordinatorResult.text;
-    const responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
+    // 7. Coordinator pass — unless nothing survived to coordinate.
+    //
+    // If EVERY reviewer failed there are no findings to consolidate, so the coordinator can
+    // only produce "no issues found" — which reads as an approval on a PR that was never
+    // actually reviewed. That is strictly worse than posting nothing: it is a green light
+    // manufactured from a total outage. Report the failure instead, skip the coordinator
+    // (saving another AGENT_TIMEOUT_MS of waiting on a provider that is already failing),
+    // and exit non-zero so the check surfaces as red.
+    const allAgentsFailed = results.length > 0 && failedAgents.length === results.length;
+    let finalReview;
+    let responseIds = reviewerResponseIds;
+
+    if (allAgentsFailed) {
+      outcome = "all_agents_failed";
+      exitCode = 1;
+      const detail = failedAgents
+        .map(r => `- ${r.agentName}: ${r.error}`)
+        .join("\n");
+      console.error(`[${isoNow()}] All ${results.length} reviewers failed — skipping coordinator and reporting failure.`);
+      TRACE.setSpanAttributes(rootSpan, {
+        "review.all_agents_failed": true,
+        "review.coordinator_skipped": true,
+      });
+      finalReview = [
+        `## AI Code Review (${MODEL_LABEL})`,
+        ``,
+        `### Decision: error`,
+        ``,
+        `⚠️ **This PR was not reviewed.** All ${results.length} reviewers failed against \`${MODEL_SLUG}\`, so there are no findings to report — this is an infrastructure failure, not an approval.`,
+        ``,
+        `<details>`,
+        `<summary>Reviewer failures (${failedAgents.length})</summary>`,
+        ``,
+        detail,
+        ``,
+        `</details>`,
+      ].join("\n");
+    } else {
+      const coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
+      finalReview = coordinatorResult.text;
+      responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
+    }
+
     TRACE.setSpanAttributes(rootSpan, {
       "gen_ai.response.ids": responseIds,
       "gen_ai.response.count": responseIds.length,
@@ -1306,11 +1342,20 @@ async function main() {
       throw err;
     }
 
+    // The failure notice is posted above so it is visible on the PR; now fail the check too,
+    // so a total reviewer outage can't pass as a green tick. Thrown after the comment lands
+    // (not at detection time) to guarantee both happen.
+    if (allAgentsFailed) {
+      const err = new Error(`All ${results.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
+      err.suppressFatalLog = true;
+      throw err;
+    }
+
     console.log(`[${isoNow()}] AI Code Review complete for PR #${prNumber}`);
   } catch (err) {
     rootError = err;
     exitCode = 1;
-    if (outcome !== "misconfigured") outcome = "failure";
+    if (outcome !== "misconfigured" && outcome !== "all_agents_failed") outcome = "failure";
     throw err;
   } finally {
     TRACE.endSpan(rootSpan, {

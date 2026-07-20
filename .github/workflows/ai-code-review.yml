@@ -43,7 +43,6 @@ jobs:
             model_id: glm-5.2
             model_variant: max
             api_key_env: GLM_API_KEY
-            agent_prefix: ai-review
             marker: "<!-- ai-code-review -->"
           - name: deepseek
             label: DeepSeek-V4-Pro
@@ -51,7 +50,6 @@ jobs:
             model_id: deepseek-v4-pro
             model_variant: ""
             api_key_env: DEEPSEEK_API_KEY
-            agent_prefix: ai-review-deepseek
             marker: "<!-- ai-code-review-deepseek -->"
     steps:
       - name: Checkout repository
@@ -129,7 +127,6 @@ jobs:
           REVIEW_MODEL_ID: ${{ matrix.provider.model_id }}
           REVIEW_MODEL_VARIANT: ${{ matrix.provider.model_variant }}
           REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
-          REVIEW_AGENT_PREFIX: ${{ matrix.provider.agent_prefix }}
           REVIEW_LABEL: ${{ matrix.provider.label }}
           REVIEW_MARKER: ${{ matrix.provider.marker }}
           # Both keys are provided; run-review.mjs reads only the one named by REVIEW_API_KEY_ENV.
