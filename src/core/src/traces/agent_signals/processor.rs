@@ -59,15 +59,16 @@ pub async fn process_agent_signals_stream(
             .map(|s| s.field_with_name(name).is_ok())
             .unwrap_or(false)
     };
-    // Failure classification reads whichever error-detail columns the operator
-    // configured (config-driven, not hardcoded). Keep ONLY the configured columns
+    // Failure classification reads the resolved taxonomy (org override → repo file
+    // → embedded fallback), not a hardcoded set. Keep ONLY the configured columns
     // that actually exist on this stream — referencing a missing column is a hard
     // search error, so the SQL must COALESCE existing columns only.
-    let detail_fields: Vec<String> = get_o2_config()
-        .agent_signals
-        .error_detail_fields_list()
-        .into_iter()
+    let taxonomy = crate::service::db::system_settings::get_agent_signals_taxonomy(org_id).await;
+    let detail_fields: Vec<String> = taxonomy
+        .error_detail_fields
+        .iter()
         .filter(|f| has_field(f))
+        .cloned()
         .collect();
     let has_failure_cols = !detail_fields.is_empty();
     let has_tool = has_field("gen_ai_tool_name");
@@ -78,8 +79,13 @@ pub async fn process_agent_signals_stream(
     // R1 failure taxonomy — classify from the configured error-detail columns,
     // using the configured (evolvable) failure-rule taxonomy.
     if has_failure_cols {
-        let rules = get_o2_config().agent_signals.failure_rules_list();
-        let sql = build_failure_sql(stream_name, start_time, end_time, &detail_fields, &rules);
+        let sql = build_failure_sql(
+            stream_name,
+            start_time,
+            end_time,
+            &detail_fields,
+            &taxonomy.failure_rules,
+        );
         match crate::service::traces::service_graph::run_graph_search(
             org_id, sql, start_time, end_time,
         )
