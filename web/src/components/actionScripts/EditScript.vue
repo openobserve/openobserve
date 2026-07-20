@@ -724,13 +724,13 @@ const goToStep = async (fields: string[], next: number) => {
 // Map a Zod issue path to its OForm field name so we can match issues to the
 // field that owns them: ["cron"] → "cron". Actions only has flat scalar fields,
 // but keep the same helper reports uses (handles nested array paths too) for parity.
-const issuePathToName = (path: readonly (string | number)[]): string =>
+const issuePathToName = (path: readonly PropertyKey[]): string =>
   path.reduce<string>(
     (acc, seg) =>
       typeof seg === "number"
         ? `${acc}[${seg}]`
         : acc
-          ? `${acc}.${seg}`
+          ? `${acc}.${String(seg)}`
           : String(seg),
     "",
   );
@@ -751,7 +751,9 @@ watch(
     const invalidNames = new Set(
       res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
     );
-    for (const name of Object.keys(form.state.fieldMeta ?? {})) {
+    for (const name of Object.keys(
+      form.state.fieldMeta ?? {},
+    ) as FormFieldPath<EditScriptForm>[]) {
       const meta = form.getFieldMeta(name);
       if (!meta) continue;
       const hasError = (meta.errors?.length ?? 0) > 0;

@@ -78,7 +78,7 @@
                 :condition="item"
                 :stream-fields="props.streamFields"
                 @input:update="(name, field) => inputUpdate(name, field)"
-                :index="index"
+                :index="Number(index)"
                 :label="group.logicalOperator?.toLowerCase() || 'and'"
                 :depth="depth"
                 :input-width="props.conditionInputWidth"
