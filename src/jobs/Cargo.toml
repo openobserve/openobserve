@@ -15,6 +15,7 @@ enterprise = [
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
+    "openobserve-alerts/enterprise",
     "openobserve-core/enterprise",
 ]
 cloud = [
@@ -28,6 +29,7 @@ vortex = ["openobserve-core/vortex"]
 
 [dependencies]
 common.workspace = true
+openobserve-alerts.workspace = true
 openobserve-compactor.workspace = true
 openobserve-core.workspace = true
 openobserve-ingestion.workspace = true

@@ -30,7 +30,7 @@ pub async fn process_expired_batches() {
 
         #[cfg(feature = "enterprise")]
         {
-            let batches = openobserve_core::alerts::grouping::get_expired_batches();
+            let batches = openobserve_alerts::grouping::get_expired_batches();
 
             if !batches.is_empty() {
                 log::debug!(

@@ -16,6 +16,7 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "dep:vrl",
+    "openobserve-alerts/enterprise",
     "openobserve-core/enterprise",
 ]
 cloud = [

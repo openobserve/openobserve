@@ -72,7 +72,7 @@ pub async fn get_dedup_summary(Path(org_id): Path<String>) -> Response {
 
     // Get current pending batches count from in-memory state
     #[cfg(feature = "enterprise")]
-    let pending_batches = openobserve_core::alerts::grouping::get_pending_batch_count(&org_id);
+    let pending_batches = openobserve_alerts::grouping::get_pending_batch_count(&org_id);
 
     #[cfg(not(feature = "enterprise"))]
     let pending_batches = 0;

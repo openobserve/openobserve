@@ -17,6 +17,7 @@ use std::sync::LazyLock;
 
 use config::{RwAHashMap, meta::triggers::Trigger};
 
+pub mod grouping;
 mod http;
 pub mod repository;
 pub mod service;

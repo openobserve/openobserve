@@ -938,7 +938,7 @@ async fn handle_alert_triggers(
                 );
 
                 // Add to batch
-                let batch_ready = crate::alerts::grouping::add_to_batch(
+                let batch_ready = openobserve_alerts::grouping::add_to_batch(
                     fingerprint.clone(),
                     new_trigger.org.clone(),
                     alert.clone(),
@@ -951,7 +951,7 @@ async fn handle_alert_triggers(
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
                     );
-                    if let Some(batch) = crate::alerts::grouping::get_ready_batch(&fingerprint)
+                    if let Some(batch) = openobserve_alerts::grouping::get_ready_batch(&fingerprint)
                         && let Err(e) =
                             crate::alerts::grouping::send_grouped_notification(batch).await
                     {

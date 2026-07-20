@@ -20,6 +20,7 @@
 
 use std::sync::{Arc, LazyLock as Lazy};
 
+use async_trait::async_trait;
 use chrono::Utc;
 use config::{meta::alerts::alert::Alert, utils::json};
 use dashmap::DashMap;
@@ -238,13 +239,23 @@ pub fn get_pending_batch_count(org_id: &str) -> i64 {
         .count() as i64
 }
 
-#[cfg(feature = "enterprise")]
+#[async_trait]
+pub trait NotificationSender: Sync {
+    async fn send_notification(
+        &self,
+        alert: &Alert,
+        rows: &[json::Map<String, json::Value>],
+        rows_end_time: i64,
+        start_time: Option<i64>,
+        evaluation_timestamp: i64,
+    ) -> Result<(String, String), anyhow::Error>;
+}
+
 pub async fn send_grouped_notification(
-    batch: crate::alerts::grouping::PendingBatch,
+    batch: PendingBatch,
+    sender: &dyn NotificationSender,
 ) -> Result<(), anyhow::Error> {
     use config::meta::alerts::deduplication::SendStrategy;
-
-    use crate::alerts::alert::AlertExt;
 
     let elapsed_seconds =
         (chrono::Utc::now().timestamp_micros() - batch.timer_started_at) / 1_000_000;
@@ -370,8 +381,9 @@ pub async fn send_grouped_notification(
     let evaluation_timestamp = chrono::Utc::now().timestamp_micros();
 
     // Send notification using alert's send_notification method
-    match notification_alert
+    match sender
         .send_notification(
+            &notification_alert,
             &combined_rows,
             rows_end_time,
             start_time,
