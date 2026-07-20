@@ -29,7 +29,7 @@ export default class DashboardTimeRefresh {
   async setRelative(date, time) {
     // Wait until the trigger is visible (not just attached). attached only
     // checks DOM presence, but in CI the button can be in the DOM before its
-    // q-menu is ready to open — clicking too early opens nothing and the
+    // menu is ready to open — clicking too early opens nothing and the
     // subsequent relativeTime.click() waits forever.
     await this.timeTab.waitFor({ state: "visible" });
 

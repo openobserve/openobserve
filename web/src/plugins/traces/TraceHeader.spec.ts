@@ -96,7 +96,6 @@ describe("TraceHeader", () => {
           store: mockStore,
         },
         stubs: {
-          "q-resize-observer": true,
         },
       },
     });
@@ -278,7 +277,6 @@ describe("TraceHeader", () => {
             store: darkStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });
@@ -320,7 +318,6 @@ describe("TraceHeader", () => {
             store: darkStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });
@@ -536,7 +533,6 @@ describe("TraceHeader", () => {
             store: mockStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });

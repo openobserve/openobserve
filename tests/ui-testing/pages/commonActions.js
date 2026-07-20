@@ -138,7 +138,7 @@ export class CommonActions {
      */
     async scrollAndFindOption(optionName, optionType) {
         // Target the visible dropdown — OSelect (Reka Listbox) post-migration,
-        // q-select (.q-menu) pre-migration.
+        // legacy select pre-migration.
         const dropdown = this.page.locator('[data-test$="-popover"]').first();
 
         // Fast path for the migrated OSelect: it renders a ListboxFilter search input

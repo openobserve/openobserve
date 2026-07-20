@@ -249,7 +249,6 @@ function mountTraceTree(
     global: {
       plugins: [i18n, router, storePlugin],
       stubs: {
-        "q-resize-observer": true,
         "span-block": true,
       },
     },

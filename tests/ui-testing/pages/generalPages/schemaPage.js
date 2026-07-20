@@ -139,7 +139,7 @@ class SchemaPage {
             // Stream creation locators
             logStreamAddStreamBtn: '[data-test="log-stream-add-stream-btn"]',
             nameLabel: 'Name *',
-            // AddStream.vue migrated from q-btn to ODrawer's primary footer
+            // AddStream.vue migrated from the legacy button to ODrawer's primary footer
             // button — there is no standalone "save-stream-btn" any more.
             saveStreamBtn: '[data-test="add-stream-dialog"] [data-test="o-dialog-primary-btn"]',
             menuHomeItem: '[data-test="menu-link-\\/-item"]',
@@ -269,7 +269,7 @@ class SchemaPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         // Try to find and click kubernetes checkboxes (they may not always exist).
-        // These names are legacy from the q-table schema; if the corresponding
+        // These names are legacy from the old table schema; if the corresponding
         // data-tests no longer exist after the OTable migration the row checkboxes
         // are simply not found and the try-block swallows the timeout.
         try {

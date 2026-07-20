@@ -2,7 +2,7 @@
  * Scheduled Alert Features E2E Tests
  *
  * Tests scheduled alert features:
- * 1. Alert History/Details dialog (q-dialog with paginated table)
+ * 1. Alert History/Details dialog (with paginated table)
  * 2. Aggregation configuration in Step 2 (QueryConfig)
  * 3. PromQL alert creation with trigger condition
  * 4. SQL preview chart rendering
@@ -419,7 +419,7 @@ test.describe("Scheduled Alert Features", () => {
 
         // Run the SQL flow end-to-end via PO method (Monaco-API driven, deterministic waits).
         await pm.alertsPage.runSqlAndCloseEditor(`SELECT COUNT(*) as cnt FROM "${STREAM_NAME}"`);
-        // Cleanup: residual q-portal elements occasionally intercept clicks after dialog close.
+        // Cleanup: residual portal elements occasionally intercept clicks after dialog close.
         await pm.alertsPage.removeResidualPortals();
 
         testLogger.info('=== PHASE 3: Verify preview chart is visible ===');

@@ -91,8 +91,8 @@ export class LogsPage {
         // OInput convention §4: drive the auto-derived `-field` inner native input for fill().
         this.savedViewNameInput = '[data-test="add-alert-name-input-field"]';
         // Saved view dialog (SearchBar.vue:1654) and saved function dialog (SearchBar.vue:1703) were both migrated
-        // from q-dialog to ODialog. Tests historically shared a single save-button selector because the legacy
-        // q-dialog used the same data-test on both. With ODialog each dialog has its own primary button, so the
+        // from the legacy dialog to ODialog. Tests historically shared a single save-button selector because the legacy
+        // dialog used the same data-test on both. With ODialog each dialog has its own primary button, so the
         // selector matches whichever dialog is currently open (they are mutually exclusive).
         this.savedViewDialogSave = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
         this.savedViewDialog = '[data-test="search-bar-store-state-saved-view-dialog"]';
@@ -186,7 +186,7 @@ export class LogsPage {
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         // OInput convention (AGENT_RULES §4): inner native <input> carries `-field` suffix
         this.savedFunctionNameInputField = '[data-test="saved-function-name-input-field"]';
-        this.qNotifyWarning = '#q-notify div';
+        this.qNotifyWarning = '[role="alert"]';
         this.qPageContainer = '[data-test="logs-page-container"]';
         this.cmContent = '.view-lines';
         this.cmLine = '.view-line';
@@ -900,7 +900,7 @@ export class LogsPage {
         //    wrapper down to its single `button` child instead.
         //  - Option:  [data-test="log-search-index-list-select-stream-option"]
         //             [data-test-value="<stream>"]   (rendered into a portalled popover by OSelect).
-        // The legacy q-select `log-search-index-list-stream-toggle-*` data-test is no longer
+        // The legacy select `log-search-index-list-stream-toggle-*` data-test is no longer
         // emitted, so we open the popover and pick the option directly. The retry loop
         // re-opens the popover on miss to handle the case where the stream list streams in
         // late after page navigation — matching the original 5-attempt retry semantic.
@@ -997,7 +997,7 @@ export class LogsPage {
 
     async deselectStream(streamName) {
         testLogger.info(`Deselecting stream: ${streamName}`);
-        // Legacy q-select used `log-search-index-list-stream-toggle-<name> div`;
+        // Legacy select used `log-search-index-list-stream-toggle-<name> div`;
         // post-OSelect migration that data-test is gone. Pick the same option
         // by `data-test-value` — toggling an already-selected option deselects
         // it in OSelect's multi-mode (selectionBehavior=toggle).
@@ -1575,7 +1575,7 @@ export class LogsPage {
         await quickMode.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
         await this.page.locator(this.utilitiesMenuButton).click();
         await quickMode.waitFor({ state: 'visible', timeout: 10000 });
-        // Click the q-item directly - it has @click="handleQuickMode" handler.
+        // Click the menu option directly - it has @click="handleQuickMode" handler.
         // force:true bypasses the stability check; the popper portal animates so the
         // element can be transiently re-laid-out, but the click is still committed.
         await quickMode.click({ force: true });
@@ -1869,7 +1869,7 @@ export class LogsPage {
         const resultsDropdown = this.page.locator(this.recordsPerPageDropdown);
         await resultsDropdown.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         await resultsDropdown.click({ force: true });
-        // Records-per-page is OSelect (Reka Listbox) post-migration, q-select pre.
+        // Records-per-page is OSelect (Reka Listbox) post-migration, the legacy select pre.
         await this.page.waitForTimeout(500);
         // Target option by data-test-value (OSelect emits `${parent}-option` + data-test-value).
         const option10 = this.page.locator(this.recordsPerPageOption(10)).first();
@@ -3124,14 +3124,14 @@ export class LogsPage {
         // This method clicks the search input inside the saved views dialog
         //
         // Why this needs special handling:
-        // The search input is inside a q-table's #top template slot. When the table's
+        // The search input is inside the table's #top template slot. When the table's
         // data updates (e.g., after applying a saved view), the entire #top template
         // gets re-rendered, causing the input element to be detached and recreated.
         //
         // The problem was exacerbated by:
         // 1. debounce="1" (now changed to 300) - caused rapid re-renders
         // 2. Table data updating from ongoing searches
-        // 3. Invalid HTML structure (q-tr inside #top-right - now fixed)
+        // 3. Invalid HTML structure (a table row inside #top-right - now fixed)
         //
         // Even with those fixes, if a search just completed, the table might still
         // be updating its pagination/data, making the input unstable for a brief moment.
@@ -3946,7 +3946,7 @@ export class LogsPage {
             await inputLocator.fill('');
         } else {
             // pressSequentially fires per-character input events that reliably
-            // trigger the q-input's debounced update:model-value chain.
+            // trigger the input's debounced update:model-value chain.
             // force:true bypasses Monaco editor's <span class="highlight">code</span>
             // overlay that can intercept pointer events on the splitter panel.
             await inputLocator.click({ clickCount: 3, force: true });
@@ -5730,7 +5730,7 @@ export class LogsPage {
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.keyboard.press("Backspace");
         // Drive the editor through Monaco's executeEdits API instead of keystrokes —
-        // typing into the search bar is intercepted by the q-input which has a
+        // typing into the search bar is intercepted by the input which has a
         // debounced model-value chain that races the test's read. The Monaco model
         // commits synchronously through executeEdits.
         await this.page.evaluate(({ selector, text }) => {
@@ -5917,7 +5917,7 @@ export class LogsPage {
     }
 
     async toggleStreamSelection(streamName) {
-        // Post-OSelect-migration: the legacy q-select toggle data-test
+        // Post-OSelect-migration: the legacy select toggle data-test
         // `log-search-index-list-stream-toggle-<name>` is no longer emitted.
         // Pick the OSelect option whose `data-test-value` matches streamName.
         // Caller must ensure the popover is open (e.g. via fillStreamFilter).

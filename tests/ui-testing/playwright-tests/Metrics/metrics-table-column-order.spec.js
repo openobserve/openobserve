@@ -165,7 +165,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
     testLogger.info('Column Order popup opened successfully');
 
     // Verify description text is present (ODialog header carries the title via :title prop,
-    // it doesn't render a .q-table__title block any more — assert the body's description data-test instead).
+    // it doesn't render a table title block any more — assert the body's description data-test instead).
     const descriptionText = pm.dashboardPanelConfigs.columnOrderDescription;
     await expect(descriptionText).toBeVisible();
     testLogger.info('Column Order popup has description text');

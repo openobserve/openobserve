@@ -122,7 +122,7 @@ async function tryExpandField(page, pm) {
     }
 
     // Strategy 2: Click on field expansion headers in the traces field list
-    // Traces uses q-expansion-item with class 'field-expansion-item'
+    // Traces renders field rows with class 'field-expansion-item'
     // The clickable header has class 'field-expansion-header'
     // Using page object selector for the fields table
     const fieldsTableSelector = pm.tracesPage.fieldsTable || '[data-test="log-search-index-list-fields-table"]';

@@ -123,7 +123,7 @@ const WHOLE = {
   arbTextSize: /text-\[[0-9.]+(?:px|rem)\]/g,
   unscopedStyle: /<style(?![^>]*\bscoped\b)[^>]*>/g,
   twPrefix: /\btw:/g,
-  quasarUtil: /\b(?:q-(?:pa|pt|pb|pl|pr|px|py|ma|mt|mb|ml|mr|mx|my|gutter)-(?:none|xs|sm|md|lg|xl)|text-weight-[a-z]+)\b/g,
+  helperUtil: /\btext-weight-[a-z]+\b/g,
   arbPx: /\b(?:gap|p[trblxy]?|m[trblxy]?|w|h|size|min-w|min-h|max-w|max-h|top|left|right|bottom|inset|leading)-\[[0-9.]+px\]/g,
   arbZ: /\bz-\[[0-9]+\]/g,
   // Literal font stacks. The app ships exactly two families, reached only via

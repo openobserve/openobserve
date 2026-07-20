@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Phase F MECHANICAL burn-down — theme-neutral, value-identical renames only.
-// Radius (§3.I), typography (§3.J), spacing (§3.N), Quasar utils (§3.M).
+// Radius (§3.I), typography (§3.J), spacing (§3.N and §3.M).
 // NO color / dark-mode work here (that needs semantic judgment → separate pass).
 // z-index intentionally excluded (needs the §12.5 ladder sign-off).
 //
@@ -45,10 +45,7 @@ const RULES = [
   [/rounded-\[20px\]/g, "rounded-full"],
   [/rounded-\[3\.125rem\]/g, "rounded-full"],
 
-  // ── Quasar spacing/weight utils (§3.M) — Quasar helper CSS isn't loaded ──
-  // Quasar scale: none=0 xs=4px sm=8px md=16px lg=24px xl=48px
-  //   → Tailwind:  0    1     2      4       6       12
-  ...quasarSpacing(),
+  // ── Typography weight utils (§3.M) — the old helper CSS isn't loaded ──
   [/\btext-weight-bold\b/g, "font-bold"],
   [/\btext-weight-bolder\b/g, "font-extrabold"],
   [/\btext-weight-medium\b/g, "font-medium"],
@@ -56,17 +53,6 @@ const RULES = [
   [/\btext-weight-light\b/g, "font-light"],
   [/\btext-weight-thin\b/g, "font-thin"],
 ];
-
-function quasarSpacing() {
-  const step = { none: "0", xs: "1", sm: "2", md: "4", lg: "6", xl: "12" };
-  const side = { pa: "p", pt: "pt", pb: "pb", pl: "pl", pr: "pr", px: "px", py: "py",
-    ma: "m", mt: "mt", mb: "mb", ml: "ml", mr: "mr", mx: "mx", my: "my" };
-  const out = [];
-  for (const [q, tw] of Object.entries(side))
-    for (const [sz, n] of Object.entries(step))
-      out.push([new RegExp(`\\bq-${q}-${sz}\\b`, "g"), `${tw}-${n}`]);
-  return out;
-}
 
 // Bare `rounded` → `rounded-sm` (identical 4px). Handled separately so we can use a
 // lookbehind/lookahead that requires it be a standalone class token in an attribute.

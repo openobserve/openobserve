@@ -74,7 +74,7 @@ export default class DashboardMultiSQL {
    * Locator for the trellis-chart OSelect when it is disabled.
    * OSelect renders an inner trigger button that carries the same
    * `data-test` as the wrapper, plus the standard `disabled` attribute
-   * when the prop is set. The `.q-field--disabled` class no longer exists
+   * when the prop is set. The legacy disabled class no longer exists
    * after the v1 UX revamp.
    */
   trellisDisabled() {

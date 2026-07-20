@@ -15,7 +15,7 @@ const SRC_DIR = join(__dirname, "..", "src");
 const EXTS = new Set([".css", ".vue", ".ts"]);
 
 // Library-injected custom properties that are never statically `--x: value;`
-// defined in our source (Reka UI, Tailwind internals, vue-flow, Quasar remnants).
+// defined in our source (Reka UI, Tailwind internals, vue-flow).
 // These resolve at runtime, so a static "undefined" report on them would be a
 // false positive — hence the prefix allowlist.
 //
@@ -25,13 +25,6 @@ const EXTS = new Set([".css", ".vue", ".ts"]);
 // renamed off the `--o2-` namespace. If you find a `--o2-*` here, delete it and
 // fix the usage — never re-exempt it.
 const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/];
-// NOTE: there is deliberately NO `--q-*` allowlist. Quasar is out of the
-// dependency tree (absent from package.json, zero <q-*> tags), so NOTHING
-// injects `--q-*` at runtime any more. The old "10 real Quasar variables"
-// exemption outlived Quasar itself and became a guard hole: it let phantom
-// refs like `--q-secondary` / `--q-dark-page` resolve to nothing and silently
-// void their declarations (O2_STYLE_MIGRATION_PLAN §2.4, phase PQ).
-// Any `--q-*` reference is now a hard failure, forever.
 const ALLOW_EXACT = new Set([
   // Non-o2 custom properties set per-element at runtime via Vue `:style`
   // bindings — dynamic values with no static `--x:` definition.

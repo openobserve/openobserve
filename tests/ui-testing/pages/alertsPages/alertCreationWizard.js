@@ -372,10 +372,6 @@ export class AlertCreationWizard {
         }
         await this.page.locator('body').click({ position: { x: 10, y: 10 } });
 
-        // Forcefully remove any remaining q-portal elements that intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { el.style.display = 'none'; });
-        }).catch(e => testLogger.warn('Failed to remove q-portal elements', { error: e.message }));
         await this.page.waitForTimeout(300);
 
         // ==================== SUBMIT ====================
@@ -487,10 +483,9 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(2000);
 
         // Aggressively clean up any portal overlays that may intercept pointer events.
-        // Both the q-portal--dialog and reka-ui (data-reka-dialog-overlay) portals
-        // can linger after the dialog state is toggled off.
+        // The reka-ui (data-reka-dialog-overlay) portals can linger after the dialog
+        // state is toggled off.
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal--dialog"]').forEach(el => { el.style.display = 'none'; });
             document.querySelectorAll('div[data-reka-dialog-overlay]').forEach(el => { el.style.display = 'none'; });
             document.querySelectorAll('div[data-reka-portalled]').forEach(el => { el.style.display = 'none'; });
         }).catch(e => testLogger.warn('Failed to remove portal overlays', { error: e.message }));
@@ -1050,7 +1045,7 @@ export class AlertCreationWizard {
         // v3 UI may have different toggle mechanisms than v2:
         //   1. [data-test="alert-conditions-toggle-operator-btn"] (v2-style button)
         //   2. Clickable AND chip/label between condition rows (v3-style chip)
-        //   3. Operator dropdown/select (v3-style q-select)
+        //   3. Operator dropdown/select (v3-style select)
         let toggleSuccessful = false;
         let message = '';
 
@@ -1572,7 +1567,7 @@ export class AlertCreationWizard {
         // In measure mode, the "Alert if" row adds a field selector ("count of [field]").
         // Must select a measure column or validateAndFocus() will reject with
         // "Column is required when using an aggregate function."
-        // The field selector is the 2nd q-select in the "Alert if" row (after function dropdown)
+        // The field selector is the 2nd select in the "Alert if" row (after function dropdown)
         const measureColumnSelect = alertIfSection.locator('.alert-v3-select').nth(1);
         await measureColumnSelect.waitFor({ state: 'visible', timeout: 5000 });
         await measureColumnSelect.click();
@@ -1595,9 +1590,9 @@ export class AlertCreationWizard {
         }
 
         // Select first available group-by field
-        // In v3, the Group By section begins with no q-select elements — the
-        // `v-for` loop over `logGroupBy` only renders q-selects when entries exist.
-        // Initially only the "+" add button (q-btn icon="add") is visible.
+        // In v3, the Group By section begins with no select elements — the
+        // `v-for` loop over `logGroupBy` only renders selects when entries exist.
+        // Initially only the "+" add button (add icon) is visible.
         const groupBySection = this.page.locator('.alert-condition-row').filter({ hasText: 'Group by' }).first();
         await groupBySection.waitFor({ state: 'visible', timeout: 5000 });
         // Click the "+" add button to create a group-by field entry
@@ -1605,7 +1600,7 @@ export class AlertCreationWizard {
         await addGroupByBtn.waitFor({ state: 'visible', timeout: 5000 });
         await addGroupByBtn.click();
         await this.page.waitForTimeout(800);
-        // Now the q-select should be rendered by the v-for — select from it
+        // Now the select should be rendered by the v-for — select from it
         const groupBySelect = groupBySection.locator('.alert-v3-select').first();
         await groupBySelect.waitFor({ state: 'visible', timeout: 5000 });
         await groupBySelect.click();
@@ -1619,10 +1614,10 @@ export class AlertCreationWizard {
         // Configure aggregation threshold (v3 UI)
         // i18n key "alerts.queryConfig.havingGroups" renders as "Having groups"
         // In v3, "Having groups" section only has:
-        //   1st q-select: operator (triggerOperator) with options ["=", "!=", ">=", ">", "<=", "<"]
-        //   q-input: threshold value
+        //   1st select: operator (triggerOperator) with options ["=", "!=", ">=", ">", "<=", "<"]
+        //   input: threshold value
         const aggThresholdSection = this.page.locator('.alert-condition-row').filter({ hasText: 'Having groups' }).first();
-        // Operator q-select (first/only q-select in this section)
+        // Operator select (first/only select in this section)
         const aggOperatorSelect = aggThresholdSection.locator('.alert-v3-select').first();
         await aggOperatorSelect.waitFor({ state: 'visible', timeout: 5000 });
         await aggOperatorSelect.click();
@@ -1844,7 +1839,7 @@ export class AlertCreationWizard {
         await this.page.waitForTimeout(300);
         testLogger.info('Set PromQL condition operator', { operator });
 
-        // Set value (q-input has debounce="300")
+        // Set value (input has debounce="300")
         const promqlValueInput = promqlConditionRow.locator('input[type="number"]');
         await promqlValueInput.clear();
         await promqlValueInput.fill(String(conditionValue));

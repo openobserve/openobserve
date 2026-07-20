@@ -257,7 +257,6 @@ describe("TraceDetails - Missing span_kind Field", () => {
         plugins: [i18n, router],
         provide: { store },
         stubs: {
-          "q-resize-observer": true,
           "chart-renderer": {
             template: '<div data-test="chart-renderer">Chart</div>',
             props: ["data", "id"],
@@ -347,7 +346,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should not display any error messages", () => {
-      const errorMessages = wrapper.findAll(".q-notification");
+      const errorMessages = wrapper.findAll('[role="alert"]');
       expect(errorMessages.length).toBe(0);
     });
 

@@ -223,7 +223,7 @@ Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything free
 
 ### OTooltip
 **Import:** `@/lib/overlay/Tooltip/OTooltip.vue`
-**Use when:** A passive hover/focus hint describing an element — icon-button labels, truncated text, disabled-state explanations. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot — attaches to its parent element like `q-tooltip`).
+**Use when:** A passive hover/focus hint describing an element — icon-button labels, truncated text, disabled-state explanations. Two modes: **wrapper** (default slot wraps the trigger) or **child** (no default slot — attaches to its parent element as its tooltip).
 **Don't use for:** Anything the user interacts with inside the bubble (use **OPopover**); an action menu (use **ODropdown**).
 **Key props:** `content` (string — plain-text shorthand for `#content`) · `side` (`"top"|"right"|"bottom"|"left"` — default `"top"`) · `align` (`"start"|"center"|"end"` — default `"center"`) · `sideOffset` (number — default `4`) · `alignOffset` (number — default `0`) · `delay` (number ms — default `700`) · `maxWidth` (string — default `"320px"`) · `disabled` (boolean) · `open` (boolean — controlled) · `contentClass` (string) · `shortcut` (`string | string[]`) · `shortcutId` (string — prefer over `shortcut`)
 **Slots:** `default` (trigger — single focusable element; omit for child mode), `content` (rich content, overrides `content` prop)

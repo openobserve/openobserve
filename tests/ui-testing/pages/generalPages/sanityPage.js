@@ -49,7 +49,7 @@ export class SanityPage {
         // Saved View / Function dialog locators
         // ============================================================
         // Saved view dialog (SearchBar.vue:1654) and saved function dialog (SearchBar.vue:1703) were migrated
-        // from q-dialog to ODialog. The legacy shared data-test "saved-view-dialog-save-btn" no longer exists;
+        // from the legacy dialog to ODialog. The legacy shared data-test "saved-view-dialog-save-btn" no longer exists;
         // each dialog now exposes its own ODialog primary button. The dialogs are mutually exclusive at runtime.
         this.savedViewDialogSave = page.locator('[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]');
         // After ConfirmDialog migrated to ODialog, the OK button no longer
@@ -730,7 +730,7 @@ export class SanityPage {
         await this.page.reload();
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        // Click the first stream row indicator (was the "01" cell in the legacy q-table).
+        // Click the first stream row indicator (was the "01" cell in the legacy table).
         await this.firstStreamRow.waitFor({ state: 'visible', timeout: 15000 });
         await this.firstStreamRow.click();
     }

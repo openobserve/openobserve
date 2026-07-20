@@ -334,7 +334,7 @@ export class ThemePage {
 
     async getThemeColor() {
         return await this.page.evaluate(() => {
-            return getComputedStyle(document.documentElement).getPropertyValue('--q-primary').trim();
+            return getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim();
         });
     }
 

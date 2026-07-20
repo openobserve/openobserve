@@ -143,11 +143,6 @@ export class AlertDestinationsPage {
     async navigateToDestinations(retryCount = 0) {
         const maxRetries = 2;
 
-        // Clean up any q-portal elements that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         try {
             await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
             await this.page.waitForTimeout(1000);
@@ -871,18 +866,13 @@ export class AlertDestinationsPage {
      * @param {string} destinationName - Name for the destination
      */
     async importDestinationFromFile(filePath, templateName, destinationName) {
-        // Clean up any q-portal elements that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         // Try multiple fallback selectors for the import button
         const importBtnFallbackLocators = [
             this.destinationImportButton,
             'button:has-text("Import Destination")',
             '[data-test*="destination-import"]',
             'button:has-text("Import")',
-            '.q-table__control button:has-text("Import")',
+            'table button:has-text("Import")',
             'button[data-o2-btn]:has-text("Import")'
         ];
 
@@ -1339,7 +1329,7 @@ export class AlertDestinationsPage {
      */
     async expectStep1Visible() {
         // Step 1 surfaces as the prebuilt destination selector being mounted/visible — the legacy
-        // q-stepper class has been removed in the UX revamp, so anchor on the selector data-test.
+        // stepper class has been removed in the UX revamp, so anchor on the selector data-test.
         await expect(this.page.locator(this.prebuiltDestinationSelector)).toBeVisible({ timeout: 10000 });
         testLogger.debug('Step 1 (destination selector) visible');
     }

@@ -460,7 +460,7 @@ test.describe("Alerts Stream Switching Regression", () => {
 
     // Remove interfering portal elements
     await page.evaluate(() => {
-      document.querySelectorAll('div[id^="q-portal"]').forEach(el => {
+      document.querySelectorAll('[data-reka-portalled], [data-reka-popper-content-wrapper]').forEach(el => {
         if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none';
       });
     }).catch(e => testLogger.warn('Failed to remove portal elements', { error: e.message }));

@@ -72,7 +72,7 @@ test.describe("ConfigPanel — Mark Line Settings", () => {
     const valueAfter = page.locator('[data-test="dashboard-config-markline-value-0"]');
     const nameAfter = page.locator('[data-test="dashboard-config-markline-name-0"]');
     await pm.dashboardPanelConfigs.scrollSidebarToElement(valueAfter);
-    // q-select uses emit-value without map-options → displays raw stored value ("yAxis" not "Y-Axis")
+    // the select uses emit-value without map-options → displays raw stored value ("yAxis" not "Y-Axis")
     await expect(page.locator('[data-test="dashboard-config-markline-type-0-trigger"]')).toHaveAttribute('data-test-selected-value', 'yAxis');
     await expect(valueAfter.locator('[data-test$="-field"]')).toHaveValue("100");
     await expect(nameAfter.locator('[data-test$="-field"]')).toHaveValue("threshold");

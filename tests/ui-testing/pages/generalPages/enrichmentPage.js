@@ -1018,7 +1018,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async verifySchemaModalVisible() {
-        // EnrichmentSchema migrated from q-dialog to ODrawer
+        // EnrichmentSchema migrated from the legacy dialog to ODrawer
         await this.schemaDrawer.waitFor({ state: 'visible', timeout: 15000 });
     }
 
@@ -1067,7 +1067,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     }
 
     async verifyDeleteConfirmationDialog() {
-        // ConfirmDialog migrated from q-dialog to ODialog — scope to the new panel
+        // ConfirmDialog migrated from the legacy dialog to ODialog — scope to the new panel
         await this.confirmDialog.waitFor({ state: 'visible', timeout: 10000 });
         // The dialog primary/secondary buttons render once the dialog is open.
         await this.confirmDialogOk.waitFor({ state: 'visible', timeout: 5000 });
@@ -1656,7 +1656,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     /**
      * Close any open dialogs/modals.
      *
-     * The logs row-detail panel was migrated from q-dialog to an ODrawer
+     * The logs row-detail panel was migrated from the legacy dialog to an ODrawer
      * (SearchResult.vue → `logs-search-result-detail-dialog`). Reka UI's
      * escape-key-down only fires when focus is inside the drawer, but
      * ODrawer's handleOpenAutoFocus prevents the default focus move and the
@@ -2135,7 +2135,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async closeUrlJobsDialog() {
         testLogger.debug('Closing URL Jobs dialog');
 
-        // URL Jobs migrated from q-dialog to ODrawer — use the o-drawer close button
+        // URL Jobs migrated from the legacy dialog to ODrawer — use the o-drawer close button
         const closeBtn = this.urlJobsDrawerCloseBtn.first();
         if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
             await closeBtn.click();

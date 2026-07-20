@@ -42,12 +42,12 @@ rg -o -i '\-\[(#[0-9a-f]{3,8}|[0-9.]+(px|rem|em|vh|vw|%))\]' src -g '*.vue' "${E
 echo "total: $(awk '{s+=$1} END {print s}' /tmp/audit_arb.txt)  files: $(wc -l < /tmp/audit_arb.txt)"
 head -20 /tmp/audit_arb.txt
 
-section "7. QUASAR SPACING/TYPO UTILITIES (q-pa/q-ma/q-gutter/text-weight)"
-rg -o '\b(q-p[atblrxy]-(none|xs|sm|md|lg|xl)|q-m[atblrxy]-(none|xs|sm|md|lg|xl)|q-gutter-[a-z-]+|text-weight-[a-z]+)\b' src -g '*.vue' "${EXC[@]}" 2>/dev/null | awk -F: '{print $1}' | sort | uniq -c | sort -rn > /tmp/audit_quasar.txt
-echo "total: $(awk '{s+=$1} END {print s}' /tmp/audit_quasar.txt)  files: $(wc -l < /tmp/audit_quasar.txt)"
-head -20 /tmp/audit_quasar.txt
+section "7. TYPO UTILITIES (text-weight)"
+rg -o '\b(text-weight-[a-z]+)\b' src -g '*.vue' "${EXC[@]}" 2>/dev/null | awk -F: '{print $1}' | sort | uniq -c | sort -rn > /tmp/audit_typo.txt
+echo "total: $(awk '{s+=$1} END {print s}' /tmp/audit_typo.txt)  files: $(wc -l < /tmp/audit_typo.txt)"
+head -20 /tmp/audit_typo.txt
 
-section "8. QUASAR PALETTE color= PROPS (color=\"red\" etc.)"
+section "8. PALETTE color= PROPS (color=\"red\" etc.)"
 rg -o '\b(color|text-color)="(red|blue|green|orange|purple|teal|pink|amber|grey|gray|cyan|indigo|lime|brown|black|white|primary|secondary|positive|negative|warning|info|accent)(-[0-9]+)?"' src -g '*.vue' "${EXC[@]}" 2>/dev/null | awk -F: '{print $1}' | sort | uniq -c | sort -rn > /tmp/audit_qcolor.txt
 echo "total: $(awk '{s+=$1} END {print s}' /tmp/audit_qcolor.txt)  files: $(wc -l < /tmp/audit_qcolor.txt)"
 head -20 /tmp/audit_qcolor.txt

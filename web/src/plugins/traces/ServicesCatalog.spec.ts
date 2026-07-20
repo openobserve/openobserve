@@ -2242,12 +2242,12 @@ describe("ServicesCatalog", () => {
     });
 
     describe("unhealthy highlight & bracket count on tabs", () => {
-      // db-degraded + db-ok (datastore), svc-crit (service), q-ok (queue).
+      // db-degraded + db-ok (datastore), svc-crit (service), queue-ok (queue).
       const healthRows = [
         { service_name: "svc-crit", infer_service_type: undefined, status: "critical" },
         { service_name: "db-degraded", infer_service_type: "database", status: "degraded" },
         { service_name: "db-ok", infer_service_type: "database", status: "healthy" },
-        { service_name: "q-ok", infer_service_type: "queue", status: "healthy" },
+        { service_name: "queue-ok", infer_service_type: "queue", status: "healthy" },
       ].map((r) => ({
         total_requests: 100,
         error_count: 0,

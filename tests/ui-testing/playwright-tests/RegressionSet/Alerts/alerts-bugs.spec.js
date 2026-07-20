@@ -280,7 +280,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('Import dialog opened with upload functionality');
 
     // Bug verification: no premature "already exists" error before import
-    const errorMessages = page.locator('[class*="error"], [class*="negative"], .q-banner')
+    const errorMessages = page.locator('[class*="error"], [class*="negative"]')
       .filter({ hasText: /already exists|duplicate/i });
     const hasPrematureError = await errorMessages.first().isVisible({ timeout: 2000 }).catch(() => false);
 

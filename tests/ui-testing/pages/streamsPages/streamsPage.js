@@ -431,7 +431,7 @@ export class StreamsPage {
             
             // Try individual selector
             try {
-                const element = this.page.locator('tr:has-text("Full text search") .q-checkbox__inner');
+                const element = this.page.locator('tr:has-text("Full text search") [role="checkbox"]');
                 if (await element.isVisible({ timeout: 1000 })) {
                     await element.click();
                 }
@@ -464,7 +464,7 @@ export class StreamsPage {
 
     async selectDateRange(startIso, endIso) {
         // Post-revamp the extended-retention picker is the shared <date-time>
-        // component with an ODateRangeCalendar inside — Quasar's .q-date is gone.
+        // component with an ODateRangeCalendar inside — the old date input is gone.
         // Day cells carry data-test="daterangecalendar-cell-<yyyy-mm-dd>";
         // exclude adjacent-month duplicates via [data-outside-view].
         await this.page.locator('[data-test="date-time-btn"]').click();
@@ -512,7 +512,7 @@ export class StreamsPage {
         await this.selectDateRange(startIso, endIso);
         // Applying the range saves immediately (dateChangeValue -> onSubmit),
         // so the new row appears in the retention table. Return the start date
-        // in the table's display format (DD-MM-YYYY via convertUnixToQuasarFormat)
+        // in the table's display format (DD-MM-YYYY)
         // so deleteRetentionPeriod's hasText row filter matches — the cells
         // render e.g. "13-07-2026", not the ISO "2026-07-13".
         const [y, m, d] = startIso.split('-');
@@ -1188,8 +1188,7 @@ export class StreamsPage {
 
     /**
      * Get full text search option from dropdown.
-     * StreamFieldInputs uses OSelect post-migration (Reka Listbox role=option);
-     * legacy q-select uses .q-item.
+     * StreamFieldInputs uses OSelect post-migration (Reka Listbox role=option).
      */
     getFullTextSearchOption() {
         return this.page.locator('[data-test$="-index-type-select-option"][data-test-value="fullTextSearchKey"]').first();

@@ -725,7 +725,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
 
     // Reopen settings and navigate to variables tab
     await pm.dashboardSetting.openSetting();
-    // Wait for the settings ODrawer to be visible (replaced legacy .q-dialog selector)
+    // Wait for the settings ODrawer to be visible (replaced the legacy dialog selector)
     await page.locator('[data-test="dashboard-settings-drawer"]').waitFor({ state: "visible", timeout: 5000 });
     await pm.dashboardSetting.openVariables();
     await page.locator('[data-test="dashboard-add-variable-btn"]').waitFor({ state: "visible", timeout: 10000 });

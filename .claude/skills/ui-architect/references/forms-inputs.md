@@ -41,7 +41,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Use when:** A single-line (or, via `type="textarea"`, multi-line) free-text field — text, password, email, number, url, tel, search — with optional prefix/suffix, icons, clear button, mask, debounce, and character counter.
 **Don't use for:** Choosing from a fixed option list (use `OSelect`); typeahead over a suggestion list where free text is also allowed (use `OCombobox`); a pure filter/search box in a toolbar (use `OSearchInput`, which wraps this with a search icon).
 **Key props:** `modelValue` (`string | number`), `type` (`"text"` default | `"password"` | `"email"` | `"number"` | `"search"` | `"url"` | `"tel"` | `"textarea"`), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (boolean — error styling only shows when `error` is true; a bare `errorMessage` alone will not surface), `prefix`, `suffix`, `clearable` (default `false`), `readonly` (default `false`), `disabled` (default `false`), `required` (renders `*` after label — do not append ` *` manually), `autofocus` (default `false`), `debounce` (ms; flushed on blur), `autogrow` (default `false`, textarea only), `mask` (`"time"` | `"fulltime"` | `"DD-MM-YYYY"` — digit-extracting), `maxlength` (shows counter), `rows` (default `3`, textarea), `size` (`"sm"` | `"md"` default), `width` (`"xs"` | `"sm"` | `"md"` | `"lg"` | `"full"` default), `labelPosition` (`"inside"` | `"outside"` default), `modelModifiers` (`{ number?, trim? }`), `id`, `name`, `autocomplete`.
-**Slots:** `icon-left`, `icon-right`, `prefix`, `suffix`, `tooltip` (put a `<q-tooltip>` inside — renders an info icon in the label). (`append` is also consumed in template.)
+**Slots:** `icon-left`, `icon-right`, `prefix`, `suffix`, `tooltip` (put a tooltip element inside — renders an info icon in the label). (`append` is also consumed in template.)
 **Emits:** `update:modelValue`, `clear`, `blur`, `focus`, `keydown`, `keyup`, `keypress`
 **Example:**
 ```vue
@@ -228,7 +228,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Checkbox/OCheckbox.vue`
 **Use when:** A single boolean (or tri-state `indeterminate`) checkbox, or a member of an `OCheckboxGroup` (set `value`/`val` and it reads the group's checked array). Supports custom `trueValue`/`falseValue`/`indeterminateValue`.
 **Don't use for:** A set of related checkboxes with a shared array model (wrap them in `OCheckboxGroup`, or use `OOptionGroup type="checkbox"` for a list-driven layout); an on/off toggle switch (use `OSwitch`).
-**Key props:** `modelValue` (`boolean | "indeterminate" | string | number | (string|number)[]`), `value` (member value in a group; excludes boolean by design), `val` (q-checkbox alias for `value`), `label`, `size` (`"xs"` | `"sm"` | `"md"` default), `trueValue`/`falseValue`/`indeterminateValue` (custom-value mode), `color` (`"primary"` default | `"negative"`), `disabled` (default `false`), `required`, `id`, `name`.
+**Key props:** `modelValue` (`boolean | "indeterminate" | string | number | (string|number)[]`), `value` (member value in a group; excludes boolean by design), `val` (compatibility alias for `value`), `label`, `size` (`"xs"` | `"sm"` | `"md"` default), `trueValue`/`falseValue`/`indeterminateValue` (custom-value mode), `color` (`"primary"` default | `"negative"`), `disabled` (default `false`), `required`, `id`, `name`.
 **Slots:** `label` (custom label content — overrides `label` prop)
 **Emits:** `update:modelValue`, `change` (emits the item value when inside a group)
 **Example:**
@@ -290,7 +290,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 **Import:** `@/lib/forms/Radio/ORadio.vue`
 **Use when:** A single radio button representing one `value` — **must** be used inside `ORadioGroup` (the group provides the RadioGroupRoot context and value map).
 **Don't use for:** Standalone use outside a group (it has no own model); a multi-select (use checkboxes); a compact options-array layout (use `OOptionGroup type="radio"`).
-**Key props:** `value` (`string | number | boolean` — this radio's value, compared against the group's `modelValue`), `val` (q-radio alias for `value`), `label`, `size` (`"xs"` | `"sm"` | `"md"` default), `disabled` (default `false`), `id`
+**Key props:** `value` (`string | number | boolean` — this radio's value, compared against the group's `modelValue`), `val` (compatibility alias for `value`), `label`, `size` (`"xs"` | `"sm"` | `"md"` default), `disabled` (default `false`), `id`
 **Slots:** `label` (custom label content)
 **Emits:** none (selection flows through the parent `ORadioGroup`)
 **Example:**
@@ -340,7 +340,7 @@ Because the wrapper is `Omit<..., "modelValue" | ...>`, you never pass `v-model`
 
 ### OSwitch
 **Import:** `@/lib/forms/Switch/OSwitch.vue`
-**Use when:** An on/off toggle (the O2 replacement for `q-toggle`) — instant enable/disable of a setting. Supports custom `checkedValue`/`uncheckedValue` and label placement.
+**Use when:** An on/off toggle — instant enable/disable of a setting. Supports custom `checkedValue`/`uncheckedValue` and label placement.
 **Don't use for:** A checkbox in a list/form validation context (use `OCheckbox`); choosing among 3+ options (use `ORadioGroup`/`OOptionGroup`).
 **Key props:** `modelValue` (`boolean | string | number`), `label`, `labelPosition` (`"left"` | `"right"` default), `size` (`"sm"` | `"md"` default | `"lg"` | `"xl"`), `checkedValue` (custom on-value — string/number only), `uncheckedValue` (custom off-value), `disabled` (default `false`), `required`, `id`, `name`
 **Slots:** `label` (custom label content — overrides prop), `tooltip` (info icon inline in label)

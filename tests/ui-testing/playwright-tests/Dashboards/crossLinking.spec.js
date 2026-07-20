@@ -777,7 +777,7 @@ test.describe("Cross-Linking testcases", () => {
         const urlText = await pm.crossLinkPage.getCrossLinkItemUrlText(0);
         expect(urlText).toContain('display.example.com');
 
-        // Verify field chips are rendered (CrossLinkManager shows OBadge for each field after q-chip → OBadge migration)
+        // Verify field chips are rendered (CrossLinkManager shows OBadge for each field after the chip → OBadge migration)
         const chipCount = await pm.crossLinkPage.getFieldChipsCount(0);
         expect(chipCount).toBe(2);
 

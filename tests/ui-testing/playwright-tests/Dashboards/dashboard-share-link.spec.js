@@ -334,7 +334,7 @@ test.describe("dashboard share URL button testcases", () => {
       .waitFor({ state: "hidden", timeout: 10000 })
       .catch(() => {});
 
-    // Click the variable dropdown (inner q-select element)
+    // Click the variable dropdown (inner select element)
     const variableDropdown = page.locator(
       getVariableSelectorInner(variableName)
     );
@@ -566,7 +566,7 @@ test.describe("dashboard share URL button testcases", () => {
       .waitFor({ state: "hidden", timeout: 10000 })
       .catch(() => {});
 
-    // Click the variable dropdown (inner q-select element)
+    // Click the variable dropdown (inner select element)
     const variableDropdown = page.locator(
       getVariableSelectorInner(variableName)
     );
