@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        v-for="(variable, index) in variables as any"
+        v-for="(variable, index) in variables"
         :key="variable.uuid"
         class="gap-2 pb-2 flex items-center"
         :data-test="`alert-variables-${index + 1}`"
@@ -193,6 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, inject, ref } from "vue";
+import type { PropType, Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -202,9 +203,17 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 
+interface VariableRow {
+  key: string;
+  value: string;
+  // Row identity used as the bare-mode v-for :key; callers may omit it.
+  uuid?: string;
+}
+
 const props = defineProps({
   variables: {
-    type: Array,
+    // Only key/value are read here; callers may carry an extra id/uuid row key.
+    type: Array as PropType<VariableRow[]>,
     required: false,
     default: () => [],
   },
@@ -245,13 +254,13 @@ const resolvePath = (obj: any, path: string): any =>
 
 // ⚠️ MUST be form.useStore (reactive) — NOT form.state.values (a snapshot a
 // computed won't track; playbook §2).
-const formRows = injectedForm
+const formRows: Ref<VariableRow[]> = injectedForm
   ? injectedForm.useStore((s: any) =>
       props.namePrefix ? (resolvePath(s.values, props.namePrefix) ?? []) : [],
     )
-  : ref<any[]>([]);
+  : ref<VariableRow[]>([]);
 
-const makeVariableRow = () => ({ key: "", value: "" });
+const makeVariableRow = (): VariableRow => ({ key: "", value: "" });
 
 const addFormRow = () =>
   injectedForm?.pushFieldValue(props.namePrefix, makeVariableRow());

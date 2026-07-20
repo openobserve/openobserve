@@ -142,7 +142,7 @@ const dashboardPanelDataPageKey = inject(
 );
 const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey);
 
-const availableLabels = computed(
+const availableLabels = computed<string[]>(
   () => props.dashboardPanelData?.meta?.promql?.availableLabels || [],
 );
 

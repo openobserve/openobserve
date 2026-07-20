@@ -102,8 +102,11 @@ import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // Define component props
+// `modelValue` is the owner form's `destination_type` field, which is a plain
+// string in the schema; accept `string` so the bound form value fits while the
+// emit side stays narrowed to real selections.
 interface Props {
-  modelValue?: PrebuiltTypeId | 'custom' | '' | null;
+  modelValue?: PrebuiltTypeId | 'custom' | '' | null | string;
 }
 
 const props = withDefaults(defineProps<Props>(), {

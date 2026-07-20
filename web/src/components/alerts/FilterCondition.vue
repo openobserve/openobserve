@@ -88,7 +88,7 @@
         <template v-else>
           <div class="ml-0">
             <OSelect
-              v-model="condition.column"
+              v-model="conditionModel.column"
               :options="filteredFields"
               :dropdownStyle="{ textTransform: 'lowercase' }"
               searchable
@@ -110,7 +110,7 @@
           </div>
           <div class="ml-0">
             <OSelect
-              v-model="condition.operator"
+              v-model="conditionModel.operator"
               :options="triggerOperators"
               :dropdownStyle="{ textTransform: 'capitalize' }"
               :class="[inputWidth ? inputWidth : (store.state.isAiChatEnabled ? 'w-[70px]' : computedInputWidth)]"
@@ -125,7 +125,7 @@
           </div>
           <div class="ml-0">
             <OInput
-              v-model="condition.value"
+              v-model="conditionModel.value"
               :placeholder="t('common.value')"
               :error="!!valueError"
               :error-message="valueError"
@@ -160,7 +160,9 @@
         required: true,
     },
     index: {
-        type: Number,
+        // Accepts string|number: the parent's v-for over an Object-typed group
+        // prop yields a `string | number` index (only ever === 0 is checked).
+        type: [Number, String],
         default: 0,
         required: true,
     },
@@ -246,6 +248,12 @@ const { t } = useI18n();
 const form = inject(FORM_CONTEXT_KEY, null);
 const formMode = computed(() => !!(props.namePrefix && form));
 
+// Alias to the SAME condition object the parent passed (bound one-way as
+// :condition="item"). Mutating conditionModel.value.* keeps that reference, so
+// in-place writes propagate exactly as before — satisfies vue/no-mutating-props
+// without a v-model/emit contract change (parent has no v-model:condition).
+const conditionModel = computed(() => props.condition);
+
 // Inline error state — BARE MODE ONLY. In form mode the schema owns validation
 // and the OForm* wrappers surface errors (R3).
 const columnError = ref('');
@@ -307,7 +315,7 @@ const toggleOperator = () => {
   if (formMode.value && form) {
     form.setFieldValue(`${props.namePrefix}.logicalOperator`, next);
   } else {
-    props.condition.logicalOperator = next;
+    conditionModel.value.logicalOperator = next;
   }
   emits('input:update', 'conditions', props.condition);
 };

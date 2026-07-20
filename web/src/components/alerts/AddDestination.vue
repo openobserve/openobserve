@@ -569,7 +569,7 @@ import {
 const props = defineProps({
   templates: {
     type: Array as PropType<Template[]>,
-    default: [],
+    default: () => [],
   },
   destination: {
     type: Object as PropType<DestinationPayload | null>,
@@ -592,16 +592,16 @@ const { track } = useReo();
 // (card grid + tabs) bridge in via setFieldValue. There is ONE form for custom,
 // pipeline AND prebuilt destinations (credentials are form-owned `credentials.*`
 // fields now, not a nested child form) — `saveDestination` dispatches by type.
-const form = useOForm({
+const form = useOForm<AddDestinationForm>({
   defaultValues: addDestinationDefaults(),
   schema: makeAddDestinationSchema(t, props.isAlerts),
-  onSubmit: (value) => saveDestination(value as AddDestinationForm),
+  onSubmit: (value: AddDestinationForm) => saveDestination(value),
 });
 
 // Single submit entry-point. Prebuilt types save via handlePrebuiltSave (which
 // reads the form-owned `credentials.*`); custom/pipeline via saveCustomDestination.
 // Returned so OForm awaits the real save → the footer Save spinner spans it.
-function saveDestination(value: AddDestinationForm) {
+function saveDestination(value: AddDestinationForm): Promise<void> {
   return isPrebuiltDestination.value
     ? handlePrebuiltSave(value)
     : saveCustomDestination(value);
@@ -851,7 +851,7 @@ const setupDestinationData = () => {
     // field meta — a setFieldValue loop leaves every prefilled field marked
     // dirty/touched with stale errors, and this runs again on every onActivated.
     // Start from the defaults so every key is present, then overlay the record.
-    const record: Record<string, any> = {
+    const record: AddDestinationForm = {
       ...addDestinationDefaults(),
       destination_type: destType,
       name: props.destination.name,
@@ -908,7 +908,7 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
 
   // Step 1: Parse metadata and remove the credential_ prefix. `metadata` is not
   // on the DestinationPayload type but is present on saved records at runtime.
-  const rawMetadata = (props.destination as any).metadata;
+  const rawMetadata = props.destination.metadata;
   if (rawMetadata) {
     try {
       const metadata =
@@ -983,12 +983,13 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
 
 const getFormattedTemplates = computed(() =>
   props.templates
-    .filter((template: any) => {
+    .filter((template) => {
       if (typeVal.value === "email" && template.type === "email")
         return true;
       else if (typeVal.value !== "email") return true;
+      return false;
     })
-    .map((template: any) => template.name),
+    .map((template) => template.name),
 );
 
 // The prebuilt template for this destination type, sourced from the API
@@ -998,7 +999,7 @@ const templateNameFor = (type: string): string => {
   if (!type || type === "custom") return "";
   const expectedName = `prebuilt_${type}`;
   const fromApi = props.templates.find(
-    (t: any) => t.isPrebuilt && t.name === expectedName,
+    (tpl) => tpl.isPrebuilt && tpl.name === expectedName,
   );
   return fromApi?.name ?? expectedName;
 };
@@ -1011,7 +1012,7 @@ const defaultPrebuiltTemplateName = computed(() => templateNameFor(dtVal.value))
 // Other prebuilt types are excluded to prevent cross-type mismatches.
 const prebuiltTemplateOptions = computed(() => {
   const isEmailType = dtVal.value === "email";
-  const matching = props.templates.filter((template: any) => {
+  const matching = props.templates.filter((template) => {
     if (template.isPrebuilt) return false;
     if (isEmailType) return template.type === "email";
     return template.type !== "email";
@@ -1026,7 +1027,7 @@ const prebuiltTemplateOptions = computed(() => {
     options.push({ label: defaultLabel, value: defaultPrebuiltTemplateName.value });
   }
 
-  matching.forEach((template: any) => {
+  matching.forEach((template) => {
     options.push({ label: template.name, value: template.name });
   });
 
@@ -1121,9 +1122,8 @@ const showPreview = async () => {
 // schema passes (the schema now validates the credentials too, so this fires only
 // on valid input). name/template/apiHeaders/skip_tls_verify AND `credentials` all
 // come from the single validated `value`. Mirrors the old save() prebuilt branch.
-async function handlePrebuiltSave(value: AddDestinationForm) {
+async function handlePrebuiltSave(value: AddDestinationForm): Promise<void> {
   try {
-    const vals = value as any;
     // Scope credentials to the ACTIVE type's fields (dropping any keys left over
     // from a previous type selection) and coerce them exactly as the schema does
     // — identical to what the pre-migration child credential form emitted.
@@ -1133,31 +1133,31 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
     );
     // Build custom headers object from the api-headers array-field
     const customHeaders: Headers = {};
-    (vals.apiHeaders || []).forEach((header: any) => {
+    (value.apiHeaders || []).forEach((header) => {
       if (header.key && header.value) customHeaders[header.key] = header.value;
     });
 
-    const templateOverride = (vals.template || "").trim() || undefined;
+    const templateOverride = (value.template || "").trim() || undefined;
 
     if (isUpdatingDestination.value) {
       // Update existing prebuilt destination
       await updateDestination(
-        vals.destination_type,
-        props.destination!.name, // original name
-        vals.name, // potentially new name
+        value.destination_type,
+        props.destination?.name ?? "", // original name
+        value.name, // potentially new name
         credentials,
         customHeaders, // custom headers
-        vals.skip_tls_verify || false, // skipTlsVerify
+        value.skip_tls_verify || false, // skipTlsVerify
         templateOverride,
       );
     } else {
       // Create new prebuilt destination
       await createDestination(
-        vals.destination_type,
-        vals.name,
+        value.destination_type,
+        value.name,
         credentials,
         customHeaders, // custom headers
-        vals.skip_tls_verify || false, // skipTlsVerify
+        value.skip_tls_verify || false, // skipTlsVerify
         templateOverride,
       );
     }
@@ -1175,7 +1175,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
 // is the validated payload source of truth; the payload is built with explicit
 // keys so no schema-only field (e.g. `credentials`) leaks into the request.
 // Mirrors the old save() custom branch exactly.
-function saveCustomDestination(value: AddDestinationForm) {
+function saveCustomDestination(value: AddDestinationForm): Promise<void> {
   const dismiss = toast({
     variant: "loading",
     message: t("common.pleaseWait"),
@@ -1186,7 +1186,7 @@ function saveCustomDestination(value: AddDestinationForm) {
     if (header.key && header.value) headers[header.key] = header.value;
   });
 
-  const payload: any = {
+  const payload: Partial<DestinationPayload> = {
     url: value.url,
     method: value.method,
     skip_tls_verify: value.skip_tls_verify,

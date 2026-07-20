@@ -576,6 +576,7 @@ import {
   ref,
   watch,
 } from "vue";
+import type { AcceptableValue } from "reka-ui";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -591,7 +592,6 @@ import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -660,7 +660,6 @@ export default defineComponent({
     OSearchInput,
     OSpinner,
     OEmptyState,
-    OTag,
     OTooltip,
     OToggleGroup,
     OToggleGroupItem,
@@ -779,7 +778,7 @@ export default defineComponent({
     const isGridMode = computed(
       () => mode.value === "explore" || mode.value === "workspace",
     );
-    const setMode = (v: string | number | undefined) => {
+    const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
       if (v !== "explore" && v !== "visualize" && v !== "workspace") return;
       // Pause BEFORE the mode flips, synchronously. The watcher below also keeps
       // `paused` in sync, but it runs after the DOM has begun tearing the grid
@@ -901,7 +900,7 @@ export default defineComponent({
     // shows; it never collapses to nothing. OToggleGroup emits `undefined` on a
     // re-click (it models a deselect); we IGNORE that so the active facet stays
     // put and the panel never blanks. Default is prefix (grid composable).
-    const selectRail = (id: string | number | undefined) => {
+    const selectRail = (id: boolean | AcceptableValue | AcceptableValue[]) => {
       if (!id) return;
       grid.activeRail.value = id as "prefix" | "suffix" | "type";
     };

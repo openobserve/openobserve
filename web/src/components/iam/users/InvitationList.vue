@@ -165,6 +165,19 @@ import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
+// Pending invitation row shape returned by GET /api/invites, enriched locally
+// with the row index (`#`) and a formatted `expiry` label.
+interface PendingInvitation {
+  "#": string | number;
+  token: string;
+  org_id: string;
+  org_name: string;
+  role: string;
+  inviter_id: string;
+  expires_at: number;
+  expiry: string;
+}
+
 export default defineComponent({
   name: "InvitationList",
   components: {
@@ -189,11 +202,11 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const invitations = ref([]);
+    const invitations = ref<PendingInvitation[]>([]);
     const filterQuery = ref("");
     const confirmAccept = ref(false);
     const confirmReject = ref(false);
-    const selectedInvitation = ref(null);
+    const selectedInvitation = ref<PendingInvitation | null>(null);
 
     const columns: OTableColumnDef[] = [
       {
@@ -284,10 +297,11 @@ export default defineComponent({
         resultTotal.value = response.data.data.length;
         dismiss();
       } catch (error) {
+        const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
           message:
-            error.response?.data?.message ||
+            e.response?.data?.message ||
             t("iam.invitationList.failedLoadPending"),
           variant: "error",
         });
@@ -328,7 +342,8 @@ export default defineComponent({
     };
 
     const confirmAcceptInvitation = async () => {
-      if (!selectedInvitation.value) return;
+      const selected = selectedInvitation.value;
+      if (!selected) return;
       confirmAccept.value = false;
 
       const dismiss = toast({
@@ -339,9 +354,9 @@ export default defineComponent({
 
       try {
         await organizationsService.process_subscription(
-          selectedInvitation.value.token,
+          selected.token,
           "confirm",
-          selectedInvitation.value.org_id,
+          selected.org_id,
         );
 
         // Refresh the organizations list in the store
@@ -356,8 +371,8 @@ export default defineComponent({
 
         // Set the selected organization and redirect
         const orgData = {
-          identifier: selectedInvitation.value.org_id,
-          name: selectedInvitation.value.org_name,
+          identifier: selected.org_id,
+          name: selected.org_name,
         };
 
         store.dispatch("setSelectedOrganization", orgData);
@@ -366,17 +381,19 @@ export default defineComponent({
           organization: orgData,
         });
       } catch (error) {
+        const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
           message:
-            error.response?.data?.message || t("iam.invitationList.failedAccept"),
+            e.response?.data?.message || t("iam.invitationList.failedAccept"),
           variant: "error",
         });
       }
     };
 
     const confirmRejectInvitation = async () => {
-      if (!selectedInvitation.value) return;
+      const selected = selectedInvitation.value;
+      if (!selected) return;
       confirmReject.value = false;
 
       const dismiss = toast({
@@ -387,7 +404,7 @@ export default defineComponent({
 
       try {
         await organizationsService.decline_subscription(
-          selectedInvitation.value.token,
+          selected.token,
         );
         dismiss();
         toast({
@@ -397,7 +414,7 @@ export default defineComponent({
 
         // Remove from list
         invitations.value = invitations.value.filter(
-          (inv: any) => inv.token !== selectedInvitation.value.token,
+          (inv) => inv.token !== selected.token,
         );
 
         // If no more invitations, emit to parent
@@ -405,10 +422,11 @@ export default defineComponent({
           emit("invitations-processed", { accepted: false, hasMore: false });
         }
       } catch (error) {
+        const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
           message:
-            error.response?.data?.message || t("iam.invitationList.failedReject"),
+            e.response?.data?.message || t("iam.invitationList.failedReject"),
           variant: "error",
         });
       }

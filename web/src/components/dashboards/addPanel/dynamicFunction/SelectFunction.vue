@@ -15,7 +15,7 @@
       <!-- Loop through the args for the first n-1 arguments -->
       <div class="w-full">
         <div
-          v-for="(arg, argIndex) in fields.args"
+          v-for="(arg, argIndex) in argRows"
           :key="argIndex + '-' + arg.type"
           class="w-full flex flex-col"
         >
@@ -207,6 +207,11 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+    interface FunctionArg {
+      type: string;
+      value: unknown;
+    }
+
     const { t } = useI18n();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -217,6 +222,10 @@ export default {
     );
 
     const fields = ref(addMissingArgs(props.modelValue));
+
+    // Typed view of the args used only for template iteration, so the v-for
+    // index resolves to `number` (v-model still writes through `fields`).
+    const argRows = computed<FunctionArg[]>(() => fields.value.args ?? []);
 
     watch(
       () => fields.value,
@@ -500,6 +509,8 @@ export default {
           return "123";
         case "histogramInterval":
           return "bar-chart";
+        default:
+          return undefined;
       }
     };
 
@@ -530,6 +541,7 @@ export default {
     return {
       t,
       fields,
+      argRows,
       // availableFunctions,
       getValidationForFunction,
       canAddArgument,

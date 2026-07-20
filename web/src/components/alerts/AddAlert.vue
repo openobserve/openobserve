@@ -477,7 +477,6 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -531,7 +530,6 @@ export default defineComponent({
     ODrawer,
     OTag,
     OTooltip,
-    OInput,
     OForm,
     OFormInput,
     OFormSelect,

@@ -63,6 +63,13 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
+interface AdHocVariable {
+  name: string;
+  operator: string;
+  value: string;
+  streams: string[];
+}
+
 export default defineComponent({
   name: "VariableAdHocValueSelector",
   props: ["modelValue", "variableItem"],
@@ -77,7 +84,9 @@ export default defineComponent({
       { label: "!=", value: "!=" },
     ];
     const options = toRef(props.variableItem, "options");
-    const { modelValue: adhocVariables } = toRefs(props);
+    const { modelValue: adhocVariables } = toRefs(props) as {
+      modelValue: Ref<AdHocVariable[]>;
+    };
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useSelectAutoComplete(options, "name");
 
@@ -123,6 +132,7 @@ export default defineComponent({
       adhocVariables,
       removeField,
       updateModelValueOfSelect,
+      emitValue,
       store,
       t,
     };

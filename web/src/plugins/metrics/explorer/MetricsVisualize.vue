@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       page-type="metrics"
       :edit-mode="true"
       :dashboard-data="{}"
-      :variables-data="{}"
+      :variables-data="emptyVariablesData"
       :selected-date-time="dashboardPanelData.meta.dateTime"
       :allowed-chart-types="allowedChartTypes"
       @add-to-dashboard="onAddToDashboard"
@@ -65,6 +65,7 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useNotifications from "@/composables/useNotifications";
 import { restoreMetricsStream } from "@/utils/streamPersist";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
+import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import AddToDashboard from "../AddToDashboard.vue";
 
 export default defineComponent({
@@ -106,6 +107,12 @@ export default defineComponent({
 
     const panelEditorRef = ref<any>(null);
     const showAddToDashboardDialog = ref(false);
+
+    // Visualize has no dashboard variables; PanelEditor still requires the shape.
+    const emptyVariablesData: PanelEditorVariablesData = {
+      isVariablesLoading: false,
+      values: [],
+    };
 
     // A metrics-appropriate subset — the chart types that make sense for a
     // PromQL time series. Mirrors the logs visualize constraint.
@@ -257,6 +264,7 @@ export default defineComponent({
     return {
       panelEditorRef,
       dashboardPanelData,
+      emptyVariablesData,
       showAddToDashboardDialog,
       allowedChartTypes,
       onAddToDashboard,
