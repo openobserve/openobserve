@@ -566,14 +566,16 @@ pub async fn queue_download(
     Ok(())
 }
 
-/// Returns true when a file contains enough records to be worth downloading
-/// into the cache.
+/// Returns true when the record count is unknown or the file contains enough
+/// records to be worth downloading into the cache.
 pub fn should_download(records: i64) -> bool {
-    has_minimum_records(records, get_config().limit.file_download_min_records)
+    should_download_with_min_records(records, get_config().limit.file_download_min_records)
 }
 
-fn has_minimum_records(records: i64, min_records: i64) -> bool {
-    records >= min_records
+fn should_download_with_min_records(records: i64, min_records: i64) -> bool {
+    // A zero value can mean the record count was not populated by an older
+    // gRPC sender. Treat it as unknown rather than as an undersized file.
+    records == 0 || records >= min_records
 }
 
 // if the file timestamp is in the past window, it should be prioritized
@@ -609,16 +611,17 @@ mod tests {
     use config::utils::time::{day_micros, hour_micros, now_micros};
 
     use super::{
-        FileInfo, PriorityDownloadQueue, exceeds_max_age, file_data, has_minimum_records,
-        processing_files, queued_files,
+        FileInfo, PriorityDownloadQueue, exceeds_max_age, file_data, processing_files,
+        queued_files, should_download_with_min_records,
     };
 
     #[test]
-    fn test_has_minimum_records() {
-        assert!(!has_minimum_records(99, 100));
-        assert!(has_minimum_records(100, 100));
-        assert!(has_minimum_records(101, 100));
-        assert!(has_minimum_records(0, 0));
+    fn test_should_download_with_min_records() {
+        assert!(should_download_with_min_records(0, 100));
+        assert!(!should_download_with_min_records(99, 100));
+        assert!(should_download_with_min_records(100, 100));
+        assert!(should_download_with_min_records(101, 100));
+        assert!(should_download_with_min_records(0, 0));
     }
 
     #[test]
