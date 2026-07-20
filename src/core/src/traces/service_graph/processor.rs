@@ -639,7 +639,14 @@ async fn run_graph_search(
     };
 
     let trace_id = config::ider::generate();
-    let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
+    let resp = openobserve_search_service::service::search(
+        &trace_id,
+        org_id,
+        StreamType::Traces,
+        None,
+        &req,
+    )
+    .await?;
     Ok(resp.hits)
 }
 

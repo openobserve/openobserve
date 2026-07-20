@@ -4,20 +4,16 @@
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
 use std::sync::Arc;
 
-pub use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
+use ::search::{
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    sql::Sql,
+};
 use chrono::Utc;
+use common::utils::functions::{get_all_transform_keys, init_vrl_runtime};
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -35,18 +31,8 @@ use config::{
 use infra::errors::Error;
 #[cfg(feature = "enterprise")]
 use infra::errors::ErrorCodes;
-#[cfg(feature = "enterprise")]
-use openobserve_search_service::SEARCH_SERVER;
-use openobserve_search_service::partition::{
-    calculate_partition_settings_for_context, cpu_cores::estimated_secs,
-    generate_partitions_for_context, sql_context::PartitionSqlContext,
-    stream_files::collect_stream_files,
-};
-#[cfg(feature = "enterprise")]
-use openobserve_search_service::query_utils::server_internal_error;
 use opentelemetry::trace::TraceContextExt;
 use proto::cluster_rpc::SearchQuery;
-use sql::Sql;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
@@ -61,275 +47,15 @@ use {
     tracing::info_span,
 };
 
-use super::self_reporting::report_request_usage_stats;
-use crate::{
-    common::utils::functions::{get_all_transform_keys, init_vrl_runtime},
-    service::search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+#[cfg(feature = "enterprise")]
+use crate::SEARCH_SERVER;
+use crate::partition::{
+    calculate_partition_settings_for_context, cpu_cores::estimated_secs,
+    generate_partitions_for_context, sql_context::PartitionSqlContext,
+    stream_files::collect_stream_files,
 };
-
-/// Core's composition adapter for cache-owned search orchestration.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct CoreSearchRuntime;
-
-#[async_trait::async_trait]
-impl openobserve_search_service::cache::CacheRuntime for CoreSearchRuntime {
-    async fn execute_search(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        stream_type: StreamType,
-        user_id: Option<String>,
-        req: &search::Request,
-    ) -> Result<search::Response, Error> {
-        crate::search::search(trace_id, org_id, stream_type, user_id, req).await
-    }
-
-    fn report_search_metrics(
-        &self,
-        start: std::time::Instant,
-        org_id: &str,
-        stream_type: StreamType,
-        search_type: &str,
-        search_group: &str,
-    ) {
-        crate::self_reporting::http_report_metrics(
-            start,
-            org_id,
-            stream_type,
-            "200",
-            "_search",
-            search_type,
-            search_group,
-        );
-    }
-
-    async fn report_search_usage(
-        &self,
-        stats: RequestStats,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        num_functions: u16,
-        timestamp: i64,
-    ) {
-        crate::self_reporting::report_request_usage_stats(
-            stats,
-            org_id,
-            stream_name,
-            stream_type,
-            UsageType::Search,
-            num_functions,
-            timestamp,
-        )
-        .await;
-    }
-}
-
-#[async_trait::async_trait]
-impl openobserve_search_service::streaming::StreamingRuntime for CoreSearchRuntime {
-    async fn max_query_range(
-        &self,
-        stream_names: &[String],
-        org_id: &str,
-        user_id: &str,
-        stream_type: StreamType,
-    ) -> i64 {
-        crate::stream_utils::get_max_query_range(stream_names, org_id, user_id, stream_type).await
-    }
-
-    async fn search_partition(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        user_id: Option<&str>,
-        stream_type: StreamType,
-        req: &search::SearchPartitionRequest,
-        skip_max_query_range: bool,
-        use_cache: bool,
-    ) -> Result<search::SearchPartitionResponse, Error> {
-        crate::search::search_partition(
-            trace_id,
-            org_id,
-            user_id,
-            stream_type,
-            req,
-            skip_max_query_range,
-            use_cache,
-        )
-        .await
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn search_error_status(&self, error: &Error) -> u16 {
-        crate::http::map_error_to_http_response(error, None)
-            .status()
-            .as_u16()
-    }
-
-    #[cfg(feature = "enterprise")]
-    async fn audit(&self, message: o2_enterprise::enterprise::common::auditor::AuditMessage) {
-        crate::self_reporting::audit(message).await;
-    }
-}
-
-#[async_trait::async_trait]
-impl openobserve_search_service::partition::PartitionRuntime for CoreSearchRuntime {
-    async fn query_file_ids(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-        time_range: (i64, i64),
-    ) -> Result<Vec<infra::file_list::FileId>, Error> {
-        crate::file_list::query_ids(trace_id, org_id, stream_type, stream_name, time_range).await
-    }
-
-    async fn settings_max_query_range(
-        &self,
-        stream_max_query_range: i64,
-        org_id: &str,
-        user_id: Option<&str>,
-    ) -> i64 {
-        crate::stream_utils::get_settings_max_query_range(stream_max_query_range, org_id, user_id)
-            .await
-    }
-}
-
-#[async_trait::async_trait]
-impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
-    async fn enrichment_table_start_time(&self, org_id: &str, stream_name: &str) -> i64 {
-        crate::db::enrichment_table::get_start_time(org_id, stream_name).await
-    }
-
-    async fn query_file_ids(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-        time_range: (i64, i64),
-    ) -> Result<Vec<infra::file_list::FileId>, Error> {
-        crate::file_list::query_ids(trace_id, org_id, stream_type, stream_name, time_range).await
-    }
-
-    async fn query_file_keys_by_ids(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-        time_range: Option<(i64, i64)>,
-        ids: &[i64],
-    ) -> Result<Vec<config::meta::stream::FileKey>, Error> {
-        crate::file_list::query_by_ids(trace_id, org_id, stream_type, stream_name, time_range, ids)
-            .await
-    }
-
-    async fn calculate_files_size(
-        &self,
-        files: &[config::meta::stream::FileKey],
-    ) -> Result<search::ScanStats, Error> {
-        crate::file_list::calculate_files_size(files).await
-    }
-
-    async fn tantivy_index_updated_at(&self) -> i64 {
-        crate::db::metas::tantivy_index::get_ttv_timestamp_updated_at().await
-    }
-
-    async fn tantivy_secondary_index_updated_at(&self) -> i64 {
-        crate::db::metas::tantivy_index::get_ttv_secondary_index_updated_at().await
-    }
-
-    async fn cached_search(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        stream_type: StreamType,
-        user_id: Option<String>,
-        req: &search::Request,
-    ) -> Result<search::Response, Error> {
-        openobserve_search_service::cache::search(
-            *self,
-            trace_id,
-            org_id,
-            stream_type,
-            user_id,
-            req,
-            String::new(),
-            false,
-            None,
-            false,
-        )
-        .await
-    }
-
-    async fn search_multi(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        stream_type: StreamType,
-        user_id: Option<String>,
-        req: &search::MultiStreamRequest,
-    ) -> Result<search::Response, Error> {
-        crate::search::search_multi(trace_id, org_id, stream_type, user_id, req).await
-    }
-
-    async fn search_partition(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        user_id: Option<&str>,
-        stream_type: StreamType,
-        req: &search::SearchPartitionRequest,
-        skip_max_query_range: bool,
-        use_cache: bool,
-    ) -> Result<search::SearchPartitionResponse, Error> {
-        crate::search::search_partition(
-            trace_id,
-            org_id,
-            user_id,
-            stream_type,
-            req,
-            skip_max_query_range,
-            use_cache,
-        )
-        .await
-    }
-
-    async fn cancel_query(
-        &self,
-        _org_id: &str,
-        trace_id: &str,
-    ) -> Result<search::CancelQueryResponse, Error> {
-        #[cfg(feature = "enterprise")]
-        return crate::search::cancel_query(_org_id, trace_id).await;
-
-        #[cfg(not(feature = "enterprise"))]
-        Ok(search::CancelQueryResponse {
-            trace_id: trace_id.to_string(),
-            is_success: false,
-        })
-    }
-
-    #[cfg(feature = "enterprise")]
-    async fn enrich_query_status(&self, status: &mut [proto::cluster_rpc::QueryStatus]) {
-        for query_status in status {
-            if let Some(ref mut ctx) = query_status.search_event_context
-                && matches!(query_status.search_type.as_deref(), Some("dashboards"))
-                && let Some(dashboard_id) = &ctx.dashboard_id
-                && ctx.dashboard_name.is_none()
-                && let Some(org_id) = &query_status.org_id
-                && let Ok((folder, dashboard)) =
-                    crate::dashboards::get_folder_and_dashboard(org_id, dashboard_id).await
-            {
-                ctx.dashboard_name = Some(dashboard.title().unwrap_or("").to_string());
-                ctx.dashboard_folder_name = Some(folder.name);
-                ctx.dashboard_folder_id = Some(folder.folder_id);
-            }
-        }
-    }
-}
+#[cfg(feature = "enterprise")]
+use crate::query_utils::server_internal_error;
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -440,14 +166,7 @@ pub async fn search(
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
         async move {
-            openobserve_search_service::cluster::http::search(
-                request,
-                query,
-                req_regions,
-                req_clusters,
-                true,
-            )
-            .await
+            crate::cluster::http::search(request, query, req_regions, req_clusters, true).await
         }
         .instrument(span),
     );
@@ -486,8 +205,7 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             if in_req.query.streaming_output && meta.order_by.is_empty() {
-                res =
-                    openobserve_search_service::streaming::sorting::order_search_results(res, None);
+                res = crate::streaming::sorting::order_search_results(res, None);
             }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
@@ -551,16 +269,18 @@ pub async fn search(
                     ..Default::default()
                 };
                 let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
-                report_request_usage_stats(
-                    req_stats,
-                    org_id,
-                    &stream_name,
-                    stream_type,
-                    UsageType::Search,
-                    num_fn,
-                    started_at,
-                )
-                .await;
+                crate::grpc_runtime()
+                    .map_err(|err| Error::Message(err.to_string()))?
+                    .report_search_usage(
+                        req_stats,
+                        org_id,
+                        &stream_name,
+                        stream_type,
+                        UsageType::Search,
+                        num_fn,
+                        started_at,
+                    )
+                    .await;
             }
             Ok(res)
         }
@@ -830,16 +550,18 @@ pub async fn search_multi(
             search_event_context: multi_req.search_event_context.clone(),
             ..Default::default()
         };
-        report_request_usage_stats(
-            req_stats,
-            org_id,
-            &stream_names.join(","),
-            stream_type,
-            UsageType::Functions,
-            0, // The request stats already contains function event
-            started_at,
-        )
-        .await;
+        crate::grpc_runtime()
+            .map_err(|err| Error::Message(err.to_string()))?
+            .report_search_usage(
+                req_stats,
+                org_id,
+                &stream_names.join(","),
+                stream_type,
+                UsageType::Functions,
+                0, // The request stats already contains function event
+                started_at,
+            )
+            .await;
     }
     Ok(multi_res)
 }
@@ -861,7 +583,8 @@ pub async fn search_partition(
 
     let ctx = PartitionSqlContext::new(req, org_id, stream_type).await?;
 
-    let stream_files = collect_stream_files(&CoreSearchRuntime, trace_id, user_id, &ctx).await?;
+    let runtime = crate::grpc_runtime().map_err(|err| Error::Message(err.to_string()))?;
+    let stream_files = collect_stream_files(runtime.as_ref(), trace_id, user_id, &ctx).await?;
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
@@ -914,8 +637,8 @@ pub async fn search_partition(
     #[cfg(feature = "enterprise")]
     {
         let (streaming_aggs, streaming_id, cache_strategy) =
-            openobserve_search_service::partition::aggregate::prepare_streaming_aggregate(
-                &CoreSearchRuntime,
+            crate::partition::aggregate::prepare_streaming_aggregate(
+                runtime.as_ref(),
                 trace_id,
                 req,
                 &ctx,

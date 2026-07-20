@@ -34,7 +34,7 @@ use hashbrown::HashMap;
 use openobserve_core::ingestion::check_ingestion_allowed;
 // Re-export service graph API handlers
 pub use openobserve_core::traces::service_graph::{self, get_current_topology, get_edge_history};
-use openobserve_search_service::streaming::sorting::TopKHeap;
+use openobserve_search_service::{service as SearchService, streaming::sorting::TopKHeap};
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
@@ -49,7 +49,7 @@ use crate::{
     },
     extractors::Headers,
     search::error_utils::map_error_to_http_response,
-    service::{search as SearchService, traces},
+    service::traces,
 };
 
 pub mod dag;
@@ -210,7 +210,8 @@ pub async fn get_latest_traces(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        if let Err(e) =
+            openobserve_search_service::service::check_search_allowed(&org_id, Some(&stream_name))
         {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
@@ -930,7 +931,8 @@ pub async fn get_latest_traces_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        if let Err(e) =
+            openobserve_search_service::service::check_search_allowed(&org_id, Some(&stream_name))
         {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }

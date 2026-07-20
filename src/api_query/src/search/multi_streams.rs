@@ -38,7 +38,9 @@ use hashbrown::HashMap;
 use infra::errors;
 #[cfg(feature = "enterprise")]
 use openobserve_core::search::sql::visitor::cipher_key::get_cipher_key_names;
-use openobserve_search_service::streaming::process_search_stream_request_multi;
+use openobserve_search_service::{
+    service as SearchService, streaming::process_search_stream_request_multi,
+};
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 #[cfg(feature = "cloud")]
@@ -66,7 +68,7 @@ use crate::{
     },
     extractors::Headers,
     search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
-    service::{search as SearchService, self_reporting::report_request_usage_stats},
+    service::self_reporting::report_request_usage_stats,
 };
 
 /// SearchStreamData

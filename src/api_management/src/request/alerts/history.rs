@@ -27,6 +27,7 @@ use config::{
     utils::time::now_micros,
 };
 use openobserve_alerts::service::alert::get_by_id;
+use openobserve_search_service::service as SearchService;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use tracing::{Instrument, Span};
@@ -40,7 +41,6 @@ use crate::{
         },
     },
     extractors::Headers,
-    service::search::{self as SearchService},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

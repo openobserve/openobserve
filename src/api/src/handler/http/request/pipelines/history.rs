@@ -29,6 +29,7 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
+use openobserve_search_service::service as SearchService;
 use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
@@ -43,10 +44,7 @@ use crate::{
         },
     },
     handler::http::{extractors::Headers, request::alerts::history::escape_like},
-    service::{
-        pipeline::list_user_pipelines,
-        search::{self as SearchService},
-    },
+    service::pipeline::list_user_pipelines,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

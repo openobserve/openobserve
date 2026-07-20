@@ -246,7 +246,9 @@ pub async fn search_http2_stream(
     };
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
-        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(stream)) {
+        if let Err(e) =
+            openobserve_search_service::service::check_search_allowed(&org_id, Some(stream))
+        {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 axum::Json(MetaHttpResponse::error(
@@ -787,9 +789,10 @@ pub async fn values_http2_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) =
-            openobserve_core::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
-        {
+        if let Err(e) = openobserve_search_service::service::check_search_allowed(
+            &org_id,
+            Some(&values_req.stream_name),
+        ) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 axum::Json(MetaHttpResponse::error(

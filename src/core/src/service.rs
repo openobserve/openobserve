@@ -28,7 +28,7 @@ pub use crate::{
 };
 pub use crate::{
     dashboards, db, enrichment, folders, http, ingestion, ingestion_tokens, logs, metadata,
-    metrics, organization, schema, search, self_reporting, stream, traces, users,
+    metrics, organization, schema, self_reporting, stream, traces, users,
 };
 #[cfg(feature = "cloud")]
 pub use crate::{org_usage, trial_quota};

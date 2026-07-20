@@ -101,7 +101,8 @@ pub async fn get_latest_sessions(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        if let Err(e) =
+            openobserve_search_service::service::check_search_allowed(&org_id, Some(&stream_name))
         {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
@@ -669,7 +670,8 @@ pub async fn get_session_details(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        if let Err(e) =
+            openobserve_search_service::service::check_search_allowed(&org_id, Some(&stream_name))
         {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }

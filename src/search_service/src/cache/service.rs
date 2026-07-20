@@ -32,7 +32,7 @@ use config::{
         dashboards::usage_report::DashboardInfo,
         function::RESULT_ARRAY_SKIP_VRL,
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, ResponseTook},
-        self_reporting::usage::RequestStats,
+        self_reporting::usage::{RequestStats, UsageType},
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
     },
@@ -92,6 +92,7 @@ pub trait CacheRuntime: Send + Sync {
         org_id: &str,
         stream_name: &str,
         stream_type: StreamType,
+        usage_type: UsageType,
         num_functions: u16,
         timestamp: i64,
     );
@@ -410,6 +411,7 @@ where
             org_id,
             &all_streams,
             stream_type,
+            UsageType::Search,
             num_fn,
             started_at,
         )

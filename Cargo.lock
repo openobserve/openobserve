@@ -6731,6 +6731,7 @@ dependencies = [
  "openobserve-dashboards",
  "openobserve-ingestion",
  "openobserve-reports",
+ "openobserve-search-service",
  "regex",
  "reqwest 0.13.2",
  "sea-orm",

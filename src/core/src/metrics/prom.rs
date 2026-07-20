@@ -62,7 +62,6 @@ use crate::{
             TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
         },
         schema::{check_for_schema, stream_schema_exists},
-        search as search_service,
         self_reporting::report_request_usage_stats,
     },
 };
@@ -915,7 +914,15 @@ pub async fn get_series(
         clear_cache: false,
         local_mode: None,
     };
-    let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
+    let series = match openobserve_search_service::service::search(
+        "",
+        org_id,
+        StreamType::Metrics,
+        None,
+        &req,
+    )
+    .await
+    {
         Err(err) => {
             log::error!("search series error: {err}");
             return Err(err);
@@ -1125,7 +1132,15 @@ pub async fn get_label_values(
         clear_cache: false,
         local_mode: None,
     };
-    let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
+    let mut label_values = match openobserve_search_service::service::search(
+        "",
+        org_id,
+        stream_type,
+        None,
+        &req,
+    )
+    .await
+    {
         Ok(resp) => resp
             .hits
             .iter()

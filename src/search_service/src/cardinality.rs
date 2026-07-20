@@ -396,6 +396,7 @@ mod tests {
             _org_id: &str,
             _stream_name: &str,
             _stream_type: StreamType,
+            _usage_type: config::meta::self_reporting::usage::UsageType,
             _num_functions: u16,
             _timestamp: i64,
         ) {

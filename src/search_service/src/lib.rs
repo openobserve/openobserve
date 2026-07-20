@@ -36,6 +36,7 @@ pub mod promql;
 pub mod query_utils;
 pub mod repository;
 mod searcher;
+pub mod service;
 pub mod streaming;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
@@ -46,17 +47,10 @@ pub use searcher::Searcher;
 pub static SEARCH_SERVER: LazyLock<Searcher> = LazyLock::new(Searcher::new);
 
 #[async_trait::async_trait]
-pub trait GrpcRuntime: Send + Sync {
+pub trait GrpcRuntime:
+    partition::PartitionRuntime + streaming::StreamingRuntime + Send + Sync
+{
     async fn enrichment_table_start_time(&self, org_id: &str, stream_name: &str) -> i64;
-
-    async fn query_file_ids(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-        time_range: (i64, i64),
-    ) -> Result<Vec<infra::file_list::FileId>, Error>;
 
     async fn query_file_keys_by_ids(
         &self,
@@ -94,17 +88,6 @@ pub trait GrpcRuntime: Send + Sync {
         user_id: Option<String>,
         req: &search::MultiStreamRequest,
     ) -> Result<search::Response, Error>;
-
-    async fn search_partition(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        user_id: Option<&str>,
-        stream_type: StreamType,
-        req: &search::SearchPartitionRequest,
-        skip_max_query_range: bool,
-        use_cache: bool,
-    ) -> Result<search::SearchPartitionResponse, Error>;
 
     async fn cancel_query(
         &self,

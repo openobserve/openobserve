@@ -174,7 +174,7 @@ async fn query(
     let trace_id = get_or_create_trace_id(headers, &http_span);
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = openobserve_core::search::check_search_allowed(org_id, None) {
+        if let Err(e) = openobserve_search_service::service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
         }
         use crate::{
@@ -455,7 +455,7 @@ async fn query_range(
             service::db::org_users::get_cached_user_org,
         };
 
-        if let Err(e) = openobserve_core::search::check_search_allowed(org_id, None) {
+        if let Err(e) = openobserve_search_service::service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
         }
 
@@ -815,7 +815,7 @@ async fn series(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = openobserve_core::search::check_search_allowed(org_id, None) {
+        if let Err(e) = openobserve_search_service::service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
         }
     }

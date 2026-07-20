@@ -504,6 +504,7 @@ where
             org_id,
             all_streams,
             stream_type,
+            config::meta::self_reporting::usage::UsageType::Search,
             num_fn,
             started_at,
         )

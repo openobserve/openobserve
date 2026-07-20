@@ -43,6 +43,7 @@ use http::HeaderMap;
 use openobserve_core::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use openobserve_core::search::sql::visitor::cipher_key::get_cipher_key_names;
+use openobserve_search_service::service as SearchService;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::{StreamPermissionResourceType, check_stream_permissions};
@@ -67,7 +68,7 @@ use crate::{
     service::{
         db::enrichment_table,
         search::{
-            self as SearchService, datafusion::plan::projections::get_result_schema,
+            datafusion::plan::projections::get_result_schema,
             sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
         },
         self_reporting::{http_report_metrics, report_request_usage_stats},
@@ -318,7 +319,9 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
         {
-            if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(stream)) {
+            if let Err(e) =
+                openobserve_search_service::service::check_search_allowed(&org_id, Some(stream))
+            {
                 return (
                     StatusCode::TOO_MANY_REQUESTS,
                     Json(MetaHttpResponse::error(
@@ -603,7 +606,8 @@ pub async fn around_v1(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        if let Err(e) =
+            openobserve_search_service::service::check_search_allowed(&org_id, Some(&stream_name))
         {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -726,7 +730,8 @@ pub async fn around_v2(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        if let Err(e) =
+            openobserve_search_service::service::check_search_allowed(&org_id, Some(&stream_name))
         {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -831,7 +836,8 @@ pub async fn values(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(&stream_name))
+        if let Err(e) =
+            openobserve_search_service::service::check_search_allowed(&org_id, Some(&stream_name))
         {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -1571,7 +1577,9 @@ pub async fn search_partition(
             }
         };
         for stream in stream_names.iter() {
-            if let Err(e) = openobserve_core::search::check_search_allowed(&org_id, Some(stream)) {
+            if let Err(e) =
+                openobserve_search_service::service::check_search_allowed(&org_id, Some(stream))
+            {
                 return (
                     StatusCode::TOO_MANY_REQUESTS,
                     Json(MetaHttpResponse::error(

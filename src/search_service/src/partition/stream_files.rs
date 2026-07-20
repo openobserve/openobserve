@@ -43,7 +43,7 @@ pub async fn collect_stream_files<R>(
     ctx: &PartitionSqlContext,
 ) -> Result<StreamFiles, Error>
 where
-    R: PartitionRuntime + Send + Sync,
+    R: PartitionRuntime + Send + Sync + ?Sized,
 {
     let start = std::time::Instant::now();
     let cfg = get_config();

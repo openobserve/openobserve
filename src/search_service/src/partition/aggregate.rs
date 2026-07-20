@@ -70,7 +70,7 @@ pub async fn prepare_streaming_aggregate<R>(
     use_cache: bool,
 ) -> Result<(bool, Option<String>, Option<StreamingAggsPartitionStrategy>), Error>
 where
-    R: PartitionRuntime + Send + Sync,
+    R: PartitionRuntime + Send + Sync + ?Sized,
 {
     let org_id = &ctx.sql.org_id;
     let stream_type = ctx.sql.stream_type;
