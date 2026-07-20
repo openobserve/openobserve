@@ -57,7 +57,7 @@
  *          on the #0d1117 canvas. #171717 is 1.7 from the app's own dark panel
  *          surface (--d-panel #181818), so it matches the other rails anyway. */
 .np-panel {
-  background: var(--color-grey-200);
+  background: var(--color-blue-50);
   backdrop-filter: blur(0.75rem);
   border: 1px solid var(--color-border-default);
   border-radius: 0.75rem;

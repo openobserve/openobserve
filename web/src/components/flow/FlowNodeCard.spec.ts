@@ -75,11 +75,14 @@ describe("FlowNodeCard", () => {
       expect(wrapper.findComponent({ name: "OSeparator" }).exists()).toBe(true);
     });
 
-    it("puts the shared node typography on the body container (15px / bold)", () => {
+    it("puts the shared node typography on the body container (0.9375rem / bold)", () => {
       wrapper = mountCard();
+      // 0.9375rem is the old 15px — rem per the house rule. Pinned here because
+      // this card is shared, so a change lands on EVERY node type at once.
       const classes = wrapper.find(".flow-node__container").classes();
-      expect(classes).toContain("text-[15px]!");
+      expect(classes).toContain("text-[0.9375rem]!");
       expect(classes).toContain("font-bold!");
+      expect(classes).toContain("text-left");
     });
   });
 
