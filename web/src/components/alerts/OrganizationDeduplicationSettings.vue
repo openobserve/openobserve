@@ -24,27 +24,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="organization-deduplication-settings-form"
     :form="form"
     v-slot="{ isSubmitting }"
-    class="w-full h-full px-2 bg-card-glass-bg flex flex-col"
+    class="w-full h-full bg-card-glass-bg flex flex-col"
   >
     <!-- Scrollable content area -->
-    <div class="flex-1 overflow-y-auto pr-2">
-      <div class="mb-6">
-        <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="mb-2" />
-        <div class="text-sm text-text-secondary">
+    <div class="flex-1 overflow-y-auto pr-2 pt-4">
+      <div class="mb-4">
+        <div class="text-sm font-semibold leading-tight text-text-heading">
+          {{ t('alerts.correlation.title') }}
+        </div>
+        <div class="text-xs text-text-secondary mt-1">
           {{ t('alerts.correlation.description') }}
         </div>
-        <div class="text-sm text-text-secondary mt-2 italic">
+        <div class="text-xs text-text-secondary mt-1 italic">
           {{ t('alerts.correlation.semanticFieldNote') }}
         </div>
-        <OButton
-          data-test="dedup-settings-refresh-btn"
-          variant="outline"
-          size="sm"
-          @click="loadConfig"
-        >{{ t('common.refresh') }}</OButton>
       </div>
 
-      <OSeparator class="mb-6" />
+      <OButton
+        data-test="dedup-settings-refresh-btn"
+        variant="outline"
+        size="sm"
+        class="mb-6"
+        @click="loadConfig"
+      >{{ t('common.refresh') }}</OButton>
 
       <!-- Enable Deduplication -->
       <div class="mb-6">
@@ -155,13 +157,11 @@ import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import alertsService from "@/services/alerts";
-import GroupHeader from "@/components/common/GroupHeader.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OFormCheckboxGroup from "@/lib/forms/Checkbox/OFormCheckboxGroup.vue";

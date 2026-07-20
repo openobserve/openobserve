@@ -19,35 +19,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="group-work"
     :subtitle="t('settings.correlationSettingsPage.subtitle')"
     data-test="correlation-settings-header"
+    tabs-below
     bleed
   >
     <template #title>
       <span data-test="correlation-settings-page-title">{{ t('settings.correlationSettings') }}</span>
     </template>
 
-    <!-- Tab bar -->
-    <template #subnav>
-      <div class="px-page-edge" data-test="correlation-settings-tabs">
-        <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
-          <OTab
-            name="services"
-            :label="t('settings.correlation.discoveredServicesTab')"
-          />
-          <OTab
-            name="discovery"
-            :label="t('settings.correlation.serviceDiscoveryTab')"
-          />
-          <OTab
-            name="alert-correlation"
-            :label="t('settings.correlation.alertCorrelationTab')"
-          />
-          <OTab
-            name="field-aliases"
-            data-test="correlation-settings-field-aliases-tab"
-            :label="t('settings.correlation.fieldAliasesTab')"
-          />
-        </OTabs>
-      </div>
+    <!-- Module tabs (Level-2 nav) -->
+    <template #header-tabs>
+      <OTabs
+        :model-value="activeTab"
+        dense
+        align="left"
+        data-test="correlation-settings-tabs"
+        @update:model-value="onTabChange"
+      >
+        <OTab
+          name="services"
+          :label="t('settings.correlation.discoveredServicesTab')"
+        />
+        <OTab
+          name="discovery"
+          :label="t('settings.correlation.serviceDiscoveryTab')"
+        />
+        <OTab
+          name="alert-correlation"
+          :label="t('settings.correlation.alertCorrelationTab')"
+        />
+        <OTab
+          name="field-aliases"
+          data-test="correlation-settings-field-aliases-tab"
+          :label="t('settings.correlation.fieldAliasesTab')"
+        />
+      </OTabs>
     </template>
 
     <!-- Tab content -->
@@ -56,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DiscoveredServices @navigate-to-configuration="onTabChange('discovery')" />
       </div>
 
-      <div v-show="activeTab === 'discovery'" class="h-full overflow-y-auto px-4 py-3">
+      <div v-show="activeTab === 'discovery'" class="h-full overflow-y-auto px-page-edge py-4">
         <ServiceIdentitySetup
           :org-identifier="store.state.selectedOrganization.identifier"
           :semantic-groups="semanticGroups"
@@ -66,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'alert-correlation'" class="h-full overflow-y-auto px-4">
+      <div v-show="activeTab === 'alert-correlation'" class="h-full overflow-y-auto px-page-edge">
         <OrganizationDeduplicationSettings
           :org-id="store.state.selectedOrganization.identifier"
           :config="store.state.organizationSettings?.deduplication_config"
@@ -74,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'field-aliases'" class="h-full overflow-y-auto px-4">
+      <div v-show="activeTab === 'field-aliases'" class="h-full overflow-y-auto px-page-edge py-4">
         <SemanticFieldGroupsConfig
           :key="`field-aliases-${fieldAliasesEditorKey}`"
           :semantic-field-groups="draftSemanticGroups"

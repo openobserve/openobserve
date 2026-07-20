@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="w-full">
-    <div class="border-b border-separator pb-3 mb-3">
-      <div class="text-xl font-semibold">
+    <div class="mb-4">
+      <div class="text-sm font-semibold leading-tight text-text-heading">
         {{ t("settings.correlation.semanticFieldGroupsTitle") }}
       </div>
-      <div class="text-xs text-text-secondary">
+      <div class="text-xs text-text-secondary mt-1">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
     </div>

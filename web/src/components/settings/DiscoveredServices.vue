@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="flex flex-col flex-1 min-h-0 pt-3">
       <!-- Info banner -->
       <div
-        class="info-banner shrink-0 mb-3 mx-4 rounded-default flex items-center gap-3 py-3 px-4 bg-banner-info-bg border border-banner-info-border"
+        class="info-banner shrink-0 mb-3 mx-page-edge rounded-default flex items-center gap-3 py-3 px-4 bg-banner-info-bg border border-banner-info-border"
       >
         <OIcon
           name="info"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Header with title -->
       <div class="bg-card-glass-bg shrink-0 mb-2.5">
         <div
-          class="services-header-bar flex justify-between items-center w-full py-3 px-4 h-[4.25rem]"
+          class="services-header-bar flex justify-between items-center w-full py-3 px-page-edge h-[4.25rem]"
         >
           <div
             class="text-xl tracking-[0.005em] font-[600]"
