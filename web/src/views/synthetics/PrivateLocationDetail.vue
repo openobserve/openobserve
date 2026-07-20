@@ -25,16 +25,6 @@
         </OButton>
         <OButton
           variant="outline"
-          size="sm"
-          icon-left="edit"
-          :disabled="!detail"
-          data-test="synthetics-private-location-detail-rename-btn"
-          @click="openRename"
-        >
-          {{ t("synthetics.privateLocations.detail.rename") }}
-        </OButton>
-        <OButton
-          variant="outline"
           size="icon-sm"
           icon-left="refresh"
           :loading="loading"
@@ -167,31 +157,6 @@
       </div>
     </div>
 
-    <!-- Rename / enable dialog -->
-    <ODialog
-      v-model:open="showRename"
-      size="xs"
-      :title="t('synthetics.privateLocations.detail.renameTitle')"
-      :primary-button-label="t('common.save')"
-      :secondary-button-label="t('common.cancel')"
-      data-test="synthetics-private-location-rename-dialog"
-      @click:primary="saveRename"
-      @click:secondary="showRename = false"
-    >
-      <div class="flex flex-col gap-4 py-2">
-        <OInput
-          v-model="renameLabel"
-          :label="t('synthetics.privateLocations.form.name')"
-          data-test="synthetics-private-location-rename-input"
-        />
-        <OSwitch
-          v-model="renameEnabled"
-          :label="t('synthetics.privateLocations.detail.enabled')"
-          data-test="synthetics-private-location-enabled-switch"
-        />
-      </div>
-    </ODialog>
-
     <AgentSetupDrawer
       v-model:open="showSetup"
       :install="detail?.install"
@@ -209,14 +174,10 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticLocationDetail } from "@/types/synthetics";
@@ -230,9 +191,6 @@ const store = useStore();
 const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
 const showSetup = ref(false);
-const showRename = ref(false);
-const renameLabel = ref("");
-const renameEnabled = ref(true);
 
 const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
 
@@ -256,34 +214,6 @@ async function load() {
 }
 
 onMounted(load);
-
-const openRename = () => {
-  if (!detail.value) return;
-  renameLabel.value = detail.value.name;
-  renameEnabled.value = detail.value.enabled;
-  showRename.value = true;
-};
-
-async function saveRename() {
-  if (!detail.value) return;
-  try {
-    await syntheticsService.updateLocation(orgIdentifier.value, detail.value.id, {
-      label: renameLabel.value,
-      enabled: renameEnabled.value,
-    });
-    toast({ variant: "success", message: t("synthetics.privateLocations.toast.updated") });
-    showRename.value = false;
-    await load();
-  } catch (err: any) {
-    toast({
-      variant: "error",
-      message:
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        t("synthetics.privateLocations.toast.updateFailed"),
-    });
-  }
-}
 
 const openMonitor = (row: { id: string; name: string }) => {
   router.push({

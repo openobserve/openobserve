@@ -1258,6 +1258,39 @@ pub async fn create_location(
 
 #[utoipa::path(
     get,
+    path = "/{org_id}/synthetics/agent-setup",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "SyntheticsAgentSetup",
+    summary = "Org-level private-agent setup: o2syn_ token + docker install template",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn agent_setup(Path(org_id): Path<String>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::synthetics::service::agent_setup(&org_id).await {
+            Ok(resp) => MetaHttpResponse::json(resp),
+            Err(e) => {
+                tracing::error!("[synthetics] agent_setup: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
     path = "/{org_id}/synthetics/locations/{id}",
     context_path = "/api",
     tag = "Synthetics",

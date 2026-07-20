@@ -9,17 +9,7 @@
       icon="radar"
     >
       <template #actions>
-        <OButton
-          v-if="activeTab === 'private'"
-          size="sm"
-          variant="primary"
-          icon-left="add"
-          data-test="synthetic-monitoring-add-location-btn"
-          @click="showAddLocation = true"
-        >
-          {{ t('synthetics.privateLocations.addAction') }}
-        </OButton>
-        <ODropdown v-else align="end">
+        <ODropdown align="end">
           <template #trigger>
             <OButton size="sm" variant="primary" data-test="synthetic-monitoring-new-check-dropdown">
               {{ t('synthetics.newCheck.button') }}
@@ -56,7 +46,6 @@
         :locations="privateLocations"
         :loading="locationsLoading"
         @refresh="loadPrivateLocations"
-        @add="showAddLocation = true"
         @setup="openSetupDrawer()"
         @copy-setup="openSetupDrawer"
         @delete="confirmDeleteLocation"
@@ -217,12 +206,6 @@
       </p>
     </ODialog>
 
-    <!-- Add private location dialog -->
-    <AddLocationDialog
-      v-model:open="showAddLocation"
-      @created="onLocationCreated"
-    />
-
     <!-- Agent setup drawer -->
     <AgentSetupDrawer
       v-model:open="showSetupDrawer"
@@ -276,7 +259,6 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
 import PrivateLocations from "@/views/synthetics/PrivateLocations.vue";
-import AddLocationDialog from "@/components/synthetic-monitoring/AddLocationDialog.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
@@ -565,7 +547,6 @@ const onTabChange = (v: unknown) => {
 // ── Private locations tab ──────────────────────────────────────────────
 const privateLocations   = ref<SyntheticLocation[]>([]);
 const locationsLoading   = ref(false);
-const showAddLocation    = ref(false);
 const showSetupDrawer    = ref(false);
 const setupInstall       = ref<string | null>(null);
 const setupLocationName  = ref<string | null>(null);
@@ -585,28 +566,22 @@ async function loadPrivateLocations() {
   }
 }
 
-/** Opens the setup drawer; with a row, fetches its install command first. */
+/** Opens the setup drawer. Without a row: the org-level template (agent
+ *  declares its location via AGENT_LOCATION — the row auto-appears on first
+ *  register). With a row: that location's pinned install command. */
 async function openSetupDrawer(row?: SyntheticLocation) {
-  const target = row ?? privateLocations.value[0];
   setupInstall.value = null;
-  setupLocationName.value = target?.name ?? null;
+  setupLocationName.value = row?.name ?? null;
   showSetupDrawer.value = true;
-  if (!target) return;
   try {
-    const res = await syntheticsService.getLocation(orgIdentifier.value, target.id);
+    const res = row
+      ? await syntheticsService.getLocation(orgIdentifier.value, row.id)
+      : await syntheticsService.getAgentSetup(orgIdentifier.value);
     setupInstall.value = (res.data as any).install ?? null;
   } catch (err) {
-    console.error('[synthetics] failed to load location install command', err);
+    console.error('[synthetics] failed to load agent setup', err);
   }
 }
-
-const onLocationCreated = async (payload: { id: string; install?: string }) => {
-  await loadPrivateLocations();
-  const created = privateLocations.value.find((l) => l.id === payload.id);
-  setupInstall.value = payload.install ?? null;
-  setupLocationName.value = created?.name ?? null;
-  showSetupDrawer.value = true;
-};
 
 const confirmDeleteLocation = (row: SyntheticLocation) => {
   locationToDelete.value = row;

@@ -164,7 +164,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "refresh"): void;
   (e: "setup"): void;
-  (e: "add"): void;
   (e: "copy-setup", row: SyntheticLocation): void;
   (e: "delete", row: SyntheticLocation): void;
 }>();
@@ -280,6 +279,6 @@ const onEmptyAction = (id?: string) => {
     search.value = "";
     return;
   }
-  emit("add");
+  emit("setup");
 };
 </script>

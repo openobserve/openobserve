@@ -85,6 +85,9 @@ const syntheticsService = {
     http().get(`/api/${orgIdentifier}/synthetics/locations`),
 
   // ── Private locations ──────────────────────────────────────────────────
+  getAgentSetup: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/agent-setup`),
+
   getLocation: (orgIdentifier: string, id: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/locations/${id}`),
 
