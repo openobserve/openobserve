@@ -17,7 +17,6 @@ use config::{
         stream::StreamType,
     },
 };
-use openobserve_ingestion::ports::{DistinctValue, TraceListValue};
 
 pub mod grpc {
     pub use openobserve_ingestion::grpc::*;
@@ -60,26 +59,6 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         .await;
     }
 
-    async fn write_distinct_values(
-        &self,
-        org_id: &str,
-        values: Vec<DistinctValue>,
-    ) -> infra::errors::Result<()> {
-        use crate::metadata::{MetadataItem, MetadataType, distinct_values::DvItem};
-
-        let values = values
-            .into_iter()
-            .map(|value| {
-                MetadataItem::DistinctValues(DvItem {
-                    stream_type: value.stream_type,
-                    stream_name: value.stream_name,
-                    value: value.value,
-                })
-            })
-            .collect();
-        crate::metadata::write(org_id, MetadataType::DistinctValues, values).await
-    }
-
     async fn ingestion_log_enabled(&self) -> bool {
         if !get_config().common.ingestion_log_enabled {
             return false;
@@ -87,27 +66,6 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
         crate::db::organization::get_org_setting_toggle_ingestion_logs(META_ORG_ID)
             .await
             .unwrap_or(false)
-    }
-
-    async fn write_trace_list(
-        &self,
-        org_id: &str,
-        values: Vec<TraceListValue>,
-    ) -> infra::errors::Result<()> {
-        use crate::metadata::{MetadataItem, MetadataType, trace_list_index::TraceListItem};
-
-        let values = values
-            .into_iter()
-            .map(|value| {
-                MetadataItem::TraceListIndexer(TraceListItem {
-                    _timestamp: value.timestamp,
-                    stream_name: value.stream_name,
-                    service_name: value.service_name,
-                    trace_id: value.trace_id,
-                })
-            })
-            .collect();
-        crate::metadata::write(org_id, MetadataType::TraceListIndexer, values).await
     }
 
     async fn ensure_gen_ai_fields_in_schema(
@@ -161,6 +119,22 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
             .await
             .map(|_| ())
             .map_err(Into::into)
+    }
+
+    async fn stream_retention(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Option<i64> {
+        crate::stream::get_stream_retention(org_id, stream_type, stream_name).await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn set_stream_ownership_if_not_exists(&self, org_id: &str, object: &str) {
+        if o2_openfga::config::get_config().enabled {
+            o2_openfga::authorizer::authz::set_ownership_if_not_exists(org_id, object).await;
+        }
     }
 
     async fn list_stream_schemas(

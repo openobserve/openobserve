@@ -47,19 +47,7 @@ pub trait RuntimeServices: Send + Sync + 'static {
         started_at: i64,
     );
 
-    async fn write_distinct_values(
-        &self,
-        org_id: &str,
-        values: Vec<DistinctValue>,
-    ) -> infra::errors::Result<()>;
-
     async fn ingestion_log_enabled(&self) -> bool;
-
-    async fn write_trace_list(
-        &self,
-        org_id: &str,
-        values: Vec<TraceListValue>,
-    ) -> infra::errors::Result<()>;
 
     async fn ensure_gen_ai_fields_in_schema(
         &self,
@@ -100,6 +88,16 @@ pub trait RuntimeServices: Send + Sync + 'static {
         stream_type: StreamType,
         settings: config::meta::stream::StreamSettings,
     ) -> anyhow::Result<()>;
+
+    async fn stream_retention(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Option<i64>;
+
+    #[cfg(feature = "enterprise")]
+    async fn set_stream_ownership_if_not_exists(&self, org_id: &str, object: &str);
 
     async fn list_stream_schemas(
         &self,
@@ -182,9 +180,19 @@ pub async fn write_distinct_values(
     org_id: &str,
     values: Vec<DistinctValue>,
 ) -> infra::errors::Result<()> {
-    runtime_services()?
-        .write_distinct_values(org_id, values)
-        .await
+    use crate::metadata::{MetadataItem, MetadataType, distinct_values::DvItem};
+
+    let values = values
+        .into_iter()
+        .map(|value| {
+            MetadataItem::DistinctValues(DvItem {
+                stream_type: value.stream_type,
+                stream_name: value.stream_name,
+                value: value.value,
+            })
+        })
+        .collect();
+    crate::metadata::write(org_id, MetadataType::DistinctValues, values).await
 }
 
 pub async fn ingestion_log_enabled() -> bool {
@@ -198,7 +206,20 @@ pub async fn write_trace_list(
     org_id: &str,
     values: Vec<TraceListValue>,
 ) -> infra::errors::Result<()> {
-    runtime_services()?.write_trace_list(org_id, values).await
+    use crate::metadata::{MetadataItem, MetadataType, trace_list_index::TraceListItem};
+
+    let values = values
+        .into_iter()
+        .map(|value| {
+            MetadataItem::TraceListIndexer(TraceListItem {
+                _timestamp: value.timestamp,
+                stream_name: value.stream_name,
+                service_name: value.service_name,
+                trace_id: value.trace_id,
+            })
+        })
+        .collect();
+    crate::metadata::write(org_id, MetadataType::TraceListIndexer, values).await
 }
 
 pub async fn ensure_gen_ai_fields_in_schema(
@@ -254,6 +275,30 @@ pub async fn save_stream_settings(
     runtime_services()?
         .save_stream_settings(org_id, stream_name, stream_type, settings)
         .await
+}
+
+pub async fn stream_retention(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Option<i64> {
+    match RUNTIME_SERVICES.get() {
+        Some(runtime) => {
+            runtime
+                .stream_retention(org_id, stream_type, stream_name)
+                .await
+        }
+        None => None,
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn set_stream_ownership_if_not_exists(org_id: &str, object: &str) {
+    if let Some(runtime) = RUNTIME_SERVICES.get() {
+        runtime
+            .set_stream_ownership_if_not_exists(org_id, object)
+            .await;
+    }
 }
 
 pub async fn list_stream_schemas(

@@ -23,7 +23,7 @@ use config::RwAHashMap;
 pub static DASHBOARD_ID_TO_ORG: LazyLock<RwAHashMap<String, String>> =
     LazyLock::new(Default::default);
 
-mod distinct_values;
+pub mod distinct_values;
 pub mod repository;
 mod service;
 pub mod timed_annotations;

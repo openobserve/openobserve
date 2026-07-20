@@ -22,6 +22,7 @@ use std::{
 };
 
 use arrow_schema::{DataType, Field, Schema};
+use common::meta::stream::SchemaRecords;
 use config::{
     FxIndexMap, TIMESTAMP_COL_NAME, get_config,
     meta::stream::StreamType,
@@ -39,13 +40,10 @@ use serde_json::{Map, Value};
 use tokio::sync::{RwLock, mpsc};
 
 use crate::{
-    common::meta::stream::SchemaRecords,
-    service::{
-        db,
-        ingestion::{self, get_thread_id},
-        metadata::{Metadata, MetadataItem},
-        schema::get_schema_changes,
-    },
+    metadata::{Metadata, MetadataItem},
+    ports,
+    schema::get_schema_changes,
+    service::{self as ingestion, get_thread_id},
 };
 
 const CHANNEL_SIZE: usize = 10240;
@@ -219,7 +217,7 @@ impl Metadata for DistinctValues {
             if !db_schema.fields_map().contains_key(TIMESTAMP_COL_NAME) {
                 is_new = true;
                 let schema = default_schema.as_ref().clone();
-                match db::schema::merge(
+                match ports::merge_schema(
                     &org_id,
                     &distinct_stream_name,
                     StreamType::Metadata,
@@ -236,9 +234,7 @@ impl Metadata for DistinctValues {
                     }
                 };
 
-                if let Some(ret) =
-                    super::super::stream::get_stream_retention(&org_id, stream_type, &stream_name)
-                        .await
+                if let Some(ret) = ports::stream_retention(&org_id, stream_type, &stream_name).await
                 {
                     let mut new_settings = infra::schema::get_settings(
                         &org_id,
@@ -248,7 +244,7 @@ impl Metadata for DistinctValues {
                     .await
                     .unwrap_or_default();
                     new_settings.data_retention = ret;
-                    if let Err(e) = super::super::stream::save_stream_settings(
+                    if let Err(e) = ports::save_stream_settings(
                         &org_id,
                         &distinct_stream_name,
                         StreamType::Metadata,
@@ -272,7 +268,7 @@ impl Metadata for DistinctValues {
                 items.iter().map(|(v, _)| v),
             )?;
             let schema = if is_new || get_schema_changes(&db_schema, &inferred_schema).0 {
-                match db::schema::merge(
+                match ports::merge_schema(
                     &org_id,
                     &distinct_stream_name,
                     StreamType::Metadata,
@@ -342,14 +338,9 @@ impl Metadata for DistinctValues {
 
             #[cfg(feature = "enterprise")]
             {
-                use o2_openfga::{
-                    authorizer::authz::set_ownership_if_not_exists,
-                    config::get_config as get_openfga_config,
-                };
-
                 // set ownership only in the first time
-                if is_new && get_openfga_config().enabled {
-                    set_ownership_if_not_exists(
+                if is_new {
+                    ports::set_stream_ownership_if_not_exists(
                         &org_id,
                         &format!("{}:{}", StreamType::Metadata, distinct_stream_name),
                     )

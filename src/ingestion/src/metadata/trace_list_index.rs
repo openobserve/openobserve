@@ -23,6 +23,7 @@ use std::{
 };
 
 use arrow_schema::{DataType, Field, Schema};
+use common::meta::stream::SchemaRecords;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::stream::{StorageType, StreamSettings, StreamType},
@@ -32,13 +33,9 @@ use infra::schema::get_partition_time_level;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::meta::stream::SchemaRecords,
-    service::{
-        db,
-        ingestion::{self, get_thread_id},
-        metadata::{Metadata, MetadataItem},
-        stream,
-    },
+    metadata::{Metadata, MetadataItem},
+    ports,
+    service::{self as ingestion, get_thread_id},
 };
 
 const STREAM_NAME: &str = "trace_list_index";
@@ -132,14 +129,9 @@ impl Metadata for TraceListIndex {
 
         #[cfg(feature = "enterprise")]
         {
-            use o2_openfga::{
-                authorizer::authz::set_ownership_if_not_exists,
-                config::get_config as get_openfga_config,
-            };
-
             // set ownership only in the first time
-            if _is_new && get_openfga_config().enabled {
-                set_ownership_if_not_exists(
+            if _is_new {
+                ports::set_stream_ownership_if_not_exists(
                     org_id,
                     &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
                 )
@@ -190,7 +182,7 @@ impl TraceListIndex {
             is_new = true;
             let timestamp = now_micros();
             let schema = self.schema.as_ref().clone();
-            if let Err(e) = db::schema::merge(
+            if let Err(e) = ports::merge_schema(
                 org_id,
                 STREAM_NAME,
                 StreamType::Metadata,
@@ -226,7 +218,7 @@ impl TraceListIndex {
                 storage_type: StorageType::Normal,
             };
 
-            stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)
+            ports::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)
                 .await?;
         }
 
@@ -240,6 +232,7 @@ impl TraceListIndex {
 mod tests {
     use std::{collections::HashMap, sync::Arc};
 
+    use common::meta::stream::SchemaRecords;
     use config::{
         meta::stream::StreamType,
         utils::{json, time::now_micros},
@@ -247,22 +240,17 @@ mod tests {
     use infra::schema::get_partition_time_level;
 
     use crate::{
-        common::meta::stream::SchemaRecords,
-        service::{
-            ingestion,
-            metadata::{
-                Metadata, MetadataItem,
-                trace_list_index::{STREAM_NAME, TraceListIndex, TraceListItem},
-            },
+        metadata::{
+            Metadata,
+            trace_list_index::{STREAM_NAME, TraceListIndex, TraceListItem},
         },
+        service as ingestion,
     };
 
     #[tokio::test]
-    async fn test_write() {
+    async fn test_empty_write() {
         let t = TraceListIndex::new();
-        let data = vec![MetadataItem::TraceListIndexer(TraceListItem::default())];
-
-        let res = t.write("default", data).await;
+        let res = t.write("default", Vec::new()).await;
         assert!(res.is_ok());
     }
 

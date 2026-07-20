@@ -65,7 +65,9 @@ pub mod dashboards {
         pub use openobserve_reports::repository::*;
     }
 }
-pub mod distinct_values;
+pub mod distinct_values {
+    pub use openobserve_dashboards::distinct_values::*;
+}
 pub mod enrichment_table {
     pub use openobserve_enrichment::repository::*;
 }

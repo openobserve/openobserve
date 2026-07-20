@@ -19,6 +19,7 @@ flamegraph.html
 /data*/
 /src/infra/data/
 /src/core/data/
+/src/ingestion/data/
 /src/search/data/
 /src/search_service/data/
 /src/transform/data/
