@@ -197,8 +197,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Token-based surface utility handles dark mode; class is identical in both themes.
-      expect(mainContainer.classes()).toContain("bg-surface-panel");
+      // Theme is handled by design tokens; container markup is theme-independent.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
       expect(mainContainer.classes()).not.toContain("dark-mode");
     });
 
@@ -208,8 +209,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Token-based surface utility handles dark mode; class is identical in both themes.
-      expect(mainContainer.classes()).toContain("bg-surface-panel");
+      // Theme is handled by design tokens; container markup is identical in both themes.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
       expect(mainContainer.classes()).not.toContain("bg-white");
     });
 
@@ -479,8 +481,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Token-based surface utility is theme-independent in markup.
-      expect(mainContainer.classes()).toContain("bg-surface-panel");
+      // Container markup is theme-independent; renders regardless of theme state.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
     });
 
     it("should handle null theme state", () => {
@@ -492,8 +495,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Token-based surface utility is theme-independent in markup.
-      expect(mainContainer.classes()).toContain("bg-surface-panel");
+      // Container markup is theme-independent; renders regardless of theme state.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
     });
 
     it("should handle empty templates array", () => {

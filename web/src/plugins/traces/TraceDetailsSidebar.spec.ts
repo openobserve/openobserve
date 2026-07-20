@@ -704,7 +704,7 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="trace-details-sidebar-no-events"]',
       );
       expect(noEventsMsg.exists()).toBe(true);
-      expect(noEventsMsg.text()).toContain("No events present for this span");
+      expect(noEventsMsg.text()).toContain("No events for this span");
     });
 
     describe("When events exist", () => {
