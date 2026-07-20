@@ -582,15 +582,15 @@
 
   /* Date / Time / Color (ODate, OTime, OColor) — share input surface */
   --color-datepicker-bg: var(--color-surface-base);
-  --color-datepicker-border: var(--color-border-strong);
-  --color-datepicker-hover-border: var(--color-primary-400);
-  --color-datepicker-focus-border: var(--color-primary-500);
+  --color-datepicker-border: var(--color-border-default);
+  --color-datepicker-hover-border: var(--color-primary-300);
+  --color-datepicker-focus-border: var(--color-primary-300);
   --color-datepicker-focus-ring: var(--color-primary-400);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
   --color-datepicker-text: var(--color-text-primary);
   --color-datepicker-placeholder: var(--color-text-disabled);
-  --color-datepicker-label: var(--color-text-secondary);
+  --color-datepicker-label: var(--color-text-primary);
   --color-datepicker-icon: var(--color-text-secondary);
   --color-datepicker-error-text: var(--color-error-600);
   --color-datepicker-error-border: var(--color-error-500);
