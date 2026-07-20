@@ -2382,6 +2382,10 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
+    /// Max `le` labels (buckets + gap markers + inf) a native histogram sample may
+    /// expand to; over-limit samples are downscaled (adjacent buckets merged).
+    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 16)]
+    pub native_histogram_max_buckets: usize,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
