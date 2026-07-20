@@ -777,8 +777,11 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     if path_columns[0].eq("node") || path_columns[0].eq("profile") {
         return Ok(());
     }
-    // Synthetics probe job API has no org_id in path — skip org check.
-    if path_columns[0].eq("synthetics") && path_columns.get(1) == Some(&"jobs") {
+    // Synthetics probe job + agent APIs have no org_id in path — skip org check
+    // (org is resolved from the o2syn_ token, not the path).
+    if path_columns[0].eq("synthetics")
+        && matches!(path_columns.get(1), Some(&"jobs") | Some(&"agent"))
+    {
         return Ok(());
     }
     // Hack for v2 apis
