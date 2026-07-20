@@ -32,7 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :min-zoom="0.1"
       @nodes-initialized="fit"
     >
-      <Background :size="2" :gap="22" pattern-color="#BDBDBD" />
+      <!-- Dot colour is token-driven via CSS (flow-canvas.css); the library
+           applies `pattern-color` as an SVG attribute, where var() would not
+           resolve. -->
+      <Background :size="2" :gap="22" />
       <template #edge-custom="edgeProps">
         <FlowEdge
           :id="edgeProps.id"
@@ -115,71 +118,15 @@ onBeforeUnmount(() => {
 </script>
 
 <style>
-/* Read-only: block all node interaction so hover-actions never appear. */
+/* The preview container already carries `o2vf_node`, so the shared, token-driven
+   node/handle styling in flow-canvas.css applies here too — this block used to
+   re-declare all of it at equal specificity, which was pure duplication. Only
+   the preview-specific rule is kept. */
+@import "@/components/flow/flow-canvas.css";
+
+/* Read-only: block all node interaction so hover-actions never appear. This is
+   also why the shared `cursor: grab` / `:hover` rules are inert here. */
 .workflow-view-tooltip .vue-flow__node {
   pointer-events: none;
-}
-
-/* Node card frame + per-type colours (mirrors WorkflowCanvas / PipelineEditor),
-   scoped to the preview so they don't leak. */
-.workflow-view-tooltip .vue-flow__node {
-  padding: 8px 16px;
-  /* width:auto lets the node size to its content (the label is nowrap) — same as
-     the canvas. Without it VueFlow's default width clips wide labels like
-     "Alert Trigger" and fitView under-measures the node. */
-  width: auto;
-  min-height: 44px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.9);
-}
-.workflow-view-tooltip .vue-flow__node-input {
-  border: 1px solid #60a5fa;
-  background: rgba(239, 246, 255, 0.8);
-  color: var(--color-grey-800);
-}
-.workflow-view-tooltip .vue-flow__node-default {
-  border: 1px solid #f59e0b;
-  background: rgba(255, 251, 235, 0.8);
-  color: var(--color-grey-800);
-}
-.workflow-view-tooltip .vue-flow__node-output {
-  border: 1px solid rgba(74, 222, 128, 0.6);
-  background: rgba(240, 253, 244, 1);
-  color: var(--color-grey-800);
-}
-
-/* Handle dots — coloured ring + darker inner dot (matches the canvas). */
-.workflow-view-tooltip .node_handle_custom {
-  width: 16px !important;
-  height: 16px !important;
-  border: 3px solid rgba(255, 255, 255, 0.9);
-  border-radius: 50% !important;
-  background: var(--color-grey-500);
-}
-.workflow-view-tooltip .handle_input { background: #dbeafe !important; }
-.workflow-view-tooltip .handle_output { background: #dcfce7 !important; }
-.workflow-view-tooltip .handle_default { background: #fef3c7 !important; }
-
-/* Dark mode mirrors the canvas. */
-.dark .workflow-view-tooltip .vue-flow__node {
-  background: rgba(30, 34, 45, 0.9) !important;
-}
-.dark .workflow-view-tooltip .vue-flow__node-input {
-  background: rgba(30, 58, 138, 0.2) !important;
-  border-color: rgba(96, 165, 250, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-.dark .workflow-view-tooltip .vue-flow__node-default {
-  background: rgba(120, 53, 15, 0.2) !important;
-  border-color: rgba(251, 146, 60, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-.dark .workflow-view-tooltip .vue-flow__node-output {
-  background: rgba(20, 83, 45, 0.2) !important;
-  border-color: rgba(74, 222, 128, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
 }
 </style>

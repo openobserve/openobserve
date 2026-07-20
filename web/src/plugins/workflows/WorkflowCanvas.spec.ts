@@ -201,7 +201,12 @@ describe("WorkflowCanvas", () => {
       expect(bg.exists()).toBe(true);
       expect(bg.props("size")).toBe(2);
       expect(bg.props("gap")).toBe(22);
-      expect(bg.props("patternColor")).toBe("#BDBDBD");
+      // No `pattern-color`: the dot colour is token-driven from flow-canvas.css
+      // (`.vue-flow__background circle { fill: var(--color-grey-400) }`). The
+      // library sets `fill` as an SVG PRESENTATION ATTRIBUTE, where var() does
+      // not resolve, so a hex prop here could never follow the theme. Pinned so
+      // a hardcoded colour does not creep back in.
+      expect(bg.props("patternColor")).toBeUndefined();
     });
 
     it("renders the zoom Controls top-left without the interactive toggle", () => {
