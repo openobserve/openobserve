@@ -19,6 +19,7 @@ enterprise = [
     "openobserve-api-management/enterprise",
     "openobserve-api-query/enterprise",
     "openobserve-core/enterprise",
+    "openobserve-pipeline/enterprise",
 ]
 cloud = [
     "enterprise",

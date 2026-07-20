@@ -17,6 +17,7 @@ use infra::errors::Result;
 pub use infra::table::backfill_jobs::BackfillJob;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::super_cluster::queue::BACKFILL_JOBS_KEY;
+use openobserve_scheduler as scheduler;
 
 /// Get a backfill job by org and job ID
 pub async fn get(org: &str, job_id: &str) -> Result<BackfillJob> {
@@ -138,8 +139,6 @@ pub async fn update(job: &BackfillJob) -> Result<()> {
 /// Update the enabled status of a backfill job
 pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<()> {
     use chrono::Utc;
-
-    use super::scheduler;
 
     // Update the enabled field in the backfill_jobs table
     infra::table::backfill_jobs::update_enabled(org, job_id, enabled).await?;

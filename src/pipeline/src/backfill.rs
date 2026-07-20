@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::{Ksuid, KsuidLike};
 use utoipa::ToSchema;
 
-use crate::db;
+use crate::repository;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackfillRequest {
@@ -172,7 +172,7 @@ pub async fn create_backfill_job(
     delete_before_backfill: bool,
 ) -> Result<String, anyhow::Error> {
     // 1. Validate pipeline exists and is scheduled
-    let pipeline = crate::db::pipeline::get_by_id(pipeline_id).await?;
+    let pipeline = repository::pipelines::get_by_id(pipeline_id).await?;
 
     if !pipeline.source.is_scheduled() {
         return Err(anyhow::anyhow!("Pipeline is not a scheduled pipeline"));
@@ -242,7 +242,7 @@ pub async fn create_backfill_job(
     };
 
     // Store static configuration in backfill_jobs table
-    let backfill_job_config = db::backfill::BackfillJob {
+    let backfill_job_config = repository::backfill::BackfillJob {
         id: backfill_job_id.clone(),
         org: org_id.to_string(),
         pipeline_id: pipeline_id.to_string(),
@@ -255,7 +255,7 @@ pub async fn create_backfill_job(
         enabled: true, // Enable by default when creating
     };
 
-    db::backfill::add(backfill_job_config).await?;
+    repository::backfill::add(backfill_job_config).await?;
 
     // Store only dynamic state in scheduled_jobs trigger data
     let backfill_job = BackfillJob {
@@ -271,19 +271,19 @@ pub async fn create_backfill_job(
     };
 
     // 4. Create trigger
-    let trigger = db::scheduler::Trigger {
+    let trigger = openobserve_scheduler::Trigger {
         org: org_id.to_string(),
         module: TriggerModule::Backfill,
         module_key,
         next_run_at: now, // Start immediately
         is_realtime: false,
         is_silenced: false,
-        status: db::scheduler::TriggerStatus::Waiting,
+        status: openobserve_scheduler::TriggerStatus::Waiting,
         data: trigger_data.to_json_string(),
         ..Default::default()
     };
 
-    db::scheduler::push(trigger).await?;
+    openobserve_scheduler::push(trigger).await?;
 
     log::info!(
         "[BACKFILL] Created backfill job {} for pipeline {} in org {}, time range: {}-{}{}",
@@ -305,14 +305,14 @@ pub async fn create_backfill_job(
 /// Helper function to create BackfillJobStatus from config and trigger data
 /// Static config is passed as parameter, dynamic state comes from BackfillJob
 async fn create_backfill_job_status(
-    config: &db::backfill::BackfillJob,
-    _trigger_status: db::scheduler::TriggerStatus,
+    config: &repository::backfill::BackfillJob,
+    _trigger_status: openobserve_scheduler::TriggerStatus,
     trigger_start_time: Option<i64>,
     backfill_job: &BackfillJob,
     created_at: Option<i64>,
 ) -> Result<BackfillJobStatus, anyhow::Error> {
     // Get pipeline name
-    let pipeline_name = match crate::db::pipeline::get_by_id(&config.pipeline_id).await {
+    let pipeline_name = match repository::pipelines::get_by_id(&config.pipeline_id).await {
         Ok(pipeline) => Some(pipeline.name),
         Err(_) => None,
     };
@@ -380,10 +380,11 @@ async fn create_backfill_job_status(
 
 pub async fn list_backfill_jobs(org_id: &str) -> Result<Vec<BackfillJobStatus>, anyhow::Error> {
     // Fetch all backfill job configs from table
-    let configs = db::backfill::list_by_org(org_id).await?;
+    let configs = repository::backfill::list_by_org(org_id).await?;
 
     // Fetch all backfill triggers (no longer using list_by_org_with_created_at)
-    let triggers = db::scheduler::list_by_org(org_id, Some(TriggerModule::Backfill)).await?;
+    let triggers =
+        openobserve_scheduler::list_by_org(org_id, Some(TriggerModule::Backfill)).await?;
 
     // Create a map of job_id -> trigger for quick lookup
     let mut trigger_map = std::collections::HashMap::new();
@@ -418,10 +419,10 @@ pub async fn get_backfill_job(
     job_id: &str,
 ) -> Result<BackfillJobStatus, anyhow::Error> {
     // Fetch static config from backfill_jobs table
-    let config = db::backfill::get(org_id, job_id).await?;
+    let config = repository::backfill::get(org_id, job_id).await?;
 
     // Fetch the trigger using module_key (which is the job_id)
-    let trigger = db::scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
+    let trigger = openobserve_scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
 
     // Parse trigger data to get dynamic state
     let trigger_data = ScheduledTriggerData::from_json_string(&trigger.data)?;
@@ -441,7 +442,8 @@ pub async fn get_backfill_job(
 
 pub async fn delete_backfill_job(org_id: &str, job_id: &str) -> Result<(), anyhow::Error> {
     // Find the trigger by job_id
-    let triggers = db::scheduler::list_by_org(org_id, Some(TriggerModule::Backfill)).await?;
+    let triggers =
+        openobserve_scheduler::list_by_org(org_id, Some(TriggerModule::Backfill)).await?;
 
     for trigger in triggers {
         if trigger.module_key == job_id {
@@ -451,9 +453,10 @@ pub async fn delete_backfill_job(org_id: &str, job_id: &str) -> Result<(), anyho
                 org_id
             );
             // Delete from scheduled_jobs
-            db::scheduler::delete(org_id, TriggerModule::Backfill, &trigger.module_key).await?;
+            openobserve_scheduler::delete(org_id, TriggerModule::Backfill, &trigger.module_key)
+                .await?;
             // Delete from backfill_jobs table
-            db::backfill::delete(org_id, job_id).await?;
+            repository::backfill::delete(org_id, job_id).await?;
             return Ok(());
         }
     }
@@ -472,13 +475,15 @@ pub async fn delete_backfill_jobs_by_pipeline(
     );
 
     // Get all backfill jobs for this pipeline
-    let jobs = db::backfill::list_by_pipeline(org_id, pipeline_id).await?;
+    let jobs = repository::backfill::list_by_pipeline(org_id, pipeline_id).await?;
     let jobs_count = jobs.len();
 
     for job in jobs {
         log::info!("delete jobs: {:#?}", job);
         // Delete the trigger from scheduled_jobs
-        if let Err(e) = db::scheduler::delete(org_id, TriggerModule::Backfill, &job.id).await {
+        if let Err(e) =
+            openobserve_scheduler::delete(org_id, TriggerModule::Backfill, &job.id).await
+        {
             log::warn!(
                 "[BACKFILL] Failed to delete trigger for job {} from scheduled_jobs: {}",
                 job.id,
@@ -488,7 +493,7 @@ pub async fn delete_backfill_jobs_by_pipeline(
         }
 
         // Delete from backfill_jobs table
-        if let Err(e) = db::backfill::delete(org_id, &job.id).await {
+        if let Err(e) = repository::backfill::delete(org_id, &job.id).await {
             log::error!(
                 "[BACKFILL] Failed to delete backfill job {} from backfill_jobs table: {}",
                 job.id,
@@ -523,7 +528,7 @@ pub async fn enable_backfill_job(
     );
 
     // Simply update the enabled field in the backfill_jobs table
-    db::backfill::update_enabled(org_id, job_id, enable).await?;
+    repository::backfill::update_enabled(org_id, job_id, enable).await?;
 
     Ok(())
 }
@@ -544,13 +549,13 @@ pub async fn update_backfill_job(
     req: BackfillRequest,
 ) -> Result<(), anyhow::Error> {
     // Fetch existing config from backfill_jobs table
-    let existing_config = db::backfill::get(org_id, job_id).await?;
+    let existing_config = repository::backfill::get(org_id, job_id).await?;
 
     // Fetch the trigger using module_key (which is the job_id)
-    let trigger = db::scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
+    let trigger = openobserve_scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
 
     // Only allow updating paused or completed jobs
-    if trigger.status != db::scheduler::TriggerStatus::Completed {
+    if trigger.status != openobserve_scheduler::TriggerStatus::Completed {
         return Err(anyhow::anyhow!(
             "Can only update paused or completed backfill jobs. Current status: {:?}",
             trigger.status
@@ -565,7 +570,7 @@ pub async fn update_backfill_job(
 
     // Validate deletion is not enabled for pipelines with remote destinations
     if req.delete_before_backfill {
-        let pipeline = crate::db::pipeline::get_by_id(&existing_config.pipeline_id).await?;
+        let pipeline = repository::pipelines::get_by_id(&existing_config.pipeline_id).await?;
         let has_remote_destination = pipeline.nodes.iter().any(|node| {
             matches!(
                 &node.data,
@@ -581,7 +586,7 @@ pub async fn update_backfill_job(
     }
 
     // Update backfill_jobs table with new config
-    let updated_db_job = db::backfill::BackfillJob {
+    let updated_db_job = repository::backfill::BackfillJob {
         id: job_id.to_string(),
         org: org_id.to_string(),
         pipeline_id: existing_config.pipeline_id, // Keep existing pipeline_id
@@ -593,7 +598,7 @@ pub async fn update_backfill_job(
         created_at: existing_config.created_at,
         enabled: existing_config.enabled, // Keep existing enabled status
     };
-    db::backfill::update(&updated_db_job).await?;
+    repository::backfill::update(&updated_db_job).await?;
 
     // Reset dynamic state for restart as new job
     let reset_backfill_job = BackfillJob {
@@ -610,8 +615,8 @@ pub async fn update_backfill_job(
     };
 
     let now = chrono::Utc::now().timestamp_micros();
-    db::scheduler::update_trigger(
-        db::scheduler::Trigger {
+    openobserve_scheduler::update_trigger(
+        openobserve_scheduler::Trigger {
             id: trigger.id,
             org: trigger.org.clone(),
             module: trigger.module,
@@ -619,7 +624,7 @@ pub async fn update_backfill_job(
             next_run_at: now, // Schedule immediately
             is_realtime: trigger.is_realtime,
             is_silenced: trigger.is_silenced,
-            status: db::scheduler::TriggerStatus::Waiting, // Reset to Waiting for execution
+            status: openobserve_scheduler::TriggerStatus::Waiting, // Reset to Waiting for execution
             start_time: trigger.start_time,
             end_time: trigger.end_time,
             retries: 0, // Reset retries

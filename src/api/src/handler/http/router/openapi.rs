@@ -454,7 +454,7 @@ use crate::{common::meta, handler::http::request};
             // Backfill
             request::pipelines::backfill::BackfillRequest,
             request::pipelines::backfill::BackfillResponse,
-            openobserve_core::alerts::backfill::BackfillJobStatus,
+            openobserve_pipeline::backfill::BackfillJobStatus,
             // Synthetics
             config::meta::synthetics::Synthetic,
             config::meta::synthetics::SyntheticType,

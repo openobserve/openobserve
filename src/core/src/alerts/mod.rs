@@ -44,7 +44,6 @@ use crate::{
 };
 
 pub mod alert;
-pub mod backfill;
 #[cfg(feature = "enterprise")]
 pub mod deduplication {
     pub use openobserve_alerts::service::deduplication::*;

@@ -10,20 +10,31 @@ path = "src/lib.rs"
 
 [features]
 default = []
-enterprise = ["config/enterprise"]
-cloud = ["enterprise", "common/cloud"]
+enterprise = [
+    "config/enterprise",
+    "dep:o2_enterprise",
+    "openobserve-scheduler/enterprise",
+]
+cloud = ["enterprise", "common/cloud", "o2_enterprise/cloud"]
 
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
 axum.workspace = true
+chrono.workspace = true
 common.workspace = true
 config.workspace = true
 infra.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+openobserve-scheduler.workspace = true
 proto.workspace = true
 sea-orm.workspace = true
+serde.workspace = true
 serde_json.workspace = true
+svix-ksuid.workspace = true
 thiserror.workspace = true
+utoipa.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

@@ -35,7 +35,6 @@ pub mod alerts {
         pub use openobserve_alerts::repository::templates::*;
     }
 }
-pub mod backfill;
 pub mod compact {
     pub mod compactor_manual_jobs {
         pub use openobserve_compactor::repository::compactor_manual_jobs::*;

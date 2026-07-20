@@ -20,8 +20,8 @@ use axum::{
     response::Response,
 };
 #[cfg(feature = "enterprise")]
-use openobserve_core::alerts::backfill;
-pub use openobserve_core::alerts::backfill::BackfillRequest;
+use openobserve_pipeline::backfill;
+pub use openobserve_pipeline::backfill::BackfillRequest;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

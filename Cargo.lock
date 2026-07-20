@@ -6984,14 +6984,21 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
+ "chrono",
  "common",
  "config",
  "infra",
+ "log",
+ "o2_enterprise",
+ "openobserve-scheduler",
  "proto",
  "sea-orm",
+ "serde",
  "serde_json",
+ "svix-ksuid",
  "thiserror 2.0.18",
  "tokio",
+ "utoipa",
 ]
 
 [[package]]
