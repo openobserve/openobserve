@@ -18,8 +18,6 @@
 #![recursion_limit = "256"]
 
 pub(crate) use openobserve_core as service;
-#[cfg(feature = "enterprise")]
-pub use openobserve_core::cipher;
 
 pub(crate) mod common {
     pub mod infra {

@@ -15,8 +15,7 @@
 
 use infra::table::cipher::{self, ListFilter};
 use o2_enterprise::enterprise::cipher::CipherData;
-
-use crate::cipher::registry::REGISTRY;
+use openobserve_search_service::cipher::registry::REGISTRY;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     log::info!("retrieving and caching cipher keys in memory");

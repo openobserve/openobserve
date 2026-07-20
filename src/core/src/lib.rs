@@ -17,9 +17,6 @@
 
 #![recursion_limit = "256"]
 
-#[cfg(feature = "enterprise")]
-pub use ::search::cipher;
-
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub use openobserve_alerts::anomaly_detection;

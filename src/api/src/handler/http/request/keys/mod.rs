@@ -16,7 +16,6 @@
 use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use {
-    crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
     crate::common::utils::auth::check_permissions,
     crate::common::{
         meta::authz::Authz,
@@ -30,6 +29,7 @@ use {
     config::utils::time::now_micros,
     infra::table::cipher::CipherEntry,
     o2_enterprise::enterprise::cipher::{Cipher, CipherData, http_repr::merge_updates},
+    openobserve_search_service::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse},
 };
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
@@ -92,7 +92,7 @@ pub async fn save(
         Err(e) => return MetaHttpResponse::bad_request(e),
     }
 
-    match openobserve_core::db::keys::add(CipherEntry {
+    match openobserve_organization::keys::add(CipherEntry {
         org: org_id.to_string(),
         created_at: now_micros(),
         created_by: user_id.to_string(),
@@ -309,7 +309,7 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     #[cfg(feature = "enterprise")]
     {
         let (org_id, key_name) = path;
-        match openobserve_core::db::keys::remove(
+        match openobserve_organization::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
             &key_name,
@@ -394,7 +394,7 @@ pub async fn delete_bulk(
     let mut unsuccessful = Vec::with_capacity(body.ids.len());
     let mut err = None;
     for key_name in &body.ids {
-        match openobserve_core::db::keys::remove(
+        match openobserve_organization::keys::remove(
             &org_id,
             infra::table::cipher::EntryKind::CipherKey,
             key_name,
@@ -509,7 +509,7 @@ pub async fn update(
         Err(e) => return MetaHttpResponse::bad_request(e),
     }
 
-    match openobserve_core::db::keys::update(CipherEntry {
+    match openobserve_organization::keys::update(CipherEntry {
         org: org_id.to_string(),
         created_at: now_micros(),
         created_by: user_id.to_string(),

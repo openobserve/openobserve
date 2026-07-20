@@ -19,6 +19,7 @@ enterprise = [
     "openobserve-catalog/enterprise",
     "openobserve-core/enterprise",
     "openobserve-pipeline/enterprise",
+    "openobserve-search-service/enterprise",
 ]
 cloud = [
     "enterprise",
@@ -40,6 +41,7 @@ openobserve-ingestion.workspace = true
 openobserve-organization.workspace = true
 openobserve-pipeline.workspace = true
 openobserve-scheduler.workspace = true
+openobserve-search-service.workspace = true
 anyhow.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true

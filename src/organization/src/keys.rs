@@ -22,8 +22,7 @@ use infra::{
     table::cipher::{CipherEntry, EntryKind},
 };
 use o2_enterprise::enterprise::cipher::CipherData;
-
-use crate::{cipher::registry::REGISTRY, service::db};
+use openobserve_search_service::cipher::registry::REGISTRY;
 
 // DBKey to set cipher keys
 pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
@@ -165,7 +164,7 @@ pub async fn remove(org: &str, kind: EntryKind, name: &str) -> Result<(), errors
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let prefix = CIPHER_KEY_PREFIX;
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = get_coordinator().await;
     let mut events = cluster_coordinator.watch(prefix).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching cipher keys");

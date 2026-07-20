@@ -90,7 +90,9 @@ pub mod functions {
     pub use openobserve_transform::repository::*;
 }
 #[cfg(feature = "enterprise")]
-pub mod keys;
+pub mod keys {
+    pub use openobserve_organization::keys::*;
+}
 pub mod kv {
     pub use common::kv::*;
 }

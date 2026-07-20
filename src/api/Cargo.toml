@@ -21,6 +21,7 @@ enterprise = [
     "openobserve-catalog/enterprise",
     "openobserve-core/enterprise",
     "openobserve-pipeline/enterprise",
+    "openobserve-search-service/enterprise",
 ]
 cloud = [
     "enterprise",

@@ -28,6 +28,8 @@ use config::meta::{
 use infra::errors::Error;
 
 pub mod cache;
+#[cfg(feature = "enterprise")]
+pub use search::cipher;
 pub mod cardinality;
 pub mod cluster;
 pub mod file_list;

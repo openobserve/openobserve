@@ -15,6 +15,8 @@ use config::meta::{function::Transform, stream::StreamType};
 pub mod auth;
 pub mod authz;
 #[cfg(feature = "enterprise")]
+pub mod keys;
+#[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod org_cleanup;
 #[cfg(feature = "enterprise")]
@@ -138,14 +140,6 @@ pub trait Runtime: Send + Sync {
         stream_name: &str,
         stream_type: StreamType,
     ) -> anyhow::Result<()>;
-
-    #[cfg(feature = "enterprise")]
-    async fn delete_cipher_key(
-        &self,
-        org_id: &str,
-        kind: infra::table::cipher::EntryKind,
-        name: &str,
-    ) -> anyhow::Result<()>;
 }
 
 static RUNTIME: OnceLock<Arc<dyn Runtime>> = OnceLock::new();
@@ -197,18 +191,6 @@ pub(crate) async fn delete_stream_schema(
     runtime
         .delete_stream_schema(org_id, stream_name, stream_type)
         .await
-}
-
-#[cfg(feature = "enterprise")]
-pub(crate) async fn delete_cipher_key(
-    org_id: &str,
-    kind: infra::table::cipher::EntryKind,
-    name: &str,
-) -> anyhow::Result<()> {
-    let runtime = RUNTIME
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("organization runtime is not installed"))?;
-    runtime.delete_cipher_key(org_id, kind, name).await
 }
 
 #[cfg(feature = "cloud")]

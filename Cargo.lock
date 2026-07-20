@@ -7082,6 +7082,7 @@ dependencies = [
  "openobserve-organization",
  "openobserve-pipeline",
  "openobserve-scheduler",
+ "openobserve-search-service",
  "openobserve-transform",
  "prometheus",
  "proto",

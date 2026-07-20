@@ -353,9 +353,9 @@ async fn delete_org_alerts(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 /// Delete every cipher key in an org. On enterprise builds this goes through the
-/// service `db::keys::remove` path so the in-memory `REGISTRY` evicts on all nodes
+/// organization key service so the in-memory `REGISTRY` evicts on all nodes
 /// (coordinator delete watch) and the super-cluster is notified — none of which a
-/// raw table wipe does. On OSS builds (no cipher REGISTRY / db::keys module) it
+/// raw table wipe does. On OSS builds (no cipher registry/key service) it
 /// falls back to a direct table delete.
 async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
@@ -369,7 +369,7 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
         };
         let keys = infra::table::cipher::list_filtered(filter, None).await?;
         for key in keys {
-            crate::delete_cipher_key(org_id, EntryKind::CipherKey, &key.name)
+            crate::keys::remove(org_id, EntryKind::CipherKey, &key.name)
                 .await
                 .map_err(|e| anyhow::anyhow!("cipher key {}: {e}", key.name))?;
         }

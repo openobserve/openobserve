@@ -49,18 +49,6 @@ impl openobserve_organization::Runtime for CoreOrganizationRuntime {
     ) -> anyhow::Result<()> {
         openobserve_catalog::schema::delete(org_id, stream_name, Some(stream_type)).await
     }
-
-    #[cfg(feature = "enterprise")]
-    async fn delete_cipher_key(
-        &self,
-        org_id: &str,
-        kind: infra::table::cipher::EntryKind,
-        name: &str,
-    ) -> anyhow::Result<()> {
-        crate::db::keys::remove(org_id, kind, name)
-            .await
-            .map_err(Into::into)
-    }
 }
 
 pub(crate) fn install_runtime() {
