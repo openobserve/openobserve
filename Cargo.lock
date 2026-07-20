@@ -7189,6 +7189,7 @@ dependencies = [
  "arrow-schema",
  "async-recursion",
  "async-trait",
+ "axum",
  "bytes",
  "chrono",
  "common",

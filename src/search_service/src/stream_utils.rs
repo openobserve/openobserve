@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{
+    io::Error,
+    sync::{Arc, OnceLock},
+};
 
 use arrow::array::{Int64Array, RecordBatch};
 use axum::response::Response;
@@ -25,7 +28,25 @@ use config::{
     },
 };
 
-use crate::users;
+#[async_trait::async_trait]
+pub trait UserResolver: Send + Sync + 'static {
+    async fn get_user(&self, org_id: &str, user_id: &str) -> Option<User>;
+}
+
+static USER_RESOLVER: OnceLock<Arc<dyn UserResolver>> = OnceLock::new();
+
+pub fn install_user_resolver(resolver: Arc<dyn UserResolver>) -> Result<(), &'static str> {
+    USER_RESOLVER
+        .set(resolver)
+        .map_err(|_| "search user resolver is already installed")
+}
+
+async fn get_user(org_id: &str, user_id: &str) -> Option<User> {
+    match USER_RESOLVER.get() {
+        Some(resolver) => resolver.get_user(org_id, user_id).await,
+        None => None,
+    }
+}
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<Response, Error> {
@@ -138,7 +159,7 @@ pub async fn get_settings_max_query_range(
         return effective_max_query_range;
     }
 
-    if let Some(user) = users::get_user(Some(org_id), user_id.unwrap()).await {
+    if let Some(user) = get_user(org_id, user_id.unwrap()).await {
         // get_max_query_range_by_user_role will use the effective max query range internally
         // Hence using the stream_max_query_range passed in
         get_max_query_range_by_user_role(stream_max_query_range, &user)
@@ -178,7 +199,7 @@ pub async fn get_max_query_range(
     user_id: &str,
     stream_type: StreamType,
 ) -> i64 {
-    let user = users::get_user(Some(org_id), user_id).await;
+    let user = get_user(org_id, user_id).await;
 
     futures::future::join_all(
         stream_names

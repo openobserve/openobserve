@@ -126,6 +126,10 @@ async fn main() -> Result<(), anyhow::Error> {
         openobserve_core::search::CoreSearchRuntime,
     ))
     .map_err(anyhow::Error::msg)?;
+    openobserve_search_service::stream_utils::install_user_resolver(std::sync::Arc::new(
+        openobserve_core::search::CoreSearchRuntime,
+    ))
+    .map_err(anyhow::Error::msg)?;
 
     #[cfg(feature = "tokio-console")]
     console_subscriber::ConsoleLayer::builder()

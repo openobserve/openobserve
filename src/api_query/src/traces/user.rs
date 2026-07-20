@@ -184,7 +184,7 @@ pub async fn get_latest_users(
         return MetaHttpResponse::bad_request("end_time is empty");
     }
 
-    let max_query_range = openobserve_core::stream_utils::get_max_query_range(
+    let max_query_range = openobserve_search_service::stream_utils::get_max_query_range(
         std::slice::from_ref(&stream_name),
         org_id.as_str(),
         user_id,

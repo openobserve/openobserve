@@ -332,7 +332,7 @@ pub async fn get_latest_traces(
         end_time = std::cmp::min(now_micros(), start_time_from_trace_id + 3600 * 1_000_000); //1 hour later
     }
 
-    let max_query_range = openobserve_core::stream_utils::get_max_query_range(
+    let max_query_range = openobserve_search_service::stream_utils::get_max_query_range(
         std::slice::from_ref(&stream_name),
         org_id.as_str(),
         user_id,
@@ -1047,7 +1047,7 @@ pub async fn get_latest_traces_stream(
         end_time = start_time_from_trace_id + 3600 * 1_000_000;
     }
 
-    let max_query_range = openobserve_core::stream_utils::get_max_query_range(
+    let max_query_range = openobserve_search_service::stream_utils::get_max_query_range(
         std::slice::from_ref(&stream_name),
         org_id.as_str(),
         user_id,

@@ -24,6 +24,7 @@ arrow.workspace = true
 arrow-schema.workspace = true
 async-recursion.workspace = true
 async-trait.workspace = true
+axum.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 common.workspace = true

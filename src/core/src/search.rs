@@ -83,7 +83,13 @@ impl openobserve_search_service::streaming::StreamingRuntime for CoreSearchRunti
         user_id: &str,
         stream_type: StreamType,
     ) -> i64 {
-        crate::stream_utils::get_max_query_range(stream_names, org_id, user_id, stream_type).await
+        openobserve_search_service::stream_utils::get_max_query_range(
+            stream_names,
+            org_id,
+            user_id,
+            stream_type,
+        )
+        .await
     }
 
     async fn search_partition(
@@ -147,8 +153,12 @@ impl openobserve_search_service::partition::PartitionRuntime for CoreSearchRunti
         org_id: &str,
         user_id: Option<&str>,
     ) -> i64 {
-        crate::stream_utils::get_settings_max_query_range(stream_max_query_range, org_id, user_id)
-            .await
+        openobserve_search_service::stream_utils::get_settings_max_query_range(
+            stream_max_query_range,
+            org_id,
+            user_id,
+        )
+        .await
     }
 }
 
@@ -342,5 +352,12 @@ impl openobserve_search_service::file_list::DumpReader for CoreSearchRuntime {
             range,
         )
         .await
+    }
+}
+
+#[async_trait::async_trait]
+impl openobserve_search_service::stream_utils::UserResolver for CoreSearchRuntime {
+    async fn get_user(&self, org_id: &str, user_id: &str) -> Option<config::meta::user::User> {
+        crate::users::get_user(Some(org_id), user_id).await
     }
 }

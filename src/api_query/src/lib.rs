@@ -28,7 +28,8 @@ pub(crate) mod common {
 
     pub mod utils {
         pub use ::common::utils::*;
-        pub use openobserve_core::{auth, stream_utils as stream};
+        pub use openobserve_core::auth;
+        pub use openobserve_search_service::stream_utils as stream;
     }
 }
 

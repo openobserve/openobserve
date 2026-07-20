@@ -43,6 +43,7 @@ pub mod repository;
 mod searcher;
 pub mod service;
 pub mod sourcemaps;
+pub mod stream_utils;
 pub mod streaming;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
