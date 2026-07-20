@@ -419,13 +419,7 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     // init http server
-    if !cfg.common.tracing_enabled
-        && (cfg.common.tracing_search_enabled || cfg.common.search_inspector_enabled)
-    {
-        if let Err(e) = init_http_server_without_tracing().await {
-            log::error!("HTTP server runs failed: {e}");
-        }
-    } else if let Err(e) = init_http_server().await {
+    if let Err(e) = init_http_server().await {
         log::error!("HTTP server runs failed: {e}");
     }
     log::info!("HTTP server stopped");
@@ -668,10 +662,10 @@ async fn init_router_grpc_server(
     Ok(())
 }
 
-async fn init_http_server() -> Result<(), anyhow::Error> {
+/// Resolve the HTTP listen address from config
+fn http_server_addr() -> Result<SocketAddr, anyhow::Error> {
     let cfg = get_config();
-
-    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
+    let haddr = if cfg.http.ipv6_enabled {
         format!("[::]:{}", cfg.http.port).parse()?
     } else {
         let ip = if !cfg.http.addr.is_empty() {
@@ -681,166 +675,85 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         };
         format!("{}:{}", ip, cfg.http.port).parse()?
     };
+    Ok(haddr)
+}
 
-    let scheme = if cfg.http.tls_enabled {
-        "HTTPS"
-    } else {
-        "HTTP"
-    };
-    log::info!("Starting {scheme} server at: {haddr}");
-
-    // Build the router
+/// Apply the middlewares shared by all HTTP servers: access log, slow log and
+/// client IP resolution
+fn apply_common_middlewares(app: axum::Router) -> axum::Router {
+    let cfg = get_config();
     let ip_sources = config::axum::middlewares::resolve_client_ip_sources(&cfg.http.real_ip_source);
     log::info!(
         "HTTP client IP sources (in order, implicit ConnectInfo fallback): {}",
         cfg.http.real_ip_source
     );
-    let app = create_app_router()
-        .layer(config::axum::middlewares::AccessLogLayer::new(
-            config::axum::middlewares::get_http_access_log_format(),
-        ))
-        .layer(config::axum::middlewares::SlowLogLayer::new(
-            cfg.limit.http_slow_log_threshold,
-        ))
-        .layer(axum::middleware::from_fn(
-            config::axum::middlewares::extract_real_ip,
-        ))
-        .layer(axum::Extension(ip_sources))
-        .layer(CompressionLayer::new())
-        .layer(TraceLayer::new_for_http());
+    app.layer(config::axum::middlewares::AccessLogLayer::new(
+        config::axum::middlewares::get_http_access_log_format(),
+    ))
+    .layer(config::axum::middlewares::SlowLogLayer::new(
+        cfg.limit.http_slow_log_threshold,
+    ))
+    .layer(axum::middleware::from_fn(
+        config::axum::middlewares::extract_real_ip,
+    ))
+    .layer(axum::Extension(ip_sources))
+}
 
+/// Serve `app` on `haddr`, with TLS if configured. Graceful shutdown is
+/// bounded by ZO_HTTP_SHUTDOWN_TIMEOUT so long-lived connections (SSE,
+/// websocket) cannot block process exit.
+async fn serve_http(haddr: SocketAddr, app: axum::Router) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    let handle = axum_server::Handle::new();
+    let shutdown_timeout = cfg.limit.http_shutdown_timeout;
+
+    // Spawn task to handle shutdown signal
+    tokio::spawn({
+        let handle = handle.clone();
+        async move {
+            shutdown_signal().await;
+            handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
+        }
+    });
+
+    let service = app.into_make_service_with_connect_info::<SocketAddr>();
     if cfg.http.tls_enabled {
-        // TLS server using axum-server
         let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
             &cfg.http.tls_cert_path,
             &cfg.http.tls_key_path,
         )
         .await?;
-
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
-            }
-        });
-
         axum_server::bind_rustls(haddr, tls_config)
             .handle(handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .serve(service)
             .await?;
     } else {
-        // Non-TLS server
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
-            }
-        });
-
-        axum_server::bind(haddr)
-            .handle(handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await?;
+        axum_server::bind(haddr).handle(handle).serve(service).await?;
     }
 
     Ok(())
 }
 
-async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
+async fn init_http_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-
-    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
-        format!("[::]:{}", cfg.http.port).parse()?
-    } else {
-        let ip = if !cfg.http.addr.is_empty() {
-            cfg.http.addr.clone()
-        } else {
-            "0.0.0.0".to_string()
-        };
-        format!("{}:{}", ip, cfg.http.port).parse()?
-    };
-
-    let scheme = if cfg.http.tls_enabled {
-        "HTTPS"
-    } else {
-        "HTTP"
-    };
-    log::info!("Starting {scheme} server at: {haddr}");
-
-    // Build the router without tracing
-    let ip_sources = config::axum::middlewares::resolve_client_ip_sources(&cfg.http.real_ip_source);
+    let haddr = http_server_addr()?;
     log::info!(
-        "HTTP client IP sources (in order, implicit ConnectInfo fallback): {}",
-        cfg.http.real_ip_source
+        "Starting {} server at: {haddr}",
+        if cfg.http.tls_enabled { "HTTPS" } else { "HTTP" }
     );
-    let app = create_app_router()
-        .layer(config::axum::middlewares::AccessLogLayer::new(
-            config::axum::middlewares::get_http_access_log_format(),
-        ))
-        .layer(config::axum::middlewares::SlowLogLayer::new(
-            cfg.limit.http_slow_log_threshold,
-        ))
-        .layer(axum::middleware::from_fn(
-            config::axum::middlewares::extract_real_ip,
-        ))
-        .layer(axum::Extension(ip_sources))
-        .layer(CompressionLayer::new());
 
-    if cfg.http.tls_enabled {
-        // TLS server using axum-server
-        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
-            &cfg.http.tls_cert_path,
-            &cfg.http.tls_key_path,
-        )
-        .await?;
-
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
-            }
-        });
-
-        axum_server::bind_rustls(haddr, tls_config)
-            .handle(handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await?;
+    // Build the router
+    let app = apply_common_middlewares(create_app_router()).layer(CompressionLayer::new());
+    // Skip the request tracing layer when tracing is enabled only for search
+    let app = if !cfg.common.tracing_enabled
+        && (cfg.common.tracing_search_enabled || cfg.common.search_inspector_enabled)
+    {
+        app
     } else {
-        // Non-TLS server
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
+        app.layer(TraceLayer::new_for_http())
+    };
 
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
-            }
-        });
-
-        axum_server::bind(haddr)
-            .handle(handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await?;
-    }
-
-    Ok(())
+    serve_http(haddr, app).await
 }
 
 /// Signal handler for graceful shutdown
@@ -1410,87 +1323,21 @@ fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, anyho
 #[cfg(feature = "enterprise")]
 async fn init_action_server() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-
-    let haddr: SocketAddr = if cfg.http.ipv6_enabled {
-        format!("[::]:{}", cfg.http.port).parse()?
-    } else {
-        let ip = if !cfg.http.addr.is_empty() {
-            cfg.http.addr.clone()
-        } else {
-            "0.0.0.0".to_string()
-        };
-        format!("{}:{}", ip, cfg.http.port).parse()?
-    };
+    let haddr = http_server_addr()?;
 
     // Setup the namespace
     o2_enterprise::enterprise::actions::action_deployer::init().await?;
 
-    let scheme = if cfg.http.tls_enabled {
-        "HTTPS"
-    } else {
-        "HTTP"
-    };
-    log::info!("Starting Action Server {scheme} server at: {haddr}");
+    log::info!(
+        "Starting Action Server {} server at: {haddr}",
+        if cfg.http.tls_enabled { "HTTPS" } else { "HTTP" }
+    );
 
     // Build the router for action server
-    let ip_sources = config::axum::middlewares::resolve_client_ip_sources(&cfg.http.real_ip_source);
-    let app = create_action_server_router()
-        .layer(config::axum::middlewares::AccessLogLayer::new(
-            config::axum::middlewares::get_http_access_log_format(),
-        ))
-        .layer(config::axum::middlewares::SlowLogLayer::new(
-            cfg.limit.http_slow_log_threshold,
-        ))
-        .layer(axum::middleware::from_fn(
-            config::axum::middlewares::extract_real_ip,
-        ))
-        .layer(axum::Extension(ip_sources))
+    let app = apply_common_middlewares(create_action_server_router())
         .layer(TraceLayer::new_for_http());
 
-    if cfg.http.tls_enabled {
-        // TLS server using axum-server
-        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
-            &cfg.http.tls_cert_path,
-            &cfg.http.tls_key_path,
-        )
-        .await?;
-
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle
-                    .graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout as u64))));
-            }
-        });
-
-        axum_server::bind_rustls(haddr, tls_config)
-            .handle(handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await?;
-    } else {
-        // Non-TLS server
-        let handle = axum_server::Handle::new();
-        let shutdown_timeout = cfg.limit.http_shutdown_timeout;
-
-        // Spawn task to handle shutdown signal
-        tokio::spawn({
-            let handle = handle.clone();
-            async move {
-                shutdown_signal().await;
-                handle.graceful_shutdown(Some(Duration::from_secs(max(1, shutdown_timeout))));
-            }
-        });
-
-        axum_server::bind(haddr)
-            .handle(handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await?;
-    }
+    serve_http(haddr, app).await?;
 
     log::info!("HTTP server stopped");
 
