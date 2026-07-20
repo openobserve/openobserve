@@ -806,6 +806,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_alert_manager() {
         o2_enterprise::enterprise::synthetics::init().await;
+        if get_o2_config().synthetics.enabled {
+            tokio::task::spawn(crate::service::synthetics::location_staleness_watcher());
+        }
     }
     tokio::task::spawn(metrics::run());
     let _ = promql::run();

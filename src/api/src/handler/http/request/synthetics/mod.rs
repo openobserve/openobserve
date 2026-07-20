@@ -1229,8 +1229,8 @@ pub async fn create_location(
             for req in batch.locations {
                 let label = req.label.clone();
                 match create_location(&org_id, is_root, req).await {
-                    Ok(loc) => results.push(serde_json::json!({
-                        "id": loc.id, "pool": loc.pool, "ok": true,
+                    Ok(resp) => results.push(serde_json::json!({
+                        "id": resp.location.id, "pool": resp.location.pool, "ok": true,
                     })),
                     Err(e) => results.push(serde_json::json!({
                         "label": label, "ok": false, "error": e.to_string(),
@@ -1252,6 +1252,46 @@ pub async fn create_location(
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/locations/{id}",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "GetSyntheticsLocation",
+    summary = "Location detail: stats + registered agents + assigned checks",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("id" = String, Path, description = "Location id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 404, description = "Not found"),
+    ),
+)]
+pub async fn get_location(Path((org_id, id)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::synthetics::service::location_detail(&org_id, &id).await {
+            Ok(detail) => MetaHttpResponse::json(detail),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("not found") {
+                    return MetaHttpResponse::not_found(msg);
+                }
+                tracing::error!("[synthetics] get_location: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, id);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }

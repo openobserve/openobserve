@@ -992,7 +992,7 @@ pub fn service_routes() -> Router {
                 // Synthetics — CRUD + locations
                 .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
                 .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
-                .route("/{org_id}/synthetics/locations/{id}", put(synthetics::update_location).delete(synthetics::delete_location))
+                .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
                 .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
                 .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
                 .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
