@@ -262,13 +262,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <OSeparator />
-    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <OSeparator />
-    <!-- filters container -->
-    <DashboardFiltersOption
-      :dashboardData="dashboardData"
-    ></DashboardFiltersOption>
+    <template v-if="showJoinsAndFilters">
+      <OSeparator />
+      <DashboardJoinsOption
+        :dashboardData="dashboardData"
+      ></DashboardJoinsOption>
+      <OSeparator />
+      <!-- filters container -->
+      <DashboardFiltersOption
+        :dashboardData="dashboardData"
+      ></DashboardFiltersOption>
+    </template>
   </div>
 </template>
 
@@ -552,9 +556,23 @@ export default defineComponent({
       return commonBtnLabel(valueField);
     });
 
+    // Joins and Filters hide themselves in custom-SQL mode; the separators
+    // around them must follow the same condition or they stack into a
+    // double border.
+    const showJoinsAndFilters = computed(() => {
+      const currentQuery =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+      return !(
+        currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql"
+      );
+    });
+
     return {
       t,
       dashboardPanelData,
+      showJoinsAndFilters,
       removeMapName,
       removeMapValue,
       nameLabel,

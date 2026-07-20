@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <OSeparator />
+    <OSeparator v-if="dashboardPanelData.data.type != 'metric'" />
     <!-- y axis container -->
     <div class="pl-3 flex flex-row">
       <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
@@ -467,10 +467,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <OSeparator />
-
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
+      <OSeparator />
       <div class="pl-3 flex flex-row">
         <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
           {{
@@ -604,13 +603,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </span>
-    <OSeparator />
-    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <OSeparator />
-    <!-- filters container -->
-    <DashboardFiltersOption
-      :dashboardData="dashboardData"
-    ></DashboardFiltersOption>
+    <template v-if="showJoinsAndFilters">
+      <OSeparator />
+      <DashboardJoinsOption
+        :dashboardData="dashboardData"
+      ></DashboardJoinsOption>
+      <OSeparator />
+      <!-- filters container -->
+      <DashboardFiltersOption
+        :dashboardData="dashboardData"
+      ></DashboardFiltersOption>
+    </template>
   </div>
 
   <!-- PromQL Builder Mode -->
@@ -771,6 +774,19 @@ export default defineComponent({
       return dashboardPanelData.data.type == "h-bar"
         ? t("panel.xAxisShort")
         : t("panel.yAxisShort");
+    });
+
+    // Joins and Filters hide themselves in custom-SQL mode; the separators
+    // around them must follow the same condition or they stack into a
+    // double border after the Y-axis row.
+    const showJoinsAndFilters = computed(() => {
+      const currentQuery =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+      return !(
+        currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql"
+      );
     });
 
     // Initialize treatAsNonTimestamp for existing fields (only for table charts)
@@ -1610,6 +1626,7 @@ export default defineComponent({
       currentYLabel,
       isPivotMode,
       reorderItems,
+      showJoinsAndFilters,
     };
   },
 });
