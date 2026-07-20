@@ -26,26 +26,34 @@ cloud = [
     "openobserve-alerts/cloud",
     "openobserve-pipeline/cloud",
 ]
+vectorscan = ["enterprise", "o2_enterprise/vectorscan"]
 
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+arrow-schema.workspace = true
 axum.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 common.workspace = true
 config.workspace = true
+flate2.workspace = true
+hashbrown.workspace = true
 infra.workspace = true
 ingester.workspace = true
+itertools.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 opentelemetry-proto.workspace = true
+opentelemetry.workspace = true
 openobserve-alerts.workspace = true
 openobserve-catalog.workspace = true
 openobserve-pipeline.workspace = true
 openobserve-scheduler.workspace = true
 openobserve-transform.workspace = true
 proto.workspace = true
+promql-parser.workspace = true
+prost.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
@@ -53,3 +61,4 @@ utoipa.workspace = true
 
 [dev-dependencies]
 arrow-schema.workspace = true
+prost-wkt-types.workspace = true

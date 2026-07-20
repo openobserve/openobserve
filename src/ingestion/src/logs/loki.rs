@@ -22,14 +22,13 @@ use config::{
     utils::{json, schema::format_stream_name},
 };
 use infra::errors::Result;
-use openobserve_ingestion::types::{
-    IngestUser, IngestionRequest, IngestionResponse, IngestionValueType,
-};
 use promql_parser::{
     label::MatchOp,
     parser::{self, Expr as PromExpr},
 };
 use proto::loki_rpc;
+
+use crate::types::{IngestUser, IngestionRequest, IngestionResponse, IngestionValueType};
 
 pub enum LokiRequest {
     Json(LokiPushRequest),

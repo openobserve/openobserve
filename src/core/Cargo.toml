@@ -39,6 +39,7 @@ cloud = [
 ]
 vectorscan = [
     "o2_enterprise/vectorscan",
+    "openobserve-ingestion/vectorscan",
     "search/vectorscan",
     "openobserve-search-service/vectorscan",
 ]

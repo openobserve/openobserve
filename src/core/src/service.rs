@@ -15,9 +15,7 @@
 
 //! Private import prelude for composition code that has not yet moved to a domain crate.
 
-use config::meta::stream::StreamParams;
 pub use config::utils::schema::format_stream_name;
-use infra::errors::Result;
 use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -32,17 +30,6 @@ pub use crate::{
 };
 #[cfg(feature = "cloud")]
 pub use crate::{org_usage, trial_quota};
-
-// format stream name
-pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
-    let stream_name = params.stream_name.to_string();
-    let schema = infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type).await?;
-    Ok(if schema.fields_map().is_empty() {
-        format_stream_name(stream_name)
-    } else {
-        stream_name
-    })
-}
 
 /// Setup tracing with a trace ID
 /// This function should be called when the parent span is already active (entered) in the tracing

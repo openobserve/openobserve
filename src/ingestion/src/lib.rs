@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod grpc;
+pub mod logs;
 pub mod ports;
 pub mod repository;
 pub mod service;

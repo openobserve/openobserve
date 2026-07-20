@@ -358,6 +358,30 @@ pub async fn check_ingestion_allowed(
     Ok(())
 }
 
+pub async fn get_formatted_stream_name(params: StreamParams) -> Result<String> {
+    let stream_name = params.stream_name.to_string();
+    let schema = infra::schema::get_cache(&params.org_id, &stream_name, params.stream_type).await?;
+    Ok(if schema.fields_map().is_empty() {
+        config::utils::schema::format_stream_name(stream_name)
+    } else {
+        stream_name
+    })
+}
+
+pub fn get_upto_discard_error() -> anyhow::Error {
+    anyhow::anyhow!(
+        "Too old data, only last {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>",
+        config::get_config().limit.ingest_allowed_upto
+    )
+}
+
+pub fn get_future_discard_error() -> anyhow::Error {
+    anyhow::anyhow!(
+        "Too far data, only future {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_IN_FUTURE=<max_hours>",
+        config::get_config().limit.ingest_allowed_in_future
+    )
+}
+
 pub fn get_val_for_attr(attr_val: &Value) -> Value {
     let local_val = attr_val.as_object().unwrap();
     if let Some((key, value)) = local_val.into_iter().next() {

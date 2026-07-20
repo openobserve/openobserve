@@ -32,6 +32,7 @@ use config::{
     utils::{
         flatten,
         json::{self, estimate_json_bytes},
+        schema::format_stream_name,
         time::{normalize_record_timestamp as handle_timestamp, now_micros},
     },
 };
@@ -50,16 +51,16 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::json;
 
-use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
+use super::{
+    bulk::{TRANSFORM_FAILED, TS_PARSE_FAILED},
+    ingestion_log_enabled, log_failed_record,
+};
 use crate::{
-    common::meta::ingestion::{
+    service::{check_ingestion_allowed, get_formatted_stream_name},
+    types::{
         AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
         IngestionDataIter, IngestionRequest, IngestionResponse, IngestionStatus,
         IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
-    },
-    service::{
-        format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
-        logs::bulk::TRANSFORM_FAILED,
     },
 };
 
@@ -138,8 +139,7 @@ pub async fn ingest(
 
     // Start retrieve associated pipeline and construct pipeline components
     let stream_param = StreamParams::new(org_id, &stream_name, stream_type);
-    let executable_pipelines =
-        crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
+    let executable_pipelines = crate::service::get_stream_executable_pipelines(&stream_param).await;
     let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
     let mut original_options = Vec::with_capacity(stream_params.len());
@@ -156,7 +156,7 @@ pub async fn ingest(
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
     let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
-    crate::ingestion::get_uds_and_original_data_streams(
+    crate::service::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
         &mut streams_need_original_map,
@@ -372,7 +372,7 @@ pub async fn ingest(
                         if !user_defined_schema_map.contains_key(&destination_stream) {
                             // a new dynamically created stream. need to check the two maps
                             // again
-                            crate::ingestion::get_uds_and_original_data_streams(
+                            crate::service::get_uds_and_original_data_streams(
                                 &[stream_params],
                                 &mut user_defined_schema_map,
                                 &mut streams_need_original_map,
@@ -413,7 +413,7 @@ pub async fn ingest(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
+                                local_val = crate::service::refactor_map(local_val, fields);
                             }
 
                             // usize::MAX used as a flag when pipeline is applied with
@@ -430,7 +430,7 @@ pub async fn ingest(
                                     ORIGINAL_DATA_COL_NAME.to_string(),
                                     original_options[idx].clone().unwrap().into(),
                                 );
-                                let record_id = crate::ingestion::generate_record_id(
+                                let record_id = crate::service::generate_record_id(
                                     org_id,
                                     &destination_stream,
                                     &StreamType::Logs,
@@ -690,7 +690,7 @@ fn finalize_and_buffer_record(
         }
     };
     if let Some(Some(fields)) = ctx.user_defined_schema_map.get(ctx.stream_name) {
-        local_val = crate::ingestion::refactor_map(local_val, fields);
+        local_val = crate::service::refactor_map(local_val, fields);
     }
     if ctx
         .streams_need_original_map
@@ -700,7 +700,7 @@ fn finalize_and_buffer_record(
     {
         local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), od.clone().into());
         let record_id =
-            crate::ingestion::generate_record_id(ctx.org_id, ctx.stream_name, &StreamType::Logs);
+            crate::service::generate_record_id(ctx.org_id, ctx.stream_name, &StreamType::Logs);
         local_val.insert(
             ID_COL_NAME.to_string(),
             json::Value::String(record_id.to_string()),

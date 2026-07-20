@@ -43,27 +43,13 @@ use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
     unwrap_stream_settings,
 };
+use openobserve_ingestion::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use serde_json::{Map, Value};
 
-use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use crate::{
     common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
     service::db,
 };
-
-pub(crate) fn get_upto_discard_error() -> anyhow::Error {
-    anyhow::anyhow!(
-        "Too old data, only last {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>",
-        get_config().limit.ingest_allowed_upto
-    )
-}
-
-pub(crate) fn get_future_discard_error() -> anyhow::Error {
-    anyhow::anyhow!(
-        "Too far data, only future {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_IN_FUTURE=<max_hours>",
-        get_config().limit.ingest_allowed_in_future
-    )
-}
 
 pub(crate) fn get_request_columns_limit_error(
     stream_name: &str,

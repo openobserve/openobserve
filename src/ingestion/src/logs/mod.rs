@@ -21,8 +21,9 @@ use std::{
 
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
+use common::meta::stream::SchemaRecords;
 use config::{
-    DISTINCT_FIELDS, META_ORG_ID, SIZE_IN_MB, get_config,
+    DISTINCT_FIELDS, SIZE_IN_MB, get_config,
     meta::{
         alerts::alert::Alert,
         self_reporting::usage::{RequestStats, UsageType},
@@ -42,17 +43,10 @@ use infra::{
 };
 use openobserve_alerts::service::alert::AlertExt;
 
-#[cfg(feature = "cloud")]
-use crate::stream::get_stream;
 use crate::{
-    common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
-    service::{
-        db,
-        ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-        metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
-        schema::{check_for_schema, stream_schema_exists},
-        self_reporting::report_request_usage_stats,
-    },
+    ports::{self, DistinctValue},
+    service::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
+    types::IngestionStatus,
 };
 
 pub mod bulk;
@@ -213,34 +207,9 @@ async fn write_logs_by_stream(
             continue; // skip
         }
 
-        // for cloud, we want to sent event when user creates a new stream
+        // For cloud, emit an event when a user creates a new stream.
         #[cfg(feature = "cloud")]
-        if get_stream(org_id, &stream_name, StreamType::Logs)
-            .await
-            .is_none()
-        {
-            let org = match super::organization::get_org(org_id).await {
-                None => {
-                    return Err(Error::Message(format!(
-                        "org with id {org_id} not found in db"
-                    )));
-                }
-                Some(org) => org,
-            };
-
-            super::self_reporting::cloud_events::enqueue_cloud_event(
-                super::self_reporting::cloud_events::CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: Some(user_email.to_string()),
-                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
-                    subscription_type: None,
-                    stream_name: Some(stream_name.clone()),
-                },
-            )
-            .await;
-        }
+        ports::report_stream_created_if_new(org_id, &stream_name, user_email).await?;
 
         // write json data by stream
         let mut req_stats = write_logs(
@@ -288,7 +257,7 @@ async fn write_logs_by_stream(
                 // req_stats already divides the size in mb
                 req_stats.size = *size as f64 / SIZE_IN_MB;
             }
-            report_request_usage_stats(
+            ports::report_request_usage_stats(
                 req_stats,
                 org_id,
                 &stream_name,
@@ -315,13 +284,13 @@ async fn write_logs(
     let log_ingest_errors = ingestion_log_enabled().await;
     // get schema and stream settings
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
-    let stream_schema = stream_schema_exists(
+    let stream_schema = ports::stream_schema_exists(
         org_id,
         stream_name,
         StreamType::Logs,
         &mut stream_schema_map,
     )
-    .await;
+    .await?;
 
     let schema = match stream_schema_map.get(stream_name) {
         Some(schema) => schema.schema().clone(),
@@ -341,7 +310,7 @@ async fn write_logs(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::ingestion::get_stream_alerts(
+    crate::service::get_stream_alerts(
         &[StreamParams {
             org_id: org_id.to_owned().into(),
             stream_name: stream_name.to_owned().into(),
@@ -359,7 +328,7 @@ async fn write_logs(
 
     // start check for schema
     let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let (schema_evolution, infer_schema) = check_for_schema(
+    let (schema_evolution, infer_schema) = ports::check_for_schema(
         org_id,
         stream_name,
         StreamType::Logs,
@@ -512,11 +481,11 @@ async fn write_logs(
 
             if !map.is_empty() {
                 // add distinct values
-                distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                distinct_values.push(DistinctValue {
                     stream_type: StreamType::Logs,
                     stream_name: stream_name.to_string(),
                     value: map,
-                }));
+                });
             }
         }
 
@@ -575,7 +544,7 @@ async fn write_logs(
     if !distinct_values.is_empty()
         && !stream_name.starts_with(DISTINCT_STREAM_PREFIX)
         && stream_settings.enable_distinct_fields
-        && let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await
+        && let Err(e) = ports::write_distinct_values(org_id, distinct_values).await
     {
         log::error!("Error while writing distinct values: {e}");
     }
@@ -589,13 +558,7 @@ async fn write_logs(
 }
 
 async fn ingestion_log_enabled() -> bool {
-    if !get_config().common.ingestion_log_enabled {
-        return false;
-    }
-    // the logging will be enabled through meta only
-    db::organization::get_org_setting_toggle_ingestion_logs(META_ORG_ID)
-        .await
-        .unwrap_or(false)
+    ports::ingestion_log_enabled().await
 }
 
 fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {

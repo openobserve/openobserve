@@ -48,7 +48,7 @@ pub mod ingestion_types {
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
-pub mod logs;
+pub use openobserve_ingestion::logs;
 pub mod metadata;
 pub mod metrics;
 pub mod node;

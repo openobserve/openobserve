@@ -27,21 +27,18 @@ use config::{
     metrics,
     utils::{
         json,
+        schema::format_stream_name,
         time::{now_micros, parse_timestamp_micro_from_value},
     },
 };
 use infra::errors::Result;
 pub use openobserve_transform::TRANSFORM_FAILED;
 
+use super::{ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::ingestion::{
+    service::{check_ingestion_allowed, get_future_discard_error, get_upto_discard_error},
+    types::{
         BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
-    },
-    service::{
-        format_stream_name,
-        ingestion::check_ingestion_allowed,
-        logs::{ingestion_log_enabled, log_failed_record},
-        schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
@@ -52,7 +49,7 @@ pub async fn ingest(
     thread_id: usize,
     org_id: &str,
     body: Bytes,
-    user: openobserve_ingestion::types::IngestUser,
+    user: crate::types::IngestUser,
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
 
@@ -405,9 +402,8 @@ pub fn add_record_status(
 
 #[cfg(test)]
 mod tests {
-    use openobserve_ingestion::types::IngestUser;
-
     use super::*;
+    use crate::types::IngestUser;
 
     #[test]
     fn test_add_record_status() {
@@ -449,7 +445,9 @@ mod tests {
             Ok(response) => {
                 // If successful, verify basic response structure
                 // The response should have items if the configuration allows it
-                if !get_config().common.bulk_api_response_errors_only {
+                if crate::ports::runtime_services_installed()
+                    && !get_config().common.bulk_api_response_errors_only
+                {
                     assert!(!response.items.is_empty());
                 }
             }

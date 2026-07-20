@@ -21,6 +21,7 @@ use axum::{
 };
 use bytes::BytesMut;
 use chrono::{Duration, Utc};
+use common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -32,6 +33,7 @@ use config::{
     utils::{
         flatten,
         json::{self, estimate_json_bytes},
+        schema::format_stream_name,
     },
 };
 use infra::{errors::Result, schema::get_flatten_level};
@@ -42,21 +44,14 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 };
 use prost::Message;
 
-use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
+use super::{
+    bulk::{TRANSFORM_FAILED, TS_PARSE_FAILED},
+    ingestion_log_enabled, log_failed_record,
+};
 use crate::{
-    common::meta::{
-        http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
-        ingestion::{IngestionStatus, StreamStatus},
-    },
-    service::{
-        format_stream_name,
-        ingestion::{
-            check_ingestion_allowed,
-            grpc::{get_val, get_val_with_type_retained},
-        },
-        logs::bulk::TRANSFORM_FAILED,
-        schema::{get_future_discard_error, get_upto_discard_error},
-    },
+    grpc::{get_val, get_val_with_type_retained},
+    service::{check_ingestion_allowed, get_future_discard_error, get_upto_discard_error},
+    types::{IngestionStatus, StreamStatus},
 };
 
 pub async fn handle_request(
@@ -87,8 +82,7 @@ pub async fn handle_request(
 
     let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Logs);
     // Start retrieve associated pipeline and construct pipeline components
-    let executable_pipelines =
-        crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
+    let executable_pipelines = crate::service::get_stream_executable_pipelines(&stream_param).await;
     let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::new();
     let mut original_options = Vec::new();
@@ -106,7 +100,7 @@ pub async fn handle_request(
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
     let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
-    crate::ingestion::get_uds_and_original_data_streams(
+    crate::service::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
         &mut streams_need_original_map,
@@ -268,7 +262,7 @@ pub async fn handle_request(
                     };
 
                     if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                        local_val = crate::ingestion::refactor_map(local_val, fields);
+                        local_val = crate::service::refactor_map(local_val, fields);
                     }
 
                     // add `_original` and '_record_id` if required by StreamSettings
@@ -279,7 +273,7 @@ pub async fn handle_request(
                     {
                         local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
 
-                        let record_id = crate::ingestion::generate_record_id(
+                        let record_id = crate::service::generate_record_id(
                             org_id,
                             &stream_name,
                             &StreamType::Logs,
@@ -360,7 +354,7 @@ pub async fn handle_request(
 
                         if !user_defined_schema_map.contains_key(&destination_stream) {
                             // a new dynamically created stream. need to check the two maps again
-                            crate::ingestion::get_uds_and_original_data_streams(
+                            crate::service::get_uds_and_original_data_streams(
                                 &[stream_params],
                                 &mut user_defined_schema_map,
                                 &mut streams_need_original_map,
@@ -380,7 +374,7 @@ pub async fn handle_request(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
+                                local_val = crate::service::refactor_map(local_val, fields);
                             }
 
                             // add `_original` and '_record_id` if required by StreamSettings
@@ -395,7 +389,7 @@ pub async fn handle_request(
                                     original_options[idx].clone().unwrap().into(),
                                 );
 
-                                let record_id = crate::ingestion::generate_record_id(
+                                let record_id = crate::service::generate_record_id(
                                     org_id,
                                     &destination_stream,
                                     &StreamType::Logs,
@@ -466,7 +460,7 @@ pub async fn handle_request(
                 };
 
                 if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                    local_val = crate::ingestion::refactor_map(local_val, fields);
+                    local_val = crate::service::refactor_map(local_val, fields);
                 }
 
                 if streams_need_original_map
@@ -476,11 +470,8 @@ pub async fn handle_request(
                 {
                     local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
 
-                    let record_id = crate::ingestion::generate_record_id(
-                        org_id,
-                        &stream_name,
-                        &StreamType::Logs,
-                    );
+                    let record_id =
+                        crate::service::generate_record_id(org_id, &stream_name, &StreamType::Logs);
 
                     local_val.insert(ID_COL_NAME.to_string(), record_id.to_string().into());
                 }
