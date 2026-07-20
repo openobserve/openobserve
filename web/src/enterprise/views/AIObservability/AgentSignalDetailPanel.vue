@@ -170,6 +170,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 
 interface SignalRow {
   signalType: "loop" | "failure" | "cost";
@@ -417,7 +418,7 @@ const ancestorJoins = (stream: string) => {
 
 /** Agent-scoping predicate on the CLIMBED agent (not the span-local column). */
 const agentClimbFilter = (agent?: string) =>
-  agent ? `${callerExpr()} = '${agent}'` : "1=1";
+  agent ? `${callerExpr()} = '${escapeSingleQuotes(agent)}'` : "1=1";
 
 /**
  * Condense a raw error string into a scannable one-liner. Framework errors are
@@ -507,7 +508,7 @@ const fetchDetails = async () => {
       // Worst traces first — ranked by how many times the tool repeated.
       traceRows.value = (
         await runQuery(
-          `SELECT c.trace_id AS trace_id, COUNT(*) AS repeats FROM "${s}" AS c ${joins} WHERE c.gen_ai_tool_name = '${r.tool}' AND c.gen_ai_operation_name = 'execute_tool' AND ${af} GROUP BY c.trace_id ORDER BY repeats DESC LIMIT 50`,
+          `SELECT c.trace_id AS trace_id, COUNT(*) AS repeats FROM "${s}" AS c ${joins} WHERE c.gen_ai_tool_name = '${escapeSingleQuotes(r.tool ?? "")}' AND c.gen_ai_operation_name = 'execute_tool' AND ${af} GROUP BY c.trace_id ORDER BY repeats DESC LIMIT 50`,
         )
       ).map((h: any) => ({ trace_id: h.trace_id, repeats: h.repeats }));
     } else {
