@@ -105,7 +105,11 @@ async function fetchLocations() {
   try {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.getLocations(org)
-    locations.value = ((res.data ?? {}).locations ?? []) as SyntheticsLocation[]
+    // Protocol checks run from public locations and private agents alike;
+    // disabled locations are hidden.
+    locations.value = (((res.data ?? {}).locations ?? []) as SyntheticsLocation[]).filter(
+      (l) => l.enabled !== false,
+    )
   } catch {
     locations.value = []
   }

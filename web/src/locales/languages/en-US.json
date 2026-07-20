@@ -8785,7 +8785,8 @@
       "empty": "No locations available",
       "locationAwsEast": "AWS · us-east-1",
       "subtitle": "Select the locations the journey runs from",
-      "title": "Locations"
+      "title": "Locations",
+      "privateBadge": "Private"
     },
     "newCheck": {
       "back": "Checks",
@@ -9190,7 +9191,8 @@
       "http": "HTTP",
       "ssh": "SSH",
       "tcp": "TCP",
-      "tls": "TLS"
+      "tls": "TLS",
+      "private": "Private Locations"
     },
     "timeline": {
       "failed": "Failed",
@@ -9230,6 +9232,85 @@
       "selectorRequired": "Selector is required for \"{step}\"",
       "urlInvalid": "Enter a valid URL starting with http:// or https://",
       "urlRequired": "Starting URL is required"
+    },
+    "privateLocations": {
+      "addTitle": "Add private location",
+      "addSubtitle": "Run checks from your own servers, VPC, or on-premise network",
+      "addAction": "Add Location",
+      "searchPlaceholder": "Search locations...",
+      "setupAgent": "Set up an agent",
+      "copySetupCmd": "Setup command",
+      "deleteTitle": "Delete location",
+      "deleteBody": "Delete private location \"{name}\"? Its agents will stop receiving jobs.",
+      "deleteBlocked": "In use by {count} checks — unassign them first",
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "pending": "Pending"
+      },
+      "table": {
+        "name": "Name",
+        "region": "Region",
+        "agents": "Agents",
+        "types": "Types",
+        "checks": "Checks",
+        "checksPerMin": "C/min",
+        "lastSeen": "Last seen"
+      },
+      "empty": {
+        "title": "Add a private location",
+        "description": "Run checks from your own servers, VPC, or on-premise network. Deploy the agent container, register a location, and assign it to any check.",
+        "action": "Get started"
+      },
+      "form": {
+        "name": "Name",
+        "namePlaceholder": "e.g. Corp HQ",
+        "nameRequired": "Name is required",
+        "region": "Region",
+        "regionPlaceholder": "e.g. us-east",
+        "regionRequired": "Region is required",
+        "provider": "Provider",
+        "providerPlaceholder": "e.g. aws (optional)"
+      },
+      "toast": {
+        "created": "Private location created",
+        "createFailed": "Failed to create location",
+        "updated": "Location updated",
+        "updateFailed": "Failed to update location",
+        "deleted": "Location deleted",
+        "deleteFailed": "Failed to delete location",
+        "copied": "Setup command copied",
+        "copyFailed": "Failed to copy to clipboard"
+      },
+      "setup": {
+        "title": "Set up a private agent",
+        "step1Title": "Deploy the agent",
+        "step1Body": "Run the container on any machine in your network — Docker, Kubernetes, or native binary.",
+        "step2Title": "Wait for the location to come online",
+        "step2Body": "The agent registers itself and every job lease refreshes its liveness — the location row turns Online within a minute.",
+        "step3Title": "Assign to checks",
+        "step3Body": "Select this location when creating or editing any check. Checks will run from your own infrastructure.",
+        "noToken": "Create a private location first — the install command is generated per location.",
+        "imagePlaceholderNote": "The agent image name is a placeholder until the published image is available.",
+        "browserNote": "Browser tests cannot run from private locations yet — protocol checks only (HTTP, TCP, TLS, SSH)."
+      },
+      "detail": {
+        "title": "Private location",
+        "back": "Private Locations",
+        "rename": "Edit",
+        "renameTitle": "Edit location",
+        "enabled": "Enabled",
+        "version": "Version",
+        "pool": "Pool",
+        "agentsTitle": "Agents",
+        "agentsSubtitle": "Agents self-register from your infrastructure and are read-only here.",
+        "agentName": "Agent",
+        "noAgents": "No agents have registered for this location yet.",
+        "checksTitle": "Checks running from this location",
+        "checkName": "Name",
+        "noChecks": "No checks are assigned to this location yet.",
+        "notFound": "Location not found"
+      }
     }
   },
   "shortcuts": {

@@ -9,7 +9,17 @@
       icon="radar"
     >
       <template #actions>
-        <ODropdown align="end">
+        <OButton
+          v-if="activeTab === 'private'"
+          size="sm"
+          variant="primary"
+          icon-left="add"
+          data-test="synthetic-monitoring-add-location-btn"
+          @click="showAddLocation = true"
+        >
+          {{ t('synthetics.privateLocations.addAction') }}
+        </OButton>
+        <ODropdown v-else align="end">
           <template #trigger>
             <OButton size="sm" variant="primary" data-test="synthetic-monitoring-new-check-dropdown">
               {{ t('synthetics.newCheck.button') }}
@@ -31,8 +41,8 @@
 
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden">
-      <!-- LEFT SIDEBAR: folder navigation -->
-      <div class="w-[14.375rem] shrink-0 overflow-y-auto">
+      <!-- LEFT SIDEBAR: folder navigation (locations are org-level, no folders) -->
+      <div v-if="activeTab !== 'private'" class="w-[14.375rem] shrink-0 overflow-y-auto">
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
@@ -40,8 +50,31 @@
         />
       </div>
 
+      <!-- ── PRIVATE LOCATIONS TAB ── -->
+      <PrivateLocations
+        v-if="activeTab === 'private'"
+        :locations="privateLocations"
+        :loading="locationsLoading"
+        @refresh="loadPrivateLocations"
+        @add="showAddLocation = true"
+        @setup="openSetupDrawer()"
+        @copy-setup="openSetupDrawer"
+        @delete="confirmDeleteLocation"
+      >
+        <template #tabs>
+          <OToggleGroup
+            :model-value="activeTab"
+            @update:model-value="onTabChange"
+          >
+            <OToggleGroupItem v-for="tab in typeTabs" :key="tab.key" :value="tab.key" size="sm">
+              {{ tab.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+        </template>
+      </PrivateLocations>
+
       <!-- RIGHT MAIN: filter bar + table -->
-      <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div v-else class="flex-1 flex flex-col overflow-hidden min-w-0">
 
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
@@ -77,7 +110,7 @@
               <!-- Type tabs -->
               <OToggleGroup
                 :model-value="activeTab"
-                @update:model-value="(v) => { activeTab = v as string; typeFilter = v === 'all' ? 'all' : (v as string).toUpperCase() }"
+                @update:model-value="onTabChange"
               >
                 <OToggleGroupItem v-for="tab in typeTabs" :key="tab.key" :value="tab.key" size="sm">
                   {{ tab.label }}
@@ -184,6 +217,36 @@
       </p>
     </ODialog>
 
+    <!-- Add private location dialog -->
+    <AddLocationDialog
+      v-model:open="showAddLocation"
+      @created="onLocationCreated"
+    />
+
+    <!-- Agent setup drawer -->
+    <AgentSetupDrawer
+      v-model:open="showSetupDrawer"
+      :install="setupInstall"
+      :location-name="setupLocationName"
+    />
+
+    <!-- Delete location confirmation -->
+    <ODialog
+      v-model:open="showDeleteLocation"
+      size="sm"
+      :title="t('synthetics.privateLocations.deleteTitle')"
+      :primary-button-label="t('synthetics.table.delete')"
+      :secondary-button-label="t('common.cancel')"
+      primary-button-variant="destructive"
+      data-test="synthetic-monitoring-delete-location-dialog"
+      @click:primary="deleteLocation"
+      @click:secondary="showDeleteLocation = false"
+    >
+      <p class="py-2">
+        {{ t('synthetics.privateLocations.deleteBody', { name: locationToDelete?.name ?? '' }) }}
+      </p>
+    </ODialog>
+
     <!-- Move checks dialog -->
     <MoveAcrossFolders
       type="synthetics"
@@ -212,10 +275,13 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
+import PrivateLocations from "@/views/synthetics/PrivateLocations.vue";
+import AddLocationDialog from "@/components/synthetic-monitoring/AddLocationDialog.vue";
+import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { mapResponseToBrowserCheck, buildCreateBrowserTestPayload } from '@/utils/synthetics/buildPayload'
-import { SYNTHETIC_CHECK_TYPES, type SyntheticCheckType } from '@/types/synthetics'
+import { SYNTHETIC_CHECK_TYPES, type SyntheticCheckType, type SyntheticLocation } from '@/types/synthetics'
 import type { IconName } from '@/lib/core/Icon/OIcon.icons'
 import { useI18n } from 'vue-i18n'
 import syntheticsService from '@/services/synthetics'
@@ -483,7 +549,89 @@ const openDetail = (monitor: any) => {
 const typeTabs = computed(() => [
   { key: 'all', label: t('synthetics.tabs.all') },
   ...SYNTHETIC_CHECK_TYPES.map(ct => ({ key: ct, label: t(`synthetics.tabs.${ct}`) })),
+  { key: 'private', label: t('synthetics.tabs.private') },
 ]);
+
+const onTabChange = (v: unknown) => {
+  const tab = v as string;
+  activeTab.value = tab;
+  if (tab === 'private') {
+    loadPrivateLocations();
+    return;
+  }
+  typeFilter.value = tab === 'all' ? 'all' : tab.toUpperCase();
+};
+
+// ── Private locations tab ──────────────────────────────────────────────
+const privateLocations   = ref<SyntheticLocation[]>([]);
+const locationsLoading   = ref(false);
+const showAddLocation    = ref(false);
+const showSetupDrawer    = ref(false);
+const setupInstall       = ref<string | null>(null);
+const setupLocationName  = ref<string | null>(null);
+const showDeleteLocation = ref(false);
+const locationToDelete   = ref<SyntheticLocation | null>(null);
+
+async function loadPrivateLocations() {
+  locationsLoading.value = true;
+  try {
+    const res = await syntheticsService.getLocations(orgIdentifier.value);
+    const all: SyntheticLocation[] = (res.data as any).locations ?? [];
+    privateLocations.value = all.filter((l) => l.kind === 'private');
+  } catch (err) {
+    console.error('[synthetics] failed to load private locations', err);
+  } finally {
+    locationsLoading.value = false;
+  }
+}
+
+/** Opens the setup drawer; with a row, fetches its install command first. */
+async function openSetupDrawer(row?: SyntheticLocation) {
+  const target = row ?? privateLocations.value[0];
+  setupInstall.value = null;
+  setupLocationName.value = target?.name ?? null;
+  showSetupDrawer.value = true;
+  if (!target) return;
+  try {
+    const res = await syntheticsService.getLocation(orgIdentifier.value, target.id);
+    setupInstall.value = (res.data as any).install ?? null;
+  } catch (err) {
+    console.error('[synthetics] failed to load location install command', err);
+  }
+}
+
+const onLocationCreated = async (payload: { id: string; install?: string }) => {
+  await loadPrivateLocations();
+  const created = privateLocations.value.find((l) => l.id === payload.id);
+  setupInstall.value = payload.install ?? null;
+  setupLocationName.value = created?.name ?? null;
+  showSetupDrawer.value = true;
+};
+
+const confirmDeleteLocation = (row: SyntheticLocation) => {
+  locationToDelete.value = row;
+  showDeleteLocation.value = true;
+};
+
+async function deleteLocation() {
+  if (!locationToDelete.value) return;
+  try {
+    await syntheticsService.deleteLocation(orgIdentifier.value, locationToDelete.value.id);
+    toast({ variant: 'success', message: t('synthetics.privateLocations.toast.deleted') });
+    await loadPrivateLocations();
+  } catch (err: any) {
+    toast({
+      variant: 'error',
+      message:
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        t('synthetics.privateLocations.toast.deleteFailed'),
+    });
+  } finally {
+    showDeleteLocation.value = false;
+    locationToDelete.value = null;
+  }
+}
 
 const locationOpts = ref<{ label: string; value: string }[]>([{ label: t('synthetics.filters.allLocations'), value: 'all' }]);
 

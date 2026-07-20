@@ -8,6 +8,7 @@ import gcpSvgUrl from '@/assets/images/ingestion/gcp.svg'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OCheckboxGroup from '@/lib/forms/Checkbox/OCheckboxGroup.vue'
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
+import OTag from '@/lib/core/Badge/OTag.vue'
 
 const props = defineProps<{ check: BrowserCheck; locations: SyntheticsLocation[] }>()
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
@@ -54,6 +55,9 @@ const selectedLocations = computed({
           <span class="flex items-center gap-1.5">
             <OIcon :name="locationIcon(location.provider)" size="sm" />
             {{ location.name }} · {{ location.region }}
+            <OTag v-if="location.kind === 'private'" size="xs" shape="rounded" variant="purple-soft">
+              {{ t('synthetics.locations.privateBadge') }}
+            </OTag>
           </span>
         </template>
       </OCheckbox>
