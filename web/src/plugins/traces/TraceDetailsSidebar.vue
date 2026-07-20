@@ -763,12 +763,7 @@ class="h-5! text-xs!">
           <!-- Loading/Empty state when no data -->
           <div
             v-else
-            class="flex items-center justify-center py-20 tab-content-dynamic-height"
-            :class="
-              isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? '[height:calc(100vh-312px)]'
-                : '[height:calc(100vh-276px)]'
-            "
+            class="flex items-center justify-center py-20 h-full"
           >
             <div class="text-center">
               <OSpinner
@@ -821,12 +816,7 @@ class="h-5! text-xs!">
           <!-- Loading/Empty state when no data -->
           <div
             v-else
-            class="flex items-center justify-center py-20 tab-content-dynamic-height"
-            :class="
-              isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? '[height:calc(100vh-312px)]'
-                : '[height:calc(100vh-276px)]'
-            "
+            class="flex items-center justify-center py-20 h-full"
           >
             <div class="text-center">
               <OSpinner
