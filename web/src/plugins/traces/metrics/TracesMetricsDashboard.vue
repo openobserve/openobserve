@@ -724,8 +724,8 @@ defineExpose({
 /* keep(lib-override:render-dashboard-charts): RenderDashboardCharts renders its
    own DOM (reached via :deep). Tighten the side padding AND collapse the top
    padding/margin it adds for full dashboards (container pt-2 + inner .displayDiv
-   mt-2 = 16px). In this compact traces view the charts live in a fixed h-40
-   (160px) overflow-hidden wrapper, so that extra 16px pushes the plot past the
+   mt-2 = 1rem). In this compact traces view the charts live in a fixed h-40
+   (10rem) overflow-hidden wrapper, so that extra 1rem pushes the plot past the
    clip line and cuts off the x-axis. Zeroing it restores the main-branch fit. */
 .charts-wrapper :deep(.render-dashboard-charts-container) {
   padding-left: 0.2rem;

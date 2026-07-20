@@ -1100,10 +1100,10 @@ function fireConfetti() {
 
 /* ---- page-supplied step content + action button ---- */
 .step-slot {
-  margin: 4px 0 14px;
+  margin: 0.25rem 0 0.875rem;
 }
 .step-action {
-  margin-top: 14px;
+  margin-top: 0.875rem;
 }
 
 /* ---- variant toggle (shared OToggleGroup) — only spacing + icon sizing here;
@@ -1260,7 +1260,7 @@ function fireConfetti() {
 }
 .acc-item {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 0.75rem;
   background: var(--panel);
   overflow: hidden;
 }
@@ -1269,14 +1269,14 @@ function fireConfetti() {
 }
 /* Roomier hit area than the component's default px-2 py-2 inside a panel. */
 .acc-item :deep(button) {
-  padding: 13px 16px;
+  padding: 0.8125rem 1rem;
   border-radius: 0;
 }
 .acc-body {
   color: var(--text-2);
   font-size: var(--text-compact);
   line-height: 1.6;
-  padding: 0 16px 16px;
+  padding: 0 1rem 1rem;
 }
 .acc-body :deep(code) {
   font-size: var(--text-2xs);
@@ -1342,7 +1342,7 @@ function fireConfetti() {
 }
 .pv-foot-sep {
   color: var(--text-3);
-  margin: 0 2px;
+  margin: 0 0.125rem;
 }
 
 /* ---- confetti overlay ---- */

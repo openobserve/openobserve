@@ -1,13 +1,53 @@
 {
   "totals": {
+    "rawProjectRamp": 164,
+    "rawVarInComponent": 615,
     "arbZ": 40,
-    "rawVarInComponent": 617,
-    "rawProjectRamp": 146,
+    "darkMechanism": 20,
     "unscopedStyle": 8,
-    "stylePxUnit": 90,
-    "darkMechanism": 20
+    "stylePxUnit": 90
   },
   "files": {
+    "components/CodeQueryEditor.vue": {
+      "rawProjectRamp": 1,
+      "rawVarInComponent": 2
+    },
+    "components/CommunitySlackInvite.vue": {
+      "rawProjectRamp": 6
+    },
+    "components/CustomDateTimePicker.vue": {
+      "arbZ": 1
+    },
+    "components/EnterpriseUpgradeDialog.vue": {
+      "arbZ": 1
+    },
+    "components/Header.vue": {
+      "rawVarInComponent": 2
+    },
+    "components/MenuLink.vue": {
+      "rawProjectRamp": 10
+    },
+    "components/O2AIChat.vue": {
+      "rawVarInComponent": 50
+    },
+    "components/OrganizationSelector.vue": {
+      "rawProjectRamp": 3,
+      "rawVarInComponent": 2
+    },
+    "components/RichTextInput.vue": {
+      "arbZ": 1,
+      "rawVarInComponent": 18
+    },
+    "components/TenstackTable.vue": {
+      "rawProjectRamp": 1,
+      "rawVarInComponent": 3
+    },
+    "components/ThemeSwitcher.vue": {
+      "darkMechanism": 1
+    },
+    "components/WebinarBanner.vue": {
+      "arbZ": 1
+    },
     "components/ai-assistant/welcome/CapabilityCards.vue": {
       "arbZ": 4
     },
@@ -57,15 +97,8 @@
     "components/anomaly_detection/AnomalySummary.vue": {
       "rawVarInComponent": 7
     },
-    "components/CodeQueryEditor.vue": {
-      "rawProjectRamp": 1,
-      "rawVarInComponent": 2
-    },
     "components/common/BaseImport.vue": {
       "unscopedStyle": 1
-    },
-    "components/common/empty-states/QuickStartCard.vue": {
-      "rawProjectRamp": 4
     },
     "components/common/LoadingProgress.vue": {
       "rawProjectRamp": 2,
@@ -74,17 +107,11 @@
     "components/common/SectionHub.vue": {
       "rawProjectRamp": 5
     },
-    "components/CommunitySlackInvite.vue": {
-      "rawProjectRamp": 6
-    },
-    "components/CustomDateTimePicker.vue": {
-      "arbZ": 1
+    "components/common/empty-states/QuickStartCard.vue": {
+      "rawProjectRamp": 4
     },
     "components/dashboards/AddDashboardFromGitHub.vue": {
       "rawProjectRamp": 1
-    },
-    "components/dashboards/addPanel/DrilldownUserGuide.vue": {
-      "rawVarInComponent": 2
     },
     "components/dashboards/ColorSwatchPicker.vue": {
       "rawProjectRamp": 3
@@ -95,22 +122,19 @@
     "components/dashboards/OverrideConfigPopup.vue": {
       "rawProjectRamp": 2
     },
+    "components/dashboards/QueryInspector.vue": {
+      "rawVarInComponent": 4
+    },
+    "components/dashboards/addPanel/DrilldownUserGuide.vue": {
+      "rawVarInComponent": 2
+    },
     "components/dashboards/panels/HTMLRenderer.vue": {
       "unscopedStyle": 2
     },
     "components/dashboards/panels/TableRenderer.vue": {
       "rawVarInComponent": 8
     },
-    "components/dashboards/QueryInspector.vue": {
-      "rawVarInComponent": 4
-    },
-    "components/EnterpriseUpgradeDialog.vue": {
-      "arbZ": 1
-    },
     "components/functions/FunctionList.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/Header.vue": {
       "rawVarInComponent": 2
     },
     "components/ingestion/ai/content/AIIntegrationCard.vue": {
@@ -120,16 +144,6 @@
       "rawVarInComponent": 17
     },
     "components/logstream/schema.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/MenuLink.vue": {
-      "rawProjectRamp": 9
-    },
-    "components/O2AIChat.vue": {
-      "rawVarInComponent": 50
-    },
-    "components/OrganizationSelector.vue": {
-      "rawProjectRamp": 3,
       "rawVarInComponent": 2
     },
     "components/pipeline/NodeForm/AssociateFunction.vue": {
@@ -154,15 +168,11 @@
       "stylePxUnit": 6,
       "rawVarInComponent": 15
     },
-    "components/RichTextInput.vue": {
-      "arbZ": 1,
-      "rawVarInComponent": 18
+    "components/rum/PlayerTracesTab.vue": {
+      "rawVarInComponent": 1
     },
     "components/rum/errorTracking/view/ErrorEvents.vue": {
       "rawVarInComponent": 7
-    },
-    "components/rum/PlayerTracesTab.vue": {
-      "rawVarInComponent": 1
     },
     "components/settings/License.vue": {
       "rawVarInComponent": 4
@@ -175,6 +185,9 @@
     },
     "components/settings/OrgStorageEditor.vue": {
       "arbZ": 1
+    },
+    "components/synthetics/CreateBrowserTestSkeleton.vue": {
+      "rawProjectRamp": 1
     },
     "components/synthetics/configure/CheckAlerts.vue": {
       "rawProjectRamp": 1
@@ -209,9 +222,6 @@
     "components/synthetics/configure/types/CheckTlsConfig.vue": {
       "rawProjectRamp": 1
     },
-    "components/synthetics/CreateBrowserTestSkeleton.vue": {
-      "rawProjectRamp": 1
-    },
     "components/synthetics/journey/BrowserJourney.vue": {
       "rawProjectRamp": 1
     },
@@ -224,18 +234,8 @@
     "components/synthetics/results/ProtocolRunSummary.vue": {
       "rawProjectRamp": 6
     },
-    "components/TenstackTable.vue": {
-      "rawProjectRamp": 1,
-      "rawVarInComponent": 3
-    },
-    "components/ThemeSwitcher.vue": {
-      "darkMechanism": 1
-    },
     "components/traces/FlameGraphView.vue": {
       "rawProjectRamp": 1
-    },
-    "components/WebinarBanner.vue": {
-      "arbZ": 1
     },
     "enterprise/components/billings/BillingGroup.vue": {
       "rawProjectRamp": 5
@@ -246,12 +246,6 @@
     "enterprise/components/onlineEvals/forms/EvalJobDetail.vue": {
       "rawProjectRamp": 1
     },
-    "enterprise/components/onlineEvals/forms/job/JobFilterBuilder.vue": {
-      "rawVarInComponent": 2
-    },
-    "enterprise/components/onlineEvals/forms/job/JobInputMapping.vue": {
-      "rawProjectRamp": 1
-    },
     "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
       "rawVarInComponent": 4
     },
@@ -259,15 +253,21 @@
       "rawProjectRamp": 5,
       "rawVarInComponent": 6
     },
-    "enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue": {
-      "rawProjectRamp": 1
-    },
     "enterprise/components/onlineEvals/forms/ScorerDetail.vue": {
       "rawVarInComponent": 47
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
       "rawProjectRamp": 4,
       "rawVarInComponent": 1
+    },
+    "enterprise/components/onlineEvals/forms/job/JobFilterBuilder.vue": {
+      "rawVarInComponent": 2
+    },
+    "enterprise/components/onlineEvals/forms/job/JobInputMapping.vue": {
+      "rawProjectRamp": 1
+    },
+    "enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue": {
+      "rawProjectRamp": 1
     },
     "lib/core/Button/OButton.vue": {
       "rawProjectRamp": 4
@@ -340,14 +340,18 @@
     "lib/core/EmptyState/illustrations/EmptyWaiting.vue": {
       "stylePxUnit": 2
     },
-    "lib/core/Navbar/ONavbar.vue": {
-      "rawVarInComponent": 1
-    },
     "lib/core/Navbar/ONavGroup.vue": {
       "rawProjectRamp": 1
     },
+    "lib/core/Navbar/ONavbar.vue": {
+      "rawProjectRamp": 2,
+      "rawVarInComponent": 1
+    },
     "lib/core/PageHeader/OPageHeader.vue": {
       "rawProjectRamp": 1
+    },
+    "lib/core/Splitter/OSplitter.vue": {
+      "rawVarInComponent": 1
     },
     "lib/core/Table/OTable.vue": {
       "rawVarInComponent": 1
@@ -370,6 +374,9 @@
     "lib/forms/Color/OColor.vue": {
       "arbZ": 1
     },
+    "lib/forms/Date/ODate.vue": {
+      "rawProjectRamp": 1
+    },
     "lib/forms/DateTimeRange/ODateRangeCalendar.vue": {
       "rawVarInComponent": 2
     },
@@ -382,6 +389,9 @@
     },
     "lib/forms/Switch/OSwitch.vue": {
       "rawProjectRamp": 2
+    },
+    "lib/forms/Time/OTime.vue": {
+      "rawProjectRamp": 1
     },
     "lib/lists/FieldList/OFieldList.vue": {
       "arbZ": 2,
@@ -402,9 +412,6 @@
     "plugins/logs/IndexList.vue": {
       "rawVarInComponent": 1
     },
-    "plugins/logs/patterns/PatternList.vue": {
-      "rawVarInComponent": 6
-    },
     "plugins/logs/SearchBar.vue": {
       "arbZ": 4,
       "rawVarInComponent": 1
@@ -413,6 +420,9 @@
       "rawVarInComponent": 19
     },
     "plugins/logs/TenstackTable.vue": {
+      "rawVarInComponent": 5
+    },
+    "plugins/logs/patterns/PatternList.vue": {
       "rawVarInComponent": 6
     },
     "plugins/metrics/explorer/FunctionConfigDialog.vue": {
@@ -425,9 +435,6 @@
     "plugins/pipelines/PipelineFlow.vue": {
       "arbZ": 1
     },
-    "plugins/traces/components/TraceErrorTab.vue": {
-      "rawVarInComponent": 14
-    },
     "plugins/traces/Index.vue": {
       "rawVarInComponent": 2
     },
@@ -439,12 +446,6 @@
     },
     "plugins/traces/LLMInsightsSkeleton.vue": {
       "rawVarInComponent": 3
-    },
-    "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
-      "rawVarInComponent": 1
-    },
-    "plugins/traces/metrics/TracesMetricsContextMenu.vue": {
-      "arbZ": 1
     },
     "plugins/traces/SearchBar.vue": {
       "arbZ": 1
@@ -477,6 +478,15 @@
     },
     "plugins/traces/TraceTree.vue": {
       "rawVarInComponent": 2
+    },
+    "plugins/traces/components/TraceErrorTab.vue": {
+      "rawVarInComponent": 14
+    },
+    "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
+      "rawVarInComponent": 1
+    },
+    "plugins/traces/metrics/TracesMetricsContextMenu.vue": {
+      "arbZ": 1
     },
     "utils/dashboard/colorPalette.ts": {
       "darkMechanism": 5
@@ -511,11 +521,11 @@
     "utils/traces/traceColors.ts": {
       "darkMechanism": 2
     },
-    "views/Dashboards/Dashboards.vue": {
-      "rawProjectRamp": 1
-    },
     "views/Dashboards/DashboardSettings.vue": {
       "rawVarInComponent": 3
+    },
+    "views/Dashboards/Dashboards.vue": {
+      "rawProjectRamp": 1
     },
     "views/Dashboards/ImportDashboard.vue": {
       "unscopedStyle": 1
@@ -541,6 +551,9 @@
       "rawProjectRamp": 14,
       "arbZ": 1
     },
+    "views/UsageTab.vue": {
+      "rawProjectRamp": 14
+    },
     "views/synthetics/CreateBrowserTest.vue": {
       "rawProjectRamp": 3
     },
@@ -549,9 +562,6 @@
     },
     "views/synthetics/RunDetail.vue": {
       "rawProjectRamp": 1
-    },
-    "views/UsageTab.vue": {
-      "rawVarInComponent": 2
     }
   }
 }
