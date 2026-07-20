@@ -70,6 +70,7 @@ function evalLink(tab: EvalTab) {
 const activeSection = computed<string>(() => {
   if (route.name === "aiLLMInsights") return "llmInsights";
   if (route.name === "aiSessions") return "sessions";
+  if (route.name === "aiAgentGraph") return "agentGraph";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
     return tab;

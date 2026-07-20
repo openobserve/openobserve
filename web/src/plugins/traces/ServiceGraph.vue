@@ -218,14 +218,14 @@
       </div>
     </div>
     <OCardSection
-      class="flex-1 min-h-0 relative overflow-hidden service-graph-container bg-surface-base!"
+      class="flex-1 min-h-0 relative overflow-hidden service-graph-container bg-surface-subtle!"
     >
       <!-- Graph Visualization -->
       <OCard class="rounded-default h-full">
         <OCardSection class="p-0 h-full">
           <div
             data-test="service-graph-container"
-            class="graph-container h-full w-full rounded-default overflow-hidden bg-surface-base relative"
+            class="graph-container h-full w-full rounded-default overflow-hidden bg-surface-subtle relative"
           >
             <div v-if="loading" class="flex items-center justify-center h-full">
               <div class="text-center flex flex-col items-center">
