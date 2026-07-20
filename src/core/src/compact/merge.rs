@@ -1080,7 +1080,7 @@ async fn write_file_list(
     // handle dump_stats for file_list type streams
     if success && stream_type == StreamType::Filelist && cfg.compact.file_list_dump_enabled {
         let (deleted_files, new_files): (Vec<_>, Vec<_>) = events.iter().partition(|e| e.deleted);
-        super::dump::handle_dump_stats_on_merge(&deleted_files, &new_files).await;
+        openobserve_compactor::dump::handle_dump_stats_on_merge(&deleted_files, &new_files).await;
     }
 
     if success {

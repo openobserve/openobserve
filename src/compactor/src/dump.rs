@@ -20,6 +20,7 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::Schema;
+use async_trait::async_trait;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     FileFormat, PARQUET_MAX_ROW_GROUP_SIZE,
@@ -42,13 +43,12 @@ use infra::{
     schema::{STREAM_SCHEMAS_LATEST, SchemaCache, get_partition_time_level, get_settings},
 };
 use itertools::Itertools;
-use openobserve_compactor::file_list_dump::{
-    FILE_LIST_SCHEMA, exec, generate_dump_stream_name, record_batch_to_file_record,
-};
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
 use tokio::sync::mpsc;
 
-use crate::db;
+use crate::file_list_dump::{
+    FILE_LIST_SCHEMA, exec, generate_dump_stream_name, record_batch_to_file_record,
+};
 
 #[derive(Clone)]
 pub struct DumpJob {
@@ -57,6 +57,18 @@ pub struct DumpJob {
     pub stream_name: String,
     pub job_id: i64,
     pub offset: i64,
+}
+
+#[async_trait]
+pub trait SchemaService: Send + Sync {
+    async fn merge(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        schema: &Schema,
+        min_ts: Option<i64>,
+    ) -> Result<(), anyhow::Error>;
 }
 
 // compactor dump run steps:
@@ -92,7 +104,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             need_done_ids.push(*job_id); // we don't dump for file_list stream
             continue;
         }
-        if !super::is_past_hour(*offset) {
+        if !crate::is_past_hour(*offset) {
             need_done_ids.push(*job_id); // the data is not past hour, need to wait
             continue;
         }
@@ -111,7 +123,12 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             continue;
         }
         // check if we are allowed to merge or just skip
-        if db::compact::retention::is_deleting_stream(&org_id, stream_type, &stream_name, None) {
+        if crate::repository::retention::is_deleting_stream(
+            &org_id,
+            stream_type,
+            &stream_name,
+            None,
+        ) {
             need_done_ids.push(*job_id); // the data will be deleted by retention, just skip
             continue;
         }
@@ -128,11 +145,11 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
             }
 
             // check if already running a job for this stream
-            if db::compact::stream::is_running(stream) {
+            if crate::repository::stream::is_running(stream) {
                 need_release_ids.push(*job_id); // another job is running
                 continue;
             } else {
-                db::compact::stream::set_running(stream);
+                crate::repository::stream::set_running(stream);
             }
         }
         // collect the dump jobs
@@ -198,7 +215,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
+pub async fn dump(job: &DumpJob, schema_service: &dyn SchemaService) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     let stream = format!("{}/{}/{}", job.org_id, job.stream_type, job.stream_name);
     log::debug!(
@@ -274,14 +291,15 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         .as_ref()
         .is_none_or(|s| s.fields_map().len() != FILE_LIST_SCHEMA.fields().len())
     {
-        if let Err(e) = super::db::schema::merge(
-            &job.org_id,
-            &dump_stream_name,
-            StreamType::Filelist,
-            &FILE_LIST_SCHEMA,
-            Some(start_time),
-        )
-        .await
+        if let Err(e) = schema_service
+            .merge(
+                &job.org_id,
+                &dump_stream_name,
+                StreamType::Filelist,
+                &FILE_LIST_SCHEMA,
+                Some(start_time),
+            )
+            .await
         {
             log::error!(
                 "[COMPACTOR::DUMP] erroring in saving file list dump schema for {dump_stream_key} to db: {e}"

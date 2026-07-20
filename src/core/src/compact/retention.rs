@@ -397,7 +397,7 @@ pub async fn delete_all(
 
     // delete from file list
     delete_from_file_list(org_id, stream_type, stream_name, (start_time, end_time)).await?;
-    super::dump::delete_all(org_id, stream_type, stream_name).await?;
+    openobserve_compactor::dump::delete_all(org_id, stream_type, stream_name).await?;
     log::info!("deleted file list for: {org_id}/{stream_type}/{stream_name}/all");
 
     // mark delete done
@@ -488,7 +488,7 @@ pub async fn delete_by_date(
             log::error!("[COMPACTOR] delete_by_date delete_from_file_list failed: {e}");
             e
         })?;
-    super::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range)
+    openobserve_compactor::dump::delete_by_time_range(org_id, stream_type, stream_name, time_range)
         .await
         .map_err(|e| {
             log::error!("[COMPACTOR] delete_by_date delete_file_list_dump failed: {e}");

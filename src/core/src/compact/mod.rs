@@ -37,7 +37,6 @@ use crate::db;
 pub mod deleted {
     pub use openobserve_compactor::deleted::*;
 }
-pub mod dump;
 pub mod incremental {
     pub use openobserve_compactor::incremental::*;
 }

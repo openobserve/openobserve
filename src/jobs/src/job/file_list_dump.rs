@@ -15,11 +15,31 @@
 
 use std::sync::Arc;
 
-use config::{cluster, get_config};
-use openobserve_core::compact::dump;
+use arrow_schema::Schema;
+use async_trait::async_trait;
+use config::{cluster, get_config, meta::stream::StreamType};
+use openobserve_compactor::dump::{self, SchemaService};
 use tokio::sync::{Mutex, mpsc};
 
 const DUMP_JOB_MIN_INTERVAL: i64 = 30;
+
+struct CoreSchemaService;
+
+#[async_trait]
+impl SchemaService for CoreSchemaService {
+    async fn merge(
+        &self,
+        org_id: &str,
+        stream_name: &str,
+        stream_type: StreamType,
+        schema: &Schema,
+        min_ts: Option<i64>,
+    ) -> Result<(), anyhow::Error> {
+        crate::service::db::schema::merge(org_id, stream_name, stream_type, schema, min_ts)
+            .await
+            .map(|_| ())
+    }
+}
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !cluster::LOCAL_NODE.is_compactor() {
@@ -67,7 +87,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 }
                             }
                         });
-                        if let Err(e) = openobserve_core::compact::dump::dump(&job).await {
+                        if let Err(e) = dump::dump(&job, &CoreSchemaService).await {
                             log::error!(
                                 "[FILE_LIST_DUMP:JOB:{thread_id}] dump for stream [{}/{}/{}] offset {}: error: {e}",
                                 job.org_id,
@@ -103,7 +123,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         // sleep
         tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
         // run
-        if let Err(e) = openobserve_core::compact::dump::run(tx.clone()).await {
+        if let Err(e) = dump::run(tx.clone()).await {
             log::error!("[FILE_LIST_DUMP:JOB] error in running dump: {e}");
         }
     }
