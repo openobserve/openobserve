@@ -5460,7 +5460,7 @@
     "dangerZone": "Gevarenzone",
     "deleteOrganization": "Organisatie verwijderen",
     "deleteOrganizationTitle": "Deze organisatie verwijderen",
-    "deleteOrganizationDescription": "Plant {name} in voor verwijdering. De organisatie wordt onmiddellijk ontoegankelijk voor iedereen — ook voor u — en wordt na afloop van de respijtperiode definitief gewist. Herstellen daarvóór kan alleen via de support.",
+    "deleteOrganizationDescription": "Iedereen, ook u, verliest onmiddellijk toegang tot {name}. Tijdens de respijtperiode kan alleen de OpenObserve-support de organisatie herstellen; daarna worden alle gegevens definitief gewist.",
     "deleteOrganizationScopeLoading": "Controleren wat deze organisatie bevat…",
     "deleteOrganizationScope": "{dashboards} dashboards · {streams} streams · {size} aan gegevens",
     "deleteFactGracePeriod": "Respijtperiode",

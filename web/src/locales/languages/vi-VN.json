@@ -5460,7 +5460,7 @@
     "dangerZone": "Khu vực Nguy hiểm",
     "deleteOrganization": "Xóa tổ chức",
     "deleteOrganizationTitle": "Xóa tổ chức này",
-    "deleteOrganizationDescription": "Lên lịch xóa {name}. Nó trở nên không thể truy cập đối với tất cả mọi người — kể cả bạn — ngay lập tức, sau đó bị xóa vĩnh viễn khi thời gian gia hạn kết thúc. Khôi phục nó trước đó cần liên hệ hỗ trợ.",
+    "deleteOrganizationDescription": "Mọi người, kể cả bạn, sẽ mất quyền truy cập vào {name} ngay lập tức. Trong thời gian gia hạn, chỉ bộ phận hỗ trợ của OpenObserve mới có thể khôi phục; sau đó, toàn bộ dữ liệu sẽ bị xóa vĩnh viễn.",
     "deleteOrganizationScopeLoading": "Đang kiểm tra nội dung tổ chức này…",
     "deleteOrganizationScope": "{dashboards} bảng điều khiển · {streams} luồng · {size} dữ liệu",
     "deleteFactGracePeriod": "Thời gian gia hạn",

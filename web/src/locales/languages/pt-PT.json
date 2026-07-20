@@ -5460,7 +5460,7 @@
     "dangerZone": "Zona de perigo",
     "deleteOrganization": "Excluir organização",
     "deleteOrganizationTitle": "Excluir esta organização",
-    "deleteOrganizationDescription": "Agenda a exclusão de {name}. Ela fica inacessível para todos — inclusive para você — imediatamente e é apagada permanentemente quando o período de carência terminar. Restaurá-la antes disso exige contato com o suporte.",
+    "deleteOrganizationDescription": "Todos, incluindo você, perdem o acesso a {name} imediatamente. Durante o período de carência, apenas o suporte da OpenObserve pode restaurá-la; depois disso, todos os dados são apagados permanentemente.",
     "deleteOrganizationScopeLoading": "Verificando o que esta organização contém…",
     "deleteOrganizationScope": "{dashboards} painéis · {streams} streams · {size} de dados",
     "deleteFactGracePeriod": "Período de carência",

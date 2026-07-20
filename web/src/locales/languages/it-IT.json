@@ -5460,7 +5460,7 @@
     "dangerZone": "Zona pericolosa",
     "deleteOrganization": "Elimina organizzazione",
     "deleteOrganizationTitle": "Elimina questa organizzazione",
-    "deleteOrganizationDescription": "Pianifica l'eliminazione di {name}. Diventa immediatamente inaccessibile a tutti — anche a te — e viene cancellata definitivamente al termine del periodo di tolleranza. Per ripristinarla prima è necessario contattare l'assistenza.",
+    "deleteOrganizationDescription": "Tutti, incluso te, perdono immediatamente l'accesso a {name}. Durante il periodo di tolleranza solo l'assistenza OpenObserve può ripristinarla; in seguito tutti i dati vengono cancellati definitivamente.",
     "deleteOrganizationScopeLoading": "Verifica del contenuto di questa organizzazione…",
     "deleteOrganizationScope": "{dashboards} dashboard · {streams} stream · {size} di dati",
     "deleteFactGracePeriod": "Periodo di tolleranza",

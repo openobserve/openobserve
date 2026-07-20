@@ -5460,7 +5460,7 @@
     "dangerZone": "Zone de danger",
     "deleteOrganization": "Supprimer l'organisation",
     "deleteOrganizationTitle": "Supprimer cette organisation",
-    "deleteOrganizationDescription": "Programme la suppression de {name}. Elle devient immédiatement inaccessible à tous — y compris à vous — puis est définitivement effacée à la fin du délai de grâce. La restaurer avant nécessite de contacter le support.",
+    "deleteOrganizationDescription": "Tout le monde, y compris vous, perd immédiatement l'accès à {name}. Pendant le délai de grâce, seul le support OpenObserve peut la restaurer ; ensuite, toutes les données sont définitivement effacées.",
     "deleteOrganizationScopeLoading": "Vérification du contenu de cette organisation…",
     "deleteOrganizationScope": "{dashboards} tableaux de bord · {streams} flux · {size} de données",
     "deleteFactGracePeriod": "Délai de grâce",

@@ -5460,7 +5460,7 @@
     "dangerZone": "Tehlikeli Bölge",
     "deleteOrganization": "Kuruluşu sil",
     "deleteOrganizationTitle": "Bu kuruluşu sil",
-    "deleteOrganizationDescription": "{name} kuruluşunu silinmek üzere zamanlar. Kuruluş herkes için — siz dahil — anında erişilemez hale gelir ve ek süre dolduğunda kalıcı olarak silinir. Bundan önce geri yüklemek için destek ekibiyle iletişime geçmeniz gerekir.",
+    "deleteOrganizationDescription": "Herkes, siz dahil, {name} kuruluşuna anında erişimini kaybeder. Ek süre boyunca yalnızca OpenObserve destek ekibi kuruluşu geri yükleyebilir; sonrasında tüm veriler kalıcı olarak silinir.",
     "deleteOrganizationScopeLoading": "Bu kuruluşun içeriği denetleniyor…",
     "deleteOrganizationScope": "{dashboards} pano · {streams} akış · {size} veri",
     "deleteFactGracePeriod": "Ek süre",

@@ -5460,7 +5460,7 @@
     "dangerZone": "危険ゾーン",
     "deleteOrganization": "組織を削除",
     "deleteOrganizationTitle": "この組織を削除",
-    "deleteOrganizationDescription": "{name} を削除予定にします。すべてのユーザー（あなたを含む）が直ちにアクセスできなくなり、猶予期間の終了後に完全に消去されます。それまでに復元するにはサポートへの連絡が必要です。",
+    "deleteOrganizationDescription": "すべてのユーザー（あなたを含む）が直ちに {name} にアクセスできなくなります。猶予期間中は OpenObserve サポートのみが復元できます。その後、すべてのデータは完全に消去されます。",
     "deleteOrganizationScopeLoading": "この組織の内容を確認しています…",
     "deleteOrganizationScope": "ダッシュボード {dashboards} 件 · ストリーム {streams} 件 · データ {size}",
     "deleteFactGracePeriod": "猶予期間",
