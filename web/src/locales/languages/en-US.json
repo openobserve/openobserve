@@ -2260,6 +2260,8 @@
       "conditionNoteEmpty": "To Check For An Empty Value, Use \"\". Example:",
       "conditionNoteNull": "To Check For A Null Value, Use null. Example:",
       "conditionNoteCustom": "To Add A Custom Column, Type Its Name And Press Enter.",
+      "conditionExampleEmpty": "severity != \"\"",
+      "conditionExampleNull": "severity != null",
       "functionBody": "Reshape The Payload With A Function",
       "functionBodySet": "Applies {name}",
       "functionSelect": "Select Function",
