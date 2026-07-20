@@ -54,7 +54,7 @@ use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::ingestion::{
         AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
-        IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
+        IngestionDataIter, IngestionRequest, IngestionResponse, IngestionStatus,
         IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
     },
     service::{
@@ -794,46 +794,12 @@ pub fn handle_timestamp(
     Ok(timestamp)
 }
 
-impl Iterator for IngestionDataIter {
-    type Item = Result<json::Value, IngestionError>;
-
-    fn next(&mut self) -> Option<Result<json::Value, IngestionError>> {
-        match self {
-            IngestionDataIter::JSONIter(iter) => iter.next().map(Ok),
-            IngestionDataIter::MultiIter(iter) => loop {
-                match iter.next() {
-                    Some(Ok(line)) if line.trim().is_empty() => {
-                        // If the line is empty, just continue to the next iteration.
-                        continue;
-                    }
-                    Some(Ok(line)) => {
-                        // If the line is not empty, attempt to parse it as JSON.
-                        return Some(json::from_str(&line).map_err(IngestionError::from));
-                    }
-                    Some(Err(e)) => {
-                        // If there's an error reading the line, return it.
-                        return Some(Err(IngestionError::from(e)));
-                    }
-                    None => {
-                        // If there are no more lines, return None.
-                        return None;
-                    }
-                }
-            },
-            IngestionDataIter::GCP(iter, err) => match err {
-                Some(e) => Some(Err(IngestionError::GCPError(e.clone()))),
-                None => iter.next().map(Ok),
-            },
-            IngestionDataIter::KinesisFH(iter, err) => match err {
-                Some(e) => Some(Err(IngestionError::AWSError(e.clone()))),
-                None => iter.next().map(Ok),
-            },
-        }
-    }
+trait IngestionDataExt {
+    fn iter(self) -> IngestionDataIter;
 }
 
-impl IngestionData {
-    pub fn iter(self) -> IngestionDataIter {
+impl IngestionDataExt for IngestionData {
+    fn iter(self) -> IngestionDataIter {
         match self {
             IngestionData::JSON(vec) => IngestionDataIter::JSONIter(vec.into_iter()),
             IngestionData::Multi(data) => {

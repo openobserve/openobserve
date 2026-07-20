@@ -6827,6 +6827,7 @@ dependencies = [
  "openobserve-catalog",
  "openobserve-compactor",
  "openobserve-dashboards",
+ "openobserve-ingestion",
  "openobserve-pipeline",
  "openobserve-reports",
  "openobserve-scheduler",
@@ -6897,6 +6898,26 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "openobserve-ingestion"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "opentelemetry-proto",
+ "serde",
+ "serde_json",
+ "tokio",
+ "utoipa",
 ]
 
 [[package]]

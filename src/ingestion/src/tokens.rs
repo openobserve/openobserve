@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::organization::OrgIngestionToken;
 use config::ider;
 use infra::table::org_ingestion_tokens;
-
-use crate::{common::meta::organization::OrgIngestionToken, service::db};
 
 /// Create the default ingestion token for a newly created org.
 pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), anyhow::Error> {
@@ -33,7 +32,7 @@ pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), 
         created_at: chrono::Utc::now().timestamp_micros(),
         updated_at: chrono::Utc::now().timestamp_micros(),
     };
-    db::org_ingestion_tokens::add(&record).await?;
+    crate::repository::org_ingestion_tokens::add(&record).await?;
     Ok(())
 }
 
@@ -43,11 +42,11 @@ pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), 
 /// is auto-generated and returned so the org always has at least one
 /// ingestion token.
 pub async fn list_tokens(org_id: &str) -> Result<Vec<OrgIngestionToken>, anyhow::Error> {
-    let mut records = db::org_ingestion_tokens::list_by_org(org_id).await?;
+    let mut records = crate::repository::org_ingestion_tokens::list_by_org(org_id).await?;
     if records.is_empty() {
         // No tokens exist (including disabled) — create a system default
         create_default_token(org_id, "system").await?;
-        records = db::org_ingestion_tokens::list_by_org(org_id).await?;
+        records = crate::repository::org_ingestion_tokens::list_by_org(org_id).await?;
     }
     let tokens = records
         .into_iter()
@@ -91,7 +90,9 @@ pub async fn create_token(
     }
 
     // Check that a token with this name doesn't already exist
-    if let Ok(Some(existing)) = db::org_ingestion_tokens::get_by_name(org_id, name).await {
+    if let Ok(Some(existing)) =
+        crate::repository::org_ingestion_tokens::get_by_name(org_id, name).await
+    {
         return Err(anyhow::anyhow!(
             "Token with name '{}' already exists in this org",
             existing.name
@@ -112,7 +113,7 @@ pub async fn create_token(
         created_at: now,
         updated_at: now,
     };
-    db::org_ingestion_tokens::add(&record).await?;
+    crate::repository::org_ingestion_tokens::add(&record).await?;
 
     Ok(OrgIngestionToken {
         name: name.to_string(),
@@ -127,11 +128,11 @@ pub async fn create_token(
 
 /// Rotate a token's value. Returns the new full token (only time it's shown unmasked).
 pub async fn rotate_token(org_id: &str, name: &str) -> Result<OrgIngestionToken, anyhow::Error> {
-    let existing = db::org_ingestion_tokens::get_by_name(org_id, name)
+    let existing = crate::repository::org_ingestion_tokens::get_by_name(org_id, name)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Token '{}' not found", name))?;
 
-    let new_token = db::org_ingestion_tokens::rotate_token(org_id, name).await?;
+    let new_token = crate::repository::org_ingestion_tokens::rotate_token(org_id, name).await?;
 
     Ok(OrgIngestionToken {
         name: existing.name,
@@ -150,7 +151,7 @@ pub async fn set_enabled_token(
     name: &str,
     enabled: bool,
 ) -> Result<(), anyhow::Error> {
-    db::org_ingestion_tokens::set_enabled(org_id, name, enabled).await
+    crate::repository::org_ingestion_tokens::set_enabled(org_id, name, enabled).await
 }
 
 /// Validate an org token credential. Returns Some(token_record) if valid, None if not found.
@@ -161,7 +162,7 @@ pub async fn validate_token(
     if !token.starts_with(org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX) {
         return Ok(None);
     }
-    db::org_ingestion_tokens::find_enabled_token(org_id, token).await
+    crate::repository::org_ingestion_tokens::find_enabled_token(org_id, token).await
 }
 
 #[cfg(test)]

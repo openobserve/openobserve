@@ -449,6 +449,34 @@ pub enum IngestionDataIter {
     ),
 }
 
+impl Iterator for IngestionDataIter {
+    type Item = Result<json::Value, IngestionError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            IngestionDataIter::JSONIter(iter) => iter.next().map(Ok),
+            IngestionDataIter::MultiIter(iter) => loop {
+                match iter.next() {
+                    Some(Ok(line)) if line.trim().is_empty() => continue,
+                    Some(Ok(line)) => {
+                        return Some(json::from_str(&line).map_err(IngestionError::from));
+                    }
+                    Some(Err(err)) => return Some(Err(IngestionError::from(err))),
+                    None => return None,
+                }
+            },
+            IngestionDataIter::GCP(iter, err) => match err {
+                Some(err) => Some(Err(IngestionError::GCPError(err.clone()))),
+                None => iter.next().map(Ok),
+            },
+            IngestionDataIter::KinesisFH(iter, err) => match err {
+                Some(err) => Some(Err(IngestionError::AWSError(err.clone()))),
+                None => iter.next().map(Ok),
+            },
+        }
+    }
+}
+
 pub enum HecStatus {
     Success,
     InvalidFormat,

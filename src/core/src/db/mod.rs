@@ -81,7 +81,9 @@ pub mod model_pricing;
 pub mod model_pricing_sync;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
-pub mod org_ingestion_tokens;
+pub mod org_ingestion_tokens {
+    pub use openobserve_ingestion::repository::org_ingestion_tokens::*;
+}
 pub mod org_status;
 #[cfg(feature = "enterprise")]
 pub mod org_storage_providers;

@@ -56,7 +56,9 @@ use crate::{
     },
 };
 
-pub mod grpc;
+pub mod grpc {
+    pub use openobserve_ingestion::grpc::*;
+}
 pub mod ingestion_service;
 
 pub use openobserve_transform::{

@@ -112,7 +112,7 @@ pub fn get_exemplar_val(attr_val: &Option<exemplar::Value>) -> json::Value {
 pub fn get_val_for_attr(attr_val: json::Value) -> json::Value {
     let local_val = attr_val.as_object().unwrap();
     if let Some((_key, value)) = local_val.into_iter().next() {
-        return serde_json::Value::String(super::get_string_value(value));
+        return serde_json::Value::String(json::get_string_value(value));
     };
     ().into()
 }

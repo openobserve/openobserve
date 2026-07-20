@@ -27,6 +27,7 @@ exceptions = [
     { name = "openobserve-api-management", allow = ["AGPL-3.0"] },
     { name = "openobserve-api-query", allow = ["AGPL-3.0"] },
     { name = "openobserve-alerts", allow = ["AGPL-3.0"] },
+    { name = "openobserve-ingestion", allow = ["AGPL-3.0"] },
     { name = "openobserve-pipeline", allow = ["AGPL-3.0"] },
     { name = "common", allow = ["AGPL-3.0"] },
     { name = "openobserve-core", allow = ["AGPL-3.0"] },
