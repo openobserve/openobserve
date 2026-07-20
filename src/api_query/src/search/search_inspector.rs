@@ -238,7 +238,7 @@ pub async fn get_search_profile(
                     }
                 };
 
-                if !openobserve_core::authz::check_permissions(
+                if !openobserve_organization::authz::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),

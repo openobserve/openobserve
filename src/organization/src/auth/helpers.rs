@@ -11,7 +11,6 @@ use common::{
     infra::config::{ORG_USERS, PASSWORD_HASH},
     meta::{organization::DEFAULT_ORG, user::UserOrgRole},
 };
-pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
 use config::{meta::user::UserRole, utils::hash::get_passcode_hash};
 
 pub fn get_hash(pass: &str, salt: &str) -> String {

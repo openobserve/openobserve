@@ -34,6 +34,7 @@ openobserve-api-common.workspace = true
 openobserve-core.workspace = true
 openobserve-dashboards.workspace = true
 openobserve-ingestion.workspace = true
+openobserve-organization.workspace = true
 openobserve-reports.workspace = true
 openobserve-search-service.workspace = true
 anyhow.workspace = true

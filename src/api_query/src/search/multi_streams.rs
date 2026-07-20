@@ -296,7 +296,7 @@ pub async fn search_multi(
                     get_user(Some(&org_id), user_id).await.unwrap();
                 let stream_type_str = stream_type.as_str();
 
-                if !openobserve_core::authz::check_permissions(
+                if !openobserve_organization::authz::check_permissions(
                     user_id,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -340,7 +340,7 @@ pub async fn search_multi(
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !openobserve_core::authz::check_permissions(
+                    if !openobserve_organization::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -1323,7 +1323,7 @@ pub async fn search_multi_stream(
 
             // Check permissions for each unique stream
             for stream_name in stream_names {
-                if !openobserve_core::authz::check_permissions(
+                if !openobserve_organization::authz::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),

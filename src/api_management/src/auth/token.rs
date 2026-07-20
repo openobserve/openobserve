@@ -28,7 +28,9 @@ pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use crate::{common::utils::auth::V2_API_PREFIX, service::authz::check_permissions};
+    use openobserve_organization::authz::check_permissions;
+
+    use crate::common::utils::auth::V2_API_PREFIX;
 
     let user;
     let keys = get_dex_jwks().await;

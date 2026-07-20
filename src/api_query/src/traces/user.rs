@@ -131,7 +131,7 @@ pub async fn get_latest_users(
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !openobserve_core::authz::check_permissions(
+            if !openobserve_organization::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),

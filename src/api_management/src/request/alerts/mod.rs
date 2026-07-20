@@ -36,7 +36,7 @@ use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
     crate::common::utils::auth::check_permissions,
-    openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions},
+    openobserve_organization::authz::{StreamPermissionResourceType, check_stream_permissions},
 };
 
 #[cfg(feature = "enterprise")]

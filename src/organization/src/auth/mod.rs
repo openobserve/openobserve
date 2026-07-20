@@ -15,6 +15,8 @@
 
 use std::{collections::HashMap, fmt::Debug};
 
+mod helpers;
+
 use ::common::meta::user::AuthTokens;
 #[cfg(feature = "enterprise")]
 use ::common::meta::user::AuthTokensExt;
@@ -30,6 +32,7 @@ use base64::Engine;
 #[cfg(test)]
 use config::meta::user::UserRole;
 use config::utils::json;
+pub use helpers::*;
 #[cfg(feature = "enterprise")]
 use {
     crate::users::get_user, jsonwebtoken::TokenData, o2_dex::service::auth::get_dex_jwks,
@@ -98,10 +101,6 @@ pub use ::common::utils::auth::{
 // domain-management blocklist validate identically. Re-exported here to preserve the existing
 // `::common::utils::auth::{EMAIL_REGEX, is_valid_email}` API.
 pub use config::utils::str::{EMAIL_REGEX, is_valid_email};
-pub use openobserve_organization::auth::{
-    delete_org_tuples, get_hash, get_role, is_root_user, save_org_tuples,
-};
-
 #[cfg(feature = "enterprise")]
 pub fn is_ofga_object_visible(
     org_id: &str,
@@ -717,14 +716,11 @@ pub fn build_basic_auth_header(email: &str, token: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use common::meta::user::UserRequest;
     use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::{
-        common::meta::user::UserRequest,
-        organization,
-        service::{self, users},
-    };
+    use crate::{db, organization, users};
 
     #[test]
     fn test_valid_emails() {
@@ -820,9 +816,9 @@ mod tests {
             },
         )
         .await;
-        service::db::user::cache().await.unwrap();
-        service::db::organization::cache().await.unwrap();
-        service::db::org_users::cache().await.unwrap();
+        db::user::cache().await.unwrap();
+        db::organization::cache().await.unwrap();
+        db::org_users::cache().await.unwrap();
         assert!(is_root_user("root@example.com"));
         assert!(!is_root_user("root2@example.com"));
     }

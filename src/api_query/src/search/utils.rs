@@ -20,9 +20,9 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
-#[cfg(feature = "enterprise")]
-pub use openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions};
 use openobserve_core::search::sql::Sql;
+#[cfg(feature = "enterprise")]
+pub use openobserve_organization::authz::{StreamPermissionResourceType, check_stream_permissions};
 
 // ============================================================================
 // Query Validation Helpers

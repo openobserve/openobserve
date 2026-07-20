@@ -26,7 +26,7 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
-pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
+pub use openobserve_organization::authz::{check_permissions, list_objects_for_user};
 
 #[cfg(feature = "enterprise")]
 pub use crate::common::utils::auth::get_user_email_from_auth_str;

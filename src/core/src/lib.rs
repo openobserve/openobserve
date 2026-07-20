@@ -23,8 +23,7 @@ pub use ::search::cipher;
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub use openobserve_alerts::anomaly_detection;
-pub mod auth;
-pub mod authz;
+pub use openobserve_organization::{auth, authz};
 pub mod bootstrap;
 pub mod cluster_info;
 pub mod dashboards;
