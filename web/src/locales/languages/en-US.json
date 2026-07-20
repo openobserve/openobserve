@@ -7404,6 +7404,7 @@
       "llmInsights": "LLM Insights",
       "sessions": "LLM Sessions",
       "agentGraph": "Agent Graph",
+      "agentBehavior": "Agent Behavior",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
       "scorers": "Scorers",
@@ -7413,6 +7414,7 @@
       "llmInsights": "Track latency, errors, tokens, and cost across your LLM traffic",
       "sessions": "Browse and inspect agent sessions turn by turn",
       "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
+      "agentBehavior": "Spot agents stuck in loops and the errors making them fail",
       "quality": "Score and track the quality of your LLM responses",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
@@ -7469,6 +7471,11 @@
       }
     },
     "behavior": {
+      "node": {
+        "tabLabel": "Behavior",
+        "cost": "Cost",
+        "disabled": "Agent behavior signals are turned off for this deployment"
+      },
       "loopsTitle": "Looping agents",
       "loopsHint": "Agents re-running the same tool many times per trace",
       "failuresTitle": "Failure taxonomy",
@@ -7502,6 +7509,9 @@
         "colTraceId": "Trace",
         "colSpans": "Spans",
         "colRepeats": "Repeats",
+        "openInNewTab": "Opens the trace in a new tab",
+        "showFull": "Show full error",
+        "showLess": "Show less",
         "colError": "Error message",
         "colOccurrences": "Times",
         "loopHeadline": "{agent} called {tool} {ratio}× per trace on average ({calls} calls across {traces} traces).",

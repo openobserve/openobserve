@@ -51,9 +51,8 @@ pub async fn get_agent_signals(
             (start, end)
         } else {
             let now = chrono::Utc::now().timestamp_micros();
-            let window_micros = super::super::service_graph::DEFAULT_QUERY_WINDOW_MINUTES
-                * 60
-                * 1_000_000;
+            let window_micros =
+                super::super::service_graph::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000;
             (now - window_micros, now)
         };
 

@@ -70,6 +70,8 @@ function evalLink(tab: EvalTab) {
 const activeSection = computed<string>(() => {
   if (route.name === "aiLLMInsights") return "llmInsights";
   if (route.name === "aiSessions") return "sessions";
+  if (route.name === "aiAgentGraph") return "agentGraph";
+  if (route.name === "aiAgentBehavior") return "agentBehavior";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
     return tab;
@@ -102,6 +104,14 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     icon: "hub",
     to: { name: "aiAgentGraph", query: orgQuery.value },
     dataTest: "ai-secondary-nav-agent-graph",
+    group: "Monitor",
+  },
+  {
+    key: "agentBehavior",
+    label: t("aiObservability.nav.agentBehavior"),
+    icon: "troubleshoot",
+    to: { name: "aiAgentBehavior", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-agent-behavior",
     group: "Monitor",
   },
   {

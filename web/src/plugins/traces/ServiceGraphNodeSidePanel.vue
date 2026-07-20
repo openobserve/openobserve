@@ -163,6 +163,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="text-transform: capitalize"
                 data-test="service-graph-node-panel-tab-operations"
               />
+              <!-- Agent behavior (loops/failures) — only for agent nodes on
+                   enterprise builds. See Agent Signals design §4b. -->
+              <OTab
+                v-if="showBehaviorTab"
+                name="behavior"
+                :label="t('aiObservability.behavior.node.tabLabel')"
+                style="text-transform: capitalize"
+                data-test="service-graph-node-panel-tab-behavior"
+              />
               <OTab
                 v-for="cfg in activeResourceTabConfigs"
                 :key="cfg.id"
@@ -337,6 +346,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </TenstackTable>
               </div>
+            </OTabPanel>
+
+            <!-- Behavior Tab (agent nodes, enterprise) -->
+            <OTabPanel
+              v-if="showBehaviorTab"
+              name="behavior"
+              class="p-0! panel-section mb-0!"
+              data-test="service-graph-side-panel-behavior"
+            >
+              <AgentNodeBehaviorTab
+                :agent-name="behaviorAgentName"
+                :source-stream="streamFilter"
+                :start-time="timeRange.startTime"
+                :end-time="timeRange.endTime"
+              />
             </OTabPanel>
 
             <!-- Nodes Tab -->
@@ -596,6 +620,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
+import config from "@/aws-exports";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -607,6 +632,12 @@ const RenderDashboardCharts = defineAsyncComponent(
 
 const TenstackTable = defineAsyncComponent(
   () => import("@/components/TenstackTable.vue"),
+);
+
+// Agent-scoped behavior signals shown on agent nodes (enterprise). Async so the
+// enterprise chunk only loads when an agent node's Behavior tab is opened.
+const AgentNodeBehaviorTab = defineAsyncComponent(
+  () => import("@/enterprise/views/AIObservability/AgentNodeBehaviorTab.vue"),
 );
 
 // ---------------------------------------------------------------------------
@@ -844,6 +875,7 @@ export default defineComponent({
     OCheckbox,
     OIcon,
     ServiceCatalogBarCell,
+    AgentNodeBehaviorTab,
 },
   props: {
     selectedNode: {
@@ -1536,6 +1568,28 @@ export default defineComponent({
 
     /** Whether the selected node is an inferred service (uninstrumented dependency). */
     const isInferred = computed(() => !!props.selectedNode?.service_type);
+
+    // The clicked agent's display name (same value the graph node is keyed by
+    // and that AgentSignalDetailPanel filters on — see design §4b id-vs-name).
+    const behaviorAgentName = computed<string>(
+      () =>
+        props.selectedNode?.name ||
+        props.selectedNode?.label ||
+        props.selectedNode?.id ||
+        "",
+    );
+
+    // The Behavior tab (loop/failure signals) shows only for agent nodes on
+    // enterprise builds, and only when a concrete stream is selected (the
+    // signals stream is per-source-stream). The AgentNodeBehaviorTab itself
+    // degrades gracefully to a "feature off" hint if the rollup is disabled.
+    const showBehaviorTab = computed(
+      () =>
+        config.isEnterprise === "true" &&
+        props.selectedNode?.service_type === "agent" &&
+        props.streamFilter !== "all" &&
+        !!props.streamFilter,
+    );
 
     // Tabs actually shown. For inferred services use the registry tabs;
     // for instrumented services use the user-selected OTEL resource tabs.
@@ -2442,6 +2496,8 @@ export default defineComponent({
       serviceHealth,
       isAllStreamsSelected,
       isInferred,
+      showBehaviorTab,
+      behaviorAgentName,
       serviceNameField,
       streamFieldSet,
       formatNumber,

@@ -466,7 +466,7 @@ export default defineComponent({
     },
   },
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -474,6 +474,9 @@ export default defineComponent({
     const { searchObj } = useTraces();
 
     const loading = ref(false);
+    // Stamped when a graph load settles — lets a parent page show a
+    // "last refreshed" time next to its refresh control.
+    const lastRunAt = ref<number | null>(null);
     const error = ref<string | null>(null);
     const showSettings = ref(false);
     const lastUpdated = ref("");
@@ -1583,6 +1586,7 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
+        lastRunAt.value = Date.now();
       }
     };
 
@@ -1844,6 +1848,9 @@ export default defineComponent({
       await loadTraceStreams();
       loadServiceGraph();
     });
+
+    // Public API for parent pages (e.g. Agent Graph page's header refresh).
+    expose({ refresh: loadServiceGraph, loading, lastRunAt });
 
     return {
       t,

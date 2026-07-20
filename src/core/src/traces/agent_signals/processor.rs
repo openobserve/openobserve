@@ -47,8 +47,12 @@ pub async fn process_agent_signals_stream(
     // Schema-gate each pass: streams from different frameworks carry different
     // columns. Referencing a missing column is a hard search error, so only run a
     // pass when its required columns exist (mirrors the service-graph gating).
-    let schema =
-        infra::schema::get(org_id, stream_name, config::meta::stream::StreamType::Traces).await;
+    let schema = infra::schema::get(
+        org_id,
+        stream_name,
+        config::meta::stream::StreamType::Traces,
+    )
+    .await;
     let has_field = |name: &str| {
         schema
             .as_ref()

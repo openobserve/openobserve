@@ -42,6 +42,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-[2rem]"
           @on:date-change="onDateChange"
         />
+        <!-- Last-refresh + refresh control, consistent with LLM Insights /
+             Sessions / Agent Behavior page headers. -->
+        <div
+          class="inline-flex items-center border border-border-default rounded-md px-1 h-[2rem] overflow-hidden"
+        >
+          <ORefreshButton
+            :last-run-at="graphLastRunAt"
+            :loading="isGraphLoading"
+            :disabled="isGraphLoading"
+            data-test="ai-agent-graph-refresh-btn"
+            @click="refresh"
+          />
+        </div>
       </template>
     </AppPageHeader>
 
@@ -106,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex-1 min-h-0 overflow-hidden">
       <ServiceGraph
+        ref="graphRef"
         :stream-filter="effectiveStream"
         hide-stream-selector
         agent-highlight
@@ -124,6 +138,7 @@ import AppPageHeader from "@/components/common/AppPageHeader.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
@@ -148,6 +163,39 @@ const DEFAULT_RELATIVE = "15m";
 const filterMode = ref<"stream" | "agent">("stream");
 const availableStreams = ref<string[]>([]);
 const activeStream = ref<string>("default");
+
+// Graph child ref + header refresh state. ServiceGraph exposes
+// { refresh, loading, lastRunAt }.
+const graphRef = ref<any>(null);
+const isRefreshing = ref(false);
+const graphLastRunAt = computed<number | null>(
+  () => graphRef.value?.lastRunAt ?? null,
+);
+const isGraphLoading = computed(
+  () => isRefreshing.value || graphRef.value?.loading || false,
+);
+
+async function refresh() {
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  try {
+    // Re-anchor a relative window first so "last 15m" refreshes to now.
+    const dt = searchObj.data.datetime;
+    if (dt.type === "relative" && dt.relativeTimePeriod) {
+      const r = getConsumableRelativeTime(dt.relativeTimePeriod);
+      if (r) {
+        searchObj.data.datetime = {
+          ...dt,
+          startTime: r.startTime,
+          endTime: r.endTime,
+        };
+      }
+    }
+    await graphRef.value?.refresh?.();
+  } finally {
+    isRefreshing.value = false;
+  }
+}
 
 const agents = ref<GenAiAgentListItem[]>([]);
 const agentsLoaded = ref(false);

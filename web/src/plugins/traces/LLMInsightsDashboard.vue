@@ -267,18 +267,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Agent behavior signals (loops / failure taxonomy / cost) — reads the
-           pre-computed _agent_signals stream; empty until the rollup has run. -->
-      <div class="mt-6">
-        <div class="text-sm font-semibold text-text-primary mb-3">
-          {{ t("aiObservability.behavior.sectionTitle") }}
-        </div>
-        <AgentBehaviorPanel
-          :start-time="startTime"
-          :end-time="endTime"
-          :source-stream="effectiveStream"
-        />
-      </div>
+      <!-- Agent behavior signals (loops / failure taxonomy) moved to their own
+           dedicated "Agent Behavior" page under Monitor. LLM Insights keeps the
+           cost/latency/error story; behavior lives beside Agent Graph. -->
     </div>
   </div>
 </template>
@@ -298,7 +289,6 @@ import KpiSparkline from "./KpiSparkline.vue";
 import LLMSchemaPanel from "./LLMSchemaPanel.vue";
 import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
-import AgentBehaviorPanel from "@/enterprise/views/AIObservability/AgentBehaviorPanel.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

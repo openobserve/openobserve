@@ -52,10 +52,10 @@ impl AgentSignalRecord {
     /// Serialize for ingestion: `timestamp` becomes `_timestamp`, None optionals omitted.
     pub fn to_json(&self) -> json::Value {
         let mut v = json::to_value(self).unwrap_or(json::Value::Null);
-        if let Some(obj) = v.as_object_mut() {
-            if let Some(ts) = obj.remove("timestamp") {
-                obj.insert("_timestamp".to_string(), ts);
-            }
+        if let Some(obj) = v.as_object_mut()
+            && let Some(ts) = obj.remove("timestamp")
+        {
+            obj.insert("_timestamp".to_string(), ts);
         }
         v
     }
