@@ -15,7 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="p-0 w-full h-[calc(100vh_-_3.5625rem)] overflow-hidden flex flex-col"
+  <!-- Height matches the host ODialog's own max-h-[90vh] cap (minus its body
+       padding + borders) so the dialog body never overflows. That keeps the
+       inner right-content area as the single scroller instead of stacking a
+       second scrollbar on the dialog body. -->
+  <OCard class="p-0 w-full h-[calc(90vh_-_2rem)] overflow-hidden flex flex-col"
     data-test="custom-chart-type-selector-popup"
   >
     <!-- Header -->
@@ -59,10 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(category, index) in chartCategories"
               :key="index"
               @click="scrollToCategory(category.chartLabel)"
-              class="flex items-center px-3 py-2 cursor-pointer rounded-default mb-1 transition-all duration-200 hover:bg-black/4"
-              :class="{
-                'bg-theme-accent text-text-inverse font-semibold': selectedCategory === category.chartLabel,
-              }"
+              class="flex items-center px-3 py-2 cursor-pointer rounded-default mb-1 transition-all duration-200"
+              :class="
+                selectedCategory === category.chartLabel
+                  ? 'bg-theme-accent text-text-inverse font-semibold'
+                  : 'hover:bg-button-ghost-hover-bg'
+              "
               data-test="chart-category-item"
             >
               <span class="text-sm">{{ category.chartLabel }}</span>
