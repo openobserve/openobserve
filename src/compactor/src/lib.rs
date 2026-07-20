@@ -20,6 +20,7 @@
 
 pub mod deleted;
 pub mod flatten;
+mod flatten_key;
 pub mod incremental;
 mod metadata;
 pub mod repository;

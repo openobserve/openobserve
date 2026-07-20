@@ -6794,6 +6794,8 @@ name = "openobserve-compactor"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrow",
+ "arrow-schema",
  "async-trait",
  "bytes",
  "config",
@@ -6803,6 +6805,7 @@ dependencies = [
  "log",
  "o2_enterprise",
  "openobserve-catalog",
+ "parking_lot 0.12.5",
  "tokio",
 ]
 
@@ -6958,6 +6961,7 @@ dependencies = [
  "anyhow",
  "arrow",
  "arrow-schema",
+ "async-trait",
  "bytes",
  "chrono",
  "common",

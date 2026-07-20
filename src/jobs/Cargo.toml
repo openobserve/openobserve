@@ -39,6 +39,7 @@ openobserve-scheduler.workspace = true
 anyhow.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
+async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 cron.workspace = true
