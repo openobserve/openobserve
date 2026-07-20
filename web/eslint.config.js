@@ -59,7 +59,7 @@ export default [
       prettier,
     },
     rules: {
-      // ── Strictness rollout — see docs/lint-and-typecheck-strictness-rollout.md ──
+      // ── Strictness rollout ──
       //
       // Kept OFF permanently:
       //   no-undef       → TypeScript already checks undefined symbols; this rule
@@ -125,7 +125,7 @@ export default [
       "no-useless-catch": "error",
       "no-async-promise-executor": "error",
       // Bucket 4 — Vue correctness. Driven to 0 via the behavior-preserving
-      // computed-alias pattern (see web/docs/SKILL.md); now enforced.
+      // computed-alias pattern (see the eslint-error-handling skill); now enforced.
       "vue/no-mutating-props": "error",
       "vue/no-unused-components": "error",
       "vue/no-unused-vars": "error",
