@@ -19,6 +19,7 @@
 //! schema and query dependencies are expressed as explicit ports.
 
 pub mod deleted;
+pub mod file_list_dump;
 pub mod flatten;
 mod flatten_key;
 pub mod incremental;

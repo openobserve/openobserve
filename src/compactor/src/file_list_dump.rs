@@ -31,8 +31,7 @@ use infra::{
 };
 use itertools::Itertools;
 use rayon::slice::ParallelSliceMut;
-
-use crate::search::datafusion::{
+use search::datafusion::{
     exec::{DataFusionContextBuilder, TableBuilder},
     table_provider::uniontable::NewUnionTable,
 };
@@ -185,7 +184,7 @@ pub async fn exec(
     // load files to local cache
     let start = std::time::Instant::now();
     let mut scan_stats = ScanStats::default();
-    let (cache_type, ..) = super::search::grpc::storage::cache_files(
+    let (cache_type, ..) = search::file_cache::cache_files(
         trace_id,
         &files
             .iter()
@@ -227,7 +226,7 @@ pub async fn exec(
     let trace_id = format!("{trace_id}-file-list-dump");
     let ret = inner_exec(&trace_id, partitions, files, query).await;
     // we always have to clear the files loaded
-    super::search::datafusion::storage::file_list::clear(&trace_id);
+    search::datafusion::storage::file_list::clear(&trace_id);
     ret
 }
 

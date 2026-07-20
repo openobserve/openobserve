@@ -34,8 +34,9 @@ use infra::{
     table::compactor_manual_jobs::Status as CompactorManualJobStatus,
 };
 use itertools::Itertools;
+use openobserve_compactor::file_list_dump::generate_dump_stream_name;
 
-use crate::{db, file_list, file_list_dump::generate_dump_stream_name};
+use crate::{db, file_list};
 
 pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     let cfg = get_config();

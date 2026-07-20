@@ -6802,10 +6802,13 @@ dependencies = [
  "hashbrown 0.16.1",
  "infra",
  "ingester",
+ "itertools 0.14.0",
  "log",
  "o2_enterprise",
  "openobserve-catalog",
  "parking_lot 0.12.5",
+ "rayon",
+ "search",
  "tokio",
 ]
 

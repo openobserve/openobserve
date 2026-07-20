@@ -23,8 +23,11 @@ config.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
 ingester.workspace = true
+itertools.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 openobserve-catalog.workspace = true
 parking_lot.workspace = true
+rayon.workspace = true
+search.workspace = true
 tokio.workspace = true
