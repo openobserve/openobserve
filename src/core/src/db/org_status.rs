@@ -151,8 +151,40 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    use super::{ORG_STATUS_CACHE, OrgStatus, is_blocked};
+
+    /// Seeds the shared cache for one org and cleans up afterwards. Org ids are
+    /// unique per test so tests stay independent under parallel execution.
+    fn with_org_status(org_id: &str, status: OrgStatus, assertion: impl FnOnce()) {
+        ORG_STATUS_CACHE.insert(org_id.to_string(), status);
+        assertion();
+        ORG_STATUS_CACHE.remove(org_id);
+    }
+
     #[test]
     fn test_is_blocked_false_for_unknown_org() {
-        assert!(!super::is_blocked("nope-unknown-org"));
+        assert!(!is_blocked("nope-unknown-org"));
+    }
+
+    #[test]
+    fn test_is_blocked_true_for_pending_deletion() {
+        // Soft-delete grace window: the org must already read as gone to users.
+        with_org_status("org-pending-deletion", OrgStatus::PendingDeletion, || {
+            assert!(is_blocked("org-pending-deletion"));
+        });
+    }
+
+    #[test]
+    fn test_is_blocked_true_for_deleting() {
+        with_org_status("org-deleting", OrgStatus::Deleting, || {
+            assert!(is_blocked("org-deleting"));
+        });
+    }
+
+    #[test]
+    fn test_is_blocked_false_for_active() {
+        with_org_status("org-active", OrgStatus::Active, || {
+            assert!(!is_blocked("org-active"));
+        });
     }
 }
