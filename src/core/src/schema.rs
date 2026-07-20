@@ -25,6 +25,7 @@ use config::{
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
+    is_uds_internal_column,
     meta::{
         promql::{
             BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
@@ -349,7 +350,10 @@ pub(crate) async fn handle_diff_schema(
     // 2. log ingestion
     // 3. user defined schema is not already enabled
     // 4. final schema fields count exceeds schema_max_fields_to_enable_uds
-    // user-defined schema does not include _timestamp or _all columns
+    // Internal columns (_timestamp, _all, _o2_id, _original, _all_values) are
+    // implicitly part of the user-defined schema: they are merged in wherever
+    // the UDS is consumed, so they are never persisted here and never occupy
+    // slots in the field list (see is_uds_internal_column).
     if cfg.common.allow_user_defined_schemas
         && cfg.limit.schema_max_fields_to_enable_uds > 0
         && stream_type.support_uds()
@@ -358,16 +362,10 @@ pub(crate) async fn handle_diff_schema(
     {
         let mut uds_fields = HashSet::with_capacity(cfg.limit.schema_max_fields_to_enable_uds);
 
-        // Helper to check if a field should be skipped
-        let keep_fields = vec![
-            TIMESTAMP_COL_NAME.to_string(),
-            ID_COL_NAME.to_string(),
-            ORIGINAL_DATA_COL_NAME.to_string(),
-            ALL_VALUES_COL_NAME.to_string(),
-            cfg.common.column_all.to_string(),
-        ];
+        // Fields that must survive auto-enable: stream-type mandatory fields
+        // plus everything FTS/secondary-index related
         let mut keep_fields =
-            check_schema_for_defined_schema_fields(stream_type, &final_schema, keep_fields);
+            check_schema_for_defined_schema_fields(stream_type, &final_schema, vec![]);
         // add FTS fields (default SQL FTS fields)
         for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
             keep_fields.insert(field.to_string());
@@ -387,7 +385,7 @@ pub(crate) async fn handle_diff_schema(
 
         // Add keep fields first
         for field in keep_fields {
-            if final_schema.field_with_name(&field).is_ok() {
+            if !is_uds_internal_column(&field) && final_schema.field_with_name(&field).is_ok() {
                 uds_fields.insert(field);
             }
         }
@@ -396,6 +394,9 @@ pub(crate) async fn handle_diff_schema(
         if let Some(stream_schema) = stream_schema_map.get(stream_name) {
             for field in stream_schema.schema().fields() {
                 let field = field.name();
+                if is_uds_internal_column(field) {
+                    continue;
+                }
                 if uds_fields.insert(field.to_string())
                     && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
                 {
@@ -408,6 +409,9 @@ pub(crate) async fn handle_diff_schema(
         if uds_fields.len() < cfg.limit.schema_max_fields_to_enable_uds {
             for field in final_schema.fields() {
                 let field = field.name();
+                if is_uds_internal_column(field) {
+                    continue;
+                }
                 if uds_fields.insert(field.to_string())
                     && uds_fields.len() >= cfg.limit.schema_max_fields_to_enable_uds
                 {
@@ -660,6 +664,51 @@ mod tests {
     use datafusion::arrow::datatypes::DataType;
 
     use super::*;
+
+    #[test]
+    fn test_generate_schema_for_defined_schema_fields_includes_internal_columns() {
+        // internal columns must be part of the effective schema even when they
+        // are not persisted in defined_schema_fields
+        let mut fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true),
+            Field::new(
+                get_config().common.column_all.as_str(),
+                DataType::Utf8,
+                true,
+            ),
+            Field::new(ID_COL_NAME, DataType::Utf8, true),
+            Field::new(ORIGINAL_DATA_COL_NAME, DataType::Utf8, true),
+            Field::new(ALL_VALUES_COL_NAME, DataType::Utf8, true),
+        ];
+        for i in 0..15 {
+            fields.push(Field::new(format!("field{i}"), DataType::Utf8, true));
+        }
+        let schema = SchemaCache::new(Schema::new(fields));
+        let defined_fields = vec!["field0".to_string(), "field1".to_string()];
+
+        let result = generate_schema_for_defined_schema_fields(
+            StreamType::Logs,
+            &schema,
+            &defined_fields,
+            true,
+            false,
+            true,
+        );
+        let names: Vec<_> = result
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().to_string())
+            .collect();
+        assert!(names.contains(&TIMESTAMP_COL_NAME.to_string()));
+        assert!(names.contains(&get_config().common.column_all));
+        assert!(names.contains(&ID_COL_NAME.to_string()));
+        assert!(names.contains(&ORIGINAL_DATA_COL_NAME.to_string()));
+        assert!(names.contains(&ALL_VALUES_COL_NAME.to_string()));
+        assert!(names.contains(&"field0".to_string()));
+        assert!(names.contains(&"field1".to_string()));
+        assert!(!names.contains(&"field2".to_string()));
+    }
 
     #[test]
     fn test_check_schema_for_defined_schema_fields_logs() {

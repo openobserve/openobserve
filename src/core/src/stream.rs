@@ -26,7 +26,7 @@ use chrono::{TimeZone, Timelike, Utc};
 use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
 use config::{
     ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config,
-    is_local_disk_storage,
+    is_local_disk_storage, is_uds_internal_column,
     meta::{
         promql,
         stream::{
@@ -467,7 +467,15 @@ pub async fn save_stream_settings(
         fields.retain(|field| schema_fields.contains_key(field));
         settings.defined_schema_fields = fields;
     }
-    if settings.defined_schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
+    // internal columns (_timestamp, _all, _o2_id, _original, _all_values) are
+    // implicitly part of the user-defined schema, so they don't count toward
+    // the limit
+    let uds_user_fields = settings
+        .defined_schema_fields
+        .iter()
+        .filter(|field| !is_uds_internal_column(field))
+        .count();
+    if uds_user_fields > cfg.limit.user_defined_schema_max_fields {
         return Ok(MetaHttpResponse::bad_request(format!(
             "user defined schema fields count exceeds the limit: {}",
             cfg.limit.user_defined_schema_max_fields

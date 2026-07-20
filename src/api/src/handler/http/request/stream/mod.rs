@@ -102,10 +102,14 @@ pub async fn schema(
             .iter()
             .map(|f| (&f.name, f))
             .collect::<HashMap<_, _>>();
+        // internal columns (_timestamp, _all, ...) are implicitly part of the
+        // user-defined schema even when not persisted in defined_schema_fields
+        let internal_columns = schema.settings.uds_internal_columns();
         schema.uds_schema = schema
             .settings
             .defined_schema_fields
             .iter()
+            .chain(internal_columns.iter())
             .filter_map(|f| schema_fields.remove(f))
             .cloned()
             .collect::<Vec<_>>();
