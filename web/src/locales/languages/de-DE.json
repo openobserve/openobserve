@@ -5460,7 +5460,7 @@
     "dangerZone": "Gefahrenzone",
     "deleteOrganization": "Organisation löschen",
     "deleteOrganizationTitle": "Diese Organisation löschen",
-    "deleteOrganizationDescription": "Plant {name} zur Löschung ein. Die Organisation wird sofort für alle — auch für Sie — unzugänglich und nach Ablauf der Schonfrist endgültig gelöscht. Eine Wiederherstellung davor ist nur über den Support möglich.",
+    "deleteOrganizationDescription": "Alle, auch Sie, verlieren sofort den Zugriff auf {name}. Während der Schonfrist kann nur der OpenObserve-Support die Organisation wiederherstellen; danach werden alle Daten endgültig gelöscht.",
     "deleteOrganizationScopeLoading": "Inhalt dieser Organisation wird geprüft…",
     "deleteOrganizationScope": "{dashboards} Dashboards · {streams} Streams · {size} Daten",
     "deleteFactGracePeriod": "Schonfrist",

@@ -5460,7 +5460,7 @@
     "dangerZone": "Strefa niebezpieczna",
     "deleteOrganization": "Usuń organizację",
     "deleteOrganizationTitle": "Usuń tę organizację",
-    "deleteOrganizationDescription": "Planuje usunięcie {name}. Staje się natychmiast niedostępna dla wszystkich – w tym dla Ciebie – a następnie trwale usuwana po zakończeniu okresu karencji. Przywrócenie jej przed tym czasem wymaga kontaktu z pomocą techniczną.",
+    "deleteOrganizationDescription": "Wszyscy, w tym Ty, natychmiast tracą dostęp do {name}. W okresie karencji tylko pomoc techniczna OpenObserve może ją przywrócić; później wszystkie dane zostają trwale usunięte.",
     "deleteOrganizationScopeLoading": "Sprawdzanie, co zawiera ta organizacja…",
     "deleteOrganizationScope": "{dashboards} dashboardów · {streams} strumieni · {size} danych",
     "deleteFactGracePeriod": "Okres karencji",

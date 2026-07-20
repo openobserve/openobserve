@@ -5460,7 +5460,7 @@
     "dangerZone": "위험 구역",
     "deleteOrganization": "조직 삭제",
     "deleteOrganizationTitle": "이 조직 삭제",
-    "deleteOrganizationDescription": "{name}을(를) 삭제하도록 예약합니다. 즉시 모든 사용자(본인 포함)가 접근할 수 없게 되며, 유예 기간이 끝나면 영구적으로 삭제됩니다. 그전에 복원하려면 지원팀에 문의해야 합니다.",
+    "deleteOrganizationDescription": "모든 사용자(본인 포함)가 즉시 {name}에 접근할 수 없게 됩니다. 유예 기간 동안에는 OpenObserve 지원팀만 복원할 수 있으며, 그 이후에는 모든 데이터가 영구적으로 삭제됩니다.",
     "deleteOrganizationScopeLoading": "이 조직의 내용을 확인하는 중…",
     "deleteOrganizationScope": "대시보드 {dashboards}개 · 스트림 {streams}개 · 데이터 {size}",
     "deleteFactGracePeriod": "유예 기간",

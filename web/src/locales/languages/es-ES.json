@@ -5460,7 +5460,7 @@
     "dangerZone": "Zona de peligro",
     "deleteOrganization": "Eliminar organización",
     "deleteOrganizationTitle": "Eliminar esta organización",
-    "deleteOrganizationDescription": "Programa {name} para su eliminación. Dejará de ser accesible para todos —incluido usted— de inmediato y se borrará de forma permanente al finalizar el período de gracia. Para restaurarla antes es necesario contactar con soporte.",
+    "deleteOrganizationDescription": "Todos, incluido usted, pierden el acceso a {name} de inmediato. Durante el período de gracia, solo el soporte de OpenObserve puede restaurarla; después, todos los datos se borran de forma permanente.",
     "deleteOrganizationScopeLoading": "Comprobando el contenido de esta organización…",
     "deleteOrganizationScope": "{dashboards} paneles · {streams} streams · {size} de datos",
     "deleteFactGracePeriod": "Período de gracia",
