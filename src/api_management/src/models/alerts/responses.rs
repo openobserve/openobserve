@@ -78,6 +78,139 @@ pub struct EnableAlertResponseBody {
     pub enabled: bool,
 }
 
+/// HTTP response body for `GetAlertOccurrence` endpoint.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AlertOccurrenceResponseBody {
+    #[schema(value_type = String)]
+    pub occurrence_id: Ksuid,
+    pub org_id: String,
+    #[schema(value_type = String)]
+    pub alert_id: Ksuid,
+    pub alert_name: Option<String>,
+    pub alert_updated_at: Option<i64>,
+    pub config_hash: String,
+    pub window_start: i64,
+    pub window_end: i64,
+    pub trigger_timestamp: i64,
+    pub query_type: String,
+    pub condition_operator: String,
+    pub threshold_value: Option<i64>,
+    pub matched_count: i64,
+    pub result_preview: AlertOccurrenceResultPreviewResponseBody,
+    pub query_took: Option<i64>,
+    pub trace_id: Option<String>,
+    pub created_at: i64,
+    pub schema_version: i16,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AlertOccurrenceResultPreviewResponseBody {
+    pub matched_count: i64,
+    #[schema(value_type = Vec<Object>)]
+    pub rows: Vec<serde_json::Value>,
+    pub truncated: bool,
+    pub max_rows: usize,
+    pub max_bytes: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct ListAlertOccurrencesResponseBody {
+    pub limit: u64,
+    pub offset: u64,
+    pub max_limit: u64,
+    pub occurrences: Vec<AlertOccurrenceSummaryResponseBody>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct AlertOccurrenceSummaryResponseBody {
+    #[schema(value_type = String)]
+    pub occurrence_id: Ksuid,
+    pub org_id: String,
+    #[schema(value_type = String)]
+    pub alert_id: Ksuid,
+    pub alert_name: Option<String>,
+    pub alert_updated_at: Option<i64>,
+    pub config_hash: String,
+    pub window_start: i64,
+    pub window_end: i64,
+    pub trigger_timestamp: i64,
+    pub query_type: String,
+    pub condition_operator: String,
+    pub threshold_value: Option<i64>,
+    pub matched_count: i64,
+    pub result_truncated: bool,
+    pub trace_id: Option<String>,
+    pub created_at: i64,
+    pub schema_version: i16,
+}
+
+impl From<openobserve_core::alerts::occurrences::AlertOccurrenceView>
+    for AlertOccurrenceResponseBody
+{
+    fn from(value: openobserve_core::alerts::occurrences::AlertOccurrenceView) -> Self {
+        Self {
+            occurrence_id: value.occurrence_id,
+            org_id: value.org_id,
+            alert_id: value.alert_id,
+            alert_name: value.alert_name,
+            alert_updated_at: value.alert_updated_at,
+            config_hash: value.config_hash,
+            window_start: value.window_start,
+            window_end: value.window_end,
+            trigger_timestamp: value.trigger_timestamp,
+            query_type: value.query_type,
+            condition_operator: value.condition_operator,
+            threshold_value: value.threshold_value,
+            matched_count: value.matched_count,
+            result_preview: value.result_preview.into(),
+            query_took: value.query_took,
+            trace_id: value.trace_id,
+            created_at: value.created_at,
+            schema_version: value.schema_version,
+        }
+    }
+}
+
+impl From<openobserve_core::alerts::occurrences::AlertOccurrenceResultPreview>
+    for AlertOccurrenceResultPreviewResponseBody
+{
+    fn from(value: openobserve_core::alerts::occurrences::AlertOccurrenceResultPreview) -> Self {
+        Self {
+            matched_count: value.matched_count,
+            rows: value.rows,
+            truncated: value.truncated,
+            max_rows: value.max_rows,
+            max_bytes: value.max_bytes,
+        }
+    }
+}
+
+impl From<openobserve_core::alerts::occurrences::AlertOccurrenceSummary>
+    for AlertOccurrenceSummaryResponseBody
+{
+    fn from(value: openobserve_core::alerts::occurrences::AlertOccurrenceSummary) -> Self {
+        Self {
+            occurrence_id: value.occurrence_id,
+            org_id: value.org_id,
+            alert_id: value.alert_id,
+            alert_name: value.alert_name,
+            alert_updated_at: value.alert_updated_at,
+            config_hash: value.config_hash,
+            window_start: value.window_start,
+            window_end: value.window_end,
+            trigger_timestamp: value.trigger_timestamp,
+            query_type: value.query_type,
+            condition_operator: value.condition_operator,
+            threshold_value: value.threshold_value,
+            matched_count: value.matched_count,
+            result_truncated: value.result_truncated,
+            trace_id: value.trace_id,
+            created_at: value.created_at,
+            schema_version: value.schema_version,
+        }
+    }
+}
+
 impl From<(meta_alerts::Alert, Option<Trigger>)> for GetAlertResponseBody {
     fn from(value: (meta_alerts::Alert, Option<Trigger>)) -> Self {
         Self(value.into())

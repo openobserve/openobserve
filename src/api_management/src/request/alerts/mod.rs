@@ -72,6 +72,7 @@ pub mod deduplication;
 pub mod destinations;
 pub mod history;
 pub mod incidents;
+pub mod occurrences;
 pub mod templates;
 
 /// CreateAlert

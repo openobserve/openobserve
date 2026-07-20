@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::TriggerCondition,
+        alerts::{TriggerCondition, TriggerEvalResults},
         dashboards::reports::ReportFrequencyType,
         pipeline::components::NodeData,
         self_reporting::{
@@ -53,6 +53,7 @@ use crate::service::{
     alerts::{
         alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
         derived_streams::DerivedStreamExt,
+        occurrences::{self, ScheduledOccurrenceInput},
     },
     dashboards::reports::SendReport,
     db::{self, alerts::alert::set_without_updating_trigger},
@@ -373,6 +374,61 @@ fn _get_max_considerable_delay(frequency: i64) -> i64 {
     let considerable_delay = get_config().limit.alert_considerable_delay as f64 * 0.01;
     let max_considerable_delay = (frequency as f64 * considerable_delay) as i64;
     std::cmp::min(max_delay, max_considerable_delay)
+}
+
+fn should_create_scheduled_alert_occurrence(
+    is_realtime: bool,
+    is_silenced: bool,
+    trigger_data_rows: usize,
+) -> bool {
+    !is_realtime && !is_silenced && trigger_data_rows > 0
+}
+
+fn scheduled_alert_occurrence_input(
+    org_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    trigger_results: &TriggerEvalResults,
+    matched_rows: &[json::Map<String, json::Value>],
+    window_start: i64,
+    trace_id: Option<String>,
+) -> ScheduledOccurrenceInput {
+    let result_preview = occurrences::bounded_result_preview(matched_rows);
+    occurrences::scheduled_occurrence_input(
+        org_id,
+        alert,
+        trigger_results,
+        result_preview,
+        window_start,
+        trace_id,
+    )
+}
+
+async fn create_scheduled_alert_occurrence_best_effort(
+    scheduler_trace_id: &str,
+    input: ScheduledOccurrenceInput,
+) {
+    let org_id = input.org_id.clone();
+    let alert_id = input.alert.id.map(|id| id.to_string()).unwrap_or_default();
+    let window_start = input.window_start;
+    let window_end = input.window_end;
+
+    match occurrences::create_scheduled_occurrence(input).await {
+        Ok(occurrence) => log::debug!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Created alert occurrence {}, org: {}, alert_id: {}, window_start: {}, window_end: {}",
+            occurrence.occurrence_id,
+            org_id,
+            alert_id,
+            window_start,
+            window_end
+        ),
+        Err(e) => log::warn!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] Alert occurrence persistence failed, org: {}, alert_id: {}, window_start: {}, window_end: {}: {e}",
+            org_id,
+            alert_id,
+            window_start,
+            window_end
+        ),
+    }
 }
 
 async fn handle_alert_triggers(
@@ -833,6 +889,7 @@ async fn handle_alert_triggers(
     }
 
     let trigger_results = result.unwrap();
+    let mut scheduled_occurrence_after_usage = None;
     trigger_data_stream.query_took = trigger_results.query_took;
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] result of alert {} evaluation matched condition: {}",
@@ -877,7 +934,7 @@ async fn handle_alert_triggers(
     }
 
     // send notification
-    if let Some(data) = trigger_results.data
+    if let Some(data) = trigger_results.data.as_ref()
         && !data.is_empty()
     {
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
@@ -1126,7 +1183,7 @@ async fn handle_alert_triggers(
         #[cfg(not(feature = "enterprise"))]
         let incident_handled_notification = false;
 
-        let vars = get_row_column_map(&data);
+        let vars = get_row_column_map(data.as_slice());
         // Multi-time range alerts can have multiple time ranges, hence only
         // use the main start_time (now - period) and end_time (now) for the alert evaluation.
         let use_given_time = alert.query_condition.multi_time_range.is_some()
@@ -1152,6 +1209,15 @@ async fn handle_alert_triggers(
             trigger_data_stream.dedup_suppressed = Some(false);
         }
 
+        let should_create_occurrence = should_create_scheduled_alert_occurrence(
+            new_trigger.is_realtime,
+            trigger.is_silenced,
+            data.len(),
+        );
+        let occurrence_org_id = new_trigger.org.clone();
+        let occurrence_window_start = start_time;
+        let occurrence_trace_id = Some(scheduler_trace_id.clone());
+
         if incident_handled_notification {
             // Notification was handled (sent or suppressed) inside correlate_alert_to_incident.
             // Still advance the trigger state so the scheduler moves forward normally.
@@ -1162,11 +1228,21 @@ async fn handle_alert_triggers(
             };
             new_trigger.data = json::to_string(&trigger_data).unwrap();
             db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+            scheduled_occurrence_after_usage = should_create_occurrence.then(|| {
+                scheduled_alert_occurrence_input(
+                    &occurrence_org_id,
+                    &alert,
+                    &trigger_results,
+                    data.as_slice(),
+                    occurrence_window_start,
+                    occurrence_trace_id.clone(),
+                )
+            });
         } else {
             // Direct notification — creates_incident=false, or incident correlation errored.
             match alert
                 .send_notification(
-                    &data,
+                    data.as_slice(),
                     trigger_results.end_time,
                     Some(start_time),
                     triggered_at,
@@ -1202,6 +1278,16 @@ async fn handle_alert_triggers(
                     // Notification is already sent to some destinations,
                     // hence in case of partial errors, no need to retry
                     db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                    scheduled_occurrence_after_usage = should_create_occurrence.then(|| {
+                        scheduled_alert_occurrence_input(
+                            &occurrence_org_id,
+                            &alert,
+                            &trigger_results,
+                            data.as_slice(),
+                            occurrence_window_start,
+                            occurrence_trace_id.clone(),
+                        )
+                    });
                 }
                 Err(e) => {
                     log::error!(
@@ -1279,6 +1365,14 @@ async fn handle_alert_triggers(
     );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream);
+
+    if let Some(input) = scheduled_occurrence_after_usage {
+        // The audit row is written after the scheduler publishes its normal
+        // trigger history. It records a genuine scheduled alert occurrence
+        // from the evaluated result already in memory; persistence is
+        // best-effort and must not block notification delivery.
+        create_scheduled_alert_occurrence_best_effort(&scheduler_trace_id, input).await;
+    }
 
     // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
     // #[cfg(feature = "enterprise")]
@@ -3747,9 +3841,119 @@ async fn check_deletion_status(job_id: &str) -> Result<String, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::stream::StreamType;
+    use config::meta::{
+        alerts::{Operator, QueryCondition, QueryType, TriggerCondition, alert::Alert},
+        stream::StreamType,
+    };
 
     use super::*;
+
+    fn occurrence_test_alert() -> Alert {
+        let mut alert = Alert::default();
+        alert.id = Some("2XQ4VdD2xcWd1FJV6m2ndOg7qxp".parse().unwrap());
+        alert.name = "cpu_high".to_string();
+        alert.stream_type = StreamType::Logs;
+        alert.stream_name = "app".to_string();
+        alert.query_condition = QueryCondition {
+            query_type: QueryType::SQL,
+            sql: Some("select count(*) as count from app".to_string()),
+            ..Default::default()
+        };
+        alert.trigger_condition = TriggerCondition {
+            operator: Operator::GreaterThanEquals,
+            threshold: 3,
+            period: 10,
+            ..Default::default()
+        };
+        alert
+    }
+
+    fn occurrence_row(value: i64) -> json::Map<String, json::Value> {
+        let mut row = json::Map::new();
+        row.insert("count".to_string(), value.into());
+        row
+    }
+
+    #[test]
+    fn scheduled_occurrence_decision_creates_for_notify_worthy_scheduled_alert() {
+        assert!(should_create_scheduled_alert_occurrence(false, false, 1));
+    }
+
+    #[test]
+    fn scheduled_occurrence_decision_skips_unsatisfied_alert() {
+        assert!(!should_create_scheduled_alert_occurrence(false, false, 0));
+    }
+
+    #[test]
+    fn scheduled_occurrence_decision_skips_empty_trigger_data() {
+        assert!(!should_create_scheduled_alert_occurrence(false, false, 0));
+    }
+
+    #[test]
+    fn scheduled_occurrence_decision_skips_realtime_alerts() {
+        assert!(!should_create_scheduled_alert_occurrence(true, false, 1));
+    }
+
+    #[test]
+    fn scheduled_occurrence_decision_skips_silenced_alerts() {
+        assert!(!should_create_scheduled_alert_occurrence(false, true, 1));
+    }
+
+    #[test]
+    fn scheduled_occurrence_decision_is_independent_of_result_row_count() {
+        assert_eq!(
+            should_create_scheduled_alert_occurrence(false, false, 1),
+            should_create_scheduled_alert_occurrence(false, false, 25)
+        );
+    }
+
+    #[test]
+    fn scheduled_occurrence_input_carries_only_bounded_preview() {
+        let rows = (0..25).map(occurrence_row).collect::<Vec<_>>();
+        let trigger_results = TriggerEvalResults {
+            data: Some(rows.clone()),
+            end_time: 20,
+            query_took: Some(7),
+        };
+
+        let input = scheduled_alert_occurrence_input(
+            "org1",
+            &occurrence_test_alert(),
+            &trigger_results,
+            rows.as_slice(),
+            10,
+            Some("trace-1".to_string()),
+        );
+
+        assert_eq!(input.result_preview.matched_count, 25);
+        assert!(input.result_preview.rows.len() <= occurrences::MAX_RESULT_PREVIEW_ROWS);
+        assert!(input.result_preview.truncated);
+        assert!(
+            serde_json::to_vec(&input.result_preview).unwrap().len()
+                <= occurrences::MAX_RESULT_PREVIEW_BYTES
+        );
+    }
+
+    #[tokio::test]
+    async fn scheduled_occurrence_persistence_failure_is_best_effort() {
+        let trigger_results = TriggerEvalResults {
+            data: None,
+            end_time: 20,
+            query_took: Some(7),
+        };
+        let mut alert = occurrence_test_alert();
+        alert.id = None;
+        let input = scheduled_alert_occurrence_input(
+            "org1",
+            &alert,
+            &trigger_results,
+            &[occurrence_row(4)],
+            10,
+            Some("trace-1".to_string()),
+        );
+
+        create_scheduled_alert_occurrence_best_effort("scheduler-trace", input).await;
+    }
 
     #[test]
     fn test_get_pipeline_info_from_module_key_valid_input() {
