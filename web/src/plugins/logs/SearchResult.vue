@@ -2254,6 +2254,10 @@ export default defineComponent({
 }
 
 .histogram-chart {
+  /* Explicit height (not just max-height): the ChartRenderer inside sizes
+     with h-full, and a percentage height collapses to 0 against an
+     auto-height parent — which renders an empty histogram strip. */
+  height: 6rem;
   max-height: 6.25rem;
   border-radius: 0.5rem;
 }
