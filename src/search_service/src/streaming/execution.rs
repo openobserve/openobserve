@@ -15,6 +15,7 @@
 
 use std::time::Instant;
 
+use ::search::{QueryDelta, SearchResultType};
 use config::meta::{
     search::{
         PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
@@ -26,19 +27,16 @@ use config::meta::{
 use log;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::datafusion::distributed_plan::streaming_aggs_exec;
-#[cfg(feature = "enterprise")]
-use openobserve_search_service::cache::cacher::delete_cache;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 
 use super::{
+    StreamingRuntime,
     sorting::{TopKHeap, order_search_results},
     utils::{calculate_progress_percentage, get_top_k_values},
 };
-use crate::{
-    common::meta::search::{QueryDelta, SearchResultType},
-    service::search::{self as SearchService},
-};
+#[cfg(feature = "enterprise")]
+use crate::cache::cacher::delete_cache;
 
 /// Do partitioned search without cache
 #[tracing::instrument(
@@ -46,7 +44,8 @@ use crate::{
     skip_all
 )]
 #[allow(clippy::too_many_arguments)]
-pub async fn do_partitioned_search(
+pub async fn do_partitioned_search<R>(
+    runtime: &R,
     req: &mut config::meta::search::Request,
     trace_id: &str,
     org_id: &str,
@@ -64,7 +63,10 @@ pub async fn do_partitioned_search(
     backup_query_fn: Option<String>,
     stream_name: &str,
     is_multi_stream_search: bool,
-) -> Result<(), infra::errors::Error> {
+) -> Result<(), infra::errors::Error>
+where
+    R: StreamingRuntime + Clone + Send + Sync + 'static,
+{
     // limit the search by max_query_range
     // Enrichment tables have no retention and must be searched in full (the request spans
     // [creation_time .. now]); clamping the range would drop older enrichment data, so skip it.
@@ -86,7 +88,8 @@ pub async fn do_partitioned_search(
     let modified_start_time = req.query.start_time;
     let modified_end_time = req.query.end_time;
 
-    let partition_resp = get_partitions(trace_id, org_id, stream_type, req, user_id).await?;
+    let partition_resp =
+        get_partitions(runtime, trace_id, org_id, stream_type, req, user_id).await?;
 
     let mut partitions = partition_resp.partitions;
 
@@ -185,6 +188,7 @@ pub async fn do_partitioned_search(
         };
         let start_timer = Instant::now();
         let mut search_res = do_search(
+            runtime,
             &trace_id,
             org_id,
             stream_type,
@@ -285,7 +289,7 @@ pub async fn do_partitioned_search(
             log::debug!("Top k values for partition {idx} took {duration:?}");
         }
         #[cfg(feature = "vectorscan")]
-        openobserve_search_service::cache::apply_regex_to_response(
+        crate::cache::apply_regex_to_response(
             &req,
             org_id,
             stream_name,
@@ -297,7 +301,7 @@ pub async fn do_partitioned_search(
         .await?;
 
         if is_result_array_skip_vrl {
-            search_res.hits = openobserve_search_service::cache::apply_vrl_to_response(
+            search_res.hits = crate::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
                 &mut search_res,
                 org_id,
@@ -386,7 +390,7 @@ pub async fn do_partitioned_search(
         }
 
         #[cfg(feature = "vectorscan")]
-        openobserve_search_service::cache::apply_regex_to_response(
+        crate::cache::apply_regex_to_response(
             req,
             org_id,
             stream_name,
@@ -398,7 +402,7 @@ pub async fn do_partitioned_search(
         .await?;
 
         if is_result_array_skip_vrl {
-            final_res.hits = openobserve_search_service::cache::apply_vrl_to_response(
+            final_res.hits = crate::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
                 &mut final_res,
                 org_id,
@@ -447,13 +451,17 @@ pub async fn do_partitioned_search(
 }
 
 /// Get partitions for search
-pub async fn get_partitions(
+pub async fn get_partitions<R>(
+    runtime: &R,
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
     req: &config::meta::search::Request,
     user_id: &str,
-) -> Result<SearchPartitionResponse, infra::errors::Error> {
+) -> Result<SearchPartitionResponse, infra::errors::Error>
+where
+    R: StreamingRuntime + Send + Sync,
+{
     let search_partition_req = SearchPartitionRequest {
         sql: req.query.sql.clone(),
         start_time: req.query.start_time,
@@ -469,26 +477,28 @@ pub async fn get_partitions(
         search_type: req.search_type,
     };
 
-    let res = SearchService::search_partition(
-        trace_id,
-        org_id,
-        Some(user_id),
-        stream_type,
-        &search_partition_req,
-        false,
-        req.use_cache,
-    )
-    .instrument(tracing::info_span!(
-        "src::service::search::stream_execution::get_partitions"
-    ))
-    .await?;
+    let res = runtime
+        .search_partition(
+            trace_id,
+            org_id,
+            Some(user_id),
+            stream_type,
+            &search_partition_req,
+            false,
+            req.use_cache,
+        )
+        .instrument(tracing::info_span!(
+            "src::service::search::stream_execution::get_partitions"
+        ))
+        .await?;
 
     Ok(res)
 }
 
 /// Execute search for a specific partition
 #[tracing::instrument(name = "service:search:stream_execution:do_search", skip_all)]
-pub async fn do_search(
+pub async fn do_search<R>(
+    runtime: &R,
     trace_id: &str,
     org_id: &str,
     stream_type: StreamType,
@@ -496,12 +506,15 @@ pub async fn do_search(
     user_id: &str,
     use_cache: bool,
     is_multi_stream_search: bool,
-) -> Result<Response, infra::errors::Error> {
+) -> Result<Response, infra::errors::Error>
+where
+    R: StreamingRuntime + Clone + Send + Sync + 'static,
+{
     let mut req = req.clone();
 
     req.use_cache = use_cache;
-    let res = openobserve_search_service::cache::search(
-        crate::search::CoreSearchRuntime,
+    let res = crate::cache::search(
+        runtime.clone(),
         trace_id,
         org_id,
         stream_type,
@@ -531,7 +544,8 @@ pub fn handle_partial_response(mut res: Response) -> Response {
 
 /// Process a single delta (time range not covered by cache)
 #[allow(clippy::too_many_arguments)]
-pub async fn process_delta(
+pub async fn process_delta<R>(
+    runtime: &R,
     req: &mut config::meta::search::Request,
     req_no: usize,
     trace_id: &str,
@@ -551,7 +565,10 @@ pub async fn process_delta(
     backup_query_fn: Option<String>,
     stream_name: &str,
     is_multi_stream_search: bool,
-) -> Result<(), infra::errors::Error> {
+) -> Result<(), infra::errors::Error>
+where
+    R: StreamingRuntime + Clone + Send + Sync + 'static,
+{
     log::info!("[HTTP2_STREAM]: Processing delta for trace_id: {trace_id}, delta: {delta:?}");
     let mut req = req.clone();
     let original_req_start_time = req.query.start_time;
@@ -559,7 +576,8 @@ pub async fn process_delta(
     req.query.start_time = delta.delta_start_time;
     req.query.end_time = delta.delta_end_time;
 
-    let partition_resp = get_partitions(trace_id, org_id, stream_type, &req, user_id).await?;
+    let partition_resp =
+        get_partitions(runtime, trace_id, org_id, stream_type, &req, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -602,6 +620,7 @@ pub async fn process_delta(
         let start_timer = Instant::now();
         let trace_id = format!("{trace_id}-{}", req_no + idx);
         let mut search_res = do_search(
+            runtime,
             &trace_id,
             org_id,
             stream_type,
@@ -691,7 +710,7 @@ pub async fn process_delta(
             search_res.hits = top_k_values;
         }
         #[cfg(feature = "vectorscan")]
-        openobserve_search_service::cache::apply_regex_to_response(
+        crate::cache::apply_regex_to_response(
             &req,
             org_id,
             stream_name,
@@ -703,7 +722,7 @@ pub async fn process_delta(
         .await?;
 
         if is_result_array_skip_vrl {
-            search_res.hits = openobserve_search_service::cache::apply_vrl_to_response(
+            search_res.hits = crate::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
                 &mut search_res,
                 org_id,
@@ -853,7 +872,7 @@ async fn send_partial_search_resp(
         ..Default::default()
     };
     #[cfg(feature = "vectorscan")]
-    openobserve_search_service::cache::apply_regex_to_response(
+    crate::cache::apply_regex_to_response(
         _req,
         org_id,
         stream_name,
@@ -864,7 +883,7 @@ async fn send_partial_search_resp(
     )
     .await?;
     if is_result_array_skip_vrl {
-        s_resp.hits = openobserve_search_service::cache::apply_vrl_to_response(
+        s_resp.hits = crate::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
             &mut s_resp,
             org_id,

@@ -64,8 +64,6 @@ use crate::{
 #[cfg(feature = "enterprise")]
 use crate::{http::map_error_to_http_response, self_reporting::audit};
 
-pub mod cache;
-pub mod execution;
 pub mod sorting {
     pub use openobserve_search_service::streaming::sorting::*;
 }
@@ -73,11 +71,12 @@ pub mod utils {
     pub use openobserve_search_service::streaming::utils::*;
 }
 
-// Re-export commonly used functions for easier access
 #[cfg(feature = "enterprise")]
-pub use cache::write_partial_results_to_cache;
-pub use cache::{handle_cache_responses_and_deltas, write_results_to_cache};
-pub use execution::do_partitioned_search;
+use openobserve_search_service::streaming::cache::write_partial_results_to_cache;
+use openobserve_search_service::streaming::{
+    cache::{handle_cache_responses_and_deltas, write_results_to_cache},
+    execution::do_partitioned_search,
+};
 pub use sorting::order_search_results;
 
 /// Main function to process search stream requests
@@ -361,6 +360,7 @@ pub async fn process_search_stream_request(
             let size = req.query.size;
             // Step 1(a): handle cache responses & query the deltas
             if let Err(e) = handle_cache_responses_and_deltas(
+                &crate::search::CoreSearchRuntime,
                 &mut req,
                 size,
                 &trace_id,
@@ -443,6 +443,7 @@ pub async fn process_search_stream_request(
 
             let size = req.query.size;
             if let Err(e) = do_partitioned_search(
+                &crate::search::CoreSearchRuntime,
                 &mut req,
                 &trace_id,
                 &org_id,
@@ -577,6 +578,7 @@ pub async fn process_search_stream_request(
         // Step 4: Search without cache for req with from > 0
         let size = req.query.size;
         if let Err(e) = do_partitioned_search(
+            &crate::search::CoreSearchRuntime,
             &mut req,
             &trace_id,
             &org_id,

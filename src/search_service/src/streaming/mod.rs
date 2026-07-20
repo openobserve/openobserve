@@ -13,5 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod cache;
+pub mod execution;
 pub mod sorting;
 pub mod utils;
+
+use config::meta::{
+    search::{SearchPartitionRequest, SearchPartitionResponse},
+    stream::StreamType,
+};
+use infra::errors::Error;
+
+use crate::cache::CacheRuntime;
+
+/// Application capability required by streaming execution to plan query partitions.
+#[async_trait::async_trait]
+pub trait StreamingRuntime: CacheRuntime {
+    async fn search_partition(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        user_id: Option<&str>,
+        stream_type: StreamType,
+        req: &SearchPartitionRequest,
+        skip_max_query_range: bool,
+        use_cache: bool,
+    ) -> Result<SearchPartitionResponse, Error>;
+}

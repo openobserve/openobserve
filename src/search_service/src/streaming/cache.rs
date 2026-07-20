@@ -15,11 +15,15 @@
 
 use std::time::Instant;
 
+use ::search::{
+    CachedQueryResponse, MultiCachedQueryResponse, QueryDelta, SearchResultType,
+    inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+};
 use config::{
     cluster::LOCAL_NODE,
     meta::{
         search::{SearchEventType, StreamResponses, TimeOffset, ValuesEventContext},
-        self_reporting::usage::{RequestStats, UsageType},
+        self_reporting::usage::RequestStats,
         sql::OrderBy,
         stream::StreamType,
     },
@@ -29,16 +33,7 @@ use log;
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tokio::sync::mpsc;
 
-use super::sorting::order_search_results;
-use crate::{
-    common::meta::search::{
-        CachedQueryResponse, MultiCachedQueryResponse, QueryDelta, SearchResultType,
-    },
-    service::{
-        search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        self_reporting::report_request_usage_stats,
-    },
-};
+use super::{StreamingRuntime, sorting::order_search_results};
 
 /// Write accumulated search results to cache
 #[tracing::instrument(name = "service:search:stream_cache:write_results_to_cache", skip_all)]
@@ -72,7 +67,7 @@ pub async fn write_results_to_cache(
         }
     }
 
-    let merged_response = openobserve_search_service::cache::merge_response(
+    let merged_response = crate::cache::merge_response(
         &c_resp.trace_id,
         &mut cached_responses,
         &mut search_responses,
@@ -99,7 +94,7 @@ pub async fn write_results_to_cache(
                 .map(|(field, _)| field != &c_resp.ts_column)
                 .unwrap_or(false);
 
-        openobserve_search_service::cache::write_results(
+        crate::cache::write_results(
             &c_resp.trace_id,
             &c_resp.ts_column,
             start_time,
@@ -129,7 +124,8 @@ pub async fn write_results_to_cache(
     skip_all
 )]
 #[allow(clippy::too_many_arguments)]
-pub async fn handle_cache_responses_and_deltas(
+pub async fn handle_cache_responses_and_deltas<R>(
+    runtime: &R,
     req: &mut config::meta::search::Request,
     req_size: i64,
     trace_id: &str,
@@ -150,7 +146,10 @@ pub async fn handle_cache_responses_and_deltas(
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
     is_multi_stream_search: bool,
-) -> Result<(), infra::errors::Error> {
+) -> Result<(), infra::errors::Error>
+where
+    R: StreamingRuntime + Clone + Send + Sync + 'static,
+{
     // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
     let search_type = req.search_type.expect("search_type is required");
@@ -223,6 +222,7 @@ pub async fn handle_cache_responses_and_deltas(
                     "[HTTP2_STREAM trace_id {trace_id}] Processing delta before cached response, order_by: {cache_order_by:#?}"
                 );
                 super::execution::process_delta(
+                    runtime,
                     req,
                     req_no,
                     trace_id,
@@ -248,6 +248,7 @@ pub async fn handle_cache_responses_and_deltas(
             } else {
                 // Send cached response
                 send_cached_responses(
+                    runtime,
                     req,
                     trace_id,
                     req_size,
@@ -272,6 +273,7 @@ pub async fn handle_cache_responses_and_deltas(
             // Process remaining deltas
             log::info!("[HTTP2_STREAM trace_id {trace_id}] Processing remaining delta");
             super::execution::process_delta(
+                runtime,
                 req,
                 req_no,
                 trace_id,
@@ -297,6 +299,7 @@ pub async fn handle_cache_responses_and_deltas(
         } else if let Some(cached) = cached_resp_iter.next() {
             // Process remaining cached responses
             send_cached_responses(
+                runtime,
                 req,
                 trace_id,
                 req_size,
@@ -352,7 +355,8 @@ pub async fn handle_cache_responses_and_deltas(
 
 /// Send cached responses to the client
 #[allow(clippy::too_many_arguments)]
-async fn send_cached_responses(
+async fn send_cached_responses<R>(
+    runtime: &R,
     req: &mut config::meta::search::Request,
     trace_id: &str,
     req_size: i64,
@@ -369,7 +373,10 @@ async fn send_cached_responses(
     started_at: i64,
     is_result_array_skip_vrl: bool,
     backup_query_fn: Option<String>,
-) -> Result<(), infra::errors::Error> {
+) -> Result<(), infra::errors::Error>
+where
+    R: StreamingRuntime + Clone + Send + Sync + 'static,
+{
     let start_timer = Instant::now();
     log::info!(
         "[HTTP2_STREAM]: Processing cached response for trace_id: {trace_id}, cache_order_by: {cache_order_by:?}, fallback_order_by_col: {fallback_order_by_col:?}"
@@ -417,7 +424,7 @@ async fn send_cached_responses(
     );
 
     #[cfg(feature = "vectorscan")]
-    openobserve_search_service::cache::apply_regex_to_response(
+    crate::cache::apply_regex_to_response(
         req,
         org_id,
         all_streams,
@@ -429,7 +436,7 @@ async fn send_cached_responses(
     .await?;
 
     if is_result_array_skip_vrl {
-        cached.cached_response.hits = openobserve_search_service::cache::apply_vrl_to_response(
+        cached.cached_response.hits = crate::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
             &mut cached.cached_response,
             org_id,
@@ -491,16 +498,16 @@ async fn send_cached_responses(
         peak_memory_usage: cached.cached_response.peak_memory_usage,
         ..Default::default()
     };
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        all_streams,
-        stream_type,
-        UsageType::Search,
-        num_fn,
-        started_at,
-    )
-    .await;
+    runtime
+        .report_search_usage(
+            req_stats,
+            org_id,
+            all_streams,
+            stream_type,
+            num_fn,
+            started_at,
+        )
+        .await;
 
     Ok(())
 }

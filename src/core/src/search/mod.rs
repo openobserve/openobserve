@@ -138,6 +138,31 @@ impl openobserve_search_service::cache::CacheRuntime for CoreSearchRuntime {
     }
 }
 
+#[async_trait::async_trait]
+impl openobserve_search_service::streaming::StreamingRuntime for CoreSearchRuntime {
+    async fn search_partition(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        user_id: Option<&str>,
+        stream_type: StreamType,
+        req: &search::SearchPartitionRequest,
+        skip_max_query_range: bool,
+        use_cache: bool,
+    ) -> Result<search::SearchPartitionResponse, Error> {
+        crate::search::search_partition(
+            trace_id,
+            org_id,
+            user_id,
+            stream_type,
+            req,
+            skip_max_query_range,
+            use_cache,
+        )
+        .await
+    }
+}
+
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
 type SearchResult = (Vec<RecordBatch>, search::ScanStats, usize, bool, String);

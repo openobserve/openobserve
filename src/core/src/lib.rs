@@ -159,10 +159,7 @@ mod common {
         /// Lives here rather than in the `common` crate so that `common` does not
         /// depend on the `search` crate.
         pub mod search {
-            pub use ::search::{
-                AuditContext, CachedQueryResponse, MultiCachedQueryResponse, QueryDelta,
-                SearchResultType,
-            };
+            pub use ::search::{AuditContext, SearchResultType};
         }
     }
 
