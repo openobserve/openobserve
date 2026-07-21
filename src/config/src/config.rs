@@ -924,7 +924,11 @@ pub struct Common {
     pub is_local_storage: bool,
     #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "nats")]
     pub cluster_coordinator: String,
-    #[env_config(name = "ZO_QUEUE_STORE", default = "nats")]
+    #[env_config(
+        name = "ZO_QUEUE_STORE",
+        default = "",
+        help = "Queue backend: nats or memory. Unset resolves to memory in local mode and nats in cluster mode."
+    )]
     pub queue_store: String,
     #[env_config(
         name = "ZO_MEMORY_QUEUE_MAX_SIZE_MB",
@@ -3148,7 +3152,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
 fn check_queue_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.queue_store.is_empty() {
-        cfg.common.queue_store = "nats".to_string();
+        // smart default: a local single process needs no NATS server
+        cfg.common.queue_store = if cfg.common.local_mode {
+            "memory".to_string()
+        } else {
+            "nats".to_string()
+        };
     }
     cfg.common.queue_store = cfg.common.queue_store.to_lowercase();
     let queue_store =
@@ -4281,11 +4290,27 @@ mod tests {
     }
 
     #[test]
-    fn test_check_queue_store_config_defaults_to_nats() {
+    fn test_check_queue_store_config_smart_default() {
+        // the check runs once per config load, so use a fresh config per case
+        // (the MB-to-bytes conversion is not idempotent)
+
+        // unset resolves to nats in cluster mode
         let mut cfg = Config::default();
+        cfg.common.local_mode = false;
         cfg.common.queue_store = "".to_string();
         check_queue_store_config(&mut cfg).unwrap();
         assert_eq!(cfg.common.queue_store, "nats");
+
+        // unset resolves to memory in local mode
+        let mut cfg = Config::default();
+        cfg.common.local_mode = true;
+        cfg.common.queue_store = "".to_string();
+        check_queue_store_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.queue_store, "memory");
+
+        // explicit values are honored and lowercased
+        let mut cfg = Config::default();
+        cfg.common.local_mode = true;
         cfg.common.queue_store = "NATS".to_string();
         check_queue_store_config(&mut cfg).unwrap();
         assert_eq!(cfg.common.queue_store, "nats");
