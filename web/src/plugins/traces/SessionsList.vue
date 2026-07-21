@@ -86,9 +86,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Streams exist: OTable owns the data surface (column chooser, server-side
          pagination footer, column resize, empty/error body). The scope control
-         lives in the page-level bar above; the header owns refresh + date. -->
+         lives in the page-level bar above; the header owns refresh + date.
+         NOTE: explicit v-if (not v-else) — the scope bar above carries its own
+         v-if, so a v-else here would chain to the bar and hide the table
+         whenever streams exist. -->
     <OTable
-      v-else
+      v-if="!(streamsLoaded && availableStreams.length === 0)"
       :data="sessions"
       :columns="tableColumns"
       :loading="loading"
