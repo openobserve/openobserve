@@ -86,9 +86,9 @@ vi.mock("./CustomNode.vue", () => ({
   }
 }));
 
-vi.mock("./CustomEdge.vue", () => ({
+vi.mock("@/components/flow/FlowEdge.vue", () => ({
   default: {
-    name: "CustomEdge",
+    name: "FlowEdge",
     template: '<div class="mock-custom-edge"></div>',
     props: [
       "id", "sourceX", "sourceY", "targetX", "targetY",
@@ -503,12 +503,12 @@ describe("PipelineFlow.vue", () => {
     expect(customNodeComponent.exists()).toBe(false); // Not rendered without nodes
   });
 
-  // Test 38: CustomEdge component is rendered in template
-  it("should render CustomEdge component in template", () => {
+  // Test 38: FlowEdge component is rendered in template
+  it("should render FlowEdge component in template", () => {
     wrapper = mountComponent();
-    const customEdgeComponent = wrapper.findComponent({ name: "CustomEdge" });
-    
-    // Check if CustomEdge component is available
+    const customEdgeComponent = wrapper.findComponent({ name: "FlowEdge" });
+
+    // Check if FlowEdge component is available
     expect(customEdgeComponent.exists()).toBe(false); // Not rendered without edges
   });
 

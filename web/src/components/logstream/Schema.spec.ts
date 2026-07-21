@@ -1099,15 +1099,10 @@ describe("Schema Component Tests", () => {
       expect(wrapper.vm.selectedFields).toEqual([]);
     });
 
-    // Test 16: updateActiveMainTab for new tabs (Configuration, LLM Evaluation, Cross-Linking)
+    // Test 16: updateActiveMainTab for new tabs (Configuration, Cross-Linking)
     it("should update activeMainTab to 'configuration'", () => {
       wrapper.vm.updateActiveMainTab("configuration");
       expect(wrapper.vm.activeMainTab).toBe("configuration");
-    });
-
-    it("should update activeMainTab to 'llmEvaluation'", () => {
-      wrapper.vm.updateActiveMainTab("llmEvaluation");
-      expect(wrapper.vm.activeMainTab).toBe("llmEvaluation");
     });
 
     it("should update activeMainTab to 'crossLinking'", () => {
@@ -1317,55 +1312,6 @@ describe("Schema Component Tests", () => {
 
       expect(typeof lightIcon).toBe("string");
       expect(typeof darkIcon).toBe("string");
-    });
-  });
-
-  describe("LLM Evaluation Tab visibility (added Mar 11)", () => {
-    it("should NOT render LLM Evaluation tab for non-traces stream", async () => {
-      const w = mount(LogStream, {
-        props: {
-          modelValue: {
-            name: "logs-stream",
-            stream_type: "logs",
-            storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
-            schema: [{ name: "_timestamp", type: "Int64" }],
-            settings: { full_text_search_keys: [], index_fields: [], bloom_filter_fields: [], data_retention: 30, max_query_range: 0, store_original_data: false, approx_partition: false, defined_schema_fields: [], extended_retention_days: [], pattern_associations: [] },
-          },
-        },
-        global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
-      });
-      await flushPromises();
-      expect(w.find('[data-test="stream-llm-evaluation-tab"]').exists()).toBe(false);
-      w.unmount();
-    });
-
-    it("should render LLM Evaluation tab for traces when enterprise and ai_enabled", async () => {
-      // Set enterprise and ai_enabled in store
-      store.state.zoConfig = {
-        ...store.state.zoConfig,
-        ai_enabled: true,
-      };
-      const localConfig = { isEnterprise: "true" };
-
-      const w = mount(LogStream, {
-        props: {
-          modelValue: {
-            name: "traces-stream",
-            stream_type: "traces",
-            storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
-            schema: [{ name: "_timestamp", type: "Int64" }],
-            settings: { full_text_search_keys: [], index_fields: [], bloom_filter_fields: [], data_retention: 30, max_query_range: 0, store_original_data: false, approx_partition: false, defined_schema_fields: [], extended_retention_days: [], pattern_associations: [] },
-          },
-        },
-        global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
-      });
-      await flushPromises();
-      // Tab visibility depends on config.isEnterprise which comes from aws-exports mock
-      // Just verify component renders without error
-      expect(w.exists()).toBe(true);
-      w.unmount();
     });
   });
 
@@ -2361,7 +2307,7 @@ describe("Schema Component Tests", () => {
   // ==========================================
   // Phase 2 tests — Cross-linking and LLM eval tabs
   // ==========================================
-  describe("Cross-Linking and LLM Evaluation Tabs", () => {
+  describe("Cross-Linking Tab", () => {
     let w: any;
 
     beforeEach(async () => {

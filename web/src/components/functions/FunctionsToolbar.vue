@@ -24,7 +24,9 @@
         </div>
         <!-- Transform Type Radio Buttons -->
         <div class="flex items-center gap-4 h-9">
-          <OFormRadioGroup name="transType" orientation="horizontal" class="items-center gap-4">
+          <!-- Language toggle hidden when a host forces a single language
+               (e.g. workflow function nodes are JS-only); the info tip stays. -->
+          <OFormRadioGroup v-if="!hideTransType" name="transType" orientation="horizontal" class="items-center gap-4">
             <div class="flex items-center gap-1">
               <ORadio value="0" data-test="function-transform-type-vrl-radio" />
               <span class="text-compact font-medium leading-none">{{ transformTypeOptions[0]?.label }}</span>
@@ -43,8 +45,13 @@
           >
             <OTooltip>
               <template #content>
-                <div class="font-semibold mb-1">{{ transTypeValue === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
-                <div>{{ transTypeValue === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+                <!-- Wrap in one column container: OTooltip renders the #content
+                     slot inside an inline-flex row, so sibling blocks would sit
+                     side-by-side. A single flex-col child keeps title over body. -->
+                <div class="flex flex-col">
+                  <div class="font-semibold mb-1">{{ transTypeValue === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+                  <div>{{ transTypeValue === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+                </div>
               </template>
             </OTooltip>
           </OIcon>
@@ -150,6 +157,12 @@ const props = defineProps({
   transformTypeOptions: {
     type: Array,
     default: () => [],
+  },
+  // Hides the VRL/JS language toggle entirely (used when a host forces a single
+  // language — e.g. workflow function nodes are JavaScript-only).
+  hideTransType: {
+    type: Boolean,
+    default: false,
   },
   /** Drives the Save spinner + disables sibling actions while the form submits. */
   isSubmitting: {

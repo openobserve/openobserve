@@ -269,6 +269,7 @@ import {
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { isJsFunction } from "@/utils/functionLanguage";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
@@ -303,6 +304,13 @@ const props = defineProps({
   heightOffset: {
     type: Number,
     default: 0,
+  },
+  // Optional sample events to seed the "Events" editor with. When omitted, the
+  // generic log sample is used (pipelines / functions page). Workflows pass the
+  // fired-alert sample payload so the VRL author sees the real structure.
+  sampleEvents: {
+    type: Array,
+    default: undefined,
   },
 });
 
@@ -368,6 +376,14 @@ const eventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 const outputEventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const outputEventsErrorMsg = ref<string>("");
+
+// The language the user picked on the Transform Type toggle. Every "failed to
+// apply …" message interpolates this — hardcoding "VRL" told JS authors their
+// JavaScript function failed as VRL. Reactive so flipping the toggle re-labels
+// an error already on screen.
+const functionLanguage = computed(() =>
+  isJsFunction(props.vrlFunction) ? t("function.javascript") : t("function.vrl"),
+);
 
 const loading = ref({
   events: false,
@@ -448,13 +464,15 @@ onMounted(() => {
 
 const setEventsEditor = () => {
   setTimeout(() => {
-    inputEvents.value = JSON.stringify(
-      JSON.parse(
-        `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
-      ),
-      null,
-      2,
-    );
+    // Caller-supplied sample (e.g. the workflow alert payload) takes precedence;
+    // otherwise fall back to the generic log sample.
+    const sample =
+      props.sampleEvents && props.sampleEvents.length
+        ? props.sampleEvents
+        : JSON.parse(
+            `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
+          );
+    inputEvents.value = JSON.stringify(sample, null, 2);
   }, 300);
 };
 
@@ -664,12 +682,20 @@ const processTestResults = async (results: any) => {
   expandState.value.output = true;
   originalOutputEvents.value = JSON.stringify(results?.data?.results);
 
-  // Clear any previous function error shown in the parent
-  emit("function-error", "");
+  const rows = results?.data?.results || [];
 
-  const processedEvents =
-    results?.data?.results.map((event: any) => event.event || event.events) ||
-    [];
+  // Only a *syntax* error fails the request outright; a runtime throw comes back
+  // on a 200 with the message attached per event. Forward those to the parent's
+  // error section — emitting "" here unconditionally cleared it, so a runtime
+  // error showed nowhere but a hover tooltip while the editor displayed the
+  // untransformed events, which reads as success. Deduped: every event usually
+  // trips the same throw.
+  const rowErrors = [
+    ...new Set(rows.map((row: any) => row?.message?.trim()).filter(Boolean)),
+  ];
+  emit("function-error", rowErrors.join("\n"));
+
+  const processedEvents = rows.map((event: any) => event.event || event.events);
 
   outputEvents.value = JSON.stringify(
     JSON.parse(JSON.stringify(processedEvents)),
@@ -685,13 +711,12 @@ const processTestResults = async (results: any) => {
 
 const handleTestError = (err: any) => {
   const rawErrMsg = err.response?.data?.message || "Error in testing function";
-  const isJSFunction = String(props.vrlFunction.transType) === '1';
 
   // Display the raw error message from the backend without modification
   // The backend now extracts detailed error information from rquickjs
-  outputEventsErrorMsg.value = isJSFunction
-    ? "JavaScript error - see details below"
-    : "Error while transforming results";
+  outputEventsErrorMsg.value = isJsFunction(props.vrlFunction)
+    ? t("function.testErrorJs")
+    : t("function.testErrorVrl");
 
   toast({
     variant: "error",
@@ -779,7 +804,9 @@ function getLineRanges(object: any) {
       ranges.push({
         startLine: startLine + 1,
         endLine: endLine + 1,
-        error: `Error: Failed to apply VRL Function.\n${object.message}`,
+        error: `${t("function.testApplyFailedEvent", {
+          language: functionLanguage.value,
+        })}\n${object.message}`,
       }); // Monaco uses 1-based indexing
     }
 
@@ -803,7 +830,9 @@ function highlightSpecificEvent() {
       }
     });
     if (errorEventRanges.length) {
-      outputEventsErrorMsg.value = "Failed to apply VRL Function on few events";
+      outputEventsErrorMsg.value = t("function.testApplyFailedSome", {
+        language: functionLanguage.value,
+      });
     }
 
     if (outputEventsEditorRef.value)

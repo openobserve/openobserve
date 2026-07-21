@@ -140,6 +140,11 @@ pub struct Alert {
     /// instead of sending direct alert notifications.
     #[serde(default)]
     pub creates_incident: bool,
+
+    /// workflows to trigger when alert triggers
+    #[serde(default)]
+    #[schema(example = json!(["abcde12345"]))]
+    pub workflows: Vec<String>,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -443,6 +448,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             last_edited_by: alert.last_edited_by,
             deduplication: alert.deduplication,
             creates_incident: alert.creates_incident,
+            workflows: alert.workflows,
         }
     }
 }
@@ -624,6 +630,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.owner = value.owner;
         alert.deduplication = value.deduplication;
         alert.creates_incident = value.creates_incident;
+        alert.workflows = value.workflows;
 
         alert
     }

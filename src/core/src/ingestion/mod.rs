@@ -261,12 +261,17 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             time_in_queue_ms: None,
             ..Default::default()
         };
+        let trace_id = config::ider::generate_trace_id();
+        let trace_id = format!("eval_trigg_{trace_id}");
         log::info!(
-            "Evaluating trigger for alert: {}/{}",
+            "Evaluating trigger for alert: {}/{} with trace id {trace_id}",
             alert.org_id,
             alert.name
         );
-        match alert.send_notification(val, now, None, now).await {
+        match alert
+            .send_notification(&trace_id, val, now, None, now)
+            .await
+        {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");
                 trigger_data_stream.status = TriggerDataStatus::Failed;

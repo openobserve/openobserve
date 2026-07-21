@@ -53,6 +53,7 @@
             :class="[inputWidth ? inputWidth : '']"
             data-test="alert-conditions-select-column"
             @search="filterColumns"
+            @create="onColumnCreate"
             @update:model-value="() => emits('input:update', 'conditions', condition)"
           />
           <OTooltip v-if="condition.column && store.state.isAiChatEnabled" :content="condition.column" />
@@ -167,10 +168,18 @@ const emits = defineEmits(["add", "remove", "input:update", "add-group"]);
 
 const filteredFields = ref<any[]>(props.streamFields as any[]);
 
+// User-created custom columns (via `allowCustomColumns`) persist separately from
+// props.streamFields, so re-filtering/searching doesn't drop them.
+const customColumns = ref<any[]>([]);
+const allColumns = () => [
+  ...(props.streamFields as any[]),
+  ...customColumns.value,
+];
+
 watch(
   () => props.streamFields,
-  (newFields) => {
-    filteredFields.value = newFields as any[];
+  () => {
+    filteredFields.value = allColumns();
   },
 );
 
@@ -228,14 +237,36 @@ const computedValueWidth = computed(() => {
 
 
 const filterColumns = (val: string) => {
+  const base = allColumns();
   if (val === "") {
-    filteredFields.value = [...props.streamFields as any[]];
+    filteredFields.value = base;
   } else {
     const value = val.toLowerCase();
-    filteredFields.value = (props.streamFields as any[]).filter(
+    filteredFields.value = base.filter(
       (column: any) => column.value.toLowerCase().indexOf(value) > -1
     );
   }
+};
+
+// Custom column: when `allowCustomColumns` is on, the select is `creatable` and
+// emits `create` with the typed term on Enter — but only EMITS, it does not set
+// the value. Add the typed column to the options so it renders, then select it.
+//
+// Form mode is now the only mode, so the value MUST be written through the
+// injected form by its name path: `condition` is the readonly form read-view and
+// assigning to it silently fails ("target is readonly"). Consumers that enable
+// this: pipeline's Condition node (its guidelines tell users to press Enter),
+// the workflow Condition node, and enterprise JobFilterBuilder.
+const onColumnCreate = (term: string) => {
+  const value = String(term ?? "").trim();
+  if (!value) return;
+  if (!allColumns().some((c: any) => c.value === value)) {
+    const col = { label: value, value, type: "custom" };
+    customColumns.value = [...customColumns.value, col];
+    filteredFields.value = [...filteredFields.value, col];
+  }
+  form?.setFieldValue(`${props.namePrefix}.column`, value);
+  emits("input:update", "conditions", props.condition);
 };
 
   </script>

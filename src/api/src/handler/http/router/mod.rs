@@ -987,6 +987,39 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
 
+        if get_o2_config().common.workflows_enabled {
+            // workflows
+            router = router
+                .route(
+                    "/{org_id}/workflows",
+                    get(workflows::list_workflows).post(workflows::save_workflow),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}",
+                    delete(workflows::delete_workflows).put(workflows::update_workflows),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/test",
+                    post(workflows::test_workflow),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/history",
+                    get(workflows::get_workflow_history),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/errors/{run_id}",
+                    get(workflows::get_workflow_errors),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/retry",
+                    post(workflows::retry_workflow),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/enable",
+                    put(workflows::enable_workflow),
+                );
+        }
+
         // Synthetics — all routes gated behind O2_SYNTHETICS_ENABLED. When off,
         // nothing is registered and every synthetics path 404s.
         if get_o2_config().synthetics.enabled {

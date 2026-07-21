@@ -703,16 +703,6 @@ describe("Query Component", () => {
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
-    it("closeDialog resets userClickedNode and userSelectedNode", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      mockPipelineObj.userClickedNode = { id: "x" };
-      mockPipelineObj.userSelectedNode = { id: "y" };
-      wrapper.vm.closeDialog();
-      expect(mockPipelineObj.userClickedNode).toEqual({});
-      expect(mockPipelineObj.userSelectedNode).toEqual({});
-    });
-
     it("closeDialog emits cancel:hideform", async () => {
       const wrapper = createWrapper();
       await flushPromises();

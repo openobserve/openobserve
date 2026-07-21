@@ -396,6 +396,19 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), DestinationError> {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    if let Ok(workflows) = crate::service::workflows::list_workflows(org_id, None).await {
+        for w in workflows {
+            for node in w.nodes {
+                if let config::meta::pipeline::components::NodeData::Destination(dest) = node.data
+                    && dest.destination_id == name
+                {
+                    return Err(DestinationError::UsedByPipeline(w.id));
+                }
+            }
+        }
+    }
+
     db::alerts::destinations::delete(org_id, name).await?;
     remove_ownership(org_id, "destinations", Authz::new(name)).await;
     Ok(())
