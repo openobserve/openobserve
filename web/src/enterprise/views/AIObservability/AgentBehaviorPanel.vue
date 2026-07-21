@@ -19,7 +19,7 @@
     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
          panels (LLMErrorTable) so the whole page reads as one surface. -->
     <div
-      class="card-container llm-trend-panel rounded-surface flex flex-col overflow-hidden"
+      class="bg-card-glass-bg llm-trend-panel rounded-default flex flex-col flex-1 min-h-0 overflow-hidden border border-border-default"
       data-test="agent-behavior-loops-card"
     >
       <div class="flex flex-col mb-2 px-4 pt-4">
@@ -37,10 +37,9 @@
         :default-columns="false"
         :frame="false"
         :show-global-filter="false"
-        :fill-height="false"
+        class="flex-1 min-h-0"
         show-index
         pagination="client"
-        :page-size="10"
         :empty-message="t('aiObservability.behavior.noLoops')"
         @row-click="(r: any) => openDetail('loop', r)"
       />
@@ -48,7 +47,7 @@
 
     <!-- Failure taxonomy -->
     <div
-      class="card-container llm-trend-panel rounded-surface flex flex-col overflow-hidden"
+      class="bg-card-glass-bg llm-trend-panel rounded-default flex flex-col flex-1 min-h-0 overflow-hidden border border-border-default"
       data-test="agent-behavior-failures-card"
     >
       <div class="flex flex-col mb-2 px-4 pt-4">
@@ -66,10 +65,9 @@
         :default-columns="false"
         :frame="false"
         :show-global-filter="false"
-        :fill-height="false"
+        class="flex-1 min-h-0"
         show-index
         pagination="client"
-        :page-size="10"
         :empty-message="t('aiObservability.behavior.noFailures')"
         @row-click="(r: any) => openDetail('failure', r)"
       />

@@ -113,9 +113,13 @@
     </div>
     </template>
 
-    <div class="flex-1 min-h-0 overflow-auto px-page-edge py-4">
+    <!-- Full-height column: the panel splits the available height between its
+         two cards, so the page itself never scrolls — each table scrolls
+         internally when its rows overflow. -->
+    <div class="flex-1 min-h-0 flex flex-col px-page-edge py-4">
       <AgentBehaviorPanel
         ref="panelRef"
+        class="flex-1 min-h-0"
         :source-stream="effectiveStream"
         :agent-filter="agentFilter"
         :start-time="timeRange.startTime"
