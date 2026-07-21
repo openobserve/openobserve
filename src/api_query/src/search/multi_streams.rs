@@ -806,7 +806,10 @@ pub async fn _search_partition_multi(
 
     let mut max_query_ranges = Vec::with_capacity(req.sql.len());
     for sql in &req.sql {
-        let stream_names = resolve_stream_names(sql).unwrap_or_default();
+        let stream_names = match resolve_stream_names(sql) {
+            Ok(stream_names) => stream_names,
+            Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
+        };
         max_query_ranges
             .push(get_max_query_range(&stream_names, &org_id, user_id, stream_type).await);
     }
@@ -1499,7 +1502,10 @@ pub async fn search_multi_stream(
 
     let mut max_query_ranges = Vec::with_capacity(queries.len());
     for req in &queries {
-        let stream_names = resolve_stream_names(&req.query.sql).unwrap_or_default();
+        let stream_names = match resolve_stream_names(&req.query.sql) {
+            Ok(stream_names) => stream_names,
+            Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
+        };
         max_query_ranges
             .push(get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await);
     }

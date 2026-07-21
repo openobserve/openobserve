@@ -1560,32 +1560,25 @@ pub async fn search_partition(
         return MetaHttpResponse::bad_request(e);
     }
 
-    #[cfg(feature = "enterprise")]
-    {
-        let stream_names = match resolve_stream_names(&req.sql) {
-            Ok(v) => v.clone(),
-            Err(e) => {
-                return map_error_to_http_response(&(e.into()), Some(trace_id));
-            }
-        };
-        for stream in stream_names.iter() {
-            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-                return (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    Json(MetaHttpResponse::error(
-                        StatusCode::TOO_MANY_REQUESTS,
-                        e.to_string(),
-                    )),
-                )
-                    .into_response();
-            }
-        }
-    }
-
     let stream_names = match resolve_stream_names(&req.sql) {
         Ok(stream_names) => stream_names,
         Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
     };
+
+    #[cfg(feature = "enterprise")]
+    for stream in stream_names.iter() {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(MetaHttpResponse::error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    e.to_string(),
+                )),
+            )
+                .into_response();
+        }
+    }
+
     let max_query_range = get_max_query_range(&stream_names, &org_id, user_id, stream_type).await;
 
     let search_res = SearchService::search_partition(

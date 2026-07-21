@@ -13,10 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::cmp::max;
+
 use chrono::Utc;
 use config::{
     get_config,
     meta::{sql::TableReferenceExt, stream::StreamSettings},
+    utils::query_range::get_default_max_query_range,
 };
 use infra::{cache::stats, errors::Error, file_list::FileId, schema::unwrap_stream_settings};
 
@@ -50,7 +53,11 @@ pub async fn collect_stream_files(
     let query_duration_secs = (time_range.1 - time_range.0) / 1000 / 1000;
 
     let mut files = Vec::with_capacity(schemas.len() * 10);
-    let max_query_range = max_query_range_in_hour * 3600 * 1_000_000;
+    // 0 means the caller did not resolve a max query range. This happens during
+    // rolling upgrades when an older leader sends SearchPartitionRequest without
+    // the max_query_range field, so fall back to the stream settings below.
+    let mut max_query_range_in_hour = max_query_range_in_hour;
+    let use_stream_settings_fallback = max_query_range_in_hour == 0;
 
     for (stream, schema) in schemas.iter() {
         let stream_type = stream.get_stream_type(stream_type);
@@ -72,6 +79,12 @@ pub async fn collect_stream_files(
                 time_range,
             )
             .await?;
+            if use_stream_settings_fallback {
+                max_query_range_in_hour = max(
+                    max_query_range_in_hour,
+                    get_default_max_query_range(stream_settings.max_query_range),
+                );
+            }
             files.extend(stream_files);
         } else {
             let data_retention = if stream_settings.data_retention > 0 {
@@ -112,6 +125,7 @@ pub async fn collect_stream_files(
         }
     }
 
+    let max_query_range = max_query_range_in_hour * 3600 * 1_000_000;
     let (records, original_size) = files.iter().fold((0, 0), |(records, original_size), f| {
         (records + f.records, original_size + f.original_size)
     });

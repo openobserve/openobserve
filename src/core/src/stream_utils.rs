@@ -112,19 +112,7 @@ pub async fn populate_file_meta(
     Ok(())
 }
 
-/// Get the default maximum query range in hours considering the stream setting max query range
-/// and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
-pub fn get_default_max_query_range(stream_max_query_range: i64) -> i64 {
-    let cfg = get_config();
-    let default_max_query_range = cfg.limit.default_max_query_range_days * 24;
-
-    // This will allow the stream setting to override the global setting
-    if stream_max_query_range > 0 {
-        stream_max_query_range
-    } else {
-        default_max_query_range
-    }
-}
+pub use config::utils::query_range::get_default_max_query_range;
 
 /// Get the maximum query range considering service account specific restrictions,
 /// stream setting max query range and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
@@ -192,7 +180,10 @@ pub async fn get_max_query_range(
             if let Some(user) = &user {
                 get_max_query_range_by_user_role(s.max_query_range, user)
             } else {
-                s.max_query_range
+                // ZO_DEFAULT_MAX_QUERY_RANGE_DAYS must still cap the range when the
+                // user cannot be resolved (e.g. internal callers), matching
+                // get_settings_max_query_range
+                get_default_max_query_range(s.max_query_range)
             }
         })
     })

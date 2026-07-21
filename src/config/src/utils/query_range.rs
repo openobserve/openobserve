@@ -13,35 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod arrow;
-pub mod async_file;
-pub mod async_walkdir;
-pub mod base64;
-pub mod download_utils;
-pub mod encryption;
-pub mod enrichment_local_cache;
-pub mod file;
-pub mod flatten;
-pub mod hash;
-pub mod inverted_index;
-pub mod json;
-pub mod md5;
-pub mod parquet;
-pub mod password;
-pub mod pausable_job;
-pub mod prom_json_encoder;
-pub mod query_range;
-pub mod query_select_utils;
-pub mod rand;
-pub mod record_batch_ext;
-pub mod schema;
-pub mod schema_ext;
-pub mod size;
-pub mod sort;
-pub mod sql;
-pub mod ssrf_guard;
-pub mod str;
-pub mod sysinfo;
-pub mod time;
-pub mod took_watcher;
-pub mod util;
+/// Get the default maximum query range in hours considering the stream setting max query range
+/// and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
+pub fn get_default_max_query_range(stream_max_query_range: i64) -> i64 {
+    let cfg = crate::get_config();
+    let default_max_query_range = cfg.limit.default_max_query_range_days * 24;
+
+    // This will allow the stream setting to override the global setting
+    if stream_max_query_range > 0 {
+        stream_max_query_range
+    } else {
+        default_max_query_range
+    }
+}

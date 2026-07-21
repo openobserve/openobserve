@@ -64,22 +64,6 @@ use crate::{
     },
 };
 
-#[cfg(feature = "enterprise")]
-fn error_status_code(err: &infra::errors::Error) -> u16 {
-    use infra::errors::{Error, ErrorCodes};
-    match err {
-        Error::ErrorCode(ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_)) => {
-            429
-        }
-        Error::ErrorCode(ErrorCodes::SearchTimeout(_)) => 408,
-        Error::ErrorCode(
-            ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound,
-        ) => 500,
-        Error::ResourceError(_) => 503,
-        _ => 400,
-    }
-}
-
 pub mod cache;
 pub mod execution;
 pub mod sorting;
@@ -294,7 +278,7 @@ pub async fn process_search_stream_request(
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
-                    let resp = error_status_code(&e);
+                    let resp = e.http_status();
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
@@ -399,7 +383,7 @@ pub async fn process_search_stream_request(
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
-                    let resp = error_status_code(&e);
+                    let resp = e.http_status();
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
@@ -479,7 +463,7 @@ pub async fn process_search_stream_request(
                 // send audit response first
                 #[cfg(feature = "enterprise")]
                 {
-                    let resp = error_status_code(&e);
+                    let resp = e.http_status();
                     if audit_enabled {
                         // Using spawn to handle the async call
                         audit(AuditMessage {
@@ -552,7 +536,7 @@ pub async fn process_search_stream_request(
             // send audit response first
             #[cfg(feature = "enterprise")]
             {
-                let resp = error_status_code(&e);
+                let resp = e.http_status();
                 if audit_enabled {
                     // Using spawn to handle the async call
                     audit(AuditMessage {
@@ -614,7 +598,7 @@ pub async fn process_search_stream_request(
             // send audit response first
             #[cfg(feature = "enterprise")]
             {
-                let resp = error_status_code(&e);
+                let resp = e.http_status();
                 if audit_enabled {
                     // Using spawn to handle the async call
                     audit(AuditMessage {

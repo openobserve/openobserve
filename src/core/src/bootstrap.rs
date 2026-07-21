@@ -21,13 +21,19 @@ use config::{cache_instance_id, ider};
 use crate::service::db::metas;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    usage_reporting::set_batch_publisher(Arc::new(
+    // publishers are process-wide singletons, so a repeated init (e.g. in tests)
+    // keeps the first registration instead of failing
+    if usage_reporting::set_batch_publisher(Arc::new(
         crate::self_reporting::persistence::CoreBatchPublisher,
     ))
-    .map_err(|_| anyhow::anyhow!("usage batch publisher is already initialized"))?;
+    .is_err()
+    {
+        log::debug!("usage batch publisher is already initialized, keeping existing one");
+    }
     #[cfg(feature = "enterprise")]
-    audit::set_audit_publisher(Arc::new(crate::self_reporting::CoreAuditPublisher))
-        .map_err(|_| anyhow::anyhow!("audit publisher is already initialized"))?;
+    if audit::set_audit_publisher(Arc::new(crate::self_reporting::CoreAuditPublisher)).is_err() {
+        log::debug!("audit publisher is already initialized, keeping existing one");
+    }
     let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {

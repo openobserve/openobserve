@@ -77,8 +77,27 @@ pub async fn query_by_ids(
         )
     };
 
+    let start = std::time::Instant::now();
     let ids: Vec<_> = ids_set.iter().copied().collect();
     let mut db_files = infra_file_list::query_by_ids(&ids, time_range).await?;
+    log::info!(
+        "{}",
+        search_inspector_fields(
+            format!(
+                "[trace_id {trace_id}] file_list query from db: {}, took: {} ms",
+                db_files.len(),
+                start.elapsed().as_millis()
+            ),
+            SearchInspectorFieldsBuilder::new()
+                .trace_id(trace_id.to_string())
+                .node_name(LOCAL_NODE.name.clone())
+                .component("file_list query from db".to_string())
+                .search_role("follower".to_string())
+                .duration(start.elapsed().as_millis() as usize)
+                .desc(format!("query from db: {}", db_files.len()))
+                .build()
+        )
+    );
     let db_ids: HashSet<_> = db_files.iter().map(|file| file.id).collect();
     let ids_set = ids_set.difference(&db_ids).copied().collect::<HashSet<_>>();
     if !ids_set.is_empty() {
@@ -103,12 +122,31 @@ pub async fn query_by_ids(
         let cached_files = db_files.clone();
         let trace_id = trace_id.to_string();
         tokio::task::spawn(async move {
+            let start = std::time::Instant::now();
             if let Err(err) = infra_file_list::LOCAL_CACHE
                 .batch_add_with_id(&cached_files)
                 .await
             {
                 log::error!("[trace_id {trace_id}] file_list set cache failed for db files: {err}");
             }
+            log::info!(
+                "{}",
+                search_inspector_fields(
+                    format!(
+                        "[trace_id {trace_id}] file_list set cached_ids: {}, took: {} ms",
+                        cached_files.len(),
+                        start.elapsed().as_millis()
+                    ),
+                    SearchInspectorFieldsBuilder::new()
+                        .trace_id(trace_id.to_string())
+                        .node_name(LOCAL_NODE.name.clone())
+                        .component("file_list set cached_ids".to_string())
+                        .search_role("follower".to_string())
+                        .duration(start.elapsed().as_millis() as usize)
+                        .desc(format!("set cached_ids: {}", cached_files.len()))
+                        .build()
+                )
+            );
         });
     }
 
