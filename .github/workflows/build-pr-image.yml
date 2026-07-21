@@ -42,7 +42,7 @@ jobs:
           echo "GIT_TAG=$GIT_TAG" >> $GITHUB_OUTPUT
           echo "GIT_HASH=$GIT_HASH" >> $GITHUB_OUTPUT
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: 'npm'
