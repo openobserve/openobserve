@@ -21,6 +21,7 @@ enterprise = [
     "config/enterprise",
     "promql/enterprise",
     "search/enterprise",
+    "search_service/enterprise",
 ]
 cloud = [
     "db/cloud",
@@ -29,12 +30,18 @@ cloud = [
     "o2_enterprise/cloud",
     "common/cloud",
 ]
-vectorscan = ["db/vectorscan", "o2_enterprise/vectorscan", "search/vectorscan"]
+vectorscan = [
+    "db/vectorscan",
+    "o2_enterprise/vectorscan",
+    "search/vectorscan",
+    "search_service/vectorscan",
+]
 vortex = [
     "dep:vortex",
     "config/vortex",
     "o2_enterprise?/vortex",
     "search/vortex",
+    "search_service/vortex",
 ]
 
 [dependencies]
@@ -43,6 +50,7 @@ common.workspace = true
 transform.workspace = true
 promql.workspace = true
 search.workspace = true
+search_service.workspace = true
 axum.workspace = true
 http.workspace = true
 http-body-util.workspace = true

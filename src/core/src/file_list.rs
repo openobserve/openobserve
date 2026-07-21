@@ -16,15 +16,13 @@
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::{
-        search::ScanStats,
-        stream::{FileKey, PartitionTimeLevel, StreamType},
-    },
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
     utils::file::get_file_meta as util_get_file_meta,
 };
 use hashbrown::HashSet;
 use infra::{errors::Result, file_list as infra_file_list, storage};
+pub use infra_file_list::calculate_files_size;
 use rayon::slice::ParallelSliceMut;
 
 use crate::service::{
@@ -269,19 +267,6 @@ pub async fn query_ids(
     files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
     files.dedup_by(|a, b| a.id == b.id);
     Ok(files)
-}
-
-#[inline]
-pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats> {
-    let mut stats = ScanStats::new();
-    stats.files = files.len() as i64;
-    for file in files {
-        stats.records += file.meta.records;
-        stats.original_size += file.meta.original_size;
-        stats.compressed_size += file.meta.compressed_size;
-        stats.idx_scan_size += file.meta.index_size;
-    }
-    Ok(stats)
 }
 
 #[inline]

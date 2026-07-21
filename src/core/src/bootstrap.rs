@@ -19,6 +19,7 @@ use config::{cache_instance_id, ider};
 use crate::service::db::metas;
 
 pub async fn init() -> Result<(), anyhow::Error> {
+    crate::search_hooks::init();
     let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {

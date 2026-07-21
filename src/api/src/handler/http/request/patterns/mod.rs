@@ -22,8 +22,8 @@ use {
     crate::handler::http::request::search::utils::{
         StreamPermissionResourceType, check_stream_permissions,
     },
-    crate::service::search::streaming,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    search_service::streaming,
     tokio::sync::mpsc,
 };
 
