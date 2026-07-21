@@ -187,7 +187,7 @@ export default defineComponent({
     const activeHomeTab = ref(
       savedActiveTab && DEFAULT_TABS.value.find((t) => t.id === savedActiveTab)
         ? savedActiveTab
-        : tabOrder.value[0].id,
+        : tabOrder.value[0].id,  
     );
 
     watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
