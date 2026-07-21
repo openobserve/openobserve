@@ -1610,7 +1610,7 @@ export default defineComponent({
         // single folder-scoped call could not cover the selection anyway. In a
         // normal folder view every row shares activeFolderId, so this collapses
         // to the one request it always was.
-        const rowFolders = new Map(
+        const rowFolders = new Map<string, string>(
           dashboards.value.map((row: any) => [row.id, row.folder_id]),
         );
         const idsByFolder = new Map<string, string[]>();
