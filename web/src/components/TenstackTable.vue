@@ -392,9 +392,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
                   class="invisible items-center absolute right-2 top-0 px-2 column-actions h-full flex group-hover:visible bg-[var(--color-table-header-bg)]"
-                  :class="
-                    store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                  "
                   v-if="
                     (header.column.columnDef.meta as any)?.closable ||
                     (header.column.columnDef.meta as any)?.showWrap
