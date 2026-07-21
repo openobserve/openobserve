@@ -32,18 +32,18 @@ const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
 const variantClass = computed(() => {
   switch (props.variant) {
     case "info":
-      return "bg-(--color-banner-info-bg) border border-(--color-banner-info-border) text-(--color-banner-info-text)";
+      return "bg-banner-info-bg border border-banner-info-border text-banner-info-text";
     case "success":
-      return "bg-(--color-banner-success-bg) border border-(--color-banner-success-border) text-(--color-banner-success-text)";
+      return "bg-banner-success-bg border border-banner-success-border text-banner-success-text";
     case "warning":
-      return "bg-(--color-banner-warning-bg) border border-(--color-banner-warning-border) border-l-4 border-l-(--color-banner-warning-border) text-(--color-banner-warning-text)";
+      return "bg-banner-warning-bg border border-banner-warning-border border-l-4 border-l-banner-warning-border text-banner-warning-text";
     case "error":
-      return "bg-(--color-banner-error-bg) text-(--color-banner-error-text)";
+      return "bg-banner-error-bg text-banner-error-text";
     // Tinted error for hints/insights — solid `error` stays for hard failures.
     case "error-soft":
-      return "bg-(--color-banner-error-soft-bg) border border-(--color-banner-error-soft-border) border-l-4 border-l-(--color-banner-error-soft-border) text-(--color-banner-error-soft-text)";
+      return "bg-banner-error-soft-bg border border-banner-error-soft-border border-l-4 border-l-banner-error-soft-border text-banner-error-soft-text";
     default:
-      return "bg-(--color-banner-default-bg) text-(--color-banner-default-text)";
+      return "bg-banner-default-bg text-banner-default-text";
   }
 });
 </script>
@@ -53,7 +53,7 @@ const variantClass = computed(() => {
     :role="ariaRole"
     :data-test="dataTest"
     :class="[
-      'flex rounded-md',
+      'flex rounded-default',
       inlineActions ? 'flex-row items-center gap-3' : 'flex-col gap-2',
       dense ? 'p-2' : 'p-4',
       variantClass,

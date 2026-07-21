@@ -169,27 +169,15 @@ describe('ScheduledDashboards', () => {
             name: 'NoData',
             template: '<div data-test="no-data-mock" class="no-data-mock">No data available</div>'
           },
-          'q-input': {
-            name: 'q-input',
-            template: '<input data-test="q-input-mock" class="q-input-mock" />',
-            props: ['modelValue', 'borderless', 'filled', 'dense', 'placeholder'],
-            emits: ['update:modelValue']
-          },
           'OInput': {
             name: 'OInput',
-            template: '<input class="q-input-mock" :data-test="$attrs[\'data-test\'] || \'q-input-mock\'" />',
+            template: '<input class="o-input-mock" :data-test="$attrs[\'data-test\'] || \'o-input-mock\'" />',
             props: ['modelValue', 'placeholder'],
             emits: ['update:modelValue']
           },
-          'q-btn': {
-            name: 'q-btn',
-            template: '<button data-test="q-btn-mock" class="q-btn-mock"><slot /></button>',
-            props: ['class', 'padding', 'color', 'no-caps', 'label', 'round', 'flat', 'icon'],
-            emits: ['click']
-          },
           'OButton': {
             name: 'OButton',
-            template: '<button class="o-btn-mock q-btn-mock" :data-test="$attrs[\'data-test\'] || \'q-btn-mock\'" @click="$emit(\'click\')"><slot /></button>',
+            template: '<button class="o-btn-mock" :data-test="$attrs[\'data-test\'] || \'o-btn-mock\'" @click="$emit(\'click\')"><slot /></button>',
             props: ['variant', 'size', 'disabled', 'loading', 'active'],
             emits: ['click']
           },
@@ -240,16 +228,19 @@ describe('ScheduledDashboards', () => {
       expect(wrapper.emitted('update:open')?.[0]).toEqual([false]);
     });
 
-    it('should apply dark-mode class when theme is dark', () => {
+    it('should apply theme-independent container class when theme is dark', () => {
       mockStore.state.theme = 'dark';
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('dark-mode');
+      // Theme is handled by design tokens; container markup is identical in both themes.
+      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('scheduled-dashboards');
+      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('h-fit');
     });
 
-    it('should apply light-mode class when theme is light', () => {
+    it('should apply theme-independent container class when theme is light', () => {
       mockStore.state.theme = 'light';
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('bg-white');
+      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('scheduled-dashboards');
+      expect(wrapper.find('[data-test="scheduled-dashboards-container"]').classes()).toContain('h-fit');
     });
   });
 

@@ -1,6 +1,5 @@
 /**
  * Alert Payload Generation Utilities
- * Extracted from AddAlert.vue to reduce file complexity
  */
 
 import { cloneDeep } from "lodash-es";
@@ -60,15 +59,14 @@ export interface SaveAlertContext {
 }
 
 /**
- * Drop the FORM-ONLY keys added by the OForm migration. These are seeded into
- * the form by `withFormExtras` and are not part of the alert resource:
+ * Drop the FORM-ONLY keys that are seeded into the form (by `withFormExtras`) but
+ * are not part of the alert resource:
  *   _ui        → display-only state (the "Check every" hours/minutes value the
  *                user sees; the real value is trigger_condition.frequency)
  *   _meta      → schema discriminators (tab / mode / org floor)
  *   logGroupBy → the logs group-by field array (mirrored into
  *                query_condition.aggregation.group_by)
- * Pre-migration formData had none of these, so dropping them restores the
- * pre-migration shape exactly (Rule ④). Mutates and returns `obj`.
+ * Mutates and returns `obj`.
  *
  * BOTH save paths must use this: the normal one (getAlertPayload) and the JSON
  * editor one (prepareAndSaveAlert). It is also applied to the JSON editor's
@@ -148,9 +146,8 @@ export const getAlertPayload = (
   // input produced. Both are name=-owned OFormInputs, and OFormInput registers
   // `v-bind="$attrs"` BEFORE its own @update:model-value="field.handleChange" — so
   // QueryConfig's Number()-coercing consumer handler runs FIRST and handleChange
-  // commits the raw string LAST, overwriting it. Pre-migration both went out as
-  // numbers (promql via `v-model.number`; having via a direct Number() write onto
-  // inputData), so without this the saved type silently drifts string-vs-number.
+  // commits the raw string LAST, overwriting it. Without this the saved type
+  // silently drifts string-vs-number.
   //
   // Coerced HERE rather than in the form, for two reasons:
   //   • it is the same last-mile rescue threshold/period/frequency/silence already
@@ -277,7 +274,7 @@ export const prepareAndSaveAlert = async (
   const payload = cloneDeep(data);
 
   // The JSON editor's data comes from the form value set, so it can carry the
-  // form-only keys. Pre-migration formData had none of them (Rule ④).
+  // form-only keys.
   stripFormExtras(payload);
 
   if (!isAggregationEnabled.value) {

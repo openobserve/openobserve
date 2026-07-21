@@ -258,7 +258,7 @@ describe("Recommended", () => {
       },
     });
 
-    const cardContainer = wrapper.find(".card-container");
+    const cardContainer = wrapper.find(".bg-card-glass-bg");
     expect(cardContainer.exists()).toBe(true);
   });
 

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     - Icons in cells (browser logos, location cloud icons, device icons)
     - Icons in filter dropdowns (browser, device, location selects)
 
-  This component is chrome-less — it does NOT render AppPageHeader.
+  This component is chrome-less — it does NOT render OPageHeader.
   The parent (MonitorResults.vue) owns the header. This component is the
   content below it, following the LLMInsightsDashboard pattern.
 -->
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Tabs ──────────────────────────────────────────────────────── -->
     <OTabs
       v-model="activeTab"
-      class="shrink-0 px-2 border-b border-border-default"
+      class="shrink-0 px-page-edge border-b border-border-default"
     >
       <OTab name="overview" data-test="monitor-runs-tab-overview">
         {{ t('synthetics.runs.tabOverview') }}
@@ -57,36 +57,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Status Timeline — gated on runs query -->
             <template v-if="runsLoading || !runsHasLoadedOnce">
-              <div class="px-2">
+              <div class="px-page-edge">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-3.5 pt-2.5 pb-2"
                   >
-                    <SkeletonBox width="100px" height="14px" rounded />
+                    <SkeletonBox width="100px" height="14px" rounded-default />
                     <span class="flex-1" />
-                    <SkeletonBox width="45px" height="12px" rounded />
-                    <SkeletonBox width="50px" height="12px" rounded />
-                    <SkeletonBox width="45px" height="12px" rounded />
+                    <SkeletonBox width="45px" height="12px" rounded-default />
+                    <SkeletonBox width="50px" height="12px" rounded-default />
+                    <SkeletonBox width="45px" height="12px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
+                  <div class="flex flex-col gap-1 py-2 px-3.5">
                     <div class="flex items-center gap-1">
                       <div class="w-5 h-5 shrink-0" />
-                      <div class="flex-1 h-[26px] rounded flex gap-0.5 items-stretch">
+                      <div class="flex-1 h-6.5 rounded-default flex gap-0.5 items-stretch">
                         <div
                           v-for="n in 26"
                           :key="n"
-                          class="flex-1 h-full rounded-[2px] bg-border-default opacity-40"
+                          class="flex-1 h-full rounded-default bg-border-default opacity-40"
                         />
                       </div>
                       <div class="w-5 h-5 shrink-0" />
                     </div>
                     <div class="flex justify-between">
-                      <SkeletonBox width="60px" height="10px" rounded />
-                      <SkeletonBox width="80px" height="10px" rounded />
-                      <SkeletonBox width="60px" height="10px" rounded />
+                      <SkeletonBox width="60px" height="10px" rounded-default />
+                      <SkeletonBox width="80px" height="10px" rounded-default />
+                      <SkeletonBox width="60px" height="10px" rounded-default />
                     </div>
                   </div>
                 </div>
@@ -94,17 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <!-- Status Timeline — runs query error state -->
             <template v-else-if="runsError">
-              <div class="px-2">
+              <div class="px-page-edge">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-3.5 pt-2.5 pb-2"
                   >
                     <span class="font-bold text-sm text-text-heading">{{ t('synthetics.runs.statusTimeline') }}</span>
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="flex items-center justify-center py-6 text-[0.75rem] text-status-error-text">
+                  <div class="flex items-center justify-center py-6 text-xs text-status-error-text">
                     <span class="flex items-center gap-1">
                       <OIcon name="error" size="xs" />
                       {{ runsError }}
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else>
-              <div class="px-2">
+              <div class="px-page-edge">
               <MonitorStatusTimeline
                 :segments="timelineSegments"
                 :fail-count="timelineFailCount"
@@ -128,31 +128,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- KPI Cards — gated on KPI + last-run queries -->
             <template v-if="kpiLoading || !kpiHasLoadedOnce">
-              <div class="px-2">
-                <div class="grid grid-cols-5 gap-[0.625rem]">
+              <div class="px-page-edge">
+                <div class="grid grid-cols-5 gap-2.5">
                   <div
                     v-for="n in 5"
                     :key="n"
-                    class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-2 bg-surface-base border border-border-default"
+                    class="card-container rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-2 bg-surface-base border border-border-default"
                   >
-                    <SkeletonBox width="60%" height="11px" rounded />
-                    <SkeletonBox width="55%" height="22px" rounded />
+                    <SkeletonBox width="60%" height="11px" rounded-default />
+                    <SkeletonBox width="55%" height="22px" rounded-default />
                   </div>
                 </div>
               </div>
             </template>
             <template v-else>
-              <div class="px-2">
-              <div class="grid grid-cols-5 gap-[0.625rem]">
+              <div class="px-page-edge">
+              <div class="grid grid-cols-5 gap-2.5">
                 <div
                   v-for="card in kpiCards"
                   :key="card.key"
-                  class="card-container rounded-lg flex flex-col px-2 pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                  class="card-container rounded-default flex flex-col px-2 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
                   :data-test="`monitor-runs-kpi-${card.key}`"
                 >
-                  <div class="flex flex-col gap-[0.25rem]">
+                  <div class="flex flex-col gap-1">
                     <div
-                      class="kpi-label text-[0.7rem] font-semibold text-text-muted"
+                      class="kpi-label text-2xs font-semibold text-text-muted"
                     >
                       {{ card.label }}
                       <span v-if="card.unit"> ({{ card.unit }}) </span>
@@ -160,14 +160,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-baseline gap-[0.2rem]">
                       <!-- Per-card error indicator -->
                       <template v-if="kpiError">
-                        <span class="flex items-center gap-1 text-[0.75rem] text-status-error-text">
+                        <span class="flex items-center gap-1 text-xs text-status-error-text">
                           <OIcon name="error" size="xs" class="shrink-0" />
                           {{ kpiError }}
                         </span>
                       </template>
                       <template v-else>
                         <span
-                          class="text-[1.4rem] font-bold leading-none text-[var(--color-text-primary)]"
+                          class="text-xl font-bold leading-none text-[var(--color-text-heading)]"
                           :class="card.valueClass"
                         >
                           {{ card.value }}
@@ -182,49 +182,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Charts — gated on histogram query -->
             <template v-if="histogramLoading || !histogramHasLoadedOnce">
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-2 gap-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
-                    <SkeletonBox width="110px" height="14px" rounded />
+                    <SkeletonBox width="110px" height="14px" rounded-default />
                     <span class="flex-1" />
-                    <SkeletonBox width="80px" height="20px" rounded />
+                    <SkeletonBox width="80px" height="20px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
                   <div class="p-4">
-                    <SkeletonBox width="100%" height="160px" rounded />
+                    <SkeletonBox width="100%" height="160px" rounded-default />
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
-                    <SkeletonBox width="120px" height="14px" rounded />
+                    <SkeletonBox width="120px" height="14px" rounded-default />
                     <span class="flex-1" />
-                    <SkeletonBox width="90px" height="20px" rounded />
+                    <SkeletonBox width="90px" height="20px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
                   <div class="p-4">
-                    <SkeletonBox width="100%" height="160px" rounded />
+                    <SkeletonBox width="100%" height="160px" rounded-default />
                   </div>
                 </div>
               </div>
               </div>
             </template>
             <template v-else>
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-2 gap-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
                     <span class="font-bold text-sm text-text-heading">
                       {{ t('synthetics.results.responseTime') }}
@@ -242,23 +242,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="min-h-[180px] p-0">
+                  <div class="min-h-45 p-0">
                     <ChartRenderer
                       v-if="!histogramError"
                       :data="{ options: responseChartOption }"
                       height="180px"
                     />
-                    <div v-else class="flex flex-col items-center justify-center h-[180px] gap-1 text-sm text-text-secondary">
+                    <div v-else class="flex flex-col items-center justify-center h-45 gap-1 text-sm text-text-secondary">
                       <OIcon name="error_outline" size="sm" class="text-status-error-text" />
                       <span>{{ histogramError }}</span>
                     </div>
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
                     <span class="font-bold text-sm text-text-heading">
                       {{ t('synthetics.runs.errorsOverTime') }}
@@ -276,13 +276,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="min-h-[180px] p-0">
+                  <div class="min-h-45 p-0">
                     <ChartRenderer
                       v-if="!histogramError"
                       :data="{ options: errorChartOption }"
                       height="180px"
                     />
-                    <div v-else class="flex flex-col items-center justify-center h-[180px] gap-1 text-sm text-text-secondary">
+                    <div v-else class="flex flex-col items-center justify-center h-45 gap-1 text-sm text-text-secondary">
                       <OIcon name="error_outline" size="sm" class="text-status-error-text" />
                       <span>{{ histogramError }}</span>
                     </div>
@@ -294,40 +294,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Breakdown Cards — gated on runs query -->
             <template v-if="runsLoading || !runsHasLoadedOnce">
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-3 gap-2">
                 <div
                   v-for="n in 3"
                   :key="n"
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
                     <SkeletonBox
                       width="16px"
                       height="16px"
                       :custom-radius="'4px'"
                     />
-                    <SkeletonBox width="110px" height="14px" rounded />
+                    <SkeletonBox width="110px" height="14px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="px-2 py-[0.5rem] flex flex-col">
+                  <div class="px-2 py-2 flex flex-col">
                     <div
                       v-for="row in 3"
                       :key="row"
-                      class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
+                      class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
                     >
                       <SkeletonBox
                         width="16px"
                         height="16px"
                         :custom-radius="'4px'"
                       />
-                      <SkeletonBox width="70px" height="12px" rounded />
+                      <SkeletonBox width="70px" height="12px" rounded-default />
                       <div
                         class="flex-1 h-1.5 rounded-full bg-border-default opacity-30"
                       />
-                      <SkeletonBox width="36px" height="12px" rounded />
+                      <SkeletonBox width="36px" height="12px" rounded-default />
                     </div>
                   </div>
                 </div>
@@ -336,22 +336,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <!-- Breakdown Cards — runs query error state -->
             <template v-else-if="runsError">
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-3 gap-2">
                 <div
                   v-for="dim in ['Browser','Location','Device']"
                   :key="dim"
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
                     <span class="font-bold text-sm text-text-heading">
                       {{ dim === 'Browser' ? t('synthetics.runs.passRateByBrowser') : dim === 'Location' ? t('synthetics.runs.passRateByLocation') : t('synthetics.runs.passRateByDevice') }}
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="flex items-center justify-center py-8 text-[0.75rem] text-status-error-text">
+                  <div class="flex items-center justify-center py-8 text-xs text-status-error-text">
                     <span class="flex items-center gap-1">
                       <OIcon name="error" size="xs" />
                       {{ runsError }}
@@ -362,13 +362,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template v-else>
-              <div class="px-2">
+              <div class="px-page-edge">
               <div class="grid grid-cols-3 gap-2">
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
                     <OIcon name="language" size="sm" class="text-primary-700" />
                     <span class="font-bold text-sm text-text-heading">
@@ -376,11 +376,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="px-2 py-[0.5rem]">
+                  <div class="px-2 py-2">
                     <div
                       v-for="b in browserBreakdown"
                       :key="b.name"
-                      class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
+                      class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
                     >
                       <OIcon
                         :name="b.icon"
@@ -388,12 +388,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-text-secondary flex-none"
                       />
                       <span
-                        class="w-20 flex-none font-semibold text-xs text-text-heading"
+                        class="w-20 flex-none font-semibold text-xs text-text-body"
                       >
                         {{ b.name }}
                       </span>
                       <div
-                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
+                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-10"
                       >
                         <!-- :style for dynamic bar width + computed color — inline required for per-breakdown values -->
                         <div
@@ -411,10 +411,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
                     <OIcon
                       name="location-on"
@@ -426,11 +426,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="px-2 py-[0.5rem]">
+                  <div class="px-2 py-2">
                     <div
                       v-for="l in locationBreakdown"
                       :key="l.name"
-                      class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
+                      class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
                     >
                       <OIcon
                         :name="l.icon"
@@ -438,12 +438,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-text-secondary flex-none"
                       />
                       <span
-                        class="w-[110px] flex-none font-semibold text-xs text-text-heading"
+                        class="w-27.5 flex-none font-semibold text-xs text-text-body"
                       >
                         {{ l.name }}
                       </span>
                       <div
-                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
+                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-10"
                       >
                         <div
                           class="h-full rounded-full"
@@ -460,10 +460,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
-                  class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
-                    class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]"
+                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
                     <OIcon name="devices" size="sm" class="text-primary-700" />
                     <span class="font-bold text-sm text-text-heading">
@@ -471,11 +471,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="px-2 py-[0.5rem]">
+                  <div class="px-2 py-2">
                     <div
                       v-for="d in deviceBreakdown"
                       :key="d.name"
-                      class="flex items-center gap-3 py-[9px] border-b border-border-default last:border-b-0"
+                      class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
                     >
                       <OIcon
                         :name="d.icon"
@@ -483,12 +483,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-text-secondary flex-none"
                       />
                       <span
-                        class="w-20 flex-none font-semibold text-xs text-text-heading"
+                        class="w-20 flex-none font-semibold text-xs text-text-body"
                       >
                         {{ d.name }}
                       </span>
                       <div
-                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-[40px]"
+                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-10"
                       >
                         <div
                           class="h-full rounded-full"
@@ -559,21 +559,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="failedStepFilter"
                   :options="failedStepOptions"
                   size="sm"
-                  class="w-[160px]"
+                  class="w-40"
                   data-test="monitor-runs-filter-step"
                 />
                 <OInput
                   v-model="locatorFilter"
                   size="sm"
                   :placeholder="t('synthetics.runs.locatorPlaceholder')"
-                  class="w-[170px]"
+                  class="w-42.5"
                   data-test="monitor-runs-filter-locator"
                 />
                 <OSelect
                   v-model="actionFilter"
                   :options="actionOptions"
                   size="sm"
-                  class="w-[130px]"
+                  class="w-32.5"
                   data-test="monitor-runs-filter-action"
                 />
               </template>
@@ -655,7 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-location="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-sm text-text-primary"
+                    class="inline-flex items-center gap-1 text-sm text-text-body"
                   >
                     <OIcon
                       :name="locationIcon((row as VisibleRun).location)"
@@ -666,7 +666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-browser="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-sm text-text-primary"
+                    class="inline-flex items-center gap-1 text-sm text-text-body"
                   >
                     <OIcon
                       :name="browserIcon((row as VisibleRun).browser)"
@@ -677,7 +677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-device="{ row }">
                   <span
-                    class="inline-flex items-center gap-1 text-sm text-text-primary"
+                    class="inline-flex items-center gap-1 text-sm text-text-body"
                   >
                     <OIcon
                       :name="deviceIconName((row as VisibleRun).device)"
@@ -697,21 +697,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OBadge
                       variant="error-outline"
                       size="sm"
-                      class="truncate max-w-[200px]"
+                      class="truncate max-w-50"
                     >
                       {{ (row as VisibleRun).errorSnippet }}
                     </OBadge>
                   </span>
                 </template>
                 <template #cell-trigger_type="{ row }">
-                  <span class="text-sm text-text-primary">
+                  <span class="text-sm text-text-body">
                     {{ (row as VisibleRun).triggerType }}
                   </span>
                 </template>
 
                 <!-- Empty state: smart — differentiates "never run" vs "no runs in window" -->
                 <template #empty>
-                  <div v-if="kpiHasLoadedOnce" class="px-2">
+                  <div v-if="kpiHasLoadedOnce" class="px-page-edge">
                     <!-- Monitor has runs elsewhere — guide to last run + optionally clear filters -->
                     <OEmptyState
                       v-if="synthetics.kpi.value.totalRuns > 0"
@@ -776,22 +776,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Loading skeleton -->
             <template v-if="stepsLoading || !stepsHasLoadedOnce">
               <div class="grid grid-cols-2 gap-2">
-                <div class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden">
-                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
-                    <SkeletonBox width="100px" height="14px" rounded />
+                <div class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden">
+                  <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                    <SkeletonBox width="100px" height="14px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded /></div>
+                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded-default /></div>
                 </div>
-                <div class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden">
-                  <div class="flex items-center gap-2 px-2 pt-[0.625rem] pb-[0.5rem]">
-                    <SkeletonBox width="100px" height="14px" rounded />
+                <div class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden">
+                  <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                    <SkeletonBox width="100px" height="14px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
-                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded /></div>
+                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded-default /></div>
                 </div>
               </div>
-              <div v-for="n in 5" :key="n" class="card-container rounded-lg overflow-hidden">
+              <div v-for="n in 5" :key="n" class="card-container rounded-default overflow-hidden">
                 <div class="h-10 bg-[var(--color-border-default)] opacity-20" />
               </div>
             </template>
@@ -849,7 +849,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="font-mono tabular-nums font-bold text-xs" :style="{ color: row.failColor }">
                         {{ row.failRatePct }}%&ensp;<span class="font-normal text-[var(--color-text-muted)]">{{ row.failCount }}</span>
                       </span>
-                      <div class="h-[5px] rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
+                      <div class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
                         <div class="h-full rounded-full" :style="{ width: row.failRateBarPct, background: row.failBarColor }" />
                       </div>
                     </div>
@@ -866,7 +866,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-avgDuration="{ row }">
                     <div class="flex flex-col gap-1">
                       <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{ row.avgDuration }}</span>
-                      <div class="h-[5px] rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
+                      <div class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
                         <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.durationBarPct }" />
                       </div>
                     </div>
@@ -876,7 +876,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-p95Duration="{ row }">
                     <div class="flex flex-col gap-1">
                       <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{ row.p95Duration }}</span>
-                      <div class="h-[5px] rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
+                      <div class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
                         <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.p95DurationBarPct }" />
                       </div>
                     </div>
@@ -886,7 +886,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-maxDuration="{ row }">
                     <div class="flex flex-col gap-1">
                       <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{ row.maxDuration }}</span>
-                      <div class="h-[5px] rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
+                      <div class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
                         <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.maxDurationBarPct }" />
                       </div>
                     </div>
@@ -908,7 +908,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ ERRORS ════════════ -->
         <OTabPanel name="errors">
           <div
-            class="mx-auto px-2 py-2 pb-[1.75rem] flex flex-col gap-2"
+            class="mx-auto px-2 py-2 pb-7 flex flex-col gap-2"
           >
             <div class="flex items-center gap-2.5">
               <span class="font-bold text-sm text-text-heading">
@@ -921,7 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OCard class="p-0">
               <div
-                class="grid grid-cols-[1fr_100px_160px_32px] gap-2.5 px-4 py-2 bg-surface-subtle border-b border-border-default text-[11px] font-semibold text-text-secondary uppercase tracking-wide"
+                class="grid grid-cols-[1fr_100px_160px_32px] gap-2.5 px-4 py-2 bg-surface-subtle border-b border-border-default text-2xs font-semibold text-text-secondary uppercase tracking-wide"
               >
                 <span>{{ t('synthetics.runs.errorPattern') }}</span>
                 <span>{{ t('synthetics.runs.count') }}</span>
@@ -931,12 +931,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="e in errorGroups"
                 :key="e.pattern"
-                class="grid grid-cols-[1fr_100px_160px_32px] gap-2.5 px-4 py-[11px] border-b border-border-default items-center cursor-pointer hover:bg-surface-subtle"
+                class="grid grid-cols-[1fr_100px_160px_32px] gap-2.5 px-4 py-2.75 border-b border-border-default items-center cursor-pointer hover:bg-surface-subtle"
                 data-test="monitor-runs-error-row"
                 @click="filterByErrorPattern(e.pattern)"
               >
                 <span
-                  class="font-mono tabular-nums text-xs text-text-heading truncate"
+                  class="font-mono tabular-nums text-xs text-text-body truncate"
                 >
                   {{ e.pattern }}
                 </span>
@@ -1911,7 +1911,7 @@ function cssVar(name: string, fallback: string): string {
 
 const responseChartOption = computed(() => {
   const lineColor = cssVar("--color-primary-600", "#3b82f6");
-  const axisColor = cssVar("--color-text-caption", "#6c707e");
+  const axisColor = cssVar("--color-text-secondary", "#6c707e");
   const splitColor = cssVar("--color-border-default", "#e2e8f0");
   const p95Color = cssVar("--color-status-warning-text", "#f59e0b");
 
@@ -1981,7 +1981,7 @@ const responseChartOption = computed(() => {
 });
 
 const errorChartOption = computed(() => {
-  const axisColor = cssVar("--color-text-caption", "#6c707e");
+  const axisColor = cssVar("--color-text-secondary", "#6c707e");
   const splitColor = cssVar("--color-border-default", "#e2e8f0");
   const errorColor = cssVar("--color-status-error-text", "#dc2626");
 

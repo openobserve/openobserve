@@ -4,15 +4,14 @@
     :form="form"
     v-slot="{ isSubmitting }"
   >
-    <AppPageHeader
+    <OPageLayout
       :subtitle="t('onlineEvals.provider.subtitle')"
       :back="{
         label: t('onlineEvals.provider.backTo'),
         onClick: () => $emit('cancel'),
         dataTest: 'provider-form-back-btn',
       }"
-      class="px-3 border-b border-border-default"
-      style="flex-shrink: 0"
+      scroll
     >
       <template #title>
         <span data-test="provider-form-title">
@@ -31,20 +30,19 @@
           @click="$emit('cancel')"
         />
       </template>
-    </AppPageHeader>
 
-    <div class="flex-1 min-h-0 overflow-auto px-6 py-4.5 [&_textarea]:max-h-[220px] [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
+    <div class="py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
       <section class="mb-6">
         <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-          <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-[11px] font-[ui-monospace,SFMono-Regular,Menlo,monospace]">01</span>
-          <div class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.provider.sectionTitle") }}</div>
+          <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">01</span>
+          <div class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.provider.sectionTitle") }}</div>
         </div>
 
-        <div class="provider-field-row grid grid-cols-2 gap-[14px]">
+        <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.provider.nameLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </div>
             <OFormInput
@@ -54,15 +52,15 @@
               :disabled="mode === 'edit'"
               data-test="provider-form-name-input"
             />
-            <div v-if="mode === 'edit'" class="text-[11.5px] text-text-secondary mt-1">
+            <div v-if="mode === 'edit'" class="text-2xs text-text-secondary mt-1">
               {{ t("onlineEvals.provider.cannotRename") }}
             </div>
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.provider.typeLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
               <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
             </div>
             <OFormSelect
@@ -76,7 +74,7 @@
         </div>
 
         <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
+          <div class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
           <OFormInput
             name="endpoint"
             :placeholder="endpointPlaceholder"
@@ -85,11 +83,11 @@
           />
         </div>
 
-        <div class="provider-field-row grid grid-cols-2 gap-[14px]">
+        <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
               {{ t("onlineEvals.provider.defaultModelLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
+              <span class="text-status-error-text ml-0.5">*</span>
             </div>
             <OFormInput
               name="defaultModel"
@@ -100,14 +98,14 @@
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
+            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
             <OFormInput
               name="availableModels"
               :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
               size="sm"
               data-test="provider-form-available-models-input"
             />
-            <div class="text-[11.5px] text-text-secondary mt-1">{{ t("onlineEvals.provider.availableModelsHelp") }}</div>
+            <div class="text-2xs text-text-secondary mt-1">{{ t("onlineEvals.provider.availableModelsHelp") }}</div>
           </div>
         </div>
 
@@ -115,19 +113,19 @@
 
       <section class="mb-6">
         <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-          <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-[11px] font-[ui-monospace,SFMono-Regular,Menlo,monospace]">02</span>
-          <div class="m-0 text-sm font-semibold text-(--color-text-primary)">{{ t("onlineEvals.provider.authSection") }}</div>
+          <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">02</span>
+          <div class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.provider.authSection") }}</div>
         </div>
 
-        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-md text-[11.5px] text-(--color-text-primary) leading-[1.4]">
-          <OIcon name="lock" size="xs" class="shrink-0 mt-px text-[var(--color-status-info-text)]" />
+        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-default text-2xs text-text-secondary leading-[1.4]">
+          <OIcon name="lock" size="xs" class="shrink-0 mt-px text-status-info-text" />
           <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
         </div>
 
         <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-(--color-text-primary) mb-1">
+          <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
             {{ t("onlineEvals.provider.apiKeyLabel") }}
-            <span v-if="mode === 'create'" class="text-(--color-status-error-text) ml-0.5">*</span>
+            <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
           </div>
           <OFormInput
             name="apiKey"
@@ -136,7 +134,7 @@
             :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
             data-test="provider-form-api-key-input"
           />
-          <div class="text-[11.5px] text-text-secondary mt-1">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
+          <div class="text-2xs text-text-secondary mt-1">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
         </div>
       </section>
     </div>
@@ -162,6 +160,7 @@
         {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
+    </OPageLayout>
   </OForm>
 </template>
 
@@ -174,7 +173,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {
@@ -202,7 +201,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 
 // Co-located Zod schema (factory keeps messages i18n-driven). apiKey is optional
-// in both modes, so the schema no longer branches on `mode`.
+// in both modes.
 const providerFormSchema = makeProviderFormSchema(t);
 
 // Headless OForm instance (matches ScorerFormPage): created here so the endpoint
@@ -271,9 +270,9 @@ function initForm(row: Provider | null): ProviderForm {
 
 // @submit handler — OForm only calls this once the whole schema passes, so the
 // schema (not a manual guard) gates the save. `value` carries the RAW field
-// values (the schema validates but does not transform), so trim/split here just
-// as the old `v-model.trim` did. OForm awaits this promise → the Save button
-// spinner spans the whole save (no manual `isSaving` ref).
+// values (the schema validates but does not transform), so trim/split here.
+// OForm awaits this promise → the Save button spinner spans the whole save
+// (no manual `isSaving` ref).
 async function save(value: ProviderForm) {
   if (!props.orgId) return;
   try {
@@ -285,11 +284,10 @@ async function save(value: ProviderForm) {
       availableModels: splitCsv(value.availableModels),
       // Backend expects an authConfig object; the form only collects an
       // API key, which is the only auth secret the supported providers
-      // need today. Wrap it as { api_key: <value> }. Trim to match the
-      // pre-migration `v-model.trim` (a pasted key with trailing
-      // whitespace/newline must not be sent verbatim).
+      // need today. Wrap it as { api_key: <value> }. Trim it — a pasted key
+      // with trailing whitespace/newline must not be sent verbatim.
       authConfig: { api_key: value.apiKey.trim() },
-      // `isDefault` is no longer surfaced in the form. Always send false;
+      // `isDefault` is not surfaced in the form. Always send false;
       // backend defaults to non-default and the user manages default-ness
       // (if ever needed) outside this create/edit flow.
       isDefault: false,
@@ -310,11 +308,3 @@ async function save(value: ProviderForm) {
   }
 }
 </script>
-
-<style>
-@media (max-width: 900px) {
-  .provider-field-row {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

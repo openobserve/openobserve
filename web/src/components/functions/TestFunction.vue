@@ -5,7 +5,7 @@
   >
     <div
       data-test="test-function-query-section"
-      class="test-function-query-container w-[100%]"
+      class="test-function-query-container w-full"
     >
       <FullViewContainer
           data-test="test-function-query-title-section"
@@ -17,7 +17,7 @@
             <OIcon
               v-if="!!sqlQueryErrorMsg"
               name="info-outline"
-              class="text-red-600 mx-1 cursor-pointer"
+              class="text-status-error-text mx-1 cursor-pointer"
               size="sm"
             >
               <OTooltip
@@ -41,22 +41,12 @@
           </template>
         </FullViewContainer>
         <div
-          class="flex items-center flex-wrap gap-x-3 py-2 w-[100%]"
-          :class="
-            store.state.theme === 'dark' ? 'bg-gray-950' : ' bg-white'
-          "
+          class="flex items-center flex-wrap gap-x-3 py-2 w-full bg-surface-base"
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input w-[100px]">
-            <div
-              class="text-[12px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'text-gray-200'
-                  : 'text-gray-700'
-              "
-            >
+          <div class="function-stream-select-input w-25">
+            <div class="text-xs text-text-label">
               {{ t("alerts.streamType") + " *" }}
             </div>
 
@@ -69,15 +59,8 @@
               style="width: 100px"
             />
           </div>
-          <div class="function-stream-select-input w-[300px]">
-            <div
-              class="text-[12px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'text-gray-200'
-                  : 'text-gray-700'
-              "
-            >
+          <div class="function-stream-select-input w-75">
+            <div class="text-xs text-text-label">
               {{ t("alerts.stream_name") + " *" }}
             </div>
             <OSelect
@@ -91,15 +74,8 @@
               @update:model-value="updateQuery"
             />
           </div>
-          <div class="functions-duration-input w-[330px]">
-            <div
-              class="text-[12px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'text-gray-200'
-                  : 'text-gray-700'
-              "
-            >
+          <div class="functions-duration-input w-82.5">
+            <div class="text-xs text-text-label">
               {{ t("common.duration") + " *" }}
             </div>
 
@@ -118,18 +94,11 @@
             />
           </div>
 
-          <div
-            class="text-[12px] w-[100%] mt-1"
-            :class="
-              store.state.theme === 'dark'
-                ? 'text-gray-200'
-                : 'text-gray-700'
-            "
-          >
+          <div class="text-xs w-full mt-1 text-text-label">
             {{ t("common.query") + " *" }}
           </div>
           <div
-            class="relative w-[100%]"
+            class="relative w-full"
           >
             <query-editor
               data-test="vrl-function-test-sql-editor"
@@ -147,12 +116,12 @@
               v-if="!inputQuery && queryEditorPlaceholderFlag"
               class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
             >
-              <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] whitespace-nowrap overflow-hidden text-ellipsis" :class="store.state.theme === 'dark' ? 'text-[#718096]' : ''">{{ queryEditorPlaceholder }}</span>
+              <span class="query-editor-placeholder-typewriter font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ queryEditorPlaceholder }}</span>
             </div>
             <div
-              class="text-red-500 p-1 invalid-sql-error min-h-[22px]"
+              class="text-status-error-text p-1 invalid-sql-error min-h-5.5"
             >
-              <span v-show="!!sqlQueryErrorMsg" class="text-[13px]">
+              <span v-show="!!sqlQueryErrorMsg" class="text-compact">
                 Error: {{ sqlQueryErrorMsg }}</span
               >
             </div>
@@ -172,17 +141,17 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
+            class="font-bold flex items-center text-text-secondary ml-2 text-compact"
           >
             <OSpinner size="xs" />
-            <div class="relative top-[2px]">
+            <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
           <OIcon
             v-if="!!eventsErrorMsg"
             name="info-outline"
-            class="text-red-600 mx-1 cursor-pointer"
+            class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
@@ -231,10 +200,10 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-sm font-medium text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
+            class="text-sm font-medium font-bold flex items-center text-text-secondary ml-2 text-compact"
           >
             <OSpinner size="xs" />
-            <div class="relative top-[2px]">
+            <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
@@ -242,7 +211,7 @@
           <OIcon
             v-if="!!outputEventsErrorMsg"
             name="info-outline"
-            class="text-red-600 mx-1 cursor-pointer"
+            class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
@@ -267,16 +236,9 @@
           <OIcon
             name="lightbulb"
             size="xl"
-            class="text-orange-400"
+            class="text-status-warning-text"
           />
-          <div
-            class="text-[15px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'text-gray-200'
-                : 'text-gray-600'
-            "
-          >
+          <div class="text-sm text-text-secondary">
             {{ outputMessage }}
           </div>
         </div>
@@ -307,6 +269,7 @@ import {
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
+import { isJsFunction } from "@/utils/functionLanguage";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
@@ -341,6 +304,13 @@ const props = defineProps({
   heightOffset: {
     type: Number,
     default: 0,
+  },
+  // Optional sample events to seed the "Events" editor with. When omitted, the
+  // generic log sample is used (pipelines / functions page). Workflows pass the
+  // fired-alert sample payload so the VRL author sees the real structure.
+  sampleEvents: {
+    type: Array,
+    default: undefined,
   },
 });
 
@@ -406,6 +376,14 @@ const eventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 const outputEventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const outputEventsErrorMsg = ref<string>("");
+
+// The language the user picked on the Transform Type toggle. Every "failed to
+// apply …" message interpolates this — hardcoding "VRL" told JS authors their
+// JavaScript function failed as VRL. Reactive so flipping the toggle re-labels
+// an error already on screen.
+const functionLanguage = computed(() =>
+  isJsFunction(props.vrlFunction) ? t("function.javascript") : t("function.vrl"),
+);
 
 const loading = ref({
   events: false,
@@ -486,13 +464,15 @@ onMounted(() => {
 
 const setEventsEditor = () => {
   setTimeout(() => {
-    inputEvents.value = JSON.stringify(
-      JSON.parse(
-        `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
-      ),
-      null,
-      2,
-    );
+    // Caller-supplied sample (e.g. the workflow alert payload) takes precedence;
+    // otherwise fall back to the generic log sample.
+    const sample =
+      props.sampleEvents && props.sampleEvents.length
+        ? props.sampleEvents
+        : JSON.parse(
+            `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
+          );
+    inputEvents.value = JSON.stringify(sample, null, 2);
   }, 300);
 };
 
@@ -702,12 +682,20 @@ const processTestResults = async (results: any) => {
   expandState.value.output = true;
   originalOutputEvents.value = JSON.stringify(results?.data?.results);
 
-  // Clear any previous function error shown in the parent
-  emit("function-error", "");
+  const rows = results?.data?.results || [];
 
-  const processedEvents =
-    results?.data?.results.map((event: any) => event.event || event.events) ||
-    [];
+  // Only a *syntax* error fails the request outright; a runtime throw comes back
+  // on a 200 with the message attached per event. Forward those to the parent's
+  // error section — emitting "" here unconditionally cleared it, so a runtime
+  // error showed nowhere but a hover tooltip while the editor displayed the
+  // untransformed events, which reads as success. Deduped: every event usually
+  // trips the same throw.
+  const rowErrors = [
+    ...new Set(rows.map((row: any) => row?.message?.trim()).filter(Boolean)),
+  ];
+  emit("function-error", rowErrors.join("\n"));
+
+  const processedEvents = rows.map((event: any) => event.event || event.events);
 
   outputEvents.value = JSON.stringify(
     JSON.parse(JSON.stringify(processedEvents)),
@@ -723,13 +711,12 @@ const processTestResults = async (results: any) => {
 
 const handleTestError = (err: any) => {
   const rawErrMsg = err.response?.data?.message || "Error in testing function";
-  const isJSFunction = String(props.vrlFunction.transType) === '1';
 
   // Display the raw error message from the backend without modification
   // The backend now extracts detailed error information from rquickjs
-  outputEventsErrorMsg.value = isJSFunction
-    ? "JavaScript error - see details below"
-    : "Error while transforming results";
+  outputEventsErrorMsg.value = isJsFunction(props.vrlFunction)
+    ? t("function.testErrorJs")
+    : t("function.testErrorVrl");
 
   toast({
     variant: "error",
@@ -817,7 +804,9 @@ function getLineRanges(object: any) {
       ranges.push({
         startLine: startLine + 1,
         endLine: endLine + 1,
-        error: `Error: Failed to apply VRL Function.\n${object.message}`,
+        error: `${t("function.testApplyFailedEvent", {
+          language: functionLanguage.value,
+        })}\n${object.message}`,
       }); // Monaco uses 1-based indexing
     }
 
@@ -841,7 +830,9 @@ function highlightSpecificEvent() {
       }
     });
     if (errorEventRanges.length) {
-      outputEventsErrorMsg.value = "Failed to apply VRL Function on few events";
+      outputEventsErrorMsg.value = t("function.testApplyFailedSome", {
+        language: functionLanguage.value,
+      });
     }
 
     if (outputEventsEditorRef.value)
@@ -862,11 +853,12 @@ defineExpose({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(lib-override): compact run-query button + full-width date-time button (child DOM) */
 .test-function-query-container :deep(.test-function-run-query-btn) {
-  padding: 2px 8px !important;
-  font-size: 11px !important;
-  margin: 1px 2px !important;
+  padding: 0.125rem 0.5rem !important;
+  font-size: var(--text-2xs) !important;
+  margin: 1px 0.125rem !important;
 }
 
 .functions-duration-input :deep(.date-time-button) {

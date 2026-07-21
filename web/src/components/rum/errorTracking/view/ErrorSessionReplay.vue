@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="mt-4 rounded-lg border border-border-default p-3"
+    class="mt-4 rounded-default border border-border-default p-3"
     data-test="error-session-replay-card"
   >
     <div class="flex items-center justify-between gap-2">

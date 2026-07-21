@@ -197,7 +197,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("bg-white");
+      // Theme is handled by design tokens; container markup is theme-independent.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
       expect(mainContainer.classes()).not.toContain("dark-mode");
     });
 
@@ -207,7 +209,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("dark-mode");
+      // Theme is handled by design tokens; container markup is identical in both themes.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
       expect(mainContainer.classes()).not.toContain("bg-white");
     });
 
@@ -477,8 +481,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Should default to light theme behavior when theme is undefined
-      expect(mainContainer.classes()).toContain("bg-white");
+      // Container markup is theme-independent; renders regardless of theme state.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
     });
 
     it("should handle null theme state", () => {
@@ -490,8 +495,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Should default to light theme behavior when theme is null
-      expect(mainContainer.classes()).toContain("bg-white");
+      // Container markup is theme-independent; renders regardless of theme state.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
     });
 
     it("should handle empty templates array", () => {

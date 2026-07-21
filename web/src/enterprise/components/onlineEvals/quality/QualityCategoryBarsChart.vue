@@ -6,6 +6,8 @@
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
+import { chartColor } from "@/utils/chartTheme";
+import { withChartFont } from "@/utils/fonts";
 
 interface CategoryRow {
   value_categorical?: string | null;
@@ -28,9 +30,8 @@ function toNumber(v: unknown): number {
 }
 
 function buildOption(): echarts.EChartsOption {
-  const isDark = store.state.theme === "dark";
-  const text = isDark ? "#d4d4d4" : "#374151";
-  const grid = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const text = chartColor("--color-text-secondary");
+  const grid = chartColor("--color-border-subtle");
   // Sort by count DESC (per spec §7.6.6 categorical secondary chart).
   const sorted = [...props.rows].sort((a, b) => toNumber(b.c) - toNumber(a.c));
   const labels = sorted.map((r) => r.value_categorical ?? "(null)");
@@ -78,7 +79,7 @@ function buildOption(): echarts.EChartsOption {
 
 function render() {
   if (!chart) return;
-  chart.setOption(buildOption(), true);
+  chart.setOption(withChartFont(buildOption()), true);
 }
 
 onMounted(() => {

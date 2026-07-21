@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="o-field-label flex items-center gap-[0.375rem] min-w-0 flex-1 py-[0.25rem]"
+    class="o-field-label flex items-center gap-1.5 min-w-0 flex-1 py-1"
   >
     <OIcon
       v-if="showTypeIcon"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip :content="field.label ?? field.name" :disabled="!isTruncated" side="right">
       <span
         ref="labelRef"
-        class="truncate flex-1 min-w-0 leading-relaxed text-[0.82rem] text-field-list-label-text"
+        class="truncate flex-1 min-w-0 leading-relaxed text-compact text-field-list-label-text"
       >
         {{ field.label ?? field.name }}
       </span>

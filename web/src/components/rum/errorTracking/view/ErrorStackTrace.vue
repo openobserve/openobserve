@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabs
         v-model="activeTab"
         dense
-        class="text-gray-500 mb-1"
+        class="text-text-secondary mb-1"
         align="left"
       >
         <OTab name="raw" :label="t('rum.stackTraceRaw')" data-test="rum-error-stack-trace-raw-tab" />
@@ -42,9 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="index"
                 data-test="error-stack-trace-line"
-                class="border-b border-l border-r border-solid border-(--o2-border) text-[13px] py-1.5 px-2"
+                class="border-b border-l border-r border-solid border-border-default text-compact py-1.5 px-2"
                 :style="{
-                  'border-top': Number(index) === 1 ? '1px solid #e0e0e0' : '',
+                  'border-top': Number(index) === 1 ? '1px solid var(--color-border-default)' : '',
                   'border-radius':
                     Number(index) === error_stack.length - 1
                       ? '0 0 4px 4px'

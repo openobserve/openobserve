@@ -285,7 +285,7 @@ onBeforeUnmount(() => {
           // Layout + stacking (must be above the app header/drawer: 2000/3000)
           'min-w-40 p-1 z-[6000]',
           // Surface
-          'bg-dropdown-bg border border-dropdown-border rounded-lg shadow-md',
+          'bg-dropdown-bg border border-dropdown-border rounded-default shadow-md',
           // Typography
           'text-sm text-dropdown-item-text',
           // Animation — clip-path reveal: the menu is unveiled at full size from

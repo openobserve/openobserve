@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <header v-if="title || description" class="mb-6">
         <h1
           v-if="title"
-          class="text-xl! font-semibold! text-text-primary"
+          class="text-xl! font-semibold! text-text-heading"
         >
           {{ title }}
         </h1>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <h2
           v-if="group.label"
-          class="text-sm! font-semibold! text-text-primary mb-3"
+          class="text-sm! font-semibold! text-text-heading mb-3"
         >
           {{ group.label }}
         </h2>
@@ -65,12 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in group.items"
             :key="item.key"
             type="button"
-            class="o2-hub-card group flex items-start gap-3 text-left p-4 rounded-lg border border-border-default bg-surface-panel transition-colors hover:border-primary-500 hover:bg-surface-subtle outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            class="o2-hub-card group flex items-start gap-3 text-left p-4 rounded-default border border-border-default bg-surface-panel transition-colors hover:border-primary-500 hover:bg-surface-subtle outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             :data-test="item.dataTest || `section-hub-card-${item.key}`"
             @click="router.push(item.to)"
           >
             <span
-              class="shrink-0 mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-md bg-surface-subtle text-text-secondary transition-colors group-hover:bg-primary-50 group-hover:text-primary-600"
+              class="shrink-0 mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-default bg-surface-subtle text-text-secondary transition-colors group-hover:bg-primary-50 group-hover:text-primary-600"
             >
               <img
                 v-if="item.icon && isImg(item.icon)"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="flex flex-col min-w-0">
               <span
-                class="text-sm font-semibold text-text-primary transition-colors group-hover:text-primary-600"
+                class="text-sm font-semibold text-text-heading transition-colors group-hover:text-primary-600"
                 >{{ item.label }}</span
               >
               <span

@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="card-container h-full flex flex-col pb-[0.3rem]">
+  <div class="bg-card-glass-bg h-full flex flex-col pb-[0.3rem]">
     <!-- Current org section (if super org, not a member) -->
     <div v-if="currentOrgToShow" class="mb-3">
-      <div class="rounded-[0.625rem] bg-(--o2-card-bg) dark:bg-[var(--o2-card-background)]">
+      <div class="rounded-default bg-card-glass-bg dark:bg-surface-base">
         <div class="font-semibold px-2 py-2">
           {{ t("billing.billingGroup.currentOrgTitle") }}
         </div>
-        <OSeparator class="mb-1 mt-[3px]" />
+        <OSeparator class="mb-1 mt-0.75" />
 
         <OTabs
           orientation="vertical"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="currentOrgToShow.secondary"
-                class="member-id text-[0.72rem] opacity-60 truncate max-w-full normal-case"
+                class="member-id text-xs opacity-60 truncate max-w-full normal-case"
                 :title="currentOrgToShow.secondary"
               >
                 {{ currentOrgToShow.secondary }}
@@ -49,11 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Member organizations section -->
     <div class="flex-1 flex flex-col min-h-0">
-      <div class="rounded-[0.625rem] bg-(--o2-card-bg) dark:bg-[var(--o2-card-background)]">
+      <div class="rounded-default bg-card-glass-bg dark:bg-surface-base">
         <div class="font-semibold px-2 py-2">
           {{ t("billing.billingGroup.memberOrgsTitle") }}
         </div>
-        <OSeparator class="mb-1 mt-[3px]" />
+        <OSeparator class="mb-1 mt-0.75" />
 
         <div class="flex items-center py-1 w-full">
           <OInput
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="members-tabs flex-1 overflow-y-auto">
+      <div class="members-tabs flex-1 overflow-y-auto px-1.5">
         <OTabs
           orientation="vertical"
           v-model="activeMember"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="member-name font-semibold truncate max-w-full normal-case" :title="opt.title">
                 {{ opt.primary }}
               </div>
-              <div v-if="opt.secondary" class="member-id text-[0.72rem] opacity-60 truncate max-w-full normal-case" :title="opt.secondary">
+              <div v-if="opt.secondary" class="member-id text-xs opacity-60 truncate max-w-full normal-case" :title="opt.secondary">
                 {{ opt.secondary }}
               </div>
             </div>
@@ -195,24 +195,29 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.card-container .o-tabs--vertical {
-  margin: 5px;
+<style scoped>
+/* keep(lib-override:o2-tabs): OTabs/OTab internals (.o-tabs--vertical, .o-tab,
+   .o-tabs) are child-component DOM this component can only reach through :deep();
+   the active-tab → .member-id opacity is a descendant state chain. */
+.members-tabs :deep(.o-tabs--vertical) {
+  margin: 0.3125rem;
 }
 
-.card-container .o-tabs--vertical .o-tab {
+/* Vertical padding only — the horizontal inset comes from OTab's vertical
+   variant (--spacing-page-edge) so this rail aligns with the page header. */
+.members-tabs :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
-  padding: 0.375rem 1rem 0.375rem 1.25rem;
+  padding-block: 0.375rem;
   border-radius: 0.5rem;
   min-height: 1.5rem;
   text-transform: none;
 }
 
-.card-container .o-tabs--vertical .o-tab[data-state="active"] .member-id {
+.members-tabs :deep(.o-tabs--vertical .o-tab[data-state="active"] .member-id) {
   opacity: 0.85;
 }
 
-.members-tabs .o-tabs {
+.members-tabs :deep(.o-tabs) {
   height: auto !important;
   max-height: none !important;
 }

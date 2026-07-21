@@ -43,6 +43,7 @@ const openGroupKey = moduleRef<string | null>(null);
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -72,9 +73,9 @@ const isLinkMode = computed(() => !!props.parentItem);
 // text stays legible on the dark surface.
 //
 // `!` is REQUIRED: the flyout items are <router-link> (<a>) and the app's global
-// `a { color: var(--o2-text-link) }` rule (app.scss, unlayered) otherwise wins
+// `a { color: var(--color-text-link) }` rule (app.scss, unlayered) otherwise wins
 // over the layered Tailwind color utility, tinting the link text/icon primary.
-const isDark = computed(() => store.state.theme === "dark");
+const { isDark } = useTheme();
 const flyoutTextClass = computed(() =>
   isDark.value ? "text-dropdown-item-text!" : "text-black!",
 );
@@ -403,14 +404,14 @@ function onChildMouseenter(event: MouseEvent) {
         :data-test="`nav-group-flyout-${groupKey}`"
         role="menu"
         :aria-label="title"
-        class="nav-group-flyout min-w-52 p-1 rounded-lg border border-dropdown-border bg-dropdown-bg shadow-md"
+        class="nav-group-flyout min-w-52 p-1 rounded-default border border-dropdown-border bg-dropdown-bg shadow-md"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
         @keydown="onFlyoutKeydown"
       >
         <div
-          class="px-3 pt-1.5 pb-1 text-[11px] font-semibold"
+          class="px-3 pt-1.5 pb-1 text-2xs font-semibold"
           :class="flyoutTextClass"
         >
           {{ title }}
@@ -418,7 +419,7 @@ function onChildMouseenter(event: MouseEvent) {
         <template v-for="(row, rowIndex) in flyoutRows" :key="row.key">
           <div
             v-if="row.kind === 'header'"
-            class="px-3 pb-1 text-[10.5px] font-medium text-tabs-inactive-text"
+            class="px-3 pb-1 text-2xs font-medium text-tabs-inactive-text"
             :class="rowIndex === 0 ? 'pt-2' : 'pt-4'"
           >
             {{ row.label }}
@@ -428,7 +429,7 @@ function onChildMouseenter(event: MouseEvent) {
             :data-test="`nav-group-item-${row.child.name}`"
             role="menuitem"
             :to="childTo(row.child)"
-            class="nav-group-item flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm [text-decoration:none]! cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500"
+            class="nav-group-item flex items-center gap-2.5 px-3 py-1.5 rounded-default text-sm [text-decoration:none]! cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500"
             :class="[
               flyoutTextClass,
               isChildActive(row.child)
@@ -451,14 +452,19 @@ function onChildMouseenter(event: MouseEvent) {
 </template>
 
 <style scoped>
-/* Reveal animation for the flyout — a quick fade + slight slide from the rail. */
+/* keep(keyframes): reveal animation for the flyout — a quick fade + slight slide
+   from the rail. A @keyframes body cannot be expressed as a utility. The
+   `animation:` declaration is co-located here on purpose: Vue rewrites the
+   keyframe name and the animation shorthand together only when both live in the
+   same scoped block — moving either out (e.g. to a template `[animation:…]`
+   arbitrary value) would break the rename and the animation would not resolve. */
 .nav-group-flyout {
   animation: nav-group-flyout-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes nav-group-flyout-in {
   from {
     opacity: 0;
-    transform: translateX(-4px);
+    transform: translateX(-0.25rem);
   }
   to {
     opacity: 1;

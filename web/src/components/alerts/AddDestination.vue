@@ -15,36 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 o2-custom-bg"
-    style="
-      height: calc(100vh - 48px);
-      min-height: inherit;
-      display: flex;
-      flex-direction: column;
-    "
+  <OPageLayout
+    class="overflow-hidden"
+    :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
+    title-data-test="add-destination-title"
+    :back="{
+      label: t('alert_destinations.header'),
+      onClick: () => emit('cancel:hideform'),
+    }"
+    bleed
   >
-    <AppPageHeader
-      :title="destination ? t('alert_destinations.updateTitle') : t('alert_destinations.addTitle')"
-      title-data-test="add-destination-title"
-      :back="{
-        label: t('alert_destinations.header'),
-        onClick: () => emit('cancel:hideform'),
-      }"
-      class="px-3 border-b border-border-default"
-      style="flex-shrink: 0"
-    >
-    </AppPageHeader>
     <div
-      class="card-container py-2"
-      style="flex: 1; overflow-y: auto; overflow-x: hidden"
+      class="bg-card-glass-bg py-2 flex-1 overflow-y-auto overflow-x-hidden"
     >
       <div>
-        <!-- OWNER of this <OForm> (Rule ③): AddDestination reads its own form
-             state (form.useStore) to drive the discriminated rendering and
-             bridges the non-<input> discriminators (destination_type card grid,
-             type tabs) via setFieldValue. Custom/pipeline destinations submit
-             THIS form (id=add-destination-form); prebuilt destinations submit
-             the nested child credential form by id (form-id bridge, R4). -->
         <OForm
           :form="form"
           id="add-destination-form"
@@ -77,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("alert_destinations.destination_type") }}
                 </div>
                 <div
-                  class="flex items-center p-2 el-border el-border-radius"
+                  class="flex items-center p-2 border border-card-glass-border rounded-default"
                   data-test="destination-type-readonly"
                 >
                   <OIcon
@@ -141,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div v-else-if="isUpdatingDestination" class="p-3 text-center">
               <OSpinner size="md" data-test="add-destination-loading-indicator" />
-              <div class="mt-2 text-gray-400">{{ t("alert_destinations.loadingData") }}</div>
+              <div class="mt-2 text-text-muted">{{ t("alert_destinations.loadingData") }}</div>
             </div>
 
             <!-- Template selector for prebuilt destinations -->
@@ -158,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 valueKey="value"
                 tabindex="0"
               />
-              <div class="text-xs text-gray-400 mt-1">
+              <div class="text-xs text-text-secondary mt-1">
                 {{ t('alert_destinations.templateHelp', {
                   type: getDestinationTypeName(dtVal),
                   name: defaultPrebuiltTemplateName,
@@ -251,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="w-full pb-3"
           >
-            <div class="app-tabs-container h-[36px] mr-2 w-fit">
+            <div class="app-tabs-container h-9 mr-2 w-fit">
               <app-tabs
                 data-test="add-destination-tabs"
                 :tabs="tabs"
@@ -423,7 +407,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('reports.recipients')"
               required
               tabindex="0"
-              style="width: 100%"
               :placeholder="t('user.inviteByEmail')"
             />
           </template>
@@ -493,11 +476,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="$emit('cancel:hideform')"
             >{{ t("alerts.cancel") }}</OButton
           >
-          <!-- R4: Enter + this Save both submit the ONE form by id (custom,
-               pipeline AND prebuilt all live in add-destination-form now — no
-               nested form to route to). @click is additive to the native submit
-               — it restores the pre-migration landing-state toast (see
-               onSaveClick) without disturbing the form-id submit. -->
           <OButton
             data-test="add-destination-submit-btn"
             variant="primary"
@@ -518,7 +496,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :template-content="previewContent"
       data-test="destination-preview-modal"
     />
-  </div>
+  </OPageLayout>
 </template>
 <script lang="ts" setup>
 import {
@@ -539,7 +517,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type {
   Template,
   Headers,
@@ -587,27 +565,24 @@ const store = useStore();
 const { t } = useI18n();
 const { track } = useReo();
 
-// ── OWNER pattern (Rule ③): create the single form here so its state drives the
-// discriminated rendering (form.useStore) and the non-<input> discriminators
-// (card grid + tabs) bridge in via setFieldValue. There is ONE form for custom,
-// pipeline AND prebuilt destinations (credentials are form-owned `credentials.*`
-// fields now, not a nested child form) — `saveDestination` dispatches by type.
+// Single form for custom, pipeline and prebuilt destinations (credentials are
+// `credentials.*` fields); saveDestination dispatches by type.
 const form = useOForm({
   defaultValues: addDestinationDefaults(),
   schema: makeAddDestinationSchema(t, props.isAlerts),
   onSubmit: (value) => saveDestination(value as AddDestinationForm),
 });
 
-// Single submit entry-point. Prebuilt types save via handlePrebuiltSave (which
-// reads the form-owned `credentials.*`); custom/pipeline via saveCustomDestination.
-// Returned so OForm awaits the real save → the footer Save spinner spans it.
+// Single submit entry-point: prebuilt types save via handlePrebuiltSave, custom/
+// pipeline via saveCustomDestination. Returned so OForm awaits the real save (the
+// footer Save spinner spans it).
 function saveDestination(value: AddDestinationForm) {
   return isPrebuiltDestination.value
     ? handlePrebuiltSave(value)
     : saveCustomDestination(value);
 }
 
-// Reactive reads of the form-owned discriminators + the api-headers array.
+// Reactive reads of the discriminators + the api-headers array.
 const dtVal = form.useStore((s: any) => s.values.destination_type as string);
 const typeVal = form.useStore((s: any) => s.values.type as string);
 const apiHeaders = form.useStore(
@@ -633,8 +608,8 @@ const {
   detectPrebuiltType,
 } = usePrebuiltDestinations();
 
-// Prebuilt credentials are a form-owned sub-object (`credentials.*`) now — read
-// them reactively from the ONE form for the Preview/Test buttons (no mirror ref).
+// Prebuilt credentials sub-object (`credentials.*`), read reactively for the
+// Preview/Test buttons.
 const prebuiltCredentials = form.useStore(
   (s: any) => (s.values.credentials ?? {}) as Record<string, any>,
 );
@@ -642,15 +617,10 @@ const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
 
-// Landing-state feedback (pre-migration parity). The Save button natively
-// submits the parent form; in the alerts create flow with no destination-type
-// card chosen yet, `destination_type` is empty so the schema rejects on
-// name/url — but those fields aren't mounted until a card is picked, so the
-// errors have nowhere to render and the click looks dead. Pre-migration
-// saveDestination always toasted "Please fill required fields" here; restore it.
-// Once a card IS picked the fields mount and show inline errors, so this only
-// needs to cover the no-type-selected state (and it runs alongside, not instead
-// of, the native submit — the R4 form-id routing is untouched).
+// When no destination-type card is chosen yet, `destination_type` is empty so the
+// schema rejects on name/url — but those fields aren't mounted until a card is
+// picked, so the errors have nowhere to render and the click looks dead. Toast a
+// fill-required message to cover that no-type-selected state.
 const onSaveClick = () => {
   if (props.isAlerts && !props.destination && !dtVal.value) {
     toast({
@@ -746,9 +716,8 @@ watch(
 const setupDestinationData = () => {
   if (props.destination) {
     isUpdatingDestination.value = true;
-    // Resolve the destination_type discriminator FIRST. `setDestType` is pure
-    // now (it only records the choice): the resolved value rides into the single
-    // form.reset(record) below instead of being poked into the form mid-scan.
+    // Resolve the destination_type discriminator FIRST; setDestType only records
+    // the choice, which rides into the single form.reset(record) below.
     let destType = "";
     const setDestType = (v: string) => {
       destType = v;
@@ -831,7 +800,7 @@ const setupDestinationData = () => {
         setDestType(isPrebuiltType(extractedType) ? extractedType : "custom");
       }
     }
-    // Priority 5: Fallback to URL-based detection (for destinations created before metadata was added)
+    // Priority 5: Fallback to URL-based detection (for destinations without metadata)
     else if (props.destination.url) {
       const detectedType = detectPrebuiltType(props.destination);
       if (detectedType) {
@@ -845,12 +814,11 @@ const setupDestinationData = () => {
       setDestType("custom");
     }
 
-    // ── Edit-prefill: ONE form.reset(record) ────────────────────────────────
-    // Async data arriving after mount re-seeds via a single reset, never a
-    // per-field setFieldValue loop (alerts-migration.md §5). reset() also clears
-    // field meta — a setFieldValue loop leaves every prefilled field marked
-    // dirty/touched with stale errors, and this runs again on every onActivated.
-    // Start from the defaults so every key is present, then overlay the record.
+    // Edit-prefill: seed via a single form.reset(record), not a per-field
+    // setFieldValue loop — reset() also clears field meta, whereas a setFieldValue
+    // loop leaves every prefilled field marked dirty/touched with stale errors, and
+    // this runs again on every onActivated. Start from the defaults so every key is
+    // present, then overlay the record.
     const record: Record<string, any> = {
       ...addDestinationDefaults(),
       destination_type: destType,
@@ -862,8 +830,7 @@ const setupDestinationData = () => {
       emails: (props.destination?.emails || []).join(", "),
       type: props.destination.type || "http",
       action_id: props.destination.action_id || "",
-      // Prebuilt credentials ride into the SAME single reset (form-owned now,
-      // not a separate mirror), typed to the active type's fields. Custom → {}.
+      // Prebuilt credentials, typed to the active type's fields. Custom → {}.
       credentials:
         destType && destType !== "custom"
           ? prebuiltDestinationDefaults(destType, extractPrebuiltCredentials(destType))
@@ -871,7 +838,7 @@ const setupDestinationData = () => {
     };
 
     // Only CUSTOM headers reach the UI array; system/prebuilt ones stay implicit.
-    // Parity: when there are none, the default apiHeaders row is kept.
+    // When there are none, the default apiHeaders row is kept.
     if (Object.keys(destHeaders).length) {
       const systemHeaders = ["Content-Type", "Authorization", "X-Routing-Key"];
       const customHeadersOnly = Object.entries(destHeaders).filter(
@@ -885,15 +852,13 @@ const setupDestinationData = () => {
       }
     }
 
-    // Parity: only override the default when the saved destination carries one.
+    // Only override the default when the saved destination carries one.
     if (props.destination.output_format) {
       record.output_format = props.destination.output_format;
     }
 
-    // ONE reset seeds every field INCLUDING credentials (built above via
-    // extractPrebuiltCredentials + prebuiltDestinationDefaults). Template name is
-    // stored/displayed as-is (e.g. "prebuilt_slack") — the dropdown's first
-    // option carries that value, so edit mode matches automatically.
+    // Template name is stored/displayed as-is (e.g. "prebuilt_slack") — the
+    // dropdown's first option carries that value, so edit mode matches automatically.
     form.reset(record);
   }
 };
@@ -901,7 +866,7 @@ const setupDestinationData = () => {
 // Rebuild the credential sub-object for an existing prebuilt destination from its
 // persisted shape (metadata `credential_*` vars, url/emails, and the auth headers
 // where sensitive values live). Pure over props.destination — used to seed the
-// single form.reset(record) in edit mode. Mirrors the pre-migration restoration.
+// single form.reset(record) in edit mode.
 const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
   const credentials: Record<string, any> = {};
   if (!props.destination) return credentials;
@@ -943,8 +908,7 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
       : props.destination.emails;
   }
   // PagerDuty: integrationKey from routing_key metadata above; fall back to the
-  // legacy X-Routing-Key header for destinations saved before the key moved into
-  // the request body.
+  // X-Routing-Key header for older destinations.
   if (
     typeId === "pagerduty" &&
     !credentials.integrationKey &&
@@ -1117,16 +1081,14 @@ const showPreview = async () => {
   }
 };
 
-// Save a prebuilt destination — invoked by saveDestination when the ONE form's
-// schema passes (the schema now validates the credentials too, so this fires only
-// on valid input). name/template/apiHeaders/skip_tls_verify AND `credentials` all
-// come from the single validated `value`. Mirrors the old save() prebuilt branch.
+// Save a prebuilt destination — invoked by saveDestination once the form's schema
+// passes. name/template/apiHeaders/skip_tls_verify and `credentials` all come from
+// the validated `value`.
 async function handlePrebuiltSave(value: AddDestinationForm) {
   try {
     const vals = value as any;
     // Scope credentials to the ACTIVE type's fields (dropping any keys left over
-    // from a previous type selection) and coerce them exactly as the schema does
-    // — identical to what the pre-migration child credential form emitted.
+    // from a previous type selection) and coerce them exactly as the schema does.
     const credentials = prebuiltDestinationDefaults(
       value.destination_type,
       (value.credentials ?? {}) as Record<string, unknown>,
@@ -1174,7 +1136,6 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
 // superRefine) passes — the schema, not a manual guard, gates the save. `value`
 // is the validated payload source of truth; the payload is built with explicit
 // keys so no schema-only field (e.g. `credentials`) leaks into the request.
-// Mirrors the old save() custom branch exactly.
 function saveCustomDestination(value: AddDestinationForm) {
   const dismiss = toast({
     variant: "loading",
@@ -1274,9 +1235,8 @@ function saveCustomDestination(value: AddDestinationForm) {
   }
 }
 
-// Add/remove operate on the FORM-OWNED apiHeaders array (single source of truth)
-// via push/removeFieldValue; the template v-for keys rows by INDEX (Rule ①). The
-// delete button passes the row INDEX.
+// Add/remove operate on the apiHeaders array via push/removeFieldValue; the
+// template v-for keys rows by index, and the delete button passes the row index.
 const addApiHeader = (key = "", value = "") => {
   (form as any).pushFieldValue("apiHeaders", { key, value });
 };

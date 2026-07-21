@@ -238,8 +238,9 @@ describe("VariablesDependenciesGraph", () => {
   describe("Component Styling and Layout", () => {
     it("should have correct container styling", () => {
       const container = wrapper.find('[data-test="dashboard-variables-dependencies-graph-container"]');
-      expect(container.attributes('style')).toContain('height: 100%');
-      expect(container.attributes('style')).toContain('width: 100%');
+      // Sizing moved from an inline style to Tailwind utilities.
+      expect(container.classes()).toContain('h-full');
+      expect(container.classes()).toContain('w-full');
     });
 
     it("should pass transparent background to chart", async () => {

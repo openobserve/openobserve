@@ -108,6 +108,8 @@ pub struct Alert {
     /// behaves byte-identically to before. See [`CompositeSpec`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub composite: Option<CompositeSpec>,
+    #[serde(default)]
+    pub workflows: Vec<String>,
 }
 
 impl MemorySize for Alert {
@@ -128,6 +130,7 @@ impl MemorySize for Alert {
             + self.owner.mem_size()
             + self.last_edited_by.mem_size()
             + self.deduplication.mem_size()
+            + self.workflows.mem_size()
     }
 }
 
@@ -166,6 +169,7 @@ impl Default for Alert {
             deduplication: None,
             creates_incident: false,
             composite: None,
+            workflows: vec![],
         }
     }
 }

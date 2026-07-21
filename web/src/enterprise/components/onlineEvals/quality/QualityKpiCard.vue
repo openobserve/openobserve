@@ -1,36 +1,36 @@
 <template>
   <div
-    class="card-container rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-(--color-surface-base) border border-(--color-border-default) transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+    class="bg-card-glass-bg rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 border border-border-default transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
     :data-test="`quality-kpi-${kpi.id}`"
   >
-    <div class="flex flex-col gap-[0.25rem]">
+    <div class="flex flex-col gap-1">
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->
-      <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
-        <div class="kpi-label text-[0.7rem] font-semibold leading-normal text-(--color-text-secondary) min-w-0 truncate">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <div class="kpi-label text-2xs font-semibold leading-normal text-text-secondary min-w-0 truncate">
           {{ t(`onlineEvals.quality.kpis.${kpi.id}.title`) }}
         </div>
         <span
-          class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md bg-(--color-surface-subtle) text-(--color-text-secondary)"
+          class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
         >
           <OIcon :name="cardIcon" size="sm" />
         </span>
       </div>
       <div class="flex items-baseline gap-[0.2rem]">
         <template v-if="kpi.value != null">
-          <span class="text-[1.4rem] font-bold leading-none text-[var(--color-grey-600)]">
+          <span class="text-2xl font-bold leading-none text-text-secondary">
             {{ bigNumber }}
           </span>
           <span
             v-if="unitLabel"
-            class="text-[0.8rem] font-semibold text-[var(--color-text-secondary)] "
+            class="text-compact font-semibold text-text-secondary "
           >
             {{ unitLabel }}
           </span>
         </template>
         <span
           v-else
-          class="text-[0.95rem] font-medium leading-none text-[var(--color-text-muted)]"
+          class="text-base font-medium leading-none text-text-muted"
         >
           {{ t("onlineEvals.quality.kpis.noData") }}
         </span>
@@ -42,11 +42,11 @@
            short history) rather than zero. -->
       <div
         v-if="kpi.value != null"
-        class="text-[0.65rem] font-medium flex items-center gap-[0.25rem]"
+        class="text-3xs font-medium flex items-center gap-1"
         :class="{
-          'text-[var(--color-success-600)]': (delta != null ? trendSentiment : 'neutral') === 'good',
-          'text-[var(--color-error-600)]': (delta != null ? trendSentiment : 'neutral') === 'bad',
-          'text-[var(--color-text-muted)]': (delta != null ? trendSentiment : 'neutral') === 'neutral',
+          'text-status-success-text': (delta != null ? trendSentiment : 'neutral') === 'good',
+          'text-error-600': (delta != null ? trendSentiment : 'neutral') === 'bad',
+          'text-text-muted': (delta != null ? trendSentiment : 'neutral') === 'neutral',
         }"
       >
         <template v-if="delta != null">

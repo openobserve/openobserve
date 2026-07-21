@@ -13,139 +13,98 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { nextTick } from "vue";
+// Condition.vue is CHROME ONLY: the drawer + Save/Cancel/Delete + addNode + the
+// pipeline stream-field loading. The condition tree itself (FilterGroup, the
+// V0/V1 -> V2 conversion, the zod schema and its validation matrix) is the
+// SHARED ConditionBuilder — covered in
+// components/flow/forms/ConditionBuilder.spec.ts, which the workflow Condition
+// node exercises through the very same component. Here we drive the builder via
+// a stub and assert only this drawer's own responsibilities.
+
+import { mount } from "@vue/test-utils";
+import { ref } from "vue";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import Condition from "./Condition.vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 
-vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: vi.fn(),
-}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
-
-// ---------------------------------------------------------------------------
-// Module mocks
-// ---------------------------------------------------------------------------
 const mockAddNode = vi.fn();
 const mockDeletePipelineNode = vi.fn();
 
-vi.mock("@/plugins/pipelines/useDnD", () => ({
-  default: vi.fn(),
-}));
-
-vi.mock("@/services/search", () => ({
-  default: { search: vi.fn() },
-}));
-
+vi.mock("@/plugins/pipelines/useDnD", () => ({ default: vi.fn() }));
+vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStream: vi.fn().mockResolvedValue({
-      schema: [
-        { name: "_timestamp", type: "datetime" },
-        { name: "message",    type: "string"   },
-        { name: "level",      type: "string"   },
-      ],
+      schema: [{ name: "level", type: "Utf8" }],
+      settings: {},
     }),
-    getStreams: vi.fn(),
+    getStreams: vi.fn().mockResolvedValue({ list: [] }),
   }),
 }));
 
-vi.mock("@/composables/useParser", () => ({
-  default: () => ({
-    sqlParser: vi.fn().mockResolvedValue({
-      astify: vi.fn().mockReturnValue({ from: [{ table: "test_stream" }] }),
-    }),
-  }),
-}));
+// Builder stub: submit() resolves whatever the test queues, and conditionGroup
+// backs the drawer's discard-changes comparison.
+let builderPayload = null;
+// reactive so the stub's computed re-evaluates when a test mutates it
+const builderGroup = ref({ filterType: "group", conditions: [] });
 
-vi.mock("@/composables/useQuery", () => ({
-  default: () => ({
-    buildQueryPayload: vi.fn().mockReturnValue({
-      query: { sql: "SELECT * FROM test_stream", start_time: 1000, end_time: 2000 },
-    }),
-  }),
-}));
+const ConditionBuilderStub = {
+  name: "ConditionBuilder",
+  props: [
+    "fields",
+    "initialConditions",
+    "module",
+    "allowCustomColumns",
+    "normalizeOperators",
+  ],
+  template: '<div class="condition-builder-stub"><slot name="guidelines" /></div>',
+  computed: {
+    conditionGroup: () => builderGroup.value,
+  },
+  methods: {
+    submit: () => Promise.resolve(builderPayload),
+  },
+};
 
-vi.mock("@/utils/alerts/alertDataTransforms", async (importOriginal) => {
-  const actual = await importOriginal();
-  return { ...actual };
-});
-
-// ODrawer stub — renders slot content and footer action buttons so tests can
-// locate them via the ODrawer-standard data-test names (o-drawer-*-btn).
 const ODrawerStub = {
   name: "ODrawer",
   props: [
-    "open", "size", "showClose", "title", "width", "persistent", "formId",
-    "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
-    "secondaryButtonVariant", "neutralButtonVariant",
+    "open",
+    "title",
+    "width",
+    "showClose",
+    "persistent",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "neutralButtonVariant",
+    "secondaryButtonVariant",
   ],
-  emits: ["update:open", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div class="o-drawer-stub">
       <slot />
-      <slot name="header-right" />
-      <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button v-if="primaryButtonLabel"   data-test="o-drawer-primary-btn"   type="submit" form="condition-form">{{ primaryButtonLabel }}</button>
-      <button v-if="neutralButtonLabel"   data-test="o-drawer-neutral-btn"   @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+      <button v-if="primaryButtonLabel" data-test="save-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+      <button v-if="secondaryButtonLabel" data-test="cancel-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+      <button v-if="neutralButtonLabel" data-test="delete-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
     </div>
   `,
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-let mockPipelineObj = {};
-
-function makePipelineObj(overrides = {}) {
-  return {
-    isEditNode: false,
-    currentSelectedNodeData: { data: {}, type: "condition" },
-    currentSelectedNodeID: "cond-node-1",
-    currentSelectedPipeline: {
-      nodes: [
-        {
-          io_type: "input",
-          data: {
-            node_type: "stream",
-            stream_name: "test_stream",
-            stream_type: "logs",
-          },
-        },
-      ],
-    },
-    userSelectedNode: {},
-    userClickedNode: {},
-    ...overrides,
-  };
-}
-
-function makeConditionGroup(logicalOperator = "AND", conditions = []) {
-  return {
-    filterType: "group",
-    groupId: "test-group",
-    logicalOperator,
-    conditions,
-  };
-}
-
-function makeCondition(overrides = {}) {
-  return {
-    filterType: "condition",
-    column: "level",
-    operator: "=",
-    value: "error",
-    ignore_case: false,
-    id: "cid-1",
-    ...overrides,
-  };
-}
-
 function createWrapper(pipelineObjOverrides = {}) {
-  mockPipelineObj = makePipelineObj(pipelineObjOverrides);
+  const mockPipelineObj = {
+    currentSelectedNodeData: { data: {}, type: "condition" },
+    currentSelectedNodeID: "node-123",
+    currentSelectedPipeline: { nodes: [] },
+    userClickedNode: {},
+    userSelectedNode: { id: "x" },
+    isEditNode: false,
+    ...pipelineObjOverrides,
+  };
 
   vi.mocked(useDnD).mockImplementation(() => ({
     pipelineObj: mockPipelineObj,
@@ -154,639 +113,133 @@ function createWrapper(pipelineObjOverrides = {}) {
   }));
 
   return mount(Condition, {
+    props: { open: true },
     global: {
       plugins: [i18n, store],
       stubs: {
-        FilterGroup:   true,
         ConfirmDialog: true,
-        ODrawer:       ODrawerStub,
+        ODrawer: ODrawerStub,
+        ConditionBuilder: ConditionBuilderStub,
       },
     },
   });
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-describe("Condition Component", () => {
-  afterEach(() => {
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+describe("Condition.vue (drawer chrome)", () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  // -------------------------------------------------------------------------
-  describe("Component Initialization", () => {
-    it("mounts successfully", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("renders the outer section with data-test attribute", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.find('[data-test="add-condition-section"]').exists()).toBe(true);
-    });
-
-    it("initializes conditionGroup with V2 structure", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const g = wrapper.vm.conditionGroup;
-      expect(g).toBeDefined();
-      expect(g.filterType).toBe("group");
-      expect(g.logicalOperator).toBe("AND");
-      expect(Array.isArray(g.conditions)).toBe(true);
-    });
-
-    it("initializes isUpdating as false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.vm.isUpdating).toBe(false);
-    });
-
-    it("clears userSelectedNode on mount", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(mockPipelineObj.userSelectedNode).toEqual({});
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("Edit Mode – Condition Loading", () => {
-    it("loads V1-backend AND format correctly", async () => {
-      const wrapper = createWrapper({
-        isEditNode: true,
-        currentSelectedNodeData: {
-          data: {
-            conditions: {
-              and: [makeCondition({ column: "status", value: "active" })],
-            },
-          },
-        },
-      });
-      await flushPromises();
-      const g = wrapper.vm.conditionGroup;
-      expect(g.logicalOperator).toBe("AND");
-      expect(g.conditions).toHaveLength(1);
-      expect(g.conditions[0].column).toBe("status");
-    });
-
-    it("loads V1-backend OR format correctly", async () => {
-      const wrapper = createWrapper({
-        isEditNode: true,
-        currentSelectedNodeData: {
-          data: {
-            conditions: {
-              or: [
-                makeCondition({ column: "level", value: "error" }),
-                makeCondition({ column: "level", value: "critical", id: "cid-2" }),
-              ],
-            },
-          },
-        },
-      });
-      await flushPromises();
-      const g = wrapper.vm.conditionGroup;
-      expect(g.logicalOperator).toBe("OR");
-      expect(g.conditions).toHaveLength(2);
-    });
-
-    it("loads V2 format as-is (ensureIds)", async () => {
-      const v2Group = makeConditionGroup("AND", [
-        makeCondition({ column: "env", value: "production" }),
-      ]);
-      const wrapper = createWrapper({
-        isEditNode: true,
-        currentSelectedNodeData: { data: { conditions: v2Group } },
-      });
-      await flushPromises();
-      const g = wrapper.vm.conditionGroup;
-      expect(g.logicalOperator).toBe("AND");
-      expect(g.conditions[0].column).toBe("env");
-    });
-
-    it("shows delete button when isEditNode is true", async () => {
-      const wrapper = createWrapper({
-        isEditNode: true,
-        currentSelectedNodeData: { data: {} },
-      });
-      await flushPromises();
-      expect(wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()).toBe(true);
-    });
-
-    it("hides delete button when isEditNode is false", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("UI Rendering", () => {
-    it("always renders cancel and save buttons", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(wrapper.find('[data-test="o-drawer-secondary-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="o-drawer-primary-btn"]').exists()).toBe(true);
-    });
-
-    it("renders FilterGroup stub", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      // The stub renders as filtergroup tag
-      expect(wrapper.findComponent({ name: "FilterGroup" }).exists()).toBe(true);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("updateGroup", () => {
-    it("updates conditionGroup when a new group is provided (uses root groupId)", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      // Use the actual root groupId so the utility can match and replace
-      const rootGroupId = wrapper.vm.conditionGroup.groupId;
-      const updatedGroup = {
+    builderGroup.value = { filterType: "group", conditions: [] };
+    builderPayload = {
+      version: 2,
+      conditions: {
         filterType: "group",
-        groupId: rootGroupId,
         logicalOperator: "AND",
-        conditions: [makeCondition({ column: "service", value: "web" })],
-      };
-      wrapper.vm.updateGroup(updatedGroup);
-      await nextTick();
-      expect(wrapper.vm.conditionGroup.conditions).toHaveLength(1);
-      expect(wrapper.vm.conditionGroup.conditions[0].column).toBe("service");
-    });
-
-    it("supports changing logicalOperator via updateGroup (uses root groupId)", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const rootGroupId = wrapper.vm.conditionGroup.groupId;
-      const updatedGroup = {
-        filterType: "group",
-        groupId: rootGroupId,
-        logicalOperator: "OR",
-        conditions: [makeCondition({ column: "level", value: "warn" })],
-      };
-      wrapper.vm.updateGroup(updatedGroup);
-      await nextTick();
-      expect(wrapper.vm.conditionGroup.logicalOperator).toBe("OR");
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("removeConditionGroup", () => {
-    it("removes a direct child group by groupId", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const childId = "child-group";
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        {
-          filterType: "group",
-          groupId: childId,
-          logicalOperator: "OR",
-          conditions: [makeCondition()],
-        },
-      ]);
-      wrapper.vm.removeConditionGroup(childId);
-      await nextTick();
-      expect(wrapper.vm.conditionGroup.conditions).toHaveLength(0);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // The "at least one condition" gate is now schema-driven (superRefine over the
-  // bridged FilterGroup model). Drive the real form's submit so the schema runs.
-  describe("schema validation – at least one condition (real OForm)", () => {
-    const submitForm = async (w) => {
-      // Production bridges the live FilterGroup model into the form via its
-      // change handlers (updateGroup / onInputUpdate); the spec sets
-      // `conditionGroup` directly, so bridge it the same way before submitting.
-      w.vm.onInputUpdate();
-      await w.vm.form.handleSubmit();
-      await flushPromises();
+        conditions: [{ column: "level", operator: "=", value: "error" }],
+      },
     };
-
-    it("blocks submit and does NOT call addNode when conditions array is empty", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", []);
-      await nextTick();
-      await submitForm(wrapper);
-      expect(wrapper.vm.form.state.isValid).toBe(false);
-      expect(mockAddNode).not.toHaveBeenCalled();
-      // The form-level error is surfaced below the FilterGroup.
-      expect(wrapper.find('[data-test="add-condition-error"]').text()).toContain(
-        "Please add at least one condition"
-      );
-    });
-
-    it("blocks submit and does NOT call addNode when condition has empty column", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "", operator: "=" }),
-      ]);
-      await nextTick();
-      await submitForm(wrapper);
-      expect(wrapper.vm.form.state.isValid).toBe(false);
-      expect(mockAddNode).not.toHaveBeenCalled();
-    });
-
-    it("blocks submit and does NOT call addNode when condition has empty operator", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "level", operator: "" }),
-      ]);
-      await nextTick();
-      await submitForm(wrapper);
-      expect(wrapper.vm.form.state.isValid).toBe(false);
-      expect(mockAddNode).not.toHaveBeenCalled();
-    });
-
-    it("blocks submit and does NOT call addNode when condition has a column but empty value", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "_timestamp", operator: "=", value: "" }),
-      ]);
-      await nextTick();
-      await submitForm(wrapper);
-      expect(wrapper.vm.form.state.isValid).toBe(false);
-      expect(mockAddNode).not.toHaveBeenCalled();
-      expect(wrapper.find('[data-test="add-condition-error"]').text()).toContain(
-        "Please fill in all condition fields"
-      );
-    });
-
-    it("blocks submit when any one of multiple conditions has an empty value", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "level", value: "error", id: "cid-1" }),
-        makeCondition({ column: "service", value: "", id: "cid-2" }),
-      ]);
-      await nextTick();
-      await submitForm(wrapper);
-      expect(wrapper.vm.form.state.isValid).toBe(false);
-      expect(mockAddNode).not.toHaveBeenCalled();
-    });
-
-    it("submits and calls addNode when at least one valid condition exists", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "level", value: "error" }),
-      ]);
-      await nextTick();
-      await submitForm(wrapper);
-      expect(wrapper.vm.form.state.isValid).toBe(true);
-      expect(mockAddNode).toHaveBeenCalled();
-    });
   });
 
-  // -------------------------------------------------------------------------
-  describe("saveCondition – success cases", () => {
-    it("calls addNode with correct payload structure when valid", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "level", value: "error" }),
-      ]);
-      await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          node_type: "condition",
-          version: 2,
-          conditions: expect.objectContaining({
-            filterType: "group",
-            logicalOperator: "AND",
-          }),
-        })
-      );
-    });
-
-    it("emits cancel:hideform after successful save", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [makeCondition()]);
-      await wrapper.vm.saveCondition();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("saves OR group with multiple conditions", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("OR", [
-        makeCondition({ column: "level", value: "error",    id: "c1" }),
-        makeCondition({ column: "level", value: "critical", id: "c2" }),
-      ]);
-      await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          conditions: expect.objectContaining({ logicalOperator: "OR" }),
-        })
-      );
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("saves condition with empty-string value (\"\")", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "app_name", operator: "!=", value: '""' }),
-      ]);
-      await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          conditions: expect.objectContaining({
-            conditions: expect.arrayContaining([
-              expect.objectContaining({ value: '""' }),
-            ]),
-          }),
-        })
-      );
-    });
-
-    it("saves condition with null value", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "app_name", operator: "!=", value: "null" }),
-      ]);
-      await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          conditions: expect.objectContaining({
-            conditions: expect.arrayContaining([
-              expect.objectContaining({ value: "null" }),
-            ]),
-          }),
-        })
-      );
-    });
-
-    it("accepts a nested group as a valid condition", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("OR", [
-        makeCondition({ id: "c1" }),
-        {
-          filterType: "group",
-          groupId: "nested-g",
-          logicalOperator: "AND",
-          conditions: [makeCondition({ id: "c2", column: "status" })],
-        },
-      ]);
-      await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalled();
-    });
-
-    it("preserves ignore_case flag in the payload", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ ignore_case: true }),
-      ]);
-      await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          conditions: expect.objectContaining({
-            conditions: expect.arrayContaining([
-              expect.objectContaining({ ignore_case: true }),
-            ]),
-          }),
-        })
-      );
-    });
-
-    it("updates originalConditionGroup after successful save", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "service", value: "auth" }),
-      ]);
-      await wrapper.vm.saveCondition();
-      // After saving, the original should reflect the current state
-      const original = wrapper.vm.originalConditionGroup;
-      expect(original.conditions[0].column).toBe("service");
-    });
+  it("mounts and renders the shared ConditionBuilder as its body", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.find(".condition-builder-stub").exists()).toBe(true);
   });
 
-  // -------------------------------------------------------------------------
-  describe("openCancelDialog", () => {
-    it("emits cancel:hideform directly when no changes were made", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      // Synchronize conditionGroup with originalConditionGroup
-      wrapper.vm.conditionGroup = JSON.parse(
-        JSON.stringify(wrapper.vm.originalConditionGroup)
-      );
-      vi.useFakeTimers();
-      await wrapper.vm.openCancelDialog();
-      vi.runAllTimers();
-      await nextTick();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-      vi.useRealTimers();
+  it("hands the saved rule to the builder when editing", () => {
+    const saved = { filterType: "group", conditions: [] };
+    const wrapper = createWrapper({
+      isEditNode: true,
+      currentSelectedNodeData: { data: { conditions: saved } },
     });
-
-    it("shows dialog when changes were made", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [
-        makeCondition({ column: "changed", value: "yes" }),
-      ]);
-      await nextTick();
-      await wrapper.vm.openCancelDialog();
-      expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
-    });
-
-    it("dialog okCallback calls closeDialog which emits cancel:hideform", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = makeConditionGroup("AND", [makeCondition()]);
-      await nextTick();
-      await wrapper.vm.openCancelDialog();
-      vi.useFakeTimers();
-      wrapper.vm.dialog.okCallback();
-      vi.runAllTimers();
-      await nextTick();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-      vi.useRealTimers();
-    });
-
-    it("closeDialog restores originalConditionGroup", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const originalSnapshot = JSON.parse(
-        JSON.stringify(wrapper.vm.originalConditionGroup)
-      );
-      // Mutate conditionGroup
-      wrapper.vm.conditionGroup.conditions = [makeCondition({ column: "mutated" })];
-      wrapper.vm.closeDialog();
-      await nextTick();
-      expect(JSON.stringify(wrapper.vm.conditionGroup)).toBe(
-        JSON.stringify(originalSnapshot)
-      );
-    });
-
-    it("closeDialog resets userClickedNode and userSelectedNode", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      mockPipelineObj.userClickedNode = { id: "x" };
-      mockPipelineObj.userSelectedNode = { id: "y" };
-      wrapper.vm.closeDialog();
-      await nextTick();
-      expect(mockPipelineObj.userClickedNode).toEqual({});
-      expect(mockPipelineObj.userSelectedNode).toEqual({});
-    });
+    expect(
+      wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
+    ).toEqual(saved);
   });
 
-  // -------------------------------------------------------------------------
-  describe("openDeleteDialog", () => {
-    it("shows delete dialog with correct title and message", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      await wrapper.vm.openDeleteDialog();
-      expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Delete Node");
-      expect(wrapper.vm.dialog.message).toBe(
-        "Are you sure you want to delete stream routing?"
-      );
-    });
-
-    it("dialog okCallback calls deletePipelineNode", async () => {
-      const wrapper = createWrapper({ currentSelectedNodeID: "cond-node-1" });
-      await flushPromises();
-      await wrapper.vm.openDeleteDialog();
-      wrapper.vm.dialog.okCallback();
-      await nextTick();
-      expect(mockDeletePipelineNode).toHaveBeenCalledWith("cond-node-1");
-    });
-
-    it("dialog okCallback emits cancel:hideform", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      await wrapper.vm.openDeleteDialog();
-      wrapper.vm.dialog.okCallback();
-      await nextTick();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
+  it("renders the pipeline guidelines into the builder's slot", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.text()).toContain("If conditions are not met");
   });
 
-  // -------------------------------------------------------------------------
-  describe("filterColumns utility", () => {
-    it("calls update and returns all options when val is empty", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const opts = ["timestamp", "message", "level"];
-      let captured = [];
-      const update = (cb) => { captured = []; cb(); };
-      wrapper.vm.filterColumns(opts, "", update);
-      // called without error – update was called
-      expect(update).toBeDefined();
-    });
+  // ── Save ────────────────────────────────────────────────────────────────
+  it("adds the node with the correct payload on save", async () => {
+    const wrapper = createWrapper();
+    await wrapper.find('[data-test="save-btn"]').trigger("click");
+    await tick();
 
-    it("filters options by search term case-insensitively", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const opts = ["timestamp", "message", "level"];
-      let result = [];
-      const update = (cb) => { cb(); };
-      // call manually to test logic
-      wrapper.vm.filterColumns(opts, "MESS", update);
-      // no assertion on internal variable but function should run without error
-      expect(typeof wrapper.vm.filterColumns).toBe("function");
-    });
+    expect(mockAddNode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        node_type: "condition",
+        version: 2,
+        conditions: builderPayload.conditions,
+      }),
+    );
+    expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
   });
 
-  // -------------------------------------------------------------------------
-  describe("filterGroupKey reactivity", () => {
-    it("filterGroupKey increments when conditionGroup.label changes", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      const initialKey = wrapper.vm.filterGroupKey;
-      wrapper.vm.conditionGroup = { ...wrapper.vm.conditionGroup, label: "or" };
-      await nextTick();
-      expect(wrapper.vm.filterGroupKey).toBe(initialKey + 1);
-    });
+  it("does NOT add a node when the builder blocks the save (invalid rule)", async () => {
+    builderPayload = null; // schema rejected it; the builder shows the error inline
+    const wrapper = createWrapper();
+    await wrapper.find('[data-test="save-btn"]').trigger("click");
+    await tick();
+
+    expect(mockAddNode).not.toHaveBeenCalled();
+    expect(wrapper.emitted("cancel:hideform")).toBeFalsy();
   });
 
-  // -------------------------------------------------------------------------
-  describe("Complex Nested Conditions", () => {
-    it("saves AND group containing a nested OR group", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = {
-        filterType: "group",
-        groupId: "root",
-        logicalOperator: "AND",
-        conditions: [
-          makeCondition({ column: "env", value: "prod", id: "c1" }),
-          {
-            filterType: "group",
-            groupId: "inner",
-            logicalOperator: "OR",
-            conditions: [
-              makeCondition({ column: "level", value: "error",    id: "c2" }),
-              makeCondition({ column: "level", value: "critical", id: "c3" }),
-            ],
-          },
-        ],
-      };
-      await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({
-          node_type: "condition",
-          version: 2,
-          conditions: expect.objectContaining({
-            logicalOperator: "AND",
-            conditions: expect.arrayContaining([
-              expect.objectContaining({ column: "env" }),
-            ]),
-          }),
-        })
-      );
-    });
-
-    it("saves triple-nested condition structure", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      wrapper.vm.conditionGroup = {
-        filterType: "group",
-        groupId: "root",
-        logicalOperator: "AND",
-        conditions: [
-          makeCondition({ column: "app", value: "web", id: "c1" }),
-          {
-            filterType: "group",
-            groupId: "l1",
-            logicalOperator: "OR",
-            conditions: [
-              makeCondition({ column: "status", value: "500", id: "c2" }),
-              {
-                filterType: "group",
-                groupId: "l2",
-                logicalOperator: "AND",
-                conditions: [
-                  makeCondition({ column: "code", value: "NullPointer", id: "c3" }),
-                ],
-              },
-            ],
-          },
-        ],
-      };
-      await wrapper.vm.saveCondition();
-      expect(mockAddNode).toHaveBeenCalled();
-    });
+  // ── Buttons ─────────────────────────────────────────────────────────────
+  it("always renders save and cancel", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.find('[data-test="save-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="cancel-btn"]').exists()).toBe(true);
   });
 
-  // -------------------------------------------------------------------------
-  describe("onInputUpdate callback", () => {
-    it("is defined and callable without throwing", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      expect(() => wrapper.vm.onInputUpdate("columnName", {})).not.toThrow();
-    });
+  it("shows delete only when editing a node", () => {
+    expect(
+      createWrapper({ isEditNode: false }).find('[data-test="delete-btn"]').exists(),
+    ).toBe(false);
+    expect(
+      createWrapper({ isEditNode: true }).find('[data-test="delete-btn"]').exists(),
+    ).toBe(true);
+  });
+
+  // ── Cancel (discard-changes prompt) ─────────────────────────────────────
+  it("closes straight away when the rule is unchanged", async () => {
+    const wrapper = createWrapper();
+    await tick(); // let the mount snapshot settle
+    await wrapper.find('[data-test="cancel-btn"]').trigger("click");
+    expect(wrapper.vm.dialog.show).toBe(false);
+  });
+
+  it("prompts to discard when the rule was edited", async () => {
+    const wrapper = createWrapper();
+    await tick();
+    builderGroup.value = { filterType: "group", conditions: [{ column: "changed" }] };
+    await wrapper.find('[data-test="cancel-btn"]').trigger("click");
+    expect(wrapper.vm.dialog.show).toBe(true);
+    expect(wrapper.vm.dialog.title).toBe("Discard Changes");
+  });
+
+  it("clears the selected/clicked node when closing", () => {
+    const wrapper = createWrapper();
+    wrapper.vm.closeDialog();
+    expect(wrapper.vm.pipelineObj.userSelectedNode).toEqual({});
+    expect(wrapper.vm.pipelineObj.userClickedNode).toEqual({});
+  });
+
+  // ── Delete ──────────────────────────────────────────────────────────────
+  it("opens the delete confirmation with the expected copy", async () => {
+    const wrapper = createWrapper({ isEditNode: true });
+    await wrapper.find('[data-test="delete-btn"]').trigger("click");
+    expect(wrapper.vm.dialog.show).toBe(true);
+    expect(wrapper.vm.dialog.title).toBe("Delete Node");
+    expect(typeof wrapper.vm.dialog.okCallback).toBe("function");
+  });
+
+  it("deletes the node when the deletion is confirmed", () => {
+    const wrapper = createWrapper({ isEditNode: true });
+    wrapper.vm.deleteRoute();
+    expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-123");
   });
 });

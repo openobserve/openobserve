@@ -12,7 +12,53 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const REVIEW_MARKER = "<!-- ai-code-review -->";
+// ─── Model provider selection ──────────────────────────────────────────────
+// The review runs against a single provider per invocation, chosen via env so the
+// same script can be launched once per provider (see .github/workflows/ai-code-review.yml,
+// whose matrix currently has a single deepseek leg). Everything defaults to that
+// DeepSeek-V4-Pro setup, so an invocation with no REVIEW_* env set still works.
+//
+// - REVIEW_PROVIDER_ID / REVIEW_MODEL_ID: opencode provider+model IDs (must match a
+//   provider/model registered in opencode.jsonc).
+// - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (empty ⇒ omit).
+// - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
+// - REVIEW_LABEL: short human label used in the posted comment header (e.g. "DeepSeek-V4-Pro").
+// - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
+//   providers post/update independent comments and never clobber each other.
+const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
+const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-v4-pro";
+const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
+// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "DEEPSEEK_API_KEY"),
+// never the key itself — the value is read only via apiKey() below and is never logged or
+// posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs and
+// into a public PR comment on misconfiguration, so a malformed value must not become the
+// vehicle for leaking anything. This also keeps CodeQL's js/clear-text-logging taint analysis
+// from treating the *name* as the secret (it flags any `...API_KEY...` env read reaching a log).
+const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "DEEPSEEK_API_KEY";
+const API_KEY_VAR_NAME = /^[A-Z][A-Z0-9_]{0,63}$/.test(RAW_API_KEY_VAR_NAME)
+  ? RAW_API_KEY_VAR_NAME
+  : "DEEPSEEK_API_KEY";
+const MODEL_LABEL = process.env.REVIEW_LABEL || "DeepSeek-V4-Pro";
+const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
+
+function apiKey() {
+  return process.env[API_KEY_VAR_NAME];
+}
+
+const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review-deepseek -->";
+
+// Every marker any provider leg may post. findExistingReviewComment matches on substring, so a
+// comment carrying a foreign marker gets claimed — and overwritten — by that other provider's
+// leg. The coordinator prompt is now told not to emit markers at all, but models don't reliably
+// obey formatting instructions, so sanitizeReviewBody strips all of these and re-prepends only
+// REVIEW_MARKER: exactly one marker per comment, enforced in code rather than by the prompt.
+// Keep in sync with the `marker` values in .github/workflows/ai-code-review.yml.
+// Includes the retired GLM leg's marker so any leftover GLM comment text still gets
+// stripped from model output rather than resurfacing inside a DeepSeek comment.
+const ALL_REVIEW_MARKERS = [
+  "<!-- ai-code-review -->",
+  "<!-- ai-code-review-deepseek -->",
+];
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 20 * 60 * 1000;
@@ -32,7 +78,9 @@ const NOISE_GENERATED_MARKERS = ["@generated", "auto-generated", "DO NOT EDIT", 
 // ─── Agent definitions ─────────────────────────────────────────────────────
 // Model/agent execution is delegated to `opencode serve` (see OpencodeServer below).
 // Each key here maps to an agent of the same name (`ai-review-<key>`) registered in
-// opencode.jsonc, all running GLM-5.2 at max reasoning effort with read-only repo tools.
+// opencode.jsonc, all running with read-only repo tools.
+// One shared agent set serves every provider: the model is overridden per-call from env
+// (see callOpencode), so these names are provider-agnostic by design.
 const AGENTS = {
   security: {
     name: "Security Reviewer",
@@ -67,22 +115,23 @@ const AGENTS = {
 };
 
 // ─── Risk tiers ────────────────────────────────────────────────────────────
+const COORDINATOR_AGENT = "ai-review-coordinator";
 const RISK_TIERS = {
   trivial: {
     maxLines: 10,
     maxFiles: 20,
     agents: ["code-quality"],
-    coordinatorAgent: "ai-review-coordinator",
+    coordinatorAgent: COORDINATOR_AGENT,
   },
   lite: {
     maxLines: 100,
     maxFiles: 20,
     agents: ["code-quality", "documentation"],
-    coordinatorAgent: "ai-review-coordinator",
+    coordinatorAgent: COORDINATOR_AGENT,
   },
   full: {
     agents: ["security", "code-quality", "performance", "documentation", "release"],
-    coordinatorAgent: "ai-review-coordinator",
+    coordinatorAgent: COORDINATOR_AGENT,
   },
 };
 
@@ -476,7 +525,7 @@ function assessRiskTier(filteredDiff) {
   return "full";
 }
 
-// ─── LLM calls (via `opencode serve`, GLM-5.2 max effort) ─────────────────
+// ─── LLM calls (via `opencode serve`) ──────────────────────────────────────
 //
 // Each reviewer/coordinator is a named agent in opencode.jsonc (ai-review-*), running
 // read-only against the checked-out repo via OpencodeServer + callOpencode below. Unlike
@@ -496,8 +545,7 @@ class OpencodeServer {
     if (this.starting) return this.starting;
 
     this.starting = (async () => {
-      const apiKey = process.env.GLM_API_KEY;
-      if (!apiKey) throw new Error("GLM_API_KEY not set");
+      if (!apiKey()) throw new Error(`${API_KEY_VAR_NAME} not set`);
 
       const proc = spawn("opencode", ["serve", "--hostname", "127.0.0.1", "--port", "0"], {
         cwd: resolve(__dirname, "../.."),
@@ -578,9 +626,9 @@ function extractText(parts) {
 async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
     "gen_ai.operation.name": traceOptions.operationName || "chat",
-    "gen_ai.system": "zai",
-    "gen_ai.request.model": "glm-5.2",
-    "gen_ai.request.reasoning_effort": "max",
+    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.request.model": MODEL_ID,
+    "gen_ai.request.reasoning_effort": MODEL_VARIANT || "default",
     "ai.agent.key": traceOptions.agentKey,
     "ai.agent.name": traceOptions.agentName,
     "gen_ai.agent.name": traceOptions.agentName,
@@ -619,8 +667,8 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           agent: agentName,
-          model: { providerID: "zai", modelID: "glm-5.2" },
-          variant: "max",
+          model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
+          ...(MODEL_VARIANT ? { variant: MODEL_VARIANT } : {}),
           system: truncatedSystem,
           parts: [{ type: "text", text: truncatedUser }],
         }),
@@ -649,11 +697,11 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
         "gen_ai.completion.0.content": text,
         "gen_ai.completion.0.content_length": text.length,
         "gen_ai.response.id": responseId,
-        "gen_ai.response.model": "glm-5.2",
+        "gen_ai.response.model": MODEL_ID,
       });
       TRACE.endSpan(llmSpan, {
         "gen_ai.response.id": responseId,
-        "gen_ai.response.model": "glm-5.2",
+        "gen_ai.response.model": MODEL_ID,
         "gen_ai.response.text_length": text.length,
       });
       return { text, responseId };
@@ -705,18 +753,17 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     "ai.agent.key": agentKey,
     "ai.agent.name": agentDef.name,
     "gen_ai.agent.name": agentDef.name,
-    "gen_ai.system": "zai",
-    "gen_ai.request.model": "glm-5.2",
+    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.request.model": MODEL_ID,
   }, parentSpan);
 
-  const hasGlm = Boolean(process.env.GLM_API_KEY);
-  if (!hasGlm) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — GLM_API_KEY not set`);
+  if (!apiKey()) {
+    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — ${API_KEY_VAR_NAME} not set`);
     TRACE.endSpan(reviewerSpan, {
       "review.skipped": true,
-      "review.error": "GLM_API_KEY not set",
+      "review.error": `${API_KEY_VAR_NAME} not set`,
     });
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: "GLM_API_KEY not set", genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
   }
 
   const systemPrompt = readPrompt("shared-rules.md");
@@ -749,7 +796,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
   const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
 
-  console.log(`[${isoNow()}] Starting ${agentDef.name} (zai/glm-5.2, ${agentDef.opencodeAgent})`);
+  console.log(`[${isoNow()}] Starting ${agentDef.name} (${MODEL_SLUG}, ${agentDef.opencodeAgent})`);
   const start = Date.now();
 
   try {
@@ -825,10 +872,28 @@ function sanitizeReviewBody(body) {
   const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
   cleaned = cleaned.replace(boundaryPattern, "");
 
-  // Ensure the marker is at the very start
-  if (!cleaned.trimStart().startsWith(REVIEW_MARKER)) {
-    cleaned = REVIEW_MARKER + "\n" + cleaned.replace(REVIEW_MARKER, "");
+  // Strip EVERY known marker (not just ours) wherever it appears, so a model that echoes a
+  // marker from the prompt or from a previous review can't end up carrying two of them.
+  for (const marker of ALL_REVIEW_MARKERS) {
+    cleaned = cleaned.split(marker).join("");
   }
+
+  // Drop any preamble the model emitted before the review proper ("Now I have all the
+  // context. Let me produce the consolidated review."). Runs after marker stripping so a
+  // leading marker can't anchor the search at index 0 and mask the preamble behind it.
+  const headingAt = cleaned.search(/^#{1,3}[ \t]*AI Code Review\b/mi);
+  if (headingAt > 0) cleaned = cleaned.slice(headingAt);
+
+  // Re-prepend exactly one marker — ours.
+  cleaned = `${REVIEW_MARKER}\n${cleaned.trimStart()}`;
+
+  // Tag the review header with the model label so each provider's comment is visually
+  // identifiable on the PR. Tolerates trailing words ("AI Code Review Summary")
+  // and any case; the negative lookahead for "(" keeps re-runs idempotent.
+  cleaned = cleaned.replace(
+    /^(#{1,3}[ \t]*AI Code Review\b)(?![ \t]*\()([ \t]*[^\n(]*)$/mi,
+    `$1 (${MODEL_LABEL})$2`,
+  );
 
   return cleaned.trim();
 }
@@ -870,21 +935,21 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   ].join("\n");
 
   const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
-  const coordinatorAgent = tierConfig.coordinatorAgent || "ai-review-coordinator";
+  const coordinatorAgent = tierConfig.coordinatorAgent || COORDINATOR_AGENT;
   const coordinatorSpan = TRACE.startSpan("ai_review.coordinator", {
     "review.agent.key": "coordinator",
     "review.agent.name": "Coordinator",
     "ai.agent.key": "coordinator",
     "ai.agent.name": "Coordinator",
     "gen_ai.agent.name": "Coordinator",
-    "gen_ai.system": "zai",
-    "gen_ai.request.model": "glm-5.2",
+    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.request.model": MODEL_ID,
     "review.risk_tier": tier,
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
     "review.failed_agents": agentResults.filter(r => r.error).length,
   }, parentSpan);
 
-  console.log(`[${isoNow()}] Running coordinator (zai/glm-5.2, ${coordinatorAgent})`);
+  console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
 
   try {
     const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, AGENT_TIMEOUT_MS, {
@@ -1068,28 +1133,27 @@ async function main() {
     console.log(`[${isoNow()}] AI Code Review started for PR #${prNumber}`);
     console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
 
-    const hasGlm = Boolean(process.env.GLM_API_KEY);
-    if (!hasGlm) {
+    if (!apiKey()) {
       outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,
-        "review.skip_reason": "missing_glm_api_key",
+        "review.skip_reason": "missing_api_key",
       });
       // A missing key is a CI/secrets misconfiguration, not a "nothing to review" case —
       // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
       // dropping to zero can't slip by as a green check. Also post to the PR so it's
       // visible without digging into Actions logs.
-      const message = "GLM_API_KEY is not set. AI Code Review did not run for this PR — this is a CI misconfiguration, not a skip.";
+      const message = `${API_KEY_VAR_NAME} is not set. AI Code Review (${MODEL_LABEL}) did not run for this PR — this is a CI misconfiguration, not a skip.`;
       console.error(`[${isoNow()}] ${message}`);
       try {
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`GLM_API_KEY\` secret is provisioned.`);
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review (${MODEL_LABEL})\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`${API_KEY_VAR_NAME}\` secret is provisioned.`);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
       throw new Error(message);
     }
 
-    console.log(`[${isoNow()}] GLM (via opencode serve): configured`);
+    console.log(`[${isoNow()}] ${MODEL_SLUG} (via opencode serve): configured`);
 
     // 1. Get PR diff
     console.log(`[${isoNow()}] Fetching PR diff...`);
@@ -1210,10 +1274,49 @@ async function main() {
     });
     console.log(`[${isoNow()}] All reviewers complete. Total findings: ${totalFindings}, Failures: ${failedAgents.length}`);
 
-    // 7. Coordinator pass
-    const coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
-    let finalReview = coordinatorResult.text;
-    const responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
+    // 7. Coordinator pass — unless nothing survived to coordinate.
+    //
+    // If EVERY reviewer failed there are no findings to consolidate, so the coordinator can
+    // only produce "no issues found" — which reads as an approval on a PR that was never
+    // actually reviewed. That is strictly worse than posting nothing: it is a green light
+    // manufactured from a total outage. Report the failure instead, skip the coordinator
+    // (saving another AGENT_TIMEOUT_MS of waiting on a provider that is already failing),
+    // and exit non-zero so the check surfaces as red.
+    const allAgentsFailed = results.length > 0 && failedAgents.length === results.length;
+    let finalReview;
+    let responseIds = reviewerResponseIds;
+
+    if (allAgentsFailed) {
+      outcome = "all_agents_failed";
+      exitCode = 1;
+      const detail = failedAgents
+        .map(r => `- ${r.agentName}: ${r.error}`)
+        .join("\n");
+      console.error(`[${isoNow()}] All ${results.length} reviewers failed — skipping coordinator and reporting failure.`);
+      TRACE.setSpanAttributes(rootSpan, {
+        "review.all_agents_failed": true,
+        "review.coordinator_skipped": true,
+      });
+      finalReview = [
+        `## AI Code Review (${MODEL_LABEL})`,
+        ``,
+        `### Decision: error`,
+        ``,
+        `⚠️ **This PR was not reviewed.** All ${results.length} reviewers failed against \`${MODEL_SLUG}\`, so there are no findings to report — this is an infrastructure failure, not an approval.`,
+        ``,
+        `<details>`,
+        `<summary>Reviewer failures (${failedAgents.length})</summary>`,
+        ``,
+        detail,
+        ``,
+        `</details>`,
+      ].join("\n");
+    } else {
+      const coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
+      finalReview = coordinatorResult.text;
+      responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
+    }
+
     TRACE.setSpanAttributes(rootSpan, {
       "gen_ai.response.ids": responseIds,
       "gen_ai.response.count": responseIds.length,
@@ -1248,11 +1351,20 @@ async function main() {
       throw err;
     }
 
+    // The failure notice is posted above so it is visible on the PR; now fail the check too,
+    // so a total reviewer outage can't pass as a green tick. Thrown after the comment lands
+    // (not at detection time) to guarantee both happen.
+    if (allAgentsFailed) {
+      const err = new Error(`All ${results.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
+      err.suppressFatalLog = true;
+      throw err;
+    }
+
     console.log(`[${isoNow()}] AI Code Review complete for PR #${prNumber}`);
   } catch (err) {
     rootError = err;
     exitCode = 1;
-    if (outcome !== "misconfigured") outcome = "failure";
+    if (outcome !== "misconfigured" && outcome !== "all_agents_failed") outcome = "failure";
     throw err;
   } finally {
     TRACE.endSpan(rootSpan, {

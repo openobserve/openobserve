@@ -1,3 +1,4 @@
+import pytest
 """
 API tests for JavaScript function _meta organization restriction.
 
@@ -43,6 +44,10 @@ class TestMetaOrgJavaScriptRestriction:
 
     def test_create_js_function_in_default_org_blocked(self, create_session, base_url):
         """JavaScript function creation should fail in default org."""
+
+        pytest.skip("JS fns are now allowed in non _meta orgs")
+        return
+    
         session = create_session
         org_id = "default"
 
@@ -86,6 +91,10 @@ class TestMetaOrgJavaScriptRestriction:
 
     def test_test_js_function_in_default_org_blocked(self, create_session, base_url):
         """Testing JavaScript function should fail in default org."""
+
+        pytest.skip("JS fns are now allowed in non _meta orgs")
+        return
+
         session = create_session
         org_id = "default"
 
@@ -116,6 +125,10 @@ class TestMetaOrgJavaScriptRestriction:
 
         The backend enforces JS restriction on both create AND update operations.
         """
+
+        pytest.skip("JS fns are now allowed in non _meta orgs")
+        return
+
         session = create_session
         org_id = "default"
 
@@ -311,6 +324,10 @@ class TestErrorMessages:
 
     def test_error_message_content(self, create_session, base_url):
         """Error message should be clear and actionable."""
+
+        pytest.skip("JS fns are now allowed in non _meta orgs")
+        return
+
         session = create_session
         org_id = "default"
 
@@ -334,6 +351,10 @@ class TestErrorMessages:
 
     def test_error_message_consistency(self, create_session, base_url):
         """Error message should be consistent across save and test endpoints."""
+
+        pytest.skip("JS fns are now allowed in non _meta orgs")
+        return
+
         session = create_session
         org_id = "default"
 

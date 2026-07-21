@@ -34,9 +34,9 @@ export const APP_LOCALE_TO_BCP47: Record<string, string> = {
   vi: "vi-VN",
 };
 
-// Resolve the active app language without importing the i18n instance — kept
-// standalone so widely-used utils don't pull `createI18n` into their import
-// graph (which breaks specs that partially mock vue-i18n).
+// Resolve the active app language without importing the i18n instance, so
+// widely-used utils don't pull `createI18n` into their import graph (which
+// breaks specs that partially mock vue-i18n).
 const resolveAppLanguage = (): string => {
   const cookieLanguage = getLanguage();
   if (cookieLanguage) return cookieLanguage;

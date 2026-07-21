@@ -64,7 +64,13 @@ withDefaults(
 );
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies from unscoped blocks — a global name collision where the
+   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
+   keyframe names per component, which ends the collision. All selectors and the
+   es-static gate live in this file's own template. */
 .es-token {
   transform-box: view-box;
   animation: es-flow 2.8s ease-in-out infinite;

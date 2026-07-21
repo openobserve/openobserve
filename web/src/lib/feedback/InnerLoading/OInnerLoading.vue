@@ -4,6 +4,7 @@ import OSpinner from "../Spinner/OSpinner.vue";
 
 withDefaults(defineProps<InnerLoadingProps>(), {
   size: "xs",
+  scrim: true,
 });
 </script>
 
@@ -16,7 +17,8 @@ withDefaults(defineProps<InnerLoadingProps>(), {
   >
     <div
       v-if="showing"
-      class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-inner-loading-overlay"
+      class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2"
+      :class="scrim ? 'bg-inner-loading-overlay' : ''"
       role="status"
       aria-live="polite"
       :aria-label="label ?? 'Loading'"

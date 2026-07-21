@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="o-field-row group h-6 flex items-center gap-1 w-full relative pl-1 rounded-[0.25rem] hover:bg-field-list-row-hover-bg"
+    class="o-field-row group h-6 flex items-center gap-1 w-full relative pl-1 rounded-default hover:bg-field-list-row-hover-bg"
     :class="[highlight && 'bg-field-list-row-hover-bg!']"
   >
     <slot />
     <div
       v-if="$slots.actions"
-      class="o-field-row__actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center py-0 px-1 gap-[0.375rem] bg-(--color-field-list-actions-bg) rounded overflow-hidden"
+      class="o-field-row__actions absolute right-0 top-0 bottom-0 hidden group-hover:flex items-center py-0 px-1 gap-1.5 bg-field-list-actions-bg rounded-default overflow-hidden"
     >
       <slot name="actions" />
     </div>

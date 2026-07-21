@@ -1,5 +1,5 @@
 <template>
-    <div class="pipeline-view-tooltip o2-scroll-container w-125 h-75 overflow-auto">
+    <div class="pipeline-view-tooltip o2-scroll-container w-125 h-75 overflow-auto rounded-default">
       <VueFlow
         ref="vueFlowRef"
         v-model:nodes="lockedNodes"
@@ -10,14 +10,14 @@
        >
        <DropzoneBackground
         :style="{
-          backgroundColor:  '#e7f3ff',
+          backgroundColor: 'var(--color-surface-panel)',
           transition: 'background-color 0.2s ease',
         }"
       >
 
       </DropzoneBackground>
       <template #edge-custom="customEdgeProps">
-      <CustomEdge
+      <FlowEdge
         :id="customEdgeProps.id"
         :source-x="customEdgeProps.sourceX"
         :source-y="customEdgeProps.sourceY"
@@ -52,7 +52,7 @@ import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
   import { VueFlow } from "@vue-flow/core";
   import { ref, onMounted, nextTick } from "vue";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
-import CustomEdge from "@/plugins/pipelines/CustomEdge.vue";
+import FlowEdge from "@/components/flow/FlowEdge.vue";
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
 import '@vue-flow/controls/dist/style.css';
@@ -69,7 +69,7 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     props: {
       pipeline: Object
     },
-    components: { VueFlow, CustomNode, DropzoneBackground, CustomEdge, ControlButton, Controls },
+    components: { VueFlow, CustomNode, DropzoneBackground, FlowEdge, ControlButton, Controls },
     setup(props) {
       const {
       pipelineObj,
@@ -186,56 +186,56 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
   });
   </script>
     
-  <style>
-  /* Node background colors — parent-context compound selectors, must stay in CSS */
-  .pipeline-view-tooltip .vue-flow__node-input .btn-fixed-width {
-    background-color: rgba(219, 234, 254, 0.8) !important;
-    border-color: #3b82f6 !important;
-    color: #000000 !important;
+  <style scoped>
+  /* keep(lib-override:vue-flow): read-only tooltip preview recolors vue-flow node/handle DOM rendered by child components (CustomNode / vue-flow wrappers) — parent-context compound selectors and ::before pseudo-elements, not expressible as utilities on this template */
+  .pipeline-view-tooltip :deep(.vue-flow__node-input .btn-fixed-width) {
+    background-color: var(--color-status-info-bg) !important;
+    border-color: var(--color-status-info-text) !important;
+    color: var(--color-text-body) !important;
     padding: 8px 12px !important;
   }
 
-  .pipeline-view-tooltip .vue-flow__node-output .btn-fixed-width {
-    background-color: rgba(220, 252, 231, 0.8) !important;
-    border-color: #22c55e !important;
-    color: #000000 !important;
+  .pipeline-view-tooltip :deep(.vue-flow__node-output .btn-fixed-width) {
+    background-color: var(--color-status-success-bg) !important;
+    border-color: var(--color-status-positive) !important;
+    color: var(--color-text-body) !important;
     padding: 8px 12px !important;
   }
 
-  .pipeline-view-tooltip .vue-flow__node-default .btn-fixed-width {
-    background-color: rgba(255, 237, 168, 0.8) !important;
-    border-color: #f59e0b !important;
-    color: #000000 !important;
+  .pipeline-view-tooltip :deep(.vue-flow__node-default .btn-fixed-width) {
+    background-color: var(--color-status-warning-bg) !important;
+    border-color: var(--color-status-warning-text) !important;
+    color: var(--color-text-body) !important;
     padding: 8px 12px !important;
   }
 
   /* Handle colors — ::before pseudo-elements, must stay in CSS */
-  .pipeline-view-tooltip .handle_input {
-    background: #dbeafe !important;
+  .pipeline-view-tooltip :deep(.handle_input) {
+    background: var(--color-status-info-bg) !important;
   }
 
-  .pipeline-view-tooltip .handle_input::before {
-    background: #3b82f6 !important;
+  .pipeline-view-tooltip :deep(.handle_input::before) {
+    background: var(--color-status-info-text) !important;
   }
 
-  .pipeline-view-tooltip .handle_output {
-    background: #dcfce7 !important;
+  .pipeline-view-tooltip :deep(.handle_output) {
+    background: var(--color-status-success-bg) !important;
   }
 
-  .pipeline-view-tooltip .handle_output::before {
-    background: #22c55e !important;
+  .pipeline-view-tooltip :deep(.handle_output::before) {
+    background: var(--color-status-positive) !important;
   }
 
-  .pipeline-view-tooltip .handle_default {
-    background: #fef3c7 !important;
+  .pipeline-view-tooltip :deep(.handle_default) {
+    background: var(--color-status-warning-bg) !important;
   }
 
-  .pipeline-view-tooltip .handle_default::before {
-    background: #f59e0b !important;
+  .pipeline-view-tooltip :deep(.handle_default::before) {
+    background: var(--color-status-warning-text) !important;
   }
 
   /* Hide action buttons in tooltip */
-  .pipeline-view-tooltip .node-action-buttons {
+  .pipeline-view-tooltip :deep(.node-action-buttons) {
     display: none !important;
   }
   </style>

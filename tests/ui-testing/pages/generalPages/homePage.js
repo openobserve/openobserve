@@ -361,16 +361,16 @@ export class HomePage {
      * After Header.vue migration the user profile menu is an ODropdown
      * ([role="menuitem"]) but the language sub-menu was kept in-place (not
      * supported by ODropdown nesting). The data-test attribute is preserved
-     * either on a q-item-section or directly on a menuitem (ODropdown),
+     * either on a menu item section or directly on a menuitem (ODropdown),
      * so target the element with data-test and walk up to its clickable ancestor.
      * @param {string} langCode - Language code (e.g., 'en-us', 'de', 'es', 'fr', etc.)
      * @returns {Locator} - Playwright locator for the language option
      */
     getLanguageOption(langCode) {
-        // Try ODropdown menuitem first (post-migration), fall back to q-item ancestor.
+        // ODropdown menuitem ancestor.
         return this.page
             .locator(`[data-test="language-dropdown-item-${langCode}"]`)
-            .locator('xpath=ancestor-or-self::*[@role="menuitem" or contains(@class, "q-item")][1]')
+            .locator('xpath=ancestor-or-self::*[@role="menuitem"][1]')
             .first();
     }
 
@@ -410,7 +410,7 @@ export class HomePage {
     async changeLanguage(langCode) {
         await this.openLanguageMenu();
 
-        // Click directly on the element with data-test, or its parent q-item
+        // Click directly on the element with data-test, or its parent menu item
         const langOption = this.page.locator(`[data-test="language-dropdown-item-${langCode}"]`);
         await langOption.waitFor({ state: 'visible', timeout: 5000 });
 
@@ -503,9 +503,11 @@ export class HomePage {
      * @returns {Promise<boolean>} - True if dark mode is active
      */
     async isDarkMode() {
-        // Read the body class via page.evaluate (the dark-theme class lives on
-        // document.body and is not addressable via a data-test attribute).
-        return await this.page.evaluate(() => document.body.classList.contains('body--dark'));
+        // The dark-mode signal is the `.dark` class on <html>
+        // (document.documentElement) — set by utils/theme.ts. The legacy Quasar
+        // `body--dark` class on <body> was retired in the design-token
+        // migration (#13173).
+        return await this.page.evaluate(() => document.documentElement.classList.contains('dark'));
     }
 
     /**

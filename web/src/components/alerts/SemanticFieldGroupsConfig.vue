@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="w-full">
-    <div class="border-b border-separator pb-3 mb-3">
-      <div class="text-xl font-semibold">
+    <div class="mb-4">
+      <div class="text-sm font-semibold leading-tight text-text-heading">
         {{ t("settings.correlation.semanticFieldGroupsTitle") }}
       </div>
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-text-secondary mt-1">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
     </div>
@@ -34,8 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="categoryOptions"
           :label="t('correlation.category')"
           :hint="t('correlation.categoryHint')"
-          class="showLabelOnTop"
-          style="max-width: 100%"
+          class="showLabelOnTop max-w-full"
         />
       </div>
       <div class="w-full col-md-8 flex items-center justify-end gap-2">
@@ -76,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete="removeGroupByFilter(index)"
       />
     </div>
-    <div v-else class="text-center p-4 text-gray-400">
+    <div v-else class="text-center p-4 text-text-muted">
       <OIcon name="info" size="md" class="mb-2" />
       <div>
         {{
@@ -88,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Total groups indicator -->
-    <div v-if="localGroups.length > 0" class="text-xs text-gray-400 mt-2">
+    <div v-if="localGroups.length > 0" class="text-xs text-text-secondary mt-2">
       {{
         t("correlation.showingGroups", {
           filterGroupLength: filteredGroups.length,
@@ -106,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("correlation.deduplicateFields") }} *
         <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>
-      <div class="text-xs text-gray-400 mb-3">
+      <div class="text-xs text-text-secondary mb-3">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
       <div class="flex flex-wrap gap-3">
@@ -123,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="localFingerprintFields.length === 0"
-        class="text-red-500 text-xs mt-2"
+        class="text-status-error-text text-xs mt-2"
       >
         {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>
@@ -412,8 +411,8 @@ onMounted(async () => {
 });
 </script>
 
-<style>
-/* Applied via JS to the target group item */
+<style scoped>
+/* keep(keyframes): @keyframes can't be expressed as a utility; applied via JS classList */
 .group-highlight {
   animation: group-border-blink 0.4s ease-in-out 3;
 }
@@ -421,11 +420,11 @@ onMounted(async () => {
 @keyframes group-border-blink {
   0%,
   100% {
-    outline: 2px solid transparent;
+    outline: 0.125rem solid transparent;
   }
   50% {
-    outline: 2px solid var(--q-primary);
-    border-radius: 4px;
+    outline: 0.125rem solid var(--color-theme-accent);
+    border-radius: 0.25rem;
   }
 }
 </style>

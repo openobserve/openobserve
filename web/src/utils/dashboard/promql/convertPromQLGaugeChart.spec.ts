@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GaugeConverter } from "./convertPromQLGaugeChart";
 import type { ProcessedPromQLData } from "./shared/types";
+import { chartColor } from "@/utils/chartTheme";
 
 // Mock dependencies
 vi.mock("./shared/dataProcessor", () => ({
@@ -444,7 +445,9 @@ describe("GaugeConverter", () => {
         mockExtras,
       );
 
-      expect(result.tooltip.textStyle.color).toBe("#fff");
+      expect(result.tooltip.textStyle.color).toBe(
+        chartColor("--color-tooltip-text"),
+      );
     });
 
     it("should configure tooltip for light theme", () => {
@@ -477,7 +480,9 @@ describe("GaugeConverter", () => {
         mockExtras,
       );
 
-      expect(result.tooltip.textStyle.color).toBe("#000");
+      expect(result.tooltip.textStyle.color).toBe(
+        chartColor("--color-tooltip-text"),
+      );
     });
 
     it("should format tooltip value", () => {

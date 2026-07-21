@@ -18,10 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="parentRef"
     :class="[
-      'o2-scroll-container rounded-none! overflow-x-auto relative',
-      !props.scrollEl ? 'table-container' : '',
+      props.scrollEl
+        ? 'relative'
+        : 'o2-scroll-container overflow-auto rounded-none! overflow-x-auto table-container relative',
     ]"
-    style="color: var(--color-text-body)"
+    class="text-text-body"
   >
     <!-- Top progress bar: keeps rows visible while a new result set streams in
       (e.g. streaming_aggs replacing values). Same component dashboard panels
@@ -48,8 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <thead
-        class="sticky top-0 z-10"
-        style="max-height: 44px"
+        class="sticky top-0 z-10 max-h-11"
         v-for="headerGroup in table.getHeaderGroups()"
         :key="headerGroup.id"
       >
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             { 'cursor-move': table.getState().columnOrder.length > 1 },
             // Header-row chrome via centralized token utilities (same tokens
             // OTable uses): background band + full-width underline on the row.
-            'bg-[var(--color-table-header-bg)] border-b border-[var(--color-grey-300)]',
+            'bg-table-header-bg border-b border-table-header-border',
           ]"
           :style="{
             width:
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           tag="tr"
           @start="(event) => handleDragStart(event)"
           @end="() => handleDragEnd()"
-          class="flex items-center"
+          class="flex items-center h-8"
         >
           <th
             v-for="(header, headerIndex) in headerGroup.headers"
@@ -109,16 +109,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   header.getResizeHandler()?.($event)
               "
               :class="[
-                'absolute right-0 top-0 h-full w-2 flex items-center justify-end select-none touch-none z-10 group/resizer',
-                header.column.getCanResize() ? 'resizer cursor-col-resize' : '',
+                'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
+                header.column.getCanResize() ? 'resizer w-1.25 cursor-col-resize' : 'w-2',
               ]"
             >
               <div
                 :class="[
                   'rounded-full transition-all duration-150',
                   header.column.getIsResizing()
-                    ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
-                    : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                    ? 'w-0.5 h-full bg-table-resize-handle'
+                    : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
                 ]"
               />
             </div>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   header.column.getToggleSortingHandler(),
                 )
               "
-              class="overflow-hidden text-ellipsis text-[var(--color-table-header-text)] text-xs font-medium capitalize"
+              class="overflow-hidden text-ellipsis text-table-header-text text-xs font-medium"
             >
               <FlexRender
                 :render="header.column.columnDef.header"
@@ -152,18 +152,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 )
               "
               :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-              class="invisible flex items-center absolute right-2 top-0 px-2 column-actions"
+              class="invisible flex items-center absolute right-2 top-0 h-full pl-3 bg-table-header-bg column-actions"
             >
               <OIcon
                 v-if="(header.column.columnDef.meta as any).closable"
                 :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
                 name="close"
-                class="m-0 mt-[0.125rem]! close-icon cursor-pointer"
-                :class="
-                  store.state.theme === 'dark' ? 'text-white' : 'text-gray-700'
-                "
+                class="close-icon cursor-pointer text-icon-color hover:text-text-heading transition-colors"
                 :title="t('common.close')"
-                size="sm"
+                size="xs"
                 @click.stop="closeColumn(header.column.columnDef)"
               />
             </div>
@@ -174,10 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <tr v-if="!loading && errMsg != ''" class="w-full">
           <td
             :colspan="columnOrder.length"
-            class="font-bold"
-            style="opacity: 0.7"
+            class="font-bold opacity-70"
           >
-            <div class="text-sm font-medium text-weight-bold bg-amber-500">
+            <div class="text-sm font-medium font-bold bg-warning">
               <OIcon size="xs"
 name="warning"
 class="mr-1" />
@@ -191,16 +187,10 @@ class="mr-1" />
         >
           <td
             :colspan="columnOrder.length"
-            class="font-bold"
-            style="opacity: 0.6"
+            class="font-bold opacity-60"
           >
             <div
-              class="text-sm font-medium text-weight-bold pl-2"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'bg-yellow-600'
-                  : 'bg-amber-300'
-              "
+              class="text-sm font-medium font-bold pl-2 bg-status-warning-bg"
             >
               <OButton
                 variant="ghost"
@@ -219,13 +209,7 @@ class="mr-1" />
         <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
           <td
             :colspan="columnOrder.length"
-            style="opacity: 0.7"
-            class="px-2"
-            :class="
-              store.state.theme === 'dark'
-                ? 'bg-yellow-600'
-                : 'bg-amber-300'
-            "
+            class="opacity-70 px-2 bg-status-warning-bg"
           >
             <pre>{{ functionErrorMsg }}</pre>
           </td>
@@ -245,13 +229,13 @@ class="mr-1" />
         <tr
           v-for="r in SKEL_ROW_COUNT"
           :key="`skel-${r}`"
-          class="logs-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--o2-log-table-row-bg) border-b border-(--o2-log-table-row-border)"
+          class="logs-skel-row flex items-center w-full opacity-0 h-[1.8125rem] bg-log-table-row-bg border-b border-log-table-row-border"
           :style="{ animationDelay: `${(r - 1) * 40}ms` }"
         >
           <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
           <td v-if="!headers?.length" class="w-full px-4 overflow-hidden">
             <span
-              class="logs-skel-pill inline-block h-3 rounded-md"
+              class="logs-skel-pill inline-block h-3 rounded-default"
               :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
               aria-hidden="true"
             />
@@ -266,7 +250,7 @@ class="mr-1" />
               :style="skelTdStyle(header, c)"
             >
               <span
-                class="logs-skel-pill inline-block h-3 rounded-md"
+                class="logs-skel-pill inline-block h-3 rounded-default"
                 :style="{ width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%` }"
                 aria-hidden="true"
               />
@@ -310,7 +294,7 @@ class="mr-1" />
             "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
             :class="[
-              'absolute flex w-max items-center justify-start border-b-[1px]',
+              'absolute flex w-max items-center justify-start border-b',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'cursor-pointer'
                 : 'cursor-default',
@@ -323,12 +307,12 @@ class="mr-1" />
                 store.state.zoConfig.timestamp_column
               ] === highlightTimestamp &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'bg-(--color-table-row-selected-bg)'
+                ? 'bg-table-row-selected-bg'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                  ? 'log-row-base bg-(--o2-log-table-row-bg)'
+                  ? 'log-row-base bg-log-table-row-bg'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-[120ms] [transition-timing-function:ease-in-out] border-b-(--o2-log-table-row-border)!'
+                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-120 [transition-timing-function:ease-in-out] border-b-log-table-row-border!'
                 : '',
             ]"
             @click="
@@ -367,7 +351,7 @@ class="mr-1" />
               <json-preview
                 :value="tableRows[virtualRow.index - 1] as any"
                 show-copy-button
-                class="py-[0.375rem]"
+                class="py-1.5"
                 mode="expanded"
                 :index="calculateActualIndex(virtualRow.index - 1)"
                 :highlight-query="highlightQuery"
@@ -470,7 +454,6 @@ class="mr-1" />
                     ]
                   "
                   :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
-                  :class="store.state.theme === 'dark' ? 'dark' : ''"
                   v-html="
                     processedResults[
                       `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
@@ -485,7 +468,7 @@ class="mr-1" />
                   class="absolute right-0 top-1/2 -translate-y-1/2 invisible"
                 >
                   <O2AIContextAddBtn
-                    class="right-0 ai-btn"
+                    class="ai-btn"
                     @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original), true)"
                     :size="'2px'"
                   />
@@ -1265,12 +1248,16 @@ defineExpose({
   processedResults,
 });
 </script>
-<style>
-@import "@/assets/styles/log-highlighting.css";
-</style>
-<style>
+<style scoped>
+/* keep(lib-override:monaco) does not apply here; the keepers below are:
+   keep(complex-state) — .table-row-hover/.table-row-focus drive the virtualized
+   row background+inset marker off :hover/:focus-visible on rows that the
+   virtualizer positions absolutely; expressing them as utilities would mean
+   editing every recycled row node.
+   keep(keyframes) — the skeleton shimmer/entrance animations are referenced only
+   from CSS in this block, so Vue's scoped @keyframes renaming stays consistent. */
 
-/* Compact expand/collapse button for log rows — matches original q-btn dense size="xs" flat */
+/* Compact expand/collapse button for log rows — matches the original dense xs flat button */
 .log-row-expand-btn {
   height: 1.25rem !important;
   width: 1.25rem !important;
@@ -1280,42 +1267,58 @@ defineExpose({
   vertical-align: middle !important;
 }
 
-.log-row-expand-btn svg {
+/* svg is rendered inside OButton's own template, so it needs :deep() */
+.log-row-expand-btn :deep(svg) {
   width: 0.75rem !important;
   height: 0.75rem !important;
 }
 
 .table-row-hover:hover,
 .table-row-focus:focus-visible {
-  background-color: var(--o2-log-table-row-hover) !important;
-  box-shadow: inset 3px 0 0 var(--o2-primary-color) !important;
+  background-color: var(--color-log-table-row-hover) !important;
+  box-shadow: inset 0.1875rem 0 0 var(--color-accent) !important;
 }
 
-/* Fix: OButton base class (relative) overrides absolute passed via props.
-   Use top:0 + translate:-50% 0 to anchor the button flush with the row top,
-   and height:100% to fill the td height (= row height minus 1px border).
-   Overriding the CSS `translate` property (not `transform`) is required because
-   Tailwind v4 sets -translate-y-1/2 via the CSS `translate` shorthand property. */
-.ai-btn {
-  position: absolute !important;
-  top: 50% !important;
-  right: 0.875rem !important;
-  translate: -50% -50% !important;
-  height: 0.875rem !important;
-  min-height: 0 !important;
-  width: 0.900rem !important;
-  min-width: 0 !important;
-  border-radius: 0.25rem !important;
+.table-row-hover:hover .ai-btn {
+  visibility: visible !important;
+  z-index: 2;
 }
 
-.ai-btn img.ai-icon {
-  width: 0.75rem !important;
-  height: 0.75rem !important;
+/* This "table" lays out entirely with flexbox + explicit column widths — it does
+   not use native table column layout. Rendering table/thead/tbody as block boxes
+   makes position:relative (the containing block for the position:absolute
+   virtual rows), height, and position:sticky on the header behave identically
+   across browsers; Firefox does not honor these on native table-row-group
+   boxes, which left the results table collapsed with no visible rows. */
+.logs-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-xs) !important;
 }
 
-/* Suppress the hover box-shadow — it visually bleeds outside the row boundary */
-.ai-btn:hover {
-  box-shadow: none !important;
+.logs-table,
+.logs-table > thead,
+.logs-table > tbody {
+  display: block;
+}
+
+.logs-table thead {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm) !important;
+}
+
+.logs-table th {
+  text-align: left;
+}
+
+/* !important is load-bearing: it outranks the `invisible` utility the actions
+   carry by default. */
+.logs-table th:hover .column-actions {
+  visibility: visible !important;
+}
+
+.logs-table td {
+  font-family: var(--font-mono);
 }
 
 /* ── Loading skeleton ───────────────────────────────────────────── */
@@ -1323,26 +1326,16 @@ defineExpose({
   animation: logs-skel-row-in 320ms ease-out forwards;
 }
 
-/* Light mode — matches histogram-skeleton --hsk-bar (grey-100 #f5f5f5) */
+/* Token-backed shimmer: --color-skeleton-* already flip with the theme. */
 .logs-skel-pill {
   background: linear-gradient(
     90deg,
-    var(--color-grey-100)       0%,
-    rgba(255, 255, 255, 0.65)   50%,
-    var(--color-grey-100)       100%
+    var(--color-skeleton-base)      0%,
+    var(--color-skeleton-highlight) 50%,
+    var(--color-skeleton-base)      100%
   );
   background-size: 200% 100%;
   animation: logs-skel-shimmer 1.5s ease-in-out infinite;
-}
-
-/* Dark mode — matches histogram-skeleton dark --hsk-bar (grey-600 #525252) */
-.body--dark .logs-skel-pill {
-  background: linear-gradient(
-    90deg,
-    var(--color-grey-600)       0%,
-    rgba(255, 255, 255, 0.03)   50%,
-    var(--color-grey-600)       100%
-  );
 }
 
 @keyframes logs-skel-shimmer {
@@ -1351,7 +1344,7 @@ defineExpose({
 }
 
 @keyframes logs-skel-row-in {
-  from { opacity: 0; transform: translateY(2px); }
+  from { opacity: 0; transform: translateY(0.125rem); }
   to   { opacity: 1; transform: translateY(0); }
 }
 

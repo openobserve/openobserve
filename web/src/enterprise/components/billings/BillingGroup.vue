@@ -36,22 +36,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="org-group-stats"
         >
           <div class="feature-card flex-1">
-            <div class="text-[15px] font-semibold leading-5 opacity-85 whitespace-nowrap">
+            <div class="text-sm font-semibold leading-5 opacity-85 whitespace-nowrap">
               {{ t("billing.billingGroup.statTotal") }}
             </div>
-            <div class="text-[24px] font-semibold leading-[1.2] mt-[6px]">{{ totalCount }}</div>
+            <div class="text-2xl font-semibold leading-[1.2] mt-1.5">{{ totalCount }}</div>
           </div>
           <div class="feature-card flex-1">
-            <div class="text-[15px] font-semibold leading-5 opacity-85 whitespace-nowrap">
+            <div class="text-sm font-semibold leading-5 opacity-85 whitespace-nowrap">
               {{ t("billing.billingGroup.statActive") }}
             </div>
-            <div class="text-[24px] font-semibold leading-[1.2] mt-[6px] text-green-600">{{ activeCount }}</div>
+            <div class="text-2xl font-semibold leading-[1.2] mt-1.5 text-status-positive">{{ activeCount }}</div>
           </div>
           <div class="feature-card flex-1">
-            <div class="text-[15px] font-semibold leading-5 opacity-85 whitespace-nowrap">
+            <div class="text-sm font-semibold leading-5 opacity-85 whitespace-nowrap">
               {{ t("billing.billingGroup.statPending") }}
             </div>
-            <div class="text-[24px] font-semibold leading-[1.2] mt-[6px] text-amber-500">
+            <div class="text-2xl font-semibold leading-[1.2] mt-1.5 text-status-warning-text">
               {{ pendingCount }}
             </div>
           </div>
@@ -116,16 +116,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex-1 min-h-0 overflow-auto flex flex-col justify-center"
         data-test="org-group-child-view"
       >
-        <div class="flex items-center justify-between gap-[56px] py-[48px] px-[40px] flex-wrap">
+        <div class="flex items-center justify-between gap-14 py-12 px-10 flex-wrap">
           <!-- Left: headline + CTA -->
-          <div class="flex-1 min-w-[280px] max-w-[480px]">
-            <div class="inline-flex items-center gap-[6px] text-[0.72rem] font-semibold tracking-[0.4px] text-(--color-primary-600) bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] py-1 px-[10px] rounded-full mb-5">
+          <div class="flex-1 min-w-70 max-w-120">
+            <div class="inline-flex items-center gap-1.5 text-xs font-semibold tracking-[0.4px] text-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] py-1 px-2.5 rounded-full mb-5">
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
-            <div class="text-[2.4rem] font-bold leading-[1.2] tracking-[-0.6px] mb-4">
+            <div class="text-4xl font-bold leading-[1.2] tracking-[-0.6px] mb-4">
               {{ t("billing.billingGroup.childHeadline") }}
-              <span class="text-(--color-tabs-active-text) cursor-pointer inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap align-bottom">
+              <span class="text-tabs-active-text cursor-pointer inline-block max-w-full overflow-hidden text-ellipsis whitespace-nowrap align-bottom">
                 {{ payerName }}
                 <OTooltip side="bottom">
                   <template #content>
@@ -139,12 +139,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </span>
             </div>
-            <div class="text-[0.95rem] leading-[1.7] opacity-70 mb-8 max-w-[420px]">
+            <div class="text-base leading-[1.7] opacity-70 mb-8 max-w-105">
               {{ t("billing.billingGroup.childHeroSub") }}
             </div>
             <OButton
               variant="primary"
-              class="h-[44px] px-6 font-semibold"
+              class="h-11 px-6 font-semibold"
               data-test="org-group-child-view-usage-btn"
               @click="goToUsage"
             >
@@ -156,29 +156,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Right: membership facts -->
-          <div class="w-[340px] shrink-0 flex flex-col gap-[14px]" data-test="org-group-child-details">
-            <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--o2-border-color,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
-              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600)">
+          <div class="w-85 shrink-0 flex flex-col gap-3.5" data-test="org-group-child-details">
+            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-default bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
+              <div class="w-10 h-10 rounded-default shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="person-add" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-[0.78rem] font-semibold opacity-60 mb-1">
+                <div class="text-xs font-semibold opacity-60 mb-1">
                   {{ t("billing.billingGroup.invitedBy") }}
                 </div>
-                <div class="text-[0.95rem] font-semibold truncate">
+                <div class="text-base font-semibold truncate">
                   {{ membership?.created_by }}
                 </div>
               </div>
             </div>
-            <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--o2-border-color,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
-              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600)">
+            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-default bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
+              <div class="w-10 h-10 rounded-default shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="how-to-reg" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-[0.78rem] font-semibold opacity-60 mb-1">
+                <div class="text-xs font-semibold opacity-60 mb-1">
                   {{ t("billing.billingGroup.acceptedBy") }}
                 </div>
-                <div class="text-[0.95rem] font-semibold truncate">
+                <div class="text-base font-semibold truncate">
                   {{
                     membership?.accepted_by ||
                     t("billing.billingGroup.addedOnCreation")
@@ -186,15 +186,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
-            <div class="og-feature flex items-start gap-4 p-[18px_20px] rounded-2xl bg-(--tile-bg) border border-(--o2-border-color,rgba(0,0,0,0.08)) transition-all duration-200 hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] hover:-translate-y-px">
-              <div class="w-10 h-10 rounded-[10px] shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600)">
+            <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-default bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
+              <div class="w-10 h-10 rounded-default shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
                 <OIcon name="schedule" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-[0.78rem] font-semibold opacity-60 mb-1">
+                <div class="text-xs font-semibold opacity-60 mb-1">
                   {{ t("billing.billingGroup.memberSince") }}
                 </div>
-                <div class="text-[0.95rem] font-semibold">
+                <div class="text-base font-semibold">
                   {{ formatDate(membership?.created_at) }}
                 </div>
               </div>
@@ -260,23 +260,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="org-group-standalone-view"
       >
         <div
-          class="flex flex-col items-center justify-center text-center min-h-full py-[48px] px-6"
+          class="flex flex-col items-center justify-center text-center min-h-full py-12 px-6"
           data-test="org-group-standalone-invite"
         >
-          <div class="w-[100px] h-[100px] rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-[28px]">
-            <div class="w-[68px] h-[68px] rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] flex items-center justify-center">
-              <OIcon name="group-add" size="lg" class="text-(--color-primary-600) opacity-85" />
+          <div class="w-25 h-25 rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-7">
+            <div class="w-17 h-17 rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] flex items-center justify-center">
+              <OIcon name="group-add" size="lg" class="text-primary-600 opacity-85" />
             </div>
           </div>
 
-          <div class="text-[1.2rem] font-bold tracking-[-0.2px] mb-[10px]">
+          <div class="text-xl font-bold tracking-[-0.2px] mb-2.5">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.emptyTitle")
                 : t("billing.billingGroup.notEnabledTitle")
             }}
           </div>
-          <div class="text-[0.88rem] leading-[1.65] opacity-65 max-w-[420px] mb-6">
+          <div class="text-sm leading-[1.65] opacity-65 max-w-105 mb-6">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.inviteTabPrompt")
@@ -286,11 +286,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="allowedForBillingGroup">
             <div class="flex items-center gap-2 flex-wrap justify-center mb-8">
-              <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
+              <span class="inline-flex items-center gap-1.25 text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-card-glass-border rounded-full py-1 px-3">
                 <OIcon name="receipt-long" size="xs" />
                 {{ t("billing.billingGroup.chipConsolidatedBill") }}
               </span>
-              <span class="inline-flex items-center gap-[5px] text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-(--o2-border-color,rgba(0,0,0,0.1)) rounded-full py-1 px-3">
+              <span class="inline-flex items-center gap-1.25 text-xs font-medium opacity-85 bg-[color-mix(in_srgb,currentColor_6%,transparent)] border border-card-glass-border rounded-full py-1 px-3">
                 <OIcon name="groups" size="xs" />
                 {{ t("billing.billingGroup.chipLinkOrgs") }}
               </span>
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OButton
               variant="primary"
-              class="h-[40px] px-6 font-semibold"
+              class="h-10 px-6 font-semibold"
               data-test="org-group-standalone-invite-btn-empty"
               @click="showInviteDialog = true"
             >

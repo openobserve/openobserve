@@ -34,9 +34,9 @@ defineSlots<TooltipSlots>();
 const slots = useSlots();
 const hasDefaultSlot = computed(() => !!slots.default);
 
-// ΓöÇΓöÇΓöÇ Child mode (placed inside a parent like q-tooltip) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-// When no default slot is provided, OTooltip acts like q-tooltip: it finds its
-// parent element via a hidden DOM anchor span and attaches hover listeners to it.
+// ─── Child mode (placed inside a parent element as its tooltip) ───────────────
+// When no default slot is provided, OTooltip attaches to its parent: it finds
+// its parent element via a hidden DOM anchor span and attaches hover listeners to it.
 const childAnchorRef = ref<HTMLSpanElement | null>(null);
 const parentEl = ref<Element | null>(null);
 const childOpen = ref(false);
@@ -149,8 +149,8 @@ const contentStyle = computed(() => ({
 
 const contentClasses = computed(() => [
   "z-[10100] px-2.5 py-1.5",
-  "bg-[var(--color-surface-overlay)] rounded-md",
-  "text-xs text-[var(--color-text-primary)] font-medium leading-relaxed",
+  "bg-surface-overlay rounded-default",
+  "text-xs text-text-body font-medium leading-relaxed",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
   // max-width box instead of overflowing onto the content behind the tooltip.
   // overflow-wrap is inherited, so nested content (e.g. pre-wrap divs) wraps too.
@@ -201,14 +201,14 @@ const contentClasses = computed(() => [
           <TooltipArrow
             :width="10"
             :height="5"
-            :class="'fill-[var(--color-surface-overlay)]'"
+            :class="'fill-surface-overlay'"
           />
         </TooltipContent>
       </TooltipPortal>
     </TooltipRoot>
   </TooltipProvider>
 
-  <!-- ΓöÇΓöÇ Child mode: no default slot, attaches to parent element like q-tooltip -->
+  <!-- ── Child mode: no default slot, attaches to parent element as its tooltip -->
   <template v-else>
     <TooltipProvider>
       <TooltipRoot
@@ -217,6 +217,12 @@ const contentClasses = computed(() => [
         @update:open="childOpen = $event"
       >
         <!-- Hidden trigger span; reference overrides positioning anchor to parentEl -->
+        <!-- NOTE: `style="display:none"` here is a FUNCTIONAL CONTRACT, not
+             decoration — do NOT convert it to `class="hidden"`. The anchor
+             resolution in onMounted() skips hidden siblings by testing
+             `.style.display === "none"`, which only sees an INLINE style. With a
+             class, that loop stops on this span and anchors every child-mode
+             tooltip to a zero-size hidden element, so it never opens on hover. -->
         <TooltipTrigger
           as="span"
           :reference="parentEl ?? undefined"
@@ -246,13 +252,14 @@ const contentClasses = computed(() => [
             <TooltipArrow
               :width="10"
               :height="5"
-              :class="'fill-[var(--color-surface-overlay)]'"
+              :class="'fill-surface-overlay'"
             />
           </TooltipContent>
         </TooltipPortal>
       </TooltipRoot>
     </TooltipProvider>
-    <!-- Anchor placeholder: inserted at the real DOM position to resolve parentElement -->
+    <!-- Anchor placeholder: inserted at the real DOM position to resolve parentElement.
+         `style="display:none"` is required, not decorative — see the note above. -->
     <span ref="childAnchorRef" style="display:none" aria-hidden="true" />
   </template>
 </template>

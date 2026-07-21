@@ -38,7 +38,7 @@ const mockGetBoundingClientRect = vi.fn(() => ({
 const getUserGuideEl = (): HTMLElement | null =>
   document.body.querySelector(".user-guide");
 const getHighlightEls = (): HTMLElement[] =>
-  Array.from(document.body.querySelectorAll(".user-guide .bg-highlight"));
+  Array.from(document.body.querySelectorAll(".user-guide .bg-highlight-bg"));
 const getGuideText = (): string => getUserGuideEl()?.textContent ?? "";
 
 describe("DrilldownUserGuide", () => {
@@ -343,9 +343,9 @@ describe("DrilldownUserGuide", () => {
 
       const userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("theme-light")).toBe(true);
-      // Tailwind v4 with  prefix
-      expect(userGuide!.classList.contains("bg-white")).toBe(true);
+      // Theme is now handled by the theme-aware bg-surface-base token utility
+      // instead of theme-light / bg-white marker classes.
+      expect(userGuide!.classList.contains("bg-surface-base")).toBe(true);
     });
 
     it("should apply dark theme classes", async () => {
@@ -357,21 +357,21 @@ describe("DrilldownUserGuide", () => {
 
       const userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("theme-dark")).toBe(true);
-      // Component uses bg-[var(--o2-bg-card-dark,#1a1a1a)] for dark theme
-      expect(
-        Array.from(userGuide!.classList).some((c) => c.startsWith("bg-["))
-      ).toBe(true);
+      // Same theme-aware token is used for dark; dark is resolved by the token,
+      // not by a theme-dark marker class.
+      expect(userGuide!.classList.contains("bg-surface-base")).toBe(true);
     });
 
-    it("should have access to store", () => {
+    it("should render the guide container without depending on the store", () => {
+      // The component no longer reads store.state.theme in JS; theme is fully
+      // token-driven, so it exposes no store on its instance.
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store).toBeDefined();
-      expect(wrapper.vm.store.state).toBeDefined();
+      expect(wrapper.vm.store).toBeUndefined();
+      expect(typeof wrapper.vm.onUserGuideClick).toBe("function");
     });
 
-    it("should react to theme changes", async () => {
+    it("should keep the same theme-aware token class across theme changes", async () => {
       wrapper = createWrapper();
 
       store.state.theme = "light";
@@ -380,14 +380,15 @@ describe("DrilldownUserGuide", () => {
 
       let userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("theme-light")).toBe(true);
+      expect(userGuide!.classList.contains("bg-surface-base")).toBe(true);
 
       store.state.theme = "dark";
       await wrapper.vm.$nextTick();
 
       userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
-      expect(userGuide!.classList.contains("theme-dark")).toBe(true);
+      // Class is unchanged; the token itself resolves dark vs light.
+      expect(userGuide!.classList.contains("bg-surface-base")).toBe(true);
     });
   });
 
@@ -411,13 +412,14 @@ describe("DrilldownUserGuide", () => {
 
       const userGuide = getUserGuideEl();
       expect(userGuide).toBeTruthy();
-      const style = userGuide!.getAttribute("style") ?? "";
+      const classes = Array.from(userGuide!.classList);
 
-      // Updated to match migrated styles
-      expect(style).toContain("position: fixed");
-      expect(style).toContain("z-index: 9999");
-      expect(style).toContain("width: 500px");
-      expect(style).toContain("max-height: 300px");
+      // The inline positioning/sizing block is now utilities:
+      // fixed / z-9999 / w-125 (31.25rem = 500px) / max-h-75 (18.75rem = 300px).
+      expect(classes).toContain("fixed");
+      expect(classes).toContain("z-9999");
+      expect(classes).toContain("w-125");
+      expect(classes).toContain("max-h-75");
     });
 
     it("should highlight code examples correctly", async () => {
@@ -431,7 +433,7 @@ describe("DrilldownUserGuide", () => {
 
       // Check that highlights have the correct class
       highlights.forEach((highlight) => {
-        expect(highlight.classList.contains("bg-highlight")).toBe(true);
+        expect(highlight.classList.contains("bg-highlight-bg")).toBe(true);
       });
     });
   });
@@ -452,8 +454,8 @@ describe("DrilldownUserGuide", () => {
     it("should have all required data properties", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store).toBeDefined();
-      expect(wrapper.vm.showUserGuide).toBeDefined();
+      // store is no longer exposed; theme is token-driven.
+      expect(wrapper.vm.showUserGuide).toBe(false);
       expect(wrapper.vm.userGuideBtnRef).toBeDefined();
       expect(wrapper.vm.userGuideDivRef).toBeDefined();
     });

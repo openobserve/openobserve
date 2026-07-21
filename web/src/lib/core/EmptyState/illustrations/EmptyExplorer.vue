@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- signpost -->
     <g>
-      <rect x="70" y="120" width="7" height="134" rx="2" fill="#8a6d4f" />
-      <rect x="70" y="120" width="3" height="134" fill="#7a5e43" />
+      <rect x="70" y="120" width="7" height="134" rx="2" fill="var(--color-illustration-bark)" />
+      <rect x="70" y="120" width="3" height="134" fill="var(--color-illustration-wood)" />
       <!-- left arrow -->
       <path d="M86 142 H44 L32 152 L44 162 H86 Z" fill="var(--color-primary-500)" />
       <rect x="80" y="146" width="14" height="3" rx="1.5" fill="var(--color-white)" opacity="0.55" />
@@ -84,22 +84,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <line x1="172" y1="199" x2="204" y2="199" stroke="var(--color-border-default)" stroke-width="1.5" />
       </g>
       <!-- tablet hand -->
-      <ellipse cx="183" cy="186" rx="5.5" ry="4.5" fill="#e8b48c" transform="rotate(-12 183 186)" />
+      <ellipse cx="183" cy="186" rx="5.5" ry="4.5" fill="var(--color-illustration-tan)" transform="rotate(-12 183 186)" />
 
       <!-- head (3/4 facing the bubble) — subtle "thinking" tilt -->
       <g class="es-head">
         <!-- neck -->
-        <rect x="192" y="132" width="12" height="14" rx="4" fill="#e8b48c" />
-        <ellipse cx="200" cy="114" rx="19" ry="21" fill="#f0c29a" />
+        <rect x="192" y="132" width="12" height="14" rx="4" fill="var(--color-illustration-tan)" />
+        <ellipse cx="200" cy="114" rx="19" ry="21" fill="var(--color-illustration-sand)" />
         <!-- ear -->
-        <circle cx="210" cy="116" r="3.5" fill="#e8b48c" />
+        <circle cx="210" cy="116" r="3.5" fill="var(--color-illustration-tan)" />
         <!-- hair -->
-        <path d="M182 110 Q179 90 200 88 Q221 89 219 110 Q219 100 210 98 Q214 104 213 110 Q205 100 195 102 Q188 103 185 112 Q183 108 182 110 Z" fill="#5b4a3a" />
-        <path d="M181 110 Q179 96 188 90 Q183 99 186 108 Z" fill="#4a3b2d" />
+        <path d="M182 110 Q179 90 200 88 Q221 89 219 110 Q219 100 210 98 Q214 104 213 110 Q205 100 195 102 Q188 103 185 112 Q183 108 182 110 Z" fill="var(--color-illustration-umber)" />
+        <path d="M181 110 Q179 96 188 90 Q183 99 186 108 Z" fill="var(--color-illustration-cocoa)" />
         <!-- face: brow (raised/puzzled), eye, mouth -->
-        <path d="M186 108 Q190 105 194 107" stroke="#4a3b2d" stroke-width="1.8" stroke-linecap="round" fill="none" />
-        <circle cx="190" cy="113" r="2" fill="#3a2f25" />
-        <path d="M187 124 Q191 126 195 123" stroke="#b5764a" stroke-width="1.8" stroke-linecap="round" fill="none" />
+        <path d="M186 108 Q190 105 194 107" stroke="var(--color-illustration-cocoa)" stroke-width="1.8" stroke-linecap="round" fill="none" />
+        <circle cx="190" cy="113" r="2" fill="var(--color-illustration-espresso)" />
+        <path d="M187 124 Q191 126 195 123" stroke="var(--color-illustration-clay)" stroke-width="1.8" stroke-linecap="round" fill="none" />
       </g>
 
       <!-- raised arm — actually scratches the head (rubs back and forth) -->
@@ -108,8 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- sleeve shade -->
         <path d="M226 114 Q232 116 230 124 Q227 134 222 140 L219 132 Q224 124 222 116 Z" fill="var(--color-primary-600)" opacity="0.5" />
         <!-- scratching hand + fingers -->
-        <ellipse cx="224" cy="111" rx="6.5" ry="6" fill="#f0c29a" />
-        <path d="M219 108 Q221 104 223 108 M223 107 Q225 103 227 107 M227 108 Q229 105 230 109" stroke="#e8b48c" stroke-width="1.4" stroke-linecap="round" fill="none" />
+        <ellipse cx="224" cy="111" rx="6.5" ry="6" fill="var(--color-illustration-sand)" />
+        <path d="M219 108 Q221 104 223 108 M223 107 Q225 103 227 107 M227 108 Q229 105 230 109" stroke="var(--color-illustration-tan)" stroke-width="1.4" stroke-linecap="round" fill="none" />
       </g>
     </g>
 
@@ -129,7 +129,13 @@ withDefaults(
 );
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies from unscoped blocks — a global name collision where the
+   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
+   keyframe names per component, which ends the collision. All selectors and the
+   es-static gate live in this file's own template. */
 /* Subtle, looping motion. transform-box/origin keep scale + translate sane on
    SVG groups. All gated behind `animated` (es-static) and the OS reduce-motion
    preference. */

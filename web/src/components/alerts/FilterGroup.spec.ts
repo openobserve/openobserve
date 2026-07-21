@@ -1242,27 +1242,6 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(addGroupBtn.attributes('disabled')).toBeDefined();
     });
 
-    it('should handle tab change for toggle label', async () => {
-      const wrapper = mount(FilterGroup, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      const tabs = wrapper.findComponent({ name: 'q-tabs' });
-      if (tabs.exists()) {
-        await tabs.vm.$emit('update:model-value', 'or');
-        expect(wrapper.emitted('add-group')).toBeTruthy();
-        expect(wrapper.emitted('input:update')).toBeTruthy();
-      }
-    });
   });
 
 
@@ -2244,4 +2223,119 @@ describe('FilterGroup.vue Form Mode (namePrefix + OForm)', () => {
 
   // Bare-mode test removed: FilterCondition is now form-mode only (all
   // FilterGroup consumers pass a name-prefix inside an OForm); no bare v-else.
+
+  // ── nesting indent ──────────────────────────────────────────────────────────
+  // The per-level indent is a COMPUTED inline style. The flow drawer used to
+  // shrink it from outside with `[style*="margin-left"] { margin-left: 10px
+  // !important }` — an attribute selector reaching into this component, which
+  // would have caught any other inline margin-left too. `indent-rem` replaces
+  // that; these pin both the default and the override so the CSS hack cannot
+  // come back unnoticed.
+  // ── allowCustomColumns passthrough ──────────────────────────────────────────
+  // FilterGroup is the middle hop: ConditionBuilder -> FilterGroup ->
+  // FilterCondition. The prop is what makes the column select `creatable`, and
+  // dropping it fails SILENTLY (the select still renders, it just stops
+  // accepting new columns) — which is exactly how #13277 killed the affordance.
+  // Nested groups are covered too: FilterGroup recurses into itself, so the
+  // prop has to survive every level, not just the root.
+  describe("allowCustomColumns passthrough", () => {
+    const leaf = (id: string) => ({
+      filterType: "condition",
+      id,
+      column: "",
+      operator: "=",
+      value: "",
+      logicalOperator: "AND",
+    });
+
+    const mountWith = (allowCustomColumns?: boolean) =>
+      mount(FilterGroup, {
+        props: {
+          group: {
+            groupId: "root",
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [
+              leaf("c1"),
+              {
+                groupId: "nested",
+                filterType: "group",
+                logicalOperator: "AND",
+                conditions: [leaf("c2")],
+              },
+            ],
+          },
+          streamFields: [{ label: "Field 1", value: "field1" }],
+          depth: 0,
+          ...(allowCustomColumns === undefined ? {} : { allowCustomColumns }),
+        },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+          stubs: { FilterCondition: true },
+        },
+      });
+
+    it("reaches every FilterCondition, including ones in nested groups", () => {
+      const conditions = mountWith(true).findAllComponents({
+        name: "FilterCondition",
+      });
+      // root leaf + nested leaf
+      expect(conditions.length).toBeGreaterThanOrEqual(2);
+      conditions.forEach((c) =>
+        expect(c.props("allowCustomColumns")).toBe(true),
+      );
+    });
+
+    it("defaults to false so alerts never get a creatable column select", () => {
+      mountWith()
+        .findAllComponents({ name: "FilterCondition" })
+        .forEach((c) => expect(c.props("allowCustomColumns")).toBe(false));
+    });
+  });
+
+  describe("indent-rem", () => {
+    // Local props: `defaultProps` belongs to another describe block.
+    const baseProps = {
+      group: {
+        groupId: "g1",
+        logicalOperator: "AND",
+        filterType: "group",
+        conditions: [],
+      },
+      streamFields: [{ label: "Field 1", value: "field1" }],
+      depth: 0,
+    };
+
+    const mountAt = (props: Record<string, any> = {}) =>
+      mount(FilterGroup, {
+        props: { ...baseProps, ...props },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+          stubs: { FilterCondition: true },
+        },
+      });
+
+    const marginOf = (w: any) =>
+      // `.filter-group-box` is the group's root box — it was `.el-border` until
+      // #13173 renamed it; the computed margin-left still lives there.
+      (w.find(".filter-group-box").attributes("style") || "").match(
+        /margin-left:\s*([^;]+)/,
+      )?.[1];
+
+    it("defaults to 1.25rem per level", () => {
+      expect(marginOf(mountAt({ depth: 0 }))).toBe("0rem");
+      expect(marginOf(mountAt({ depth: 2 }))).toBe("2.5rem");
+    });
+
+    it("uses the caller's indent when given", () => {
+      expect(marginOf(mountAt({ depth: 2, indentRem: 0.625 }))).toBe("1.25rem");
+    });
+
+    it("still scales with depth under a custom indent", () => {
+      expect(marginOf(mountAt({ depth: 0, indentRem: 0.625 }))).toBe("0rem");
+      expect(marginOf(mountAt({ depth: 3, indentRem: 0.625 }))).toBe("1.875rem");
+    });
+  });
 });

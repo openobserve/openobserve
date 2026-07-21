@@ -61,6 +61,8 @@ pub mod short_url;
 pub mod sourcemaps;
 pub mod system_settings;
 pub mod user;
+#[cfg(feature = "enterprise")]
+pub mod workflows;
 
 pub(crate) use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
 

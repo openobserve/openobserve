@@ -180,9 +180,12 @@ describe("DashboardErrors", () => {
     it("shows error list hidden when collapsed", () => {
       wrapper = mountComponent(["Test error"]);
 
-      // The error list container should have height: 0px when collapsed
-      const containers = wrapper.findAll('[style*="overflow: hidden"]');
-      expect(containers.length).toBeGreaterThan(0);
+      // `overflow: hidden` moved to the overflow-hidden utility; the collapse
+      // itself is still driven by the inline height binding.
+      const list = wrapper.find('[data-test="dashboard-errors-list"]');
+      const collapseContainer = list.element.closest(".overflow-hidden");
+      expect(collapseContainer).toBeTruthy();
+      expect(collapseContainer?.getAttribute("style")).toContain("height: 0px");
     });
 
     it("expands when the expand bar is clicked", async () => {
@@ -280,11 +283,13 @@ describe("DashboardErrors", () => {
   });
 
   describe("theme reactivity", () => {
-    it("renders expand bar with inline background style", () => {
+    it("renders expand bar with the theme-aware background utility", () => {
       wrapper = mountComponent(["Test error"]);
 
       const expandBar = wrapper.find('[data-test="dashboard-errors-expand-bar"]');
-      expect(expandBar.attributes("style")).toBeDefined();
+      // Background is now driven by the theme-aware bg-section-header-bg token
+      // utility rather than an inline background style.
+      expect(expandBar.classes()).toContain("bg-section-header-bg");
     });
 
     it("handles dark theme without errors", () => {

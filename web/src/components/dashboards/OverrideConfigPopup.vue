@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="override-config-accordion"
-      class="grid grid-cols-[264px_minmax(0,1fr)_360px] max-[900px]:grid-cols-[220px_minmax(0,1fr)] h-[calc(86vh-150px)] overflow-hidden -mx-(--spacing-dialog-content-px) -my-(--spacing-dialog-content-py)"
+      class="grid grid-cols-[16.5rem_minmax(0,1fr)_22.5rem] max-[56.25rem]:grid-cols-[13.75rem_minmax(0,1fr)] h-[calc(86vh-9.375rem)] overflow-hidden -mx-dialog-content-px -my-dialog-content-py"
     >
       <!-- Left: add-field dropdown + list of added fields -->
       <div
-        class="flex flex-col gap-2.5 min-w-0 p-3 border-r border-[rgba(128,128,128,0.18)]"
+        class="flex flex-col gap-2.5 min-w-0 p-3 border-r border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)]"
       >
         <ODropdown
           v-model:open="addOpenLeft"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-test="dashboard-addpanel-config-add-column"
-              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-[9px] rounded-lg border border-dashed border-[rgba(25,118,210,0.5)] bg-transparent cursor-pointer text-[length:var(--text-sm,13px)] font-medium text-[var(--color-primary-600,#1976d2)] transition-colors hover:bg-[rgba(25,118,210,0.05)] hover:border-[var(--color-primary-600,#1976d2)]"
+              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-2.25 rounded-default border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent cursor-pointer text-sm font-medium text-primary-600 transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)] hover:border-primary-600"
             >
               <OIcon name="add" size="sm" />
               {{ t("dashboard.columnFormattingAddField") }}
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="addField(opt.value)"
             >
               <span class="flex items-center gap-2">
-                <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
+                <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default" :class="badgeClass(opt.isNumeric)">
                   {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                 </span>
                 <span>{{ opt.label }}</span>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
             <div
               v-if="!availableToAdd.length"
-              class="py-2 px-2.5 text-xs text-[var(--o2-text-2,#9e9e9e)]"
+              class="py-2 px-2.5 text-xs text-text-secondary"
             >
               {{ t("dashboard.columnFormattingAllAdded") }}
             </div>
@@ -79,21 +79,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             role="button"
             tabindex="0"
             :data-test="`override-config-row-${idx}`"
-            class="group relative flex items-center gap-2 w-full py-2 pl-[9px] pr-1.5 rounded-lg border-l-[3px] border-transparent cursor-pointer outline-none transition-colors hover:bg-[rgba(128,128,128,0.05)]"
+            class="group relative flex items-center gap-2 w-full py-2 pl-2.25 pr-1.5 rounded-default border-l-[0.1875rem] border-transparent cursor-pointer outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-grey-500)_5%,transparent)]"
             :class="
               idx === selectedIdx
-                ? 'bg-[rgba(46,85,163,0.06)] border-l-[var(--color-primary-600,#1976d2)]!'
+                ? 'bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)] border-l-primary-600!'
                 : ''
             "
             @click="selectedIdx = idx"
             @keydown.enter.prevent="selectedIdx = idx"
             @keydown.space.prevent="selectedIdx = idx"
           >
-            <span :class="['cf-badge-base', badgeClass(isNumericColumn(col))]">
+            <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default" :class="badgeClass(isNumericColumn(col))">
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
-              class="flex-1 min-w-0 font-semibold text-[length:var(--text-sm,13px)] overflow-hidden text-ellipsis whitespace-nowrap group-hover:pr-7"
+              class="flex-1 min-w-0 font-semibold text-sm overflow-hidden text-ellipsis whitespace-nowrap group-hover:pr-7"
             >
               {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
             </span>
@@ -115,12 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="format-color-text"
             size="lg"
-            class="text-[var(--o2-text-2,#b0bec5)]"
+            class="text-text-secondary"
           />
-          <div class="font-semibold text-[length:var(--text-sm,13px)]">
+          <div class="font-semibold text-sm">
             {{ t("dashboard.columnFormattingNoFields") }}
           </div>
-          <div class="text-xs text-[var(--o2-text-2,#9e9e9e)] leading-[1.4]">
+          <div class="text-xs text-text-secondary leading-[1.4]">
             {{ t("dashboard.columnFormattingNoFieldsHint") }}
           </div>
         </div>
@@ -135,16 +135,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
-          class="flex flex-col gap-2 min-w-0 overflow-y-auto p-3 border-l border-[rgba(128,128,128,0.18)]"
+          class="flex flex-col gap-2 min-w-0 overflow-y-auto p-3 border-l border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)]"
         >
           <div
-            class="flex items-center gap-[5px] text-[10px] font-bold tracking-[0.06em] uppercase text-[var(--o2-text-2,#757575)]"
+            class="flex items-center gap-1.25 text-3xs font-bold tracking-[0.06em] uppercase text-text-secondary"
           >
             <OIcon name="visibility" size="xs" />
             <span>{{ t("dashboard.inlinePreview") }}</span>
           </div>
           <div
-            class="cf-preview-table border border-[rgba(128,128,128,0.18)] rounded-md overflow-hidden"
+            class="border border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] rounded-default overflow-hidden [&_[data-test=dashboard-table-cell-copy-btn]]:hidden!"
           >
             <TableRenderer
               v-if="selectedPreview"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-pagination="false"
             />
           </div>
-          <div class="text-[11px] text-[var(--o2-text-2,#9e9e9e)]">
+          <div class="text-2xs text-text-secondary">
             {{ t("dashboard.columnFormattingSampleNote") }}
           </div>
         </div>
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty state: nothing added yet -->
       <div
         v-else
-        class="col-start-2 col-end-4 max-[900px]:col-end-3 flex items-center justify-center p-6"
+        class="col-start-2 col-end-4 max-[56.25rem]:col-end-3 flex items-center justify-center p-6"
       >
         <OEmptyState
           size="block"
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #illustration>
             <div
-              class="w-[72px] h-[72px] rounded-2xl bg-[rgba(128,128,128,0.08)] flex items-center justify-center text-[var(--o2-text-2,#90a4ae)]"
+              class="w-18 h-18 rounded-default bg-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)] flex items-center justify-center text-text-secondary"
             >
               <OIcon name="tune" size="xl" />
             </div>
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="addField(opt.value)"
                 >
                   <span class="flex items-center gap-2">
-                    <span :class="['cf-badge-base', badgeClass(opt.isNumeric)]">
+                    <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default" :class="badgeClass(opt.isNumeric)">
                       {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                     </span>
                     <span>{{ opt.label }}</span>
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <div
                   v-if="!availableToAdd.length"
-                  class="py-2 px-2.5 text-xs text-[var(--o2-text-2,#9e9e9e)]"
+                  class="py-2 px-2.5 text-xs text-text-secondary"
                 >
                   {{ t("dashboard.columnFormattingAllAdded") }}
                 </div>
@@ -221,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex items-center justify-between w-full">
-        <span class="text-xs text-[var(--o2-text-2,#9e9e9e)]">{{ footerSummary }}</span>
+        <span class="text-xs text-text-secondary">{{ footerSummary }}</span>
         <div class="flex gap-2">
           <OButton
             variant="outline"
@@ -376,8 +376,8 @@ export default defineComponent({
     // Field-type badge colour (num = blue, text = grey).
     const badgeClass = (isNum: boolean) =>
       isNum
-        ? "text-[#2e55a3] bg-[rgba(46,85,163,0.1)]"
-        : "text-[#6b7280] bg-[rgba(107,114,128,0.12)]";
+        ? "text-field-type-number-text bg-field-type-number-bg"
+        : "text-field-type-string-text bg-field-type-string-bg";
 
     const getFieldLabel = (alias: string) => {
       if (!alias) return "";
@@ -528,21 +528,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-// Shared field-type badge base (variant colour comes from badgeClass()).
-.cf-badge-base {
-  flex-shrink: 0;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 2px 5px;
-  border-radius: 4px;
-}
-
-// :deep needed to reach the renderer's copy button inside the mini preview.
-.cf-preview-table :deep([data-test="dashboard-table-cell-copy-btn"]) {
-  display: none !important;
-}
-</style>

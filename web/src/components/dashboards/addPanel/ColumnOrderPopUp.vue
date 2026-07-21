@@ -28,17 +28,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Content -->
     <div>
-      <div class="text-xs text-gray-400 mb-3" data-test="dashboard-column-order-description">
+      <div class="text-xs text-text-secondary mb-3" data-test="dashboard-column-order-description">
         {{ t("dashboard.columnOrderDescription") }}
       </div>
 
       <!-- Empty state -->
       <div
         v-if="!editColumnOrder || editColumnOrder.length === 0"
-        class="text-center p-6 text-gray-400"
+        class="text-center p-6 text-text-muted"
         data-test="dashboard-column-order-empty-state"
       >
-        <OIcon name="view-column" class="mb-3" style="width: 48px; height: 48px;" />
+        <OIcon name="view-column" class="mb-3 w-12 h-12" />
         <div class="text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
         <div class="text-xs">
           {{ t("dashboard.columnsDefaultOrder") }}
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(column, index) in editColumnOrder"
           :key="`column-${index}`"
-          class="flex items-center px-3 py-2 mb-1 border-b border-[#cccccc70] transition-colors hover:bg-black/[0.02] last:border-b-0 dark:border-b-[rgba(255,255,255,0.12)] dark:hover:bg-[rgba(255,255,255,0.05)]"
+          class="flex items-center px-3 py-2 mb-1 border-b border-border-default transition-colors hover:bg-surface-subtle-hover last:border-b-0"
           :data-test="`column-order-row-${index}`"
         >
           <!-- Drag handle -->
@@ -69,10 +69,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Column number -->
-          <div class="min-w-8 font-medium text-[13px] text-[#666] dark:text-[#aaa]" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
+          <div class="min-w-8 font-medium text-compact text-text-secondary" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
 
           <!-- Column name -->
-          <div class="flex-1 font-medium overflow-hidden text-ellipsis whitespace-nowrap text-[13px]" data-test="dashboard-column-order-column-name">{{ column }}</div>
+          <div class="flex-1 font-medium overflow-hidden text-ellipsis whitespace-nowrap text-compact" data-test="dashboard-column-order-column-name">{{ column }}</div>
 
           <!-- Actions -->
           <div class="flex gap-0.5 ml-2" data-test="dashboard-column-order-column-actions">

@@ -81,7 +81,7 @@ export const illustrations = {
   "browser-check": EmptyBrowserCheck,
   // ---- character scenes (opt-in — use ONLY where a person adds value) ------
   explorer: EmptyExplorer,
-  // ---- earlier geometric experiments (kept for reference) ------------------
+  // ---- earlier geometric experiments ------------------
   constellation: EmptyConstellation,
   observatory: EmptyObservatory,
   "data-scene": EmptyDataScene,
