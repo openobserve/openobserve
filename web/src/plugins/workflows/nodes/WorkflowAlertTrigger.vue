@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          not always full-height), and the editor fills the wrapper. -->
     <div
       data-test="workflow-trigger-structure"
-      class="w-full h-110 rounded-lg border border-border-default overflow-hidden"
+      class="w-full h-110 rounded-default border border-border-default overflow-hidden"
     >
       <QueryEditor
         editor-id="workflow-trigger-payload"

@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <div
         v-show="showButtons && meta?.category !== 'trigger'"
-        class="absolute top-[-30px] right-0 flex gap-[6px] z-10 pt-[5px] px-[5px] pb-[10px]"
+        class="absolute -top-7.5 right-0 flex gap-1.5 z-10 pt-1.25 px-1.25 pb-2.5"
         :data-test="`workflow-node-${data?.node_type}-actions`"
         @mouseenter="handleActionsEnter"
         @mouseleave="handleActionsLeave"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="icon"
-          class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-[#dc2626]! text-[#dc2626]!"
+          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-surface-overlay/95! border! border-status-negative! text-status-negative!"
           :data-test="`workflow-node-${data?.node_type}-delete-btn`"
           @click.stop="requestDeleteNode(id)"
         >
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (red, hover for messages, click to open the step drawer). -->
       <div
         v-if="testStatus === 'ok'"
-        class="wf-test-badge wf-test-ok wf-test-pop nodrag"
+        class="wf-test-badge wf-test-pop nodrag bg-status-positive text-white"
         :data-test="`workflow-node-${data?.node_type}-test-ok`"
         @pointerdown.stop
         @click.stop
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="testStatus === 'skipped'"
-        class="wf-test-badge wf-test-skipped wf-test-pop nodrag"
+        class="wf-test-badge wf-test-pop nodrag bg-badge-default-solid-bg text-badge-default-solid-text cursor-help"
         :data-test="`workflow-node-${data?.node_type}-test-skipped`"
         @pointerdown.stop
         @click.stop
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="remove" size="xs" />
         <OTooltip side="top" align="center" :side-offset="8" max-width="320px">
           <template #content>
-            <div class="p-2 text-left text-[12px]">
+            <div class="p-2 text-left text-xs">
               {{ t("workflow.test.notVerified") }}
             </div>
           </template>
@@ -93,20 +93,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="testStatus === 'error'"
-        class="wf-test-badge wf-test-error wf-test-pop nodrag"
+        class="wf-test-badge wf-test-pop nodrag bg-status-negative text-white cursor-pointer transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-error`"
         @pointerdown.stop
         @click.stop="openResult"
       >
         <OIcon name="error" size="xs" />
-        <span v-if="errorCount > 1" class="wf-test-count">{{ errorCount }}</span>
+        <span v-if="errorCount > 1" class="wf-test-count bg-white text-status-negative">{{ errorCount }}</span>
         <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
           <template #content>
             <div class="p-2 text-left flex flex-col gap-1">
               <div
                 v-for="(m, i) in errorMessages"
                 :key="i"
-                class="text-[12px] leading-[1.35]"
+                class="text-xs leading-[1.35]"
               >
                 {{ m }}
               </div>
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <button
           type="button"
-          class="wf-plus-btn"
+          class="wf-plus-btn border-2 border-dashed border-border-strong bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
           :data-test="`workflow-node-${data?.node_type}-add-${p.handle}`"
           @click.stop="openStepPicker(id, p.handle)"
         >
@@ -288,21 +288,27 @@ const openResult = () => {
 </script>
 
 <style scoped>
+/* keep(keyframes): the pop animation and its @keyframes have no utility
+   equivalent. Everything else here is GEOMETRY only — every colour moved to
+   token utilities on the elements themselves (bg-status-*, border-border-strong,
+   bg-surface-overlay, hover:*-accent), so this block holds no colour at all. */
+
 /* Test result badge — corner circle on the node (the VueFlow node wrapper is the
-   positioned ancestor). Green tick = passed, red = errored (hover for messages). */
+   positioned ancestor). Colour comes from the template. */
 .wf-test-badge {
   position: absolute;
-  top: -10px;
-  right: -10px;
-  width: 22px;
-  height: 22px;
+  top: -0.625rem;
+  right: -0.625rem;
+  width: 1.375rem;
+  height: 1.375rem;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #fff;
+  border-width: 0.125rem;
+  border-style: solid;
+  border-color: currentColor;
   z-index: 16;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
 }
 /* pop when a node's badge appears */
 .wf-test-pop {
@@ -321,37 +327,17 @@ const openResult = () => {
     opacity: 1;
   }
 }
-.wf-test-ok {
-  background: #22c55e;
-  color: #fff;
-}
-.wf-test-skipped {
-  background: var(--color-grey-400);
-  color: #fff;
-  cursor: help;
-}
-.wf-test-error {
-  background: #ef4444;
-  color: #fff;
-  cursor: pointer;
-  transition: transform 0.14s ease;
-}
-.wf-test-error:hover {
-  transform: scale(1.12);
-}
 .wf-test-count {
   position: absolute;
-  top: -7px;
-  right: -7px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 3px;
-  background: #fff;
-  color: #ef4444;
-  border-radius: 8px;
-  font-size: 10px;
+  top: -0.4375rem;
+  right: -0.4375rem;
+  min-width: 0.9375rem;
+  height: 0.9375rem;
+  padding: 0 0.1875rem;
+  border-radius: 0.5rem;
+  font-size: 0.625rem;
   font-weight: 700;
-  line-height: 15px;
+  line-height: 0.9375rem;
   text-align: center;
 }
 
@@ -360,7 +346,7 @@ const openResult = () => {
 .wf-plus {
   position: absolute;
   top: 100%;
-  margin-top: 12px;
+  margin-top: 0.75rem;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -371,39 +357,20 @@ const openResult = () => {
   left: 50%;
 }
 .wf-plus-btn {
-  width: 26px;
-  height: 26px;
+  width: 1.625rem;
+  height: 1.625rem;
   border-radius: 50%;
-  border: 2px dashed var(--color-border-strong);
-  background: #fff;
-  color: var(--color-grey-500);
   display: grid;
   place-items: center;
   cursor: pointer;
   transition: all 0.14s;
 }
-.wf-plus-btn:hover {
-  border-style: solid;
-  border-color: #5a61cc;
-  color: #5a61cc;
-  background: #eceefb;
-}
-.dark .wf-plus-btn {
-  background: rgba(30, 34, 45, 0.95);
-  border-color: rgba(255, 255, 255, 0.22);
-  color: rgba(255, 255, 255, 0.7);
-}
-.dark .wf-plus-btn:hover {
-  border-color: #818cf8;
-  color: #818cf8;
-  background: rgba(129, 140, 248, 0.15);
-}
 .wf-plus-tag {
-  margin-top: 4px;
-  font-size: 10px;
+  margin-top: 0.25rem;
+  font-size: 0.625rem;
   font-weight: 800;
   text-transform: uppercase;
-  padding: 1px 6px;
-  border-radius: 5px;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.3125rem;
 }
 </style>

@@ -129,10 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :on-drag-start="paletteDragStart"
         :on-item-click="paletteClick"
       />
-      <!-- Canvas drop area — gray rounded inset card, matching the pipeline
+      <!-- Canvas drop area — gray rounded-default inset card, matching the pipeline
            editor's `#pipelineChartContainer` so both look identical. -->
       <div
-        class="flex-1 relative min-w-0 rounded-xl overflow-hidden mb-3 bg-surface-subtle"
+        class="flex-1 relative min-w-0 rounded-surface overflow-hidden mb-3 bg-surface-subtle"
       >
         <WorkflowCanvas />
       </div>

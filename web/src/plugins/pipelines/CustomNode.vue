@@ -311,9 +311,8 @@ function getIcon(data, ioType) {
       <template #body>
         <div
           v-if="data.node_type == 'function'"
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
+          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
           align="left"
-          style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
         >
           {{ data.name }} -
           <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
@@ -322,15 +321,13 @@ function getIcon(data, ioType) {
         <template v-else-if="data.node_type == 'stream'">
           <div
             v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
-            class="flex text-[15px]! font-bold! leading-[1.4]!"
-            style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
+            class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
           >
             {{ data.stream_type }} - {{ data.stream_name.label }}
           </div>
           <div
             v-else
-            class="flex text-[15px]! font-bold! leading-[1.4]!"
-            style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
+            class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
           >
             {{ data.stream_type }} - {{ data.stream_name }}
           </div>
@@ -338,24 +335,21 @@ function getIcon(data, ioType) {
 
         <div
           v-else-if="data.node_type == 'query'"
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
-          style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
+          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
 
         <div
           v-else-if="data.node_type == 'remote_stream'"
-          class="flex text-[15px]! font-bold! leading-[1.4]!"
-          style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
+          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
           {{ data.destination_name }}
         </div>
 
         <div
           v-else-if="data.node_type == 'condition'"
-          class="text-[15px]! font-bold! leading-[1.4]!"
-          style="text-align: left; text-wrap: wrap; width: auto; text-overflow: ellipsis"
+          class="text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
         >
           {{ getTruncatedConditions(data.condition || data.conditions) }}
         </div>
@@ -367,7 +361,7 @@ function getIcon(data, ioType) {
         <div
           v-if="data.node_type == 'function' && hasNodeError"
           data-test="pipeline-node-error-badge"
-          class="absolute top-[-12px] right-[-12px] w-[20px] h-[20px] bg-[#ef4444] border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_2px_6px_rgba(239,68,68,0.5)] transition-all duration-200 error-badge"
+          class="absolute -top-3 -right-3 w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200 error-badge"
           @click.stop="navigateToFunction(data.name)"
         >
           <OIcon name="error" size="sm" />
@@ -377,7 +371,7 @@ function getIcon(data, ioType) {
               pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
                 ?.error_count
             "
-            class="absolute top-[-6px] right-[-6px] bg-[#dc2626] text-white text-[9px] font-bold min-w-[14px] h-[14px] rounded-[7px] flex items-center justify-center px-[3px] border-[1.5px] border-solid border-white shadow-[0_1px_3px_rgba(0,0,0,0.4)]"
+            class="absolute -top-1.5 -right-1.5 bg-status-negative text-white text-3xs font-bold min-w-3.5 h-3.5 rounded-full flex items-center justify-center px-0.75 border-[0.09375rem] border-solid border-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
           >
             {{
               pipelineObj.currentSelectedPipeline.last_error.node_errors[id]
@@ -386,7 +380,7 @@ function getIcon(data, ioType) {
           </span>
           <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
             <template #content>
-              <div style="max-height: 300px; overflow-y: auto">
+              <div class="max-h-75 overflow-y-auto">
                 {{ getNodeErrorInfo || "Error occurred" }}
               </div>
             </template>
@@ -395,7 +389,7 @@ function getIcon(data, ioType) {
 
         <div
           v-show="showButtons"
-          class="absolute top-[-30px] right-0 flex gap-[6px] transition-all duration-300 z-10 pt-[5px] px-[5px] pb-[10px] node-action-buttons"
+          class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
           :data-test="`pipeline-node-${io_type}-actions`"
           :style="{ '--node-color': getNodeColor(io_type) }"
           @mouseenter="handleActionButtonsEnter"
@@ -405,7 +399,7 @@ function getIcon(data, ioType) {
             variant="ghost"
             size="icon"
             @click.stop="deleteNode(id)"
-            class="min-w-[20px]! w-[20px]! h-[20px]! p-0! rounded! bg-[rgba(255,255,255,0.95)]! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+            class="min-w-5! w-5! h-5! p-0! rounded-default! bg-surface-overlay/95! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
             :data-test="`pipeline-node-${io_type}-delete-btn`"
             @mouseenter="handleDeleteTooltipEnter"
             @mouseleave="handleDeleteTooltipLeave"
@@ -414,8 +408,7 @@ function getIcon(data, ioType) {
           </OButton>
           <div
             v-if="showDeleteTooltip"
-            class="fixed bg-[#dc2626] text-white py-[6px] px-[10px] rounded-md text-[11px] z-[1000] shadow-[0_4px_12px_rgba(0,0,0,0.3)] pointer-events-none whitespace-nowrap"
-            style="left: 15px"
+            class="fixed bg-status-negative text-white py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap left-3.75"
           >
             Delete Node
             <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
@@ -436,7 +429,7 @@ function getIcon(data, ioType) {
         >
           <button
             type="button"
-            class="pl-plus-btn"
+            class="pl-plus-btn border-2 border-dashed border-border-strong bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
             :data-test="`pipeline-node-${io_type}-add-btn`"
             @click.stop="openStepPicker(id)"
           >
@@ -457,56 +450,49 @@ function getIcon(data, ioType) {
   />
 </template>
 
-<style>
-/* hover-`+` "add next step" affordance — positioned below the node card. */
+<style scoped>
+/* keep(lib-override:vue-flow): the `:deep()` rules below style the Vue Flow
+   handles that the shared FlowNodeCard child renders — child-component DOM this
+   template cannot put a utility class on. Scoped (not global): every selector
+   here is a DESCENDANT of this node, so nothing needs to escape the component.
+   CustomNode renders in two places (the editor canvas and the list-row preview),
+   so these must travel with the component rather than live in the editor.
+
+   hover-`+` "add next step" affordance — positioned below the node card. Its
+   colours live on the element as token utilities (see the template); only
+   geometry is here. Two legacy dark overrides were dropped rather than ported:
+   they keyed off Quasar's old body-level dark class, which this app never sets,
+   so they had been dead for a while — and the tokens now flip with the theme
+   on their own, which is what those rules were reaching for. */
 .pl-plus {
   position: absolute;
   top: 100%;
   left: 50%;
-  margin-top: 12px;
+  margin-top: 0.75rem;
   transform: translateX(-50%);
   z-index: 5;
 }
 .pl-plus-btn {
-  width: 26px;
-  height: 26px;
+  width: 1.625rem;
+  height: 1.625rem;
   border-radius: 50%;
-  border: 2px dashed var(--color-border-strong);
-  background: #fff;
-  color: var(--color-grey-500);
   display: grid;
   place-items: center;
   cursor: pointer;
   transition: all 0.14s;
 }
-.pl-plus-btn:hover {
-  border-style: solid;
-  border-color: #5a61cc;
-  color: #5a61cc;
-  background: #eceefb;
-}
-.body--dark .pl-plus-btn {
-  background: rgba(30, 34, 45, 0.95);
-  border-color: rgba(255, 255, 255, 0.22);
-  color: rgba(255, 255, 255, 0.7);
-}
-.body--dark .pl-plus-btn:hover {
-  border-color: #818cf8;
-  color: #818cf8;
-  background: rgba(129, 140, 248, 0.15);
-}
 
-.node_handle_custom {
+:deep(.node_handle_custom) {
   width: 1rem !important;
   height: 1rem !important;
   border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
   border-radius: 50% !important;
   background: var(--color-grey-500);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
   transition: all 0.3s ease;
 }
 
-.node_handle_custom::before {
+:deep(.node_handle_custom::before) {
   content: "";
   position: absolute;
   top: 50%;
@@ -520,29 +506,29 @@ function getIcon(data, ioType) {
 }
 
 /* Input nodes - info theme */
-.handle_input {
+:deep(.handle_input) {
   background: var(--color-status-info-bg) !important;
 }
 
-.handle_input::before {
+:deep(.handle_input::before) {
   background: var(--color-status-info-text) !important;
 }
 
 /* Output nodes - success theme */
-.handle_output {
+:deep(.handle_output) {
   background: var(--color-status-success-bg) !important;
 }
 
-.handle_output::before {
+:deep(.handle_output::before) {
   background: var(--color-status-positive) !important;
 }
 
 /* Transform nodes (default) - warning theme */
-.handle_default {
+:deep(.handle_default) {
   background: var(--color-status-warning-bg) !important;
 }
 
-.handle_default::before {
+:deep(.handle_default::before) {
   background: var(--color-status-warning-text) !important;
 }
 

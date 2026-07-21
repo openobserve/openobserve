@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div
-          class="flex-1 min-h-0 rounded-md border border-border-default overflow-hidden"
+          class="flex-1 min-h-0 rounded-default border border-border-default overflow-hidden"
         >
           <CodeQueryEditor
             editor-id="workflow-test-input"

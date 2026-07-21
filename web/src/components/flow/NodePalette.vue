@@ -28,6 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     testPrefix  — data-test prefix, so each editor keeps its existing selectors
 -->
 <script>
+// Palette styling lives in its own token-driven stylesheet (see the note at the
+// top of node-palette.css for why it cannot be scoped). Imported here rather
+// than through an SFC style block, so this component carries none at all.
+import "@/components/flow/node-palette.css";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -63,12 +67,12 @@ export default {
         <template v-for="(node, idx) in items" :key="`${node.subtype}-${node.io_type}-${idx}`">
         <!-- section label (Source / Transform / Destination). Same mb-3 outer
              gap as the node cards (matching the original NodeSidebar). -->
-        <div v-if="node.isSectionHeader" class="rounded-lg mb-3">
+        <div v-if="node.isSectionHeader" class="rounded-default mb-3">
           <div class="np-section text-base font-medium">{{ node.label }}</div>
         </div>
 
         <!-- draggable / clickable node card -->
-        <div v-else class="o2vf_node transition-all rounded-lg mb-3 last:mb-0">
+        <div v-else class="o2vf_node transition-all rounded-default mb-3 last:mb-0">
           <OButton
             variant="ghost"
             size="md"
@@ -82,8 +86,8 @@ export default {
             <OTooltip side="right" :side-offset="10">
               <template #content>
                 <div class="px-2.5 py-1.5">
-                  <div class="font-medium text-[0.6875rem] mb-0.5 capitalize">{{ node.label }}</div>
-                  <div v-if="node.tooltip" class="text-[0.625rem] leading-[1.3] capitalize">{{ node.tooltip }}</div>
+                  <div class="font-medium text-2xs mb-0.5 capitalize">{{ node.label }}</div>
+                  <div v-if="node.tooltip" class="text-3xs leading-[1.3] capitalize">{{ node.tooltip }}</div>
                 </div>
               </template>
             </OTooltip>
@@ -114,10 +118,3 @@ export default {
   </div>
 </template>
 
-<style>
-/* Palette styling lives in its own token-driven stylesheet (see the note at the
-   top of node-palette.css for why it cannot be scoped). Kept out of the SFC so
-   this component carries no style block of its own — same arrangement as
-   flow-canvas.css for the canvas. */
-@import "@/components/flow/node-palette.css";
-</style>

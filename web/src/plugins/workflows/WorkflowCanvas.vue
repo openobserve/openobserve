@@ -87,6 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Shared, token-driven canvas styling lives in ONE place so the pipeline and
+// workflow canvases cannot drift. Intentionally global: the selectors target
+// VueFlow's own markup, which never carries a scoped data-attribute.
+import "@/components/flow/flow-canvas.css";
 import { ref, computed } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
@@ -150,10 +154,3 @@ defineExpose({ vueFlowRef });
 <!-- Node card + handle styling ported from PipelineEditor's `.o2vf_node` rules
      so workflow nodes match pipeline nodes. Unscoped: targets VueFlow's
      internal node wrapper. -->
-<style>
-/* Shared, token-driven canvas styling lives in ONE place so the pipeline and
-   workflow canvases cannot drift (it was previously re-pasted per canvas). It
-   is intentionally unscoped: the selectors target VueFlow's own markup, which
-   never carries a scoped data-attribute. */
-@import "@/components/flow/flow-canvas.css";
-</style>

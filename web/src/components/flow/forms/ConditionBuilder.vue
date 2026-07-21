@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove-group="(id) => removeGroup(id)"
           @input:update="onInputUpdate"
         />
-        <div v-else class="p-3 text-gray-400">{{ t("flow.condition.loading") }}</div>
+        <div v-else class="p-3 text-text-muted">{{ t("flow.condition.loading") }}</div>
       </div>
 
       <!-- The saved condition could not be parsed, so the builder reset to an
@@ -279,30 +279,35 @@ const submit = async () => {
 defineExpose({ submit, conditionGroup, form });
 </script>
 
-<style>
-/* Unscoped BY NECESSITY: these target FilterGroup's INTERNALS (`.el-border`,
-   `.group-container`, …) to fit it into the narrow flow drawer. A scoped block
-   would add a data-attribute those child elements never carry.
-   The old `[style*="margin-left"] { margin-left: 10px !important }` rule is
-   gone — it patched FilterGroup's computed inline indent from the outside and
-   would have hit any other inline margin-left. The child now takes an
-   `indent-rem` prop instead (see the FilterGroup usage above). */
+<style scoped>
+/* keep(lib-override:FilterGroup): these fit FilterGroup into the narrow flow
+   drawer by reaching its INTERNALS, which utilities cannot address — hence
+   :deep(). Scoped (not global): `.flow-filter-group-wrapper` is this
+   component's own element, so nothing needs to escape.
+
+   NOTE `.filter-group-box` was `.el-border` until the design-token migration
+   renamed it; the old selector silently stopped matching, which is why this is
+   pinned by name here.
+
+   The former `[style*="margin-left"]` rule is gone — it patched FilterGroup's
+   computed inline indent from outside and would have hit any other inline
+   margin-left. The child takes an `indent-rem` prop instead (see above). */
 
 /* Force the FilterGroup box to span the full drawer width (defaults to w-fit). */
-.flow-filter-group-wrapper > .el-border {
+.flow-filter-group-wrapper > :deep(.filter-group-box) {
   width: 100% !important;
 }
-.flow-filter-group-wrapper .group-container {
+.flow-filter-group-wrapper :deep(.group-container) {
   white-space: normal !important;
   overflow-x: visible !important;
   max-width: 100%;
   pointer-events: auto;
 }
-.flow-filter-group-wrapper .conditions-input {
+.flow-filter-group-wrapper :deep(.conditions-input) {
   min-width: 7.5rem !important;
   max-width: 12.5rem;
 }
-.flow-filter-group-wrapper .group-border {
+.flow-filter-group-wrapper :deep(.group-border) {
   max-width: calc(100% - 1.25rem);
 }
 </style>

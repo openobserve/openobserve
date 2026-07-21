@@ -51,18 +51,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="item in filtered"
         :key="item.key"
         type="button"
-        class="flow-step-card flex items-start gap-3 p-3 border border-border-default rounded-lg bg-card-bg text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-primary-600 hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
+        class="flow-step-card flex items-start gap-3 p-3 border border-border-default rounded-default bg-card-bg text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
         :data-test="`${testPrefix}-${item.key}`"
         @click="emit('pick', item)"
       >
         <div
-          class="inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-lg"
+          class="inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-default"
           :class="item.iconTint"
         >
           <OIcon :name="item.icon || 'help'" size="md" />
         </div>
         <div class="min-w-0">
-          <div class="text-sm font-semibold text-text-primary">
+          <div class="text-sm font-semibold text-text-body">
             {{ item.title }}
           </div>
           <div v-if="item.description" class="text-xs text-text-secondary leading-snug">

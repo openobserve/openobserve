@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          here so every #body slot inherits it — wrappers supply content, not
          styling. Changing it here changes every node type at once. -->
     <div
-      class="flow-node__container text-left min-w-0 text-[0.9375rem]! font-bold! leading-[1.4]!"
+      class="flow-node__container text-left min-w-0 text-sm! font-bold! leading-[1.4]!"
     >
       <slot name="body" />
     </div>

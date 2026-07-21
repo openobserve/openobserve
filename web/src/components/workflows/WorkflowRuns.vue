@@ -68,14 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-1 flex min-h-0 pt-3 px-2 gap-2">
       <!-- Read-only canvas (per-node run status overlay). -->
       <div
-        class="flex-1 relative min-w-0 rounded-xl overflow-hidden mb-3 bg-surface-subtle"
+        class="flex-1 relative min-w-0 rounded-surface overflow-hidden mb-3 bg-surface-subtle"
       >
         <WorkflowCanvas />
       </div>
 
       <!-- Persistent runs list (master-detail). -->
       <div
-        class="w-[27.5rem] max-w-[46%] shrink-0 mb-3 rounded-xl overflow-hidden border border-border-default bg-surface-base flex flex-col min-h-0"
+        class="w-[27.5rem] max-w-[46%] shrink-0 mb-3 rounded-surface overflow-hidden border border-border-default bg-surface-base flex flex-col min-h-0"
       >
         <WorkflowRunsPanel
           :org-id="orgId"

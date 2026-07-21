@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                flat token surface — a gradient can't be expressed in tokens, and
                the flat fill matches the rest of the app's card headers. -->
           <OCard
-            class="function-definition-card border border-border-default bg-surface-base rounded-lg overflow-hidden shadow-[0_0.125rem_0.25rem_color-mix(in_srgb,var(--color-black)_5%,transparent)]"
+            class="function-definition-card border border-border-default bg-surface-base rounded-default overflow-hidden shadow-[0_0.125rem_0.25rem_color-mix(in_srgb,var(--color-black)_5%,transparent)]"
           >
             <OCardSection
               role="header"
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="function-code-container max-h-[15.625rem] overflow-y-auto relative bg-surface-subtle border border-border-default"
               >
                 <pre
-                  class="font-mono bg-transparent m-0 p-4 text-[0.8125rem] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text text-text-code"
+                  class="font-mono bg-transparent m-0 p-4 text-compact leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text text-text-code"
                 >{{ selectedDefinition }}</pre>
               </div>
             </OCardSection>
@@ -378,7 +378,7 @@ defineExpose({ submit, createNewFunction, form });
 </script>
 
 <style scoped>
-/* Only AddFunction's own chrome is suppressed here — :deep() reaches a child
+/* keep(lib-override:AddFunction): only AddFunction's own chrome is suppressed here — :deep() reaches a child
    component's internals, which utilities cannot.
    The `.function-code` font-family became the `font-mono` utility, and the
    ::-webkit-scrollbar rules were DELETED: component.css already styles

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="min-w-0">
         <div
-          class="text-sm font-semibold text-text-primary leading-tight"
+          class="text-sm font-semibold text-text-body leading-tight"
         >
           {{ t("workflow.history.title") }}
         </div>

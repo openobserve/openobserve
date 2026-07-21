@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="destinationsError"
-                class="text-red-8 pt-1 text-[0.6875rem] leading-3"
+                class="text-red-8 pt-1 text-2xs leading-3"
               >
                 {{ destinationsError }}
               </div>
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="destinationsError"
-                class="text-red-8 pt-1 text-[0.6875rem] leading-3"
+                class="text-red-8 pt-1 text-2xs leading-3"
               >
                 {{ destinationsError }}
               </div>
