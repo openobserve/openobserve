@@ -234,27 +234,24 @@ def test_js_enrichment_multiple_lookups(client: OpenObserveClient):
 # ----- documented org-restriction (always runs) -----
 
 
-def test_js_function_in_default_org_returns_400(client: OpenObserveClient):
-    """OO restricts JS functions to the `_meta` org. Documents this constraint.
+def test_js_function_in_default_org_allowed(client: OpenObserveClient):
+    """JS functions run in the `default` (non-_meta) org. Documents the current contract.
 
-    The original suite missed this — it POSTed JS to `default` and silently
-    failed. This test makes the constraint a first-class contract: if/when
-    the backend opens JS to other orgs, this test starts failing and you
-    know to update.
+    The backend used to restrict JS to `_meta` (400 elsewhere). That
+    restriction was removed (PR #13156): JS is now accepted in every org on
+    every edition. This test pins the positive contract — a valid JS transform
+    in `default` returns 200 and transforms the event. If the backend ever
+    re-introduces an org restriction, this starts failing and you know to update.
     """
-
-    pytest.skip("JS fns are now allowed in non _meta orgs")
-    return
-
     payload = {
         "function": "row.x = 'js works here';",
         "events": [{"id": 1}],
         "trans_type": 1,
     }
     resp = client.post("functions/test", json=payload, org=DEFAULT_ORG)
-    assert resp.status_code == 400, \
-        f"JS in non-_meta org should be 400, got {resp.status_code}: {resp.text}"
+    assert resp.status_code == 200, \
+        f"JS in non-_meta org should now be 200, got {resp.status_code}: {resp.text}"
 
     body = resp.json()
-    assert "JavaScript" in body.get("message", "") or "_meta" in body.get("message", ""), \
-        f"error message should mention JS restriction, got: {body}"
+    assert body["results"][0]["event"].get("x") == "js works here", \
+        f"JS transform should have run, got: {body['results']}"
