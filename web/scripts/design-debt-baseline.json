@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 148,
+    "rawProjectRamp": 131,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -181,39 +181,6 @@
     "components/synthetics/CreateBrowserTestSkeleton.vue": {
       "rawProjectRamp": 1
     },
-    "components/synthetics/configure/CheckAlerts.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/CheckAuthNetwork.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/CheckBrowserDevices.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/CheckCapture.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/CheckDetails.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/CheckLocations.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/CheckSchedule.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/types/CheckHttpConfig.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/types/CheckSshConfig.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/types/CheckTcpConfig.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/configure/types/CheckTlsConfig.vue": {
-      "rawProjectRamp": 1
-    },
     "components/synthetics/journey/BrowserJourney.vue": {
       "rawProjectRamp": 1
     },
@@ -222,9 +189,6 @@
     },
     "components/synthetics/journey/JourneySteps.vue": {
       "rawProjectRamp": 3
-    },
-    "components/synthetics/results/ProtocolRunSummary.vue": {
-      "rawProjectRamp": 6
     },
     "components/traces/FlameGraphView.vue": {
       "rawProjectRamp": 1

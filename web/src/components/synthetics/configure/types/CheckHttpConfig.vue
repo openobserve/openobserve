@@ -80,7 +80,7 @@ function removeAssertion(index: number) {
 <template>
   <div class="rounded-default border border-border-default mb-4">
     <div class="flex items-center border-b border-border-default py-2.5 px-3">
-      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
+      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-accent" />
       <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolConfig.http.title') }}</h3>
     </div>
     <div class="px-3 py-2 flex flex-col gap-4">
