@@ -56,6 +56,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div class="px-5 py-3">
     <template v-if="selectedPattern">
+        <!-- Actions (moved here from each row) — highlighted bar with prominent,
+             semantically-colored buttons so they're impossible to miss. -->
+        <div
+          class="flex items-center gap-2 mb-4 p-2.5 rounded-surface bg-surface-subtle border border-solid border-card-glass-border"
+          data-test="pattern-detail-actions"
+        >
+          <span class="text-xs font-medium text-text-secondary uppercase tracking-wide mr-1">
+            {{ t("logs.patternList.actionsLabel") }}
+          </span>
+          <OButton
+            variant="primary"
+            size="xs"
+            data-test="pattern-detail-include-btn"
+            @click="onInclude"
+          >
+            <template #icon-left><EqualIcon class="size-2.5" /></template>
+            {{ t("logs.patternList.includeInQuery") }}
+          </OButton>
+          <OButton
+            variant="outline-destructive"
+            size="xs"
+            data-test="pattern-detail-exclude-btn"
+            @click="onExclude"
+          >
+            <template #icon-left><NotEqualIcon class="size-2.5" /></template>
+            {{ t("logs.patternList.excludeFromQuery") }}
+          </OButton>
+          <OButton
+            variant="warning"
+            size="xs"
+            icon-left="notifications"
+            data-test="pattern-detail-create-alert-btn"
+            @click="onCreateAlert"
+          >
+            {{ t("logs.patternList.createAlertAction") }}
+          </OButton>
+        </div>
+
         <!-- Statistics -->
         <div class="mb-4">
           <div class="text-sm font-medium mb-1.5">
@@ -77,10 +115,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     class="text-2xl font-semibold font-bold text-primary mt-1"
+                    :title="
+                      volumeCount !== null
+                        ? t('logs.patternList.exactCountTooltip', {
+                            count: volumeCount.toLocaleString(),
+                          })
+                        : undefined
+                    "
                   >
-                    {{
-                      selectedPattern.pattern.frequency.toLocaleString()
-                    }}
+                    {{ occurrencesLabel }}
                   </div>
                 </OCardSection>
               </OCard>
@@ -154,23 +197,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("search.patternTemplate") }}
           </div>
           <div
-            class="px-2.5 py-1.5 font-mono text-compact leading-[1.6] rounded-default border-l-4 border-solid border-l-accent break-all flex flex-wrap items-baseline gap-x-[2px] gap-y-[2px] bg-surface-subtle"
+            class="px-2.5 py-1.5 font-mono text-compact leading-[1.6] rounded-default border-l-4 border-solid border-l-accent whitespace-pre-wrap break-all bg-surface-subtle"
           >
             <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
-              <span v-if="tok.kind === 'text'" class="whitespace-pre">{{ tok.value }}</span>
+              <span v-if="tok.kind === 'text'">{{ tok.value }}</span>
               <span
                 v-else
-                class="inline-flex"
+                class="rounded-default px-0.5 bg-pattern-var-bg text-pattern-var-text"
                 @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
                 @mouseleave="onMouseLeave"
-              >
-                <OTag
-                  type="wildcardChip"
-                  :class="wildcardChipColor(tok.value, tok.sampleValues)"
-                >
-                  {{ wildcardLabel(tok.value, tok.sampleValues) }}
-                </OTag>
-              </span>
+              >{{ tok.mask ?? wildcardLabel(tok.value, tok.sampleValues) }}</span>
             </template>
           </div>
         </div>
@@ -292,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 
-import { computed } from "vue";
+import { computed, inject, watch } from "vue";
 import useTheme from "@/composables/useTheme";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -301,19 +337,25 @@ import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import {
   tokenizeTemplate,
-  wildcardChipColor,
   wildcardLabel,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
 import { extractStatusFromTemplate } from "@/utils/logs/statusParser";
+import { compactCount } from "./patternUtils";
+import {
+  PATTERN_VOLUME_CACHE,
+  type PatternVolumeCache,
+} from "./usePatternVolume";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -321,13 +363,62 @@ const props = defineProps<{
   totalPatterns: number;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:modelValue", value: boolean): void;
   (e: "navigate", next: boolean, prev: boolean): void;
   (e: "filter-value", value: string, action: "include" | "exclude"): void;
+  (e: "add-to-search", pattern: any, action: "include" | "exclude"): void;
+  (e: "create-alert", pattern: any): void;
 }>();
 
 const { t } = useI18n();
+
+// Window-wide occurrences for the selected pattern, read from the SAME cache the
+// rows use. Opening a row is therefore a cache hit and shows its real count
+// immediately — previously this panel ran its own query and displayed the
+// extraction-sample figure (a few hundred) until that resolved, so the number
+// visibly jumped. Paging to a pattern that was never on screen still has to
+// fetch, and shows a placeholder rather than a number we know to be wrong.
+const volumeCache = inject<PatternVolumeCache | null>(PATTERN_VOLUME_CACHE, null);
+
+const volumeEntry = computed(() =>
+  props.selectedPattern?.pattern
+    ? volumeCache?.get(props.selectedPattern.pattern)
+    : undefined,
+);
+const volumeCount = computed<number | null>(() => volumeEntry.value?.total ?? null);
+
+// Pull in anything not already cached (Next/Prev past the rendered rows).
+watch(
+  () => props.selectedPattern?.pattern,
+  (pattern) => {
+    if (pattern && !volumeEntry.value) volumeCache?.request(pattern);
+  },
+  { immediate: true },
+);
+
+const occurrencesLabel = computed(() =>
+  volumeCount.value !== null ? `~${compactCount(volumeCount.value)}` : "…",
+);
+
+// Row-level actions now live in this side panel. Each fires the action and
+// closes the drawer (include/exclude switch to the logs view; create-alert
+// navigates to the alert form).
+const onInclude = () => {
+  if (!props.selectedPattern) return;
+  emit("add-to-search", props.selectedPattern.pattern, "include");
+  emit("update:modelValue", false);
+};
+const onExclude = () => {
+  if (!props.selectedPattern) return;
+  emit("add-to-search", props.selectedPattern.pattern, "exclude");
+  emit("update:modelValue", false);
+};
+const onCreateAlert = () => {
+  if (!props.selectedPattern) return;
+  emit("create-alert", props.selectedPattern.pattern);
+  emit("update:modelValue", false);
+};
 const { isDark } = useTheme();
 
 const {

@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OTooltip class="text-center"
               :content="item.title"
-              data-test="dashboard-addpanel-chart-selection-tooltip"
             />
           </div>
         </li>

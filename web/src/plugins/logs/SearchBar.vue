@@ -557,7 +557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-toolbar"
             >
               <OIcon name="menu" size="sm" />
-              <OTooltip style="width: 110px" :content="t('search.moreActions')" />
+              <OTooltip max-width="7rem" :content="t('search.moreActions')" />
             </OButton>
           </template>
 

@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <template v-if="patternChips">
               <OTag
+                v-if="patternChips.events !== null"
                 type="logsResultChip"
                 value="neutral"
                 data-test="logs-result-events-chip"
@@ -531,9 +532,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :scroll-target="scrollContainerRef"
             :stream-doc-time-range="streamDocTimeRange"
             :query-window-us="queryWindowUs"
+            :window-total="patternWindowTotal"
             @open-details="openPatternDetails"
-            @add-to-search="addPatternToSearch"
-            @create-alert="createAlertFromPattern"
             @filter-value="addWildcardValueToSearch"
             @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
           />
@@ -593,9 +593,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <PatternDetailsDialog
         v-model="showPatternDetails"
         :selectedPattern="selectedPattern"
-        :totalPatterns="patternsState?.patterns?.patterns?.length || 0"
+        :totalPatterns="patternNavTotal"
         @navigate="navigatePatternDetail"
         @filter-value="addWildcardValueToSearch"
+        @add-to-search="addPatternToSearch"
+        @create-alert="createAlertFromPattern"
       />
 
       <!-- Volume Analysis Dashboard -->
@@ -655,6 +657,7 @@ import {
   watch,
   nextTick,
   type PropType,
+  provide,
 } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
@@ -704,6 +707,13 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  buildPatternVolumeContext,
+  fetchWindowTotal,
+  usePatternVolumeCache,
+  PATTERN_VOLUME_CACHE,
+  type PatternVolumeContext,
+} from "./patterns/usePatternVolume";
 
 export default defineComponent({
   name: "SearchResult",
@@ -1014,8 +1024,14 @@ export default defineComponent({
       if (!stats) return null;
 
       const patternsFound = stats.total_patterns_found || 0;
-      const totalEvents = searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
-      const totalEventsStr = totalEvents ? formatLargeNumber(totalEvents) : "0";
+      // The window's real event count — NOT `total_logs_analyzed`, which is the
+      // extraction sample (capped at ~10K). Showing that read as "this window
+      // holds 10K events" when it holds millions, and disagreed with the same
+      // chip when arriving from the search page.
+      const totalEvents =
+        patternWindowTotal.value ?? searchObj.data.queryResults?.total ?? null;
+      const totalEventsStr =
+        totalEvents === null ? null : formatLargeNumber(totalEvents);
       const totalTimeMs =
         (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
 
@@ -1048,10 +1064,54 @@ export default defineComponent({
       showPatternDetails,
       openPatternDetails,
       navigatePatternDetail,
+      navTotal: patternNavTotal,
       addPatternToSearch,
       addWildcardValueToSearch,
       createAlertFromPattern,
     } = usePatternActions();
+
+    // Context the pattern details drawer needs to look up a pattern's
+    // window-wide volume, so its Occurrences figure matches the list's `~N`
+    // instead of falling back to the much smaller extraction-sample count.
+    const patternVolumeContext = computed<PatternVolumeContext | null>(() =>
+      buildPatternVolumeContext({
+        orgId: store.state.selectedOrganization?.identifier ?? "",
+        streamName: searchObj.data.stream.selectedStream[0],
+        window: props.queryWindowUs as { start: number; end: number } | undefined,
+        lastQuery: patternsState.value?.lastQuery,
+      }),
+    );
+
+    // Exact event count for the query window, from one aggregate query. Feeds
+    // both the "N events" chip and the severity-chip scaling in PatternList, so
+    // they can't disagree. Generation-guarded: a slow reply for an earlier
+    // window must not overwrite the current one.
+    // One volume cache for the whole patterns view. Provided here rather than in
+    // PatternList so the details drawer — a sibling of the list, not a child —
+    // reads the same entries the rows already fetched. Opening a row is then a
+    // cache hit and shows its real count immediately, instead of rendering the
+    // extraction-sample figure and swapping it out a moment later.
+    const patternVolumeCache = usePatternVolumeCache(patternVolumeContext);
+    provide(PATTERN_VOLUME_CACHE, {
+      request: patternVolumeCache.request,
+      get: patternVolumeCache.get,
+    });
+
+    const patternWindowTotal = ref<number | null>(null);
+    let patternWindowTotalGeneration = 0;
+    watch(
+      patternVolumeContext,
+      async (ctx) => {
+        const token = ++patternWindowTotalGeneration;
+        patternWindowTotal.value = null;
+        if (!ctx) return;
+        const total = await fetchWindowTotal(ctx);
+        if (token === patternWindowTotalGeneration) {
+          patternWindowTotal.value = total;
+        }
+      },
+      { immediate: true },
+    );
 
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -1987,6 +2047,9 @@ export default defineComponent({
       showVolumeAnalysisDashboard,
       openPatternDetails,
       navigatePatternDetail,
+      patternNavTotal,
+      patternVolumeContext,
+      patternWindowTotal,
       addPatternToSearch,
       addWildcardValueToSearch,
       createAlertFromPattern,

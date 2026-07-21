@@ -143,20 +143,8 @@ describe("PatternCard", () => {
   });
 
   describe("Pattern Actions", () => {
-    it("should display include button", () => {
-      const includeBtn = wrapper.find(
-        '[data-test="pattern-card-0-include-btn"]',
-      );
-      expect(includeBtn.exists()).toBe(true);
-    });
-
-    it("should display exclude button", () => {
-      const excludeBtn = wrapper.find(
-        '[data-test="pattern-card-0-exclude-btn"]',
-      );
-      expect(excludeBtn.exists()).toBe(true);
-    });
-
+    // Row-level include/exclude/create-alert buttons were moved into the details
+    // side panel (PatternDetailsDialog); the row now only opens the panel.
     it("should emit click event when card is clicked", async () => {
       const card = wrapper.find('[data-test="pattern-card-0"]');
       await card.trigger("click");
@@ -165,41 +153,10 @@ describe("PatternCard", () => {
       expect(wrapper.emitted("click")![0]).toEqual([mockPattern, mockIndex]);
     });
 
-    it("should emit include event when include button is clicked", async () => {
-      const includeBtn = wrapper.find(
-        '[data-test="pattern-card-0-include-btn"]',
-      );
-      await includeBtn.trigger("click");
-
-      expect(wrapper.emitted("include")).toBeTruthy();
-      expect(wrapper.emitted("include")![0]).toEqual([mockPattern]);
-    });
-
-    it("should emit exclude event when exclude button is clicked", async () => {
-      const excludeBtn = wrapper.find(
-        '[data-test="pattern-card-0-exclude-btn"]',
-      );
-      await excludeBtn.trigger("click");
-
-      expect(wrapper.emitted("exclude")).toBeTruthy();
-      expect(wrapper.emitted("exclude")![0]).toEqual([mockPattern]);
-    });
-
-    it("should display create alert button", () => {
-      const createAlertBtn = wrapper.find(
-        '[data-test="pattern-card-0-create-alert-btn"]',
-      );
-      expect(createAlertBtn.exists()).toBe(true);
-    });
-
-    it("should emit create-alert event when create alert button is clicked", async () => {
-      const createAlertBtn = wrapper.find(
-        '[data-test="pattern-card-0-create-alert-btn"]',
-      );
-      await createAlertBtn.trigger("click");
-
-      expect(wrapper.emitted("create-alert")).toBeTruthy();
-      expect(wrapper.emitted("create-alert")![0]).toEqual([mockPattern]);
+    it("should not render per-row action buttons", () => {
+      expect(wrapper.find('[data-test="pattern-card-0-include-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="pattern-card-0-exclude-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="pattern-card-0-create-alert-btn"]').exists()).toBe(false);
     });
   });
 
@@ -244,9 +201,10 @@ describe("PatternCard", () => {
   });
 
   describe("wrap prop", () => {
-    it("should apply flex-nowrap class on template when wrap is false (default)", () => {
+    it("should render a single truncated line when wrap is false (default)", () => {
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(template.classes()).toContain("flex-nowrap");
+      // Continuous message line: whitespace preserved, ellipsis on overflow.
+      expect(template.classes()).toContain("whitespace-pre");
       expect(template.classes()).toContain("overflow-hidden");
       expect(template.classes()).not.toContain("flex-wrap");
     });
@@ -254,16 +212,15 @@ describe("PatternCard", () => {
     it("should apply break-all class on template when wrap is true", async () => {
       await wrapper.setProps({ wrap: true });
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      // flex-wrap removed in commit eb9f1f80f2; flex layout moves to the false branch
       expect(template.classes()).toContain("break-all");
-      expect(template.classes()).not.toContain("flex-nowrap");
+      expect(template.classes()).toContain("whitespace-pre-wrap");
     });
 
-    it("should revert to flex-nowrap when wrap is toggled back to false", async () => {
+    it("should revert to single-line when wrap is toggled back to false", async () => {
       await wrapper.setProps({ wrap: true });
       await wrapper.setProps({ wrap: false });
       const template = wrapper.find('[data-test="pattern-card-0-template"]');
-      expect(template.classes()).toContain("flex-nowrap");
+      expect(template.classes()).toContain("whitespace-pre");
     });
   });
 

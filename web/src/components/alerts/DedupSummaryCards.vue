@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div data-test="alerts-with-dedup-label" class="text-sm text-text-secondary flex items-center gap-1">
           Using Deduplication
           <OIcon data-test="dedup-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
-            <OTooltip data-test="dedup-info-tooltip" content="Alerts with deduplication configured" />
+            <OTooltip content="Alerts with deduplication configured" />
         </div>
       </OCardSection>
     </OCard>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div data-test="suppression-rate-label" class="text-sm text-text-secondary flex items-center gap-1">
           Suppression Rate (24h)
           <OIcon data-test="suppression-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
-            <OTooltip data-test="suppression-info-tooltip">
+            <OTooltip>
               <template #content>
                 {{ summary.suppressions_total }} suppressed /
                 {{ summary.suppressions_total + summary.passed_total }} total
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div data-test="pending-batches-label" class="text-sm text-text-secondary flex items-center gap-1">
           Pending Batches
           <OIcon data-test="pending-batches-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
-            <OTooltip data-test="pending-batches-info-tooltip" content="Alerts waiting to be grouped together" />
+            <OTooltip content="Alerts waiting to be grouped together" />
         </div>
       </OCardSection>
     </OCard>

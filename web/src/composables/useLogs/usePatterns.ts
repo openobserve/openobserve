@@ -121,6 +121,13 @@ export default function usePatterns() {
           avg_frequency: pattern.avg_frequency ?? 0,
           // Per-wildcard value distributions for hover tooltips
           wildcard_values: pattern.wildcard_values ?? [],
+          // Per-pattern volume sparkline + dominant service (enterprise backend;
+          // absent on older backends → safe empty defaults).
+          time_buckets: pattern.time_buckets ?? [],
+          service: pattern.service ?? null,
+          service_other_count: pattern.service_other_count ?? 0,
+          // Dominant status/level read from the log's severity/level field.
+          level: pattern.level ?? null,
         }),
       );
 

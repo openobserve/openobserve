@@ -995,8 +995,12 @@ export default defineComponent({
         searchObj.meta.clearCache = clear_cache;
         searchObj.meta.refreshHistogram = true;
 
-        // Fetch histogram data only (not logs) for patterns mode
-        await getHistogramData();
+        // Fetch histogram data only (not logs) for patterns mode. It needs the
+        // same request the extraction ran on: called with no arguments it threw
+        // on `queryReq.query`, and because the throw happens inside the
+        // manager's own promise it escaped this try/catch as an unhandled
+        // rejection rather than surfacing as a search error.
+        await getHistogramData(queryReq, { clear_cache });
         refreshHistogramChart();
       } catch (error) {
         console.error("[Index] Error extracting patterns:", error);

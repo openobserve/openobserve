@@ -808,6 +808,10 @@ const useIngestionRoutes = () => {
           },
           children: [
             {
+              // Named so the router doesn't warn about an unnamed empty-path
+              // child under a named parent. Nothing navigates to this name; it
+              // exists only to land /ai-integrations on the first integration.
+              name: "ai-integrations-default",
               path: "",
               redirect: () => {
                 const first = aiCategories[0].integrations[0];
