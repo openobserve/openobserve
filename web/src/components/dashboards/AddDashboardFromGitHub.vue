@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,96 +15,152 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="add-dashboard-from-github-drawer"
+  <ODrawer
+    data-test="add-dashboard-from-github-drawer"
     v-model:open="show"
     side="right"
-    size="lg"
+    size="xl"
     :title="t('dashboard.addDashboardFromGitHub.title')"
     :secondary-button-label="t('dashboard.addDashboardFromGitHub.cancel')"
-    :primary-button-label="t('dashboard.addDashboardFromGitHub.next', { count: selectedDashboards.length })"
+    :primary-button-label="primaryButtonLabel"
     :primary-button-disabled="selectedDashboards.length === 0"
+    :primary-button-loading="preparing"
+    bleed
     @click:secondary="show = false"
     @click:primary="handleNext"
   >
-        <!-- Loading State -->
-        <div
-          v-if="loading"
-          class="flex flex-1 items-center justify-center"
-        >
-          <OSpinner size="lg" />
-        </div>
+    <!-- Loading -->
+    <div
+      v-if="loading"
+      class="flex flex-col items-center justify-center gap-3 min-h-80 px-page-edge"
+    >
+      <OSpinner size="lg" />
+      <OText variant="meta">{{
+        t("dashboard.addDashboardFromGitHub.loading")
+      }}</OText>
+    </div>
 
-        <!-- Error State -->
-        <div
-          v-else-if="error"
-          class="flex flex-1 flex-col items-center justify-center text-center"
-        >
-          <OIcon
-            name="error-outline"
-            class="mb-2 w-[3em] h-[3em]" />
-          <div class="text-status-error-text">{{ error }}</div>
-          <OButton
-            variant="primary"
-            size="sm"
-            class="mt-4"
-            @click="loadDashboards"
-            >{{ t('dashboard.addDashboardFromGitHub.retry') }}</OButton
+    <!-- Error -->
+    <OEmptyState
+      v-else-if="error"
+      preset="load-error"
+      size="hero"
+      :description="error"
+      :action-label="t('dashboard.addDashboardFromGitHub.retry')"
+      @action="loadDashboards"
+    />
+
+    <!-- Gallery. The drawer body is `bleed` (no padding) so the sticky toolbar
+         can pin flush at the very top of the drawer's own scroll — with the
+         default body inset it pinned below the padding and cards peeked into
+         that strip. We re-add the horizontal inset (px-page-edge) ourselves. -->
+    <div v-else class="flex flex-col">
+      <!-- Toolbar — sticks flush to the top; its opaque bg covers cards that
+           scroll underneath. Keeps the drawer's own scroll shadow. -->
+      <div
+        class="sticky top-0 z-20 flex flex-col gap-2 bg-dialog-bg px-page-edge pt-3 pb-2"
+      >
+        <OSearchInput
+          v-model="searchQuery"
+          :placeholder="t('dashboard.addDashboardFromGitHub.searchPlaceholder')"
+          clearable
+          data-test="add-dashboard-github-search"
+          class="w-full"
+        />
+        <!-- Fixed-height meta row: 'available' pinned right, 'selected' badge
+             appears to its left so neither the search nor the count ever shifts. -->
+        <div class="flex items-center justify-end gap-2 min-h-6 whitespace-nowrap">
+          <OTag
+            v-if="selectedDashboards.length"
+            variant="primary-soft"
+            size="xs"
           >
+            {{
+              t("dashboard.addDashboardFromGitHub.selectedCount", {
+                count: selectedDashboards.length,
+              })
+            }}
+          </OTag>
+          <OText variant="meta">{{
+            t("dashboard.addDashboardFromGitHub.dashboardsAvailable", {
+              count: filteredDashboards.length,
+            })
+          }}</OText>
         </div>
+      </div>
 
-        <!-- Dashboard List -->
-        <div v-else class="flex flex-col mx-2 my-2">
-          <OSearchInput
-            v-model="searchQuery"
-            :placeholder="t('dashboard.addDashboardFromGitHub.searchPlaceholder')"
-            clearable
-            class="mb-3"
-            data-test="add-dashboard-github-search"
-          />
+      <!-- Empty search -->
+      <OEmptyState
+        v-if="!filteredDashboards.length"
+        preset="no-search-results"
+        size="hero"
+        filtered
+        class="px-page-edge"
+        @action="searchQuery = ''"
+      />
 
-          <div class="text-xs text-text-secondary mb-2 px-1">
-            {{ t('dashboard.addDashboardFromGitHub.dashboardsAvailable', { count: filteredDashboards.length }) }}
+      <!-- Grouped sections -->
+      <div v-else class="flex flex-col gap-6 px-page-edge pb-3">
+        <div
+          v-for="[category, items] in groupedDashboards"
+          :key="category"
+          class="flex flex-col gap-2"
+        >
+          <!-- Group header — sticks just below the toolbar while its category
+               scrolls (top ≈ toolbar height 5.375rem, tucked slightly under). -->
+          <div
+            class="sticky top-21 z-10 flex items-center gap-2 pt-0.5 pb-1.5 bg-dialog-bg border-b border-border-default"
+          >
+            <OTag
+              :variant="getCategoryInfo(items[0]).variant"
+              :icon="getCategoryInfo(items[0]).icon"
+              size="sm"
+            />
+            <OText variant="label" class="font-semibold">{{
+              categoryLabel(category)
+            }}</OText>
+            <OTag variant="default-soft" size="xs">{{
+              items.length
+            }}</OTag>
           </div>
 
-          <ul
-            class="flex flex-col rounded-default list-none p-0 m-0 max-h-[calc(100dvh-12.5rem)] overflow-y-auto"
-            :class="filteredDashboards.length > 0 ? 'border border-border-default' : ''"
-          >
-            <li
-              v-for="dashboard in filteredDashboards"
+          <!-- 2-column card grid for this group -->
+          <div class="grid grid-cols-2 gap-1.5 content-start">
+            <div
+              v-for="dashboard in items"
               :key="dashboard.name"
-              @click="toggleDashboard(dashboard)"
-              class="flex items-center gap-2 px-3 py-1 cursor-pointer transition-colors duration-200 border-l-4"
-              :class="[
+              role="button"
+              tabindex="0"
+              :aria-pressed="isSelected(dashboard)"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-default border select-none min-w-0 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              :class="
                 isSelected(dashboard)
-                  ? 'bg-theme-tab-bg! border-primary-600'
-                  : 'border-transparent hover:bg-hover-gray',
-              ]"
+                  ? 'border-accent bg-surface-accent-hover'
+                  : 'border-border-default bg-surface-base hover:border-accent'
+              "
               data-test="add-dashboard-github-item"
+              @click="toggleDashboard(dashboard)"
+              @keydown.enter.prevent="toggleDashboard(dashboard)"
+              @keydown.space.prevent="toggleDashboard(dashboard)"
             >
-              <div class="shrink-0 pr-2">
-                <OCheckbox
-                  :model-value="isSelected(dashboard)"
-                  @update:model-value="toggleDashboard(dashboard)"
-                />
-              </div>
-              <div class="flex flex-col flex-1 min-w-0">
-                <span class="text-sm font-medium">
-                  {{ dashboard.displayName }}
-                </span>
-                <span
-                  v-if="dashboard.description"
-                  class="block text-xs text-text-muted"
-                >
-                  {{ dashboard.description }}
-                </span>
-              </div>
-            </li>
-          </ul>
+              <span
+                class="flex-1 min-w-0 truncate text-sm font-medium text-text-heading"
+                >{{ dashboard.displayName }}</span
+              >
+              <OCheckbox
+                :model-value="isSelected(dashboard)"
+                size="sm"
+                class="shrink-0 pointer-events-none"
+              />
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
 
     <!-- Folder Selection Dialog -->
-    <ODialog data-test="add-dashboard-from-github-folder-selection-dialog"
+    <ODialog
+      data-test="add-dashboard-from-github-folder-selection-dialog"
       v-model:open="showFolderSelection"
       persistent
       size="sm"
@@ -165,7 +221,9 @@ import { useI18n } from "vue-i18n";
 import dashboardsService from "@/services/dashboards";
 import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -184,9 +242,19 @@ interface GitHubDashboard {
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
-  components: { AddFolder, OButton, ODialog, ODrawer, OSearchInput, OSelect, OCheckbox, OSpinner,
-    OIcon,
-},
+  components: {
+    AddFolder,
+    OButton,
+    OText,
+    OTag,
+    OEmptyState,
+    ODialog,
+    ODrawer,
+    OSearchInput,
+    OSelect,
+    OCheckbox,
+    OSpinner,
+  },
   props: {
     modelValue: {
       type: Boolean,
@@ -212,6 +280,7 @@ export default defineComponent({
     const selectedFolderObj = ref<string | null>(null);
     const folderOptions = ref<{ label: string; value: string }[]>([]);
     const importing = ref(false);
+    const preparing = ref(false);
     const showAddFolderDialog = ref(false);
     const addFolderRef = ref<InstanceType<typeof AddFolder> | null>(null);
     const isAddingFolder = ref(false);
@@ -234,6 +303,50 @@ export default defineComponent({
           d.displayName.toLowerCase().includes(query) ||
           d.description?.toLowerCase().includes(query),
       );
+    });
+
+    // Primary button reflects the current selection count.
+    const primaryButtonLabel = computed(() =>
+      selectedDashboards.value.length
+        ? t("dashboard.addDashboardFromGitHub.addCount", {
+            count: selectedDashboards.value.length,
+          })
+        : t("dashboard.addDashboardFromGitHub.selectPrompt"),
+    );
+
+    // Translated display label for a category key.
+    const categoryLabel = (category: string) =>
+      t(`dashboard.addDashboardFromGitHub.category.${category}`);
+
+    // Group filtered dashboards by category for the gallery view
+    const CATEGORY_ORDER = [
+      "aws",
+      "cloudwatch",
+      "googleCloud",
+      "azure",
+      "kubernetes",
+      "database",
+      "networking",
+      "observability",
+      "security",
+      "storage",
+      "dashboard",
+    ];
+    const groupedDashboards = computed(() => {
+      const groups: Record<string, GitHubDashboard[]> = {};
+      for (const d of filteredDashboards.value) {
+        const cat = getCategoryInfo(d).category;
+        (groups[cat] = groups[cat] || []).push(d);
+      }
+      // Sort groups by preferred order, then alphabetically
+      return Object.entries(groups).sort(([a], [b]) => {
+        const ai = CATEGORY_ORDER.indexOf(a);
+        const bi = CATEGORY_ORDER.indexOf(b);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return a.localeCompare(b);
+      });
     });
 
     const isSelected = (dashboard: GitHubDashboard) => {
@@ -362,7 +475,9 @@ export default defineComponent({
     const handleNext = async () => {
       if (selectedDashboards.value.length === 0) return;
 
-      loading.value = true;
+      // Keep the gallery visible and show the spinner on the primary button
+      // while we fetch each selection's JSON files, then open the folder dialog.
+      preparing.value = true;
       try {
         // Fetch JSON files for selected dashboards if not already loaded
         for (const dashboard of selectedDashboards.value) {
@@ -397,7 +512,7 @@ export default defineComponent({
         await loadFolders();
         showFolderSelection.value = true;
       } finally {
-        loading.value = false;
+        preparing.value = false;
       }
     };
 
@@ -586,6 +701,7 @@ export default defineComponent({
       selectedFolderObj,
       folderOptions,
       importing,
+      preparing,
       showAddFolderDialog,
       addFolderRef,
       isAddingFolder,
@@ -596,7 +712,38 @@ export default defineComponent({
       handleNext,
       confirmAdd,
       updateFolderList,
+      getCategoryInfo,
+      groupedDashboards,
+      primaryButtonLabel,
+      categoryLabel,
     };
   },
 });
+
+// Classify a dashboard into a category key, its icon, and a token-backed
+// badge variant. Category keys resolve to translated labels via categoryLabel().
+function getCategoryInfo(dashboard: { name: string }) {
+  const n = dashboard.name.toLowerCase();
+  if (n.includes("aws") || n.includes("amazon") || n.includes("ec2") || n.includes("s3") || n.includes("rds") || n.includes("elb") || n.includes("lambda"))
+    return { icon: "cloud",         variant: "orange-soft",  category: "aws" };
+  if (n.includes("cloudwatch"))
+    return { icon: "cloud",         variant: "orange-soft",  category: "cloudwatch" };
+  if (n.includes("gcp") || n.includes("google") || n.includes("bigquery") || n.includes("pubsub"))
+    return { icon: "cloud",         variant: "blue-soft",    category: "googleCloud" };
+  if (n.includes("azure") || n.includes("microsoft"))
+    return { icon: "cloud",         variant: "cyan-soft",    category: "azure" };
+  if (n.includes("kubernetes") || n.includes("k8s") || n.includes("kube") || n.includes("pod") || n.includes("helm") || n.includes("container") || n.includes("docker"))
+    return { icon: "hub",           variant: "indigo-soft",  category: "kubernetes" };
+  if (n.includes("postgres") || n.includes("mysql") || n.includes("mongo") || n.includes("redis") || n.includes("elastic") || n.includes("cassandra") || n.includes("database") || n.includes("db"))
+    return { icon: "database",      variant: "purple-soft",  category: "database" };
+  if (n.includes("nginx") || n.includes("apache") || n.includes("haproxy") || n.includes("istio") || n.includes("envoy") || n.includes("traefik"))
+    return { icon: "dns",           variant: "teal-soft",    category: "networking" };
+  if (n.includes("security") || n.includes("audit") || n.includes("threat") || n.includes("waf") || n.includes("firewall"))
+    return { icon: "shield",        variant: "error-soft",   category: "security" };
+  if (n.includes("monitor") || n.includes("alert") || n.includes("metric") || n.includes("prometheus") || n.includes("opentelemetry") || n.includes("otel"))
+    return { icon: "monitor-heart", variant: "success-soft", category: "observability" };
+  if (n.includes("storage") || n.includes("disk") || n.includes("blob"))
+    return { icon: "storage",       variant: "amber-soft",   category: "storage" };
+  return   { icon: "dashboard",     variant: "primary-soft", category: "dashboard" };
+}
 </script>

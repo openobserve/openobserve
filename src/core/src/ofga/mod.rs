@@ -75,6 +75,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_anomaly_detection_migration = false;
     let mut need_online_eval_migration = false;
     let mut need_billing_group_migration = false;
+    let mut need_workflows_migration = false;
     let mut need_synthetics_migration = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
@@ -260,6 +261,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_34 = version_compare::Version::from("0.0.34").unwrap();
                 let v0_0_35 = version_compare::Version::from("0.0.35").unwrap();
                 let v0_0_36 = version_compare::Version::from("0.0.36").unwrap();
+                let v0_0_37 = version_compare::Version::from("0.0.37").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -337,6 +339,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if existing_model_version < v0_0_36 {
                     log::info!("[OFGA:Local] synthetics permissions migration needed");
                     need_synthetics_migration = true;
+                }
+                if existing_model_version < v0_0_37 {
+                    log::info!("[OFGA:Local] workflows permissions migration needed");
+                    need_workflows_migration = true;
                 }
             }
 
@@ -478,6 +484,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if need_synthetics_migration {
                         get_ownership_all_org_tuple(org_name, "synthetic_folder", &mut tuples);
                         get_ownership_all_org_tuple(org_name, "synthetics", &mut tuples);
+                    }
+                    if need_workflows_migration {
+                        get_ownership_all_org_tuple(org_name, "workflows", &mut tuples);
                     }
                 }
                 if need_alert_folders_migration {

@@ -95,6 +95,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .query_multi_time_range
             .map(serde_json::from_value)
             .transpose()?;
+        let workflows: Vec<String> = serde_json::from_value(value.workflows)?;
 
         // Transform the Unix timestamp into a date time that will always use
         // the UTC timezone.
@@ -161,6 +162,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
         }
 
         alert.creates_incident = value.creates_incident;
+        alert.workflows = workflows;
 
         Ok(alert)
     }
@@ -673,6 +675,7 @@ fn update_mutable_fields(
     let last_edited_by = alert.last_edited_by.filter(|s| !s.is_empty());
     let align_time = alert.trigger_condition.align_time;
     let updated_at: i64 = chrono::Utc::now().timestamp_micros();
+    let workflows = serde_json::to_value(alert.workflows)?;
 
     // Handle deduplication configuration
     // Note: time_window_minutes is stored in a separate column, not in the JSON config
@@ -726,6 +729,7 @@ fn update_mutable_fields(
     alert_am.dedup_time_window_minutes = Set(dedup_time_window_minutes);
     alert_am.dedup_config = Set(dedup_config);
     alert_am.creates_incident = Set(alert.creates_incident);
+    alert_am.workflows = Set(workflows);
     Ok(())
 }
 
@@ -800,6 +804,7 @@ mod tests {
             dedup_time_window_minutes: None,
             dedup_config: None,
             creates_incident: false,
+            workflows: serde_json::json!(["abc123"]),
         }
     }
 
