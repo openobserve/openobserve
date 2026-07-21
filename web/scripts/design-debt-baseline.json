@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 60,
+    "rawProjectRamp": 36,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -178,23 +178,15 @@
       "rawVarInComponent": 2
     },
     "lib/core/Button/OButton.vue": {
-      "rawProjectRamp": 4
-    },
-    "lib/core/Code/OCode.vue": {
-      "rawProjectRamp": 2
+      "rawProjectRamp": 1
     },
     "lib/core/Code/OCodeBlock.vue": {
       "rawVarInComponent": 13
     },
-    "lib/core/EmptyState/EmptyStateActionCard.vue": {
-      "rawProjectRamp": 2
-    },
     "lib/core/EmptyState/EmptyStateIngestionCard.vue": {
-      "rawProjectRamp": 2,
       "rawVarInComponent": 12
     },
     "lib/core/EmptyState/EmptyStateIngestionChip.vue": {
-      "rawProjectRamp": 3,
       "rawVarInComponent": 5
     },
     "lib/core/EmptyState/illustrations/EmptyAlert.vue": {
@@ -248,15 +240,8 @@
     "lib/core/EmptyState/illustrations/EmptyWaiting.vue": {
       "stylePxUnit": 2
     },
-    "lib/core/Navbar/ONavGroup.vue": {
-      "rawProjectRamp": 1
-    },
     "lib/core/Navbar/ONavbar.vue": {
-      "rawProjectRamp": 2,
       "rawVarInComponent": 1
-    },
-    "lib/core/PageHeader/OPageHeader.vue": {
-      "rawProjectRamp": 1
     },
     "lib/core/Splitter/OSplitter.vue": {
       "rawVarInComponent": 1
@@ -282,23 +267,13 @@
     "lib/forms/Color/OColor.vue": {
       "arbZ": 1
     },
-    "lib/forms/Date/ODate.vue": {
-      "rawProjectRamp": 1
-    },
     "lib/forms/DateTimeRange/ODateRangeCalendar.vue": {
       "rawVarInComponent": 2
     },
-    "lib/forms/Input/OInput.vue": {
-      "rawProjectRamp": 1
-    },
     "lib/forms/Select/OSelect.vue": {
-      "rawProjectRamp": 4,
       "arbZ": 2
     },
     "lib/forms/Switch/OSwitch.vue": {
-      "rawProjectRamp": 2
-    },
-    "lib/forms/Time/OTime.vue": {
       "rawProjectRamp": 1
     },
     "lib/lists/FieldList/OFieldList.vue": {

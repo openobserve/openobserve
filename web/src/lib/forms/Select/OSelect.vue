@@ -1109,7 +1109,7 @@ const fieldWidthClass = computed(() => {
               'bg-select-bg',
               hasError
                 ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
-                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
+                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-accent/25',
               /* Keep the red error border on focus; focus border color applies only when there's no error. */
               'focus:outline-none',
               'transition-[color,background-color,border-color,box-shadow] duration-150',
@@ -1668,7 +1668,7 @@ const fieldWidthClass = computed(() => {
             'bg-select-bg',
             hasError
               ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
-              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
+              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-accent/25',
             /* Keep the red error border on focus; focus border color applies only when there's no error. */
             'focus:outline-none',
             'transition-[color,background-color,border-color,box-shadow] duration-150',

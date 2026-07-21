@@ -220,7 +220,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "bg-transparent text-inherit border border-border-default",
     "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
     "transition-colors duration-150",
-    "enabled:hover:border-primary-600 enabled:hover:text-primary-600 enabled:hover:bg-button-ghost-hover-bg",
+    "enabled:hover:border-accent enabled:hover:text-accent enabled:hover:bg-button-ghost-hover-bg",
     "disabled:opacity-60",
   ].join(" "),
 };
@@ -288,7 +288,7 @@ const classes = computed<string[]>(() => [
      halo hugging the control (no ring-offset gap). The trailing `!` overrides
      each variant's own ring width/color below, so every button focuses with the
      exact same soft glow regardless of variant. */
-  "focus-visible:ring-[0.125rem]! focus-visible:ring-primary-500/25!",
+  "focus-visible:ring-[0.125rem]! focus-visible:ring-accent/25!",
   "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   props.active ? activeClasses : variantClasses[props.variant],
