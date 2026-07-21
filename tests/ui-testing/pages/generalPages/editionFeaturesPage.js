@@ -4,6 +4,7 @@
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
+
 // Enterprise features rendered in the dialog for OSS and ENT builds (non-cloud layout).
 // Source of truth: web/src/components/EnterpriseUpgradeDialog.vue (FEATURE_LINKS + enterpriseFeatures).
 // expectedPath = fragment that must appear in the final openobserve.ai URL after the
