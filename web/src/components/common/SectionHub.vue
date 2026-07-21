@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="router.push(item.to)"
           >
             <span
-              class="shrink-0 mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-default bg-surface-subtle text-text-secondary transition-colors group-hover:bg-primary-50 group-hover:text-primary-600"
+              class="shrink-0 mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-default bg-surface-subtle text-text-secondary transition-colors group-hover:bg-tabs-hover-bg group-hover:text-accent"
             >
               <img
                 v-if="item.icon && isImg(item.icon)"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="flex flex-col min-w-0">
               <span
-                class="text-sm font-semibold text-text-heading transition-colors group-hover:text-primary-600"
+                class="text-sm font-semibold text-text-heading transition-colors group-hover:text-accent"
                 >{{ item.label }}</span
               >
               <span

@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!hideChevron"
       name="chevron-right"
       size="sm"
-      class="relative shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-primary-600"
+      class="relative shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-accent"
     />
   </button>
 </template>

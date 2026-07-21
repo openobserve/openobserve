@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-compact font-semibold text-text-heading truncate">{{ label }}</span>
       <span v-if="sublabel" class="text-xs text-text-secondary leading-[1.4]">{{ sublabel }}</span>
     </span>
-    <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-primary-600" />
+    <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent" />
   </button>
 </template>
 

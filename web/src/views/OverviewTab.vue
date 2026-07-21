@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
           <span v-if="incidentsTotal > incidents.length" class="ml-2 text-xs font-normal text-text-secondary align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-text-link bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="flex flex-col border border-[0.0625em] border-border-default rounded-default overflow-hidden">
         <div
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             — viewing <strong class="font-semibold text-text-body">{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-text-link bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="relative">
         <!-- Left fade + floating scroll control (only present when scrollable) -->
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('overview.activeAnomalies') }}
           <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-text-link bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="flex flex-col gap-1.5">
         <div
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('overview.recentEvents') }}
           <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-text-link bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-default overflow-hidden bg-surface-base">
         <div
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-(length:--text-sm) font-semibold text-text-heading truncate">{{ t('overview.emptyActionAlerts') }}</span>
             <span class="text-(length:--text-xs) text-text-secondary leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-primary-600" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent" />
         </button>
         <!-- Explore logs -->
         <button v-if="showLogsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-logs-card" @click="goToLogs">
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-(length:--text-sm) font-semibold text-text-heading truncate">{{ t('overview.emptyActionLogs') }}</span>
             <span class="text-(length:--text-xs) text-text-secondary leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-primary-600" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent" />
         </button>
         <!-- Explore traces -->
         <button v-if="showTracesCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-traces-card" @click="goToTraces">
@@ -344,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-(length:--text-sm) font-semibold text-text-heading truncate">{{ t('overview.emptyActionTraces') }}</span>
             <span class="text-(length:--text-xs) text-text-secondary leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-primary-600" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent" />
         </button>
       </template>
     </OEmptyState>

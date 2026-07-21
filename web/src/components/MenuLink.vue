@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="icon-wrapper relative inline-flex items-center justify-center rounded-default p-0.5 transition-colors duration-250"
         :class="isActive
           ? activeIconClass
-          : 'text-tabs-inactive-text group-hover:text-primary-600'"
+          : 'text-tabs-inactive-text group-hover:text-accent'"
       >
         <!-- Rail icons are a hair smaller than the md (24px) default. -->
         <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="nav-menu-item-label text-xs tracking-[0.01em] transition-colors duration-250 w-full text-center leading-tight line-clamp-2 wrap-normal break-normal [hyphens:none]"
         :class="isActive
           ? activeLabelClass
-          : 'font-medium text-tabs-inactive-text group-hover:text-primary-600'"
+          : 'font-medium text-tabs-inactive-text group-hover:text-accent'"
       >{{ title }}</div>
     </div>
 

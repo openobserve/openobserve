@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 131,
+    "rawProjectRamp": 107,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -25,7 +25,7 @@
       "rawVarInComponent": 2
     },
     "components/MenuLink.vue": {
-      "rawProjectRamp": 10
+      "rawProjectRamp": 8
     },
     "components/O2AIChat.vue": {
       "rawVarInComponent": 50
@@ -91,9 +91,6 @@
     "components/alerts/SemanticFieldGroupsConfig.vue": {
       "rawVarInComponent": 1
     },
-    "components/alerts/steps/QueryConfig.vue": {
-      "rawProjectRamp": 2
-    },
     "components/anomaly_detection/AnomalySummary.vue": {
       "rawVarInComponent": 7
     },
@@ -105,10 +102,10 @@
       "arbZ": 1
     },
     "components/common/SectionHub.vue": {
-      "rawProjectRamp": 5
+      "rawProjectRamp": 2
     },
     "components/common/empty-states/QuickStartCard.vue": {
-      "rawProjectRamp": 4
+      "rawProjectRamp": 3
     },
     "components/dashboards/AddDashboardFromGitHub.vue": {
       "rawProjectRamp": 1
@@ -181,15 +178,6 @@
     "components/synthetics/CreateBrowserTestSkeleton.vue": {
       "rawProjectRamp": 1
     },
-    "components/synthetics/journey/BrowserJourney.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/synthetics/journey/BrowserJourneyStep.vue": {
-      "rawProjectRamp": 3
-    },
-    "components/synthetics/journey/JourneySteps.vue": {
-      "rawProjectRamp": 3
-    },
     "components/traces/FlameGraphView.vue": {
       "rawProjectRamp": 1
     },
@@ -235,10 +223,10 @@
       "rawVarInComponent": 13
     },
     "lib/core/EmptyState/EmptyStateActionCard.vue": {
-      "rawProjectRamp": 4
+      "rawProjectRamp": 3
     },
     "lib/core/EmptyState/EmptyStateIngestionCard.vue": {
-      "rawProjectRamp": 3,
+      "rawProjectRamp": 2,
       "rawVarInComponent": 12
     },
     "lib/core/EmptyState/EmptyStateIngestionChip.vue": {
@@ -504,7 +492,7 @@
       "rawVarInComponent": 18
     },
     "views/OverviewTab.vue": {
-      "rawProjectRamp": 14,
+      "rawProjectRamp": 7,
       "arbZ": 1
     },
     "views/synthetics/CreateBrowserTest.vue": {
