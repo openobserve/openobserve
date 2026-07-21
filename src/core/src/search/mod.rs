@@ -462,7 +462,7 @@ pub async fn search_multi(
             Ok(program) => {
                 let registry = program
                     .config
-                    .get_custom::<vector_enrichment::TableRegistry>()
+                    .get_custom::<transform::vector_enrichment::TableRegistry>()
                     .unwrap();
                 registry.finish_load();
                 Some(program)

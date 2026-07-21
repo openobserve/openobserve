@@ -14,13 +14,13 @@ enterprise = [
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
-    "dep:vrl",
     "openobserve-core/enterprise",
 ]
 cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
 
 [dependencies]
 openobserve-api-common.workspace = true
+transform.workspace = true
 openobserve-core.workspace = true
 anyhow.workspace = true
 axum.workspace = true
@@ -47,7 +47,6 @@ tokio.workspace = true
 tracing.workspace = true
 url.workspace = true
 utoipa.workspace = true
-vrl = { workspace = true, optional = true }
 
 [dev-dependencies]
 cron.workspace = true
