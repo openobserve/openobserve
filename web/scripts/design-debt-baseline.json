@@ -1,9 +1,9 @@
 {
   "totals": {
-    "arbZ": 40,
-    "rawVarInComponent": 615,
-    "rawProjectRamp": 149,
-    "unscopedStyle": 8,
+    "arbZ": 35,
+    "rawVarInComponent": 587,
+    "rawProjectRamp": 147,
+    "unscopedStyle": 7,
     "stylePxUnit": 90,
     "darkMechanism": 20
   },
@@ -129,16 +129,8 @@
       "rawProjectRamp": 3,
       "rawVarInComponent": 2
     },
-    "components/pipeline/NodeForm/AssociateFunction.vue": {
-      "rawProjectRamp": 2,
-      "rawVarInComponent": 7
-    },
     "components/pipeline/NodeForm/CreateDestinationForm.vue": {
       "arbZ": 1
-    },
-    "components/pipeline/NodeSidebar.vue": {
-      "unscopedStyle": 1,
-      "rawVarInComponent": 21
     },
     "components/pipeline/PipelineEditor.vue": {
       "unscopedStyle": 1,
@@ -426,7 +418,7 @@
       "rawProjectRamp": 2
     },
     "plugins/pipelines/CustomNode.vue": {
-      "arbZ": 7,
+      "arbZ": 2,
       "rawVarInComponent": 10
     },
     "plugins/pipelines/PipelineFlow.vue": {

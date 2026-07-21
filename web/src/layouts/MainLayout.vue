@@ -342,6 +342,11 @@ export default defineComponent({
       );
     });
 
+    // Workflows — enterprise/cloud only (FD3). Build-time gate, no runtime flag.
+    const isWorkflowsEnabled = computed(() => {
+      return config.isEnterprise == "true" || config.isCloud == "true";
+    });
+
     // Backend `/config` flag `online_evals_enabled` — controlled by
     // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
     // of whether the config response arrived before or after this component
@@ -607,6 +612,32 @@ export default defineComponent({
         }
       }
     };
+
+    // Insert the Workflows entry after Actions (fallback: Alerts). Idempotent.
+    const updateWorkflowsMenu = () => {
+      if (!isWorkflowsEnabled.value) return;
+
+      const workflowExists = linksList.value.some(
+        (link) => link.name === "workflows",
+      );
+      if (workflowExists) return;
+
+      const actionIndex = linksList.value.findIndex(
+        (link) => link.name === "actionScripts",
+      );
+      const alertIndex = linksList.value.findIndex(
+        (link) => link.name === "alertList",
+      );
+      const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
+      if (anchor === -1) return;
+
+      linksList.value.splice(anchor + 1, 0, {
+        title: t("menu.workflows"),
+        icon: "schema",
+        link: "/workflows",
+        name: "workflows",
+      });
+    };
     const splitterModel = ref(100);
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
@@ -680,6 +711,7 @@ export default defineComponent({
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateWorkflowsMenu();
       updateSyntheticMenu();
       updateAIObservabilityMenu();
 

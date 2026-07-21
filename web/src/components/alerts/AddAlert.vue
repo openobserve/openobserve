@@ -262,12 +262,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :formattedDestinations="getFormattedDestinations"
+              :workflows="formData.workflows"
               @update:trigger="updateTriggerCondition"
               @update:aggregation="updateAggregation"
               @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
               @update:promqlCondition="updatePromqlCondition"
               @update:destinations="updateDestinations"
               @refresh:destinations="refreshDestinations"
+              @update:workflows="updateWorkflows"
             />
             </div>
           </div>

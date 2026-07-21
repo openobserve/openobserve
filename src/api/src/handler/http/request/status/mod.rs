@@ -224,6 +224,8 @@ struct ConfigResponse<'a> {
     org_storage_region: String,
     #[cfg(feature = "cloud")]
     billing_group_allowed_orgs: String,
+    #[cfg(feature = "enterprise")]
+    workflows_enabled: bool,
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -401,6 +403,9 @@ pub async fn zo_config() -> impl IntoResponse {
     #[cfg(feature = "cloud")]
     let billing_group_allowed_orgs = o2cfg.cloud.billing_group_allowed_orgs.clone();
 
+    #[cfg(feature = "enterprise")]
+    let workflows_enabled = o2cfg.common.workflows_enabled;
+
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
         instance: get_instance_id(),
@@ -492,6 +497,8 @@ pub async fn zo_config() -> impl IntoResponse {
         org_storage_region,
         #[cfg(feature = "cloud")]
         billing_group_allowed_orgs,
+        #[cfg(feature = "enterprise")]
+        workflows_enabled,
     })
 }
 

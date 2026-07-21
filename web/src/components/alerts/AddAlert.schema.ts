@@ -121,7 +121,12 @@ export const multiTimeRangeSchema = z.array(multiTimeRangeRowSchema);
  * `is_real_time` discriminates; the QueryConfig `_meta` discriminators (bridged
  * into this form by QueryConfig's syncMeta watcher) gate the QueryConfig rules.
  */
-export const makeAddAlertSchema = (t: Translator) =>
+export const makeAddAlertSchema = (
+  t: Translator,
+  // ENTERPRISE/CLOUD only — see createAlertSettingsSchema. Defaults to false so
+  // OSS (and existing callers/specs passing only `t`) keep main's exact rules.
+  allowWorkflows = false,
+) =>
   z
     .looseObject({
     name: z.string().optional(),
@@ -208,7 +213,11 @@ export const makeAddAlertSchema = (t: Translator) =>
     // keeps period rule-free (createAlertSettingsSchema toggles it). silence ≥ 0
     // + destinations ≥ 1 apply in both non-anomaly modes.
     const isRealTime = mode === "true";
-    const as = createAlertSettingsSchema(t, isRealTime).safeParse(val);
+    const as = createAlertSettingsSchema(
+      t,
+      isRealTime,
+      allowWorkflows,
+    ).safeParse(val);
     if (!as.success) {
       for (const issue of as.error.issues) {
         ctx.addIssue({

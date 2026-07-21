@@ -19,7 +19,7 @@
     :style="{
         opacity: computedOpacity,
         backgroundColor: computedStyleMap,
-        marginLeft: store.state.isAiChatEnabled ? (depth * 0.625 + 'rem') : (depth * 1.25 + 'rem')
+        marginLeft: depth * (props.indentRem ?? (store.state.isAiChatEnabled ? 0.625 : 1.25)) + 'rem'
     }"
     >
       <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
@@ -63,6 +63,7 @@
             :condition-input-width="props.conditionInputWidth"
             :allow-custom-columns="props.allowCustomColumns"
             :module="props.module"
+            :indent-rem="props.indentRem"
             :name-prefix="childNamePrefix(index)"
             @input:update="(name, field) => inputUpdate(name, field)"
           />
@@ -173,6 +174,20 @@
         type: Number,
         default: 0,
         required: true,
+    },
+    /**
+     * Per-nesting-level indent, in rem. Optional: when unset the existing
+     * behaviour applies (1.25rem, or 0.625rem with the AI chat open).
+     *
+     * Exists so a narrow host can ASK for a smaller indent instead of reaching
+     * in from outside — the flow drawer previously did
+     * `[style*="margin-left"] { margin-left: 10px !important }`, an attribute
+     * selector patching this component's inline style, which broke the moment
+     * any other inline margin-left appeared.
+     */
+    indentRem: {
+        type: Number,
+        default: null,
     },
     conditionInputWidth: {
         type: String,

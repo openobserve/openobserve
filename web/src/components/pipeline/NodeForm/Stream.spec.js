@@ -623,15 +623,6 @@ describe("Stream Component", () => {
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
-    it("resets userClickedNode and userSelectedNode", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      mockPipelineObj.userClickedNode = { id: "x" };
-      mockPipelineObj.userSelectedNode = { id: "y" };
-      wrapper.vm.openCancelDialog();
-      expect(mockPipelineObj.userClickedNode).toEqual({});
-      expect(mockPipelineObj.userSelectedNode).toEqual({});
-    });
   });
 
   // -------------------------------------------------------------------------

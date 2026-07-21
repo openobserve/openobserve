@@ -97,6 +97,7 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
+import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
   makeAddAlertSchema,
@@ -145,6 +146,8 @@ export const defaultAlertValue: any = () => {
       timezone: "UTC",
     },
     destinations: [],
+    // Enterprise-only: workflows linked to this alert (run when it fires).
+    workflows: [],
     template: "",
     context_attributes: [],
     enabled: true,
@@ -298,7 +301,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   // i18n-driven validation schema (messages resolve via `t` — see AddAlert.schema).
-  const addAlertSchema = makeAddAlertSchema(t);
+  // Workflows are enterprise/cloud-only; where they exist an alert may be
+  // delivered to a destination OR a workflow, which relaxes "destinations ≥ 1"
+  // into "at least one of the two". In OSS this stays false and the rule (and
+  // its message) is byte-identical to before.
+  const addAlertSchema = makeAddAlertSchema(
+    t,
+    config.isEnterprise === "true" || config.isCloud === "true",
+  );
   const form = useOForm({
     defaultValues: buildDefaultForm() as Record<string, unknown>,
     schema: addAlertSchema,
@@ -1416,6 +1426,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     setF("destinations", destinations);
   };
 
+  const updateWorkflows = (workflows: any[]) => {
+    setF("workflows", workflows);
+  };
+
   const updateTab = (tab: string) => {
     setF("query_condition.type", tab);
   };
@@ -2387,6 +2401,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // `formData.value = cloneDeep(modelValue)` full swap).
       Object.keys(data).forEach((k) => delete data[k]);
       Object.assign(data, cloneDeep(props.modelValue));
+      // Guard the enterprise workflows link: the edited alert is expected to
+      // carry `workflows` (v2 GET returns it, serde-defaulted to []), but if a
+      // partially-populated row is ever passed, default it so an edit-save can't
+      // silently wipe existing links. Must run AFTER the swap above, which
+      // replaces every key on `data`.
+      if (!Array.isArray(data.workflows)) data.workflows = [];
       isAggregationEnabled.value = !!data.query_condition.aggregation;
 
       if (data.query_condition.promql_condition) {
@@ -3132,6 +3152,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     refreshDestinations,
     refreshTemplates,
     updateDestinations,
+    updateWorkflows,
     updateTab,
     handleGoToSqlEditor,
     clearMultiWindows,
