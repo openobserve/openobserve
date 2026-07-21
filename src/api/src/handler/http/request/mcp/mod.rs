@@ -348,6 +348,29 @@ pub async fn oauth_authorization_server_metadata() -> Response {
         .unwrap()
 }
 
+/// Extract the org id from an RFC 9728 resource path of the form
+/// `api/{org_id}/mcp`, returning `None` for any other shape.
+///
+/// The org id must be an opaque alphanumeric token: the value is echoed back in
+/// the metadata document (and, for the 401 challenge, into a quoted header
+/// parameter), so anything else is rejected rather than escaped.
+#[cfg(any(feature = "enterprise", test))]
+fn parse_mcp_resource_org(resource_path: &str) -> Option<&str> {
+    let mut segments = resource_path.trim_matches('/').split('/');
+    if segments.next()? != "api" {
+        return None;
+    }
+    let org_id = segments.next()?;
+    if segments.next()? != "mcp" || segments.next().is_some() {
+        return None;
+    }
+    let valid = !org_id.is_empty()
+        && org_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'));
+    valid.then_some(org_id)
+}
+
 /// Handler for OAuth 2.0 Protected Resource Metadata (Enterprise)
 /// RFC 9728: https://datatracker.ietf.org/doc/html/rfc9728
 /// Public (no auth) — points MCP clients at the Dex authorization server.
@@ -364,12 +387,29 @@ pub async fn oauth_authorization_server_metadata() -> Response {
 pub async fn oauth_protected_resource_metadata(Path(resource_path): Path<String>) -> Response {
     let cfg = config::get_config();
     let o2_base = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
-    // resource_path is the captured suffix, e.g. "api/default/mcp"
-    let resource = format!(
-        "{}/{}",
-        o2_base.trim_end_matches('/'),
-        resource_path.trim_start_matches('/')
-    );
+    let o2_base = o2_base.trim_end_matches('/');
+
+    // `resource_path` is the RFC 9728 §3.1 suffix and is fully caller-controlled.
+    // It is echoed into `resource`, which clients use as the RFC 8707 audience,
+    // so reconstruct it from a recognised `api/{org}/mcp` shape instead of
+    // reflecting arbitrary text. Anything else describes no resource we serve.
+    let resource = match parse_mcp_resource_org(&resource_path) {
+        Some(org) => format!("{o2_base}/api/{org}/mcp"),
+        // Bare-root probe (empty suffix): advertise the deployment itself.
+        None if resource_path.trim_matches('/').is_empty() => o2_base.to_string(),
+        None => {
+            return Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    serde_json::to_string(&serde_json::json!({
+                        "error": "no protected resource metadata for that path"
+                    }))
+                    .unwrap(),
+                ))
+                .unwrap();
+        }
+    };
 
     let dex_config = o2_dex::config::get_config();
     let auth_server = dex_config.dex_url.clone();
@@ -471,6 +511,33 @@ mod tests {
         openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
 
         assert!(!openobserve_mcp::tools::get_mcp_tools().is_empty());
+    }
+
+    #[test]
+    fn parse_mcp_resource_org_accepts_only_the_mcp_shape() {
+        assert_eq!(parse_mcp_resource_org("api/default/mcp"), Some("default"));
+        assert_eq!(parse_mcp_resource_org("/api/default/mcp/"), Some("default"));
+        assert_eq!(
+            parse_mcp_resource_org("api/3GjLqZseGw8M8qmh6zEx7dgGUTY/mcp"),
+            Some("3GjLqZseGw8M8qmh6zEx7dgGUTY")
+        );
+
+        // Anything that is not exactly `api/{org}/mcp`, or whose org is not an
+        // opaque token, describes no resource we serve.
+        for bad in [
+            "",
+            "api/default",
+            "api/default/mcp/extra",
+            "other/default/mcp",
+            "api//mcp",
+            "https://evil.com/mcp",
+            "api/https://evil.com/mcp",
+            "api/../../evil/mcp",
+            r#"api/x",Basic,realm="phish/mcp"#,
+            "api/e vil/mcp",
+        ] {
+            assert_eq!(parse_mcp_resource_org(bad), None, "should reject {bad:?}");
+        }
     }
 
     #[tokio::test]

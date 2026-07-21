@@ -168,30 +168,48 @@ fn maybe_add_mcp_www_authenticate(uri: &Uri, resp: Response) -> Response {
     // `token.rs`'s `path_columns.get(1)`) so routes that merely END in a
     // user-named `mcp` segment (e.g. a stream called "mcp") do not false-positive.
     let path = uri.path();
-    let is_mcp = path.trim_start_matches('/').split('/').nth(1) == Some("mcp");
-    if !is_mcp {
+    let mut segments = path.trim_start_matches('/').split('/');
+    let Some(org_id) = segments.next() else {
+        return resp;
+    };
+    if segments.next() != Some("mcp") {
+        return resp;
+    }
+
+    // The org id is reflected into a quoted `WWW-Authenticate` parameter below.
+    // A `"` or `\` there would close the quoted-string and let a caller append
+    // an arbitrary extra challenge (e.g. `Basic realm="…"`, which browsers turn
+    // into a credential prompt on our own origin). Org identifiers are opaque
+    // alphanumeric tokens, so refuse to emit a challenge for anything else
+    // rather than trying to escape it.
+    if org_id.is_empty()
+        || !org_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+    {
         return resp;
     }
 
     // On the OSS build MCP OAuth discovery is a 404 anyway, so there is nothing
     // to advertise — `attach_mcp_www_authenticate` is a no-op there.
-    attach_mcp_www_authenticate(path, resp)
+    attach_mcp_www_authenticate(org_id, resp)
 }
 
 /// Enterprise: attach the RFC 9728 `WWW-Authenticate` header pointing at this
 /// org's protected-resource metadata, unless Dex is disabled.
 #[cfg(feature = "enterprise")]
-fn attach_mcp_www_authenticate(path: &str, mut resp: Response) -> Response {
+fn attach_mcp_www_authenticate(org_id: &str, mut resp: Response) -> Response {
     let dex = o2_dex::config::get_config();
     if !dex.dex_enabled {
         return resp; // no auth server to advertise
     }
     let cfg = config::get_config();
-    // `path` here is the nest-stripped `/{org}/mcp`. The externally-visible
-    // resource is `{base_uri}/api/{org}/mcp`, and the RFC 9728 discovery doc
-    // lives at `<web_url>{base_uri}/.well-known/oauth-protected-resource` with
-    // that resource path appended (RFC 9728 §3.1).
-    let external_resource_path = format!("/api{path}");
+    // Rebuild the externally-visible resource path from the validated `org_id`
+    // rather than reflecting the request URI, so nothing caller-controlled can
+    // reach the quoted header parameter. The RFC 9728 discovery doc lives at
+    // `<web_url>{base_uri}/.well-known/oauth-protected-resource` with that
+    // resource path appended (RFC 9728 §3.1).
+    let external_resource_path = format!("/api/{org_id}/mcp");
     let resource_meta = format!(
         "{}{}/.well-known/oauth-protected-resource{}",
         cfg.common.web_url.trim_end_matches('/'),
@@ -207,7 +225,7 @@ fn attach_mcp_www_authenticate(path: &str, mut resp: Response) -> Response {
 
 /// OSS: no MCP OAuth discovery, so the 401 is returned unchanged.
 #[cfg(not(feature = "enterprise"))]
-fn attach_mcp_www_authenticate(_path: &str, resp: Response) -> Response {
+fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
@@ -1537,6 +1555,36 @@ mod tests {
                 !out.headers().contains_key(header::WWW_AUTHENTICATE),
                 "non-mcp path {p} must not carry an MCP WWW-Authenticate challenge"
             );
+        }
+    }
+
+    #[test]
+    fn mcp_www_authenticate_rejects_header_injection_in_org_id() {
+        // A `"` in the org segment previously closed the quoted-string parameter
+        // and let the caller append a second challenge (e.g. `Basic realm="…"`,
+        // which browsers render as a credential prompt on our own origin).
+        // Such an org id is not valid, so no challenge must be emitted at all.
+        for org in [
+            r#"x",Basic,realm="phish"#,
+            r#"a"b"#,
+            r"back\slash",
+            "sp ace",
+            "",
+        ] {
+            let uri: Uri = format!("/{org}/mcp").parse().unwrap_or_else(|_| {
+                // Unparseable URIs can never reach the middleware; use a benign
+                // stand-in so the loop still asserts the no-header outcome.
+                "//mcp".parse().unwrap()
+            });
+            let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
+            let out = maybe_add_mcp_www_authenticate(&uri, resp);
+            if let Some(v) = out.headers().get(header::WWW_AUTHENTICATE) {
+                let v = v.to_str().unwrap();
+                assert!(
+                    !v.contains(r#"","#) && !v.contains("Basic"),
+                    "injected challenge for org {org:?}: {v}"
+                );
+            }
         }
     }
 
