@@ -37,9 +37,15 @@ export class AlertManagement {
         const operatorDropdown = this.page.locator(this.locators.operatorSelect).first();
         await expect(operatorDropdown).toBeVisible({ timeout: 15000 });
         await operatorDropdown.click();
-        await this.page.waitForTimeout(500);
-        await this.page.getByText('=', { exact: true }).click();
-        await this.page.waitForTimeout(1000);
+        // The operator control is an OSelect: it renders an aria-hidden native
+        // <select><option>=</option> alongside the visible popover item, so an unscoped
+        // getByText('=', {exact}) matches BOTH nodes and trips a strict-mode violation.
+        // Scope the click to the popover and match by role so the hidden native select is
+        // excluded, and gate on the popover's open/close state instead of hard waits.
+        const operatorPopover = this.page.locator('[data-test="alert-conditions-operator-select-popover"]');
+        await expect(operatorPopover).toBeVisible({ timeout: 10000 });
+        await operatorPopover.getByRole('option', { name: '=', exact: true }).click();
+        await expect(operatorPopover).toBeHidden({ timeout: 10000 });
         testLogger.info('Changed operator from Contains to =');
 
         await this.page.locator(this.locators.alertSubmitButton).click();
