@@ -5,7 +5,7 @@
     "arbZ": 35,
     "darkMechanism": 20,
     "unscopedStyle": 7,
-    "stylePxUnit": 90
+    "stylePxUnit": 84
   },
   "files": {
     "components/CodeQueryEditor.vue": {
@@ -123,7 +123,6 @@
       "rawVarInComponent": 20
     },
     "components/pipeline/PipelineView.vue": {
-      "stylePxUnit": 6,
       "rawVarInComponent": 15
     },
     "components/rum/PlayerTracesTab.vue": {

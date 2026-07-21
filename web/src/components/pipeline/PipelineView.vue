@@ -192,21 +192,21 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     background-color: var(--color-status-info-bg) !important;
     border-color: var(--color-status-info-text) !important;
     color: var(--color-text-body) !important;
-    padding: 8px 12px !important;
+    padding: 0.5rem 0.75rem !important;
   }
 
   .pipeline-view-tooltip :deep(.vue-flow__node-output .btn-fixed-width) {
     background-color: var(--color-status-success-bg) !important;
     border-color: var(--color-status-positive) !important;
     color: var(--color-text-body) !important;
-    padding: 8px 12px !important;
+    padding: 0.5rem 0.75rem !important;
   }
 
   .pipeline-view-tooltip :deep(.vue-flow__node-default .btn-fixed-width) {
     background-color: var(--color-status-warning-bg) !important;
     border-color: var(--color-status-warning-text) !important;
     color: var(--color-text-body) !important;
-    padding: 8px 12px !important;
+    padding: 0.5rem 0.75rem !important;
   }
 
   /* Handle colors — ::before pseudo-elements, must stay in CSS */
