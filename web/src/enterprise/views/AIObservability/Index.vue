@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   picks the route the rail/breadcrumb highlight.
 -->
 <template>
-  <PageLayout :sidebar-width="232">
+  <OPageLayout bleed :sidebar-width="230">
     <template #sidebar>
       <SectionRail
         :groups="sectionGroups"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <section class="h-full min-w-0 min-h-0 overflow-y-auto">
       <router-view />
     </section>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -41,7 +41,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import type {
   SectionHubGroup,

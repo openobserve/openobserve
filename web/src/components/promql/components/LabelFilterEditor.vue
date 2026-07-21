@@ -1,6 +1,6 @@
 <template>
   <div data-test="promql-labelfilter-editor">
-    <div style="display: flex; flex-direction: row" class="pl-2">
+    <div class="pl-2 flex flex-row">
       <div
         data-test="promql-labelfilter-editor-label"
         class="text-sm whitespace-nowrap flex items-center min-w-21.5"
@@ -20,7 +20,7 @@
                 <OButton
                   variant="primary"
                   size="chip"
-                  class="!text-[12px]"
+                  class="!text-xs"
                   :data-test="`promql-label-filter-${index}`"
                 >
                   {{ computedLabel(label) }}
@@ -28,16 +28,16 @@
                 </OButton>
               </template>
               <div
-                class="p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+                class="p-3"
                 :data-test="`promql-label-filter-${index}-menu`"
               >
-                <div style="width: 350px">
+                <div class="w-86 [&_.o-input-label]:text-xs [&_.o-input-label]:font-normal">
                   <!-- Label Selection -->
                   <OSelect
                     v-model="label.label"
                     :options="availableLabelOptions"
                     :label="t('metrics.labelFilterEditor.label')"
-                    class="label-filter-label-select showLabelOnTop normal-case! mb-2"
+                    class="label-filter-label-select showLabelOnTop normal-case! mb-1.5"
                     searchable
                     clearable
                     data-test="promql-label-select"
@@ -56,7 +56,7 @@
                     v-model="label.op"
                     :options="operatorOptions"
                     :label="t('metrics.labelFilterEditor.operator')"
-                    class="label-filter-operator-select showLabelOnTop mb-2"
+                    class="label-filter-operator-select showLabelOnTop mb-1.5"
                     data-test="promql-operator-select"
                   />
 

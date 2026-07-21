@@ -31,7 +31,7 @@ const isOIcon = computed<boolean>(() =>
 
 /** True when the right trailing area should render (slot OR count prop).
  *  When hideZeroCount is set and count is 0, the trailing area is suppressed
- *  (q-badge-compatible behavior). */
+ *  (matches the previous badge behavior). */
 const hasTrailing = computed(() => {
   if (slots.trailing) return true;
   if (props.count === undefined) return false;
@@ -191,15 +191,15 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
 // ── Size class map ────────────────────────────────────────────────────────
 const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
-  xs: "px-1.5 py-0.5 text-[10px] gap-0.5",
-  sm: "px-2.5 py-1.5 text-[11px] gap-1",
+  xs: "px-1.5 py-0.5 text-3xs gap-0.5",
+  sm: "px-2.5 py-1.5 text-2xs gap-1",
   md: "px-2.5 py-2 text-xs gap-1.5",
 };
 
 // ── Shape (corner radius) class map ───────────────────────────────────────
 const shapeClasses: Record<NonNullable<BadgeProps["shape"]>, string> = {
   pill: "rounded-full",
-  rounded: "rounded-md",
+  rounded: "rounded-default",
   square: "rounded-none",
 };
 
@@ -211,8 +211,6 @@ const trailingSizeClasses = computed(() =>
 // ── Root element classes ──────────────────────────────────────────────────
 const classes = computed(() => [
   // Base — layout + typography + shape.
-  // Weight 600 per the design-system weight scale (HANDOFF §2.2: badges = 600).
-  // Pill shape (rounded-full) per HANDOFF §11 + this component's own contract.
   "inline-flex items-center whitespace-nowrap",
   "font-medium leading-none",
   "transition-colors duration-150",

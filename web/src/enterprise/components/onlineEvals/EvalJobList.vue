@@ -71,7 +71,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title">
+          <span class="text-xs font-normal">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.job.listTitle") }}
           </span>
           <OButton
@@ -96,11 +96,11 @@
         </template>
 
         <template #cell-stream="{ row }">
-          <span class="font-mono text-xs">{{ row.stream }}</span>
+          {{ row.stream }}
         </template>
 
         <template #cell-scorers="{ row }">
-          <span class="font-mono text-xs">{{ scorerCountText(row) }}</span>
+          <span class="tabular-nums">{{ scorerCountText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -319,7 +319,7 @@ const hasFilters = computed(
 );
 
 // Wire OEmptyState's action ids back into the existing emit contract.
-// `create` mirrors a click on the AppPageHeader's "New job" button;
+// `create` mirrors a click on the OPageHeader's "New job" button;
 // `clear-filters` resets the search + status filter inline.
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");

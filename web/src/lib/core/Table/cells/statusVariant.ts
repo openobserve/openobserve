@@ -2,9 +2,8 @@
 //
 // statusVariant — the single source of truth that maps a raw status/state
 // string (from any table, any feature) onto a semantic OBadge variant + a
-// human label. Per TABLE_VISUAL_AUDIT.md §2.3 / §5: define ONE map so that
-// "active"/"paused"/"failed" look identical everywhere instead of every
-// table inventing its own colours.
+// human label. One map so that "active"/"paused"/"failed" look identical
+// everywhere instead of every table inventing its own colours.
 //
 // Usage:
 //   const { variant, label, dot } = statusVariant("paused", "pipeline");
@@ -13,7 +12,7 @@
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 /** Semantic tone — the calm, low-chroma "soft" badge family reads best at
- *  table density (HANDOFF §11 / audit §2.3). Each tone maps to one variant. */
+ *  table density. Each tone maps to one variant. */
 export type StatusTone = "success" | "warning" | "error" | "info" | "neutral";
 
 const TONE_VARIANT: Record<StatusTone, BadgeVariant> = {

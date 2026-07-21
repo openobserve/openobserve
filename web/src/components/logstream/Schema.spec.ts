@@ -1405,7 +1405,7 @@ describe("Schema Component Tests", () => {
     });
   });
 
-  // Coverage for the q-dialog/q-drawer → ODrawer migration.
+  // Coverage for the ODrawer migration.
   describe("ODrawer Migration", () => {
     const buildProps = (open = true) => ({
       open,

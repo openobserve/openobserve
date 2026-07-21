@@ -19,14 +19,14 @@
     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
          panels (LLMErrorTable) so the whole page reads as one surface. -->
     <div
-      class="card-container llm-trend-panel rounded-lg flex flex-col overflow-hidden"
+      class="card-container llm-trend-panel rounded-surface flex flex-col overflow-hidden"
       data-test="agent-behavior-loops-card"
     >
       <div class="flex flex-col mb-[0.5rem] px-[1rem] pt-[1rem]">
-        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
+        <div class="text-sm font-semibold text-[var(--color-text-heading)]">
           {{ t("aiObservability.behavior.loopsTitle") }}
         </div>
-        <div class="text-[0.7rem] leading-normal mt-[0.1rem] text-[var(--color-text-secondary)]">
+        <div class="text-2xs leading-normal mt-[0.1rem] text-[var(--color-text-secondary)]">
           {{ t("aiObservability.behavior.loopsHint") }}
         </div>
       </div>
@@ -48,14 +48,14 @@
 
     <!-- Failure taxonomy -->
     <div
-      class="card-container llm-trend-panel rounded-lg flex flex-col overflow-hidden"
+      class="card-container llm-trend-panel rounded-surface flex flex-col overflow-hidden"
       data-test="agent-behavior-failures-card"
     >
       <div class="flex flex-col mb-[0.5rem] px-[1rem] pt-[1rem]">
-        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
+        <div class="text-sm font-semibold text-[var(--color-text-heading)]">
           {{ t("aiObservability.behavior.failuresTitle") }}
         </div>
-        <div class="text-[0.7rem] leading-normal mt-[0.1rem] text-[var(--color-text-secondary)]">
+        <div class="text-2xs leading-normal mt-[0.1rem] text-[var(--color-text-secondary)]">
           {{ t("aiObservability.behavior.failuresHint") }}
         </div>
       </div>

@@ -38,21 +38,21 @@
     >
       <span>
         {{ t("aiObservability.behavior.node.cost") }}:
-        <span class="text-text-primary font-semibold">{{ costSummary.cost }}</span>
+        <span class="text-text-heading font-semibold">{{ costSummary.cost }}</span>
       </span>
       <span>
         {{ t("aiObservability.behavior.colTokens") }}:
-        <span class="text-text-primary font-semibold">{{ costSummary.tokens }}</span>
+        <span class="text-text-heading font-semibold">{{ costSummary.tokens }}</span>
       </span>
       <span v-if="costSummary.errors">
         {{ t("aiObservability.behavior.colErrors") }}:
-        <span class="text-text-primary font-semibold">{{ costSummary.errors }}</span>
+        <span class="text-text-heading font-semibold">{{ costSummary.errors }}</span>
       </span>
     </div>
 
     <!-- Looping tools for this agent -->
     <div class="flex flex-col gap-1.5">
-      <div class="text-xs font-semibold text-text-primary">
+      <div class="text-xs font-semibold text-text-heading">
         {{ t("aiObservability.behavior.loopsTitle") }}
       </div>
       <OTable
@@ -72,7 +72,7 @@
 
     <!-- Failure classes for this agent -->
     <div class="flex flex-col gap-1.5">
-      <div class="text-xs font-semibold text-text-primary">
+      <div class="text-xs font-semibold text-text-heading">
         {{ t("aiObservability.behavior.failuresTitle") }}
       </div>
       <OTable

@@ -61,7 +61,7 @@ describe("HistogramIntervalDropDown", () => {
     it("should have correct component structure with OSelect", () => {
       wrapper = createWrapper();
 
-      // Component uses OSelect now (not q-select)
+      // Component uses OSelect now
       expect(wrapper.find('[data-test="histogram-interval-dropdown"]').exists()).toBe(true);
     });
 

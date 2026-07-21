@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import JsonFieldRenderer from "./JsonFieldRenderer.vue";
 import store from "@/test/unit/helpers/store";
+import { chartColor } from "@/utils/chartTheme";
 
 
 describe("JsonFieldRenderer Component", () => {
@@ -201,16 +202,19 @@ describe("JsonFieldRenderer Component", () => {
   });
 
   describe("keyColor Computed", () => {
-    it("should return dark theme key color when theme is dark", () => {
+    // Key color is now resolved from the --color-json-key design token via
+    // chartColor(); it is theme-independent in jsdom (no live CSS), so both
+    // themes resolve to the same token value.
+    it("should return the json-key token color when theme is dark", () => {
       store.state.theme = "dark";
       wrapper = createWrapper({ key: "value" });
-      expect(wrapper.vm.keyColor).toBe("#f67a7aff");
+      expect(wrapper.vm.keyColor).toBe(chartColor("--color-json-key"));
     });
 
-    it("should return light theme key color when theme is light", () => {
+    it("should return the json-key token color when theme is light", () => {
       store.state.theme = "light";
       wrapper = createWrapper({ key: "value" });
-      expect(wrapper.vm.keyColor).toBe("#B71C1C");
+      expect(wrapper.vm.keyColor).toBe(chartColor("--color-json-key"));
     });
   });
 
@@ -220,53 +224,55 @@ describe("JsonFieldRenderer Component", () => {
       wrapper = createWrapper("test");
     });
 
-    it("should return gray color for null in light theme", () => {
-      expect(wrapper.vm.getValueColor(null)).toBe("#6B7280");
+    // Value colors are now resolved from --color-json-* design tokens via
+    // chartColor(); theme-independent in jsdom (no live CSS).
+    it("should return the json-null token color for null in light theme", () => {
+      expect(wrapper.vm.getValueColor(null)).toBe(chartColor("--color-json-null"));
     });
 
-    it("should return purple color for boolean in light theme", () => {
-      expect(wrapper.vm.getValueColor(true)).toBe("#6D28D9");
-      expect(wrapper.vm.getValueColor(false)).toBe("#6D28D9");
+    it("should return the json-boolean token color for boolean in light theme", () => {
+      expect(wrapper.vm.getValueColor(true)).toBe(chartColor("--color-json-boolean"));
+      expect(wrapper.vm.getValueColor(false)).toBe(chartColor("--color-json-boolean"));
     });
 
-    it("should return blue color for number in light theme", () => {
-      expect(wrapper.vm.getValueColor(42)).toBe("#2563EB");
+    it("should return the json-number token color for number in light theme", () => {
+      expect(wrapper.vm.getValueColor(42)).toBe(chartColor("--color-json-number"));
     });
 
-    it("should return green color for string in light theme", () => {
-      expect(wrapper.vm.getValueColor("hello")).toBe("#047857");
+    it("should return the json-string token color for string in light theme", () => {
+      expect(wrapper.vm.getValueColor("hello")).toBe(chartColor("--color-json-string"));
     });
 
-    it("should return gray color for object in light theme", () => {
-      expect(wrapper.vm.getValueColor({ nested: true })).toBe("#4B5563");
+    it("should return the json-object token color for object in light theme", () => {
+      expect(wrapper.vm.getValueColor({ nested: true })).toBe(chartColor("--color-json-object"));
     });
 
-    it("should return dark gray for null in dark theme", async () => {
+    it("should return the json-null token color for null in dark theme", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper("test");
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getValueColor(null)).toBe("#9CA3AF");
+      expect(wrapper.vm.getValueColor(null)).toBe(chartColor("--color-json-null"));
     });
 
-    it("should return indigo color for boolean in dark theme", async () => {
+    it("should return the json-boolean token color for boolean in dark theme", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper("test");
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getValueColor(true)).toBe("#A5B4FC");
+      expect(wrapper.vm.getValueColor(true)).toBe(chartColor("--color-json-boolean"));
     });
 
-    it("should return sky blue color for number in dark theme", async () => {
+    it("should return the json-number token color for number in dark theme", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper("test");
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getValueColor(100)).toBe("#60A5FA");
+      expect(wrapper.vm.getValueColor(100)).toBe(chartColor("--color-json-number"));
     });
 
-    it("should return teal color for string in dark theme", async () => {
+    it("should return the json-string token color for string in dark theme", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper("test");
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.getValueColor("world")).toBe("#6EE7B7");
+      expect(wrapper.vm.getValueColor("world")).toBe(chartColor("--color-json-string"));
     });
   });
 
@@ -381,17 +387,18 @@ describe("JsonFieldRenderer Component", () => {
     });
   });
 
-  describe("isDarkTheme Computed", () => {
+  describe("isDark Computed", () => {
+    // The removed local isDarkTheme computed was replaced by useTheme()'s isDark.
     it("should return true when theme is dark", () => {
       store.state.theme = "dark";
       wrapper = createWrapper("test");
-      expect(wrapper.vm.isDarkTheme).toBe(true);
+      expect(wrapper.vm.isDark).toBe(true);
     });
 
     it("should return false when theme is light", () => {
       store.state.theme = "light";
       wrapper = createWrapper("test");
-      expect(wrapper.vm.isDarkTheme).toBe(false);
+      expect(wrapper.vm.isDark).toBe(false);
     });
   });
 

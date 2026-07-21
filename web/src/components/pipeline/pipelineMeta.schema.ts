@@ -8,9 +8,9 @@
 // graph, source, edges) is authored on the drag-and-drop canvas and persisted
 // through `pipelineObj.currentSelectedPipeline`, not through this form.
 //
-// Behavior parity: the old store-driven path required a non-empty name and
-// nothing else, so this keeps `min(1)` only (no character regex). Tighten here
-// deliberately if that ever becomes a product requirement.
+// Only `min(1)` is enforced (no character regex) — a non-empty name is all that
+// is required. Tighten here deliberately if that ever becomes a product
+// requirement.
 
 import { z } from "zod";
 

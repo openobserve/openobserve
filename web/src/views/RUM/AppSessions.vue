@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isSessionReplayEnabled">
       <div>
         <div
-          class="card-container border-b border-border-default py-[0.375rem] px-[0.375rem]"
+          class="bg-card-glass-bg border-b border-border-default py-1.5 px-page-edge"
         >
           <div class="flex items-start gap-1">
             <!-- Query editor (flex-grow to fill available space) -->
@@ -30,9 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   'border',
                   'solid',
-                  'border-[var(--o2-border-color)]',
-                  'p-[0.25rem]',
-                  'rounded-[0.375rem]',
+                  'border-card-glass-border',
+                  'p-1',
+                  'rounded-default',
                   'overflow-y-auto',
                   queryEditorHeight,
                 ]"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="false"
       >
         <template #before>
-          <div class="card-container p-[0.325rem] h-full overflow-auto border-r border-border-default">
+          <div class="bg-surface-panel py-1 h-full overflow-auto border-r border-border-default">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #after>
           <div class="h-full flex flex-col min-h-0">
       <!-- KPI summary strip -->
-      <div class="card-container border-b border-border-default">
+      <div class="bg-card-glass-bg border-b border-border-default">
         <SessionsMetricsStrip
           :total="kpiMetrics.total"
           :error-sessions="kpiMetrics.errorSessions"
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- One actionable insight for the current window, when one exists -->
-        <div v-if="topInsight" class="px-2 pb-2">
+        <div v-if="topInsight" class="px-page-edge pb-2">
           <SessionsInsightBanner
             :insight="topInsight"
             @apply="applyInsightFilter(topInsight)"
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Segment filters -->
         <div
-          class="flex flex-wrap items-center gap-4 px-2 pb-2"
+          class="flex flex-wrap items-center gap-4 px-page-edge pb-2"
           data-test="rum-app-sessions-segment-filters"
         >
           <OToggleGroup
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-            <div class="card-container flex-1 min-h-0">
+            <div class="bg-card-glass-bg flex-1 min-h-0">
                 <OTable
                   :data="tableRows"
                   :columns="tableColumns"
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="play-circle-filled"
                       size="md"
-                      class="cursor-pointer session-play-icon text-[var(--o2-icon-color)] hover:text-[var(--o2-primary-btn-bg)]"
+                      class="cursor-pointer session-play-icon text-icon-color hover:text-button-primary"
                     />
                   </template>
                   <template #cell-session="{ row }">
@@ -320,10 +320,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="font-medium truncate"
                       />
                       <div
-                        class="flex items-center gap-1.5 text-xs text-[var(--o2-text-caption)]"
+                        class="flex items-center gap-1.5 text-xs text-text-secondary"
                       >
                         <span
-                          class="o2-monospace-font"
+                          class="font-mono"
                           :title="row.session_id"
                           data-test="rum-app-sessions-session-id-text"
                         >{{ shortSessionId(row.session_id) }}</span>
@@ -363,12 +363,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}</span>
                       <small
                         v-if="row.is_bounce"
-                        class="text-[var(--o2-status-warning-text)]"
+                        class="text-status-warning-text"
                         data-test="rum-app-sessions-bounced-text"
                       >{{ t("rum.bounced").toLowerCase() }}</small>
                       <small
                         v-else-if="row.is_active"
-                        class="text-[var(--o2-status-success-text)]"
+                        class="text-status-success-text"
                         data-test="rum-app-sessions-active-text"
                       >{{ t("rum.active") }}</small>
                     </div>
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OSplitter>
     </template>
     <template v-else>
-      <div class="card-container">
+      <div class="bg-card-glass-bg">
         <div class="p-4 enable-rum max-w-[64rem]">
           <div class="pb-4">
             <div class="text-left text-xl font-semibold font-bold pb-3">
@@ -549,9 +549,9 @@ const completeQuery = computed(() => {
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
   const lines = (sessionState.data.editorValue.match(/\n/g) || []).length + 1;
-  if (lines === 1) return "h-[2rem]!";
-  if (lines === 2) return "h-[3.5rem]!";
-  return "h-[5rem]!"; // 3+ lines, capped at 5rem (approx 3 lines)
+  if (lines === 1) return "h-8!";
+  if (lines === 2) return "h-14!";
+  return "h-20!"; // 3+ lines, capped at 5rem (approx 3 lines)
 });
 
 const isMounted = ref(false);
@@ -1475,9 +1475,9 @@ const formatSessionDuration = (ms?: number) => {
 // Spine colors match the logs page severity colors (statusParser STATUS_COLORS)
 // so "error red" reads the same across modules.
 const getSessionStatusColor = (row: any) => {
-  if ((row.error_count || 0) > 0) return "var(--o2-severity-error-color)";
+  if ((row.error_count || 0) > 0) return "var(--color-severity-error-color)";
   if ((row.frustration_count || 0) > 0)
-    return "var(--o2-severity-warning-color)";
+    return "var(--color-severity-warning-color)";
   return undefined;
 };
 
@@ -1620,24 +1620,3 @@ useShortcuts([
   { id: "rumSessionsRefresh", handler: () => { if (!isInputFocused()) runQuery(); } },
 ]);
 </script>
-<style>
-.sessions_page {
-  .index-table :hover::-webkit-scrollbar,
-  #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 0.8125rem;
-    width: 0.8125rem;
-  }
-
-  .index-table ::-webkit-scrollbar-track,
-  #tracesSearchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 0.625rem;
-  }
-
-  .index-table ::-webkit-scrollbar-thumb,
-  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 0.625rem;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
-}
-</style>

@@ -243,7 +243,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
     });
   });
 
-  // TODO: filterColumns internal API was removed when q-select was replaced with OSelect.
+  // TODO: filterColumns internal API was removed when the select was replaced with OSelect.
   // These tests need rewriting against the new OSelect filter API.
   describe.skip('Filter Functionality Branch Coverage', () => {
     it('should reset filtered fields when filter value is empty', async () => {

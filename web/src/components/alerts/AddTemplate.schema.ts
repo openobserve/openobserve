@@ -2,34 +2,19 @@
 //
 // Validation schema for AddTemplate.vue (alert notification templates).
 //
-// Migration notes (form-migration-playbook / START-HERE Rule ②/④):
-//   • `name`   — genuinely user-typed → form-owned OFormInput. Rules mirror the
-//     old hand-rolled `saveTemplate` gate: required (`common.nameRequired`) +
-//     the resource-name character check (isValidResourceName). Kept UNtrimmed so
-//     the payload can send `template_name` raw and `data.name` trimmed exactly
-//     like the pre-migration form.
-//   • `title`  — form-owned OFormInput, optional at the object level; required
-//     ONLY when `type === 'email'` (enforced in `superRefine`, mirroring the old
-//     `type === 'email' && !title.trim()` gate).
-//   • `body`   — a bare Monaco/`<query-editor>` (the sanctioned non-form widget),
-//     bridged into the form via `setFieldValue` from the editor's change handler
-//     so this schema's `min(1)` required rule covers it. The http JSON-validity
-//     check stays a submit-time toast side-effect in the component (NOT a schema
-//     rule) to preserve the exact pre-migration behaviour.
-//   • `type`   — NOT an <input>: it is the app-tabs UI toggle. It is a schema
-//     enum discriminator bridged into the form via `setFieldValue` from the
-//     tab's own handler (the sanctioned Rule-② bridge) so `superRefine` can
-//     branch on it. Never rendered as an OForm* control.
-//
-// Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
-// this file only describes WHAT is valid.
+//   • `name`   — required + resource-name character check (isValidResourceName).
+//     Kept untrimmed so the payload can send `template_name` raw and `data.name`
+//     trimmed.
+//   • `title`  — optional at the object level; required only when
+//     `type === 'email'` (enforced in `superRefine`).
+//   • `body`   — bare Monaco/`<query-editor>` bridged into the form via
+//     `setFieldValue`. The http JSON-validity check stays a submit-time toast
+//     side-effect in the component, not a schema rule.
+//   • `type`   — the app-tabs UI toggle, bridged in as a schema enum
+//     discriminator so `superRefine` can branch on it. Never an OForm* control.
 
 import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
-
-// Mirrors the old `saveTemplate` name gate:
-//   !name.trim() ? nameRequired : (!isValidResourceName(name) ? charsMsg : "")
-// nameRequired → i18n `common.nameRequired`; charsMsg → `alerts.validation.nameInvalidChars`.
 
 export const makeAddTemplateSchema = (t: (_key: string) => string) =>
   z
@@ -44,18 +29,15 @@ export const makeAddTemplateSchema = (t: (_key: string) => string) =>
       type: z.enum(["http", "email"]),
       // Optional at the object level; required-when-email in superRefine below.
       title: z.string().optional(),
-      // Bridged from the bare Monaco body editor; required.
-      // PARITY (R7): pre-migration `isTemplateFilled()` gated on
-      // `body.trim().trim().length`, so a WHITESPACE-ONLY body was INVALID —
-      // `.min(1)` alone would pass "   " (length 3). Checked on the trimmed
-      // value but NOT transformed: `.trim()` / `z.string().trim()` would MUTATE
-      // the saved body, and pre-migration sent it RAW.
+      // Bridged from the bare Monaco body editor; required. Whitespace-only is
+      // invalid, so check the trimmed value — but do NOT transform, the saved
+      // body must be sent raw.
       body: z.string().refine((v) => v.trim().length > 0, {
         message: t("alerts.validation.fieldRequired"),
       }),
     })
     .superRefine((val, ctx) => {
-      // Email templates require a subject title (old: `!title.trim()`).
+      // Email templates require a subject title.
       if (val.type === "email" && !String(val.title ?? "").trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -68,7 +50,7 @@ export const makeAddTemplateSchema = (t: (_key: string) => string) =>
 export type AddTemplateForm = z.infer<ReturnType<typeof makeAddTemplateSchema>>;
 
 // Static (create-only) defaults. Edit/clone prefill is applied at runtime via
-// `form.reset(record)` (see AddTemplate.vue), not here.
+// `form.reset(record)` in AddTemplate.vue.
 export const addTemplateDefaults = (): AddTemplateForm => ({
   name: "",
   type: "http",

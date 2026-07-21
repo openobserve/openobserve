@@ -15,16 +15,14 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div
+  <OPageLayout
     data-test="ai-agent-behavior-page"
-    class="flex flex-col h-full min-h-0 overflow-hidden"
+    :title="t('aiObservability.nav.agentBehavior')"
+    :subtitle="t('aiObservability.subtitle.agentBehavior')"
+    icon="troubleshoot"
+    bleed
+    :scroll="false"
   >
-    <AppPageHeader
-      :title="t('aiObservability.nav.agentBehavior')"
-      :subtitle="t('aiObservability.subtitle.agentBehavior')"
-      icon="troubleshoot"
-      class="px-4 border-b border-border-default"
-    >
       <template #actions>
         <date-time
           ref="dateTimeRef"
@@ -43,7 +41,7 @@
         <!-- Last-refresh + refresh control, consistent with LLM Insights /
              Sessions page headers. -->
         <div
-          class="inline-flex items-center border border-border-default rounded-md px-1 h-[2rem] overflow-hidden"
+          class="inline-flex items-center border border-border-default rounded-default px-1 h-[2rem] overflow-hidden"
         >
           <ORefreshButton
             :last-run-at="behaviorLastRunAt"
@@ -54,13 +52,13 @@
           />
         </div>
       </template>
-    </AppPageHeader>
 
     <!-- Scope control — same Stream/Agent pattern as Agent Graph, so the AI
          pages read as one product. Stream tab shows every agent's signals for
          the stream; Agent tab narrows to one discovered agent (and follows its
-         source_stream). -->
-    <div class="flex items-center gap-3 px-4 py-2 border-b border-border-default">
+         source_stream). Lives in OPageLayout's #subnav (full-bleed divider). -->
+    <template #subnav>
+    <div class="flex items-center gap-3 px-page-edge py-2">
       <OToggleGroup
         :model-value="filterMode"
         type="single"
@@ -78,13 +76,13 @@
       <div
         v-if="filterMode === 'agent'"
         data-test="agent-behavior-agent-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 flex-shrink-0"
       >
         <SkeletonBox
           v-if="!agentsLoaded"
           width="100%"
           height="2.125rem"
-          rounded
+          :rounded="true"
         />
         <OSelect
           v-else
@@ -94,13 +92,13 @@
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded"
+          class="w-full rounded-default"
         />
       </div>
       <div
         v-else
         data-test="agent-behavior-stream-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 flex-shrink-0"
       >
         <OSelect
           v-model="activeStream"
@@ -109,12 +107,13 @@
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded"
+          class="w-full rounded-default"
         />
       </div>
     </div>
+    </template>
 
-    <div class="flex-1 min-h-0 overflow-auto p-4">
+    <div class="flex-1 min-h-0 overflow-auto px-page-edge py-4">
       <AgentBehaviorPanel
         ref="panelRef"
         :source-stream="effectiveStream"
@@ -123,14 +122,14 @@
         :end-time="timeRange.endTime"
       />
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import DateTime from "@/components/DateTime.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AgentBehaviorPanel from "./AgentBehaviorPanel.vue";

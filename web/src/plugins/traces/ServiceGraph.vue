@@ -1,7 +1,7 @@
-<template>
+﻿<template>
   <OCard class="h-full flex flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
-    <div class="flex items-center gap-2 p-[0.375rem] pb-0">
+    <div class="flex items-center gap-2 p-1.5 pb-0">
       <!-- Stream selector (hidden when a parent drives selection, e.g. the
            Agent Graph page which selects by agent). -->
       <div
@@ -14,7 +14,7 @@
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-auto flex-shrink-0 rounded"
+          class="w-auto flex-shrink-0 rounded-default"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
@@ -36,7 +36,7 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="flex flex-row items-center gap-3 p-[0.325rem] rounded border border-[var(--o2-border-color)]!"
+        class="flex flex-row items-center gap-3 p-[0.325rem] rounded-default border border-card-glass-border!"
       >
         <div
           data-test="sg-legend"
@@ -44,7 +44,7 @@
         >
           <!-- Border Color -->
           <div
-            class="mb-0! whitespace-nowrap text-(--o2-text-4)! font-bold text-xs"
+            class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs"
           >
             {{ t("traces.serviceGraph.borderColor") }}
             <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.borderColorMetric") }}</span>
@@ -57,23 +57,26 @@
               :data-test="`sg-legend-${level.key}`"
             >
               <span
-                class="sg-health-ring"
-                :class="`sg-health-ring--${level.key}`"
+                class="w-3 h-3 rounded-full border-2 bg-transparent flex-none"
+                :class="{
+                  'border-service-health-healthy': level.key === 'healthy',
+                  'border-service-health-degraded': level.key === 'degraded',
+                  'border-service-health-warning': level.key === 'warning',
+                  'border-service-health-critical': level.key === 'critical',
+                }"
               />
               <div class="flex flex-row items-baseline gap-1">
-                <div class="text-left text-(--o2-text-2)! text-xs font-semibold">
+                <div class="text-left text-text-secondary! text-xs font-semibold">
                   {{ level.label }}
                 </div>
-                <div class="text-left text-[0.625rem] opacity-55">{{ level.range }}</div>
+                <div class="text-left text-3xs opacity-55">{{ level.range }}</div>
               </div>
             </div>
           </div>
         </div>
         <OSeparator vertical class="self-stretch mx-1" />
-        <!-- Inventory chip: the at-a-glance "how big is my system" number. Fixed
-             width regardless of how many kinds exist. Click to expand the
-             per-kind distribution (read-only here — the show/hide toggles live
-             in the "Show types" control next to it). -->
+        <!-- Inventory chip: total entity count. Click to expand the per-kind
+             distribution (read-only; the show/hide toggles live in "Show types"). -->
         <ODropdown side="bottom" align="start">
           <template #trigger>
             <OButton
@@ -82,8 +85,8 @@
               size="xs"
               icon-right="expand-more"
             >
-              <span class="font-bold text-(--o2-text-2)">{{ totalEntities }}</span>
-              <span class="ml-1 text-(--o2-text-4)">{{ t("traces.serviceGraph.entities") }}</span>
+              <span class="font-bold text-text-secondary">{{ totalEntities }}</span>
+              <span class="ml-1 text-text-body">{{ t("traces.serviceGraph.entities") }}</span>
             </OButton>
           </template>
           <div class="min-w-48" data-test="service-graph-entity-distribution">
@@ -109,10 +112,8 @@
           </div>
         </ODropdown>
         <OSeparator vertical class="self-stretch mx-1" />
-        <!-- "Show types": one control that unifies the kind inventory (each
-             kind's count) with the kind filter (show/hide) and the layout mode.
-             Counts and toggles sit together so the numbers and the control that
-             acts on them are the same thing, not two divorced widgets. -->
+        <!-- "Show types": unifies the kind inventory (each kind's count) with
+             the kind filter (show/hide) and the layout mode. -->
         <ODropdown side="bottom" align="end">
           <template #trigger>
             <OButton
@@ -124,11 +125,8 @@
             >
               {{ t("traces.serviceGraph.showTypes") }}
               <!-- Filter-active dot: signals the graph is filtered (some types
-                   hidden → entities withheld) rather than simply empty. A plain
-                   dot avoids the "is that N shown or N hidden?" ambiguity of a
-                   count; the per-type detail lives in the dropdown below. The
-                   button is `active` (primary fill) when filtered, so a white
-                   dot reads clearly on top of it. -->
+                   hidden), not simply empty. Per-type detail lives in the
+                   dropdown below. -->
               <span
                 v-if="activeFilterCount > 0"
                 class="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-white"
@@ -144,7 +142,7 @@
             class="p-2 flex flex-col gap-2 min-w-52"
             data-test="service-graph-collapse-mode"
           >
-            <div class="text-[0.625rem] font-bold uppercase opacity-60">
+            <div class="text-3xs font-bold uppercase opacity-60">
               {{ t("traces.serviceGraph.layout") }}
             </div>
             <OToggleGroup
@@ -163,12 +161,12 @@
                 {{ t(`traces.serviceGraph.mode.${m}`) }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <div class="text-[0.625rem] font-bold uppercase opacity-60 mt-1">
+            <div class="text-3xs font-bold uppercase opacity-60 mt-1">
               {{ t("traces.serviceGraph.types") }}
             </div>
             <!-- Each row: type name + live count, with a checkbox to show/hide.
-                 Services are the graph's spine (always shown) so their row is a
-                 count-only, non-toggleable entry rather than a disabled box. -->
+                 Services are always shown, so their row is count-only
+                 (non-toggleable). -->
             <div
               v-for="row in kindRows"
               :key="row.key"
@@ -200,51 +198,50 @@
         >
           <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
           <div
-            class="mb-0! whitespace-nowrap text-(--o2-text-4)! font-bold text-xs"
+            class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs"
           >
             {{ t("traces.serviceGraph.nodeSize") }}
             <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span>
           </div>
           <div class="flex items-center gap-1 py-0!">
             <div class="flex flex-row items-center gap-1.5">
-              <span class="sg-size-ring sg-size-ring--sm" />
-              <span class="text-xs text-(--o2-text-2)!">{{ t("traces.serviceGraph.sizeLow") }}</span>
+              <span class="w-4 h-4 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0" />
+              <span class="text-xs text-text-secondary!">{{ t("traces.serviceGraph.sizeLow") }}</span>
             </div>
             <div class="opacity-35 text-base tracking-[0.125rem] mb-0">···</div>
             <div class="flex flex-row items-center gap-1.5">
-              <span class="sg-size-ring sg-size-ring--lg" />
-              <span class="text-xs text-(--o2-text-2)!">{{ t("traces.serviceGraph.sizeHigh") }}</span>
+              <span class="w-7 h-7 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0" />
+              <span class="text-xs text-text-secondary!">{{ t("traces.serviceGraph.sizeHigh") }}</span>
             </div>
           </div>
         </div>
       </div>
     </div>
     <OCardSection
-      class="flex-1 min-h-0 relative overflow-hidden service-graph-container"
+      class="flex-1 min-h-0 relative overflow-hidden service-graph-container bg-surface-subtle!"
     >
       <!-- Graph Visualization -->
-      <OCard class="rounded-lg shadow-sm h-full">
-        <OCardSection class="p-0 h-full" style="height: 100%">
+      <OCard class="rounded-default h-full">
+        <OCardSection class="p-0 h-full">
           <div
             data-test="service-graph-container"
-            class="graph-container h-full w-full rounded overflow-hidden bg-[var(--o2-bg)]"
-            style="position: relative"
+            class="graph-container h-full w-full rounded-default overflow-hidden bg-surface-subtle relative"
           >
             <div v-if="loading" class="flex items-center justify-center h-full">
               <div class="text-center flex flex-col items-center">
-                <OSpinner size="xl" />
-                <div class="text-base font-medium mt-3 text-gray-400">
+                <OSpinner size="lg" />
+                <div class="text-sm mt-3 text-text-secondary">
                   {{ t("traces.serviceGraph.loading") }}
                 </div>
               </div>
             </div>
             <div
               v-else-if="error"
-              class="flex flex-center h-full items-center justify-center p-[0.675rem]"
+              class="flex h-full items-center justify-center p-[0.675rem]"
             >
               <div>
                 <OIcon name="error-outline" style="width: 4em; height: 4em;" />
-                <div class="text-xl font-semibold mt-3 text-[var(--o2-text-primary)]">
+                <div class="text-xl font-semibold mt-3 text-text-heading">
                   {{ error }}
                 </div>
                 <OButton
@@ -283,11 +280,10 @@
                 @click="handleNodeClick"
               />
 
-              <!-- Zoom controls: mouse-wheel zoom is disabled (pan only), so
-                   these explicit buttons drive zoom + fit-to-screen. Floated
-                   bottom-right like a map control. -->
+              <!-- Zoom controls: explicit buttons drive zoom + fit-to-screen,
+                   floated bottom-right like a map control. -->
               <div
-                class="absolute bottom-3 right-3 z-10 flex flex-col rounded-md border border-border-default bg-surface-panel shadow-sm overflow-hidden"
+                class="absolute bottom-3 right-3 z-10 flex flex-col rounded-default border border-border-default bg-surface-panel overflow-hidden"
                 data-test="service-graph-zoom-controls"
               >
                 <OButton
@@ -343,7 +339,7 @@
     </OCardSection>
   </OCard>
 
-  <!-- Enhanced Settings Dialog -->
+  <!-- Settings Dialog -->
   <ODialog data-test="service-graph-settings-dialog"
     v-model:open="showSettings"
     size="sm"
@@ -354,7 +350,7 @@
     @click:primary="resetSettings"
   >
     <div class="gap-3">
-      <div class="text-xs text-gray-400">
+      <div class="text-xs text-text-muted">
         {{ t("traces.serviceGraph.settingsDescription") }}
         <OTooltip :content="t('traces.serviceGraph.settingsTooltip')" />
       </div>
@@ -374,6 +370,7 @@ import {
 } from "vue";
 import * as echarts from "echarts";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import serviceGraphService from "@/services/service_graph";
@@ -468,6 +465,7 @@ export default defineComponent({
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit, expose }) {
     const store = useStore();
+    const { isDark } = useTheme();
     const router = useRouter();
     const { t } = useI18n();
     const { getStreams } = useStreams();
@@ -637,21 +635,18 @@ export default defineComponent({
       return counts;
     });
 
-    // Total entity count for the header inventory chip. Sums every kind — the
-    // single "how big is my system" number a user reads at a glance.
+    // Total entity count for the header inventory chip. Sums every kind.
     const totalEntities = computed(() => {
       const c = kindCounts.value;
       return c.service + c.database + c.queue + c.external + c.rpc;
     });
 
     // The kind rows for the "Show types" control: label + count + whether the
-    // user can hide it. Services are always shown (they're the graph's spine),
-    // so only the dependency kinds are toggleable. Order matches the graph's
-    // reading order. Counts and toggles live together so the inventory and the
-    // filter are one thing, not two.
+    // user can hide it. Services are always shown, so only the dependency kinds
+    // are toggleable. Order matches the graph's reading order.
     // Health levels for the "Border Color | Errors" legend: label + error-rate
     // range + the CSS class carrying its color token. Data-driven so the legend
-    // markup is one v-for (no repeated inline-styled swatches).
+    // markup is one v-for.
     const healthLevels = computed(() => [
       { key: "healthy", label: t("traces.serviceGraph.status.healthy"), range: t("traces.serviceGraph.range.healthy") },
       { key: "degraded", label: t("traces.serviceGraph.status.degraded"), range: t("traces.serviceGraph.range.degraded") },
@@ -671,9 +666,7 @@ export default defineComponent({
     ]);
 
     // How many entity types the user has hidden. Non-zero means the graph is
-    // filtered — the "Show types" button reflects this (active state + count)
-    // so the user knows entities are being withheld, not that the graph is
-    // simply empty.
+    // filtered — the "Show types" button reflects this (active state + count).
     const activeFilterCount = computed(() => hiddenKinds.value.size);
 
     // Key to control chart recreation - only change when layout/visualization type changes
@@ -745,7 +738,7 @@ export default defineComponent({
           ? convertServiceGraphToTree(
               filteredGraphData.value,
               layoutType,
-              store.state.theme === 'dark',
+              isDark.value,
               // Pass the live panel height so the tree can auto-shrink its
               // label font + node size to the fit-to-view compression, keeping
               // labels from overlapping on tall (many-leaf) graphs.
@@ -759,7 +752,7 @@ export default defineComponent({
               // terminal leaves); honor an explicit 'force' choice from the user.
               layoutType === "force" ? "force" : "layered",
               new Map(),
-              store.state.theme === 'dark',
+              isDark.value,
               undefined,
               graphContainerRef.value?.clientWidth || 1200,
               graphContainerRef.value?.clientHeight || 700,
@@ -782,11 +775,11 @@ export default defineComponent({
       return {
         ...newOptions,
         // Always full-replace. ECharts cannot swap a series TYPE via a merge, so
-        // a merge (the old graph path) left the previous `tree` series in place
-        // and Graph View rendered blank after a tree→graph switch. Both views now
-        // use fixed node positions (tree: computeTreeLayout; graph: layered
-        // layout with explicit x/y), so a replace re-renders at the same
-        // coordinates — no zoom/pan jump — while guaranteeing the series swaps.
+        // a merge leaves the previous `tree` series in place and Graph View
+        // renders blank after a tree→graph switch. Both views use fixed node
+        // positions (tree: computeTreeLayout; graph: layered layout with explicit
+        // x/y), so a replace re-renders at the same coordinates — no zoom/pan
+        // jump — while guaranteeing the series swaps.
         notMerge: true,
         lazyUpdate: true, // Prevent viewport reset when only styles change
         silent: true, // Disable animations during update to prevent position jumps
@@ -939,7 +932,7 @@ export default defineComponent({
 
       // Custom tooltip element — node tooltips use innerHTML, edge tooltips use an ECharts mini chart
       const tooltipEl = document.createElement("div");
-      const isDarkInit = store.state.theme === 'dark';
+      const isDarkInit = isDark.value;
       tooltipEl.style.cssText = `
         position: absolute; pointer-events: none; z-index: 9999;
         background: ${isDarkInit ? "rgba(22, 22, 26, 0.90)" : "rgba(255, 255, 255, 0.88)"};
@@ -1165,7 +1158,7 @@ export default defineComponent({
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";
         tooltipEl.style.whiteSpace = "nowrap";
-        tooltipEl.style.color = store.state.theme === 'dark'
+        tooltipEl.style.color = isDark.value
           ? "rgba(255,255,255,0.88)"
           : "rgba(0,0,0,0.82)";
       };
@@ -1933,55 +1926,11 @@ export default defineComponent({
 </script>
 
 <!-- Flowing edge animation — non-scoped so it reaches inside ECharts SVG output -->
-<style>
-/* Legend swatches — driven by the shared health-color design tokens so the
-   legend rings match the graph's node border colors without inline styles. */
-.sg-health-ring {
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 9999px;
-  border: 2px solid;
-  background: transparent;
-  flex: none;
-}
-.sg-health-ring--healthy {
-  border-color: var(--o2-service-health-healthy);
-}
-.sg-health-ring--degraded {
-  border-color: var(--o2-service-health-degraded);
-}
-.sg-health-ring--warning {
-  border-color: var(--o2-service-health-warning);
-}
-.sg-health-ring--critical {
-  border-color: var(--o2-service-health-critical);
-}
-
-/* Node-size legend rings: two sizes, both the "healthy" hue (size, not health,
-   is what this legend communicates). */
-.sg-size-ring {
-  border-radius: 9999px;
-  border: 2px solid var(--o2-service-health-healthy);
-  background: transparent;
-  flex-shrink: 0;
-}
-.sg-size-ring--sm {
-  width: 1rem;
-  height: 1rem;
-}
-.sg-size-ring--lg {
-  width: 1.75rem;
-  height: 1.75rem;
-}
-
-.service-graph-container {
-  background: #0f1419 !important;
-}
-
-.body--light .service-graph-container {
-  background: #ffffff !important;
-}
-
+<style scoped>
+/* keep(lib-override:echarts): dashed edge paths are rendered inside ECharts'
+   SVG DOM (no scope id, reached via :deep), animated by a keyframe that must
+   travel with the rule. ECharts may expose stroke-dasharray as an attribute or
+   an inline style depending on version — both are covered. */
 @keyframes sg-edge-flow {
   from {
     stroke-dashoffset: 14;
@@ -1991,19 +1940,9 @@ export default defineComponent({
   }
 }
 
-/*
- * Target dashed edge paths rendered by ECharts graph series.
- * ECharts SVG mode may set stroke-dasharray as an HTML attribute OR inside
- * an inline style depending on the version — we cover both.
- */
-.graph-container svg path[stroke-dasharray],
-.graph-container svg path[style*="stroke-dasharray"] {
+.graph-container :deep(svg path[stroke-dasharray]),
+.graph-container :deep(svg path[style*="stroke-dasharray"]) {
   animation: sg-edge-flow 0.5s linear infinite;
   animation-fill-mode: both;
-}
-
-.body--dark [data-test="service-graph-stream-selector"] .q-field,
-.body--dark [data-test="service-graph-search-input"] .q-field {
-  background: var(--o2-primary-background);
 }
 </style>

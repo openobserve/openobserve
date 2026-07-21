@@ -26,23 +26,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-col h-full min-h-0 bg-surface-panel"
     data-test="section-rail"
   >
+    <!-- Title aligns with the item LABELS below it (the page-edge grid line the
+         OTab pills' text lands on), not the pill edge — so 'IAM'/'Settings' sits
+         directly above 'Users'. Matches FolderList's heading. -->
     <div
       v-if="title"
-      class="shrink-0 px-3.5 pt-3 pb-1 text-sm font-semibold text-text-primary truncate"
+      class="shrink-0 pl-page-edge pr-1.5 pt-3 pb-1 text-sm font-semibold text-text-heading truncate"
     >
       {{ title }}
     </div>
 
-    <div class="flex-1 overflow-y-auto px-2 pt-1 pb-3">
+    <div class="flex-1 overflow-y-auto px-1.5 pt-1 pb-3">
       <OTabs
         :model-value="activeKey ?? ''"
         orientation="vertical"
-        class="w-full"
+        class="w-full section-rail-tabs"
         @change="onTabChange"
       >
-        <template v-for="group in visibleGroups" :key="group.label">
+        <template v-for="(group, idx) in visibleGroups" :key="group.label">
+          <!-- Section label. Each group after the first gets top spacing so the
+               sub-sections read as separate blocks rather than one merged list. -->
+          <!-- pl-1.5 (on top of the container's px-1.5) puts the section label on
+               the same 12px item-label grid line as the tabs below it. -->
           <div
-            class="px-2 py-1 text-[0.72rem] font-semibold text-text-secondary"
+            class="py-1 pl-1.5 text-xs font-semibold text-text-secondary"
+            :class="{ 'mt-3': idx > 0 }"
           >
             {{ group.label }}
           </div>

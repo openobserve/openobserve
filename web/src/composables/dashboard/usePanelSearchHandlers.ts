@@ -23,9 +23,8 @@ import {
  * Composable that encapsulates all streaming search response event handlers
  * for histogram / SQL panel queries.
  *
- * All handlers receive `state` by reference (it is the same reactive object
- * created in usePanelDataLoader) so mutations here are equivalent to
- * mutations in the original closure ΓÇö no behavioural change.
+ * All handlers receive `state` by reference (the same reactive object created
+ * in usePanelDataLoader), so mutations here update the caller's state directly.
  */
 export const usePanelSearchHandlers = ({
   state,

@@ -5,7 +5,7 @@
   >
     <div
       data-test="test-function-query-section"
-      class="test-function-query-container w-[100%]"
+      class="test-function-query-container w-full"
     >
       <FullViewContainer
           data-test="test-function-query-title-section"
@@ -17,7 +17,7 @@
             <OIcon
               v-if="!!sqlQueryErrorMsg"
               name="info-outline"
-              class="text-red-600 mx-1 cursor-pointer"
+              class="text-status-error-text mx-1 cursor-pointer"
               size="sm"
             >
               <OTooltip
@@ -41,22 +41,12 @@
           </template>
         </FullViewContainer>
         <div
-          class="flex items-center flex-wrap gap-x-3 py-2 w-[100%]"
-          :class="
-            store.state.theme === 'dark' ? 'bg-gray-950' : ' bg-white'
-          "
+          class="flex items-center flex-wrap gap-x-3 py-2 w-full bg-surface-base"
           v-show="expandState.query"
           data-test="test-function-query-editor-section"
         >
-          <div class="function-stream-select-input w-[100px]">
-            <div
-              class="text-[12px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'text-gray-200'
-                  : 'text-gray-700'
-              "
-            >
+          <div class="function-stream-select-input w-25">
+            <div class="text-xs text-text-label">
               {{ t("alerts.streamType") + " *" }}
             </div>
 
@@ -69,15 +59,8 @@
               style="width: 100px"
             />
           </div>
-          <div class="function-stream-select-input w-[300px]">
-            <div
-              class="text-[12px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'text-gray-200'
-                  : 'text-gray-700'
-              "
-            >
+          <div class="function-stream-select-input w-75">
+            <div class="text-xs text-text-label">
               {{ t("alerts.stream_name") + " *" }}
             </div>
             <OSelect
@@ -91,15 +74,8 @@
               @update:model-value="updateQuery"
             />
           </div>
-          <div class="functions-duration-input w-[330px]">
-            <div
-              class="text-[12px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'text-gray-200'
-                  : 'text-gray-700'
-              "
-            >
+          <div class="functions-duration-input w-82.5">
+            <div class="text-xs text-text-label">
               {{ t("common.duration") + " *" }}
             </div>
 
@@ -118,18 +94,11 @@
             />
           </div>
 
-          <div
-            class="text-[12px] w-[100%] mt-1"
-            :class="
-              store.state.theme === 'dark'
-                ? 'text-gray-200'
-                : 'text-gray-700'
-            "
-          >
+          <div class="text-xs w-full mt-1 text-text-label">
             {{ t("common.query") + " *" }}
           </div>
           <div
-            class="relative w-[100%]"
+            class="relative w-full"
           >
             <query-editor
               data-test="vrl-function-test-sql-editor"
@@ -147,12 +116,12 @@
               v-if="!inputQuery && queryEditorPlaceholderFlag"
               class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
             >
-              <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] whitespace-nowrap overflow-hidden text-ellipsis" :class="store.state.theme === 'dark' ? 'text-[#718096]' : ''">{{ queryEditorPlaceholder }}</span>
+              <span class="query-editor-placeholder-typewriter font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ queryEditorPlaceholder }}</span>
             </div>
             <div
-              class="text-red-500 p-1 invalid-sql-error min-h-[22px]"
+              class="text-status-error-text p-1 invalid-sql-error min-h-5.5"
             >
-              <span v-show="!!sqlQueryErrorMsg" class="text-[13px]">
+              <span v-show="!!sqlQueryErrorMsg" class="text-compact">
                 Error: {{ sqlQueryErrorMsg }}</span
               >
             </div>
@@ -172,17 +141,17 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
+            class="font-bold flex items-center text-text-secondary ml-2 text-compact"
           >
             <OSpinner size="xs" />
-            <div class="relative top-[2px]">
+            <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
           <OIcon
             v-if="!!eventsErrorMsg"
             name="info-outline"
-            class="text-red-600 mx-1 cursor-pointer"
+            class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
@@ -231,10 +200,10 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-sm font-medium text-weight-bold flex items-center text-gray-500 ml-2 text-[13px]"
+            class="text-sm font-medium font-bold flex items-center text-text-secondary ml-2 text-compact"
           >
             <OSpinner size="xs" />
-            <div class="relative top-[2px]">
+            <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
@@ -242,7 +211,7 @@
           <OIcon
             v-if="!!outputEventsErrorMsg"
             name="info-outline"
-            class="text-red-600 mx-1 cursor-pointer"
+            class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
@@ -267,16 +236,9 @@
           <OIcon
             name="lightbulb"
             size="xl"
-            class="text-orange-400"
+            class="text-status-warning-text"
           />
-          <div
-            class="text-[15px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'text-gray-200'
-                : 'text-gray-600'
-            "
-          >
+          <div class="text-sm text-text-secondary">
             {{ outputMessage }}
           </div>
         </div>
@@ -862,11 +824,12 @@ defineExpose({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(lib-override): compact run-query button + full-width date-time button (child DOM) */
 .test-function-query-container :deep(.test-function-run-query-btn) {
-  padding: 2px 8px !important;
-  font-size: 11px !important;
-  margin: 1px 2px !important;
+  padding: 0.125rem 0.5rem !important;
+  font-size: var(--text-2xs) !important;
+  margin: 1px 0.125rem !important;
 }
 
 .functions-duration-input :deep(.date-time-button) {

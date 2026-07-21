@@ -64,7 +64,7 @@ function mountComp() {
       stubs: {
         ODialog: ODialogStub,
         OTable: true,
-        AppPageHeader: true,
+        OPageHeader: true,
         OSearchInput: true,
         OTooltip: true,
         OEmptyState: true,

@@ -699,7 +699,10 @@ describe("IncidentDetailDrawer.vue", () => {
 
       expect(formatted).toContain("font-bold");
       expect(formatted).toContain("text-lg");
-      expect(formatted).toContain("text-blue-600");
+      // Colour comes from the `:deep(.rca-report-content) .rca-h2` rule in
+      // IncidentRCAAnalysis.vue (unlayered, so it beat the old text-blue-600
+      // utility anyway) — the hook class is what this renderer must emit.
+      expect(formatted).toContain("rca-h2");
     });
 
     it("should format h3 headers", () => {

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,17 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
     <div
-      class="w-full flex flex-col flex-center gap-2"
-      style="font-size: 1.5rem"
+      class="w-full flex flex-col items-center justify-center gap-2 text-2xl"
     >
-      <img
+      <img class="size-50 mt-[20vh]"
         data-test="no-organization-selected-image"
         :src="getImageURL('images/common/selectOrganization.svg')"
-        style="width: 200px; height: 200px; margin-top: 20vh"
         alt=""
       />
-      <div data-test="no-organization-selected-title" class="m-0 text-[18px] font-semibold">{{ t("ticket.noOrganizationSelected") }}</div>
-      <div data-test="no-organization-selected-message" class="m-0 text-sm font-normal leading-5 text-[#7F7777]">{{ t("ticket.selectOrganizationForQuota") }}</div>
+      <div data-test="no-organization-selected-title" class="m-0 text-lg font-semibold">{{ t("ticket.noOrganizationSelected") }}</div>
+      <div data-test="no-organization-selected-message" class="m-0 text-sm font-normal leading-5 text-text-secondary">{{ t("ticket.selectOrganizationForQuota") }}</div>
     </div>
   </template>
   

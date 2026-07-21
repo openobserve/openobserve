@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="handleDrawerClose"
     :title="t('pipeline.associateFunction')"
     :width="createNewFunction ? 97 : 30"
+    :bleed="createNewFunction"
     @keydown.stop
     :primaryButtonLabel="!createNewFunction ? t('alerts.save') : undefined"
     :secondaryButtonLabel="!createNewFunction ? t('alerts.cancel') : undefined"
@@ -32,8 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-function-node-routing-section"
-      class="flex flex-col h-full"
-      :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
+      class="flex flex-col h-full bg-surface-base"
     >
 
 
@@ -48,9 +48,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="associate-function-routing-container"
-      class="rounded-lg w-full pt-3 pb-3 flex flex-col gap-4 flex-1 min-h-0"
+      class="rounded-default w-full flex flex-col gap-4 flex-1 min-h-0"
     >
-      <div class="flex items-center gap-3 px-(--spacing-dialog-header-px)">
+      <!-- In create mode the drawer body is `bleed` (0 inset) so the AddFunction
+           editor can fill edge-to-edge; re-inset just this toggle row to match the
+           header grid line. Select mode keeps the drawer's own 12px body inset. -->
+      <div class="flex items-center gap-3" :class="createNewFunction ? 'px-3 pt-3' : ''">
         <OSwitch
           data-test="create-function-toggle"
           :label="isUpdating ? 'Edit function' : 'Create new function'"
@@ -58,12 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="createNewFunction"
-          class="text-sm text-gray-600 dark:text-gray-300"
+          class="text-sm text-text-secondary"
         >
           ({{ t("alerts.newFunctionAssociationMsg") }})
         </div>
       </div>
-      <div class="flex flex-col gap-4" :class="[!createNewFunction ? 'px-3' : 'flex-1 min-h-0']">
+      <div class="flex flex-col gap-4" :class="[!createNewFunction ? '' : 'flex-1 min-h-0']">
         <!-- Select-existing branch — form-owned fields inside <OForm>. -->
         <OForm
           v-if="!createNewFunction"
@@ -93,16 +96,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="associate-function-definition-section"
             class="mt-4 mb-4"
           >
-            <OCard class="function-definition-card border border-[#e1e5e9] dark:border-[#2d3748] rounded-lg shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] overflow-hidden dark:bg-[#1a202c]">
-              <OCardSection role="header" class="function-definition-header bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b border-b-[#e2e8f0] dark:border-b-[#4a5568]">
-                <div class="text-base font-semibold text-[#2d3748] dark:text-white">
+            <OCard class="function-definition-card border border-border-default rounded-default shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.4)] overflow-hidden bg-surface-base">
+              <OCardSection role="header" class="function-definition-header bg-[linear-gradient(135deg,#f8fafc_0%,#f1f5f9_100%)] dark:bg-[linear-gradient(135deg,#2d3748_0%,#1a202c_100%)] border-b border-b-border-default">
+                <div class="text-base font-semibold text-text-heading">
                   {{ t("function.function_definition") }}
                 </div>
               </OCardSection>
               <OSeparator />
               <OCardSection class="p-0 function-definition-content">
-                <div class="function-code-container bg-[#fafbfc] dark:bg-[#0d1117] dark:border dark:border-[#21262d] rounded-none max-w-[584px] max-h-[250px] overflow-y-auto relative">
-                  <pre class="function-code text-[#2d3748] dark:text-[#f7fafc] bg-transparent m-0 p-4 font-[JetBrains_Mono,Fira_Code,Monaco,Menlo,Ubuntu_Mono,monospace] text-[13px] leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text">{{
+                <div class="function-code-container bg-code-block-bg dark:border dark:border-border-default rounded-none max-w-146 max-h-62.5 overflow-y-auto relative">
+                  <pre class="function-code text-code-block-text bg-transparent m-0 p-4 font-mono text-compact leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text selection:bg-primary-100 dark:selection:bg-primary-600 dark:selection:text-text-inverse">{{
                     pipelineObj.functions[selectedFunction]?.function ||
                     "No definition available"
                   }}</pre>
@@ -119,19 +122,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- Info note explaining RAF/RBF -->
-            <div class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2">
-              <div class="text-sm text-[#2d3748]">
+            <div class="bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2">
+              <div class="text-sm text-banner-warning-text">
                 Function Execution Guidelines:
               </div>
-              <div class="flex flex-col gap-1 text-sm text-[#2d3748]">
+              <div class="flex flex-col gap-1 text-sm text-banner-warning-text">
                 <div class="flex items-start gap-2">
                   <OIcon
                     name="info"
                     size="sm"
-                    class="shrink-0 mt-0.5 text-amber-500"
+                    class="shrink-0 mt-0.5 text-status-warning-text"
                   />
                   <span>
-                    <span class="font-bold text-[#007bff]">RBF (Run Before Flattening):</span>
+                    <span class="font-bold text-text-link">RBF (Run Before Flattening):</span>
                     Function executes before data structure is flattened
                   </span>
                 </div>
@@ -139,10 +142,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="info"
                     size="sm"
-                    class="shrink-0 mt-0.5 text-amber-500"
+                    class="shrink-0 mt-0.5 text-status-warning-text"
                   />
                   <span>
-                    <span class="font-bold text-[#007bff]">RAF (Run After Flattening):</span>
+                    <span class="font-bold text-text-link">RAF (Run After Flattening):</span>
                     Function executes after data structure is flattened
                   </span>
                 </div>
@@ -427,66 +430,60 @@ const filterFunctions = (val: any, update: any) => {
 };
 </script>
 
-<style>
+<style scoped>
+/* keep(lib-override): AddFunction renders its own back/fullscreen/title chrome and name
+   input; this hides that chrome and stretches the input inside the pipeline drawer.
+   All of it is AddFunction-internal DOM, so it is not addressable via template utilities. */
 .pipeline-add-function :deep(.add-function-back-btn),
 .pipeline-add-function :deep(.add-function-fullscreen-btn),
 .pipeline-add-function :deep(.add-function-title) {
   display: none;
 }
 
-.function-code::selection {
-  background-color: #bee3f8;
+.pipeline-add-function :deep(.add-function-name-input) {
+  width: 100%;
+  margin-left: 0 !important;
 }
 
-/* Custom scrollbar */
+.pipeline-add-function :deep(.add-function-name-input label) {
+  width: 100%;
+  padding-left: 0;
+}
+
+/* keep(scrollbar): ::-webkit-scrollbar pseudo-elements have no Tailwind utility equivalent. */
 .function-code-container::-webkit-scrollbar {
-  width: 6px;
+  width: 0.375rem;
 }
 
 .function-code-container::-webkit-scrollbar-track {
-  background: #f7fafc;
+  background: var(--color-surface-subtle);
 }
 
 .function-code-container::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 3px;
+  background: var(--color-border-strong);
+  border-radius: 0.1875rem;
 }
 
 .function-code-container::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
-}
-
-.dark .function-code::selection {
-  background-color: #2b6cb0;
-  color: #ffffff;
+  background: var(--color-text-secondary);
 }
 
 .dark .function-code-container::-webkit-scrollbar {
-  width: 8px;
+  width: 0.5rem;
 }
 
 .dark .function-code-container::-webkit-scrollbar-track {
-  background: #0d1117;
-  border-radius: 4px;
+  background: var(--color-surface-subtle);
+  border-radius: 0.25rem;
 }
 
 .dark .function-code-container::-webkit-scrollbar-thumb {
-  background: #4a5568;
-  border-radius: 4px;
-  border: 1px solid #2d3748;
+  background: var(--color-border-strong);
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-border-default);
 }
 
 .dark .function-code-container::-webkit-scrollbar-thumb:hover {
-  background: #718096;
-}
-
-.pipeline-add-function .add-function-name-input {
-  width: 100%;
-  margin-left: 0px !important;
-}
-
-.pipeline-add-function .add-function-name-input label {
-  width: 100%;
-  padding-left: 0;
+  background: var(--color-text-secondary);
 }
 </style>

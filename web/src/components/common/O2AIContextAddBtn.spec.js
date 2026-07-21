@@ -37,9 +37,7 @@ describe('O2AIContextAddBtn', () => {
       global: {
         plugins: [],
         provide: { store },
-        stubs: {
-          'q-btn': false // Don't stub q-btn to test actual button
-        }
+        stubs: {}
       },
       props: {
         class: '',

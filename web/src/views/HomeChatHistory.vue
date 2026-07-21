@@ -92,8 +92,7 @@ function formatTime(ts: string): string {
 
 <template>
   <div
-    class="flex flex-col h-full text-base w-[15em] shrink-0 border-r border-r-[0.0625em] border-(--o2-border-color) bg-(--o2-card-bg) overflow-hidden"
-    :class="store.state.theme === 'dark' ? 'hch-dark' : 'hch-light'"
+    class="flex flex-col h-full text-base w-[15em] shrink-0 border-r border-r-[0.0625em] border-card-glass-border bg-card-glass-bg overflow-hidden"
   >
     <!-- Header -->
     <div class="flex items-center justify-between px-3 pt-[0.625em] pb-[0.375em] shrink-0">
@@ -122,7 +121,7 @@ function formatTime(ts: string): string {
 
     <!-- Search -->
     <div class="px-2 pb-[0.375em] shrink-0">
-      <div class="flex items-center gap-[0.375em] bg-(--o2-input-bg) rounded-md px-[0.375em]">
+      <div class="flex items-center gap-[0.375em] bg-input-bg rounded-default px-[0.375em]">
         <svg
           class="opacity-50 shrink-0"
           width="0.875em"
@@ -139,7 +138,7 @@ function formatTime(ts: string): string {
         </svg>
         <input
           v-model="searchTerm"
-          class="hch-search-input flex-1 min-w-0 border-0 bg-transparent outline-none text-[0.8125em] text-(--o2-text-primary) py-[0.375em]"
+          class="hch-search-input flex-1 min-w-0 border-0 bg-transparent outline-none text-[0.8125em] text-text-body py-[0.375em] placeholder:text-text-muted placeholder:opacity-70"
           :placeholder="t('chatHistory.search')"
           type="text"
         />
@@ -170,15 +169,15 @@ function formatTime(ts: string): string {
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="group flex items-center gap-1 py-[0.4375em] px-2 rounded-md cursor-pointer transition-[background] duration-[120ms] hover:bg-[var(--o2-hover-color,rgba(128,128,128,0.1))]"
+        class="group flex items-center gap-1 py-[0.4375em] px-2 rounded-default cursor-pointer transition-[background] duration-[120ms] hover:bg-interactive-hover-bg"
         :class="{
-          'bg-[var(--o2-selected-color,rgba(57,126,246,0.12))]!': activeChatId === chat.id,
+          'bg-primary-100!': activeChatId === chat.id,
         }"
         @click="selectChat(chat.id)"
       >
         <div class="flex-1 min-w-0">
-          <div class="text-[0.8125em] leading-[1.35] truncate text-(--o2-text-body)" :class="{ 'font-medium': activeChatId === chat.id }">{{ chat.title }}</div>
-          <div class="text-[0.6875em] text-(--o2-text-caption) mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
+          <div class="text-[0.8125em] leading-[1.35] truncate text-text-body" :class="{ 'font-medium': activeChatId === chat.id }">{{ chat.title }}</div>
+          <div class="text-[0.6875em] text-text-secondary mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
         </div>
         <span class="inline-flex items-center shrink-0 opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100">
           <OButton
@@ -215,7 +214,7 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- Clear all -->
-    <div v-if="history.length > 0" class="shrink-0 py-[0.375em] px-2 border-t border-t-[0.0625em] border-t-(--o2-border-color)">
+    <div v-if="history.length > 0" class="shrink-0 py-[0.375em] px-2 border-t border-t-[0.0625em] border-t-card-glass-border">
       <OButton variant="ghost-subtle" :block="true" @click="clearAll">
         <svg
           width="0.875em"
@@ -235,11 +234,3 @@ function formatTime(ts: string): string {
     </div>
   </div>
 </template>
-
-<style>
-/* placeholder pseudo-element — cannot be inlined */
-.hch-search-input::placeholder {
-  color: var(--o2-text-muted);
-  opacity: 0.7;
-}
-</style>

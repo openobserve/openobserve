@@ -27,7 +27,7 @@
          a glance (⟳ loop / ⚠ failure / $ cost). -->
     <template #header-left>
       <div
-        class="flex items-center justify-center h-7 w-7 rounded-md"
+        class="flex items-center justify-center h-7 w-7 rounded-default"
         :class="signalIconWrap"
       >
         <OIcon :name="signalIcon" size="sm" />
@@ -50,11 +50,11 @@
           :class="signalIconColor"
         />
         <div class="flex flex-col gap-[0.25rem]">
-          <p class="m-0 text-[13px] leading-normal text-(--color-text-primary)">
+          <p class="m-0 text-compact leading-normal text-(--color-text-heading)">
             {{ headline }}
           </p>
           <p
-            class="m-0 text-[11px] leading-normal text-(--color-text-secondary)"
+            class="m-0 text-2xs leading-normal text-(--color-text-secondary)"
           >
             {{ explanation }}
           </p>
@@ -64,7 +64,7 @@
       <!-- FAILURE: the real error messages (the "read it, know the fix" section) -->
       <section
         v-if="signalType === 'failure'"
-        class="card-container py-3 px-[0.875rem] pb-[0.875rem] bg-(--color-surface-base) border border-(--color-border-default) rounded-md"
+        class="card-container py-3 px-[0.875rem] pb-[0.875rem] bg-(--color-surface-base) border border-(--color-border-default) rounded-surface"
       >
         <header class="mb-[0.375rem] flex items-center gap-1.5">
           <OIcon
@@ -72,7 +72,7 @@
             size="xs"
             class="text-(--color-badge-error-soft-text)"
           />
-          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">
+          <h4 class="m-0 text-compact font-semibold text-(--color-text-heading)">
             {{ t("aiObservability.behavior.detail.errorsTitle") }}
           </h4>
         </header>
@@ -89,14 +89,14 @@
           <template #cell-message="{ row }">
             <div class="flex flex-col gap-1 py-0.5">
               <span
-                class="text-[12px] leading-normal text-(--color-text-primary) whitespace-pre-wrap break-words"
+                class="text-xs leading-normal text-(--color-text-heading) whitespace-pre-wrap break-words"
               >
                 {{ expandedErrors.has(row.full) ? row.full : row.message }}
               </span>
               <button
                 v-if="row.full && row.full !== row.message"
                 type="button"
-                class="self-start text-[11px] text-(--color-primary) hover:underline"
+                class="self-start text-2xs text-(--color-text-link) hover:underline"
                 @click.stop="toggleError(row.full)"
               >
                 {{
@@ -117,13 +117,13 @@
 
       <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
       <section
-        class="card-container py-3 px-[0.875rem] pb-[0.875rem] bg-(--color-surface-base) border border-(--color-border-default) rounded-md"
+        class="card-container py-3 px-[0.875rem] pb-[0.875rem] bg-(--color-surface-base) border border-(--color-border-default) rounded-surface"
       >
         <header class="mb-[0.375rem] flex items-center justify-between gap-2">
-          <h4 class="m-0 text-[13px] font-semibold text-(--color-text-primary)">
+          <h4 class="m-0 text-compact font-semibold text-(--color-text-heading)">
             {{ tracesTitle }}
           </h4>
-          <span class="text-[11px] text-(--color-text-secondary)">
+          <span class="text-2xs text-(--color-text-secondary)">
             {{ t("aiObservability.behavior.detail.tracesHint") }}
           </span>
         </header>
@@ -141,7 +141,7 @@
                row opens the trace in a new browser tab, not in place. -->
           <template #cell-trace_id="{ row }">
             <span
-              class="inline-flex items-center gap-1 text-(--color-primary) hover:underline"
+              class="inline-flex items-center gap-1 text-(--color-text-link) hover:underline"
               :title="t('aiObservability.behavior.detail.openInNewTab')"
             >
               <OIcon name="open-in-new" size="xs" class="opacity-70" />

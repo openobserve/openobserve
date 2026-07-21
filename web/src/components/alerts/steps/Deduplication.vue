@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="step-deduplication w-full h-full overflow-auto mx-auto"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE <OForm>
          and provides FORM_CONTEXT_KEY. The fields below bind by nested `name=`
@@ -26,19 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back into it (payload parity). -->
     <div>
     <div
-      class="step-content rounded-lg min-h-full bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
+      class="step-content rounded-default min-h-full bg-surface-overlay border border-border-default"
     >
       <div
-        class="section-header flex items-center gap-0 py-2.5 px-3"
-        :class="
-          store.state.theme === 'dark'
-            ? 'border-b border-[#343434]'
-            : 'border-b border-[#eeeeee]'
-        "
+        class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default"
       >
-        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
+        <div class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
         <span
-          class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]"
+          class="section-header-title text-compact font-semibold text-text-heading"
         >{{
           t("alerts.steps.deduplication")
         }}</span>
@@ -56,12 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
           <div
-            class="text-sm mb-2"
-            :class="
-              store.state.theme === 'dark'
-                ? 'text-gray-400'
-                : 'text-gray-600'
-            "
+            class="text-sm mb-2 text-text-secondary"
           >
             {{ t("alerts.deduplication.fingerprintFieldsHint") }}
           </div>
@@ -72,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               multiple
               creatable
               data-test="alert-dedup-fingerprint-fields"
-              class="max-w-[600px] min-w-[300px]"
+              class="max-w-150 min-w-75"
               :helpText="t('alerts.deduplication.fingerprintFieldsHelp')"
               @update:model-value="onFingerprintChange"
               @create="addFingerprintField"
@@ -97,17 +86,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
           <div
-            class="text-sm mb-2"
-            :class="
-              store.state.theme === 'dark'
-                ? 'text-gray-400'
-                : 'text-gray-600'
-            "
+            class="text-sm mb-2 text-text-secondary"
           >
             {{ t("alerts.deduplication.timeWindowHint") }}
           </div>
           <div class="flex items-center">
-            <div class="w-[210px] ml-0">
+            <div class="w-52.5 ml-0">
               <OFormInput
                 name="deduplication.time_window_minutes"
                 type="number"
@@ -124,8 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 height: 28px;
                 font-weight: normal;
               "
-              :class="store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'"
-              class="flex justify-center items-center"
+              class="flex justify-center items-center bg-surface-subtle"
             >
               {{ t("alerts.minutes") }}
             </div>

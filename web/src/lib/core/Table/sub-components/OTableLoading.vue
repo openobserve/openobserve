@@ -1,9 +1,9 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject } from "vue";
 import type { Column } from "@tanstack/vue-table";
-import { TABLE_CHECKBOX_COL_SIZE, TABLE_CHECKBOX_COL_PAD_LEFT, type OTableColumnDef } from "../OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
 
 const props = defineProps<{
   /** Number of skeleton rows. Default: 10 */
@@ -16,7 +16,17 @@ const props = defineProps<{
   expansionEnabled?: boolean;
   /** Render placeholder for the drag-handle column */
   enableRowReorder?: boolean;
+  /** Mirror the loaded body's row divider so the skeleton is the same height. */
+  bordered?: boolean;
 }>();
+
+// Same injection OTableBodyCell uses — under horizontal scroll the real cells
+// may grow past their size var, so capping maxWidth here (when the body doesn't)
+// would make columns visibly widen the moment data arrives.
+const horizontalScroll = inject<{ value: boolean } | null>(
+  "o2TableHorizontalScroll",
+  null,
+);
 
 const BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
 const JITTER = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
@@ -34,22 +44,49 @@ const safeId = (id: string) => id.replace(/[^a-zA-Z0-9]/g, "-");
 const defOf = (col: Column<any, any>): OTableColumnDef =>
   col.columnDef as unknown as OTableColumnDef;
 
-// `isAction` lives on meta after useTableCore's column conversion.
+// `isAction` lives on meta after useTableCore's column conversion. useTableCore
+// also treats a column literally named "actions" as one (isRigidColumn), so the
+// skeleton must too — otherwise such a column renders as a text bar in a
+// ~80px cell and then snaps to icon buttons on load.
 const isActionCol = (col: Column<any, any>): boolean => {
   const def = defOf(col);
-  return !!def.isAction || !!(def.meta as any)?.isAction;
+  return !!def.isAction || !!(def.meta as any)?.isAction || col.id === "actions";
+};
+
+const isSpacerCol = (col: Column<any, any>): boolean =>
+  !!(defOf(col).meta as any)?.spacer;
+
+// Mirror OTableBodyCell's horizontal padding exactly: the invisible spacer must
+// be able to reach 0 width, and compact columns are px-1.
+const cellPadClass = (col: Column<any, any>): string => {
+  const meta = (defOf(col).meta as any) ?? {};
+  if (meta.spacer) return "px-0";
+  return meta.compactPadding ? "px-1" : "px-2";
 };
 
 // Mirror OTableBodyCell's width + sticky-pinning behaviour exactly.
 const cellStyle = (col: Column<any, any>): Record<string, any> => {
   const style: Record<string, any> = {};
+  const meta = (defOf(col).meta as any) ?? {};
+  const def = defOf(col);
   // Auto-width columns (meta.autoWidth) flex to fill remaining space —
-  // OTableBodyCell skips the width style for these, and we must too.
-  const isAutoWidth = (defOf(col).meta as any)?.autoWidth === true;
-  if (!isAutoWidth) {
+  // OTableBodyCell skips the width style for these, and we must too, but it
+  // still honours minSize so the elastic column can't collapse.
+  const isAutoWidth = meta.autoWidth === true;
+  if (isAutoWidth) {
+    if (def.minSize) style.minWidth = `${def.minSize}px`;
+  } else {
     const sizeVar = `var(--header-${safeId(col.id)}-size)`;
     style.width = sizeVar;
-    style.maxWidth = sizeVar;
+    // Rigid columns (index, actions) pin min+max so their width never depends
+    // on siblings — without minWidth the skeleton's actions cell can be
+    // squeezed below its budget and then jump wider on load.
+    if (meta.fixedWidth) {
+      style.minWidth = sizeVar;
+      style.maxWidth = sizeVar;
+    } else if (!horizontalScroll?.value) {
+      style.maxWidth = sizeVar;
+    }
   }
   const pin = col.getIsPinned?.();
   if (pin === "left") {
@@ -74,11 +111,15 @@ const actionCountFor = (col: Column<any, any>): number => {
   return 2;
 };
 
+// The visual pill drawn INSIDE the fixed footprint below. The footprint itself
+// is always the real button box (w-8 h-8 = ACTION_ICON_BTN in useTableCore), so
+// the cell's geometry matches the loaded row exactly; only the shimmer inside is
+// smaller, which reads as an icon rather than a heavy solid block.
 const actionDimsFor = (col: Column<any, any>): string => {
   const s = (defOf(col).meta as any)?.actionSize;
-  if (s === "button") return "h-7 w-7 rounded-md";
-  if (s === "pill") return "h-5 w-12 rounded-md";
-  return "h-[22px] w-[22px] rounded-md"; // icon (Vercel/GitHub style)
+  if (s === "button") return "h-5 w-5 rounded-default";
+  if (s === "pill") return "h-4 w-10 rounded-default";
+  return "h-4.5 w-4.5 rounded-default"; // icon
 };
 
 const alignClassFor = (col: Column<any, any>): string => {
@@ -102,7 +143,7 @@ const alignClassFor = (col: Column<any, any>): string => {
       class="o2-skel-row opacity-0 [animation:o2-skel-row-in_320ms_ease-out_forwards]"
       :style="{
         animationDelay: `${(r - 1) * 40}ms`,
-        height: 'var(--o2-table-row-height)',
+        height: 'var(--table-row-height, 2.25rem)',
       }"
     >
       <!-- Expand chevron placeholder — matches OTableBodyRow exactly -->
@@ -115,10 +156,10 @@ const alignClassFor = (col: Column<any, any>): string => {
       <td
         v-if="selectionEnabled"
         class="text-left align-middle"
-        :style="{ width: TABLE_CHECKBOX_COL_SIZE + 'px', minWidth: TABLE_CHECKBOX_COL_SIZE + 'px', maxWidth: TABLE_CHECKBOX_COL_SIZE + 'px', paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px' }"
+        :style="{ width: TABLE_CHECKBOX_COL_SIZE + 'px', minWidth: TABLE_CHECKBOX_COL_SIZE + 'px', maxWidth: TABLE_CHECKBOX_COL_SIZE + 'px', paddingLeft: 'var(--spacing-table-edge)' }"
       >
         <span
-          class="inline-block h-3.5 w-3.5 rounded-[3px] border border-[var(--color-skeleton-base)]"
+          class="inline-block h-3.5 w-3.5 rounded-default border border-skeleton-base"
           aria-hidden="true"
         />
       </td>
@@ -129,18 +170,26 @@ const alignClassFor = (col: Column<any, any>): string => {
         class="w-4 min-w-4 px-0 text-center align-middle"
       />
 
-      <!-- Data cells — class & style mirror OTableBodyCell exactly -->
+      <!-- Data cells — class, data-test & style mirror OTableBodyCell exactly.
+           The data-test prefix matters: OTable's edge-inset rule is keyed on
+           `td[data-test^="o2-table-cell-"]`, so without it the skeleton would
+           miss the 1rem first/last-cell inset and every row would shift
+           horizontally the moment loading finished. -->
       <td
         v-for="(col, c) in tableColumns"
         :key="col.id"
+        :data-test="`o2-table-cell-${col.id}`"
         :class="[
-          'px-2 align-middle',
+          cellPadClass(col),
+          'align-middle',
           alignClassFor(col),
           isActionCol(col) ? 'w-0 whitespace-nowrap' : '',
+          bordered ? 'border-b border-table-row-divider' : '',
         ]"
         :style="cellStyle(col)"
       >
-        <!-- Action column → inline group of N icon-sized placeholders -->
+        <!-- Action column → N placeholders, each in the REAL button footprint
+             (w-8 h-8) so the cell measures identically to the loaded row. -->
         <span
           v-if="isActionCol(col)"
           class="inline-flex items-center gap-1 align-middle"
@@ -148,14 +197,22 @@ const alignClassFor = (col: Column<any, any>): string => {
           <span
             v-for="a in actionCountFor(col)"
             :key="`a-${r}-${c}-${a}`"
-            :class="['o2-skel-pill inline-block shrink-0 [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]', actionDimsFor(col)]"
+            class="inline-flex items-center justify-center shrink-0 w-8 h-8"
             aria-hidden="true"
-          />
+          >
+            <span
+              :class="['o2-skel-pill inline-block [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]', actionDimsFor(col)]"
+            />
+          </span>
         </span>
-        <!-- Data column → chunky rounded bar with shimmer; td text-align positions it -->
+        <!-- The invisible spacer column must stay empty: it collapses to 0 width
+             in the loaded table, so drawing a bar in it would reserve width the
+             real table never uses. -->
+        <template v-else-if="isSpacerCol(col)" />
+        <!-- Data column → chunky rounded-default bar with shimmer; td text-align positions it -->
         <span
           v-else
-          class="o2-skel-pill inline-block h-3 rounded-md align-middle [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
+          class="o2-skel-pill inline-block h-3 rounded-default align-middle [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
           :style="{ width: `${cellWidth(r - 1, c)}%` }"
           aria-hidden="true"
         />
@@ -164,23 +221,14 @@ const alignClassFor = (col: Column<any, any>): string => {
   </tbody>
 </template>
 
-<style>
-@keyframes o2-skel-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-@keyframes o2-skel-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
+<style scoped>
+/* keep(keyframes): reduced-motion opt-out for the skeleton animations. The
+   `o2-skel-shimmer` / `o2-skel-row-in` keyframes themselves now live in
+   styles/keyframes.css (shared with TenstackTable + OTablePagination) because
+   the template starts them from `[animation:…]` utilities. This cancel rule
+   stays as CSS: a `motion-reduce:animate-none` utility does not reliably
+   outrank the arbitrary `[animation:…]` utility it has to override. Both
+   selectors are this component's own elements, so scoping is safe. */
 @media (prefers-reduced-motion: reduce) {
   .o2-skel-row {
     opacity: 1;

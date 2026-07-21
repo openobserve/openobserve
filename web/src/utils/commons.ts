@@ -62,7 +62,7 @@ export const modifySQLQuery = async (
   return modString;
 };
 
-// ----------- NEW Methods to retrieve dashboard data
+// ----------- Methods to retrieve dashboard data
 export function getConsumableDateTime(dateObj: any) {
   if (dateObj.tab == "relative") {
     // watcher issue based on changeRelativeDate() in logs/Index.vue

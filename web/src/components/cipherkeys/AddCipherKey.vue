@@ -14,30 +14,28 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="p-0" style="min-height: inherit;">
-    <AppPageHeader
-      :back="{
-        label: t('cipherKey.header'),
-        onClick: () => emit('cancel:hideform'),
-      }"
-      class="px-3 border-b border-border-default"
-    >
+  <OPageLayout
+    class="min-h-[inherit]"
+    :back="{
+      label: t('cipherKey.header'),
+      onClick: () => emit('cancel:hideform'),
+    }"
+    bleed
+  >
       <template #title>
         <span data-test="add-template-title">
           {{ isUpdatingCipherKey ? t("cipherKey.update") : t("cipherKey.add") }}
         </span>
       </template>
-    </AppPageHeader>
     <div class="create-cipher-form">
       <!-- One OForm owns every field across the stepper (the children render
            OForm* controls connected by name); a single Zod schema gates the
            whole form. Inline form → the footer Save is type="submit" (Enter
            works natively) and its spinner is form-driven via v-slot. -->
       <OForm :form="form" v-slot="{ isSubmitting }">
-        <div style="height: calc(100vh -  var(--navbar-height) - 155px); overflow: auto">
+        <div class="overflow-auto" style="height: calc(100vh -  var(--navbar-height) - 155px)">
           <!-- Constrain the whole form to a sensible reading width on wide screens
-               while staying fluid below the breakpoint. Uses Tailwind's design-system
-               max-width token (max-w-3xl ≈ 48rem) instead of arbitrary px values. -->
+               while staying fluid below the breakpoint. -->
           <div class="w-full max-w-3xl">
             <div class="flex">
               <div class="w-1/3 o2-input flex mx-3 mt-3 mb-4">
@@ -132,8 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="mx-2">
-          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default"
-            style="position: sticky; bottom: 0px; z-index: 2"
+          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default sticky"
+            style="bottom: 0px; z-index: 2"
           >
             <OButton
               data-test="add-cipher-key-cancel-btn"
@@ -164,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="dialog.okCallback"
       @update:cancel="dialog.show = false"
     />
-  </div>
+  </OPageLayout>
 </template>
 <script lang="ts" setup>
 import { ref, computed, onMounted, onActivated } from "vue";
@@ -184,7 +182,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import {
   makeAddCipherKeySchema,
   addCipherKeyDefaults,
@@ -223,13 +221,12 @@ const getTypeLabel = (type: string) =>
 // The parent OWNS the form (headless useOForm): it renders <OForm>, so it sits
 // above the provide boundary and can't inject — yet it needs store.type
 // reactively to drive the OStepper's conditional child + the step-1 title.
-// useOForm + form.useStore gives that directly, with no mirror/subscribe; the
-// children inject this SAME form via <OForm :form="form">. The save is wired
-// here through useOForm (not @submit on the tag) — wrapped lazily so onFormSubmit
-// (declared below) resolves at submit time, not at setup.
-// Build the schema with useI18n's `t` so the three previously-translated
-// validation messages (provider-type / algorithm / secret required) render in
-// the active locale, exactly as they did before the migration.
+// useOForm + form.useStore gives that directly; the children inject this SAME
+// form via <OForm :form="form">. The save is wired here through useOForm (not
+// @submit on the tag) — wrapped lazily so onFormSubmit (declared below)
+// resolves at submit time, not at setup.
+// Build the schema with useI18n's `t` so validation messages render in the
+// active locale.
 const addCipherKeySchema = makeAddCipherKeySchema(t);
 
 const form = useOForm<AddCipherKeyForm>({
@@ -278,7 +275,7 @@ const setupTemplateData = () => {
     )
       .then((response) => {
         // :default-values is read once at mount; re-seed via reset now the
-        // record has arrived (playbook §4: async edit prefill → form.reset).
+        // record has arrived.
         const record = mergeObjects(
           addCipherKeyDefaults(),
           response.data,
@@ -343,12 +340,11 @@ const createCipherKey = async (value: AddCipherKeyForm) => {
   });
   try {
     // The service's CipherKeyData type declares a `provider` field the payload
-    // has never included (the old code passed an `any`-typed formData); cast to
-    // keep the real shape without editing the shared service type.
-    // `isUpdate` is a UI flag, NOT a form field — merged in here (outside the
-    // schema) so the request body stays byte-for-byte identical to the
-    // pre-migration payload. The backend ignores it (KeyAddRequest deserializes
-    // only `name` + `key`, no deny_unknown_fields), so this is purely parity.
+    // doesn't include; cast to keep the real shape without editing the shared
+    // service type.
+    // `isUpdate` is a UI flag, not a form field — merged in here outside the
+    // schema. The backend ignores it (KeyAddRequest deserializes only `name` +
+    // `key`, no deny_unknown_fields).
     await CipherKeysService.create(
       store.state.selectedOrganization.identifier,
       { ...value, isUpdate: isUpdatingCipherKey.value } as any,
@@ -377,8 +373,8 @@ const updateCipherKey = async (value: AddCipherKeyForm) => {
     timeout: 0,
   });
   try {
-    // Merge the `isUpdate` UI flag back into the body for payload parity with
-    // the pre-migration code (backend ignores it — see createCipherKey).
+    // Merge the `isUpdate` UI flag into the body (backend ignores it — see
+    // createCipherKey).
     await CipherKeysService.update(
       store.state.selectedOrganization.identifier,
       { ...value, isUpdate: isUpdatingCipherKey.value } as any,

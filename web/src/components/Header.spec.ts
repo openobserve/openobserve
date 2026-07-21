@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+﻿// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@ import { mount, shallowMount } from "@vue/test-utils";
 import i18n from "@/locales";
 import Header from "@/components/Header.vue";
 import * as cookies from "@/utils/cookies";
+import { chartColor } from "@/utils/chartTheme";
 
 
 // Mock the cookies module
@@ -83,6 +84,10 @@ describe("Header Component", () => {
 
     const globalConfig = {
       plugins: defaultGlobalConfig.plugins,
+      // Header renders useTheme(), whose useStore() resolves via vuex's `store`
+      // injection key — the store prop alone does not satisfy it. Provide the
+      // same per-test store so storeOverrides still drive theme-dependent logic.
+      provide: { store },
       stubs: {
         ...defaultGlobalConfig.stubs,
         ...stubsOverrides,
@@ -393,7 +398,7 @@ describe("Header Component", () => {
       quotaWrapper.unmount();
     });
 
-    it("should return orange color when quota is 85-94%", () => {
+    it("should return warning token color when quota is 85-94%", () => {
       const quotaWrapper = createWrapper({
         storeOverrides: {
           state: {
@@ -404,10 +409,12 @@ describe("Header Component", () => {
         },
       });
 
-      expect(quotaWrapper.vm.ingestionQuotaColor).toBe("orange");
+      expect(quotaWrapper.vm.ingestionQuotaColor).toBe(
+        chartColor("--color-status-warning-text"),
+      );
     });
 
-    it("should return red color when quota is >= 95%", () => {
+    it("should return negative token color when quota is >= 95%", () => {
       const quotaWrapper = createWrapper({
         storeOverrides: {
           state: {
@@ -418,7 +425,9 @@ describe("Header Component", () => {
         },
       });
 
-      expect(quotaWrapper.vm.ingestionQuotaColor).toBe("red");
+      expect(quotaWrapper.vm.ingestionQuotaColor).toBe(
+        chartColor("--color-status-negative"),
+      );
     });
 
     it("should not display quota icon when quota < 85%", async () => {
@@ -751,7 +760,7 @@ describe("Header Component", () => {
       const orgs = [{ identifier: "test-org", label: "Test Organization" }];
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           organizations: orgs,
@@ -763,7 +772,7 @@ describe("Header Component", () => {
 
     it("should display empty state when no organizations match search", () => {
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           organizations: [],
@@ -842,7 +851,7 @@ describe("Header Component", () => {
       mockConfig.isEnterprise = "false";
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           config: mockConfig,
@@ -859,7 +868,7 @@ describe("Header Component", () => {
       mockConfig.isCloud = "true";
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           config: mockConfig,
@@ -873,7 +882,7 @@ describe("Header Component", () => {
       mockStore.state.zoConfig.custom_hide_menus = "openapi,settings";
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           store: mockStore,
@@ -1116,7 +1125,7 @@ describe("Header Component", () => {
       };
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           user: userWithoutName,
@@ -1187,8 +1196,10 @@ describe("Header Component", () => {
         }
       });
 
-      // Verify the computed property returns red color
-      expect(wrapper.vm.ingestionQuotaColor).toBe("red");
+      // Verify the computed property returns the negative token color
+      expect(wrapper.vm.ingestionQuotaColor).toBe(
+        chartColor("--color-status-negative"),
+      );
 
       // Verify the computed percentage
       expect(wrapper.vm.ingestionQuotaPercentage).toBe(95.0);
@@ -1244,7 +1255,7 @@ describe("Header Component", () => {
       const selectedOrg = { identifier: "test-org", label: "Test Organization" };
 
       wrapper = shallowMount(Header, {
-        global: { plugins: [i18n] },
+        global: { plugins: [i18n], provide: { store: mockStore } },
         props: {
           ...wrapper.props(),
           userClickedOrg: selectedOrg,

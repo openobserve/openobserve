@@ -76,7 +76,7 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
     // Verify the filter icon switches to its "active" state (isColFiltered →
     // primary-colored icon) while the panel is still open — checking before
     // Escape avoids a race with the dropdown's close/portal-unmount transition.
-    const activeFilterIcon = getColumnFilterBtn(page, 0).locator('[class*="color-primary-600"]');
+    const activeFilterIcon = getColumnFilterBtn(page, 0).locator('[data-test$="-active"]');
     await expect(activeFilterIcon).toBeVisible();
     await page.keyboard.press("Escape");
 

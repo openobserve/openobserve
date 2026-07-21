@@ -15,16 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OPageLayout
     data-test="alert-history-page"
-    class="w-full h-full flex flex-col min-h-0"
+    :title="t('alerts.history')"
+    title-data-test="alerts-history-title"
+    :back="{ onClick: goBack, dataTest: 'alert-history-back-btn' }"
+    bleed
   >
-    <AppPageHeader
-      :title="t('alerts.history')"
-      title-data-test="alerts-history-title"
-      :back="{ onClick: goBack, dataTest: 'alert-history-back-btn' }"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
       <template #actions>
         <DateTime
           ref="dateTimeRef"
@@ -53,11 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #icon-left>
             <OIcon
               class="o2-search-input-icon"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-search-input-icon-dark'
-                  : 'o2-search-input-icon-light'
-              "
               name="search" size="sm"
             />
           </template>
@@ -88,9 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('common.refresh') || 'Refresh'" />
         </OButton>
       </template>
-    </AppPageHeader>
-    <div class="flex-1 min-h-0 px-2.5 pt-2">
-      <div class="alert-history-table card-container h-full">
+    <div class="flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg h-full">
         <OTable
           data-test="alert-history-table"
           :data="rows"
@@ -105,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="sortBy"
           :sort-order="sortOrder"
           :loading="loading"
+          show-index
           :show-global-filter="false"
           :default-columns="false"
           width="100%"
@@ -137,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_realtime="{ value }">
             <OIcon
               :name="value ? 'check-circle' : 'schedule'"
-              :class="value ? 'text-(--o2-positive)' : 'text-text-primary'"
+              :class="value ? 'text-status-positive' : 'text-text-body'"
               size="xs"
             >
               <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
@@ -147,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-is_silenced="{ value }">
             <OIcon
               :name="value ? 'volume-off' : 'volume-up'"
-              :class="value ? 'text-text-primary' : 'text-(--o2-positive)'"
+              :class="value ? 'text-text-body' : 'text-status-positive'"
               size="md"
             >
               <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
@@ -159,8 +151,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-dedup="{ row }">
-            <span v-if="!row.dedup_enabled" class="text-text-primary">-</span>
-            <div v-else-if="row.dedup_suppressed" class="text-red-500">
+            <span v-if="!row.dedup_enabled" class="text-text-secondary">-</span>
+            <div v-else-if="row.dedup_suppressed" class="text-status-error-text">
               <OIcon name="block" size="sm">
                 <OTooltip>
                   <template #content>
@@ -183,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
               <span class="text-xs ml-1">×{{ row.group_size || 1 }}</span>
             </div>
-            <div v-else class="text-green-500 flex items-center justify-center">
+            <div v-else class="text-status-positive flex items-center justify-center">
               <OIcon name="check-circle" size="md">
                 <OTooltip>
                   <template #content>
@@ -369,15 +361,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Error Details
                 </div>
-                <div class="rounded border border-solid border-negative/30 p-2 mt-2 bg-red-500/5">
+                <div class="rounded-default border border-solid border-negative/30 p-2 mt-2 bg-status-error-bg">
                   <pre
                     class="text-sm"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: 'Courier New', monospace;
-                      font-size: 12px;
+                      font-family: var(--font-mono);
+                      font-size: var(--text-xs);
                     "
                     >{{ selectedRow.error }}</pre
                   >
@@ -397,15 +389,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   Response
                 </div>
-                <div class="rounded border border-solid border-positive/30 p-2 mt-2 bg-green-500/5">
+                <div class="rounded-default border border-solid border-positive/30 p-2 mt-2 bg-status-success-bg">
                   <pre
                     class="text-sm"
                     style="
                       white-space: pre-wrap;
                       word-break: break-word;
                       margin: 0;
-                      font-family: 'Courier New', monospace;
-                      font-size: 12px;
+                      font-family: var(--font-mono);
+                      font-size: var(--text-xs);
                     "
                     >{{ selectedRow.success_response }}</pre
                   >
@@ -424,10 +416,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <OIcon name="error" size="sm" class="text-red-500" />
+        <OIcon name="error" size="sm" class="text-status-error-text" />
       </template>
       <template #header-right>
-        <div class="flex items-center text-[13px] opacity-70 ml-9 text-xs">
+        <div class="flex items-center text-compact opacity-70 ml-9 text-xs">
           <span class="mr-1">Last error:</span>
           <OIcon name="schedule" size="xs" class="mr-1" />
           {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
@@ -436,12 +428,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="mb-4">
         <div class="text-sm font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
-        <div class="p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-solid border-[rgba(239,68,68,0.2)] text-[#dc2626]">
+        <div class="p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-status-error-bg border border-solid border-status-negative text-status-error-text">
           {{ errorMessage.error }}
         </div>
       </div>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -457,7 +449,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -466,7 +458,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -514,7 +506,6 @@ const errorMessage = ref("");
 
 // Table columns
 const columns = ref<OTableColumnDef[]>([
-  { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, minSize: TABLE_INDEX_COL_SIZE, maxSize: TABLE_INDEX_COL_SIZE, sortable: false, meta: { align: "left" } },
   {
     id: "alert_name",
     header: t("alerts.alertName") || "Alert Name",
@@ -726,7 +717,6 @@ const fetchAlertHistory = async () => {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
-        "#": (index + 1) + (currentPage.value - 1) * pageSize.value,
       }));
 
       totalCount.value = historyData.total || 0;
@@ -852,13 +842,3 @@ watch(
   },
 );
 </script>
-
-<style>
-.alert-history-table :deep(table) {
-  width: 100%;
-}
-
-.alert-history-table :deep(table) td {
-  vertical-align: middle;
-}
-</style>

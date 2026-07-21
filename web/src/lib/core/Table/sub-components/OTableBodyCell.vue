@@ -54,10 +54,10 @@ const emit = defineEmits<{
 const meta = computed(() => props.cell.column.columnDef.meta as any);
 const align = computed(() => meta.value?.align ?? "left");
 
-// Record-name column → weight 500 (HANDOFF §8.2). Metadata columns stay 400.
-// Only the default-rendered text path uses this; custom cells style their own.
+// Record-name column weight. Only the default-rendered text path uses this;
+// custom cells style their own.
 const defaultTextClass = computed(() => [
-  "text-text-primary",
+  "text-text-body",
 ]);
 
 const alignClass = computed(() => {
@@ -203,15 +203,15 @@ function handleClick() {
       // the default text wrapper) still inherit the theme-aware primary color
       // instead of falling back to a grey inherited value in dark mode. Inner
       // links/badges override this with their own color.
-      'text-text-primary',
+      'text-text-body',
       meta?.spacer ? 'px-0 align-middle' : (meta?.compactPadding ? 'px-1 align-middle' : 'px-2 align-middle'),
-      bordered ? 'border-b border-[var(--color-table-row-divider)]' : '',
+      bordered ? 'border-b border-table-row-divider' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
        isPinned
         ? (rowSelected
-            ? 'bg-[var(--color-table-row-selected-bg)] group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
-            : 'bg-[var(--color-table-cell-bg)] group-hover/row:bg-[var(--color-table-row-hover-bg)] transition-colors duration-150')
+            ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
+            : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150')
         : '',
       wrap
         ? 'break-words whitespace-normal'
@@ -231,8 +231,8 @@ function handleClick() {
       cellStyle,
       isTreeColumn
         ? {
-            '--o2-tree-x': treeChevronX + 'px',
-            '--o2-tree-parent-x': treeParentChevronX + 'px',
+            '--tree-x': treeChevronX + 'px',
+            '--tree-parent-x': treeParentChevronX + 'px',
           }
         : {},
     ]"
@@ -246,12 +246,12 @@ function handleClick() {
     >
       <span
         v-if="treeMeta?.hasChildren || (treeMeta && treeMeta.parentId !== null)"
-        class="inline-flex items-center justify-center w-[18px] h-[18px] shrink-0"
+        class="inline-flex items-center justify-center w-4.5 h-4.5 shrink-0"
       >
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
-          class="inline-flex items-center justify-center w-[18px] h-[18px] p-0 bg-transparent border-0 rounded cursor-pointer text-(--color-text-secondary,#6b7280) hover:bg-(--color-table-row-hover-bg,rgba(0,0,0,0.05)) hover:text-(--color-text-primary)"
+          class="inline-flex items-center justify-center w-4.5 h-4.5 p-0 bg-transparent border-0 rounded-default cursor-pointer text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
@@ -263,7 +263,7 @@ function handleClick() {
         </button>
         <span
           v-else
-          class="w-[7px] h-[7px] bg-(--q-primary,#6366f1) opacity-75 rounded-[1px] shadow-[0_0_0_2px_var(--color-table-cell-bg,#fff)] z-3 relative"
+          class="size-1.75 bg-theme-accent opacity-75 rounded-default ring-2 ring-table-cell-bg z-3 relative"
           aria-hidden="true"
         />
       </span>
@@ -317,7 +317,7 @@ function handleClick() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="absolute right-1 opacity-0 group-hover:opacity-100 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] rounded cursor-pointer p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] leading-none transition-opacity"
+      class="absolute right-1 opacity-0 group-hover:opacity-100 bg-surface-base border border-border-default rounded-default cursor-pointer p-0.5 text-text-muted hover:text-text-body leading-none transition-opacity"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >
@@ -326,18 +326,19 @@ function handleClick() {
   </td>
 </template>
 
-<style>
-/* ── Tree connector lines (parent ↓ children) ────────────────── */
+<style scoped>
+/* keep(generated-content): tree connector lines (parent ↓ children) drawn as
+   ::before/::after pseudo-elements positioned off inline --tree-x vars. */
 
 /* Vertical line going down from below the chevron, on expanded parent rows */
 .o2-tree-parent-expanded::after {
   content: "";
   position: absolute;
-  left: var(--o2-tree-x);
-  top: calc(50% + 9px);
+  left: var(--tree-x, 0);
+  top: calc(50% + 0.5625rem);
   bottom: 0;
-  width: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  width: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 1;
 }
@@ -349,11 +350,11 @@ function handleClick() {
 .o2-tree-child::before {
   content: "";
   position: absolute;
-  left: var(--o2-tree-parent-x);
+  left: var(--tree-parent-x, 0);
   top: 0;
   bottom: 0;
-  width: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  width: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 1;
 }
@@ -363,19 +364,19 @@ function handleClick() {
 .o2-tree-child::after {
   content: "";
   position: absolute;
-  left: var(--o2-tree-parent-x);
+  left: var(--tree-parent-x, 0);
   top: 50%;
-  /* Parent-row child (has its own chevron): stop the stub 9px before the
+  /* Parent-row child (has its own chevron): stop the stub 0.5625rem before the
      chevron center so the line doesn't run into the icon. */
-  width: calc(var(--o2-tree-x) - var(--o2-tree-parent-x) - 9px);
-  height: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  width: calc(var(--tree-x, 0) - var(--tree-parent-x, 0) - 0.5625rem);
+  height: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 1;
 }
 /* Leaf children (no chevron, endpoint marker dot instead): run the stub all
    the way to the dot's centre so the line visually touches it. */
 .o2-tree-child.o2-tree-leaf::after {
-  width: calc(var(--o2-tree-x) - var(--o2-tree-parent-x));
+  width: calc(var(--tree-x, 0) - var(--tree-parent-x, 0));
 }
 </style>

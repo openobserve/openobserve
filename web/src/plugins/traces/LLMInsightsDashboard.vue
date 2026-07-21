@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Page wrapper is intentionally chrome-less: KPI tiles and trend
-       panels each carry their own `card-container`. Wrapping them in
-       another card-container would render same-bg-on-same-bg and the
+       panels each carry their own `bg-card-glass-bg`. Wrapping them in
+       another bg-card-glass-bg would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
   <div
-    class="bg-transparent h-full flex flex-col px-2.5"
+    class="bg-transparent h-full flex flex-col"
   >
     <!-- Toolbar: Stream/Agent mode tab (left) + the matching picker (right) —
          hidden when no streams are available. Padding lives on the toolbar +
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="flex items-center gap-3 px-4 py-2 border-b border-border-default"
+      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
     >
       <!-- Scope control — left-aligned Stream/Agent bar directly under the
            header, matching Agent Graph / Agent Behavior / Sessions so every AI
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="filterMode === 'stream'"
         data-test="llm-insights-stream-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 flex-shrink-0"
       >
         <OSelect
           v-model="activeStream"
@@ -58,24 +58,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded"
+          class="w-full rounded-default"
           @update:model-value="onStreamChange"
         />
       </div>
       <div
         v-else
         data-test="llm-insights-agent-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 flex-shrink-0"
       >
         <!-- Hold a picker-shaped skeleton until the agents list lands the first
              time, so the dropdown doesn't flash an empty "Agent" picker before
              its options exist. -->
-        <SkeletonBox
-          v-if="!agentsLoaded"
-          width="100%"
-          height="2.125rem"
-          rounded
-        />
+        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
         <OSelect
           v-else
           v-model="activeAgent"
@@ -84,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded"
+          class="w-full rounded-default"
           @update:model-value="onAgentChange"
         />
       </div>
@@ -97,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LLMInsightsSkeleton
       v-if="!streamsLoaded || switching"
       :hide-toolbar="streamsLoaded"
-      class="flex-1 px-4"
+      class="flex-1 px-page-edge"
     />
 
     <!-- Generic error state — kept separate because a failed request is a
@@ -124,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the preset's "Instrument with OpenTelemetry" call to action. -->
     <div
       v-else-if="isEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-4"
+      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
       data-test="llm-insights-empty"
     >
       <OEmptyState
@@ -139,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back to the Stream tab. -->
     <div
       v-else-if="agentEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-4"
+      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
       data-test="llm-insights-agent-empty"
     >
       <OEmptyState
@@ -155,63 +150,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Dashboard content — scrollable panel area. Horizontal padding lives
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
-    <div v-else class="flex-1 overflow-y-auto px-4 pb-3">
+    <div v-else class="flex-1 overflow-y-auto px-page-edge pb-3">
       <!-- KPI strip: keep a skeleton until the first KPI result lands so the
            cards never flash zeros. The panels below render regardless, so
            their queries fire in parallel with the KPI fetch. -->
       <LLMInsightsSkeleton
         v-if="loading || !hasLoadedOnce"
         kpi-only
-        class="mt-[0.625rem] mb-[0.625rem]"
+        class="mb-2.5"
       />
       <!-- KPI Cards Row -->
-      <div
+      <KpiCardRow
         v-else
-        class="grid grid-cols-5 gap-[0.625rem] mt-[0.625rem] mb-[0.625rem]"
+        :columns="5"
+        class="mt-2.5 mb-2.5"
       >
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="card-container rounded-lg flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-(--color-surface-base) border border-(--color-border-default) transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 min-h-32.5 border border-border-default transition-colors duration-200 hover:border-border-strong"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
                LLMInsightsSkeleton). Its sparkline comes from the histogram, but
                showing a chart before the number reads as ready, so we hold both. -->
           <template v-if="card.loading">
-            <div class="flex flex-col gap-[0.25rem]">
-              <SkeletonBox width="60%" height="12px" rounded />
-              <SkeletonBox width="55%" height="22px" rounded />
+            <div class="flex flex-col gap-1">
+              <OSkeleton type="text" class="w-[60%] h-3" />
+              <OSkeleton type="text" class="w-[55%] h-5.5" />
             </div>
-            <div class="flex items-end gap-[0.15rem] h-[32px] mt-auto">
-              <SkeletonBox
-                v-for="bar in 16"
-                :key="bar"
-                width="100%"
-                :height="`${30 + ((bar * 23) % 65)}%`"
-                rounded
-              />
+            <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
+              <OSkeleton type="text" v-for="bar in 16" :key="bar" :style="{ height: `${30 + ((bar * 23) % 65)}%` }" class="w-full" />
             </div>
           </template>
           <template v-else>
-            <div class="flex flex-col gap-[0.25rem]">
-              <div class="flex items-center justify-between gap-2 mb-[0.25rem]">
-                <div class="text-[0.7rem] leading-normal font-semibold text-(--color-text-secondary) min-w-0 truncate">
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <div class="text-2xs leading-normal font-semibold text-text-secondary min-w-0 truncate">
                   {{ card.label }}
                 </div>
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-md bg-(--color-surface-subtle) text-(--color-text-secondary)"
+                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
                 >
                   <OIcon :name="card.icon" size="sm" />
                 </span>
               </div>
               <div class="flex items-baseline gap-[0.2rem]">
-                <span class="text-[1.4rem] font-bold leading-none text-(--color-grey-600)">
+                <span class="text-2xl font-bold leading-none text-text-secondary">
                   {{ card.value }}
                 </span>
                 <span
                   v-if="card.unit"
-                  class="text-[0.8rem] font-semibold text-(--color-text-secondary)"
+                  class="text-compact font-semibold text-text-secondary"
                 >
                   {{ card.unit }}
                 </span>
@@ -226,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
         </div>
-      </div>
+      </KpiCardRow>
 
       <!-- Trend panels (config-driven). The key carries the panel-cache id
            (stream + agent + window), so changing tab / agent / time range
@@ -235,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            remount is what lets it restore an already-fetched result instead of
            re-querying. Same selection + window → instant cache hit; a new one →
            a clean miss that fetches. -->
-      <div class="grid grid-cols-2 gap-[0.625rem]">
+      <div class="grid grid-cols-2 gap-2.5">
         <div
           v-for="panel in LLM_INSIGHTS_PANELS"
           :key="`${panel.id}::${panelCacheDashboardId}`"
@@ -286,10 +276,11 @@ import {
   splitCost,
 } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import LLMSchemaPanel from "./LLMSchemaPanel.vue";
 import LLMErrorTable from "./LLMErrorTable.vue";
 import LLMInsightsSkeleton from "./LLMInsightsSkeleton.vue";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -346,7 +337,7 @@ const {
   streamsLoaded,
 } = useLLMInsights();
 
-// activeStream is component-local (drives the q-select v-model), but its
+// activeStream is component-local (drives the select v-model), but its
 // initial value falls back to localStorage / parent prop. Once the streams
 // list is reconciled, it's clamped to a valid option.
 const activeStream = ref<string>(

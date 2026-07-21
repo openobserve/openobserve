@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-group-item p-3 mb-2 rounded-lg transition-all duration-200 w-full max-w-full bg-(--o2-card-bg) border border-(--o2-border-color,rgba(0,0,0,0.12))">
+  <div class="semantic-group-item p-3 mb-2 rounded-default transition-all duration-200 w-full max-w-full bg-card-glass-bg border border-card-glass-border">
     <OForm :form="form">
       <div class="grid grid-cols-[200px_1fr_auto] gap-4 items-start w-full overflow-hidden">
         <!-- Left Column: Display Name only (ID is internal/read-only) -->
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <!-- Show ID as read-only caption for existing groups -->
-          <div v-if="currentId" class="text-xs text-gray-400">
+          <div v-if="currentId" class="text-xs text-text-secondary">
             {{ t("common.id") }}: {{ currentId }}
           </div>
           <OFormSwitch
@@ -127,22 +127,20 @@ const generateIdFromDisplay = (display: string): string => {
   return categorySlug ? `${categorySlug}-${displaySlug}` : displaySlug;
 };
 
-// This row OWNS its <OForm> (Rule ③ owner pattern): it must read form state
-// reactively to re-emit the parent-collected "update" on every field change and
-// to run the id-generation side-effect. Wire the save into `onSubmit` so a
-// programmatic submit (or Enter inside the inline form) emits the assembled
-// group only when the schema passes.
+// This row owns its <OForm>: it reads form state reactively to re-emit the
+// parent-collected "update" on every field change and to run the id-generation
+// side-effect. The save runs on submit so a programmatic submit (or Enter inside
+// the inline form) emits the assembled group only when the schema passes.
 const form = useOForm<SemanticGroupItemForm>({
   defaultValues: semanticGroupItemDefaults(props.group),
   schema: makeSemanticGroupItemSchema(t),
-  // emitIfChanged, not emitUpdate: handleDisplayBlur submits on every blur to
-  // paint the required error, and the values watcher has usually emitted already
-  // — so an unconditional emit would fire a redundant "update" per blur.
+  // Emit only if changed: handleDisplayBlur submits on every blur to paint the
+  // required error, so an unconditional emit would fire a redundant "update".
   onSubmit: () => emitIfChanged(),
 });
 
-// Assemble the emitted group from the outside-form context (id + category from
-// the prop) merged with the form-owned values — explicit keys, no schema leak.
+// Assemble the emitted group from the id + category (from the prop) merged with
+// the form-owned values.
 const buildGroup = (): SemanticGroup => {
   const values = form.state.values as SemanticGroupItemForm;
   return {
@@ -154,9 +152,8 @@ const buildGroup = (): SemanticGroup => {
   };
 };
 
-// Guard against redundant / self-echo emits (the parent round-trips the group
-// back into the `group` prop after each emit) so the empty-form submit test can
-// assert "not fired" and typing doesn't loop.
+// Guard against redundant / self-echo emits: the parent round-trips the group
+// back into the `group` prop after each emit, so typing could otherwise loop.
 const lastEmitted = ref<string>(JSON.stringify(buildGroup()));
 
 const emitUpdate = () => {
@@ -171,20 +168,15 @@ const emitIfChanged = () => {
   }
 };
 
-// Re-emit "update" on every field change (parent collects rows live — Rule ④
-// event parity with the pre-migration per-field @update handlers).
+// Re-emit "update" on every field change (parent collects rows live).
 const formValues = form.useStore((s: any) => s.values);
 watch(formValues, () => emitIfChanged(), { deep: true });
 
 // Regenerate the id from the display, then surface the schema's "Name is
-// required" on the field — pre-migration `handleDisplayBlur` did BOTH.
-//
-// The submit is what paints it: useOForm wires revalidateLogic({mode:"submit"}),
-// so nothing validates until a first submit, and this inline row has no submit
-// button (its only consumer wires @update/@delete). Without this call the rule
-// exists but can never fire. `modeAfterSubmission:"change"` then re-validates on
-// every keystroke, which is what clears the message as the user types — matching
-// the old `handleDisplayChange` reset.
+// required" on the field. The submit call is what paints it: validation runs on
+// submit, and this inline row has no submit button, so without this call the
+// rule can never fire. Re-validation on change then clears the message as the
+// user types.
 const handleDisplayBlur = () => {
   const display = (form.state.values as SemanticGroupItemForm).display;
   if (display) {
@@ -199,8 +191,7 @@ const handleDisplayBlur = () => {
 
 // External changes to the group prop (import merge, category switch) reset the
 // form; a self-echo (the parent replaying our own emit) is skipped so it never
-// resets mid-edit (which would flash/jump). Only the form-owned fields + id are
-// compared — the `group` category is not a form field.
+// resets mid-edit. Only the form-owned fields + id are compared.
 watch(
   () => props.group,
   (newGroup) => {
@@ -221,7 +212,7 @@ watch(
       currentId.value = newGroup.id;
       form.reset(semanticGroupItemDefaults(newGroup));
       // Rebaseline so the deep values-watch that follows the reset does NOT
-      // re-emit "update" (the original prop-sync did not emit either).
+      // re-emit "update".
       lastEmitted.value = JSON.stringify(buildGroup());
     }
   },

@@ -40,7 +40,7 @@ export interface RadioProps {
    * Compared against ORadioGroup's modelValue to determine checked state.
    */
   value?: RadioValue;
-  /** q-radio compatibility alias for `value` */
+  /** Compatibility alias for `value` */
   val?: RadioValue;
   /** Accessible label */
   label?: string;

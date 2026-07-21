@@ -220,10 +220,10 @@ function handleUpdateExpanded(ids: string[]) {
     <!-- ── cell-screenshot: Thumbnail (results mode) ───────────── -->
     <template v-if="mode === 'results'" #cell-screenshot="{ row }">
       <div
-        class="w-18 h-12 shrink-0 rounded border border-border-default bg-surface-subtle flex items-center justify-center overflow-hidden"
+        class="w-18 h-12 shrink-0 rounded-default border border-border-default bg-surface-subtle flex items-center justify-center overflow-hidden"
       >
         <slot name="screenshot-thumb" :row="row">
-          <OIcon name="image" size="xs" class="text-text-caption" />
+          <OIcon name="image" size="xs" class="text-text-secondary" />
         </slot>
       </div>
     </template>
@@ -253,7 +253,7 @@ function handleUpdateExpanded(ids: string[]) {
 
         <!-- Action icon chip -->
         <span
-          class="bg-primary-50 rounded p-1 shrink-0 flex items-center"
+          class="bg-primary-50 rounded-default p-1 shrink-0 flex items-center"
         >
           <OIcon
             :name="actionIcon(row)"

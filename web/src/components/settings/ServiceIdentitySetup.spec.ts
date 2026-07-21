@@ -224,8 +224,6 @@ function mountComponent(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        "q-menu": true,
-        "q-tooltip": true,
         ODialog: ODialogStub,
         ODrawer: ODrawerStub,
       },

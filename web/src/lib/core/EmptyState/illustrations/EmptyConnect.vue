@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </g>
     </g>
 
-    <!-- dashed flowchart connectors: right-angle routing with rounded elbows,
+    <!-- dashed flowchart connectors: right-angle routing with rounded-default elbows,
          merging onto the database like a real diagram, not diagonal lines -->
     <g stroke="var(--color-primary-300)" stroke-width="1.75" stroke-dasharray="4 5" stroke-linecap="round" fill="none">
       <path d="M52 46 L52 64 Q52 70 58 70 L98 70 Q104 70 104 76 L104 104" />
@@ -107,7 +107,13 @@ withDefaults(
 );
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies from unscoped blocks — a global name collision where the
+   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
+   keyframe names per component, which ends the collision. All selectors and the
+   es-static gate live in this file's own template. */
 /* packets — straight-line translate along each connector (per-line deltas) */
 .es-pk {
   transform-box: fill-box;

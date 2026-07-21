@@ -215,7 +215,7 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
   });
 
   // TODO: filterDestinations and timezoneFilterFn internal APIs were removed when
-  // q-select was replaced with OSelect. Skipped until OSelect-based tests are written.
+  // the select was replaced with OSelect. Skipped until OSelect-based tests are written.
   describe.skip("2. Filter Functions", () => {
     describe("filterDestinations", () => {
       it("should show all destinations when filter is empty", () => {

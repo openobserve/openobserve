@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="justify-between w-full py-px px-1 border-t border-(--o2-border-color) bg-(--o2-card-bg)"
+    class="justify-between w-full py-px px-1 border-t border-card-glass-border bg-card-glass-bg"
     :class="showSchemaToggle || showQuickMode ? 'flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="opt.slot === 'user_defined_slot'">
-            <OIcon name="person" size="xs" class="text-[10px]!"></OIcon>
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="person" size="xs" class="text-3xs!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-user-defined-fields-warning-tooltip`"
               :content="t('search.userDefinedSchemaLabel')"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
@@ -69,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <OIcon name="info-outline" size="xs" class="text-[10px]!" />
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="text-3xs!" />
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="opt.slot === 'all_fields_slot' ? `${dataTestPrefix}-all-fields-btn` : `${dataTestPrefix}-interesting-fields-btn`"
         >
           <template v-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
@@ -116,8 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template
             v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
           >
-            <OIcon name="info-outline" size="xs" class="text-[10px]!" />
-            <OIcon name="schema" size="xs" class="text-[10px]!"></OIcon>
+            <OIcon name="info-outline" size="xs" class="text-3xs!" />
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -271,12 +271,13 @@ const visiblePages = computed(() => {
 });
 </script>
 
-<style>
-.schema-field-toggle [role="group"] {
+<style scoped>
+/* keep(complex-state): :deep overrides of the child toggle-group's [role=group] internals */
+.schema-field-toggle :deep([role="group"]) {
   gap: 0.125rem;
 }
 
-.schema-field-toggle [role="group"] > * {
+.schema-field-toggle :deep([role="group"]) > * {
   gap: 0.25rem;
   height: 1.375rem;
   min-height: unset;
