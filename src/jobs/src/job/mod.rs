@@ -30,6 +30,20 @@ use crate::{
 };
 
 #[cfg(feature = "enterprise")]
+fn eval_scheduler_fetch_size(total: usize, max_rows: usize) -> anyhow::Result<i64> {
+    if total > max_rows {
+        return Err(anyhow::anyhow!(
+            "online eval scheduler interval has {total} rows, exceeding the safe limit of {max_rows}"
+        ));
+    }
+    let fetch_size = total
+        .checked_add(1)
+        .ok_or_else(|| anyhow::anyhow!("online eval scheduler result count exceeds search size"))?;
+    i64::try_from(fetch_size)
+        .map_err(|_| anyhow::anyhow!("online eval scheduler result count exceeds search size"))
+}
+
+#[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_manager;
 #[cfg(feature = "enterprise")]
@@ -621,8 +635,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(service_graph::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
-    // Register enterprise callbacks on every node. HTTP/background work can land on
-    // querier, ingester, or alert_manager nodes, so callbacks must be available everywhere.
+    // Register enterprise callbacks before durable consumers and scheduler startup.
+    // HTTP/background work can land on querier, ingester, or alert_manager nodes,
+    // so callbacks must be available everywhere before consumers start.
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_score_writer(
@@ -676,6 +691,114 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 })
             },
         );
+
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::register_search_executor(
+            |org_id, stream_type, sql, start_time, end_time| {
+                Box::pin(async move {
+                    let count_req = config::meta::search::Request {
+                        query: config::meta::search::Query {
+                            sql: sql.clone(),
+                            start_time,
+                            end_time,
+                            size: 1,
+                            track_total_hits: true,
+                            ..Default::default()
+                        },
+                        use_cache: false,
+                        ..Default::default()
+                    };
+                    let stream_type = config::meta::stream::StreamType::from(stream_type.as_str());
+                    let count_response =
+                        crate::service::search::search("", &org_id, stream_type, None, &count_req)
+                            .await
+                            .map_err(|e| anyhow::anyhow!(e))?;
+                    if count_response.is_partial || !count_response.function_error.is_empty() {
+                        return Ok(o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                            total: count_response.total,
+                            is_partial: count_response.is_partial,
+                            function_error: count_response.function_error,
+                            hits: Vec::new(),
+                        });
+                    }
+
+                    let total = count_response.total;
+                    if total == 0 {
+                        return Ok(Default::default());
+                    }
+                    let max_rows = o2_enterprise::enterprise::common::config::get_config()
+                        .llm_eval_config
+                        .max_buffer_size
+                        .saturating_mul(10)
+                        .max(10_001);
+                    let size = eval_scheduler_fetch_size(total, max_rows)?;
+                    let data_req = config::meta::search::Request {
+                        query: config::meta::search::Query {
+                            sql,
+                            start_time,
+                            end_time,
+                            size,
+                            track_total_hits: false,
+                            ..Default::default()
+                        },
+                        use_cache: false,
+                        ..Default::default()
+                    };
+                    crate::service::search::search("", &org_id, stream_type, None, &data_req)
+                        .await
+                        .map(|response| {
+                            o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                                hits: response.hits,
+                                total,
+                                is_partial: response.is_partial,
+                                function_error: response.function_error,
+                            }
+                        })
+                        .map_err(|e| anyhow::anyhow!(e))
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::register_executor(
+            |request| {
+                Box::pin(async move {
+                    let stream_type =
+                        config::meta::stream::StreamType::from(request.stream_type.as_str());
+                    let req = config::meta::search::Request {
+                        query: config::meta::search::Query {
+                            sql: request.sql,
+                            start_time: request.start_time,
+                            end_time: request.end_time,
+                            from: request.from as i64,
+                            size: request.size as i64,
+                            track_total_hits: request.track_total_hits,
+                            ..Default::default()
+                        },
+                        use_cache: false,
+                        ..Default::default()
+                    };
+                    crate::service::search::search(
+                        "",
+                        &request.org_id,
+                        stream_type,
+                        None,
+                        &req,
+                    )
+                    .await
+                    .map(|response| {
+                        o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::EvalSearchResponse {
+                            hits: response.hits,
+                            total: response.total,
+                            is_partial: response.is_partial,
+                            function_error: response.function_error,
+                        }
+                    })
+                    .map_err(|error| anyhow::anyhow!(error))
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::start_eval_scheduler();
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
@@ -1024,4 +1147,20 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::eval_scheduler_fetch_size;
+
+    #[test]
+    fn eval_scheduler_fetches_one_row_past_the_count() {
+        assert_eq!(eval_scheduler_fetch_size(10_001, 100_000).unwrap(), 10_002);
+    }
+
+    #[test]
+    fn eval_scheduler_rejects_intervals_above_the_safe_limit() {
+        let error = eval_scheduler_fetch_size(100_001, 100_000).unwrap_err();
+        assert!(error.to_string().contains("exceeding the safe limit"));
+    }
 }

@@ -8133,7 +8133,7 @@
         "chipSampling": "Stichprobensteuerung"
       },
       "descriptionPlaceholder": "Was überwacht dieser Auftrag?",
-      "samplingValueHelp": "JSON: rate ist eine Zahl 0-1, count ist eine positive Ganzzahl.",
+      "samplingValueHelp": "Geben Sie eine Rate zwischen 0 und 1 ein.",
       "samplingValueAllHelp": "Nicht anwendbar, wenn der Modus „Alle“ ist – jedes übereinstimmende Ereignis wird bewertet.",
       "samplingHelp": "Wird nach dem Filter angewendet. Steuert die Kosten – nur übereinstimmende Spans zählen für die Rate.",
       "presets": {
@@ -8152,6 +8152,7 @@
         "sampling": "Probenentnahme"
       },
       "targetSection": "Ziel",
+      "filteringSection": "Filterung",
       "scorersSection": "Punktezähler und Kartierung",
       "nameLabel": "Name",
       "namePlaceholder": "Überwachung der Produktionstreue",
@@ -8161,7 +8162,7 @@
       "streamTypePlaceholder": "Spuren",
       "descriptionLabel": "Beschreibung",
       "samplingModeLabel": "Sampling-Modus",
-      "samplingValueLabel": "Stichprobenwert JSON",
+      "samplingValueLabel": "Stichprobenrate",
       "samplingModes": {
         "rate": "Bewerte",
         "all": "Alle",

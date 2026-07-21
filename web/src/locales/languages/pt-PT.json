@@ -8133,7 +8133,7 @@
         "chipSampling": "Controle de Amostragem"
       },
       "descriptionPlaceholder": "O que este trabalho monitora?",
-      "samplingValueHelp": "JSON: rate é um número de 0 a 1, count é um inteiro positivo.",
+      "samplingValueHelp": "Insira uma taxa entre 0 e 1.",
       "samplingValueAllHelp": "Não aplicável quando o modo é Todos — cada evento correspondente será avaliado.",
       "samplingHelp": "Aplicado após o Filtro. Controla o custo — apenas os spans correspondentes contam para a taxa.",
       "presets": {
@@ -8152,6 +8152,7 @@
         "sampling": "Amostragem"
       },
       "targetSection": "Alvo",
+      "filteringSection": "Filtragem",
       "scorersSection": "Marcadores e mapeamento",
       "nameLabel": "Nome",
       "namePlaceholder": "Monitor de fidelidade de produção",
@@ -8161,7 +8162,7 @@
       "streamTypePlaceholder": "rastros",
       "descriptionLabel": "Descrição",
       "samplingModeLabel": "Modo de amostragem",
-      "samplingValueLabel": "Valor de amostragem JSON",
+      "samplingValueLabel": "Taxa de amostragem",
       "samplingModes": {
         "rate": "Tarifa",
         "all": "Todos",

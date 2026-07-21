@@ -16,13 +16,17 @@
 //! Online Eval Job service layer.
 //!
 //! Jobs are the user-facing scheduling primitive that ties a target stream to
-//! a set of scorers. Each Job is reconciled to a hidden evaluation pipeline
-//! ([`PipelineKind::Evaluation`]) which carries the actual span-bounded eval
-//! work — see [`reconciler`] for the sync logic.
+//! a set of scorers. Span-scope jobs are reconciled to a hidden evaluation
+//! pipeline ([`PipelineKind::Evaluation`]) for eligibility detection, while
+//! trace/session jobs are detected by the Eval Scheduler.
+
+use std::collections::BTreeMap;
 
 use chrono::Utc;
-use config::ider;
+use config::{ider, meta::stream::StreamType};
 use infra::table;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::common::{
     meta::authz::Authz,
@@ -47,8 +51,40 @@ pub enum EvalJobError {
     #[error("Invalid status transition from '{from}' to '{to}'")]
     InvalidStatusTransition { from: String, to: String },
 
+    #[error("Invalid eval job: {0}")]
+    InvalidJob(String),
+
     #[error("ReconcilerError# {0}")]
     ReconcilerError(String),
+}
+
+/// Request body for manually evaluating an explicit target with a job's scorers.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ManualEvalJobRequestBody {
+    pub target_id: String,
+    #[serde(default)]
+    pub span_id: Option<String>,
+    #[serde(default)]
+    pub trace_id: Option<String>,
+    #[serde(default)]
+    pub session_id: Option<String>,
+    #[serde(default)]
+    #[schema(value_type = Object)]
+    pub variables: BTreeMap<String, serde_json::Value>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+/// Response body for manual evaluation task creation.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ManualEvalJobResponseBody {
+    pub job_id: String,
+    #[schema(value_type = String)]
+    pub target_scope: table::online_eval_jobs::TargetScope,
+    pub target_id: String,
+    pub tasks_created: usize,
 }
 
 fn merge_input_mapping(
@@ -64,6 +100,24 @@ fn merge_input_mapping(
     }
 }
 
+fn ensure_source_stream_exists(stream: &str, exists: bool) -> Result<(), EvalJobError> {
+    if exists {
+        Ok(())
+    } else {
+        Err(EvalJobError::InvalidJob(format!(
+            "Trace stream '{stream}' not found"
+        )))
+    }
+}
+
+async fn validate_source_stream(
+    org_id: &str,
+    job: &table::online_eval_jobs::OnlineEvalJob,
+) -> Result<(), EvalJobError> {
+    let schema = infra::schema::get(org_id, &job.stream, StreamType::Traces).await?;
+    ensure_source_stream_exists(&job.stream, !schema.fields().is_empty())
+}
+
 #[tracing::instrument(skip(job))]
 pub async fn create_job(
     org_id: &str,
@@ -77,8 +131,14 @@ pub async fn create_job(
     job.status = "draft".to_string();
 
     // New jobs get pipeline_ids assigned only
-    // they are activated
+    // they are activated, and only for span-scope jobs.
     job.pipeline_id = None;
+    job.apply_target_scope_defaults();
+    job.normalize_sampling()
+        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    job.validate()
+        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_source_stream(org_id, &job).await?;
 
     let now = Utc::now().timestamp_millis();
     job.created_at = now;
@@ -102,6 +162,17 @@ pub async fn update_job(
 
     job.input_mapping = merge_input_mapping(existing.input_mapping.clone(), job.input_mapping);
 
+    job.apply_target_scope_defaults();
+    job.normalize_sampling()
+        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    job.validate()
+        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_source_stream(org_id, &job).await?;
+    if existing.status == "active" {
+        job.validate_for_activation()
+            .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    }
+
     // Preserve identity & lifecycle fields from the existing row.
     job.id = existing.id;
     job.org_id = existing.org_id;
@@ -111,15 +182,16 @@ pub async fn update_job(
     job.version = existing.version + 1;
     job.updated_at = Utc::now().timestamp_millis();
 
-    table::online_eval_jobs::update(&job).await?;
-
     // If the job is currently bound to a pipeline (active/paused/degraded),
-    // re-reconcile so the pipeline picks up the new filter/sampling/scorers.
-    if job.pipeline_id.is_some() {
-        reconciler::reconcile(&job)
+    // re-reconcile so span pipelines pick up changes, or are torn down when
+    // switching to trace/session scope.
+    if matches!(job.status.as_str(), "active" | "paused" | "degraded") {
+        job.pipeline_id = reconciler::reconcile(&job)
             .await
             .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
     }
+
+    table::online_eval_jobs::update(&job).await?;
 
     publish_eval_job_put(&job).await;
     Ok(job)
@@ -197,6 +269,12 @@ pub async fn transition_status(
     // claiming `active` while its pipeline isn't enabled.
     let mut target = job.clone();
     target.status = new_status.to_string();
+    if new_status == "active" {
+        target
+            .validate_for_activation()
+            .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+        validate_source_stream(org_id, &target).await?;
+    }
     let pipeline_id = reconciler::reconcile(&target)
         .await
         .map_err(|e| EvalJobError::ReconcilerError(e.to_string()))?;
@@ -208,13 +286,77 @@ pub async fn transition_status(
     let mut updated = job;
     updated.status = new_status.to_string();
     updated.updated_at = now;
-    if pipeline_id.is_some() {
-        updated.pipeline_id = pipeline_id;
-    } else if new_status == "archived" {
-        updated.pipeline_id = None;
-    }
+    updated.pipeline_id = pipeline_id;
     publish_eval_job_put(&updated).await;
     Ok(updated)
+}
+
+#[cfg(feature = "enterprise")]
+#[tracing::instrument(skip(body))]
+pub async fn manual_evaluate(
+    org_id: &str,
+    job_id: &str,
+    body: ManualEvalJobRequestBody,
+    author: Option<String>,
+) -> Result<ManualEvalJobResponseBody, EvalJobError> {
+    let job = get_job(org_id, job_id).await?;
+    if job.status == "archived" {
+        return Err(EvalJobError::InvalidJob(
+            "Archived eval jobs cannot be manually evaluated".to_string(),
+        ));
+    }
+    job.validate()
+        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+    validate_source_stream(org_id, &job).await?;
+
+    let target_id = body.target_id.trim().to_string();
+    let target =
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::manual::ManualEvaluationTarget {
+            target_id: target_id.clone(),
+            span_id: body
+                .span_id
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+            trace_id: body
+                .trace_id
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+            session_id: body
+                .session_id
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+            variables: body.variables,
+            reason: body
+                .reason
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+            author,
+        };
+    let tasks_created =
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::manual::publish_manual_evaluation(
+            &job, target,
+        )
+        .await
+        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+
+    Ok(ManualEvalJobResponseBody {
+        job_id: job.id,
+        target_scope: job.target_scope,
+        target_id,
+        tasks_created,
+    })
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn manual_evaluate(
+    _org_id: &str,
+    _job_id: &str,
+    _body: ManualEvalJobRequestBody,
+    _author: Option<String>,
+) -> Result<ManualEvalJobResponseBody, EvalJobError> {
+    Err(EvalJobError::InvalidJob(
+        "Manual evaluation requires enterprise features".to_string(),
+    ))
 }
 
 #[cfg(feature = "enterprise")]
@@ -311,5 +453,16 @@ mod tests {
         let merged = merge_input_mapping(Some(existing), Some(incoming)).unwrap();
 
         assert_eq!(merged["scorer-1"]["input"], "{{new_input}}");
+    }
+
+    #[test]
+    fn missing_trace_stream_is_rejected() {
+        let error = ensure_source_stream_exists("missing-traces", false).unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "Invalid eval job: Trace stream 'missing-traces' not found"
+        );
+        assert!(ensure_source_stream_exists("traces", true).is_ok());
     }
 }

@@ -1,10 +1,20 @@
 <template>
   <div class="mb-4">
     <div class="flex flex-col gap-0.5 mb-2">
-      <span class="text-xs font-semibold text-text-heading">{{ t("onlineEvals.job.filter.title") }}</span>
-      <span class="text-2xs text-text-secondary">{{ t("onlineEvals.job.filter.hint") }}</span>
+      <span
+        class="text-xs font-semibold text-text-heading"
+        data-test="job-condition-builder-title"
+        >{{ t(`onlineEvals.job.${purpose}.title`) }}</span
+      >
+      <span
+        class="text-2xs text-text-secondary"
+        data-test="job-condition-builder-hint"
+        >{{ t(`onlineEvals.job.${purpose}.hint.${targetScope}`) }}</span
+      >
     </div>
-    <div class="job-filter__group min-w-0">
+    <div
+      class="min-w-0 [&_.el-border]:ml-0! [&_.el-border]:w-full [&_.el-border]:max-w-full [&_.el-border]:border-border-default [&_.group-container]:w-full [&>.el-border]:mt-0!"
+    >
       <FilterGroup
         :group="group"
         :name-prefix="namePrefix"
@@ -32,74 +42,91 @@ import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   removeConditionGroup as removeAlertConditionGroup,
   updateGroup as updateAlertConditionGroup,
+  type V2Group,
 } from "@/utils/alerts/alertDataTransforms";
 import { cloneDeep } from "lodash-es";
 import { DEFAULT_JOB_STREAM_FIELDS } from "../../utils/defaultStreamFields";
+import type { EvalTargetScope } from "@/services/online-evals.service";
 
-// FORM MODE (Rule ③): FilterGroup renders name-bound to the parent OForm's
-// `${namePrefix}` tree. Leaf column/operator/value write straight into the form;
-// structural changes (add/remove/toggle) are written here via setFieldValue on a
-// CLONE of the form's current tree (the transform utils mutate in place and the
-// form store is readonly) — mirrors alerts' useAlertForm / pipeline Condition.
-const props = defineProps<{
-  namePrefix: string;
+const props = withDefaults(
+  defineProps<{
+    targetScope: EvalTargetScope;
+    group?: V2Group;
+    namePrefix?: string;
+    purpose?: "filter" | "endSignal" | "selector";
+    streamFields?: Array<{ label: string; value: string; type: string }>;
+  }>(),
+  {
+    purpose: "filter",
+  },
+);
+
+const emit = defineEmits<{
+  (e: "update:group", value: V2Group): void;
 }>();
 
 const { t } = useI18n();
 const form: any = inject(FORM_CONTEXT_KEY, null);
 
-const streamFields = computed(() => DEFAULT_JOB_STREAM_FIELDS);
+const streamFields = computed(() =>
+  props.streamFields?.length ? props.streamFields : DEFAULT_JOB_STREAM_FIELDS,
+);
 const streamFieldsMap = computed(() =>
-  Object.fromEntries(streamFields.value.map((field) => [field.value, { type: field.type }])),
+  Object.fromEntries(
+    streamFields.value.map((field) => [field.value, { type: field.type }]),
+  ),
 );
 
-// Reactive READ-VIEW of the form-owned tree — drives FilterGroup's `:group`.
-const group = form
-  ? form.useStore((s: any) => s.values?.[props.namePrefix])
-  : computed(() => undefined);
+// Main job filters are form-owned. Completion and span-selector filters remain
+// controlled composites, so this adapter supports both modes.
+const formGroup =
+  form && props.namePrefix
+    ? form.useStore((s: any) => s.values?.[props.namePrefix as string])
+    : computed(() => undefined);
+const group = computed(() =>
+  props.namePrefix ? formGroup.value : props.group,
+);
 
-const clonedTree = () => cloneDeep(form.state.values?.[props.namePrefix]);
+const clonedFormTree = () =>
+  cloneDeep(form.state.values?.[props.namePrefix as string]);
 
 function handleUpdate(updatedGroup: any) {
-  if (!form) return;
-  const conditions = clonedTree();
+  const isFormMode = Boolean(form && props.namePrefix);
+  const conditions = isFormMode ? clonedFormTree() : cloneDeep(props.group);
+  if (!conditions) return;
   const ctx = { formData: { query_condition: { conditions } } };
   updateAlertConditionGroup(updatedGroup, ctx);
-  form.setFieldValue(props.namePrefix, ctx.formData.query_condition.conditions);
+  if (isFormMode) {
+    form.setFieldValue(
+      props.namePrefix,
+      ctx.formData.query_condition.conditions,
+    );
+  } else {
+    emit("update:group", ctx.formData.query_condition.conditions);
+  }
 }
 
 function handleRemove(groupId: string) {
-  if (!form) return;
-  const conditions = clonedTree();
+  const isFormMode = Boolean(form && props.namePrefix);
+  const conditions = isFormMode ? clonedFormTree() : cloneDeep(props.group);
+  if (!conditions) return;
   const ctx = { formData: { query_condition: { conditions } } };
   removeAlertConditionGroup(groupId, conditions, ctx);
-  form.setFieldValue(props.namePrefix, ctx.formData.query_condition.conditions);
+  if (isFormMode) {
+    form.setFieldValue(
+      props.namePrefix,
+      ctx.formData.query_condition.conditions,
+    );
+  } else {
+    emit("update:group", ctx.formData.query_condition.conditions);
+  }
 }
 
 function handleInputUpdate() {
-  // Leaf values are name-bound in form mode; nothing to bridge here.
+  // Leaf values are name-bound in form mode. Controlled composites still need
+  // to notify their parent after FilterGroup mutates a leaf.
+  if (!props.namePrefix && props.group) {
+    emit("update:group", { ...props.group });
+  }
 }
 </script>
-
-<style scoped>
-/* keep(lib-override:alerts-filter-group): .filter-group-box / .group-container are
-   FilterGroup's internal DOM, reachable only through :deep(); the width/margin
-   overrides fit the shared builder into this narrow column. */
-.job-filter__group :deep(.filter-group-box) {
-  width: 100%;
-  max-width: 100%;
-  margin-left: 0 !important;
-  border-color: var(--color-dialog-header-border, var(--color-border-default));
-}
-
-/* Only the root group sits flush under the label. Nested groups keep their
-   top margin so the upward-shifted AND/OR toggle isn't clipped by the
-   parent .group-container (overflow-x-auto also clips vertically). */
-.job-filter__group > :deep(.filter-group-box) {
-  margin-top: 0 !important;
-}
-
-.job-filter__group :deep(.group-container) {
-  width: 100%;
-}
-</style>

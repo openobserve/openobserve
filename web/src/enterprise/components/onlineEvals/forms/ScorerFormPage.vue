@@ -205,6 +205,7 @@
               :rows="8"
               data-test="scorer-form-prompt-input"
             />
+            <ScorerPromptVariableGuide />
             <div class="flex items-center flex-wrap gap-1.5 mt-1.5 text-2xs">
               <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.promptVariablesLabel") }}
@@ -707,6 +708,7 @@ import {
   showError,
 } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
+import ScorerPromptVariableGuide from "./scorer/ScorerPromptVariableGuide.vue";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
 import {
   makeScorerFormSchema,

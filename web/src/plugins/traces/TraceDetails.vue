@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details h-[calc(100vh-2.625rem)] overflow-hidden w-full flex flex-col relative">
+  <div
+    class="trace-details h-[calc(100vh-2.625rem)] overflow-hidden w-full flex flex-col relative"
+  >
     <!-- Original View -->
     <div
       class="flex-1 flex flex-col min-h-0 overflow-hidden box-border"
@@ -64,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
 
               <!-- Copy Trace ID Button -->
-              <OIcon
+              <OButton
                 data-test="trace-details-copy-trace-id-btn"
                 name="content-copy"
                 size="xs"
@@ -86,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ sessionId }}
                   </span>
                 </span>
-                <OIcon
+                <OButton
                   data-test="trace-details-copy-session-id-btn"
                   name="content-copy"
                   size="xs"
@@ -192,7 +194,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="handleBackOrClose"
             >
               <OIcon name="arrow-back" size="sm" />
-              <OTooltip :content="areFiltersAdded ? t('traces.applyPendingFilters') : t('traces.backToTraces')" />
+              <OTooltip
+                :content="
+                  areFiltersAdded
+                    ? t('traces.applyPendingFilters')
+                    : t('traces.backToTraces')
+                "
+              />
             </OButton>
 
             <div
@@ -238,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
 
                 <!-- Copy Trace ID Button -->
-                <OIcon
+                <OButton
                   data-test="trace-details-copy-trace-id-btn"
                   name="content-copy"
                   size="xs"
@@ -262,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ sessionId }}
                     </span>
                   </span>
-                  <OIcon
+                  <OButton
                     data-test="trace-details-copy-session-id-btn"
                     name="content-copy"
                     size="xs"
@@ -273,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Open in new icon (embedded mode only) -->
-                <OIcon
+                <OButton
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
                   class="cursor-pointer hover:text-theme-accent"
@@ -299,7 +307,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.spansLabel") }}
                   </span>
                 </OTag>
-                <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
+                <OTooltip
+                  :content="
+                    effectiveSpanList.length + ' ' + t('traces.spansLabel')
+                  "
+                />
               </span>
 
               <div
@@ -318,14 +330,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.errorsLabel") }}</span
                   >
                 </OTag>
-                <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
+                <OTooltip
+                  :content="errorSpansCount + ' ' + t('traces.errorsLabel')"
+                />
               </span>
             </div>
           </div>
 
-          <div
-            class="flex justify-end items-center space-x-3 w-fit!"
-          >
+          <div class="flex justify-end items-center space-x-3 w-fit!">
             <!-- Apply filters button (standalone mode, right side) -->
             <OButton
               v-if="mode === 'standalone' && areFiltersAdded"
@@ -336,8 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openFilterPopover"
             >
               <template #icon-left
-                ><OIcon name="filter-alt"
-size="xs"
+                ><OIcon name="filter-alt" size="xs"
               /></template>
               <span class="text-xs">{{ t("traces.viewFilters") }}</span>
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
@@ -398,27 +409,25 @@ size="xs"
                 <template #icon-left
                   ><OIcon name="align-left" size="sm" class="shrink-0"
                 /></template>
-                {{ t('traces.waterfall') }}
+                {{ t("traces.waterfall") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="flame-graph" size="sm">
                 <template #icon-left>
                   <OIcon name="flame" size="sm" />
                 </template>
-                {{ t('traces.flameGraph') }}
+                {{ t("traces.flameGraph") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="map" size="sm">
                 <template #icon-left
                   ><OIcon name="account-tree" size="sm" class="shrink-0"
                 /></template>
-                {{ t('traces.traceGraph') }}
+                {{ t("traces.traceGraph") }}
               </OToggleGroupItem>
-              <OToggleGroupItem v-if="hasLLMSpans"
-value="dag"
-size="sm">
+              <OToggleGroupItem v-if="hasLLMSpans" value="dag" size="sm">
                 <template #icon-left>
                   <OIcon name="git-branch" size="sm" />
                 </template>
-                {{ t('traces.dag') }}
+                {{ t("traces.dag") }}
               </OToggleGroupItem>
               <!--
                 Thread tab gated on:
@@ -437,7 +446,7 @@ size="sm">
                 <template #icon-left
                   ><OIcon name="chat" size="xs" class="shrink-0"
                 /></template>
-                {{ t('traces.thread') }}
+                {{ t("traces.thread") }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -518,10 +527,7 @@ size="sm">
               />
               <span class="traces-view-logs-btn pl-1">
                 <!-- Single button with wrapper for tooltip functionality -->
-                <span
-                  class="inline-block"
-                  tabindex="0"
-                >
+                <span class="inline-block" tabindex="0">
                   <OButton
                     data-test="trace-details-view-logs-btn"
                     variant="outline"
@@ -540,23 +546,27 @@ size="sm">
                     }}
                   </OButton>
                   <OTooltip
-                    :content="isViewLogsDisabled ? t('search.selectLogsStreamFirst') : t('traces.viewLogs')"
+                    :content="
+                      isViewLogsDisabled
+                        ? t('search.selectLogsStreamFirst')
+                        : t('traces.viewLogs')
+                    "
                   />
                 </span>
               </span>
             </div>
             <OButton
-                v-if="hasRumSessionId && !hideSessionReplayButton"
-                data-test="trace-details-view-session-replay-btn"
-                variant="outline"
-                size="sm"
-                class="ml-1"
-                @click="redirectToSessionReplay"
-              >
-                <template #icon-left>
-                  <OIcon name="play-circle" size="sm"/>
-                </template>
-                {{ t("rum.playSessionReplay") }}
+              v-if="hasRumSessionId && !hideSessionReplayButton"
+              data-test="trace-details-view-session-replay-btn"
+              variant="outline"
+              size="sm"
+              class="ml-1"
+              @click="redirectToSessionReplay"
+            >
+              <template #icon-left>
+                <OIcon name="play-circle" size="sm" />
+              </template>
+              {{ t("rum.playSessionReplay") }}
             </OButton>
           </div>
         </div>
@@ -662,7 +672,9 @@ size="sm">
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
-                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :selected-log-streams="
+                    searchObj.data.traceDetails.selectedLogStreams
+                  "
                   :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
@@ -680,13 +692,12 @@ size="sm">
               class="flex flex-1 min-h-0"
             >
               <div
-                class="h-[calc(100vh-200px)] p-4 min-w-0 overflow-hidden"
+                class="h-[calc(100vh-12.5rem)] min-w-[12.5rem] overflow-hidden p-4"
                 :style="{
                   width:
                     isSidebarOpen && (selectedSpanId || showTraceDetails)
                       ? `${dagLeftWidth}%`
                       : '100%',
-                  minWidth: '200px',
                 }"
               >
                 <TraceDAG
@@ -713,10 +724,9 @@ size="sm">
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="h-[calc(100vh-200px)] overflow-y-auto overflow-x-hidden min-h-0"
+                class="h-[calc(100vh-12.5rem)] min-h-0 min-w-[18.75rem] overflow-x-hidden overflow-y-auto"
                 :style="{
                   width: `${100 - dagLeftWidth}%`,
-                  minWidth: '300px',
                 }"
               >
                 <trace-details-sidebar
@@ -728,7 +738,9 @@ size="sm">
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
-                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :selected-log-streams="
+                    searchObj.data.traceDetails.selectedLogStreams
+                  "
                   :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
@@ -776,15 +788,12 @@ size="sm">
               class="w-full bg-card-glass-bg! flex flex-1 min-h-0"
             >
               <div
-                class="thread-left-panel"
+                class="thread-left-panel h-full min-w-[20rem] overflow-hidden"
                 :style="{
                   width:
                     isSidebarOpen && (selectedSpanId || showTraceDetails)
                       ? '60%'
                       : '100%',
-                  minWidth: '320px',
-                  height: '100%',
-                  overflow: 'hidden',
                 }"
               >
                 <ThreadView
@@ -807,7 +816,9 @@ size="sm">
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
-                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :selected-log-streams="
+                    searchObj.data.traceDetails.selectedLogStreams
+                  "
                   :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
@@ -866,7 +877,6 @@ size="sm">
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </div>
@@ -877,20 +887,17 @@ size="sm">
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="flex flex-col items-center justify-center"
-      :style="{ height: '100%' }"
+      class="flex h-full flex-col items-center justify-center"
     >
-      <OSpinner
-        data-test="trace-details-loading-spinner"
-        size="lg"
-      />
+      <OSpinner data-test="trace-details-loading-spinner" size="lg" />
       <div data-test="trace-details-loading-text" class="pt-2">
         {{ t("traces.fetchingTrace") }}
       </div>
     </div>
 
     <!-- Filters Sidebar -->
-    <ODrawer data-test="trace-details-filter-popover-drawer"
+    <ODrawer
+      data-test="trace-details-filter-popover-drawer"
       v-model:open="showFilterPopover"
       :width="30"
       :title="t('traces.traceFilters')"
@@ -975,6 +982,7 @@ import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
   parseCostDetails,
+  hasTracePreview,
   isLLMTrace,
 } from "@/utils/llmUtils";
 import {
@@ -984,7 +992,7 @@ import {
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -1011,9 +1019,7 @@ const FlameGraphView = defineAsyncComponent(
 );
 
 // Import ThreadView (LLM Thread tab)
-const ThreadView = defineAsyncComponent(
-  () => import("./ThreadView.vue"),
-);
+const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
 
 export default defineComponent({
   name: "TraceDetails",
@@ -1121,7 +1127,9 @@ export default defineComponent({
   setup(props, { emit }) {
     const serviceDetectionConfig = ref<ServiceDetectionConfig | null>(null);
     provide(TRACE_SERVICE_DETECTION_KEY, serviceDetectionConfig);
-    const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
+    const { resolveSpanIdentity } = useSpanServiceDetection(
+      serviceDetectionConfig,
+    );
 
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
@@ -1178,34 +1186,34 @@ export default defineComponent({
       treeData: patternTreeData,
       getNodeLabel: getPatternNodeLabel,
       getNodeTooltip: getPatternNodeTooltip,
-      getNodeErrorRate: getPatternNodeErrorRate
+      getNodeErrorRate: getPatternNodeErrorRate,
     } = useTracePatternTree(consolidatedPatterns, isDarkMode);
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
-        // Pattern view - use new pattern-based visualization
-        const chartOptions = generateEChartsOptions(
-          {
-            treeData: patternTreeData.value,
-            getNodeLabel: getPatternNodeLabel,
-            getNodeTooltip: getPatternNodeTooltip,
-            getNodeErrorRate: getPatternNodeErrorRate,
-            getNodeServiceColor: (node: any) =>
-              searchObj.meta.serviceColors[node.name]
-          },
-          {
-            layoutType: 'horizontal',
-            isDarkMode: isDarkMode.value,
-            nodeSize: 'fixed'
-          }
-        );
+      // Pattern view - use new pattern-based visualization
+      const chartOptions = generateEChartsOptions(
+        {
+          treeData: patternTreeData.value,
+          getNodeLabel: getPatternNodeLabel,
+          getNodeTooltip: getPatternNodeTooltip,
+          getNodeErrorRate: getPatternNodeErrorRate,
+          getNodeServiceColor: (node: any) =>
+            searchObj.meta.serviceColors[node.name],
+        },
+        {
+          layoutType: "horizontal",
+          isDarkMode: isDarkMode.value,
+          nodeSize: "fixed",
+        },
+      );
 
-        // Wrap in the format expected by ChartRenderer
-        return {
-          options: chartOptions,
-          notMerge: true,
-          lazyUpdate: true
-        };
+      // Wrap in the format expected by ChartRenderer
+      return {
+        options: chartOptions,
+        notMerge: true,
+        lazyUpdate: true,
+      };
     });
 
     const spanDimensions = {
@@ -1246,7 +1254,6 @@ export default defineComponent({
     const streamSearchValue = ref<string>("");
 
     const { t } = useI18n();
-
 
     const router = useRouter();
 
@@ -1315,10 +1322,7 @@ export default defineComponent({
 
     const ChartData: any = ref({});
 
-    const {
-      value: leftWidth,
-      onMouseDown: startResize,
-    } = useResizer({
+    const { value: leftWidth, onMouseDown: startResize } = useResizer({
       direction: "horizontal",
       initialValue: 460,
       unit: "px",
@@ -1326,10 +1330,7 @@ export default defineComponent({
     });
 
     // DAG panel resize state
-    const {
-      value: dagLeftWidth,
-      onMouseDown: startDagResize,
-    } = useResizer({
+    const { value: dagLeftWidth, onMouseDown: startDagResize } = useResizer({
       direction: "horizontal",
       initialValue: 50,
       minValue: 20,
@@ -1610,10 +1611,10 @@ export default defineComponent({
 
     const updateActiveTab = (tab: string) => {
       activeTab.value = tab;
-      if(tab === 'map') {
+      if (tab === "map") {
         setupTooltips();
       }
-    }
+    };
 
     const setupTooltips = async () => {
       // Cleanup existing tooltips
@@ -1633,15 +1634,19 @@ export default defineComponent({
         const chart = chartRendererRef.value?.chart;
         if (chart) {
           const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
-          tooltipCleanup = setupTraceNodeTooltips(chart, {
-            treeData: patternTreeData.value,
-            getNodeTooltip: getPatternNodeTooltip,
-            getNodeErrorRate: getPatternNodeErrorRate
-          }, isDarkMode.value);
+          tooltipCleanup = setupTraceNodeTooltips(
+            chart,
+            {
+              treeData: patternTreeData.value,
+              getNodeTooltip: getPatternNodeTooltip,
+              getNodeErrorRate: getPatternNodeErrorRate,
+            },
+            isDarkMode.value,
+          );
         }
       }, 300);
-    }
-    
+    };
+
     const backgroundStyle = computed(() => {
       return {
         background: "var(--color-surface-base)",
@@ -1759,7 +1764,8 @@ export default defineComponent({
       setupContextProvider();
 
       const keyFields: KeyFieldsConfig = await loadKeyFields();
-      serviceDetectionConfig.value = keyFields["traces"]?.service_detection ?? null;
+      serviceDetectionConfig.value =
+        keyFields["traces"]?.service_detection ?? null;
 
       const params = router.currentRoute.value.query;
       if (params.span_id) {
@@ -1813,12 +1819,12 @@ export default defineComponent({
     // (e.g. moving from LLM span with "preview" to a non-LLM span).
     watch(selectedSpanId, (newSpanId, oldSpanId) => {
       if (newSpanId && spanMap.value[newSpanId]) {
-        const isLLM = isLLMTrace(spanMap.value[newSpanId]);
+        const canPreview = hasTracePreview(spanMap.value[newSpanId]);
         if (
           !oldSpanId ||
-          (sidebarActiveTab.value === "preview" && !isLLM)
+          (sidebarActiveTab.value === "preview" && !canPreview)
         ) {
-          sidebarActiveTab.value = isLLM ? "preview" : "attributes";
+          sidebarActiveTab.value = canPreview ? "preview" : "attributes";
         }
       }
     });
@@ -1980,12 +1986,8 @@ export default defineComponent({
             }
 
             const traceSpans = traceRes.data?.hits || [];
-            const {
-              tracedResources,
-              viewEvents,
-              actionEvents,
-              allViewEvents,
-            } = rumData;
+            const { tracedResources, viewEvents, actionEvents, allViewEvents } =
+              rumData;
             const rumSpans = formatRumEventsAsSpans(
               tracedResources,
               viewEvents,
@@ -2217,6 +2219,15 @@ export default defineComponent({
           searchObj.data.traceDetails.selectedSpanId = "";
           searchObj.data.traceDetails.showSpanDetails = false;
         } else {
+          // A span selected from the URL is set before `spanMap` is populated,
+          // so the selectedSpanId watcher cannot classify it on first pass.
+          // Re-apply the default now that the span exists: evaluator/LLM spans
+          // land directly on Preview, while ordinary spans use Attributes.
+          sidebarActiveTab.value = hasTracePreview(
+            spanMap.value[selectedSpanId.value],
+          )
+            ? "preview"
+            : "attributes";
           scrollSpanIntoView(selectedSpanId.value);
         }
       }
@@ -2282,7 +2293,8 @@ export default defineComponent({
       ) => {
         maxHeight[depth] =
           maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
-        const serviceIdentity = span.resolvedIdentity || span.serviceName || 'unknown';
+        const serviceIdentity =
+          span.resolvedIdentity || span.serviceName || "unknown";
         if (serviceName !== serviceIdentity) {
           const children: any[] = [];
           currentColumn.push({
@@ -2322,7 +2334,9 @@ export default defineComponent({
       });
 
       // Build consolidated patterns for pattern view
-      consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
+      consolidatedPatterns.value = buildPatternConsolidatedTree(
+        traceTree.value,
+      );
       // console.log('[DEBUG] consolidatedPatterns size:', consolidatedPatterns.value?.size || 0);
       // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
       // Pattern consolidation completed successfully
@@ -2387,8 +2401,7 @@ export default defineComponent({
         parentId: span.reference_parent_span_id || "",
         spans: [],
         index: 0,
-        style: {
-        },
+        style: {},
         links: JSON.parse(span.links || "[]"),
         genAiUsage: usage,
         genAiCost: cost,
@@ -2508,9 +2521,7 @@ export default defineComponent({
       });
     };
 
-    const sessionId = computed<string>(() =>
-      resolveSessionId(spanList.value),
-    );
+    const sessionId = computed<string>(() => resolveSessionId(spanList.value));
 
     const copySessionId = () => {
       if (!sessionId.value) return;
@@ -2533,7 +2544,7 @@ export default defineComponent({
       if (customFrom) queryParams.from = customFrom;
       if (customTo) queryParams.to = customTo;
 
-      if(effectiveStreamName.value){
+      if (effectiveStreamName.value) {
         queryParams.stream = effectiveStreamName.value as string;
       }
 
@@ -2752,14 +2763,18 @@ export default defineComponent({
       if (isInputFocused()) return;
       const list = spanList.value;
       if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      const idx = list.findIndex(
+        (s: any) => s.span_id === selectedSpanId.value,
+      );
       if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
     };
     const prevSpanHandler = () => {
       if (isInputFocused()) return;
       const list = spanList.value;
       if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      const idx = list.findIndex(
+        (s: any) => s.span_id === selectedSpanId.value,
+      );
       if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
     };
 
@@ -2816,7 +2831,7 @@ export default defineComponent({
       sessionId,
       copySessionId,
       traceDetailsShareURL,
-      "info": "info",
+      info: "info",
       outlinedPlayCircle: "play-circle",
       redirectToLogs,
       handleTreeViewCorrelatedLogs,
@@ -2895,7 +2910,7 @@ export default defineComponent({
       flatSpans,
       traceMetadata,
       formatLargeNumber,
-      updateActiveTab
+      updateActiveTab,
     };
   },
 });

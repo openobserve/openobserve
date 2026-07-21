@@ -56,7 +56,6 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   initServiceCorrelationProviders: vi.fn(),
 }));
 
-
 // ---------------------------------------------------------------------------
 // ODrawer stub — replaces the migrated trace filters drawer
 // (-> ODrawer with v-model:open). Renders default + footer
@@ -214,8 +213,7 @@ describe("TraceDetails", () => {
             name: "CodeQueryEditor",
             props: ["query", "language"],
             emits: ["update:query"],
-            template:
-              '<div data-test="trace-details-filters-code-editor" />',
+            template: '<div data-test="trace-details-filters-code-editor" />',
           },
           "chart-renderer": {
             template: '<div data-test="chart-renderer">Chart</div>',
@@ -267,9 +265,16 @@ describe("TraceDetails", () => {
               "parentMode",
               "activeTab",
               "selectedLogStreams",
-              "showLogStreamSelector"
+              "showLogStreamSelector",
             ],
-            emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"],
+            emits: [
+              "view-logs",
+              "close",
+              "open-trace",
+              "add-filter",
+              "apply-filter-immediately",
+              "update:activeTab",
+            ],
           },
         },
       },
@@ -419,7 +424,7 @@ describe("TraceDetails", () => {
       // The component HAS isViewLogsDisabled computed property that controls disabled state
       // When no log streams are selected, button should be disabled
       if (wrapper.vm.isViewLogsDisabled) {
-        expect(viewLogsBtn.attributes('disabled')).toBeDefined();
+        expect(viewLogsBtn.attributes("disabled")).toBeDefined();
       } else {
         const routerPushSpy = vi.spyOn(router, "push");
         await viewLogsBtn.trigger("click");
@@ -699,9 +704,16 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"],
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
@@ -814,8 +826,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -862,9 +873,16 @@ describe("TraceDetails", () => {
                 "parentMode",
                 "activeTab",
                 "selectedLogStreams",
-                "showLogStreamSelector"
+                "showLogStreamSelector",
               ],
-              emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"],
+              emits: [
+                "view-logs",
+                "close",
+                "open-trace",
+                "add-filter",
+                "apply-filter-immediately",
+                "update:activeTab",
+              ],
             },
           },
         },
@@ -975,9 +993,16 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
@@ -1034,9 +1059,16 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
@@ -1104,9 +1136,16 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
@@ -1165,9 +1204,16 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
@@ -1234,9 +1280,16 @@ describe("TraceDetails", () => {
                   "parentMode",
                   "activeTab",
                   "selectedLogStreams",
-                  "showLogStreamSelector"
+                  "showLogStreamSelector",
                 ],
-                emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"]
+                emits: [
+                  "view-logs",
+                  "close",
+                  "open-trace",
+                  "add-filter",
+                  "apply-filter-immediately",
+                  "update:activeTab",
+                ],
               },
             },
           },
@@ -1305,8 +1358,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -1355,8 +1407,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -1407,8 +1458,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -1461,13 +1511,19 @@ describe("TraceDetails", () => {
       wrapper.vm.updateSelectedSpan(spanId);
       await wrapper.vm.$nextTick();
 
-      const sidebar = wrapper.findComponent('[data-test="trace-details-sidebar"]');
+      const sidebar = wrapper.findComponent(
+        '[data-test="trace-details-sidebar"]',
+      );
       if (sidebar.exists()) {
         // The component DOES pass these props based on the current implementation
-        expect(sidebar.props('selectedLogStreams')).toBeDefined();
-        expect(sidebar.props('showLogStreamSelector')).toBeDefined();
-        expect(sidebar.props('selectedLogStreams')).toEqual(wrapper.vm.searchObj.data.traceDetails.selectedLogStreams);
-        expect(sidebar.props('showLogStreamSelector')).toBe(wrapper.vm.showLogStreamSelector);
+        expect(sidebar.props("selectedLogStreams")).toBeDefined();
+        expect(sidebar.props("showLogStreamSelector")).toBeDefined();
+        expect(sidebar.props("selectedLogStreams")).toEqual(
+          wrapper.vm.searchObj.data.traceDetails.selectedLogStreams,
+        );
+        expect(sidebar.props("showLogStreamSelector")).toBe(
+          wrapper.vm.showLogStreamSelector,
+        );
       }
     });
 
@@ -1505,13 +1561,15 @@ describe("TraceDetails", () => {
       expect(typeof wrapper.vm.isViewLogsDisabled).toBe("boolean");
 
       // 2. View Logs button may be disabled based on isViewLogsDisabled state
-      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
+      const viewLogsBtn = wrapper.find(
+        '[data-test="trace-details-view-logs-btn"]',
+      );
       if (viewLogsBtn.exists()) {
         // Disabled state is controlled by isViewLogsDisabled computed property
         if (wrapper.vm.isViewLogsDisabled) {
-          expect(viewLogsBtn.attributes('disabled')).toBeDefined();
+          expect(viewLogsBtn.attributes("disabled")).toBeDefined();
         } else {
-          expect(viewLogsBtn.attributes('disabled')).toBeUndefined();
+          expect(viewLogsBtn.attributes("disabled")).toBeUndefined();
         }
       }
 
@@ -1521,16 +1579,24 @@ describe("TraceDetails", () => {
       await wrapper.vm.$nextTick();
 
       // 4. TraceDetailsSidebar should receive selected-log-streams props correctly
-      const sidebar = wrapper.findComponent('[data-test="trace-details-sidebar"]');
+      const sidebar = wrapper.findComponent(
+        '[data-test="trace-details-sidebar"]',
+      );
       if (sidebar.exists()) {
-        expect(sidebar.props('selectedLogStreams')).toBeDefined();
-        expect(sidebar.props('showLogStreamSelector')).toBeDefined();
-        expect(sidebar.props('selectedLogStreams')).toEqual(wrapper.vm.searchObj.data.traceDetails.selectedLogStreams);
-        expect(sidebar.props('showLogStreamSelector')).toBe(wrapper.vm.showLogStreamSelector);
+        expect(sidebar.props("selectedLogStreams")).toBeDefined();
+        expect(sidebar.props("showLogStreamSelector")).toBeDefined();
+        expect(sidebar.props("selectedLogStreams")).toEqual(
+          wrapper.vm.searchObj.data.traceDetails.selectedLogStreams,
+        );
+        expect(sidebar.props("showLogStreamSelector")).toBe(
+          wrapper.vm.showLogStreamSelector,
+        );
       }
 
       // 5. Log stream selector should exist with current structure
-      const streamSelector = wrapper.find('[data-test="trace-details-log-streams-select"]');
+      const streamSelector = wrapper.find(
+        '[data-test="trace-details-log-streams-select"]',
+      );
       expect(streamSelector.exists()).toBe(true);
     });
   });
@@ -1743,8 +1809,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -1920,8 +1985,8 @@ describe("TraceDetails", () => {
 
       const result = wrapper.vm.formatRumEventsAsSpans(
         [resource], // tracedResources
-        [],         // viewEvents
-        [],         // actionEvents
+        [], // viewEvents
+        [], // actionEvents
         [resource], // allViewEvents
       );
 
@@ -1978,9 +2043,9 @@ describe("TraceDetails", () => {
 
       const result = wrapper.vm.formatRumEventsAsSpans(
         [tracedResource], // sets traceId and tracedTimestamp
-        [],               // viewEvents
-        [action],         // actionEvents
-        [action],         // allViewEvents
+        [], // viewEvents
+        [action], // actionEvents
+        [action], // allViewEvents
       );
 
       expect(result).toHaveLength(1);
@@ -2004,10 +2069,10 @@ describe("TraceDetails", () => {
       };
 
       const result = wrapper.vm.formatRumEventsAsSpans(
-        [view],  // tracedResources — provides traceId
-        [view],  // viewEvents
-        [],      // actionEvents
-        [view],  // allViewEvents — classifyLeafEvents skips 'view' type → no leaf spans
+        [view], // tracedResources — provides traceId
+        [view], // viewEvents
+        [], // actionEvents
+        [view], // allViewEvents — classifyLeafEvents skips 'view' type → no leaf spans
       );
 
       expect(result).toHaveLength(1);
@@ -2259,8 +2324,8 @@ describe("TraceDetails", () => {
       );
 
       expect(result[0].start_time).toBe(1000000000); // date * 1_000_000
-      expect(result[0].end_time).toBe(1500000000);   // (date + 500ms) * 1_000_000
-      expect(result[0].duration).toBe(500000);        // 500ms * 1000 = 500 000 µs
+      expect(result[0].end_time).toBe(1500000000); // (date + 500ms) * 1_000_000
+      expect(result[0].duration).toBe(500000); // 500ms * 1000 = 500 000 µs
     });
 
     it("should handle unknown event types with default operation name", () => {
@@ -2314,8 +2379,7 @@ describe("TraceDetails", () => {
               name: "CodeQueryEditor",
               props: ["query", "language"],
               emits: ["update:query"],
-              template:
-                '<div data-test="trace-details-filters-code-editor" />',
+              template: '<div data-test="trace-details-filters-code-editor" />',
             },
             "chart-renderer": {
               template: '<div data-test="chart-renderer">Chart</div>',
@@ -2357,9 +2421,16 @@ describe("TraceDetails", () => {
                 "parentMode",
                 "activeTab",
                 "selectedLogStreams",
-                "showLogStreamSelector"
+                "showLogStreamSelector",
               ],
-              emits: ["view-logs", "close", "open-trace", "add-filter", "apply-filter-immediately", "update:activeTab"],
+              emits: [
+                "view-logs",
+                "close",
+                "open-trace",
+                "add-filter",
+                "apply-filter-immediately",
+                "update:activeTab",
+              ],
             },
           },
         },
@@ -2441,6 +2512,61 @@ describe("TraceDetails", () => {
         validSpanId,
       );
 
+      localWrapper.unmount();
+    });
+
+    it("opens Preview when a URL-selected span is an LLM evaluator span", async () => {
+      const response = JSON.parse(
+        JSON.stringify(tracesMockData.tracesDetails.traceSpans),
+      );
+      response.hits[0].gen_ai_system = "openai";
+      const spanId = response.hits[0].span_id;
+
+      globalThis.server.use(
+        http.post(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+          async ({ request }) => {
+            const body = (await request.json()) as any;
+            if (body.query?.sql?.includes("_rumdata")) {
+              return HttpResponse.json({ hits: [], total: 0 });
+            }
+            return HttpResponse.json(response);
+          },
+        ),
+      );
+
+      const localWrapper = mountWithSpanQuery(spanId);
+      await flushPromises();
+
+      expect(localWrapper.vm.sidebarActiveTab).toBe("preview");
+      localWrapper.unmount();
+    });
+
+    it("opens Preview when a URL-selected remote evaluator has a response", async () => {
+      const response = JSON.parse(
+        JSON.stringify(tracesMockData.tracesDetails.traceSpans),
+      );
+      response.hits[0].attributes_response =
+        '{"code":"OK","value":0.9,"reason":"good"}';
+      const spanId = response.hits[0].span_id;
+
+      globalThis.server.use(
+        http.post(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+          async ({ request }) => {
+            const body = (await request.json()) as any;
+            if (body.query?.sql?.includes("_rumdata")) {
+              return HttpResponse.json({ hits: [], total: 0 });
+            }
+            return HttpResponse.json(response);
+          },
+        ),
+      );
+
+      const localWrapper = mountWithSpanQuery(spanId);
+      await flushPromises();
+
+      expect(localWrapper.vm.sidebarActiveTab).toBe("preview");
       localWrapper.unmount();
     });
   });
@@ -2706,16 +2832,14 @@ describe("TraceDetails", () => {
   describe("effectiveSpanId", () => {
     it("should return hoveredSpanId when hovering over a span", () => {
       wrapper.vm.hoveredSpanId = "hovered-span-1";
-      wrapper.vm.searchObj.data.traceDetails.selectedSpanId =
-        "selected-span-1";
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "selected-span-1";
 
       expect(wrapper.vm.effectiveSpanId).toBe("hovered-span-1");
     });
 
     it("should return selectedSpanId when not hovering", () => {
       wrapper.vm.hoveredSpanId = "";
-      wrapper.vm.searchObj.data.traceDetails.selectedSpanId =
-        "selected-span-1";
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "selected-span-1";
 
       expect(wrapper.vm.effectiveSpanId).toBe("selected-span-1");
     });
@@ -2756,9 +2880,7 @@ describe("TraceDetails", () => {
         '[data-test="trace-details-tree"]',
       );
       expect(traceTree.exists()).toBe(true);
-      expect(traceTree.props("hoveredSpanId")).toBe(
-        "hovered-span-from-parent",
-      );
+      expect(traceTree.props("hoveredSpanId")).toBe("hovered-span-from-parent");
     });
   });
 

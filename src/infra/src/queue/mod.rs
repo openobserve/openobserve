@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use async_nats::jetstream::AckKind;
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::meta::meta_store::MetaStore;
@@ -150,6 +151,26 @@ impl Message {
                 .ack()
                 .await
                 .map_err(|e| Error::Message(format!("ack error:{e}")))?,
+        }
+        Ok(())
+    }
+
+    pub async fn progress(&self) -> Result<()> {
+        match self {
+            Message::Nats(msg) => msg
+                .ack_with(AckKind::Progress)
+                .await
+                .map_err(|e| Error::Message(format!("progress ack error:{e}")))?,
+        }
+        Ok(())
+    }
+
+    pub async fn double_ack(&self) -> Result<()> {
+        match self {
+            Message::Nats(msg) => msg
+                .double_ack()
+                .await
+                .map_err(|e| Error::Message(format!("double ack error:{e}")))?,
         }
         Ok(())
     }
