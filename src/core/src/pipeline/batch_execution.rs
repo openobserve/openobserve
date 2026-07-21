@@ -49,9 +49,10 @@ use proto::cluster_rpc;
 #[cfg(feature = "enterprise")]
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{Receiver, Sender, channel};
+use transform::js::JSRuntimeConfig;
 
 use crate::{
-    common::{infra::config::QUERY_FUNCTIONS, utils::js::JSRuntimeConfig},
+    common::infra::config::QUERY_FUNCTIONS,
     service::{
         alerts::{ConditionExt, ConditionGroupExt},
         ingestion::{apply_js_fn, apply_vrl_fn, compile_js_function, compile_vrl_function},
@@ -181,7 +182,7 @@ impl PipelineExt for Pipeline {
                     let vrl_runtime_config = compile_vrl_function(&transform.function, &self.org)?;
                     let registry = vrl_runtime_config
                         .config
-                        .get_custom::<vector_enrichment::TableRegistry>()
+                        .get_custom::<transform::vector_enrichment::TableRegistry>()
                         .unwrap();
                     registry.finish_load();
                     CompiledFunctionRuntime::VRL(
@@ -222,7 +223,7 @@ impl PipelineExt for Workflow {
                         compile_vrl_function(&transform.function, &self.org_id)?;
                     let registry = vrl_runtime_config
                         .config
-                        .get_custom::<vector_enrichment::TableRegistry>()
+                        .get_custom::<transform::vector_enrichment::TableRegistry>()
                         .unwrap();
                     registry.finish_load();
                     CompiledFunctionRuntime::VRL(
@@ -2995,7 +2996,7 @@ mod tests {
     // Tests for CompiledFunctionRuntime enum
     #[test]
     fn test_compiled_function_runtime_enum_js_variant() {
-        use crate::common::utils::js::JSRuntimeConfig;
+        use transform::js::JSRuntimeConfig;
 
         let js_config = JSRuntimeConfig {
             function: "function(row) { return row; }".to_string(),
@@ -3046,7 +3047,9 @@ mod tests {
 
     #[test]
     fn test_compiled_function_runtime_result_array_flags() {
-        use crate::{common::utils::js::JSRuntimeConfig, service::ingestion::compile_vrl_function};
+        use transform::js::JSRuntimeConfig;
+
+        use crate::service::ingestion::compile_vrl_function;
 
         let js_config = JSRuntimeConfig {
             function: "function(rows) { return rows; }".to_string(),
@@ -3081,7 +3084,7 @@ mod tests {
 
     #[test]
     fn test_compiled_function_runtime_clone() {
-        use crate::common::utils::js::JSRuntimeConfig;
+        use transform::js::JSRuntimeConfig;
 
         let js_config = JSRuntimeConfig {
             function: "function(row) { return row; }".to_string(),
