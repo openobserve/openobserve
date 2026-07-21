@@ -386,10 +386,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(11);
     });
 
-    // Test 34: Should have 9 routes in cloud configuration (iam + synthetic + 3 synthetic sub-routes + 2 incident routes + actions + workflows)
-    it("should have 8 routes in cloud configuration", () => {
+    // Test 34: Should have 10 routes in cloud configuration (iam + synthetic + 4 synthetic sub-routes + 2 incident routes + actions + workflows)
+    it("should have 10 routes in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(9);
+      expect(routes.length).toBe(10);
     });
   });
 
@@ -416,10 +416,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(10);
     });
 
-    // Test 37: Should have 9 routes in enterprise configuration
+    // Test 37: Should have 10 routes in enterprise configuration
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(9);
+      expect(routes.length).toBe(10);
     });
   });
 
@@ -433,7 +433,7 @@ describe("useEnterpriseRoutes.ts", () => {
     // Test 38: Should add all routes when both flags are true
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(9);
+      expect(routes.length).toBe(10);
     });
 
     // Test 39: Should have all IAM children when both flags are true
