@@ -74,7 +74,6 @@ describe("useDragAndDrop", () => {
 
     it("should have default object properties", () => {
       const defaults = useDnD.defaultObject;
-      expect(defaults.pipelineDirectionTopBottom).toBe(false);
       expect(defaults.dirtyFlag).toBe(false);
       expect(defaults.isEditPipeline).toBe(false);
       expect(defaults.isEditNode).toBe(false);
@@ -688,45 +687,11 @@ describe("useDragAndDrop", () => {
       useDnD.addNode({ name: "test" });
 
       expect(useDnD.pipelineObj.dirtyFlag).toBe(true);
-      expect(useDnD.pipelineObj.nodesChange).toBe(true);
     });
 
-    it("should create edge with userClickedNode", () => {
-      useDnD.pipelineObj.userClickedNode = "source-node-id";
-      useDnD.pipelineObj.userSelectedNode = {};
-
-      useDnD.addNode({ name: "test" });
-
-      expect(useDnD.pipelineObj.currentSelectedPipeline.edges).toHaveLength(1);
-      const edge = useDnD.pipelineObj.currentSelectedPipeline.edges[0];
-      expect(edge.source).toBe("source-node-id");
-      expect(edge.target).toBe("test-node-id");
-    });
-
-    it("should create edge with userSelectedNode", () => {
-      useDnD.pipelineObj.userSelectedNode = { id: "selected-node-id" };
-
-      useDnD.addNode({ name: "test" });
-
-      expect(useDnD.pipelineObj.currentSelectedPipeline.edges).toHaveLength(1);
-      const edge = useDnD.pipelineObj.currentSelectedPipeline.edges[0];
-      expect(edge.source).toBe("selected-node-id");
-      expect(edge.target).toBe("test-node-id");
-    });
-
-    it("should handle cycle detection for userSelectedNode", () => {
-      useDnD.pipelineObj.userSelectedNode = { id: "selected-node-id" };
-      
-      const originalDetectCycle = useDnD.detectCycle;
-      useDnD.detectCycle = vi.fn().mockReturnValue(true);
-
-      useDnD.addNode({ name: "test" });
-
-      // Should still add the node but no edge due to cycle
-      expect(useDnD.pipelineObj.currentSelectedPipeline.nodes).toHaveLength(1);
-      
-      useDnD.detectCycle = originalDetectCycle;
-    });
+    // NOTE: the legacy userClickedNode/userSelectedNode auto-edge tests were
+    // removed with that dead code. The clean pendingEdge wiring is covered by the
+    // "addNode — edge wiring" describe below.
 
     it("should create output node for single input stream node", () => {
       useDnD.pipelineObj.currentSelectedNodeData = {
@@ -767,45 +732,10 @@ describe("useDragAndDrop", () => {
       expect(nodeData.meta).toBeUndefined();
     });
 
-    it("should clean up user selection states", () => {
-      useDnD.pipelineObj.userClickedNode = "test";
-      useDnD.pipelineObj.userSelectedNode = { id: "test" };
+    it("clears isEditNode after adding", () => {
       useDnD.pipelineObj.isEditNode = true;
-
       useDnD.addNode({ name: "test" });
-
-      expect(useDnD.pipelineObj.userClickedNode).toEqual({});
-      expect(useDnD.pipelineObj.userSelectedNode).toEqual({});
       expect(useDnD.pipelineObj.isEditNode).toBe(false);
-    });
-
-    it("should filter existing target edge when userSelectedNode exists", () => {
-      useDnD.pipelineObj.userSelectedNode = { id: "selected-node-id" };
-      useDnD.pipelineObj.currentSelectedPipeline.edges = [
-        { targetNode: { id: "test-node-id" }, sourceNode: { id: "source1" } },
-        { targetNode: { id: "other-node-id" }, sourceNode: { id: "source2" } },
-      ];
-
-      useDnD.addNode({ name: "test" });
-
-      // Should have filtered and replaced edges
-      expect(useDnD.pipelineObj.currentSelectedPipeline.edges.length).toBeGreaterThan(0);
-    });
-
-    it("should remove edges when editing node without userSelectedNode", () => {
-      useDnD.pipelineObj.isEditNode = true;
-      useDnD.pipelineObj.userSelectedNode = null;
-      useDnD.pipelineObj.currentSelectedPipeline.edges = [
-        { targetNode: { id: "test-node-id" } },
-        { targetNode: { id: "other-node-id" } },
-      ];
-
-      useDnD.addNode({ name: "test" });
-
-      const remainingEdges = useDnD.pipelineObj.currentSelectedPipeline.edges.filter(
-        (edge: any) => edge.targetNode && edge.targetNode.id === "test-node-id"
-      );
-      expect(remainingEdges).toHaveLength(0);
     });
   });
 
@@ -926,11 +856,6 @@ describe("useDragAndDrop", () => {
           { source: "node2", target: "node3" },
         ],
       };
-      useDnD.pipelineObj.previousNodeOptions = [
-        { id: "node1" },
-        { id: "node2" },
-        { id: "node3" },
-      ];
       useDnD.pipelineObj.pipelineWithoutChange = {
         nodes: [
           { id: "node1" },
@@ -945,7 +870,6 @@ describe("useDragAndDrop", () => {
 
       expect(useDnD.pipelineObj.currentSelectedPipeline.nodes).toHaveLength(2);
       expect(useDnD.pipelineObj.currentSelectedPipeline.edges).toHaveLength(0);
-      expect(useDnD.pipelineObj.previousNodeOptions).toHaveLength(2);
     });
 
     it("should clear currentSelectedNodeData", () => {
@@ -1246,8 +1170,7 @@ describe("useDragAndDrop", () => {
       useDnD.addNode({ name: "test-function" });
       
       expect(useDnD.pipelineObj.dirtyFlag).toBe(true);
-      expect(useDnD.pipelineObj.nodesChange).toBe(true);
-      
+
       useDnD.pipelineObj.isEditNode = true;
       useDnD.addNode({ name: "updated-function" });
       
@@ -1257,7 +1180,6 @@ describe("useDragAndDrop", () => {
 
   describe("Exported Constants", () => {
     it("should expose defaultObject with correct initial values", () => {
-      expect(useDnD.defaultObject.pipelineDirectionTopBottom).toBe(false);
       expect(useDnD.defaultObject.dirtyFlag).toBe(false);
       expect(useDnD.defaultObject.isEditPipeline).toBe(false);
       expect(useDnD.defaultObject.isEditNode).toBe(false);
@@ -1375,6 +1297,51 @@ describe("useDragAndDrop", () => {
 
       const result = useDnD.validateConnection(connection);
       expect(result).toBe(true);
+    });
+  });
+
+  describe("addNode — edge wiring", () => {
+    beforeEach(() => {
+      useDnD.pipelineObj.currentSelectedPipeline.nodes = [
+        { id: "src", type: "input", position: { x: 0, y: 0 }, data: { node_type: "stream" } },
+      ];
+      useDnD.pipelineObj.currentSelectedPipeline.edges = [];
+      useDnD.pipelineObj.currentSelectedNodeData = {
+        id: "new1",
+        type: "default",
+        position: { x: 0, y: 0 },
+        data: { node_type: "function" },
+      };
+      useDnD.pipelineObj.isEditNode = false;
+      useDnD.pipelineObj.isEditPipeline = false;
+      useDnD.pipelineObj.pendingEdge = null;
+    });
+
+    it("pushes the staged node to the graph", () => {
+      useDnD.addNode({ name: "fn" });
+      expect(
+        useDnD.pipelineObj.currentSelectedPipeline.nodes.some((n: any) => n.id === "new1"),
+      ).toBe(true);
+    });
+
+    it("creates NO edge for a plain add (no pendingEdge)", () => {
+      useDnD.addNode({ name: "fn" });
+      expect(useDnD.pipelineObj.currentSelectedPipeline.edges).toHaveLength(0);
+    });
+
+    it("wires pendingEdge.source -> the new node when pendingEdge is set", () => {
+      useDnD.pipelineObj.pendingEdge = { source: "src" };
+      useDnD.addNode({ name: "fn" });
+      const edges = useDnD.pipelineObj.currentSelectedPipeline.edges;
+      expect(edges).toHaveLength(1);
+      expect(edges[0].source).toBe("src");
+      expect(edges[0].target).toBe("new1");
+    });
+
+    it("clears pendingEdge after adding", () => {
+      useDnD.pipelineObj.pendingEdge = { source: "src" };
+      useDnD.addNode({ name: "fn" });
+      expect(useDnD.pipelineObj.pendingEdge).toBeNull();
     });
   });
 });

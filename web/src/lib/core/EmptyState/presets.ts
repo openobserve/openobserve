@@ -175,6 +175,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-workflows": {
+    illustration: "pipeline",
+    variant: "create",
+    titleKey: "emptyState.noWorkflows.title",
+    descriptionKey: "emptyState.noWorkflows.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noWorkflows.action",
+        descriptionKey: "emptyState.noWorkflows.actionDesc",
+      },
+    ],
+  },
 
   // --- no ingestion / no data flowing in -----------------------------------
   "no-streams": {
@@ -756,6 +770,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-patterns": "emptyState.nouns.patterns",
   "no-dashboards": "emptyState.nouns.dashboards",
   "no-pipelines": "emptyState.nouns.pipelines",
+  "no-workflows": "emptyState.nouns.workflows",
   "no-functions": "emptyState.nouns.functions",
   "no-streams": "emptyState.nouns.streams",
   "no-alerts": "emptyState.nouns.alerts",

@@ -3,7 +3,7 @@
   // - e2e-ci-* agents: used by .github/workflows/e2e-council.yml for CI test-generation, on DeepSeek.
   // - ai-review-* agents: used by scripts/ai-review/run-review.mjs (dispatched via `opencode serve`)
   //   for PR code review. ONE shared set, run once per provider by the matrix in
-  //   .github/workflows/ai-code-review.yml (GLM-5.2 vs DeepSeek-V4-Pro head-to-head). The model is
+  //   .github/workflows/ai-code-review.yml (DeepSeek-V4-Pro). The model is
   //   supplied per-call by the runner, so the agents themselves are provider-agnostic.
   // Docs: https://opencode.ai/docs/  — verify provider shape against current docs at build time.
   "$schema": "https://opencode.ai/config.json",
@@ -20,20 +20,6 @@
         "deepseek-v4-pro": {
           "name": "DeepSeek-V4-Pro",
           "limit": { "context": 1048576, "output": 262144 }
-        }
-      }
-    },
-    "zai": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Z.AI",
-      "options": {
-        "baseURL": "https://api.z.ai/api/paas/v4",
-        "apiKey": "{env:GLM_API_KEY}"
-      },
-      "models": {
-        "glm-5.2": {
-          "name": "GLM-5.2",
-          "limit": { "context": 1000000, "output": 131072 }
         }
       }
     },
@@ -118,7 +104,7 @@
     // so a newly added tool doesn't silently become available by omission.
     "ai-review-security": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek-review/deepseek-v4-pro",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -127,7 +113,7 @@
     },
     "ai-review-code-quality": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek-review/deepseek-v4-pro",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -136,7 +122,7 @@
     },
     "ai-review-performance": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek-review/deepseek-v4-pro",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -145,7 +131,7 @@
     },
     "ai-review-documentation": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek-review/deepseek-v4-pro",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -154,7 +140,7 @@
     },
     "ai-review-release": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek-review/deepseek-v4-pro",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
@@ -163,7 +149,7 @@
     },
     "ai-review-coordinator": {
       "mode": "primary",
-      "model": "zai/glm-5.2",
+      "model": "deepseek-review/deepseek-v4-pro",
       "tools": {
         "read": true, "glob": true, "grep": true,
         "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,

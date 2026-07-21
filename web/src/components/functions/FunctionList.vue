@@ -96,6 +96,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-text-body" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
               </template>
 
+              <!-- Language of the transform. Its own column (sortable + hideable)
+                   rather than a glyph on the name, so JS vs VRL reads at a glance. -->
+              <template #cell-transType="{ row }">
+                <OBadge
+                  size="xs"
+                  :variant="row?.transType === '1' ? 'amber-soft' : 'blue-soft'"
+                  :data-test="`function-list-type-badge-${
+                    row?.transType === '1' ? 'js' : 'vrl'
+                  }`"
+                >
+                  {{
+                    row?.transType === "1"
+                      ? t("function.javascript")
+                      : t("function.vrl")
+                  }}
+                </OBadge>
+              </template>
+
               <template #cell-actions="{ row }">
                 <div class="flex items-center actions-container">
                   <OButton
@@ -227,6 +245,7 @@ import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -248,6 +267,7 @@ export default defineComponent({
     NoData,
     ConfirmDialog,
     OButton,
+    OBadge,
     ODialog,
     OSearchInput,
     OTooltip,
@@ -283,6 +303,14 @@ export default defineComponent({
         header: t("common.name"),
         sortable: true,
         meta: { align: "left", autoWidth: true },
+      },
+      {
+        id: "transType",
+        accessorKey: "transType",
+        header: t("common.type"),
+        sortable: true,
+        size: 120,
+        meta: { align: "left" },
       },
       {
         id: "actions",
