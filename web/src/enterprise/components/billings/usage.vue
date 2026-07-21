@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="showContractCreditMessage"
           data-test="contract-ai-credits-exhausted"
           role="status"
-          class="border border-(--o2-status-warning-text) bg-(--o2-status-warning-bg) text-(--o2-status-warning-text) rounded-lg px-4 py-3 text-sm"
+          class="border border-status-warning-text bg-status-warning-bg text-status-warning-text rounded-lg px-4 py-3 text-sm"
         >
           {{ t("billing.aiContractExhaustedMessage") }}
         </div>
@@ -1177,4 +1177,3 @@ import config from "@/aws-exports";
     },
   });
   </script>
-
