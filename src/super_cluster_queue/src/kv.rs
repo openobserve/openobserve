@@ -19,8 +19,7 @@ use infra::{
     errors::{Error, Result},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-
-use crate::common::infra::config::KVS;
+use openobserve_core::common::infra::config::KVS;
 
 /// Process KV messages from super cluster queue
 ///

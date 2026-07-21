@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#![cfg(feature = "enterprise")]
+
 mod action_scripts;
 mod alerts;
 mod anomaly_detection;

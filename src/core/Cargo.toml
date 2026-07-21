@@ -37,7 +37,7 @@ vortex = [
 
 [dependencies]
 common.workspace = true
-openobserve-vrl.workspace = true
+transform.workspace = true
 promql.workspace = true
 search.workspace = true
 axum.workspace = true
@@ -107,9 +107,7 @@ tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
 version-compare.workspace = true
-vector-enrichment.workspace = true
 x509-parser.workspace = true
-vrl.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true

@@ -17,18 +17,37 @@
 //! and VRL compilation. This crate deliberately has no dependency on core or
 //! the search engine so both can consume the same runtime state.
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::LazyLock,
+};
 
 use config::{
     DEFAULT_ORG, RwHashMap,
-    meta::function::{Transform, VRLCompilerConfig, VRLRuntimeConfig},
+    meta::{
+        function::{Transform, VRLCompilerConfig, VRLResultResolver, VRLRuntimeConfig},
+        stream::StreamType,
+    },
+    metrics,
+    utils::json,
 };
 use vector_enrichment::{Table, TableRegistry};
-use vrl::compiler::{CompilationResult, runtime::Runtime};
+use vrl::{
+    compiler::{CompilationResult, TargetValueRef, runtime::Runtime},
+    prelude::NotNan,
+};
 
 pub mod enrichment;
+pub mod js;
 
 use enrichment::ENRICHMENT_TABLES;
+// Re-export the underlying engines so downstream crates depend on this crate
+// instead of on `vrl`/`vector-enrichment` directly.
+pub use vector_enrichment;
+pub use vrl;
+
+/// Metric label recorded when a transform fails to process a record.
+pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 
 /// Query and ingestion transform definitions, keyed by `org_id/function_name`.
 pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
@@ -124,6 +143,125 @@ pub fn compile_vrl_function(
         Err(error) => Err(std::io::Error::other(
             vrl::diagnostic::Formatter::new(source, error).to_string(),
         )),
+    }
+}
+
+pub fn apply_vrl_fn(
+    runtime: &mut Runtime,
+    vrl_runtime: &VRLResultResolver,
+    row: json::Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (json::Value, Option<String>) {
+    let mut metadata = vrl::value::Value::from(BTreeMap::new());
+    metadata.insert("org_id", vrl::value::Value::from(org_id.to_string()));
+    metadata.insert(
+        "stream_name",
+        vrl::value::Value::from(stream_name[0].clone()),
+    );
+    let mut target = TargetValueRef {
+        value: &mut vrl::value::Value::from(&row),
+        metadata: &mut metadata,
+        secrets: &mut vrl::value::Secrets::new(),
+    };
+
+    target
+        .secrets
+        .insert(stream_name[0].clone(), stream_name[0].clone());
+
+    let timezone = vrl::compiler::TimeZone::Local;
+    let result = match vrl::compiler::VrlRuntime::default() {
+        vrl::compiler::VrlRuntime::Ast => {
+            runtime.resolve(&mut target, &vrl_runtime.program, &timezone)
+        }
+    };
+    match result {
+        Ok(res) => match res.try_into() {
+            Ok(val) => (val, None),
+            Err(err) => {
+                metrics::INGEST_ERRORS
+                    .with_label_values(&[
+                        org_id,
+                        StreamType::Logs.as_str(),
+                        &format!("{stream_name:?}"),
+                        TRANSFORM_FAILED,
+                    ])
+                    .inc();
+                // Log full error with record for debugging
+                log::debug!(
+                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
+                );
+                // Return only error message without sensitive record data
+                let clean_err = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
+                (row, Some(clean_err))
+            }
+        },
+        Err(err) => {
+            metrics::INGEST_ERRORS
+                .with_label_values(&[
+                    org_id,
+                    StreamType::Logs.as_str(),
+                    &format!("{stream_name:?}"),
+                    TRANSFORM_FAILED,
+                ])
+                .inc();
+            // Log full error with record for debugging
+            log::debug!(
+                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
+            );
+            // Return only error message without sensitive record data
+            let clean_err = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
+            (row, Some(clean_err))
+        }
+    }
+}
+
+pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
+    match value {
+        json::Value::Null => vrl::value::Value::Null,
+        json::Value::Bool(b) => vrl::value::Value::Boolean(*b),
+        json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                vrl::value::Value::Integer(i)
+            } else if let Some(f) = n.as_f64() {
+                vrl::value::Value::Float(NotNan::new(f).unwrap_or(NotNan::new(0.0).unwrap()))
+            } else {
+                unimplemented!("handle other number types")
+            }
+        }
+        json::Value::String(s) => vrl::value::Value::from(s.as_str()),
+        json::Value::Array(arr) => {
+            vrl::value::Value::Array(arr.iter().map(convert_to_vrl).collect())
+        }
+        json::Value::Object(obj) => vrl::value::Value::Object(
+            obj.iter()
+                .map(|(k, v)| (k.to_string().into(), convert_to_vrl(v)))
+                .collect(),
+        ),
+    }
+}
+
+pub fn convert_from_vrl(value: &vrl::value::Value) -> json::Value {
+    match value {
+        vrl::value::Value::Null => json::Value::Null,
+        vrl::value::Value::Boolean(b) => json::Value::Bool(*b),
+        vrl::value::Value::Integer(i) => json::Value::Number(json::Number::from(*i)),
+        vrl::value::Value::Float(f) => json::Value::Number(
+            json::Number::from_f64(f.into_inner()).unwrap_or(json::Number::from(0)),
+        ),
+        vrl::value::Value::Bytes(b) => json::Value::String(String::from_utf8_lossy(b).to_string()),
+        vrl::value::Value::Array(arr) => {
+            json::Value::Array(arr.iter().map(convert_from_vrl).collect())
+        }
+        vrl::value::Value::Object(obj) => json::Value::Object(
+            obj.iter()
+                .map(|(k, v)| (k.to_string(), convert_from_vrl(v)))
+                .collect(),
+        ),
+        vrl::value::Value::Timestamp(ts) => json::Value::Number(json::Number::from(
+            ts.timestamp_nanos_opt().unwrap_or(0) / 1000,
+        )),
+        vrl::value::Value::Regex(_) => json::Value::String("regex".to_string()),
     }
 }
 
