@@ -213,7 +213,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import { useOForm, type OFormInstance } from "@/lib/forms/Form/useOForm";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
   makeAssociateFunctionSchema,
   type AssociateFunctionForm,
@@ -367,19 +367,14 @@ const submit = async () => {
   if (createNewFunction.value) return null; // still in the inline editor
   validated.value = null;
   await form.handleSubmit();
-  const values: AssociateFunctionForm | null = validated.value;
+  const values = validated.value as AssociateFunctionForm | null;
   if (!values?.selectedFunction) return null;
   return props.showFlatten
     ? { name: values.selectedFunction, after_flatten: !!values.afterFlattening }
     : { name: values.selectedFunction };
 };
 
-// Expose `form` under its generic-erased library type (OFormInstance, what
-// <OForm :form> and every other consumer already accept). Exposing the raw,
-// deeply-parameterised useForm return type makes vue-tsc over-resolve it in the
-// SFC's exposed-type serialization, which collapses inference and mistypes the
-// unrelated `validated` ref as `never`. Type-only — no runtime change.
-defineExpose({ submit, createNewFunction, form: form as OFormInstance });
+defineExpose({ submit, createNewFunction, form });
 </script>
 
 <style scoped>

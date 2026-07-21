@@ -163,7 +163,7 @@ const submit = async () => {
   if (createNewDestination.value) return null; // still in the inline create form
   validated.value = null;
   await form.handleSubmit();
-  const values = validated.value;
+  const values = validated.value as ExternalDestinationForm | null;
   const name = values?.selectedDestination;
   if (!name) return null;
   return {
