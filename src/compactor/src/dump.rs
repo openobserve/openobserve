@@ -20,7 +20,6 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use arrow_schema::Schema;
-use async_trait::async_trait;
 use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     FileFormat, PARQUET_MAX_ROW_GROUP_SIZE,
@@ -57,18 +56,6 @@ pub struct DumpJob {
     pub stream_name: String,
     pub job_id: i64,
     pub offset: i64,
-}
-
-#[async_trait]
-pub trait SchemaService: Send + Sync {
-    async fn merge(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        schema: &Schema,
-        min_ts: Option<i64>,
-    ) -> Result<(), anyhow::Error>;
 }
 
 // compactor dump run steps:
@@ -215,7 +202,7 @@ pub async fn run(tx: mpsc::Sender<DumpJob>) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub async fn dump(job: &DumpJob, schema_service: &dyn SchemaService) -> Result<(), anyhow::Error> {
+pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
     let start = std::time::Instant::now();
     let stream = format!("{}/{}/{}", job.org_id, job.stream_type, job.stream_name);
     log::debug!(
@@ -291,15 +278,14 @@ pub async fn dump(job: &DumpJob, schema_service: &dyn SchemaService) -> Result<(
         .as_ref()
         .is_none_or(|s| s.fields_map().len() != FILE_LIST_SCHEMA.fields().len())
     {
-        if let Err(e) = schema_service
-            .merge(
-                &job.org_id,
-                &dump_stream_name,
-                StreamType::Filelist,
-                &FILE_LIST_SCHEMA,
-                Some(start_time),
-            )
-            .await
+        if let Err(e) = openobserve_catalog::schema::merge(
+            &job.org_id,
+            &dump_stream_name,
+            StreamType::Filelist,
+            &FILE_LIST_SCHEMA,
+            Some(start_time),
+        )
+        .await
         {
             log::error!(
                 "[COMPACTOR::DUMP] erroring in saving file list dump schema for {dump_stream_key} to db: {e}"

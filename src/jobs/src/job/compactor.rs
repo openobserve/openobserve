@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -23,23 +25,11 @@ use infra::cluster::get_node_by_uuid;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use openobserve_compactor::{
-    merge::{FileListBroadcaster, MergeService},
+    merge::MergeService,
     service as compact,
     worker::{JobScheduler, MergeExecutor, MergeWorker},
 };
 const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/compact/enrichment_table";
-
-struct CoreFileListBroadcaster;
-
-#[async_trait]
-impl FileListBroadcaster for CoreFileListBroadcaster {
-    async fn broadcast(
-        &self,
-        events: &[config::meta::stream::FileKey],
-    ) -> Result<(), anyhow::Error> {
-        openobserve_catalog::file_list::broadcast::send(events).await
-    }
-}
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_compactor() {
@@ -52,8 +42,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
     log::info!("[COMPACTOR::JOB] Compactor is enabled");
 
-    let merge_service: Arc<dyn MergeExecutor> =
-        Arc::new(MergeService::new(Arc::new(CoreFileListBroadcaster)));
+    let merge_service: Arc<dyn MergeExecutor> = Arc::new(MergeService::new());
     let mut worker = MergeWorker::new(cfg.limit.file_merge_thread_num, merge_service.clone());
     if let Err(e) = worker.run() {
         log::error!("[COMPACTOR::JOB] start merge worker error: {e}");
@@ -283,6 +272,3 @@ async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     openobserve_core::enrichment::storage::remote::run_merge_job().await;
     Ok(())
 }
-use std::sync::Arc;
-
-use async_trait::async_trait;

@@ -37,7 +37,6 @@ anyhow.workspace = true
 arrow.workspace = true
 arrow-json.workspace = true
 arrow-schema.workspace = true
-async-trait.workspace = true
 axum.workspace = true
 bytes.workspace = true
 chrono.workspace = true

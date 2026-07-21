@@ -22,7 +22,7 @@ use config::{
 };
 use infra::{cache::stats, errors::Error, file_list::FileId, schema::unwrap_stream_settings};
 
-use super::{PartitionRuntime, sql_context::PartitionSqlContext};
+use super::sql_context::PartitionSqlContext;
 
 /// Result of collecting stream file information across all streams in a query.
 pub struct StreamFiles {
@@ -36,15 +36,11 @@ pub struct StreamFiles {
 /// For each stream in the query, either queries the actual file list or
 /// estimates file metadata from stream statistics (when using single partition
 /// or using approximate partitioning).
-pub async fn collect_stream_files<R>(
-    runtime: &R,
+pub async fn collect_stream_files(
     trace_id: &str,
     user_id: Option<&str>,
     ctx: &PartitionSqlContext,
-) -> Result<StreamFiles, Error>
-where
-    R: PartitionRuntime + Send + Sync + ?Sized,
-{
+) -> Result<StreamFiles, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
     let sql = &ctx.sql;
@@ -71,12 +67,20 @@ where
         };
 
         if !use_single_partition && !use_stream_stats_for_partition {
-            let stream_files = runtime
-                .query_file_ids(trace_id, org_id, stream_type, &stream_name, time_range)
-                .await?;
-            let settings_max_query_range = runtime
-                .settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
-                .await;
+            let stream_files = crate::file_list::query_ids(
+                trace_id,
+                org_id,
+                stream_type,
+                &stream_name,
+                time_range,
+            )
+            .await?;
+            let settings_max_query_range = crate::stream_utils::get_settings_max_query_range(
+                stream_settings.max_query_range,
+                org_id,
+                user_id,
+            )
+            .await;
             max_query_range = max(max_query_range, settings_max_query_range * 3600 * 1_000_000);
             max_query_range_in_hour = max(max_query_range_in_hour, settings_max_query_range);
             files.extend(stream_files);

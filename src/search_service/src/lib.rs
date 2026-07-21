@@ -57,9 +57,7 @@ pub use searcher::Searcher;
 pub static SEARCH_SERVER: LazyLock<Searcher> = LazyLock::new(Searcher::new);
 
 #[async_trait::async_trait]
-pub trait GrpcRuntime:
-    cache::CacheRuntime + partition::PartitionRuntime + streaming::StreamingRuntime + Send + Sync
-{
+pub trait GrpcRuntime: cache::CacheRuntime + streaming::StreamingRuntime + Send + Sync {
     async fn enrichment_table_start_time(&self, org_id: &str, stream_name: &str) -> i64;
 
     async fn query_file_keys_by_ids(

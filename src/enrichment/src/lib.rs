@@ -7,10 +7,7 @@
 
 //! Enrichment-table caching, persistence, ingestion, and refresh processing.
 
-use std::sync::{Arc, OnceLock};
-
-use config::meta::stream::{FileMeta, StreamType};
-use infra::errors::Error;
+use config::meta::stream::StreamType;
 
 pub mod enrichment;
 pub mod enrichment_table;
@@ -19,26 +16,6 @@ pub mod repository;
 /// Historical internal namespace retained inside the owning crate while callers migrate.
 pub mod db {
     pub use crate::repository as enrichment_table;
-}
-
-#[async_trait::async_trait]
-pub trait Runtime: Send + Sync {
-    async fn register_file(&self, account: &str, key: &str, meta: FileMeta) -> Result<(), Error>;
-}
-
-static RUNTIME: OnceLock<Arc<dyn Runtime>> = OnceLock::new();
-
-pub fn install_runtime(runtime: Arc<dyn Runtime>) -> Result<(), &'static str> {
-    RUNTIME
-        .set(runtime)
-        .map_err(|_| "enrichment runtime is already installed")
-}
-
-pub(crate) async fn register_file(account: &str, key: &str, meta: FileMeta) -> Result<(), Error> {
-    let runtime = RUNTIME
-        .get()
-        .ok_or_else(|| Error::Message("enrichment runtime is not installed".to_string()))?;
-    runtime.register_file(account, key, meta).await
 }
 
 pub(crate) async fn delete_stream_schema(

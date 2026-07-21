@@ -16,7 +16,6 @@
 use ::common::{infra::wal, metadata};
 use config::{cache_instance_id, ider};
 
-struct CoreEnrichmentRuntime;
 struct CoreCatalogRuntime;
 struct CoreStreamRuntime;
 
@@ -81,18 +80,6 @@ impl openobserve_catalog::schema::SchemaRuntime for CoreCatalogRuntime {
             },
         );
         Ok(len)
-    }
-}
-
-#[async_trait::async_trait]
-impl openobserve_enrichment::Runtime for CoreEnrichmentRuntime {
-    async fn register_file(
-        &self,
-        account: &str,
-        key: &str,
-        meta: config::meta::stream::FileMeta,
-    ) -> Result<(), infra::errors::Error> {
-        openobserve_catalog::file_list::set(account, key, Some(meta), false).await
     }
 }
 
@@ -276,8 +263,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     crate::self_reporting_adapter::install_runtime();
     crate::organization_adapter::install_runtime();
     crate::transform_adapter::install_runtime();
-    let _ = openobserve_enrichment::install_runtime(std::sync::Arc::new(CoreEnrichmentRuntime));
-
     let instance_id = match metadata::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {

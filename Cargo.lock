@@ -6934,7 +6934,6 @@ dependencies = [
  "arrow",
  "arrow-json",
  "arrow-schema",
- "async-trait",
  "axum",
  "bytes",
  "chrono",

@@ -63,18 +63,12 @@ use crate::{
     worker::{MergeBatch, MergeExecutor, MergeSender},
 };
 
-#[async_trait]
-pub trait FileListBroadcaster: Send + Sync + 'static {
-    async fn broadcast(&self, events: &[FileKey]) -> Result<(), anyhow::Error>;
-}
-
-pub struct MergeService {
-    broadcaster: Arc<dyn FileListBroadcaster>,
-}
+#[derive(Default)]
+pub struct MergeService;
 
 impl MergeService {
-    pub fn new(broadcaster: Arc<dyn FileListBroadcaster>) -> Self {
-        Self { broadcaster }
+    pub fn new() -> Self {
+        Self
     }
 }
 
@@ -89,16 +83,7 @@ impl MergeExecutor for MergeService {
         job_id: i64,
         offset: i64,
     ) -> Result<(), anyhow::Error> {
-        merge_by_stream(
-            worker_tx,
-            org_id,
-            stream_type,
-            stream_name,
-            job_id,
-            offset,
-            self.broadcaster.clone(),
-        )
-        .await
+        merge_by_stream(worker_tx, org_id, stream_type, stream_name, job_id, offset).await
     }
 
     async fn merge_files(
@@ -426,7 +411,6 @@ pub async fn merge_by_stream(
     stream_name: &str,
     job_id: i64,
     offset: i64,
-    broadcaster: Arc<dyn FileListBroadcaster>,
 ) -> Result<(), anyhow::Error> {
     let cfg = get_config();
     let start = std::time::Instant::now();
@@ -505,7 +489,6 @@ pub async fn merge_by_stream(
         let stream_name = stream_name.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let worker_tx = worker_tx.clone();
-        let broadcaster = broadcaster.clone();
         let task: JoinHandle<Result<Vec<i64>, anyhow::Error>> = tokio::task::spawn(async move {
             let cfg = get_config();
             // sort by file size
@@ -656,9 +639,7 @@ pub async fn merge_by_stream(
                 events.sort_by(|a, b| a.key.cmp(&b.key));
 
                 // write file list to storage
-                if let Err(e) =
-                    write_file_list(&org_id, stream_type, &events, broadcaster.as_ref()).await
-                {
+                if let Err(e) = write_file_list(&org_id, stream_type, &events).await {
                     log::error!("[COMPACTOR] write file list failed: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
@@ -1100,7 +1081,6 @@ async fn write_file_list(
     org_id: &str,
     stream_type: StreamType,
     events: &[FileKey],
-    broadcaster: &dyn FileListBroadcaster,
 ) -> Result<(), anyhow::Error> {
     if events.is_empty() {
         return Ok(());
@@ -1159,7 +1139,7 @@ async fn write_file_list(
                     event.id = *id;
                 }
             }
-            if let Err(e) = broadcaster.broadcast(&events).await {
+            if let Err(e) = openobserve_catalog::file_list::broadcast::send(&events).await {
                 log::error!("[COMPACTOR] send broadcast for file_list failed: {e}");
             }
         }

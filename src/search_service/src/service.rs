@@ -583,8 +583,7 @@ pub async fn search_partition(
 
     let ctx = PartitionSqlContext::new(req, org_id, stream_type).await?;
 
-    let runtime = crate::grpc_runtime().map_err(|err| Error::Message(err.to_string()))?;
-    let stream_files = collect_stream_files(runtime.as_ref(), trace_id, user_id, &ctx).await?;
+    let stream_files = collect_stream_files(trace_id, user_id, &ctx).await?;
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
@@ -636,6 +635,7 @@ pub async fn search_partition(
 
     #[cfg(feature = "enterprise")]
     {
+        let runtime = crate::grpc_runtime().map_err(|err| Error::Message(err.to_string()))?;
         let (streaming_aggs, streaming_id, cache_strategy) =
             crate::partition::aggregate::prepare_streaming_aggregate(
                 runtime.as_ref(),

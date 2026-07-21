@@ -128,41 +128,6 @@ impl openobserve_search_service::streaming::StreamingRuntime for CoreSearchRunti
 }
 
 #[async_trait::async_trait]
-impl openobserve_search_service::partition::PartitionRuntime for CoreSearchRuntime {
-    async fn query_file_ids(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-        time_range: (i64, i64),
-    ) -> Result<Vec<infra::file_list::FileId>, Error> {
-        openobserve_search_service::file_list::query_ids(
-            trace_id,
-            org_id,
-            stream_type,
-            stream_name,
-            time_range,
-        )
-        .await
-    }
-
-    async fn settings_max_query_range(
-        &self,
-        stream_max_query_range: i64,
-        org_id: &str,
-        user_id: Option<&str>,
-    ) -> i64 {
-        openobserve_search_service::stream_utils::get_settings_max_query_range(
-            stream_max_query_range,
-            org_id,
-            user_id,
-        )
-        .await
-    }
-}
-
-#[async_trait::async_trait]
 impl openobserve_search_service::GrpcRuntime for CoreSearchRuntime {
     async fn enrichment_table_start_time(&self, org_id: &str, stream_name: &str) -> i64 {
         openobserve_enrichment::repository::get_start_time(org_id, stream_name).await

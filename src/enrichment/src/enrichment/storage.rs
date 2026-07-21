@@ -226,7 +226,7 @@ pub mod remote {
             .await
             .map_err(|e| anyhow!("Failed to upload enrichment table to remote: {}", e))?;
 
-        crate::register_file(&account, &remote_key, file_meta).await?;
+        openobserve_catalog::file_list::set(&account, &remote_key, Some(file_meta), false).await?;
 
         log::debug!("Uploaded enrichment table {table_name} to remote");
         Ok(())

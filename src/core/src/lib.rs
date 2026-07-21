@@ -57,62 +57,8 @@ pub use openobserve_search_service::promql;
 pub mod search;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs {
-    use async_trait::async_trait;
-    use config::meta::{
-        cluster::RoleGroup,
-        search::{Request, Response, SearchPartitionRequest, SearchPartitionResponse},
-        stream::StreamType,
-    };
-    use infra::errors::Error;
-    use openobserve_search_service::jobs::SearchExecutor;
-
-    struct CoreSearchExecutor;
-
-    #[async_trait]
-    impl SearchExecutor for CoreSearchExecutor {
-        async fn search(
-            &self,
-            trace_id: &str,
-            org_id: &str,
-            stream_type: StreamType,
-            user_id: Option<String>,
-            req: &Request,
-            role_group: Option<RoleGroup>,
-        ) -> Result<Response, Error> {
-            openobserve_search_service::grpc_search::grpc_search(
-                trace_id,
-                org_id,
-                stream_type,
-                user_id,
-                req,
-                role_group,
-            )
-            .await
-        }
-
-        async fn search_partition(
-            &self,
-            trace_id: &str,
-            org_id: &str,
-            stream_type: StreamType,
-            req: &SearchPartitionRequest,
-            role_group: Option<RoleGroup>,
-            skip_max_query_range: bool,
-        ) -> Result<SearchPartitionResponse, Error> {
-            openobserve_search_service::grpc_search::grpc_search_partition(
-                trace_id,
-                org_id,
-                stream_type,
-                req,
-                role_group,
-                skip_max_query_range,
-            )
-            .await
-        }
-    }
-
     pub async fn run(id: i64) -> Result<(), anyhow::Error> {
-        openobserve_search_service::jobs::run(id, &CoreSearchExecutor).await
+        openobserve_search_service::jobs::run(id).await
     }
 
     pub use openobserve_search_service::jobs::{

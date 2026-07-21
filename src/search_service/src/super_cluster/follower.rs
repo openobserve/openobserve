@@ -350,10 +350,9 @@ pub async fn get_file_id_lists(
         let end = config::utils::time::now_micros();
         time_range = (start, end);
     }
-    let file_id_list = crate::grpc_runtime()
-        .map_err(|err| Error::Message(err.to_string()))?
-        .query_file_ids(trace_id, org_id, stream_type, &stream_name, time_range)
-        .await?;
+    let file_id_list =
+        crate::file_list::query_ids(trace_id, org_id, stream_type, &stream_name, time_range)
+            .await?;
     Ok(file_id_list)
 }
 

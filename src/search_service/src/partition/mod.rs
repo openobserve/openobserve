@@ -21,37 +21,12 @@ pub mod settings;
 pub mod sql_context;
 pub mod stream_files;
 
-use config::{
-    get_config,
-    meta::{sql::OrderBy, stream::StreamType},
-};
+use config::{get_config, meta::sql::OrderBy};
 use histogram::generate_partitions_aligned_with_histogram_interval;
-use infra::{errors::Error, file_list::FileId};
 use regular_partition::generate_partitions_with_mini_partition;
 pub use settings::{PartitionSettings, PartitionSettingsInput, calculate_partition_settings};
 
 use self::sql_context::PartitionSqlContext;
-use crate::cache::CacheRuntime;
-
-#[async_trait::async_trait]
-pub trait PartitionRuntime: CacheRuntime {
-    async fn query_file_ids(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        stream_type: StreamType,
-        stream_name: &str,
-        time_range: (i64, i64),
-    ) -> Result<Vec<FileId>, Error>;
-
-    async fn settings_max_query_range(
-        &self,
-        stream_max_query_range: i64,
-        org_id: &str,
-        user_id: Option<&str>,
-    ) -> i64;
-}
-
 pub struct PartitionSpec {
     pub start_time: i64,
     pub end_time: i64,

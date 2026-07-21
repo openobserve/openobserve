@@ -110,34 +110,10 @@ pub mod destinations {
 }
 #[cfg(feature = "enterprise")]
 pub mod grouping {
-    use async_trait::async_trait;
-    use config::{meta::alerts::alert::Alert, utils::json};
-    use openobserve_alerts::{
-        grouping::{NotificationSender, PendingBatch},
-        service::alert::AlertExt,
-    };
-
-    struct CoreNotificationSender;
-
-    #[async_trait]
-    impl NotificationSender for CoreNotificationSender {
-        async fn send_notification(
-            &self,
-            alert: &Alert,
-            rows: &[json::Map<String, json::Value>],
-            rows_end_time: i64,
-            start_time: Option<i64>,
-            evaluation_timestamp: i64,
-        ) -> Result<(String, String), anyhow::Error> {
-            Ok(alert
-                .send_notification(rows, rows_end_time, start_time, evaluation_timestamp)
-                .await?)
-        }
-    }
+    use openobserve_alerts::grouping::PendingBatch;
 
     pub async fn send_grouped_notification(batch: PendingBatch) -> Result<(), anyhow::Error> {
-        openobserve_alerts::grouping::send_grouped_notification(batch, &CoreNotificationSender)
-            .await
+        openobserve_alerts::grouping::send_grouped_notification(batch).await
     }
 }
 #[cfg(feature = "enterprise")]
