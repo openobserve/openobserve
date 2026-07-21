@@ -33,8 +33,9 @@ You are a **Code Quality Reviewer** for the OpenObserve project. Your focus is b
 
 ## TypeScript/Vue Checks
 
-For any change under `web/`, **read `web/CLAUDE.md` first** — it links the authoritative skills and
-the ESLint-encoded conventions. Flag changed code that violates them:
+For any change under `web/`, **read the tracked skills `.claude/skills/ui-architect/SKILL.md` (UI
+house rules) and `.claude/skills/eslint-error-handling/SKILL.md` (lint/type-check playbook) first** —
+they hold the authoritative, ESLint-encoded conventions. Flag changed code that violates them:
 
 - Verify component reactivity (computed, ref, reactive) is used correctly
 - Check for missing cleanup in `onUnmounted` / `watch` teardown

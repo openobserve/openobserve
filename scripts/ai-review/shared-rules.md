@@ -19,9 +19,11 @@ This is **OpenObserve**, an open-source observability platform written in **Rust
 
 - **Backend**: Rust nightly, uses `tokio` for async, `actix-web` for HTTP, `sqlx`/sqlite for storage
 - **Frontend**: Vue 3 SPA with Vite, using Vuex for state management. When reviewing changes under
-  `web/`, **read `web/CLAUDE.md`** (and the skills it links) first — it is the authoritative source
-  for frontend conventions (O2 component library over Quasar, no `any`/`!`/use-site `as`,
-  type-clean + lint-clean, design tokens + i18n over hardcoded strings). Flag deviations from it.
+  `web/`, **read the tracked skills `.claude/skills/ui-architect/SKILL.md` (UI house rules) and
+  `.claude/skills/eslint-error-handling/SKILL.md` (lint/type-check playbook)** first — they are the
+  authoritative source for frontend conventions (O2 component library over Quasar, no
+  `any`/`!`/use-site `as`, type-clean + lint-clean, design tokens + i18n over hardcoded strings).
+  Flag deviations from them.
 - **Testing**: Rust unit tests with `cargo test`, E2E with Playwright
 - **Code quality**: `cargo clippy` for Rust, ESLint for TypeScript
 - **PR conventions**: Conventional commits (`feat:`, `fix:`, `perf:`, `refactor:`, `test:`, `docs:`, `ci:`, `build:`, `style:`)
