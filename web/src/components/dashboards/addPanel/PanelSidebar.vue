@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="panel-sidebar-header-collapsed"
       @click="toggleSidebar"
     >
-      <!-- <div class="mt-[10px] text-[20px]">+</div> -->
+      <!-- <div class="mt-2.5 text-xl">+</div> -->
       <OIcon
         name="expand-all" size="sm"
-        class="mt-[10px] text-[20px] rotate-90"
+        class="mt-2.5 text-xl rotate-90"
         data-test="dashboard-sidebar"
       />
       <div
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else
-      class="flex items-center justify-between h-[60px] px-[10px] shrink-0"
+      class="flex items-center justify-between h-15 px-2.5 shrink-0"
       data-test="panel-sidebar-header-expanded"
     >
       <div
@@ -58,8 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator class="-mt-px shrink-0" data-test="panel-sidebar-separator" />
     <div
-      class="scroll"
-      style="height: calc(100vh - 176px); overflow-y: auto;"
+      class="scroll h-[calc(100vh_-_11rem)] overflow-y-auto"
       data-test="panel-sidebar-content"
       v-if="isOpen"
       @scroll.passive="onSidebarScroll"

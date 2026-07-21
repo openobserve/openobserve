@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div
           data-test="rum-upload-source-maps-file-dropzone"
-          class="border-2 border-dashed border-(--o2-border-color) rounded-lg p-8 text-center cursor-pointer transition-all duration-300 bg-(--q-background) hover:border-(--q-primary) dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[rgba(var(--q-primary-rgb),0.05)]"
+          class="border-2 border-dashed border-card-glass-border rounded-default p-8 text-center cursor-pointer transition-all duration-300 bg-surface-base hover:border-theme-accent dark:border-[color-mix(in_srgb,var(--color-white)_10%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]"
           :class="[
-            isDragging ? 'border-(--q-primary)! bg-[rgba(var(--q-primary-rgb),0.05)]! border-solid! dark:bg-[rgba(var(--q-primary-rgb),0.1)]!' : '',
-            field.state.value ? 'p-6! text-left! border-solid! border-(--q-positive)! bg-[rgba(var(--q-positive-rgb),0.02)]! dark:bg-[rgba(var(--q-positive-rgb),0.05)]!' : ''
+            isDragging ? 'border-theme-accent! bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]! border-solid! dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]!' : '',
+            field.state.value ? 'p-6! text-left! border-solid! border-status-positive! bg-[color-mix(in_srgb,var(--color-status-positive)_2%,transparent)]! dark:bg-[color-mix(in_srgb,var(--color-status-positive)_5%,transparent)]!' : ''
           ]"
           @dragover.prevent="isDragging = true"
           @dragleave.prevent="isDragging = false"
@@ -46,15 +46,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-upload-source-maps-file-input"
             type="file"
             accept=".zip"
-            style="display: none"
+            class="hidden"
             @change="onFileInput(field, $event)"
           />
 
           <div v-if="!field.state.value" class="flex flex-col items-center justify-center">
             <OIcon name="backup" size="xl" class="mb-3" />
-            <div class="text-xl font-semibold text-gray-500 mb-2">Drop your file here</div>
-            <div class="text-sm text-gray-400 mb-3">or click to browse</div>
-            <div class="text-xs text-gray-400">.zip files only</div>
+            <div class="text-xl font-semibold text-text-secondary mb-2">Drop your file here</div>
+            <div class="text-sm text-text-secondary mb-3">or click to browse</div>
+            <div class="text-xs text-text-secondary">.zip files only</div>
           </div>
 
           <div v-else class="file-info">
@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center gap-3">
                 <OIcon name="draft" size="lg" />
                 <div>
-                  <div class="text-sm font-medium text-weight-medium">{{ field.state.value.name }}</div>
-                  <div class="text-xs text-gray-400">{{ formatFileSize(field.state.value.size) }}</div>
+                  <div class="text-sm font-medium font-medium">{{ field.state.value.name }}</div>
+                  <div class="text-xs text-text-secondary">{{ formatFileSize(field.state.value.size) }}</div>
                 </div>
               </div>
               <OButton

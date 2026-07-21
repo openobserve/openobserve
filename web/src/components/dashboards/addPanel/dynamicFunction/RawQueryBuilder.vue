@@ -1,5 +1,5 @@
 <template>
-  <div style="width: 100%" data-test="dashboard-raw-query-builder">
+  <div class="w-full" data-test="dashboard-raw-query-builder">
     <div class="query-section" data-test="dashboard-raw-query-section">
       <div class="query-label" data-test="dashboard-raw-query-title">Query</div>
       <div class="query-label text-xs" data-test="dashboard-raw-query-instruction">

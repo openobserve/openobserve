@@ -72,8 +72,8 @@ if (form) {
   );
 }
 
-// Mirror the old updateDateTime() translation: DateTime's event shape →
-// the form's { type, from, to, period } timerange object.
+// Translate DateTime's event shape → the form's { type, from, to, period }
+// timerange object.
 const toTimerange = (dt: any): DateTimeRangeValue => ({
   type: dt.valueType === "relative-custom" ? "relative" : dt.valueType,
   from: dt.startTime,
@@ -93,15 +93,11 @@ const onDateChange = (field: any, dt: any) => {
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div v-if="props.label || props.description" class="mb-2">
-        <div
-          v-if="props.label"
-          style="font-size: 14px"
-          class="font-bold text-gray-500"
-        >
+        <div v-if="props.label" class="text-sm font-bold text-input-label-text">
           {{ props.label
           }}<span v-if="props.required" class="text-input-error-text"> *</span>
         </div>
-        <div v-if="props.description" style="font-size: 12px">
+        <div v-if="props.description" class="text-xs">
           {{ props.description }}
         </div>
       </div>

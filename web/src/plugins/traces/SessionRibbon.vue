@@ -21,16 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-lg border border-[var(--color-border-default)] pt-[1rem] px-[1rem] pb-[0.625rem] flex flex-col"
+    class="bg-card-glass-bg rounded-default border border-border-default pt-4 px-4 pb-2.5 flex flex-col"
     data-test="session-ribbon"
   >
     <!-- Header: title + subtitle (left) · metric toggle (right) -->
-    <div class="flex items-baseline justify-between gap-[0.5rem] mb-[0.75rem]">
+    <div class="flex items-baseline justify-between gap-2 mb-3">
       <div>
-        <div class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]">
+        <div class="text-sm font-semibold text-text-heading">
           {{ t('traces.sessionDetail.ribbon.title') }}
         </div>
-        <div class="text-[0.7rem] leading-normal text-[var(--color-text-secondary)] mt-[0.1rem]">
+        <div class="text-2xs leading-normal text-text-secondary mt-[0.1rem]">
           {{ t('traces.sessionDetail.ribbon.subtitle') }}
         </div>
       </div>
@@ -53,9 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          whole session when it fits, otherwise just the selected window. -->
     <div class="flex flex-col flex-1 min-h-0">
       <!-- chart region: y-axis labels + bars, sharing the grown height -->
-      <div class="flex gap-[0.5rem] flex-1 min-h-0">
+      <div class="flex gap-2 flex-1 min-h-0">
         <div
-          class="flex flex-col justify-between items-end h-full w-[2.75rem] flex-shrink-0 text-[0.6rem] text-[var(--color-text-muted)] tabular-nums"
+          class="flex flex-col justify-between items-end h-full w-11 flex-shrink-0 text-3xs text-text-muted tabular-nums"
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-[3px] border-l border-b border-[var(--color-border-default)]"
+          class="relative flex-1 min-w-0 min-h-0 flex items-end gap-0.75 border-l border-b border-border-default"
         >
           <!-- gridlines (top + mid) to echo the dashboard chart grid -->
-          <div class="absolute inset-x-0 top-0 border-t border-[var(--color-border-default)] opacity-60" />
-          <div class="absolute inset-x-0 top-1/2 border-t border-[var(--color-border-default)] opacity-40" />
+          <div class="absolute inset-x-0 top-0 border-t border-border-default opacity-60" />
+          <div class="absolute inset-x-0 top-1/2 border-t border-border-default opacity-40" />
 
           <TurnPreviewCard
             v-for="bar in detailBars"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :delay="40"
           >
             <div
-              class="relative flex-1 min-w-0 rounded-t-[2px] cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
+              class="relative flex-1 min-w-0 rounded-t-default cursor-pointer transition-[height] duration-300 ease-out hover:brightness-110"
               :style="{ height: bar.pct + '%', background: bar.color }"
               @click="emit('jump', bar.index + 1)"
             />
@@ -89,14 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- x-axis + title, offset by the y-axis column width so the numbers stay
            aligned under their bars. With the window capped at WINDOW turns, every
            visible bar is wide enough to print its turn number. -->
-      <div class="flex gap-[0.5rem] flex-shrink-0">
-        <div class="w-[2.75rem] flex-shrink-0" />
+      <div class="flex gap-2 flex-shrink-0">
+        <div class="w-11 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <div class="flex gap-[3px] mt-[0.25rem]">
+          <div class="flex gap-0.75 mt-1">
             <span
               v-for="bar in detailBars"
               :key="bar.index"
-              class="flex-1 min-w-0 text-center text-[0.6rem] text-[var(--color-text-muted)] tabular-nums"
+              class="flex-1 min-w-0 text-center text-3xs text-text-muted tabular-nums"
             >
               {{ detailLabeled.has(bar.index + 1) ? bar.index + 1 : "" }}
             </span>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- x-axis title — matches the dashboard axis name (nameLocation
                "middle" + nameTextStyle bold/14px). -->
           <div
-            class="text-center text-[14px] font-bold text-[var(--color-text-heading)] mt-[0.25rem]"
+            class="text-center text-sm font-bold text-text-heading mt-1"
           >
             {{ t('traces.sessionDetail.turnLabel') }}
           </div>
@@ -121,12 +121,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          up with the bars above. -->
     <div
       v-if="windowed"
-      class="flex gap-[0.5rem] flex-shrink-0 mt-[0.625rem]"
+      class="flex gap-2 flex-shrink-0 mt-2.5"
     >
-      <div class="w-[2.75rem] flex-shrink-0" />
+      <div class="w-11 flex-shrink-0" />
       <div
         ref="overviewTrackRef"
-        class="relative flex-1 min-w-0 h-[26px] flex items-end gap-[1px] select-none touch-none"
+        class="relative flex-1 min-w-0 h-6.5 flex items-end gap-px select-none touch-none"
         :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
         @pointerdown="onTrackPointerDown"
         data-test="session-ribbon-overview"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="bar in bars"
           :key="bar.index"
-          class="flex-1 min-w-0 rounded-t-[1px] transition-opacity"
+          class="flex-1 min-w-0 rounded-t-default transition-opacity"
           :style="{
             height: Math.max(2, bar.pct) + '%',
             background: bar.color,
@@ -143,24 +143,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- selected window: drag the body to pan, or either edge to resize -->
         <div
-          class="absolute top-0 bottom-0 rounded-[2px] border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
+          class="absolute top-0 bottom-0 rounded-default border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
           :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
           :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
           @pointerdown.stop="(e) => beginDrag('pan', e)"
         >
           <!-- left resize handle (overhangs the edge so it's easy to grab) -->
           <div
-            class="absolute top-0 bottom-0 -left-[4px] w-[9px] cursor-ew-resize flex items-center justify-center"
+            class="absolute top-0 bottom-0 -left-1 w-2.25 cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-left', e)"
           >
-            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
+            <div class="w-0.5 h-[55%] rounded-default bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
           <!-- right resize handle -->
           <div
-            class="absolute top-0 bottom-0 -right-[4px] w-[9px] cursor-ew-resize flex items-center justify-center"
+            class="absolute top-0 bottom-0 -right-1 w-2.25 cursor-ew-resize flex items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-right', e)"
           >
-            <div class="w-[2px] h-[55%] rounded bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
+            <div class="w-0.5 h-[55%] rounded-default bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]" />
           </div>
         </div>
       </div>

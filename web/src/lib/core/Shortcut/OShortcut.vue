@@ -74,7 +74,7 @@ const caps = computed<string[]>(() => {
 });
 
 const sizeClasses: Record<NonNullable<ShortcutProps["size"]>, string> = {
-  sm: "h-5 min-w-5 px-1.5 text-[11px]",
+  sm: "h-5 min-w-5 px-1.5 text-2xs",
   md: "h-6 min-w-6 px-1.5 text-xs",
 };
 </script>
@@ -89,8 +89,8 @@ const sizeClasses: Record<NonNullable<ShortcutProps["size"]>, string> = {
       :key="i"
       :class="[
         'inline-flex items-center justify-center',
-        'rounded border border-kbd-border bg-kbd-bg text-kbd-text',
-        'font-medium leading-none whitespace-nowrap shadow-xs',
+        'rounded-default border border-kbd-border bg-kbd-bg text-kbd-text',
+        'font-medium leading-none whitespace-nowrap shadow-md',
         sizeClasses[size],
       ]"
       >{{ cap }}</kbd

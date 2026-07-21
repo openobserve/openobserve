@@ -5,6 +5,7 @@
     ref="ofieldListRef"
     :fields="visibleFields"
     :search="search"
+    :search-class="searchClass"
     :search-placeholder="t('search.searchField')"
     :current-page="currentPage"
     :page-size="pageSize"
@@ -19,7 +20,7 @@
     <template #group-header="{ row, groupName }">
       <slot name="group-header" :row="row" :group-name="groupName">
         <div
-          class="h-full w-full flex justify-between items-center rounded-[0.25rem] font-semibold text-xs px-[0.325rem] cursor-pointer bg-surface-subtle text-field-list-group-text"
+          class="h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs cursor-pointer bg-surface-subtle text-field-list-group-text"
           @click="toggleGroup(row.group)"
         >
           <div class="flex-1 min-w-0">
@@ -50,7 +51,7 @@
       <slot name="empty">
         <div class="text-center py-[0.725rem] flex items-center justify-center">
           <OIcon name="info" size="xs" />
-          <span class="pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+          <span class="pl-1.5">{{ t("search.noFieldFound") }}</span>
         </div>
       </slot>
     </template>
@@ -84,6 +85,8 @@ const { t } = useI18n();
 interface Props {
   fields: any[];
   search?: string;
+  /** Passed to OFieldList so the owning panel can inset the search control. */
+  searchClass?: string;
   loading?: boolean;
   theme?: string;
   currentPage?: number;
@@ -93,6 +96,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   search: "",
+  searchClass: "",
   loading: false,
   theme: "light",
   currentPage: 1,

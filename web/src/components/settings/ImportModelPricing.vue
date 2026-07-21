@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -31,11 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
-          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
           {{ t('modelPricing.errorValidations') }}
         </div>
-        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">{{ t('modelPricing.outputMessages') }}</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('modelPricing.outputMessages') }}</div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="flex-1 min-h-0 overflow-auto resize-none">
           <!-- Model Pricing Errors Section -->
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span
                     data-test="model-pricing-import-name-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'model_pricing_name'
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <span
                     data-test="model-pricing-import-pattern-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'model_pricing_pattern'
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </span>
-                  <span class="text-red" v-else>{{ errorMessage }}</span>
+                  <span class="text-status-negative" v-else>{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
@@ -113,11 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{
                   'py-1.25 text-sm font-bold': true,
                   'text-green ': val.success,
-                  'text-red': !val.success,
+                  'text-status-negative': !val.success,
                 }"
                 :data-test="`model-pricing-import-creation-${index}-message`"
               >
-                <pre class="creators-message" style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; max-width: 100%;">{{ val.message }}</pre>
+                <pre class="creators-message whitespace-pre-wrap max-w-full" style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;">{{ val.message }}</pre>
               </div>
             </div>
           </div>

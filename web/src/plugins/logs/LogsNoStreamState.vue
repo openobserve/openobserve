@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="storage"
           :data-test="`logs-no-stream-recent-${stream}`"
           @click="emit('pick-stream', stream)"
-        ><span class="truncate max-w-[10rem]">{{ stream }}</span></EmptyStateIngestionChip>
+        ><span class="truncate max-w-40">{{ stream }}</span></EmptyStateIngestionChip>
       </div>
     </template>
   </OEmptyState>

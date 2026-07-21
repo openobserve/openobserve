@@ -15,15 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full">
+  <div class="trace-details-sidebar flex flex-col h-full">
     <div
-      class="flex justify-start items-center pl-3 pr-2 h-[2rem] border-b border-solid border-b-[var(--o2-border-color)] bg-surface-panel"
+      class="flex justify-start items-center px-page-edge h-8 border-b border-solid border-b-card-glass-border bg-surface-panel"
       data-test="trace-details-sidebar-header"
     >
       <div
         :title="span.operation_name"
-        :style="{ width: 'calc(100% - 24px)' }"
-        class="pb-0 pl-[0.25rem] truncate flex items-center"
+        class="w-[calc(100%-1.5rem)] pb-0 pl-1 truncate flex items-center"
         data-test="trace-details-sidebar-header-operation-name"
       >
         <!-- Status Code Badge -->
@@ -35,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="error"
             size="sm"
-            class="mr-1 text-[var(--o2-status-error-text)]!"
+            class="mr-1 text-status-error-text!"
           />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
@@ -60,33 +59,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     <div
-      class="trace-details-toolbar-container bg-[rgba(248,249,250,0.5)] whitespace-nowrap"
+      class="trace-details-toolbar-container bg-surface-panel/50 whitespace-nowrap"
       data-test="trace-details-sidebar-header-toolbar"
     >
       <!-- Row 1: Trace Details -->
-      <div
-        class="flex items-center justify-between p-1"
-        style="overflow-x: auto; flex-wrap: nowrap"
-      >
-        <div class="flex items-center" style="flex-wrap: nowrap">
+      <div class="flex items-center justify-between p-1 overflow-x-auto flex-nowrap">
+        <div class="flex items-center flex-nowrap">
           <!-- Service Badge -->
           <OTag
             type="metricChip"
-            class="toolbar-chip service-chip mr-[0.325rem]"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-blue-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
             <template #icon>
               <img
                 :src="serviceIconUrl"
-                class="w-[0.875rem] h-[0.875rem] shrink-0"
+                class="w-3.5 h-3.5 shrink-0"
                 aria-hidden="true"
                 alt=""
               />
             </template>
-            <span class="chip-label">{{ t('traces.traceDetailsSidebar.service') }}</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.service') }}</span>
             <span
-              class="chip-value"
+              class="text-3xs font-semibold text-text-body"
               data-test="trace-details-sidebar-header-toolbar-service-name"
             >
               {{ span.service_name }}
@@ -96,51 +92,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Duration Badge -->
           <OTag
             type="metricChip"
-            class="toolbar-chip duration-chip mr-[0.325rem]"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-indigo-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
-            <span class="chip-label">{{ t('traces.traceDetailsSidebar.duration') }}</span>
-            <span class="chip-value">{{ getDuration }}</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.duration') }}</span>
+            <span class="text-3xs font-semibold text-text-body">{{ getDuration }}</span>
           </OTag>
 
           <!-- TTFT Badge -->
           <OTag
             v-if="getTTFT"
             type="metricChip"
-            class="toolbar-chip ttft-chip mr-[0.325rem]"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-purple-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
-            <span class="chip-label">TTFT</span>
-            <span class="chip-value">{{ getTTFT }}</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">TTFT</span>
+            <span class="text-3xs font-semibold text-text-body">{{ getTTFT }}</span>
           </OTag>
 
           <!-- Start Time Badge -->
           <OTag
             type="metricChip"
-            class="toolbar-chip time-chip mr-[0.325rem]"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-amber-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
-            <span class="chip-label">{{ t('traces.traceDetailsSidebar.start') }}</span>
-            <span class="chip-value">{{ getStartTime }}</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.start') }}</span>
+            <span class="text-3xs font-semibold text-text-body">{{ getStartTime }}</span>
           </OTag>
 
           <!-- Resend Count Badge -->
           <OTag
             v-if="spanHttpResendCount"
             type="metricChip"
-            class="toolbar-chip resend-chip mr-[0.325rem]"
+            class="text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default shrink-0 transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="t('traces.traceDetailsSidebar.requestResent', { count: spanHttpResendCount })"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
-            <span class="chip-label">{{ t('traces.traceDetailsSidebar.resends') }}</span>
-            <span class="chip-value">{{ spanHttpResendCount }}</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.resends') }}</span>
+            <span class="text-3xs font-semibold text-text-body">{{ spanHttpResendCount }}</span>
           </OTag>
         </div>
 
@@ -149,17 +145,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             clickable
-            class="toolbar-chip span-id-chip mr-[0.325rem]"
+            class="group text-2xs h-5.5 px-1.5 mr-[0.325rem] bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-teal-ol-border shrink-0 cursor-pointer transition-all duration-200 hover:-translate-y-px hover:bg-surface-panel"
             :title="t('traces.traceDetailsSidebar.spanIdTitle', { id: span.span_id })"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
           >
             <template #icon><OIcon name="tag" size="xs" /></template>
-            <span class="chip-value">{{ span.span_id }}</span>
+            <span class="text-3xs font-semibold text-text-body">{{ span.span_id }}</span>
             <OIcon
               name="content-copy"
               size="xs"
-              class="ml-1 copy-icon"
+              class="ml-1 opacity-60 transition-opacity duration-200 group-hover:opacity-100"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
           </OTag>
@@ -174,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="outline"
                 size="xs"
-                class="h-full text-[0.75rem]!"
+                class="h-full text-xs!"
                 :disabled="isViewLogsDisabled"
                 :loading="config.isEnterprise === 'true' && correlationLoading"
                 @click.stop="viewSpanLogs"
@@ -191,46 +187,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Row 2: LLM Metrics (conditional) -->
       <div
         v-if="isLLMSpan && llmMetrics && span.gen_ai_response_model"
-        class="flex items-center justify-between p-1 llm-metrics-row"
-        style="
-          overflow-x: auto;
-          flex-wrap: nowrap;
-          border-top: 1px solid #e9ecef;
-        "
+        class="flex items-center justify-between p-1 llm-metrics-row overflow-x-auto flex-nowrap border-t border-solid border-border-default"
       >
-        <div class="flex items-center" style="flex-wrap: nowrap">
+        <div class="flex items-center flex-nowrap">
           <!-- Model Chip -->
           <OTag
             type="metricChip"
             icon="psychology"
-            class="llm-chip model-chip"
+            class="text-3xs h-5 px-1.5 bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-purple-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px"
             :title="span.gen_ai_response_model"
           >
-            <span class="chip-value font-bold">{{ span.gen_ai_response_model }}</span>
+            <span class="text-3xs font-semibold text-badge-purple-ol-text">{{ span.gen_ai_response_model }}</span>
           </OTag>
 
           <!-- Token Usage Group -->
-          <div class="tokens-group">
+          <div class="inline-flex gap-0.75 shrink-0">
             <!-- Input Tokens -->
             <OTag
               type="metricChip"
-              class="llm-chip token-chip input-token-chip"
+              class="text-3xs h-5 px-1.5 min-w-15 justify-center bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-blue-ol-border text-badge-blue-ol-text shrink-0 transition-all duration-200 hover:-translate-y-px"
               :title="t('traces.traceDetailsSidebar.inputTokens')"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
-              <span class="chip-label">{{ t('traces.traceDetailsSidebar.in') }}</span>
-              <span class="chip-value">{{ llmMetrics.usage.input }}</span>
+              <span class="text-3xs font-medium mr-0.5">{{ t('traces.traceDetailsSidebar.in') }}</span>
+              <span class="text-3xs font-medium">{{ llmMetrics.usage.input }}</span>
             </OTag>
 
             <!-- Output Tokens -->
             <OTag
               type="metricChip"
-              class="llm-chip token-chip output-token-chip"
+              class="text-3xs h-5 px-1.5 min-w-15 justify-center bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-success-ol-border text-badge-success-ol-text shrink-0 transition-all duration-200 hover:-translate-y-px"
               :title="t('traces.traceDetailsSidebar.outputTokens')"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
-              <span class="chip-label">{{ t('traces.traceDetailsSidebar.out') }}</span>
-              <span class="chip-value">{{ llmMetrics.usage.output }}</span>
+              <span class="text-3xs font-medium mr-0.5">{{ t('traces.traceDetailsSidebar.out') }}</span>
+              <span class="text-3xs font-medium">{{ llmMetrics.usage.output }}</span>
             </OTag>
           </div>
 
@@ -238,10 +229,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             icon="attach-money"
-            class="llm-chip cost-chip"
+            class="text-3xs h-5 px-1.5 bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-orange-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.totalCost')"
           >
-            <span class="chip-value font-bold"
+            <span class="text-3xs font-semibold text-badge-orange-ol-text"
               >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
           </OTag>
@@ -252,13 +243,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="span.gen_ai_provider_name"
             type="metricChip"
-            class="provider-badge"
+            class="text-3xs font-semibold px-2 py-0.75 bg-badge-blue-solid-bg text-badge-blue-solid-text rounded-full uppercase tracking-wide shrink-0"
           >{{ span.gen_ai_provider_name }}</OTag>
         </div>
       </div>
     </div>
 
-    <div class="font-bold mx-2 span_details_tabs ">
+    <div class="px-page-edge span_details_tabs">
       <OTabs
         v-model="activeTab"
         dense
@@ -270,24 +261,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="isLLMSpan"
           name="preview"
           :label="t('traces.traceDetailsSidebar.preview')"
-          style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-preview"
-                    class="font-normal!"
+                    class="font-normal! capitalize"
 
         />
 
         <OTab
           name="attributes"
           :label="t('common.attributes')"
-          style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-attributes"
-          class="font-normal!"
+          class="font-normal! capitalize"
         />
         <OTab
           name="error"
-          style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-error"
-          class="font-normal! gap-1!"
+          class="font-normal! gap-1! capitalize"
         >
           {{ t('common.error') }}
           <OTag
@@ -302,24 +290,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="hasDbSpan"
           name="database"
           :label="t('common.db')"
-          style="text-transform: capitalize"
-          class="font-normal!"
+          class="font-normal! capitalize"
           data-test="trace-details-sidebar-tabs-database"
         />
         <OTab
           name="events"
           :label="t('common.events')"
-          style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-events"
-                    class="font-normal!"
+                    class="font-normal! capitalize"
 
         />
         <OTab
           name="links"
           :label="t('common.links')"
-          style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-links"
-          class="font-normal!"
+          class="font-normal! capitalize"
 
         />
         <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
@@ -327,23 +312,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
           name="correlated-logs"
           :label="t('correlation.correlatedLogs')"
-          style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-correlated-logs"
-          class="font-normal!"
+          class="font-normal! capitalize"
 
         />
         <OTab
           v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
           name="correlated-metrics"
           :label="t('correlation.correlatedMetrics')"
-          style="text-transform: capitalize"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
-          class="font-normal!"
+          class="font-normal! capitalize"
         />
       </OTabs>
     </div>
     <OSeparator class="w-full" />
-    <div class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden p-2">
+    <div
+      class="span_details_tab-panels h-[calc(100%-6rem)] overflow-hidden"
+      :class="
+        activeTab === 'correlated-logs' || activeTab === 'correlated-metrics'
+          ? ''
+          : 'px-page-edge py-2'
+      "
+    >
       <OTabPanels v-model="activeTab"
 grow
 class="h-full overflow-y-auto">
@@ -357,13 +347,12 @@ class="h-full overflow-y-auto">
             <!-- Input and Output Side by Side -->
             <div
               class="flex io-container w-full! h-full!"
-              :class="{ 'io-container-dark': isDarkMode }"
               ref="ioContainerRef"
             >
               <!-- Input Section -->
-              <div class="w-1/2 io-section pr-[0.5rem]">
+              <div class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full pr-2">
                 <div
-                  class="section-label font-bold mb-1 flex items-center justify-between"
+                  class="section-label font-bold mb-2 flex items-center justify-between text-text-heading text-sm"
                 >
                   <div>{{ t('traces.traceDetailsSidebar.input') }}</div>
                   <div class="flex items-center gap-1">
@@ -391,7 +380,7 @@ class="h-full overflow-y-auto">
                     </OButton>
                   </div>
                 </div>
-                <div class="llm-content-box">
+                <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
                   <!-- System Instructions (when available) -->
                   <div v-if="parsedSystemInstructions" class="mb-3">
                     <OCollapsible
@@ -399,7 +388,7 @@ class="h-full overflow-y-auto">
                       icon="settings"
                       :label="t('traces.traceDetailsSidebar.systemInstructions')"
                     >
-                      <div class="p-2 bg-[var(--o2-code-bg)]">
+                      <div class="p-2 bg-code-bg">
                         <LLMContentRenderer
                           :content="JSON.stringify([{ role: 'system', content: parsedSystemInstructions }])"
                           :observation-type="span.gen_ai_operation_name"
@@ -411,7 +400,7 @@ class="h-full overflow-y-auto">
                   </div>
                   <div
                     v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
-                    class="no-data-message"
+                    class="text-text-secondary italic text-center p-8 text-sm"
                   >
                     {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
 </div>
@@ -428,9 +417,9 @@ class="h-full overflow-y-auto">
               </div>
 
               <!-- Output Section -->
-              <div class="w-1/2 io-section">
+              <div class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full">
                 <div
-                  class="section-label font-bold mb-1 flex items-center justify-between"
+                  class="section-label font-bold mb-2 flex items-center justify-between text-text-heading text-sm"
                 >
                   <div>{{ t('traces.traceDetailsSidebar.output') }}</div>
                   <div class="flex items-center gap-1">
@@ -458,10 +447,10 @@ class="h-full overflow-y-auto">
                     </OButton>
                   </div>
                 </div>
-                <div class="llm-content-box">
+                <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
                   <div
                     v-if="!hasContent(span.gen_ai_output_messages)"
-                    class="no-data-message"
+                    class="text-text-secondary italic text-center p-8 text-sm"
                   >
                     {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
 </div>
@@ -485,7 +474,7 @@ class="h-full overflow-y-auto">
               :label="t('traces.traceDetailsSidebar.modelParameters')"
               class="mt-3"
             >
-              <pre class="model-params-json p-2">{{
+              <pre class="bg-code-bg p-4 rounded-default overflow-x-auto font-mono text-xs m-0">{{
                 formatModelParams(span.llm_request_parameters)
               }}</pre>
             </OCollapsible>
@@ -498,10 +487,10 @@ class="h-full overflow-y-auto">
         >
           <!-- View mode toggle toolbar -->
           <div class="flex items-center justify-start pb-1.5! h-fit!">
-            <OToggleGroup v-model="attributesViewMode" class="rounded!">
+            <OToggleGroup v-model="attributesViewMode" class="rounded-default!">
               <OToggleGroupItem value="json"
 size="xs"
-class="h-5! text-[0.75rem]!">
+class="h-5! text-xs!">
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
@@ -509,7 +498,7 @@ class="h-5! text-[0.75rem]!">
               </OToggleGroupItem>
               <OToggleGroupItem value="table"
 size="xs"
-class="h-5! text-[0.75rem]!">
+class="h-5! text-xs!">
                 <template #icon-left
                   ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
@@ -552,7 +541,7 @@ class="h-5! text-[0.75rem]!">
                         </OIcon>
                       </OButton>
                     </span>
-                    <span class="text-[0.85rem]!">{{
+                    <span class="text-sm!">{{
                       $t("traces.applyAndSearch")
                     }}</span>
                   </li>
@@ -563,7 +552,7 @@ class="h-5! text-[0.75rem]!">
           <!-- Table View -->
           <div
             v-else
-            class="flex-1 overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--o2-border-color)]"
+            class="flex-1 overflow-hidden tab-content-dynamic-height border-1 border-solid border-card-glass-border"
             :class="
               isLLMSpan && llmMetrics && span.gen_ai_response_model
                 ? '[height:calc(100vh-312px)]'
@@ -609,7 +598,7 @@ class="h-5! text-[0.75rem]!">
                             </OIcon>
                           </OButton>
                         </span>
-                        <span class="text-[0.85rem]!">{{
+                        <span class="text-sm!">{{
                           $t("traces.applyAndSearch")
                         }}</span>
                       </li>
@@ -636,7 +625,7 @@ class="h-5! text-[0.75rem]!">
             </div>
             <!-- TenstackTable for events -->
             <div
-              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-[var(--o2-border-color)] rounded"
+              class="flex-1 traces-events-table-container overflow-hidden tab-content-dynamic-height border-1 border-solid border-card-glass-border rounded-default"
               :class="
                 isLLMSpan && llmMetrics && span.gen_ai_response_model
                   ? '[height:calc(100vh-312px)]'
@@ -663,26 +652,22 @@ class="h-5! text-[0.75rem]!">
                 <template #expanded-row="{ row }">
                   <json-preview
                     :value="row"
-                    class="py-[0.375rem] pl-[0.375rem]"
-                    copyButtonClass="left-[0.25rem]! w-fit! sticky!"
+                    class="py-1.5 pl-1.5"
+                    copyButtonClass="left-1! w-fit! sticky!"
                     mode="expanded"
                   />
                 </template>
               </TenstackTable>
             </div>
           </template>
-          <div
+          <OEmptyState
             v-else
-            class="w-full text-center flex items-center justify-center pt-4 font-bold tab-content-dynamic-height"
-            :class="
-              isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? '[height:calc(100vh-312px)]'
-                : '[height:calc(100vh-276px)]'
-            "
+            size="inline"
+            variant="no-results"
+            :title="t('traces.noEventsPresent')"
+            hide-action
             data-test="trace-details-sidebar-no-events"
-          >
-            {{ t('traces.traceDetailsSidebar.noEvents') }}
-          </div>
+          />
         </OTabPanel>
         <OTabPanel name="error" class="h-full">
           <TraceErrorTab
@@ -700,19 +685,18 @@ class="h-5! text-[0.75rem]!">
         </OTabPanel>
 
         <OTabPanel name="links">
-          <div v-if="spanLinks.length" class="overflow-auto max-h-[20rem]">
+          <div v-if="spanLinks.length" class="overflow-auto max-h-80">
             <table
-              class="trace-detail-tab-table border border-solid border-[var(--o2-border-color)] w-full"
+              class="trace-detail-tab-table border border-solid border-card-glass-border w-full"
               data-test="trace-details-sidebar-links-table"
             >
               <thead
-                class="thead-sticky text-left bg-(--color-surface-accent)"
+                class="thead-sticky text-left bg-surface-accent"
               >
                 <tr>
                   <th
                     v-for="(col, index) in linkColumns"
                     :key="'result_' + index"
-                    class="table-header"
                     :data-test="`trace-events-table-th-${col.label}`"
                   >
                     {{ col.label }}
@@ -727,14 +711,12 @@ class="h-5! text-[0.75rem]!">
                   tabindex="0"
                   @click="openReferenceTrace('span', row)"
                   @keydown="onLinkRowKeydown($event, row)"
-                  style="cursor: pointer"
-                  class="pointer focus-visible:outline-none focus-visible:bg-(--color-surface-accent)"
+                  class="pointer cursor-pointer focus-visible:outline-none focus-visible:bg-surface-accent"
                 >
                   <td
                     v-for="column in linkColumns"
                     :key="index + '-' + column.name"
-                    class="p-0 mb-0.5 relative overflow-visible cursor-default"
-                    style="cursor: pointer"
+                    class="p-0 mb-0.5 relative overflow-visible cursor-pointer"
                   >
                     <div class="flex flex items-center flex-nowrap">
                       {{ column.prop(row) }}
@@ -744,24 +726,20 @@ class="h-5! text-[0.75rem]!">
               </tbody>
             </table>
           </div>
-          <div
+          <OEmptyState
             v-else
-            class="w-full flex items-center justify-center text-center pt-4 font-bold tab-content-dynamic-height"
-            :class="
-              isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? '[height:calc(100vh-312px)]'
-                : '[height:calc(100vh-276px)]'
-            "
+            size="inline"
+            variant="no-results"
+            :title="t('traces.noLinksPresent')"
+            hide-action
             data-test="trace-details-sidebar-no-links"
-          >
-            {{ t('traces.traceDetailsSidebar.noLinks') }}
-          </div>
+          />
         </OTabPanel>
 
         <!-- Correlated Logs Tab Panel -->
         <OTabPanel
           name="correlated-logs"
-          class="p-0 full-height traces-correlated-logs-container"
+          class="p-0 h-full max-h-full overflow-hidden traces-correlated-logs-container"
         >
           <CorrelatedLogsTable
             v-if="correlationProps"
@@ -785,12 +763,7 @@ class="h-5! text-[0.75rem]!">
           <!-- Loading/Empty state when no data -->
           <div
             v-else
-            class="flex items-center justify-center py-20 tab-content-dynamic-height"
-            :class="
-              isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? '[height:calc(100vh-312px)]'
-                : '[height:calc(100vh-276px)]'
-            "
+            class="flex items-center justify-center py-20 h-full"
           >
             <div class="text-center">
               <OSpinner
@@ -800,11 +773,11 @@ class="h-5! text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="text-[0.875rem] font-bold"
+                class="text-sm font-bold"
               >
                 {{ correlationError }}
               </div>
-              <div v-else class="text-base text-gray-500">
+              <div v-else class="text-base text-text-muted">
                 {{ t("correlation.clickToLoadLogs") }}
               </div>
             </div>
@@ -814,7 +787,7 @@ class="h-5! text-[0.75rem]!">
         <!-- Correlated Metrics Tab Panel -->
         <OTabPanel
           name="correlated-metrics"
-          class="p-0 full-height traces-correlated-metrics-container"
+          class="p-0 h-full max-h-full overflow-hidden traces-correlated-metrics-container"
         >
           <TelemetryCorrelationDashboard
             v-if="correlationProps"
@@ -843,12 +816,7 @@ class="h-5! text-[0.75rem]!">
           <!-- Loading/Empty state when no data -->
           <div
             v-else
-            class="flex items-center justify-center py-20 tab-content-dynamic-height"
-            :class="
-              isLLMSpan && llmMetrics && span.gen_ai_response_model
-                ? '[height:calc(100vh-312px)]'
-                : '[height:calc(100vh-276px)]'
-            "
+            class="flex items-center justify-center py-20 h-full"
           >
             <div class="text-center">
               <OSpinner
@@ -858,11 +826,11 @@ class="h-5! text-[0.75rem]!">
               />
               <div
                 v-else-if="correlationError"
-                class="text-[0.875rem] font-bold"
+                class="text-sm font-bold"
               >
                 {{ correlationError }}
               </div>
-              <div v-else class="text-base text-gray-500">
+              <div v-else class="text-base text-text-muted">
                 {{ t("correlation.clickToLoadMetrics") }}
               </div>
             </div>
@@ -884,12 +852,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
 import {
@@ -1003,6 +973,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OCollapsible,
+    OEmptyState,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
@@ -1087,16 +1058,6 @@ export default defineComponent({
     const { buildQueryDetails, navigateToLogs, navigateToCorrelatedLogs, searchObj } = useTraces();
     const router = useRouter();
 
-    // JSON syntax highlighting colors - using CSS variables for theme-aware colors
-    const themeColors = {
-      key: "var(--o2-json-key)",
-      stringValue: "var(--o2-json-string)",
-      numberValue: "var(--o2-json-number)",
-      booleanValue: "var(--o2-json-boolean)",
-      nullValue: "var(--o2-json-null)",
-      objectValue: "var(--o2-json-object)",
-    };
-
     const highlightTextMatch = (text: string, query: string): string => {
       if (!query) return escapeHtml(text);
       try {
@@ -1105,50 +1066,51 @@ export default defineComponent({
         const regex = new RegExp(`(${escapedQuery})`, "gi");
         return escapeHtml(text).replace(
           regex,
-          (match) => `<span class="highlight">${match}</span>`,
+          (match) => `<span class="trace-sidebar-highlight">${match}</span>`,
         );
       } catch (e) {
         return escapeHtml(text);
       }
     };
 
+    // Emits class names only — the colours live in the style block below, driven
+    // by the registered --color-json-* tokens, so the output themes itself.
     const highlightedJSON = (value) => {
-      const colors = themeColors;
       const attrs = value;
       const query = props.searchQuery;
 
       const formatValue = (value: any): string => {
         if (value === null) {
-          return `<span style="color: ${colors.nullValue};">${highlightTextMatch("null", query)}</span>`;
+          return `<span class="trace-json-null">${highlightTextMatch("null", query)}</span>`;
         } else if (typeof value === "boolean") {
-          return `<span style="color: ${colors.booleanValue};">${highlightTextMatch(String(value), query)}</span>`;
+          return `<span class="trace-json-boolean">${highlightTextMatch(String(value), query)}</span>`;
         } else if (typeof value === "number") {
-          return `<span style="color: ${colors.numberValue};">${highlightTextMatch(String(value), query)}</span>`;
+          return `<span class="trace-json-number">${highlightTextMatch(String(value), query)}</span>`;
         } else if (typeof value === "string") {
-          return `<span style="color: ${colors.stringValue};">"${highlightTextMatch(value, query)}"</span>`;
+          return `<span class="trace-json-string">"${highlightTextMatch(value, query)}"</span>`;
         } else if (typeof value === "object") {
-          return `<span style="color: ${colors.objectValue};">"${highlightTextMatch(JSON.stringify(value), query)}"</span>`;
+          return `<span class="trace-json-object">"${highlightTextMatch(JSON.stringify(value), query)}"</span>`;
         }
         return highlightTextMatch(String(value), query);
       };
 
       const lines: string[] = [];
-      lines.push('<span style="color: #9ca3af;">{</span>');
+      lines.push('<span class="trace-json-punct">{</span>');
 
       const entries = Object.entries(attrs);
       entries.forEach(([key, value], index) => {
-        const keyHtml = `<span style="color: ${colors.key};">"${escapeHtml(key)}"</span>`;
+        const keyHtml = `<span class="trace-json-key">"${escapeHtml(key)}"</span>`;
         const valueHtml = formatValue(value);
         const comma =
           index < entries.length - 1
-            ? '<span style="color: #9ca3af;">,</span>'
+            ? '<span class="trace-json-punct">,</span>'
             : "";
         lines.push(
-          `  ${keyHtml}<span style="color: #9ca3af;">:</span> ${valueHtml}${comma}`,
+          `  ${keyHtml}<span class="trace-json-punct">:</span> ${valueHtml}${comma}`,
         );
       });
 
-      lines.push('<span style="color: #9ca3af;">}</span>');
+      lines.push('<span class="trace-json-punct">}</span>');
       return lines.join("\n");
     };
 
@@ -1202,9 +1164,9 @@ export default defineComponent({
         size: 200,
         meta: {
           headerClass:
-            "border-b border-r border-b-[var(--o2-border-color)]",
+            "border-b border-r border-b-card-glass-border",
           cellClass:
-            "border-r border-b-[var(--o2-border-color)] text-[var(--o2-json-key)]",
+            "border-r border-b-card-glass-border text-json-key",
         },
       },
       {
@@ -1214,8 +1176,8 @@ export default defineComponent({
         size: 400,
         meta: {
           slot: true,
-          headerClass: "border-b border-b-[var(--o2-border-color)]",
-          cellClass: "border-b-[var(--o2-border-color)] p-0!",
+          headerClass: "border-b border-b-card-glass-border",
+          cellClass: "border-b-card-glass-border p-0!",
         },
       },
     ];
@@ -1283,8 +1245,8 @@ export default defineComponent({
       spanDetails.value = getFormattedSpanDetails();
     });
 
-    // Get current theme from store
-    const isDarkMode = computed(() => store.state.theme === "dark");
+    // Get current theme via the sanctioned dark-mode seam
+    const { isDark: isDarkMode } = useTheme();
 
     // Check if View Logs button should be disabled
     const isViewLogsDisabled = computed(() => {
@@ -1396,8 +1358,8 @@ export default defineComponent({
             ),
           meta: {
             headerClass:
-              "border-b border-r border-b-[var(--o2-border-color)]",
-            cellClass: "border-r border-b-[var(--o2-border-color)]",
+              "border-b border-r border-b-card-glass-border",
+            cellClass: "border-r border-b-card-glass-border",
           },
         });
         allKeys.delete(tsCol);
@@ -1424,8 +1386,8 @@ export default defineComponent({
           },
           meta: {
             headerClass:
-              "border-b border-r border-b-[var(--o2-border-color)]",
-            cellClass: "border-r border-b-[var(--o2-border-color)]",
+              "border-b border-r border-b-card-glass-border",
+            cellClass: "border-r border-b-card-glass-border",
           },
         });
       });
@@ -1839,7 +1801,7 @@ export default defineComponent({
           // Use filters from logStreams[0] as matchedDimensions — these contain
           // the correct field names for the log stream (e.g., k8s_namespace_name)
           // instead of semantic IDs (k8s-namespace) or trace field names
-          // (service_k8s_namespace_name). Same fix as 9127b6172 for incidents.
+          // (service_k8s_namespace_name).
           const logFilters =
             correlationData.related_streams.logs?.[0]?.filters || {};
           const actualMatchedDimensions =
@@ -2066,7 +2028,7 @@ export default defineComponent({
     const serviceIconUrl = computed(() =>
       getServiceIconDataUrl(
         props.span?.service_name ?? "",
-        store.state.theme === "dark",
+        isDarkMode.value,
         props.span
           ? getOrSetServiceColor(resolveSpanIdentity(props.span))
           : "#9e9e9e",
@@ -2148,648 +2110,213 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.attributes-view-toggle .q-btn {
-  padding: 0.25rem 0.5rem;
+<style lang="scss" scoped>
+/* keep(complex-state): Deliberate CSS — generated content the template can't class up,
+   child-component internals reached with :deep(), :fullscreen chains, and
+   scrollbar rails. */
+
+/* generated-content — highlightedJSON()/highlightTextMatch() build these spans
+   as HTML strings, so scoped classes can't reach them; colours come from the
+   registered --color-json-* tokens and flip with the theme on their own. */
+.trace-details-sidebar {
+  :deep(.trace-json-key) {
+    color: var(--color-json-key);
+  }
+
+  :deep(.trace-json-string) {
+    color: var(--color-json-string);
+  }
+
+  :deep(.trace-json-number) {
+    color: var(--color-json-number);
+  }
+
+  :deep(.trace-json-boolean) {
+    color: var(--color-json-boolean);
+  }
+
+  :deep(.trace-json-null) {
+    color: var(--color-json-null);
+  }
+
+  :deep(.trace-json-object) {
+    color: var(--color-json-object);
+  }
+
+  :deep(.trace-json-punct) {
+    color: var(--color-text-label);
+  }
+
+  :deep(.trace-sidebar-highlight) {
+    background-color: var(--color-table-highlight-bg);
+  }
 }
 
-.span_details_tab-panels .o-tab-panel {
+/* .trace-detail-tab-table is also worn by TraceErrorTab.vue's table, which only
+   ever renders inside this sidebar — anchoring under the root keeps both
+   reachable without the bare th/td restyle leaking app-wide. */
+.trace-details-sidebar :deep(.trace-detail-tab-table) {
+  th,
+  td {
+    border-bottom: 1px solid var(--color-table-row-divider);
+    border-right: 1px solid var(--color-table-row-divider);
+    text-align: left;
+    padding: 0.5rem;
+    font-size: var(--text-compact);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    min-height: 1.5rem;
+    height: auto;
+    max-width: 37.5rem;
+  }
+
+  th {
+    background-color: var(--color-surface-panel);
+  }
+
+  th:first-child,
+  td:first-child {
+    width: 12.5rem;
+    min-width: 12.5rem;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: auto;
+    min-width: 6.25rem;
+  }
+
+  th:last-child,
+  td:last-child {
+    border-right: none;
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  td span {
+    display: inline-block;
+    width: 100%;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+  }
+
+  tbody tr:first-child {
+    td:first-child {
+      border-top-left-radius: var(--radius-surface);
+    }
+
+    td:last-child {
+      border-top-right-radius: var(--radius-surface);
+    }
+  }
+
+  tbody tr:last-child {
+    td:first-child {
+      border-bottom-left-radius: var(--radius-surface);
+    }
+
+    td:last-child {
+      border-bottom-right-radius: var(--radius-surface);
+    }
+  }
+}
+
+/* scrollbar — both toolbar rows overflow horizontally */
+.trace-details-toolbar-container > div {
+  &::-webkit-scrollbar {
+    height: 0.25rem;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-scrollbar-thumb);
+    border-radius: 0.125rem;
+
+    &:hover {
+      background: var(--color-scrollbar-thumb-hover);
+    }
+  }
+}
+
+/* complex-state — :fullscreen chains on the LLM input/output panes */
+.llm-preview-container {
+  .io-container:fullscreen {
+    background-color: var(--color-surface-panel);
+    padding: 0.75rem;
+    height: 100vh;
+    max-height: 100vh;
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+
+    .io-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+
+      .section-label {
+        background: var(--color-surface-panel);
+        border-radius: var(--radius-default);
+      }
+
+      .llm-content-box {
+        height: calc(100vh - 5rem);
+        max-height: unset;
+        min-height: unset;
+      }
+    }
+  }
+
+  /* generated-content — LLMContentRenderer output rendered inside the box */
+  :deep(.llm-content-box .plain-text-content:hover) {
+    background-color: var(--color-interactive-hover-bg) !important;
+  }
+
+  /* lib-override:vue-json-pretty — suppress the library's own row hover */
+  :deep(.llm-content-box .vjs-tree *:hover) {
+    background-color: transparent !important;
+  }
+}
+
+/* child-component internals */
+.span_details_tab-panels :deep(.o-tab-panel) {
   height: 100%;
 }
 
-.traces-correlated-metrics-container .q-splitter--vertical .q-splitter__separator {
+.traces-correlated-metrics-container {
+  :deep(.dimension-sidebar) {
+    padding-left: 0.25rem;
+  }
+
+  :deep(.dimension-sidebar-search-container) {
+    padding: 0.375rem 0.2rem !important;
+  }
+}
+
+.traces-correlated-logs-container :deep(.logs-table-container .o2-scroll-container) {
   height: 100% !important;
 }
 
-.traces-correlated-metrics-container .q-card {
-  box-shadow: none !important;
-  border: 1px solid var(--o2-border) !important;
-}
-
-.traces-correlated-metrics-container .card-container {
-  box-shadow: none !important;
-}
-
-.traces-correlated-metrics-container .dimension-sidebar {
-  padding-left: 0.25rem;
-}
-
-.traces-correlated-metrics-container .dimension-sidebar-search-container {
-  padding: 0.375rem 0.2rem !important;
-}
-
-.traces-correlated-logs-container .logs-table-container .o2-scroll-container {
-  height: 100% !important;
-}
-
-.traces-events-table-container .table-container {
+.traces-events-table-container :deep(.table-container) {
   border-radius: 0 !important;
 }
-
-.trace-detail-tab-table table {
-  border-collapse: separate;
-  border-spacing: 0;
-  width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(0.625rem);
-  border-radius: 0.5rem;
-  border: 0.125rem solid rgba(255, 255, 255, 0.3);
-  overflow: hidden;
-}
-
-.trace-detail-tab-table th,
-.trace-detail-tab-table td {
-  border-bottom: 1px solid var(--color-table-row-divider);
-  border-right: 1px solid var(--color-table-row-divider);
-  text-align: left;
-  padding: 8px !important;
-  font-size: 13px;
-  word-break: break-word;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  min-height: 24px;
-  height: auto;
-  max-width: 600px;
-}
-
-/* Add proper column sizing */
-.trace-detail-tab-table th:first-child,
-.trace-detail-tab-table td:first-child {
-  width: 200px;
-  min-width: 200px;
-}
-
-.trace-detail-tab-table th:nth-child(2),
-.trace-detail-tab-table td:nth-child(2) {
-  width: auto;
-  min-width: 100px;
-}
-
-.trace-detail-tab-table td span {
-  display: inline-block;
-  width: 100%;
-  word-break: break-word;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  white-space: pre-wrap;
-}
-
-.trace-detail-tab-table th:last-child,
-.trace-detail-tab-table td:last-child {
-  border-right: none;
-}
-
-.trace-detail-tab-table tr:last-child td {
-  border-bottom: none;
-}
-
-.trace-detail-tab-table tbody tr:first-child td:first-child {
-  border-top-left-radius: 0.5rem;
-}
-
-.trace-detail-tab-table tbody tr:first-child td:last-child {
-  border-top-right-radius: 0.5rem;
-}
-
-.trace-detail-tab-table tbody tr:last-child td:first-child {
-  border-bottom-left-radius: 0.5rem;
-}
-
-.trace-detail-tab-table tbody tr:last-child td:last-child {
-  border-bottom-right-radius: 0.5rem;
-}
-
-.trace-detail-tab-table table.q-table {
-  background: var(--color-surface-base);
-  backdrop-filter: blur(0.625rem);
-  border: 0.125rem solid var(--color-table-header-border);
-}
-
-.table-header .table-head-chip {
-  padding: 0px;
-}
-
-.table-header .table-head-chip .q-table th.sortable {
-  cursor: pointer;
-  text-transform: capitalize;
-  font-weight: bold;
-}
-
-.table-header.isClosable {
-  padding-right: 26px;
-  position: relative;
-}
-
-.table-header.isClosable .q-table-col-close {
-  transform: translateX(26px);
-  position: absolute;
-  margin-top: 2px;
-  color: grey;
-  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
-}
-
-.table-header .q-table th.sortable {
-  cursor: pointer;
-  text-transform: capitalize;
-  font-weight: bold;
-}
-
-.table-header .log_json_content {
-  white-space: pre-wrap;
-}
-
-.q-table__top {
-  padding-left: 0;
-  padding-top: 0;
-}
-
-.q-table thead tr,
-.q-table tbody td,
-.q-table th,
-.q-table td {
-  height: 25px;
-  padding: 0px 5px;
-  font-size: 0.75rem;
-}
-
-.q-table__bottom {
-  width: 100%;
-}
-
-.q-table__bottom {
-  min-height: 40px;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.q-td {
-  overflow: hidden;
-  min-width: 100px;
-}
-
-.q-td .expanded {
-  margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  word-break: break-all;
-}
-
-/* Hide filter action buttons until the row is hovered */
-.filter-cell .filter-actions {
-  visibility: hidden;
-}
-
-.filter-cell:hover .filter-actions {
-  visibility: visible;
-}
-
-.cell-with-max-height .cell-content {
-  max-height: 200px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  display: block;
-  word-break: break-word;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-}
-
-.thead-sticky tr > *,
-.tfoot-sticky tr > * {
+/* sticky header cells for the links table — position:sticky must sit on the
+   cells (tr > *), not the <thead>, so it cannot be a utility on the thead
+   element this template owns. */
+.thead-sticky tr > * {
   position: sticky;
   opacity: 1;
   z-index: 1;
+  background: var(--color-grey-200);
 }
 
 .thead-sticky tr:last-child > * {
   top: 0;
-}
-
-.tfoot-sticky tr:first-child > * {
-  bottom: 0;
-}
-
-/* Trace Details Toolbar - Modern Styling */
-.trace-details-toolbar-container .toolbar-chip {
-  font-size: 11px;
-  height: 22px;
-  padding: 0 6px;
-  background: white;
-  border: 1px solid #dee2e6;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.trace-details-toolbar-container .toolbar-chip:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.trace-details-toolbar-container .toolbar-chip .chip-label {
-  color: #6c757d;
-  font-size: 10px;
-  font-weight: 500;
-  margin-right: 3px;
-}
-
-.trace-details-toolbar-container .toolbar-chip .chip-value {
-  color: #212529;
-  font-weight: 600;
-  font-size: 10px;
-}
-
-.trace-details-toolbar-container .toolbar-chip.service-chip {
-  border-left: 3px solid #0d6efd;
-}
-
-.trace-details-toolbar-container .toolbar-chip.duration-chip {
-  border-left: 3px solid #6610f2;
-}
-
-.trace-details-toolbar-container .toolbar-chip.ttft-chip {
-  border-left: 3px solid #6f42c1;
-}
-
-.trace-details-toolbar-container .toolbar-chip.time-chip {
-  border-left: 3px solid #d63384;
-}
-
-.trace-details-toolbar-container .toolbar-chip.span-id-chip {
-  border-left: 3px solid #20c997;
-  cursor: pointer;
-}
-
-.trace-details-toolbar-container .toolbar-chip.span-id-chip .copy-icon {
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-.trace-details-toolbar-container .toolbar-chip.span-id-chip:hover .copy-icon {
-  opacity: 1;
-}
-
-.trace-details-toolbar-container .view-logs-btn {
-  height: 24px;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 0 10px;
-  border-radius: 4px;
-  text-transform: none;
-  flex-shrink: 0;
-}
-
-/* Scrollbar styling for horizontal scroll */
-.trace-details-toolbar-container > div::-webkit-scrollbar {
-  height: 4px;
-}
-
-.trace-details-toolbar-container > div::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.trace-details-toolbar-container > div::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 2px;
-}
-
-.trace-details-toolbar-container > div::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
-}
-
-/* LLM Chips - Modern Styling (now integrated into toolbar) */
-.trace-details-toolbar-container .llm-chip {
-  font-size: 10px;
-  height: 20px;
-  padding: 0 6px;
-  background: white;
-  border: 1px solid #dee2e6;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.trace-details-toolbar-container .llm-chip:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-}
-
-.trace-details-toolbar-container .llm-chip .chip-value {
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.trace-details-toolbar-container .llm-chip.model-chip {
-  border-left: 3px solid #ab47bc;
-}
-
-.trace-details-toolbar-container .llm-chip.model-chip .chip-value {
-  color: #4a148c;
-  font-weight: 600;
-}
-
-.trace-details-toolbar-container .llm-chip.token-chip {
-  min-width: 60px;
-  justify-content: center;
-}
-
-.trace-details-toolbar-container .llm-chip.token-chip .chip-label {
-  font-size: 9px;
-  font-weight: 500;
-  margin-right: 2px;
-}
-
-.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip {
-  border-left: 3px solid #42a5f5;
-}
-
-.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .OIcon,
-.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-label,
-.trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-value {
-  color: #1565c0;
-}
-
-.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip {
-  border-left: 3px solid #66bb6a;
-}
-
-.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .OIcon,
-.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-label,
-.trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-value {
-  color: #2e7d32;
-}
-
-.trace-details-toolbar-container .llm-chip.cost-chip {
-  border-left: 3px solid #ef6c00;
-}
-
-.trace-details-toolbar-container .llm-chip.cost-chip .chip-value {
-  color: #e65100;
-  font-weight: 600;
-}
-
-.trace-details-toolbar-container .tokens-group {
-  display: inline-flex;
-  gap: 3px;
-  flex-shrink: 0;
-}
-
-.trace-details-toolbar-container .provider-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 3px 8px;
-  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
-  border-radius: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  flex-shrink: 0;
-}
-
-/* Scrollbar styling for horizontal scroll in llm-metrics-row */
-.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar {
-  height: 4px;
-}
-
-.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 2px;
-}
-
-.trace-details-toolbar-container .llm-metrics-row::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
-}
-
-/* Dark Mode Styles */
-body.body--dark .trace-details-toolbar-container {
-  background: rgba(45, 55, 72, 0.5);
-  border-bottom-color: #4a5568;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-metrics-row {
-  border-top-color: #4a5568 !important;
-}
-
-body.body--dark .trace-details-toolbar-container .toolbar-chip {
-  background: #1a202c;
-  border-color: #4a5568;
-  color: #e2e8f0;
-}
-
-body.body--dark .trace-details-toolbar-container .toolbar-chip .chip-label {
-  color: #a0aec0;
-}
-
-body.body--dark .trace-details-toolbar-container .toolbar-chip .chip-value {
-  color: #e2e8f0;
-}
-
-body.body--dark .trace-details-toolbar-container .toolbar-chip:hover {
-  background: #2d3748;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip {
-  background: #1a202c;
-  border-color: #4a5568;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip .chip-value {
-  color: #e2e8f0;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip.model-chip {
-  border-left: 3px solid #ab47bc;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip.model-chip .chip-value {
-  color: #e9d8fd;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip {
-  border-left: 3px solid #42a5f5;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .OIcon,
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-label,
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.input-token-chip .chip-value {
-  color: #90cdf4;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip {
-  border-left: 3px solid #66bb6a;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .OIcon,
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-label,
-body.body--dark .trace-details-toolbar-container .llm-chip.token-chip.output-token-chip .chip-value {
-  color: #9ae6b4;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip.cost-chip {
-  border-left: 3px solid #ef6c00;
-}
-
-body.body--dark .trace-details-toolbar-container .llm-chip.cost-chip .chip-value {
-  color: #fed7aa;
-}
-
-body.body--dark .trace-details-toolbar-container .provider-badge {
-  background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
-}
-
-.llm-preview-container .section-label {
-  color: var(--o2-text-primary);
-  font-size: 14px;
-  margin-bottom: 0.5rem;
-}
-
-.llm-preview-container .io-section {
-  flex: 0 0 calc(50% - 0.4rem);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.llm-preview-container .llm-content-box {
-  flex: 1;
-  height: 100%;
-  max-height: calc(100% - 1.625rem);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 4px;
-  padding: 0.75rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background-color: var(--o2-code-bg);
-}
-
-.llm-preview-container .llm-content-box .plain-text-content:hover {
-  background-color: rgba(0, 0, 0, 0.04) !important;
-}
-
-.llm-preview-container .llm-content-box .vjs-tree *:hover {
-  background-color: transparent !important;
-}
-
-.llm-preview-container .no-data-message {
-  color: var(--o2-text-secondary);
-  font-style: italic;
-  text-align: center;
-  padding: 2rem;
-  font-size: 14px;
-}
-
-.llm-preview-container .io-container:fullscreen {
-  background-color: #f5f5f5;
-  padding: 0.75rem;
-  height: 100vh;
-  max-height: 100vh;
-  display: flex;
-  gap: 0.5rem;
-  align-items: stretch;
-}
-
-.llm-preview-container .io-container:fullscreen .io-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.llm-preview-container .io-container:fullscreen .io-section .section-label {
-  background: #f5f5f5;
-  border-radius: 4px;
-}
-
-.llm-preview-container .io-container:fullscreen .io-section .llm-content-box {
-  height: calc(100vh - 80px);
-  max-height: unset;
-  min-height: unset;
-}
-
-.llm-preview-container .io-container-dark:fullscreen {
-  background: #1e1e1e;
-}
-
-.llm-preview-container .io-container-dark:fullscreen .io-section .section-label {
-  background: #1e1e1e;
-  color: var(--o2-border);
-}
-
-.llm-preview-container .io-container-dark .llm-content-box .plain-text-content:hover {
-  background-color: rgba(255, 255, 255, 0.05) !important;
-}
-
-.llm-preview-container .io-container-dark .llm-content-box .vjs-tree *:hover {
-  background-color: transparent !important;
-}
-
-.llm-preview-container .model-params-json {
-  background-color: var(--o2-code-bg);
-  padding: 1rem;
-  border-radius: 4px;
-  overflow-x: auto;
-  font-family: monospace;
-  font-size: 12px;
-  margin: 0;
-}
-</style>
-
-<style>
-.span_details_tabs .q-tab__indicator {
-  display: none;
-}
-
-.span_details_tabs .q-tab--active {
-  border-bottom: 1px solid var(--q-primary);
-}
-
-.span_details_tab-panels .q-tab-panel {
-  padding: 8px 8px 8px 8px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  height: 100%;
-}
-
-.view-span-logs-btn .q-btn__content {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-}
-
-.highlight {
-  background-color: yellow; /* Adjust background color as desired */
-}
-</style>
-
-<style>
-/* Dark theme support for glassmorphic tables */
-.body--dark .trace-detail-tab-table table {
-  /* background: rgba(255, 255, 255, 0.05); */
-  /* border: 0.125rem solid rgba(255, 255, 255, 0.3); */
-}
-
-.body--dark .trace-detail-tab-table th,
-.body--dark .trace-detail-tab-table td {
-  border-bottom: 1px solid var(--color-table-row-divider);
-  border-right: 1px solid var(--color-table-row-divider);
-}
-
-/* Light theme support for glassmorphic tables */
-.body--light .trace-detail-tab-table table {
-  /* background: rgba(240, 240, 245, 0.8); */
-  /* border: 0.125rem solid rgba(100, 100, 120, 0.5); */
-}
-
-.body--light .trace-detail-tab-table th,
-.body--light .trace-detail-tab-table td {
-  border-bottom: 1px solid var(--color-table-row-divider);
-  border-right: 1px solid var(--color-table-row-divider);
-}
-
-.trace-detail-tab-table th {
-  background-color: #f5f5f5 !important;
-}
-
-.body--dark .trace-detail-tab-table th {
-  background-color: #424242 !important;
 }
 </style>

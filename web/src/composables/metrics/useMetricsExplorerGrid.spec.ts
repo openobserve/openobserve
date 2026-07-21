@@ -655,12 +655,58 @@ describe("useMetricsExplorerGrid", () => {
 
       expect(grid.pagedCards.value).toHaveLength(INITIAL_PAGE_SIZE);
 
+      /**
+       * Answer every query the grid fires for this preview, until it goes quiet.
+       *
+       * The shared `landPreview` caps itself at 5 rounds, which is not enough
+       * here: partway through the loop below the grid's own debounced sweep
+       * (SWEEP_DEBOUNCE_MS) fires and resolves the REST of the slice, six
+       * queries at a time. Those batches arrive on later rounds, so a 5-round
+       * cap stops answering and strands them, and the awaited preview never
+       * settles — the test times out rather than failing an assertion. Draining
+       * to quiescence is timing-independent; the round cap only exists so a
+       * genuine storm terminates the test instead of hanging it.
+       */
+      /**
+       * Count only the queries THIS org fires. Earlier tests in this file leave
+       * their own grids' debounced sweeps running, and those land in the shared
+       * `inFlight` array during the rounds below — they are this file's own
+       * cross-talk (they name `cpu_temperature`, `lat_seconds_*`, `code="500"`
+       * …, none of which exist in `sparseOrg`), not a storm from this grid.
+       */
+      const asked: number[] = [];
+      const drain = async (preview: Promise<any>) => {
+        for (let round = 0; round < 100; round++) {
+          await flush();
+          if (!inFlight.length) break;
+          for (const q of inFlight) {
+            const m = q.query.match(/metric_(\d+)_total/);
+            if (m) asked.push(Number(m[1]));
+          }
+          inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES));
+        }
+        await preview;
+      };
+
       // Every card on the page comes back empty — the worst case.
       const page = [...grid.pagedCards.value];
       for (const card of page) {
-        await landPreview(grid.requestPreview(card), NO_SERIES);
+        await drain(grid.requestPreview(card));
         inFlight.length = 0;
       }
+
+      // The point of the test, now actually measured rather than assumed.
+      // No metric outside the first page is ever queried: this is the cascade
+      // itself, caught at the query layer rather than only at its after-effect.
+      expect(Math.max(...asked)).toBeLessThan(INITIAL_PAGE_SIZE);
+      expect(new Set(asked).size).toBe(INITIAL_PAGE_SIZE);
+      // And each card is asked at most twice — the rate query, plus the presence
+      // probe that confirms an empty rate() result is real.
+      const perMetric = [...new Set(asked)].map(
+        (i) => asked.filter((a) => a === i).length,
+      );
+      expect(Math.max(...perMetric)).toBeLessThanOrEqual(2);
+      expect(asked).toHaveLength(2 * INITIAL_PAGE_SIZE);
 
       // The page is now EMPTY (all 30 hidden) — it must not have refilled itself
       // from the other 470 metrics.

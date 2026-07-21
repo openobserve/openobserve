@@ -296,7 +296,7 @@ const isPlaceholder = computed(
 );
 
 const triggerClasses = computed(() => [
-  "flex items-center gap-2 w-full min-h-10 px-3 rounded-md border text-sm transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring bg-datepicker-bg",
+  "flex items-center gap-2 w-full min-h-10 px-3 rounded-default border text-sm transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring bg-datepicker-bg",
   hasError.value
     ? "border-datepicker-error-border"
     : "border-datepicker-border hover:border-datepicker-hover-border",
@@ -380,7 +380,7 @@ const triggerClasses = computed(() => [
       <PopoverContent
         :side-offset="4"
         align="start"
-        class="z-50 rounded-lg border shadow-lg bg-datepicker-popup-bg border-datepicker-popup-border w-80 outline-none"
+        class="z-50 rounded-default border shadow-lg bg-datepicker-popup-bg border-datepicker-popup-border w-80 outline-none"
         data-test="datetimerange-popup"
       >
         <!-- Tab bar -->
@@ -439,7 +439,7 @@ const triggerClasses = computed(() => [
                 type="button"
                 :disabled="isRelativeDisabled(unit, val) || disabled"
                 :class="[
-                  'w-8 h-7 rounded text-xs transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring tabular-nums',
+                  'w-8 h-7 rounded-default text-xs transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring tabular-nums',
                   stagedRelativeUnit === unit && stagedRelativeAmount === val && !isRelativeDisabled(unit, val)
                     ? 'bg-datepicker-relative-btn-selected-bg text-datepicker-relative-btn-selected-text'
                     : isRelativeDisabled(unit, val)
@@ -463,14 +463,14 @@ const triggerClasses = computed(() => [
               type="number"
               min="1"
               :disabled="disabled"
-              class="w-16 h-7 rounded border border-datepicker-border bg-datepicker-bg text-datepicker-text text-xs px-2 outline-none focus:border-datepicker-focus-border tabular-nums disabled:opacity-50"
+              class="w-16 h-7 rounded-default border border-datepicker-border bg-datepicker-bg text-datepicker-text text-xs px-2 outline-none focus:border-datepicker-focus-border tabular-nums disabled:opacity-50"
               data-test="datetimerange-custom-amount"
               @keydown.enter="applyCustomRelative"
             />
             <select
               v-model="customUnit"
               :disabled="disabled"
-              class="flex-1 h-7 rounded border border-datepicker-border bg-datepicker-bg text-datepicker-text text-xs px-2 outline-none focus:border-datepicker-focus-border disabled:opacity-50"
+              class="flex-1 h-7 rounded-default border border-datepicker-border bg-datepicker-bg text-datepicker-text text-xs px-2 outline-none focus:border-datepicker-focus-border disabled:opacity-50"
               data-test="datetimerange-custom-unit"
             >
               <option
@@ -492,7 +492,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="disabled"
-              class="flex items-center justify-between w-full h-7 rounded border border-datepicker-inner-border bg-datepicker-bg text-datepicker-text text-xs px-2 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              class="flex items-center justify-between w-full h-7 rounded-default border border-datepicker-inner-border bg-datepicker-bg text-datepicker-text text-xs px-2 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               data-test="datetimerange-timezone-trigger"
               @click="!disabled && (tzOpen = !tzOpen)"
             >
@@ -514,7 +514,7 @@ const triggerClasses = computed(() => [
             </button>
             <div
               v-if="tzOpen && !disabled"
-              class="rounded border border-datepicker-inner-border overflow-hidden"
+              class="rounded-default border border-datepicker-inner-border overflow-hidden"
             >
               <input
                 v-model="tzSearch"
@@ -553,7 +553,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="disabled || stagedRelativeAmount <= 0"
-              class="px-4 py-1.5 rounded text-sm font-medium transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text hover:opacity-90 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-4 py-1.5 rounded-default text-sm font-medium transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text hover:opacity-90 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
               data-test="datetimerange-relative-apply"
               @click="commitRelative"
             >Apply</button>
@@ -580,7 +580,7 @@ const triggerClasses = computed(() => [
                 class="flex items-center justify-between mb-3"
               >
                 <RangeCalendarPrev
-                  class="flex items-center justify-center size-7 rounded transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
+                  class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -600,7 +600,7 @@ const triggerClasses = computed(() => [
                   class="text-sm font-medium text-datepicker-heading-text"
                 />
                 <RangeCalendarNext
-                  class="flex items-center justify-center size-7 rounded transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
+                  class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -647,7 +647,7 @@ const triggerClasses = computed(() => [
                       <RangeCalendarCellTrigger
                         :day="date"
                         :month="month.value"
-                        class="flex items-center justify-center size-8 rounded text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text"
+                        class="flex items-center justify-center size-8 rounded-default text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text"
                       >{{ date.day }}</RangeCalendarCellTrigger>
                     </RangeCalendarCell>
                   </RangeCalendarGridRow>
@@ -691,7 +691,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="disabled"
-              class="flex items-center justify-between w-full h-9 rounded-md border border-datepicker-inner-border bg-datepicker-bg text-datepicker-text text-sm px-3 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              class="flex items-center justify-between w-full h-9 rounded-default border border-datepicker-inner-border bg-datepicker-bg text-datepicker-text text-sm px-3 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               data-test="datetimerange-timezone-trigger"
               @click="!disabled && (tzOpen = !tzOpen)"
             >
@@ -713,7 +713,7 @@ const triggerClasses = computed(() => [
             </button>
             <div
               v-if="tzOpen && !disabled"
-              class="rounded-md border border-datepicker-inner-border overflow-hidden"
+              class="rounded-default border border-datepicker-inner-border overflow-hidden"
             >
               <input
                 v-model="tzSearch"
@@ -749,7 +749,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="disabled"
-              class="px-4 py-1.5 rounded text-sm font-medium transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text hover:opacity-90 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
+              class="px-4 py-1.5 rounded-default text-sm font-medium transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text hover:opacity-90 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
               data-test="datetimerange-apply"
               @click="handleApply"
             >Apply</button>

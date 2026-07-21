@@ -100,8 +100,8 @@ watch(
         'hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg',
         'focus-visible:ring-2 focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-offset-1',
         variant === 'sidebar'
-          ? 'px-3 py-0 min-h-[36px] rounded-none'
-          : 'px-2 py-2 rounded-md',
+          ? 'px-3 py-0 min-h-9 rounded-none'
+          : 'px-2 py-2 rounded-default',
         triggerClass,
       ]"
     >
@@ -140,7 +140,7 @@ watch(
           <span
             :class="[
               'font-medium text-collapsible-label truncate',
-              variant === 'sidebar' ? 'text-[13px]' : 'text-sm',
+              variant === 'sidebar' ? 'text-compact' : 'text-sm',
             ]"
             >{{ label }}</span
           >
@@ -169,7 +169,16 @@ watch(
   </CollapsibleRoot>
 </template>
 
-<style>
+<style scoped>
+/* keep(keyframes): reka-ui height animation keyed off [data-state] +
+   --reka-collapsible-content-height; no utility can express it.
+   These keyframes are referenced ONLY from the CSS in this block (never from a
+   template `[animation:…]` utility), so `scoped` is safe: Vue renames the
+   @keyframes and the `animation:` shorthands together and stays consistent.
+   That is also why they do NOT belong in styles/keyframes.css.
+   `.o-collapsible-content` sits on reka's CollapsibleContent in THIS
+   component's template, so it carries this scope id. FieldExpansion.vue reaches
+   the same class through its own `:deep()`, which is unaffected. */
 .o-collapsible-content[data-state="open"] {
   animation: o-collapsible-open 200ms ease-out;
 }

@@ -1242,27 +1242,6 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(addGroupBtn.attributes('disabled')).toBeDefined();
     });
 
-    it('should handle tab change for toggle label', async () => {
-      const wrapper = mount(FilterGroup, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      const tabs = wrapper.findComponent({ name: 'q-tabs' });
-      if (tabs.exists()) {
-        await tabs.vm.$emit('update:model-value', 'or');
-        expect(wrapper.emitted('add-group')).toBeTruthy();
-        expect(wrapper.emitted('input:update')).toBeTruthy();
-      }
-    });
   });
 
 

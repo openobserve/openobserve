@@ -7,7 +7,7 @@ defineSlots<OCardSlots>();
 
 <template>
   <div
-    class="bg-card-bg text-card-text rounded-lg flex flex-col"
+    class="bg-card-bg text-card-text rounded-default flex flex-col"
     v-bind="$attrs"
   >
     <slot />

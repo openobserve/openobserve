@@ -1,0 +1,31 @@
+/* ============================================================
+   Structural lock on the --color-* and --shadow-* theme namespaces.
+   ============================================================
+   Tailwind v4 ships a full built-in colour palette (--color-red-500,
+   --color-gray-400, --color-blue-100, …). Those generate utilities
+   (bg-red-500, text-gray-400 …) that bypass the design-token system —
+   un-themed, invisible to dark mode, and impossible to retheme.
+
+   This block clears the ENTIRE --color-* theme namespace. It is imported
+   AFTER `tailwindcss` but BEFORE the token files (base/semantic/component),
+   so Tailwind's defaults are removed here and only OUR registered tokens
+   (re-added by the `@theme inline` blocks in those files, which run later in
+   source order) survive. Net effect: `bg-gray-400` / `text-red-500` no longer
+   compile to anything — a raw-palette class becomes structurally impossible,
+   not merely lint-discouraged. `bg-surface-base`, `text-text-heading`,
+   `bg-primary-600`, `bg-grey-500`, `bg-transparent`, `text-white` etc. are all
+   re-registered downstream and keep working.
+
+   The same lock applies to --shadow-*: Tailwind's default scale spans
+   2xs…2xl, but the hairline-border philosophy sanctions only two real
+   elevation tiers — shadow-md / shadow-lg for overlays (dialogs, menus,
+   drawers). Flat surfaces (cards) use a 1px border, never a drop shadow.
+   Clearing the namespace here makes shadow-sm / shadow-xl / shadow-2xl
+   structurally impossible; semantic.css re-registers only --shadow-md and
+   --shadow-lg downstream. (`shadow-none` is a static Tailwind utility and is
+   unaffected.)
+   ============================================================ */
+@theme {
+  --color-*: initial;
+  --shadow-*: initial;
+}

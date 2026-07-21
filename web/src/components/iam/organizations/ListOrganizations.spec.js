@@ -176,11 +176,18 @@ describe("ListOrganizations", () => {
 
     it("should setup columns correctly for non-cloud mode", () => {
       const columns = wrapper.vm.columns;
-      // #, name, identifier, type, status, actions = 6 columns when isCloud is false
-      expect(columns).toHaveLength(6);
-      expect(columns.map(c => c.id)).toContain("name");
-      expect(columns.map(c => c.id)).toContain("identifier");
-      expect(columns.map(c => c.id)).toContain("status");
+      // The row index is rendered by OTable's `show-index` prop, so there is no
+      // "#" column in the definition. Non-cloud columns are:
+      // name, identifier, type, status, actions = 5
+      expect(columns.map(c => c.id)).toEqual([
+        "name",
+        "identifier",
+        "type",
+        "status",
+        "actions",
+      ]);
+      expect(columns.map(c => c.id)).not.toContain("plan");
+      expect(columns[columns.length - 1].isAction).toBe(true);
     });
 
     it("should add plan column when isCloud is true", async () => {
@@ -207,8 +214,16 @@ describe("ListOrganizations", () => {
       });
 
       await flushPromises();
-      // #, name, identifier, type, status, plan, actions = 7 columns when isCloud is true
-      expect(wrapperWithCloud.vm.columns).toHaveLength(7);
+      // When isCloud is true a "plan" column is inserted before "actions":
+      // name, identifier, type, status, plan, actions = 6
+      expect(wrapperWithCloud.vm.columns.map(c => c.id)).toEqual([
+        "name",
+        "identifier",
+        "type",
+        "status",
+        "plan",
+        "actions",
+      ]);
       wrapperWithCloud.unmount();
 
       config.isCloud = "false";
@@ -621,8 +636,10 @@ describe("ListOrganizations", () => {
       expect(wrapper.vm.organizations).toHaveLength(0);
     });
 
-    it("should format counter for double-digit rows", async () => {
-      // Generate 12 orgs to trigger the counter > 9 branch
+    it("should transform the 10th org row correctly in a large list", async () => {
+      // Generate 12 orgs; the row index is now rendered by OTable's `show-index`
+      // prop, so the transformed data no longer carries a "#" field. Assert the
+      // mapped fields for the 10th item instead.
       const largeOrgs = Array.from({ length: 12 }, (_, i) => ({
         name: `Org ${i + 1}`,
         identifier: `org-${i + 1}`,
@@ -638,8 +655,15 @@ describe("ListOrganizations", () => {
       await flushPromises();
 
       expect(wrapper.vm.organizations).toHaveLength(12);
-      // Counter should be 10 (without leading zero) for the 10th item
-      expect(wrapper.vm.organizations[9]["#"]).toBe(10);
+      // The transformation maps type via convertToTitleCase and plan "0" → "Free".
+      expect(wrapper.vm.organizations[9]).toMatchObject({
+        name: "Org 10",
+        identifier: "org-10",
+        type: "Team",
+        plan: "Free",
+      });
+      // No "#" field is added by the component anymore.
+      expect(wrapper.vm.organizations[9]["#"]).toBeUndefined();
     });
   });
 

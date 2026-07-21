@@ -24,27 +24,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="organization-deduplication-settings-form"
     :form="form"
     v-slot="{ isSubmitting }"
-    class="w-full h-full px-2 bg-(--o2-card-bg) flex flex-col"
+    class="w-full h-full bg-card-glass-bg flex flex-col"
   >
     <!-- Scrollable content area -->
-    <div class="flex-1 overflow-y-auto pr-2">
-      <div class="mb-6">
-        <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="mb-2" />
-        <div class="text-sm text-gray-400">
+    <div class="flex-1 overflow-y-auto pr-2 pt-4">
+      <div class="mb-4">
+        <div class="text-sm font-semibold leading-tight text-text-heading">
+          {{ t('alerts.correlation.title') }}
+        </div>
+        <div class="text-xs text-text-secondary mt-1">
           {{ t('alerts.correlation.description') }}
         </div>
-        <div class="text-sm text-gray-400 mt-2 italic">
+        <div class="text-xs text-text-secondary mt-1 italic">
           {{ t('alerts.correlation.semanticFieldNote') }}
         </div>
-        <OButton
-          data-test="dedup-settings-refresh-btn"
-          variant="outline"
-          size="sm"
-          @click="loadConfig"
-        >{{ t('common.refresh') }}</OButton>
       </div>
 
-      <OSeparator class="mb-6" />
+      <OButton
+        data-test="dedup-settings-refresh-btn"
+        variant="outline"
+        size="sm"
+        class="mb-6"
+        @click="loadConfig"
+      >{{ t('common.refresh') }}</OButton>
 
       <!-- Enable Deduplication -->
       <div class="mb-6">
@@ -71,12 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Cross-Alert Fingerprint Groups -->
       <div class="mb-6" v-if="enabled && alertDedupEnabled">
         <div class="font-semibold pb-2 flex items-center">
-          {{ t('alerts.correlation.fingerprintGroups') }} <span class="text-red-500 ml-1">*</span>
+          {{ t('alerts.correlation.fingerprintGroups') }} <span class="text-status-error-text ml-1">*</span>
           <OIcon
             name="info"
             size="sm"
             class="ml-1 cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+            :class="'text-text-secondary'"
           >
             <OTooltip
               side="right"
@@ -85,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OIcon>
         </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+        <div class="text-sm text-text-secondary mb-2">
           {{ t('alerts.correlation.fingerprintGroupsHint') }}
         </div>
         <!-- The selected group ids ARE the form's alert_fingerprint_groups
@@ -110,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="info"
             size="sm"
             class="ml-1 cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+            :class="'text-text-secondary'"
            />
             <OTooltip
               side="right"
@@ -118,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :content="t('alerts.correlation.defaultWindowTooltip')"
             />
         </div>
-        <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+        <div class="text-sm text-text-secondary mb-2">
           {{ t('alerts.correlation.defaultWindowDescription') }}
         </div>
         <OFormInput
@@ -128,17 +130,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           min="1"
           width="md"
           :placeholder="t('alerts.correlation.defaultWindowPlaceholder')"
-          :class="
-            store.state.theme === 'dark'
-              ? 'input-box-bg-dark input-border-dark'
-              : 'input-box-bg-light input-border-light'
-          "
         />
       </div>
     </div>
 
     <!-- Sticky footer with buttons -->
-    <div class="flex justify-end gap-3 pt-4 pb-2 border-t border-gray-200 dark:border-gray-700 bg-inherit sticky bottom-0">
+    <div class="flex justify-end gap-3 pt-4 pb-2 border-t border-border-default bg-inherit sticky bottom-0">
       <OButton
         variant="outline"
         size="sm-action"
@@ -160,13 +157,11 @@ import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import alertsService from "@/services/alerts";
-import GroupHeader from "@/components/common/GroupHeader.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OFormCheckboxGroup from "@/lib/forms/Checkbox/OFormCheckboxGroup.vue";

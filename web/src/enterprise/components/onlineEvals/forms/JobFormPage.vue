@@ -4,14 +4,13 @@
     :form="form"
     v-slot="{ isSubmitting }"
   >
-    <AppPageHeader
+    <OPageLayout
       :back="{
         label: t('onlineEvals.job.backTo'),
         onClick: () => $emit('cancel'),
         dataTest: 'job-form-back-btn',
       }"
-      class="px-3 border-b border-border-default"
-      style="flex-shrink: 0"
+      bleed
     >
       <template #title>
         <span data-test="job-form-title">
@@ -30,22 +29,21 @@
           @click="$emit('cancel')"
         />
       </template>
-    </AppPageHeader>
 
-    <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2">
-      <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2">
+    <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2 max-[68.75rem]:flex-col">
+      <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2 max-[68.75rem]:flex-auto">
         <!-- Target -->
-        <section class="card-container border border-(--color-dialog-header-border,var(--o2-border)) rounded-md overflow-hidden shrink-0">
-          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--o2-border))">
-            <div class="w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-(--q-primary)" />
-            <span class="text-[13px] font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
+        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0">
+          <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
+            <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
           <div class="job-field">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
+            <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">
               {{ t("onlineEvals.job.nameLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--o2-text-secondary))" />
+              <span class="text-status-error-text ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
             </label>
             <OFormInput
               name="name"
@@ -57,10 +55,10 @@
           </div>
 
           <div class="job-field">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
+            <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">
               {{ t("onlineEvals.job.streamLabel") }}
-              <span class="text-(--color-status-error-text) ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--o2-text-secondary))" />
+              <span class="text-status-error-text ml-0.5">*</span>
+              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
             </label>
             <OFormSelect
               name="stream"
@@ -86,10 +84,10 @@
         </section>
 
         <!-- Scorers + Filter + Mapping -->
-        <section class="card-container border border-(--color-dialog-header-border,var(--o2-border)) rounded-md overflow-hidden shrink-0">
-          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--o2-border))">
-            <div class="w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-(--q-primary)" />
-            <span class="text-[13px] font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
+        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0">
+          <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
+            <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
           <JobScorerPicker
@@ -109,13 +107,13 @@
         </section>
 
         <!-- Sampling -->
-        <section class="card-container border border-(--color-dialog-header-border,var(--o2-border)) rounded-md overflow-hidden shrink-0">
-          <div class="flex items-center py-[10px] px-3 border-b border-(--color-border-default,var(--o2-border))">
-            <div class="w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-(--q-primary)" />
-            <span class="text-[13px] font-semibold tracking-[0.01em] text-(--color-text-primary,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
+        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0">
+          <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
+            <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
-          <div class="job-field-row grid grid-cols-2 max-[1100px]:grid-cols-1 gap-[14px]">
+          <div class="job-field-row grid grid-cols-2 max-[68.75rem]:grid-cols-1 gap-3.5">
             <div class="job-field">
               <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
               <OFormSelect
@@ -124,13 +122,13 @@
                 size="md"
                 data-test="job-form-sampling-mode-select"
               />
-              <div class="job-field__help text-[11.5px] text-(--color-text-secondary,var(--o2-text-secondary)) mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
+              <div class="job-field__help text-2xs text-(--color-text-secondary,var(--color-text-secondary)) mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
             </div>
 
             <div class="job-field">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-primary,currentColor) mb-1">
+              <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">
                 {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span v-if="formValues.samplingMode !== 'all'" class="text-(--color-status-error-text) ml-0.5">*</span>
+                <span v-if="formValues.samplingMode !== 'all'" class="text-status-error-text ml-0.5">*</span>
               </label>
               <OFormInput
                 name="samplingValue"
@@ -159,7 +157,7 @@
       />
     </div>
 
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)] shrink-0 z-1">
+    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base border-t border-border-default shrink-0 z-1">
       <OButton
         data-test="job-form-cancel-btn"
         type="button"
@@ -208,6 +206,7 @@
         {{ t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
+    </OPageLayout>
   </OForm>
 </template>
 
@@ -221,7 +220,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
 import onlineEvalsService, {
@@ -274,9 +273,9 @@ const { t } = useI18n();
 // mounted fresh per create/edit action, so building it once is safe.
 const jobFormSchema = makeJobFormSchema(t);
 
-// OWNER pattern (Rule ③): this component owns <OForm>, so it creates the form
-// with useOForm and reads it reactively via form.useStore — a SINGLE source of
-// truth, NO mirror ref. `formValues` drives the parent-side reads a parent can't
+// This component owns <OForm>, so it creates the form with useOForm and reads
+// it reactively via form.useStore (single source of truth, no mirror ref).
+// `formValues` drives the parent-side reads a parent can't
 // get from form context: JobPreviewPanel (name/streamType), the stream-option
 // list (stream), selectedScorers + the mapping sync (scorerIds), and the
 // sampling `v-if`/disabled (samplingMode). Writes go through form.setFieldValue
@@ -431,8 +430,7 @@ function syncMappings() {
 async function onSubmit(value: JobForm) {
   if (!props.orgId) return;
   // Scorer selection is validated here, not in the schema: surface the empty
-  // case as a toast (matching the pre-migration guard) since JobScorerPicker
-  // renders no inline error.
+  // case as a toast since JobScorerPicker renders no inline error.
   if (!value.scorerIds.length) {
     showError(new Error(t("onlineEvals.job.selectAtLeastOne")), t("onlineEvals.job.saveError"));
     return;
@@ -489,28 +487,16 @@ async function onSubmit(value: JobForm) {
 }
 </script>
 
-<style lang="scss">
-// Layout, spacing, colors, and text styling are Tailwind utilities in the
-// template. Only descendant/`:deep` selectors (targeting child-component
-// internals) and the responsive @media block remain here.
+<style scoped lang="scss">
+/* keep(lib-override:o2-forms): caps the height of the native <textarea> rendered
+   inside OFormTextarea — a child-component element this component can only reach
+   through :deep(). */
 .job-form__main :deep(textarea) {
-  max-height: 200px;
+  max-height: 12.5rem;
   overflow-y: auto;
 }
 
 .job-form__main .job-field--desc :deep(textarea) {
-  max-height: 120px;
-}
-
-@media (max-width: 1100px) {
-  .job-form__body {
-    flex-direction: column;
-  }
-  .job-form__main {
-    flex: 1 1 auto;
-  }
-  .job-field-row {
-    grid-template-columns: 1fr;
-  }
+  max-height: 7.5rem;
 }
 </style>

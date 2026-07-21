@@ -25,11 +25,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="relative w-full h-full overflow-hidden [--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]">
-    <!-- decorative backdrop — subtle dot texture only (no color gradient) -->
+    <!--
+      Decorative backdrop — subtle dot texture only (no color gradient).
+      The dot colour comes from `--empty-dot` (set theme-aware on the parent).
+      Sparse 1.875rem spacing keeps the texture subtle, and the ellipse mask
+      concentrates it behind the illustration/text, dissolving well before the
+      edges so it reads as a soft backdrop rather than an all-over grid.
+    -->
     <div
       aria-hidden="true"
-      class="absolute inset-0 pointer-events-none"
-      :style="dotGridStyle"
+      class="absolute inset-0 pointer-events-none bg-[radial-gradient(var(--empty-dot)_1.25px,transparent_1.25px)] bg-size-[1.875rem_1.875rem] [-webkit-mask-image:radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)] mask-[radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)]"
     />
 
     <!-- content -->
@@ -42,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex flex-col gap-2.5 max-w-xl">
         <h2
-          class="text-2xl! font-semibold! text-text-primary tracking-[-0.01em]"
+          class="text-2xl! font-semibold! text-text-heading tracking-[-0.01em]"
         >
           <slot name="title">{{ title }}</slot>
         </h2>
@@ -67,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="h-px flex-1 bg-border-default" />
           <span
-            class="text-[0.6875rem] font-semibold text-text-secondary whitespace-nowrap"
+            class="text-2xs font-semibold text-text-secondary whitespace-nowrap"
             >{{ actionsLabel }}</span
           >
           <span class="h-px flex-1 bg-border-default" />
@@ -99,18 +104,5 @@ withDefaults(
   }>(),
   { title: "", description: "", actionsLabel: "" },
 );
-
-// Faded dot-grid, masked to a soft ellipse so it concentrates behind the
-// content and dissolves toward the edges.
-const dotGridStyle =
-  // `--empty-dot` is theme-aware (see <style> below): grey-300 in light so the
-  // dots read clearly on white, ~grey-800 in dark.
-  "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
-  // sparse spacing so the texture stays subtle, not busy.
-  "background-size: 30px 30px;" +
-  // concentrated behind the illustration/text and faded to clean space well
-  // before the edges — a soft backdrop, not an all-over grid.
-  "-webkit-mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);" +
-  "mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);";
 </script>
 

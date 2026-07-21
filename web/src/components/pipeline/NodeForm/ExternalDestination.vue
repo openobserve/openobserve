@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="handleCancel"
     @click:neutral="openDeleteDialog"
   >
-    <div class="w-full pt-3 pb-3 px-3 flex flex-col gap-4">
+    <div class="w-full flex flex-col gap-4">
       <!-- Mode toggle — stays a bare UI control OUTSIDE the form: it swaps the
            select-existing form for the CreateDestinationForm create child. -->
       <OSwitch
