@@ -1086,22 +1086,22 @@ async fn process_custom_claim_parsing(
     let vrl_execute_fn = |function_content: &String,
                           claims: Value|
      -> Result<Value, anyhow::Error> {
-        use vrl::compiler::{TargetValue, runtime::Runtime};
+        use transform::vrl::compiler::{TargetValue, runtime::Runtime};
 
         // Compile the VRL function
         let vrl_config = crate::service::ingestion::compile_vrl_function(function_content, "_meta")
             .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
 
         let mut runtime = Runtime::default();
-        let timezone = vrl::compiler::TimeZone::Local;
+        let timezone = transform::vrl::compiler::TimeZone::Local;
         let mut target = TargetValue {
             value: claims.into(),
-            metadata: vrl::value::Value::Object(Default::default()),
-            secrets: vrl::value::Secrets::new(),
+            metadata: transform::vrl::value::Value::Object(Default::default()),
+            secrets: transform::vrl::value::Secrets::new(),
         };
 
-        let result = match vrl::compiler::VrlRuntime::default() {
-            vrl::compiler::VrlRuntime::Ast => {
+        let result = match transform::vrl::compiler::VrlRuntime::default() {
+            transform::vrl::compiler::VrlRuntime::Ast => {
                 runtime.resolve(&mut target, &vrl_config.program, &timezone)
             }
         };
