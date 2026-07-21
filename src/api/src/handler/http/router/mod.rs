@@ -162,39 +162,56 @@ fn maybe_add_mcp_www_authenticate(uri: &Uri, resp: Response) -> Response {
     if resp.status() != StatusCode::UNAUTHORIZED {
         return resp;
     }
-    // MCP endpoint == path segment after "/api/{org}/" equals "mcp".
+    // MCP endpoint == the `.../{org}/mcp` resource. `auth_middleware` runs
+    // inside the `.nest("/api", …)` router, so by the time we see the URI the
+    // `/api` prefix has been stripped — the path is `/{org}/mcp`, not
+    // `/api/{org}/mcp`. Match on the last non-empty segment so detection is
+    // independent of whether the prefix is present.
     let path = uri.path();
     let is_mcp = path
-        .strip_prefix("/api/")
-        .and_then(|rest| rest.split('/').nth(1))
+        .rsplit('/')
+        .find(|seg| !seg.is_empty())
         .map(|seg| seg == "mcp")
         .unwrap_or(false);
     if !is_mcp {
         return resp;
     }
 
-    #[cfg(feature = "enterprise")]
-    {
-        let dex = o2_dex::config::get_config();
-        if !dex.dex_enabled {
-            return resp; // no auth server to advertise
-        }
-        let cfg = config::get_config();
-        let o2_base = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
-        let resource_meta = format!(
-            "{}/.well-known/oauth-protected-resource{}",
-            o2_base.trim_end_matches('/'),
-            path // e.g. "/api/default/mcp"
-        );
-        let value = format!(r#"Bearer resource_metadata="{resource_meta}""#);
-        let mut resp = resp;
-        if let Ok(hv) = header::HeaderValue::from_str(&value) {
-            resp.headers_mut().insert(header::WWW_AUTHENTICATE, hv);
-        }
-        return resp;
-    }
+    // On the OSS build MCP OAuth discovery is a 404 anyway, so there is nothing
+    // to advertise — `attach_mcp_www_authenticate` is a no-op there.
+    attach_mcp_www_authenticate(path, resp)
+}
 
-    #[cfg(not(feature = "enterprise"))]
+/// Enterprise: attach the RFC 9728 `WWW-Authenticate` header pointing at this
+/// org's protected-resource metadata, unless Dex is disabled.
+#[cfg(feature = "enterprise")]
+fn attach_mcp_www_authenticate(path: &str, mut resp: Response) -> Response {
+    let dex = o2_dex::config::get_config();
+    if !dex.dex_enabled {
+        return resp; // no auth server to advertise
+    }
+    let cfg = config::get_config();
+    // `path` here is the nest-stripped `/{org}/mcp`. The externally-visible
+    // resource is `{base_uri}/api/{org}/mcp`, and the RFC 9728 discovery doc
+    // lives at `<web_url>{base_uri}/.well-known/oauth-protected-resource` with
+    // that resource path appended (RFC 9728 §3.1).
+    let external_resource_path = format!("{}/api{}", cfg.common.base_uri, path);
+    let resource_meta = format!(
+        "{}{}/.well-known/oauth-protected-resource{}",
+        cfg.common.web_url.trim_end_matches('/'),
+        cfg.common.base_uri,
+        external_resource_path
+    );
+    let value = format!(r#"Bearer resource_metadata="{resource_meta}""#);
+    if let Ok(hv) = header::HeaderValue::from_str(&value) {
+        resp.headers_mut().insert(header::WWW_AUTHENTICATE, hv);
+    }
+    resp
+}
+
+/// OSS: no MCP OAuth discovery, so the 401 is returned unchanged.
+#[cfg(not(feature = "enterprise"))]
+fn attach_mcp_www_authenticate(_path: &str, resp: Response) -> Response {
     resp
 }
 
