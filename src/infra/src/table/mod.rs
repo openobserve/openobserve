@@ -75,6 +75,7 @@ pub mod timed_annotations;
 #[cfg(feature = "cloud")]
 pub mod trial_quota_usage;
 pub mod users;
+pub mod workflows;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;

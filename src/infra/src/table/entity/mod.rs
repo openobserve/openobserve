@@ -58,3 +58,6 @@ pub mod timed_annotations;
 #[cfg(feature = "cloud")]
 pub mod trial_quota_usage;
 pub mod users;
+pub mod workflow_errors;
+pub mod workflow_run_data;
+pub mod workflows;

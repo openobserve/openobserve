@@ -61,7 +61,7 @@
     "highlight.js": "^11.11.1",
     "js-beautify": "^1.15.4",
     "js-cookie": "^3.0.7",
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^4.3.0",
     "json-2-csv": "^5.5.11",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",

@@ -245,7 +245,7 @@ async fn get_metering_lock() -> Result<Option<()>, infra::errors::Error> {
 
 // TODO: in a separate PR, replace the metering lock fn with this one instead
 #[cfg(feature = "enterprise")]
-async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
+pub async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
     use infra::{cluster::get_node_by_uuid, dist_lock};
 
     let db = infra::db::get_db().await;
@@ -940,6 +940,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::keys::watch());
         tokio::task::spawn(org_storage::run());
         tokio::task::spawn(db::org_storage_providers::watch());
+        tokio::task::spawn(db::workflows::clean());
+        tokio::task::spawn(db::workflows::watch());
+        if LOCAL_NODE.is_alert_manager() {
+            tokio::task::spawn(db::workflows::watch_workflow_triggers());
+        }
     }
 
     #[cfg(feature = "vectorscan")]

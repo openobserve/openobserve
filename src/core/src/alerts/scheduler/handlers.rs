@@ -957,8 +957,11 @@ async fn handle_alert_triggers(
                     );
                     if let Some(batch) =
                         crate::service::alerts::grouping::get_ready_batch(&fingerprint)
-                        && let Err(e) =
-                            crate::service::alerts::grouping::send_grouped_notification(batch).await
+                        && let Err(e) = crate::service::alerts::grouping::send_grouped_notification(
+                            &scheduler_trace_id,
+                            batch,
+                        )
+                        .await
                     {
                         log::error!(
                             "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
@@ -1166,6 +1169,7 @@ async fn handle_alert_triggers(
             // Direct notification — creates_incident=false, or incident correlation errored.
             match alert
                 .send_notification(
+                    &scheduler_trace_id,
                     &data,
                     trigger_results.end_time,
                     Some(start_time),

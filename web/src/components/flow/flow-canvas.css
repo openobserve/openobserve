@@ -1,0 +1,207 @@
+/* Copyright 2026 OpenObserve Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SHARED VueFlow canvas styling — the ONE token-driven source.
+ *
+ * These selectors target markup VueFlow renders itself (`.vue-flow__node-*`,
+ * `.vue-flow__background`) and classes FlowNodeCard puts on its handles, so they
+ * CANNOT be `scoped` — a scoped block adds a data-attribute the library's own
+ * elements never carry. Global is deliberate here, not an oversight; keeping it
+ * in one imported file is what stops it being re-pasted per canvas.
+ *
+ * Colours are registered `--color-*` tokens and sizes are rem. Every value
+ * resolves to exactly what the previous hardcoded hex/px produced, so this is a
+ * refactor with no visual change:
+ *   #60a5fa blue-400   #3b82f6 blue-500    #dbeafe blue-100    #eff6ff blue-50
+ *   #f59e0b amber-500  #fef3c7 amber-100   #fffbeb amber-50
+ *   #22c55e success-500  #dcfce7 success-100  #f0fdf4 success-50  #4ade80 success-400
+ *
+ * Node types map to roles: input = blue, default (transform) = amber,
+ * output = green. Both the pipeline and workflow canvases use the same three.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Node chrome ─────────────────────────────────────────────────────────── */
+.o2vf_node .vue-flow__node {
+  padding: 0.5rem 1rem;
+  width: auto;
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 8%, transparent);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  background: color-mix(in srgb, var(--color-surface-base) 90%, transparent);
+  backdrop-filter: blur(0.625rem);
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.o2vf_node .vue-flow__node:active,
+.o2vf_node .vue-flow__node.dragging {
+  cursor: grabbing;
+  transition: none !important;
+}
+
+/* Read-only inspection canvas (Runs view): nodes aren't draggable/editable. */
+.workflow-flow--readonly .vue-flow__node {
+  cursor: default;
+}
+
+.o2vf_node .vue-flow__node.selected {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-indigo-500) 22%, transparent);
+}
+
+/* ── Per-type colour: input = blue, default = amber, output = green ──────── */
+.o2vf_node .vue-flow__node-input {
+  border: 1px solid var(--color-blue-400);
+  color: var(--color-grey-800);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--color-blue-50) 80%, transparent);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-blue-500) 10%, transparent);
+}
+
+.o2vf_node .vue-flow__node-default {
+  border: 1px solid var(--color-amber-500);
+  color: var(--color-grey-800);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--color-amber-50) 80%, transparent);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-amber-500) 10%, transparent);
+}
+
+.o2vf_node .vue-flow__node-output {
+  border: 1px solid color-mix(in srgb, var(--color-success-400) 60%, transparent);
+  color: var(--color-grey-800);
+  border-radius: 0.75rem;
+  background: var(--color-success-50);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-success-500) 10%, transparent);
+}
+
+/* ── Hover glow, same three roles ────────────────────────────────────────── */
+.o2vf_node .vue-flow__node-input:hover {
+  background: var(--color-blue-50);
+  border-color: color-mix(in srgb, var(--color-blue-400) 90%, transparent);
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-blue-500) 20%, transparent);
+}
+
+.o2vf_node .vue-flow__node-default:hover {
+  background: color-mix(in srgb, var(--color-amber-50) 95%, transparent);
+  border-color: var(--color-amber-500);
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-amber-600) 20%, transparent);
+}
+
+.o2vf_node .vue-flow__node-output:hover {
+  background: var(--color-success-50);
+  border-color: color-mix(in srgb, var(--color-success-400) 80%, transparent);
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-success-500) 20%, transparent);
+}
+
+/* ── Handles — a coloured ring with a darker inner dot (the `::before`) ──── */
+.node_handle_custom {
+  width: 1rem !important;
+  height: 1rem !important;
+  border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
+  border-radius: 50% !important;
+  background: var(--color-grey-500);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
+  transition: all 0.3s ease;
+}
+
+.node_handle_custom::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-grey-700);
+  transition: all 0.3s ease;
+}
+
+.handle_input {
+  background: var(--color-blue-100) !important;
+}
+.handle_input::before {
+  background: var(--color-blue-500) !important;
+}
+.handle_output {
+  background: var(--color-success-100) !important;
+}
+.handle_output::before {
+  background: var(--color-success-500) !important;
+}
+.handle_default {
+  background: var(--color-amber-100) !important;
+}
+.handle_default::before {
+  background: var(--color-amber-500) !important;
+}
+
+/* ── Canvas dot grid ─────────────────────────────────────────────────────────
+ * @vue-flow/background renders `h("circle", { fill: color })` — an SVG
+ * PRESENTATION ATTRIBUTE, where `var(--color-*)` does not resolve. The CSS
+ * `fill` property overrides that attribute, so the grid is driven from a token
+ * here instead of a `pattern-color` hex prop, and it follows the theme for free.
+ * ───────────────────────────────────────────────────────────────────────────── */
+.o2vf_node .vue-flow__background circle {
+  fill: var(--color-border-strong);
+}
+
+/* ── Dark mode ───────────────────────────────────────────────────────────── */
+.dark .o2vf_node .vue-flow__node {
+  background: color-mix(in srgb, var(--color-surface-base) 90%, transparent) !important;
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 35%, transparent);
+}
+
+.dark .o2vf_node .vue-flow__node-input {
+  background: color-mix(in srgb, var(--color-blue-900) 20%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-blue-400) 30%, transparent) !important;
+  color: color-mix(in srgb, var(--color-white) 90%, transparent) !important;
+}
+
+.dark .o2vf_node .vue-flow__node-default {
+  background: color-mix(in srgb, var(--color-warning-900) 20%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-orange-400) 30%, transparent) !important;
+  color: color-mix(in srgb, var(--color-white) 90%, transparent) !important;
+}
+
+.dark .o2vf_node .vue-flow__node-output {
+  background: color-mix(in srgb, var(--color-success-900) 20%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-success-400) 30%, transparent) !important;
+  color: color-mix(in srgb, var(--color-white) 90%, transparent) !important;
+}
+
+.dark .o2vf_node .vue-flow__node-input:hover {
+  background: color-mix(in srgb, var(--color-blue-900) 30%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-blue-400) 50%, transparent) !important;
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-blue-500) 20%, transparent) !important;
+}
+
+.dark .o2vf_node .vue-flow__node-default:hover {
+  background: color-mix(in srgb, var(--color-warning-900) 30%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-orange-400) 50%, transparent) !important;
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-amber-500) 20%, transparent) !important;
+}
+
+.dark .o2vf_node .vue-flow__node-output:hover {
+  background: color-mix(in srgb, var(--color-success-900) 30%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-success-400) 50%, transparent) !important;
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-success-500) 20%, transparent) !important;
+}

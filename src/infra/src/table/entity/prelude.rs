@@ -20,4 +20,5 @@ pub use super::{
     source_maps::Entity as SourceMaps, templates::Entity as Templates,
     timed_annotation_panels::Entity as TimedAnnotationPanels,
     timed_annotations::Entity as TimedAnnotations, users::Entity as Users,
+    workflow_errors::Entity as WorkflowErrors, workflows::Entity as Workflows,
 };
