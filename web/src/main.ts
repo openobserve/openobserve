@@ -135,7 +135,7 @@ const getConfig = async () => {
               /RS SDK/i,
               /reo.dev/i,
               /Cannot set properties of null \(setting 'innerHTML'\)/,
-              /^Fetch error (POST|GET) https:/,
+              /^(Fetch|XHR) error (POST|GET) https:/,
             ];
 
             // Check if error matches any ignored pattern
@@ -172,8 +172,8 @@ const getConfig = async () => {
           const ignoredLogPatterns = [
             /ResizeObserver loop/i,
             // Network errors forwarded by forwardErrorsToLogs, e.g.
-            // "Fetch error POST https://..." / "Fetch error GET https://..."
-            /^Fetch error (POST|GET) https:/,
+            // "Fetch error POST https://..." / "XHR error GET https://..."
+            /^(Fetch|XHR) error (POST|GET) https:/,
           ];
 
           // Check if log matches any ignored pattern
