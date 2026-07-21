@@ -30,7 +30,8 @@ exceptions = [
     { name = "openobserve-core", allow = ["AGPL-3.0"] },
     { name = "openobserve-jobs", allow = ["AGPL-3.0"] },
     { name = "openobserve-mcp", allow = ["AGPL-3.0"] },
-    { name = "openobserve-vrl", allow = ["AGPL-3.0"] },
+    { name = "transform", allow = ["AGPL-3.0"] },
+    { name = "super_cluster_queue", allow = ["AGPL-3.0"] },
     { name = "search", allow = ["AGPL-3.0"] },
     { name = "promql", allow = ["AGPL-3.0"] },
     # Empty dependency-resolution stubs for the private enterprise crates.

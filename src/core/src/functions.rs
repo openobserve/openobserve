@@ -156,7 +156,7 @@ async fn test_run_vrl_function(
         Ok(program) => {
             let registry = program
                 .config
-                .get_custom::<vector_enrichment::TableRegistry>()
+                .get_custom::<transform::vector_enrichment::TableRegistry>()
                 .unwrap();
             registry.finish_load();
             program

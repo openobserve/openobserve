@@ -1,16 +1,24 @@
 [package]
-name = "openobserve-vrl"
+name = "transform"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
 
+[features]
+default = []
+enterprise = ["dep:o2_enterprise"]
+
 [dependencies]
 async-trait.workspace = true
 config.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+regex.workspace = true
+rquickjs.workspace = true
+serde_json.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
 tokio.workspace = true
