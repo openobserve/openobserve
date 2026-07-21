@@ -556,7 +556,7 @@ function onClearResults() {
       <div class="max-w-[48rem] w-full mx-auto py-4 px-4">
         <div class="flex justify-center mb-6">
           <div class="rounded-default border border-border-default bg-surface-base p-6 flex items-center justify-center">
-            <OIcon name="open-in-browser" size="xl" class="text-primary-500" aria-hidden="true" />
+            <OIcon name="open-in-browser" size="xl" class="text-accent" aria-hidden="true" />
           </div>
         </div>
 
@@ -568,7 +568,7 @@ function onClearResults() {
           <!-- Step 1 -->
           <div class="flex items-start gap-4 p-4">
             <span
-            class="flex-shrink-0 w-7 h-7 rounded-full bg-primary-500 text-text-inverse flex items-center justify-center text-sm font-semibold"
+            class="flex-shrink-0 w-7 h-7 rounded-full bg-accent text-text-inverse flex items-center justify-center text-sm font-semibold"
             :class="extensionInstalled ? 'bg-[var(--color-status-success-text)]!': ''"
             >
               1
@@ -622,7 +622,7 @@ function onClearResults() {
           <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionInstalled }">
             <span
               class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-              :class="extensionInstalled ? incognitoAllowed ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
+              :class="extensionInstalled ? incognitoAllowed ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-accent text-text-inverse' : 'bg-surface-subtle text-text-muted'"
             >2</span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">

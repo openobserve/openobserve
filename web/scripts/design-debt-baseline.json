@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 25,
+    "rawProjectRamp": 16,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -9,11 +9,10 @@
   },
   "files": {
     "components/CodeQueryEditor.vue": {
-      "rawProjectRamp": 1,
       "rawVarInComponent": 2
     },
     "components/CommunitySlackInvite.vue": {
-      "rawProjectRamp": 5
+      "rawProjectRamp": 4
     },
     "components/CustomDateTimePicker.vue": {
       "arbZ": 1
@@ -128,9 +127,6 @@
       "unscopedStyle": 1,
       "rawVarInComponent": 20
     },
-    "components/pipeline/PipelineSectionTabs.vue": {
-      "rawProjectRamp": 2
-    },
     "components/pipeline/PipelineView.vue": {
       "stylePxUnit": 6,
       "rawVarInComponent": 15
@@ -152,9 +148,6 @@
     },
     "components/settings/OrgStorageEditor.vue": {
       "arbZ": 1
-    },
-    "components/synthetics/CreateBrowserTestSkeleton.vue": {
-      "rawProjectRamp": 1
     },
     "components/traces/FlameGraphView.vue": {
       "rawProjectRamp": 1
@@ -414,17 +407,11 @@
       "unscopedStyle": 1,
       "rawVarInComponent": 1
     },
-    "views/HomeChatHistory.vue": {
-      "rawProjectRamp": 1
-    },
     "views/HomeView.vue": {
       "rawVarInComponent": 18
     },
     "views/OverviewTab.vue": {
       "arbZ": 1
-    },
-    "views/synthetics/CreateBrowserTest.vue": {
-      "rawProjectRamp": 3
     }
   }
 }

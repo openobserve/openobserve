@@ -153,7 +153,7 @@ const joinSlack = () => {
       <!-- Header: Slack badge, title to its right, close button on the far right -->
       <div class="flex items-start gap-3">
         <div
-          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-default bg-primary-50"
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-default bg-icon-chip-primary-bg"
           aria-hidden="true"
         >
           <svg
