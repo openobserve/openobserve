@@ -367,19 +367,19 @@ export class PipelinesPage {
 
     // Methods from PipelinePage
     async openPipelineMenu() {
-        await openNavFlyoutChild(this.page, 'pipeline');
-        // openNavFlyoutChild navigates via a hover-flyout force-click that can
-        // intermittently miss (the flyout self-closes on settle), leaving us on the
-        // previous page. That was the dominant Pipelines-shard flake: the follow-up
-        // pipelineTab.click() then timed out at the 45s action timeout because the
-        // streamPipelines tab only exists on the pipeline list page. Confirm we
-        // actually landed; if not, navigate directly — a goto is deterministic and
-        // needs no flyout.
-        const onPipelinePage = await this.page.locator('[data-test="pipeline-list-page"]')
-            .waitFor({ state: 'visible', timeout: 15000 })
-            .then(() => true)
-            .catch(() => false);
-        if (!onPipelinePage) {
+        // Navigate straight to the pipeline list via goto — deterministic and fast.
+        // The left-nav flyout (openNavFlyoutChild) is a hover-reveal that self-closes on
+        // settle and, under concurrent cloud load, burns up to ~30s retrying to open
+        // before its goto-fallback even fires. A heavy condition test calls this twice,
+        // and that wasted time tipped pipeline-conditions:82 over the 180s test timeout
+        // (validated against alpha at --workers=5). The flyout adds no coverage here — we
+        // only need to land on the pipeline list page — so skip it. goto is already the
+        // proven fallback path; promoting it to primary removes the flake source.
+        // (Auth is safe: with the stored session, a goto to a list route boots the SPA
+        // with the existing token — unlike a reload of the unsaved /pipelines/add editor,
+        // which re-triggers the Dex callback.)
+        if (!(await this.page.locator('[data-test="pipeline-list-page"]')
+            .isVisible({ timeout: 3000 }).catch(() => false))) {
             await this.page.goto(
                 `${process.env.ZO_BASE_URL}/web/pipeline/pipelines?org_identifier=${process.env["ORGNAME"]}`
             );
