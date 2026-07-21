@@ -918,6 +918,7 @@ name = "audit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "config",
  "log",
  "o2_enterprise",
@@ -11879,6 +11880,7 @@ checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
 name = "usage_reporting"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "config",
  "log",

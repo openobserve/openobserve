@@ -217,10 +217,17 @@ pub async fn flush() {
 }
 
 #[cfg(feature = "enterprise")]
-pub fn publish_audit(request: proto::cluster_rpc::IngestionRequest) -> audit::AuditPublishFuture {
-    Box::pin(async move {
+pub struct CoreAuditPublisher;
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl audit::AuditPublisher for CoreAuditPublisher {
+    async fn publish(
+        &self,
+        request: proto::cluster_rpc::IngestionRequest,
+    ) -> Result<proto::cluster_rpc::IngestionResponse, anyhow::Error> {
         crate::service::ingestion::ingestion_service::ingest(request)
             .await
             .map_err(|error| anyhow::anyhow!(error.to_string()))
-    })
+    }
 }

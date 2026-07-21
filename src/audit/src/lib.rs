@@ -7,27 +7,27 @@
 
 #[cfg(feature = "enterprise")]
 mod enterprise {
-    use std::{future::Future, pin::Pin, sync::OnceLock};
+    use std::sync::{Arc, OnceLock};
 
+    use async_trait::async_trait;
     use config::{META_ORG_ID, spawn_pausable_job};
     pub use o2_enterprise::enterprise::common::auditor;
     use proto::cluster_rpc;
 
-    pub type AuditPublishFuture = Pin<
-        Box<
-            dyn Future<Output = Result<cluster_rpc::IngestionResponse, anyhow::Error>>
-                + Send
-                + 'static,
-        >,
-    >;
-    pub type AuditPublisher = fn(cluster_rpc::IngestionRequest) -> AuditPublishFuture;
+    #[async_trait]
+    pub trait AuditPublisher: Send + Sync + 'static {
+        async fn publish(
+            &self,
+            request: cluster_rpc::IngestionRequest,
+        ) -> Result<cluster_rpc::IngestionResponse, anyhow::Error>;
+    }
 
-    static AUDIT_PUBLISHER: OnceLock<AuditPublisher> = OnceLock::new();
+    static AUDIT_PUBLISHER: OnceLock<Arc<dyn AuditPublisher>> = OnceLock::new();
 
-    pub fn set_audit_publisher(publisher: AuditPublisher) {
-        if AUDIT_PUBLISHER.set(publisher).is_err() {
-            log::warn!("[AUDIT-SERVICE] audit publisher was already initialized");
-        }
+    pub fn set_audit_publisher(
+        publisher: Arc<dyn AuditPublisher>,
+    ) -> Result<(), Arc<dyn AuditPublisher>> {
+        AUDIT_PUBLISHER.set(publisher)
     }
 
     async fn publish_audit(
@@ -36,7 +36,7 @@ mod enterprise {
         let publisher = AUDIT_PUBLISHER
             .get()
             .ok_or_else(|| anyhow::anyhow!("audit publisher is not initialized"))?;
-        publisher(request).await
+        publisher.publish(request).await
     }
 
     pub async fn audit(message: auditor::AuditMessage) {

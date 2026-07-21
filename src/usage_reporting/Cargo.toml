@@ -10,6 +10,7 @@ default = []
 enterprise = ["config/enterprise"]
 
 [dependencies]
+async-trait.workspace = true
 chrono.workspace = true
 config.workspace = true
 log.workspace = true

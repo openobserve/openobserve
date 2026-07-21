@@ -71,9 +71,7 @@ impl Searcher {
 
     // get all task status that is leader
     pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::QueryStatus> {
-        let mut status = self.query_manager.get_task_status().await;
-
-        status
+        self.query_manager.get_task_status().await
     }
 
     // add file stats

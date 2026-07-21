@@ -5,12 +5,9 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, LazyLock as Lazy, OnceLock},
-};
+use std::sync::{Arc, LazyLock as Lazy, OnceLock};
 
+use async_trait::async_trait;
 use chrono::{DateTime, Datelike, Timelike};
 use config::{
     SIZE_IN_MB, get_config,
@@ -28,20 +25,22 @@ use tokio::{
     time,
 };
 
-pub type BatchPublishFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
-pub type BatchPublisher = fn(usize, Vec<ReportingData>) -> BatchPublishFuture;
+#[async_trait]
+pub trait BatchPublisher: Send + Sync + 'static {
+    async fn publish(&self, worker_id: usize, batch: Vec<ReportingData>);
+}
 
-static BATCH_PUBLISHER: OnceLock<BatchPublisher> = OnceLock::new();
+static BATCH_PUBLISHER: OnceLock<Arc<dyn BatchPublisher>> = OnceLock::new();
 static USAGE_QUEUE: Lazy<Arc<ReportingQueue>> =
     Lazy::new(|| Arc::new(initialize_reporting_queue()));
 static ERROR_QUEUE: Lazy<Arc<ReportingQueue>> =
     Lazy::new(|| Arc::new(initialize_reporting_queue()));
 
 /// Registers the persistence adapter used after the reporting queue forms a batch.
-pub fn set_batch_publisher(publisher: BatchPublisher) {
-    if BATCH_PUBLISHER.set(publisher).is_err() {
-        log::warn!("[USAGE-REPORTING] batch publisher was already initialized");
-    }
+pub fn set_batch_publisher(
+    publisher: Arc<dyn BatchPublisher>,
+) -> Result<(), Arc<dyn BatchPublisher>> {
+    BATCH_PUBLISHER.set(publisher)
 }
 
 pub async fn report_request_usage_stats(
@@ -301,7 +300,7 @@ async fn run_queue_worker(
 async fn publish_batch(worker_id: usize, batch: Vec<ReportingData>) {
     decrement_queue_depth(&batch);
     match BATCH_PUBLISHER.get() {
-        Some(publisher) => publisher(worker_id, batch).await,
+        Some(publisher) => publisher.publish(worker_id, batch).await,
         None => log::error!("[USAGE-REPORTING] batch publisher is not initialized"),
     }
 }

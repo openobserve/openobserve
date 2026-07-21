@@ -29,11 +29,13 @@ use hashbrown::HashMap;
 #[cfg(feature = "cloud")]
 use crate::service::organization;
 
-pub fn publish_batch(
-    thread_id: usize,
-    buffered: Vec<ReportingData>,
-) -> usage_reporting::BatchPublishFuture {
-    Box::pin(ingest_buffered_data(thread_id, buffered))
+pub struct CoreBatchPublisher;
+
+#[async_trait::async_trait]
+impl usage_reporting::BatchPublisher for CoreBatchPublisher {
+    async fn publish(&self, thread_id: usize, buffered: Vec<ReportingData>) {
+        ingest_buffered_data(thread_id, buffered).await;
+    }
 }
 
 async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
