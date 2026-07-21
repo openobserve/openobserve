@@ -283,6 +283,7 @@ import { SYNTHETIC_CHECK_TYPES, type AgentSetup, type SyntheticCheckType, type S
 import { CHECK_TYPE_CARDS } from '@/constants/synthetics'
 import { useI18n } from 'vue-i18n'
 import syntheticsService from '@/services/synthetics'
+import { locationDisplayLabel } from '@/utils/synthetics/format'
 import { getFoldersListByType } from '@/utils/commons'
 import { toast } from '@/lib/feedback/Toast/useToast'
 
@@ -640,10 +641,10 @@ async function loadLocations() {
       (res.data as any).locations ?? [];
     locationOpts.value = [
       { label: t('synthetics.filters.allLocations'), value: 'all' },
-      ...locations.map((loc) => ({ label: `${loc.name} (${loc.region})`, value: loc.id })),
+      ...locations.map((loc) => ({ label: locationDisplayLabel(loc.name, loc.region), value: loc.id })),
     ];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, `${loc.name} (${loc.region})`]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
     );
   } catch (err) {
     console.error('[synthetics] failed to load locations', err);

@@ -560,6 +560,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import { locationDisplayLabel } from "@/utils/synthetics/format";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -637,7 +638,7 @@ syntheticsService
   .then((res) => {
     const locations: { id: string; name: string; region: string }[] = (res.data as any).locations ?? [];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, `${loc.name} (${loc.region})`]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
     );
   })
   .catch((err) => console.error("[synthetics] failed to load locations", err));

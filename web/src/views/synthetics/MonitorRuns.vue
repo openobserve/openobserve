@@ -999,6 +999,7 @@ import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import syntheticsService from "@/services/synthetics";
+import { locationDisplayLabel } from "@/utils/synthetics/format";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
@@ -1027,7 +1028,7 @@ onMounted(async () => {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
     const locations: { id: string; name: string; region: string }[] = (res.data as any).locations ?? [];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, `${loc.name} (${loc.region})`]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
     );
   } catch (err) {
     console.error("[synthetics] failed to load locations", err);

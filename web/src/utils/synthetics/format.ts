@@ -18,3 +18,13 @@ export function formatIntervalSecs(secs: number): string {
   if (secs < 86400) return `${Math.round(secs / 3600)}h`
   return `${Math.round(secs / 86400)}d`
 }
+
+/** "Name (region)", omitting the region when it's blank or a mechanical
+ *  duplicate of the name — private locations without an explicit region
+ *  default to a slug of their own name server-side, which reads as
+ *  pointless noise ("private-location-5660 (private-location-5660)"). */
+export function locationDisplayLabel(name: string, region: string | undefined | null): string {
+  const r = region?.trim()
+  if (!r || r.toLowerCase() === name.trim().toLowerCase()) return name
+  return `${name} (${r})`
+}
