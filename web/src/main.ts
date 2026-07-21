@@ -135,6 +135,7 @@ const getConfig = async () => {
               /RS SDK/i,
               /reo.dev/i,
               /Cannot set properties of null \(setting 'innerHTML'\)/,
+              /^Fetch error (POST|GET) https:/,
             ];
 
             // Check if error matches any ignored pattern
@@ -168,7 +169,12 @@ const getConfig = async () => {
           const logMessage = log.message || "";
 
           // List of log patterns to ignore
-          const ignoredLogPatterns = [/ResizeObserver loop/i];
+          const ignoredLogPatterns = [
+            /ResizeObserver loop/i,
+            // Network errors forwarded by forwardErrorsToLogs, e.g.
+            // "Fetch error POST https://..." / "Fetch error GET https://..."
+            /^Fetch error (POST|GET) https:/,
+          ];
 
           // Check if log matches any ignored pattern
           const shouldIgnore = ignoredLogPatterns.some((pattern) =>
