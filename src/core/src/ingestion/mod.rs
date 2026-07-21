@@ -13,8 +13,9 @@ use common::meta::stream::StreamSchema;
 use config::{
     META_ORG_ID, get_config,
     meta::{
+        pipeline::PipelineKind,
         self_reporting::usage::{RequestStats, TriggerData, UsageType},
-        stream::StreamType,
+        stream::{StreamParams, StreamType},
     },
 };
 
@@ -32,6 +33,58 @@ pub use openobserve_transform::{
 };
 
 struct CoreIngestionRuntime;
+
+#[derive(Debug)]
+struct CoreExecutablePipeline(openobserve_pipeline::batch_execution::ExecutablePipeline);
+
+#[async_trait]
+impl openobserve_ingestion::ports::PipelineExecutor for CoreExecutablePipeline {
+    fn kind(&self) -> PipelineKind {
+        self.0.kind.clone()
+    }
+
+    fn contains_llm_evaluation_node(&self) -> bool {
+        self.0.contains_llm_evaluation_node()
+    }
+
+    fn destination_streams(&self) -> Vec<StreamParams> {
+        self.0.get_all_destination_streams()
+    }
+
+    fn name(&self) -> &str {
+        self.0.get_pipeline_name()
+    }
+
+    fn num_functions(&self) -> usize {
+        self.0.num_of_func()
+    }
+
+    async fn process_batch(
+        &self,
+        org_id: &str,
+        records: Vec<serde_json::Value>,
+        stream_name: Option<String>,
+    ) -> anyhow::Result<openobserve_ingestion::ports::PipelineBatchOutput> {
+        self.0.process_batch(org_id, records, stream_name).await
+    }
+}
+
+#[async_trait]
+impl openobserve_ingestion::ports::PipelineProvider for CoreIngestionRuntime {
+    async fn executable_pipelines(
+        &self,
+        stream: &StreamParams,
+    ) -> Vec<openobserve_ingestion::ports::ExecutablePipeline> {
+        openobserve_pipeline::service::get_executable_pipelines(stream)
+            .await
+            .into_iter()
+            .map(|pipeline| {
+                Arc::new(CoreExecutablePipeline(pipeline))
+                    as openobserve_ingestion::ports::ExecutablePipeline
+            })
+            .collect()
+    }
+}
 
 #[async_trait]
 impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
@@ -226,5 +279,7 @@ impl openobserve_ingestion::ports::RuntimeServices for CoreIngestionRuntime {
 }
 
 pub fn install_runtime_services() {
-    let _ = openobserve_ingestion::ports::install_runtime_services(Arc::new(CoreIngestionRuntime));
+    let runtime = Arc::new(CoreIngestionRuntime);
+    let _ = openobserve_ingestion::ports::install_runtime_services(runtime.clone());
+    let _ = openobserve_ingestion::ports::install_pipeline_provider(runtime);
 }

@@ -17,6 +17,7 @@ enterprise = [
     "config/enterprise",
     "search/enterprise",
     "openobserve-alerts/enterprise",
+    "openobserve-query-evaluation/enterprise",
     "openobserve-ingestion/enterprise",
     "openobserve-catalog/enterprise",
     "openobserve-enrichment/enterprise",
@@ -58,6 +59,7 @@ vortex = [
 [dependencies]
 common.workspace = true
 openobserve-alerts.workspace = true
+openobserve-query-evaluation.workspace = true
 openobserve-ingestion.workspace = true
 openobserve-enrichment.workspace = true
 openobserve-organization.workspace = true

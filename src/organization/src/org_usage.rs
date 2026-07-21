@@ -23,9 +23,10 @@ use o2_enterprise::enterprise::{
     },
     metering::MeteringEventName,
 };
-use openobserve_self_reporting::search::get_usage;
 use serde::Serialize;
 use utoipa::ToSchema;
+
+use crate::search_usage;
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct GetOrgUsageResponseBody {
@@ -124,7 +125,7 @@ pub async fn get_org_usage(
     // The main `usage` stream may not exist yet for a brand-new org. As with
     // data retention below, a missing stream should read as "no usage" rather
     // than failing the whole request.
-    let mut usage_results = match get_usage(sql, start_time, end_time, false).await {
+    let mut usage_results = match search_usage(sql, start_time, end_time, false).await {
         Ok(hits) => hits
             .into_iter()
             .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())
@@ -147,7 +148,7 @@ pub async fn get_org_usage(
     // failure here (most commonly "stream not found") must NOT fail the whole
     // usage response — treat it as zero retention and return the rest.
     let mut data_retention_results =
-        match get_usage(data_retention_query, start_time, end_time, false).await {
+        match search_usage(data_retention_query, start_time, end_time, false).await {
             Ok(hits) => hits
                 .into_iter()
                 .filter_map(|hit| json::from_value::<OrgUsageQueryResult>(hit).ok())

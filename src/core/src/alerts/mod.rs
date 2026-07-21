@@ -18,7 +18,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use config::{
     meta::{
-        alerts::{AlertConditionParams, QueryCondition, TriggerEvalResults, alert::Alert},
+        alerts::{TriggerEvalResults, alert::Alert},
         search::{SearchEventContext, SearchEventType},
         stream::StreamType,
     },
@@ -195,74 +195,6 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
                 )
                 .await
         }
-    }
-
-    async fn build_sql(
-        &self,
-        org_id: &str,
-        stream_name: &str,
-        stream_type: StreamType,
-        query_condition: &QueryCondition,
-        conditions: &AlertConditionParams,
-    ) -> anyhow::Result<String> {
-        openobserve_alerts::evaluation::build_sql(
-            org_id,
-            stream_name,
-            stream_type,
-            query_condition,
-            conditions,
-        )
-        .await
-    }
-
-    async fn promql_search(
-        &self,
-        trace_id: &str,
-        org_id: &str,
-        query: String,
-        start: i64,
-        end: i64,
-        step: i64,
-        is_super_cluster: bool,
-    ) -> anyhow::Result<config::meta::promql::value::Value> {
-        let req = super::promql::MetricsQueryRequest {
-            query,
-            start,
-            end,
-            step,
-            query_exemplars: false,
-            use_cache: None,
-            search_type: Some(SearchEventType::Alerts),
-            regions: vec![],
-            clusters: vec![],
-        };
-        Ok(super::promql::search::search(trace_id, org_id, &req, "", 0, is_super_cluster).await?)
-    }
-
-    async fn setup_tracing_with_trace_id(
-        &self,
-        trace_id: &str,
-        span: tracing::Span,
-    ) -> tracing::Span {
-        common::utils::tracing::setup_tracing_with_trace_id(trace_id, span).await
-    }
-
-    fn report_search_metrics(
-        &self,
-        start: std::time::Instant,
-        org_id: &str,
-        stream_type: StreamType,
-        search_type: &str,
-    ) {
-        crate::self_reporting::http_report_metrics(
-            start,
-            org_id,
-            stream_type,
-            "200",
-            "_search",
-            search_type,
-            "",
-        );
     }
 
     #[cfg(feature = "enterprise")]
@@ -457,6 +389,111 @@ impl openobserve_alerts::ports::RuntimeServices for CoreRuntimeServices {
     }
 }
 
+#[async_trait]
+impl openobserve_query_evaluation::QueryExecutor for CoreRuntimeServices {
+    async fn search_service(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        request: &config::meta::search::Request,
+    ) -> infra::errors::Result<config::meta::search::Response> {
+        openobserve_search_service::service::search(trace_id, org_id, stream_type, None, request)
+            .await
+    }
+
+    async fn search(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        request: &config::meta::search::Request,
+    ) -> infra::errors::Result<config::meta::search::Response> {
+        openobserve_search_service::grpc_search::grpc_search(
+            trace_id,
+            org_id,
+            stream_type,
+            None,
+            request,
+            Some(config::meta::cluster::RoleGroup::Background),
+        )
+        .await
+    }
+
+    async fn search_multi(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        stream_type: StreamType,
+        request: &config::meta::search::MultiStreamRequest,
+    ) -> infra::errors::Result<config::meta::search::Response> {
+        openobserve_search_service::grpc_search::grpc_search_multi(
+            trace_id,
+            org_id,
+            stream_type,
+            None,
+            request,
+            Some(config::meta::cluster::RoleGroup::Background),
+        )
+        .await
+    }
+
+    async fn promql_search(
+        &self,
+        trace_id: &str,
+        org_id: &str,
+        query: String,
+        start: i64,
+        end: i64,
+        step: i64,
+        is_super_cluster: bool,
+    ) -> anyhow::Result<config::meta::promql::value::Value> {
+        let request = super::promql::MetricsQueryRequest {
+            query,
+            start,
+            end,
+            step,
+            query_exemplars: false,
+            use_cache: None,
+            search_type: Some(SearchEventType::Alerts),
+            regions: vec![],
+            clusters: vec![],
+        };
+        Ok(
+            super::promql::search::search(trace_id, org_id, &request, "", 0, is_super_cluster)
+                .await?,
+        )
+    }
+
+    async fn setup_tracing_with_trace_id(
+        &self,
+        trace_id: &str,
+        span: tracing::Span,
+    ) -> tracing::Span {
+        common::utils::tracing::setup_tracing_with_trace_id(trace_id, span).await
+    }
+
+    fn report_search_metrics(
+        &self,
+        start: std::time::Instant,
+        org_id: &str,
+        stream_type: StreamType,
+        search_type: &str,
+    ) {
+        crate::self_reporting::http_report_metrics(
+            start,
+            org_id,
+            stream_type,
+            "200",
+            "_search",
+            search_type,
+            "",
+        );
+    }
+}
+
 pub fn install_runtime_services() {
-    let _ = openobserve_alerts::ports::install_runtime_services(Arc::new(CoreRuntimeServices));
+    let services = Arc::new(CoreRuntimeServices);
+    let _ = openobserve_alerts::ports::install_runtime_services(services.clone());
+    let _ = openobserve_query_evaluation::install_query_executor(services);
 }

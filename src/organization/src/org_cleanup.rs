@@ -238,17 +238,12 @@ async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
 async fn emit_failed_alert(org_id: &str, _step: &str) {
     #[cfg(feature = "cloud")]
     {
-        use openobserve_self_reporting::cloud_events::{
-            CloudEvent, EventType, enqueue_cloud_event,
-        };
-        enqueue_cloud_event(CloudEvent {
-            event: EventType::OrgCleanupFailed,
+        crate::enqueue_reporting_event(crate::ReportingEvent {
+            event: crate::ReportingEventType::OrgCleanupFailed,
             org_id: org_id.to_string(),
             org_name: org_id.to_string(),
             org_type: String::new(),
             user: None,
-            subscription_type: None,
-            stream_name: None,
         })
         .await;
     }
@@ -614,23 +609,7 @@ async fn step_delete_users(org_id: &str) -> Result<(), anyhow::Error> {
 async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     #[cfg(feature = "enterprise")]
     {
-        use openobserve_self_reporting::{audit, auditor};
-        audit(auditor::AuditMessage {
-            user_email: actor.to_string(),
-            org_id: org_id.to_string(),
-            _timestamp: config::utils::time::now_micros(),
-            protocol: auditor::Protocol::Http,
-            response_meta: auditor::ResponseMeta {
-                http_method: "SYSTEM".to_string(),
-                http_path: format!("/system/org_cleanup/{from}_to_{to}"),
-                http_query_params: String::new(),
-                http_body: String::new(),
-                http_response_code: 200,
-                error_msg: None,
-                trace_id: None,
-            },
-        })
-        .await;
+        crate::audit_status_transition(org_id, actor, from, to).await;
     }
 }
 

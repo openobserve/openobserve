@@ -697,7 +697,7 @@ pub async fn handle_otlp_request(
         let mut evaluation_tasks = tokio::task::JoinSet::new();
 
         for exec_pl in &executable_pipelines {
-            if exec_pl.kind == config::meta::pipeline::PipelineKind::Evaluation
+            if exec_pl.kind() == config::meta::pipeline::PipelineKind::Evaluation
                 && exec_pl.contains_llm_evaluation_node()
             {
                 let exec_pl = exec_pl.clone();
@@ -823,10 +823,10 @@ pub async fn handle_otlp_request(
         // records by writing them back to the source stream.
         let has_user_pipeline = executable_pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+            .any(|p| p.kind() == config::meta::pipeline::PipelineKind::User);
         let has_evaluation_pipeline = executable_pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
+            .any(|p| p.kind() == config::meta::pipeline::PipelineKind::Evaluation);
         log::debug!(
             "[TRACES:OTLP] source preservation check stream={traces_stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
             executable_pipelines.len(),

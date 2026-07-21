@@ -14,8 +14,9 @@ use arrow_schema::{Field, Schema};
 use async_trait::async_trait;
 use common::meta::stream::StreamSchema;
 use config::meta::{
+    pipeline::PipelineKind,
     self_reporting::usage::{RequestStats, TriggerData, UsageType},
-    stream::StreamType,
+    stream::{StreamParams, StreamType},
 };
 use serde_json::{Map, Value};
 
@@ -30,6 +31,34 @@ pub struct TraceListValue {
     pub stream_name: String,
     pub service_name: String,
     pub trace_id: String,
+}
+
+pub type PipelineBatchOutput = HashMap<StreamParams, Vec<(usize, Value)>>;
+pub type ExecutablePipeline = Arc<dyn PipelineExecutor>;
+
+#[async_trait]
+pub trait PipelineExecutor: std::fmt::Debug + Send + Sync + 'static {
+    fn kind(&self) -> PipelineKind;
+
+    fn contains_llm_evaluation_node(&self) -> bool;
+
+    fn destination_streams(&self) -> Vec<StreamParams>;
+
+    fn name(&self) -> &str;
+
+    fn num_functions(&self) -> usize;
+
+    async fn process_batch(
+        &self,
+        org_id: &str,
+        records: Vec<Value>,
+        stream_name: Option<String>,
+    ) -> anyhow::Result<PipelineBatchOutput>;
+}
+
+#[async_trait]
+pub trait PipelineProvider: Send + Sync + 'static {
+    async fn executable_pipelines(&self, stream: &StreamParams) -> Vec<ExecutablePipeline>;
 }
 
 #[async_trait]
@@ -131,11 +160,28 @@ pub trait RuntimeServices: Send + Sync + 'static {
 }
 
 static RUNTIME_SERVICES: OnceLock<Arc<dyn RuntimeServices>> = OnceLock::new();
+static PIPELINE_PROVIDER: OnceLock<Arc<dyn PipelineProvider>> = OnceLock::new();
 
 pub fn install_runtime_services(
     services: Arc<dyn RuntimeServices>,
 ) -> Result<(), Arc<dyn RuntimeServices>> {
     RUNTIME_SERVICES.set(services)
+}
+
+pub fn install_pipeline_provider(
+    provider: Arc<dyn PipelineProvider>,
+) -> Result<(), Arc<dyn PipelineProvider>> {
+    PIPELINE_PROVIDER.set(provider)
+}
+
+pub async fn executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
+    match PIPELINE_PROVIDER.get() {
+        Some(provider) => provider.executable_pipelines(stream).await,
+        None => {
+            log::error!("ingestion pipeline provider is not installed");
+            Vec::new()
+        }
+    }
 }
 
 pub fn runtime_services_installed() -> bool {

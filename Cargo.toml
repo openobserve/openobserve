@@ -267,6 +267,7 @@ members = [
     "src/config",
     "src/infra",
     "src/pipeline",
+    "src/query_evaluation",
     "src/ingester",
     "src/ingestion",
     "src/enrichment",
@@ -297,6 +298,7 @@ tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
 openobserve-alerts = { path = "src/alerts" }
+openobserve-query-evaluation = { path = "src/query_evaluation" }
 openobserve-ingestion = { path = "src/ingestion" }
 openobserve-enrichment = { path = "src/enrichment" }
 openobserve-organization = { path = "src/organization" }

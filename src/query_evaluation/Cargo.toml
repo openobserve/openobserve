@@ -1,0 +1,26 @@
+[package]
+name = "openobserve-query-evaluation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise", "config/enterprise"]
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+common.workspace = true
+config.workspace = true
+infra.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+promql.workspace = true
+search.workspace = true
+tracing.workspace = true

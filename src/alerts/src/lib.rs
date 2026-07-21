@@ -19,7 +19,7 @@ use config::{RwAHashMap, meta::triggers::Trigger};
 
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
-pub mod evaluation;
+pub use openobserve_query_evaluation as evaluation;
 pub mod grouping;
 mod http;
 pub mod ports;

@@ -28,7 +28,7 @@ use config::{
     utils::sql::is_timestamp_selected,
 };
 use cron::Schedule;
-use openobserve_alerts::evaluation::QueryConditionExt;
+use openobserve_query_evaluation::QueryConditionExt;
 use openobserve_scheduler::{self as scheduler, Trigger, TriggerModule};
 
 pub async fn save(

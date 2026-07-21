@@ -29,7 +29,6 @@ use config::{
     utils::time::now_micros,
 };
 use infra::{db::ORM_CLIENT, table::anomaly_detection::config as anomaly_config_table};
-use openobserve_search_service::service as search;
 use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
@@ -1375,9 +1374,14 @@ pub async fn execute_anomaly_query(
 
     let parsed_stream_type = StreamType::from(stream_type);
     let trace_id = config::ider::generate_trace_id();
-    let search_result = search::search(&trace_id, org_id, parsed_stream_type, None, &search_req)
-        .await
-        .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e))?;
+    let search_result = openobserve_query_evaluation::search_service(
+        &trace_id,
+        org_id,
+        parsed_stream_type,
+        &search_req,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("[anomaly_detection {}] search failed: {}", anomaly_id, e))?;
 
     log::info!(
         "[anomaly_detection {}] search returned {} hits (total={})",

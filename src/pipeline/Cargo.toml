@@ -13,14 +13,13 @@ default = []
 enterprise = [
     "config/enterprise",
     "dep:o2_enterprise",
-    "openobserve-alerts/enterprise",
+    "openobserve-query-evaluation/enterprise",
     "openobserve-scheduler/enterprise",
 ]
 cloud = [
     "enterprise",
     "common/cloud",
     "o2_enterprise/cloud",
-    "openobserve-alerts/cloud",
 ]
 
 [dependencies]
@@ -36,7 +35,7 @@ infra.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 openobserve-scheduler.workspace = true
-openobserve-alerts.workspace = true
+openobserve-query-evaluation.workspace = true
 openobserve-transform.workspace = true
 proto.workspace = true
 rand.workspace = true

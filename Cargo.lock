@@ -6612,13 +6612,11 @@ dependencies = [
  "log",
  "o2_enterprise",
  "o2_openfga",
+ "openobserve-query-evaluation",
  "openobserve-scheduler",
- "openobserve-search-service",
- "promql",
  "regex",
  "reqwest 0.13.2",
  "sea-orm",
- "search",
  "serde",
  "serde_json",
  "svix-ksuid",
@@ -6892,6 +6890,7 @@ dependencies = [
  "openobserve-ingestion",
  "openobserve-organization",
  "openobserve-pipeline",
+ "openobserve-query-evaluation",
  "openobserve-reports",
  "openobserve-scheduler",
  "openobserve-search-service",
@@ -6990,7 +6989,6 @@ dependencies = [
  "o2_enterprise",
  "openobserve-alerts",
  "openobserve-catalog",
- "openobserve-pipeline",
  "openobserve-scheduler",
  "openobserve-search-service",
  "openobserve-transform",
@@ -7087,7 +7085,6 @@ dependencies = [
  "openobserve-ingestion",
  "openobserve-pipeline",
  "openobserve-search-service",
- "openobserve-self-reporting",
  "sea-orm",
  "serde",
  "serde_json",
@@ -7114,7 +7111,7 @@ dependencies = [
  "infra",
  "log",
  "o2_enterprise",
- "openobserve-alerts",
+ "openobserve-query-evaluation",
  "openobserve-scheduler",
  "openobserve-transform",
  "proto",
@@ -7128,6 +7125,23 @@ dependencies = [
  "tokio",
  "tracing",
  "utoipa",
+]
+
+[[package]]
+name = "openobserve-query-evaluation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "common",
+ "config",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "promql",
+ "search",
+ "tracing",
 ]
 
 [[package]]

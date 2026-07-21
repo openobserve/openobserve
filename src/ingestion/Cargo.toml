@@ -15,7 +15,6 @@ enterprise = [
     "common/enterprise",
     "config/enterprise",
     "openobserve-alerts/enterprise",
-    "openobserve-pipeline/enterprise",
     "openobserve-scheduler/enterprise",
     "openobserve-search-service/enterprise",
     "openobserve-transform/enterprise",
@@ -25,7 +24,6 @@ cloud = [
     "o2_enterprise/cloud",
     "common/cloud",
     "openobserve-alerts/cloud",
-    "openobserve-pipeline/cloud",
     "openobserve-search-service/cloud",
 ]
 vectorscan = ["enterprise", "o2_enterprise/vectorscan"]
@@ -51,7 +49,6 @@ opentelemetry-proto.workspace = true
 opentelemetry.workspace = true
 openobserve-alerts.workspace = true
 openobserve-catalog.workspace = true
-openobserve-pipeline.workspace = true
 openobserve-scheduler.workspace = true
 openobserve-search-service.workspace = true
 openobserve-transform.workspace = true

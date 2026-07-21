@@ -147,7 +147,7 @@ pub async fn ingest(
 
     if !executable_pipelines.is_empty() {
         for exec_pl in &executable_pipelines {
-            let pl_destinations = exec_pl.get_all_destination_streams();
+            let pl_destinations = exec_pl.destination_streams();
             stream_params.extend(pl_destinations);
         }
     }
@@ -307,7 +307,7 @@ pub async fn ingest(
         let records_count = pipeline_inputs.len();
         let mut evaluation_tasks = tokio::task::JoinSet::new();
         for exec_pl in &executable_pipelines {
-            if exec_pl.kind == config::meta::pipeline::PipelineKind::Evaluation
+            if exec_pl.kind() == config::meta::pipeline::PipelineKind::Evaluation
                 && exec_pl.contains_llm_evaluation_node()
             {
                 let exec_pl = exec_pl.clone();
@@ -336,7 +336,7 @@ pub async fn ingest(
                 // pipeline's share of ingestion latency at the ingest layer.
                 log::info!(
                     "[Pipeline:Timing] ingest org={org_id} stream={stream_name} pipeline={} records={records_count} pipeline_ms={} ingest_elapsed_ms={}",
-                    exec_pl.get_pipeline_name(),
+                    exec_pl.name(),
                     pipeline_start.elapsed().as_millis(),
                     start.elapsed().as_millis(),
                 );
@@ -358,7 +358,7 @@ pub async fn ingest(
                         .inc();
                 }
                 Ok(pl_results) => {
-                    let function_no = exec_pl.num_of_func();
+                    let function_no = exec_pl.num_functions();
                     for (stream_params, stream_pl_results) in pl_results {
                         if stream_params.stream_type != StreamType::Logs {
                             continue;
@@ -505,10 +505,10 @@ pub async fn ingest(
         // records by writing them back to the source stream.
         let has_user_pipeline = executable_pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+            .any(|p| p.kind() == config::meta::pipeline::PipelineKind::User);
         let has_evaluation_pipeline = executable_pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::Evaluation);
+            .any(|p| p.kind() == config::meta::pipeline::PipelineKind::Evaluation);
         log::debug!(
             "[LOGS] source preservation check stream={stream_name}, pipelines={}, has_user_pipeline={has_user_pipeline}, has_evaluation_pipeline={has_evaluation_pipeline}, source_buffered={}",
             executable_pipelines.len(),

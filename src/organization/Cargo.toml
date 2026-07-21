@@ -23,7 +23,6 @@ enterprise = [
     "openobserve-compactor/enterprise",
     "openobserve-pipeline/enterprise",
     "openobserve-search-service/enterprise",
-    "openobserve-self-reporting/enterprise",
 ]
 cloud = [
     "enterprise",
@@ -33,7 +32,6 @@ cloud = [
     "openobserve-compactor/cloud",
     "openobserve-pipeline/cloud",
     "openobserve-search-service/cloud",
-    "openobserve-self-reporting/cloud",
 ]
 
 [dependencies]
@@ -62,7 +60,6 @@ openobserve-compactor.workspace = true
 openobserve-ingestion.workspace = true
 openobserve-pipeline.workspace = true
 openobserve-search-service.workspace = true
-openobserve-self-reporting.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true

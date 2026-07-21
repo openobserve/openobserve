@@ -15,7 +15,6 @@ use config::{
             AggFunction, AlertConditionParams, Operator, QueryCondition, QueryType,
             TriggerCondition, TriggerEvalResults,
         },
-        cluster::RoleGroup,
         search::{SearchEventContext, SearchEventType, SqlQuery},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -26,8 +25,6 @@ use config::{
     },
 };
 use tracing::Instrument;
-
-use crate::service::alert::to_float;
 
 #[async_trait]
 pub trait QueryConditionExt: Sync + Send + 'static {
@@ -91,7 +88,7 @@ impl QueryConditionExt for QueryCondition {
     ) -> Result<TriggerEvalResults, anyhow::Error> {
         let trace_id = trace_id.unwrap_or_else(ider::generate_trace_id);
         // create context with trace_id
-        let eval_span = crate::ports::setup_tracing_with_trace_id(
+        let eval_span = crate::setup_tracing_with_trace_id(
             &trace_id,
             tracing::info_span!("service:alerts:evaluate_scheduled"),
         )
@@ -159,7 +156,7 @@ impl QueryConditionExt for QueryCondition {
                 let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
                     .super_cluster
                     .enabled;
-                let resp = match crate::ports::promql_search(
+                let resp = match crate::promql_search(
                     &trace_id,
                     org_id,
                     promql_query,
@@ -345,16 +342,9 @@ impl QueryConditionExt for QueryCondition {
             log::debug!(
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search_multi, {req:?}"
             );
-            openobserve_search_service::grpc_search::grpc_search_multi(
-                &trace_id,
-                org_id,
-                stream_type,
-                None,
-                &req,
-                Some(RoleGroup::Background),
-            )
-            .instrument(eval_span)
-            .await
+            crate::search_multi(&trace_id, org_id, stream_type, &req)
+                .instrument(eval_span)
+                .await
             // SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
         } else {
             let encode_query_fn = if let Some(v) = &self.vrl_function {
@@ -405,16 +395,9 @@ impl QueryConditionExt for QueryCondition {
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {req:?}"
             );
             // SearchService::search(&trace_id, org_id, stream_type, None, &req).await
-            openobserve_search_service::grpc_search::grpc_search(
-                &trace_id,
-                org_id,
-                stream_type,
-                None,
-                &req,
-                Some(RoleGroup::Background),
-            )
-            .instrument(eval_span)
-            .await
+            crate::search(&trace_id, org_id, stream_type, &req)
+                .instrument(eval_span)
+                .await
         };
 
         // Resp hits can be of two types -
@@ -429,7 +412,7 @@ impl QueryConditionExt for QueryCondition {
                 }
 
                 // the search request doesn't via cache layer, so need report usage separately
-                crate::ports::report_search_metrics(
+                crate::report_search_metrics(
                     req_start,
                     org_id,
                     stream_type,
@@ -578,4 +561,16 @@ pub async fn build_sql(
         );
     }
     Ok(sql)
+}
+
+fn to_float(value: &Value) -> f64 {
+    if value.is_number() {
+        value.as_f64().unwrap_or_default()
+    } else {
+        value
+            .as_str()
+            .unwrap_or_default()
+            .parse()
+            .unwrap_or_default()
+    }
 }

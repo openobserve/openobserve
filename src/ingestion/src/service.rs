@@ -40,7 +40,6 @@ use infra::{
     schema::STREAM_RECORD_ID_GENERATOR,
 };
 use openobserve_alerts::{REALTIME_ALERT_TRIGGERS, repository::alert, service::alert::AlertExt};
-use openobserve_pipeline::{batch_execution::ExecutablePipeline, service as pipeline};
 use openobserve_scheduler::{self as scheduler, Trigger, TriggerModule};
 #[cfg(test)]
 use openobserve_transform::compile_vrl_function;
@@ -78,8 +77,10 @@ pub async fn get_stream_partition_keys(
 }
 
 #[inline(always)]
-pub async fn get_stream_executable_pipelines(stream: &StreamParams) -> Vec<ExecutablePipeline> {
-    pipeline::get_executable_pipelines(stream).await
+pub async fn get_stream_executable_pipelines(
+    stream: &StreamParams,
+) -> Vec<crate::ports::ExecutablePipeline> {
+    crate::ports::executable_pipelines(stream).await
 }
 
 pub async fn get_stream_alerts(

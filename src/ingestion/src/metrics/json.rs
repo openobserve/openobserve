@@ -42,11 +42,11 @@ use config::{
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
 use openobserve_alerts::service::alert::AlertExt;
-use openobserve_pipeline::batch_execution::ExecutablePipeline;
 
 use super::get_exclude_labels;
 use crate::{
     ports,
+    ports::ExecutablePipeline,
     service::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
         get_write_partition_key, write_file,
@@ -275,7 +275,7 @@ pub async fn ingest(
         let count = records.len();
         let has_user_pipeline = pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+            .any(|p| p.kind() == config::meta::pipeline::PipelineKind::User);
 
         for exec_pl in pipelines {
             match exec_pl
@@ -560,11 +560,15 @@ pub async fn ingest(
             Some(email_str)
         };
         req_stats.response_time = start.elapsed().as_secs_f64();
-        let fns_length: usize = stream_executable_pipelines
-            .get(&stream_name)
-            .map_or(0, |pipelines| {
-                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
-            });
+        let fns_length: usize =
+            stream_executable_pipelines
+                .get(&stream_name)
+                .map_or(0, |pipelines| {
+                    pipelines
+                        .iter()
+                        .map(|exec_pl| exec_pl.num_functions())
+                        .sum()
+                });
         ports::report_request_usage_stats(
             req_stats,
             org_id,

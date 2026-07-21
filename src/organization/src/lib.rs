@@ -10,6 +10,8 @@
 use std::sync::{Arc, OnceLock};
 
 use common::meta::stream::{Stream, StreamSchema};
+#[cfg(feature = "cloud")]
+use config::meta::self_reporting::usage::UsageData;
 use config::meta::{function::Transform, stream::StreamType};
 
 pub mod auth;
@@ -146,12 +148,100 @@ pub trait Runtime: Send + Sync {
     ) -> anyhow::Result<()>;
 }
 
+#[cfg(feature = "cloud")]
+#[derive(Debug)]
+pub enum ReportingEventType {
+    OrgCreated,
+    OrgDeleted,
+    OrgCleanupFailed,
+    UserJoined,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Debug)]
+pub struct ReportingEvent {
+    pub org_id: String,
+    pub org_name: String,
+    pub org_type: String,
+    pub user: Option<String>,
+    pub event: ReportingEventType,
+}
+
+#[async_trait::async_trait]
+pub trait ReportingRuntime: Send + Sync {
+    async fn search_usage(
+        &self,
+        sql: String,
+        start_time: i64,
+        end_time: i64,
+        local: bool,
+    ) -> anyhow::Result<Vec<config::utils::json::Value>>;
+
+    #[cfg(feature = "cloud")]
+    async fn enqueue_event(&self, event: ReportingEvent);
+
+    #[cfg(feature = "cloud")]
+    fn report_usage(&self, usages: Vec<UsageData>);
+
+    #[cfg(feature = "enterprise")]
+    async fn audit_status_transition(&self, org_id: &str, actor: &str, from: &str, to: &str);
+}
+
 static RUNTIME: OnceLock<Arc<dyn Runtime>> = OnceLock::new();
+static REPORTING_RUNTIME: OnceLock<Arc<dyn ReportingRuntime>> = OnceLock::new();
 
 pub fn install_runtime(runtime: Arc<dyn Runtime>) -> Result<(), &'static str> {
     RUNTIME
         .set(runtime)
         .map_err(|_| "organization runtime is already installed")
+}
+
+pub fn install_reporting_runtime(runtime: Arc<dyn ReportingRuntime>) -> Result<(), &'static str> {
+    REPORTING_RUNTIME
+        .set(runtime)
+        .map_err(|_| "organization reporting runtime is already installed")
+}
+
+pub(crate) async fn search_usage(
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+    local: bool,
+) -> anyhow::Result<Vec<config::utils::json::Value>> {
+    REPORTING_RUNTIME
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("organization reporting runtime is not installed"))?
+        .search_usage(sql, start_time, end_time, local)
+        .await
+}
+
+#[cfg(feature = "cloud")]
+pub(crate) async fn enqueue_reporting_event(event: ReportingEvent) {
+    if let Some(runtime) = REPORTING_RUNTIME.get() {
+        runtime.enqueue_event(event).await;
+    } else {
+        log::error!("organization reporting runtime is not installed");
+    }
+}
+
+#[cfg(feature = "cloud")]
+pub(crate) fn report_usage(usages: Vec<UsageData>) {
+    if let Some(runtime) = REPORTING_RUNTIME.get() {
+        runtime.report_usage(usages);
+    } else {
+        log::error!("organization reporting runtime is not installed");
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub(crate) async fn audit_status_transition(org_id: &str, actor: &str, from: &str, to: &str) {
+    if let Some(runtime) = REPORTING_RUNTIME.get() {
+        runtime
+            .audit_status_transition(org_id, actor, from, to)
+            .await;
+    } else {
+        log::error!("organization reporting runtime is not installed");
+    }
 }
 
 pub(crate) async fn streams(

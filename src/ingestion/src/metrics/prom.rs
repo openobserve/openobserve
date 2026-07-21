@@ -51,13 +51,13 @@ use infra::{
     schema::{SchemaCache, get_partition_time_level},
 };
 use openobserve_alerts::service::alert::AlertExt;
-use openobserve_pipeline::batch_execution::ExecutablePipeline;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use proto::prometheus_rpc;
 
 use crate::{
     ports,
+    ports::ExecutablePipeline,
     service::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
     },
@@ -436,7 +436,7 @@ pub async fn remote_write(
             pipeline_inputs.into_iter().unzip();
         let has_user_pipeline = pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+            .any(|p| p.kind() == config::meta::pipeline::PipelineKind::User);
 
         for exec_pl in pipelines {
             match exec_pl
@@ -668,11 +668,15 @@ pub async fn remote_write(
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
         write_file_time += t.elapsed().as_micros();
 
-        let fns_length: usize = stream_executable_pipelines
-            .get(&stream_name)
-            .map_or(0, |pipelines| {
-                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
-            });
+        let fns_length: usize =
+            stream_executable_pipelines
+                .get(&stream_name)
+                .map_or(0, |pipelines| {
+                    pipelines
+                        .iter()
+                        .map(|exec_pl| exec_pl.num_functions())
+                        .sum()
+                });
         req_stats.response_time = start.elapsed().as_secs_f64();
         let email_str = user.to_email();
         req_stats.user_email = if email_str.is_empty() {

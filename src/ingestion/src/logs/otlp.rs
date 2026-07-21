@@ -91,7 +91,7 @@ pub async fn handle_request(
 
     if !executable_pipelines.is_empty() {
         for pl in &executable_pipelines {
-            let pl_destinations = pl.get_all_destination_streams();
+            let pl_destinations = pl.destination_streams();
             stream_params.extend(pl_destinations);
         }
     }
@@ -341,7 +341,7 @@ pub async fn handle_request(
                         .inc();
                 }
                 Ok(pl_results) => {
-                    let function_no = exec_pl.num_of_func();
+                    let function_no = exec_pl.num_functions();
                     for (stream_params, stream_pl_results) in pl_results {
                         if stream_params.stream_type != StreamType::Logs {
                             continue;
@@ -445,7 +445,7 @@ pub async fn handle_request(
         // original log stream while evaluator work runs asynchronously.
         let has_user_pipeline = executable_pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+            .any(|p| p.kind() == config::meta::pipeline::PipelineKind::User);
         if !has_user_pipeline && !json_data_by_stream.contains_key(&stream_name) {
             for (idx, mut rec) in pipeline_inputs.iter().cloned().enumerate() {
                 let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);

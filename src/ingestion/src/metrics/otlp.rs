@@ -46,7 +46,6 @@ use config::{
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
 use openobserve_alerts::service::alert::AlertExt;
-use openobserve_pipeline::batch_execution::ExecutablePipeline;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
@@ -60,6 +59,7 @@ use super::get_exclude_labels;
 use crate::{
     grpc::{get_exemplar_val, get_metric_val, get_val},
     ports,
+    ports::ExecutablePipeline,
     service::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
     },
@@ -417,7 +417,7 @@ pub async fn handle_otlp_request(
         let count = pipeline_inputs.len();
         let has_user_pipeline = pipelines
             .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
+            .any(|p| p.kind() == config::meta::pipeline::PipelineKind::User);
 
         for exec_pl in pipelines {
             match exec_pl
@@ -610,11 +610,15 @@ pub async fn handle_otlp_request(
         let fsync = false;
         let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
 
-        let fns_length: usize = stream_executable_pipelines
-            .get(&stream_name)
-            .map_or(0, |pipelines| {
-                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
-            });
+        let fns_length: usize =
+            stream_executable_pipelines
+                .get(&stream_name)
+                .map_or(0, |pipelines| {
+                    pipelines
+                        .iter()
+                        .map(|exec_pl| exec_pl.num_functions())
+                        .sum()
+                });
         req_stats.response_time = start.elapsed().as_secs_f64();
         let email_str = user.to_email();
         req_stats.user_email = if email_str.is_empty() {

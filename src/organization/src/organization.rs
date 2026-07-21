@@ -37,9 +37,6 @@ use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 use openobserve_ingestion::tokens as ingestion_tokens;
-use openobserve_self_reporting as self_reporting;
-#[cfg(feature = "cloud")]
-use openobserve_self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 #[cfg(feature = "cloud")]
 use {
     ::common::meta::organization::{
@@ -143,7 +140,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
         );
         let end_time = time::now_micros();
         let start_time = end_time - time::second_micros(900); // 15 mins
-        self_reporting::search::get_usage(sql, start_time, end_time, false)
+        crate::search_usage(sql, start_time, end_time, false)
             .await
             .unwrap_or_default()
             .into_iter()
@@ -679,14 +676,12 @@ pub async fn create_org(
                 }
             }
             #[cfg(feature = "cloud")]
-            enqueue_cloud_event(CloudEvent {
+            crate::enqueue_reporting_event(crate::ReportingEvent {
                 org_id: org.identifier.clone(),
                 org_name: org.name.clone(),
                 org_type: org.org_type.clone(),
                 user: Some(user_email.to_string()),
-                event: EventType::OrgCreated,
-                subscription_type: None,
-                stream_name: None,
+                event: crate::ReportingEventType::OrgCreated,
             })
             .await;
 
@@ -761,14 +756,12 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
         Ok(_) => {
             save_org_tuples(&org.identifier).await;
             #[cfg(feature = "cloud")]
-            enqueue_cloud_event(CloudEvent {
+            crate::enqueue_reporting_event(crate::ReportingEvent {
                 org_id: org.identifier.clone(),
                 org_name: org.name.clone(),
                 org_type: org.org_type.clone(),
                 user: None,
-                subscription_type: None,
-                event: EventType::OrgCreated,
-                stream_name: None,
+                event: crate::ReportingEventType::OrgCreated,
             })
             .await;
             // Create default org-level ingestion token for auto-provisioned orgs
@@ -900,14 +893,12 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
             delete_org_tuples(org_id).await;
             #[cfg(feature = "cloud")]
             if let Some(org) = org_snapshot {
-                enqueue_cloud_event(CloudEvent {
+                crate::enqueue_reporting_event(crate::ReportingEvent {
                     org_id: org.identifier.clone(),
                     org_name: org.name.clone(),
                     org_type: org.org_type.clone(),
                     user: None,
-                    subscription_type: None,
-                    event: EventType::OrgDeleted,
-                    stream_name: None,
+                    event: crate::ReportingEventType::OrgDeleted,
                 })
                 .await;
             }
@@ -1139,14 +1130,12 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     {
         log::error!("Error updating the invite status in the db: {e}");
     }
-    enqueue_cloud_event(CloudEvent {
+    crate::enqueue_reporting_event(crate::ReportingEvent {
         org_id: org.identifier.clone(),
         org_name: org.name.clone(),
         org_type: org.org_type.clone(),
         user: Some(user_email.to_string()),
-        event: EventType::UserJoined,
-        subscription_type: None,
-        stream_name: None,
+        event: crate::ReportingEventType::UserJoined,
     })
     .await;
     Ok(())

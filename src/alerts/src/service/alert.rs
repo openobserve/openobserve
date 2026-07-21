@@ -1641,7 +1641,7 @@ async fn process_dest_template(
             }
             QueryType::Custom => {
                 if let Some(conditions) = &alert.query_condition.conditions
-                    && let Ok(v) = ports::build_sql(
+                    && let Ok(v) = openobserve_query_evaluation::build_sql(
                         &alert.org_id,
                         &alert.stream_name,
                         alert.stream_type,
