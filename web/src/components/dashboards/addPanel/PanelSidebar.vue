@@ -39,11 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-else
-      class="flex items-center justify-between h-15 px-2.5 shrink-0"
+      class="flex items-center justify-between h-11 px-3 shrink-0"
       data-test="panel-sidebar-header-expanded"
     >
       <div
-        class="font-bold"
+        class="text-sm font-semibold text-text-primary"
         data-test="panel-sidebar-expanded-title"
       >{{ title }}</div>
       <OButton
