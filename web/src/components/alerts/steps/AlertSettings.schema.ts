@@ -109,15 +109,44 @@ export const makeAlertSettingsShape = (t: Translator) =>
  * ≥ 1) only for scheduled alerts. In realtime mode period is not rendered and
  * keeps its default value, so it is a plain `z.coerce.number()` with no min.
  */
-export const createAlertSettingsSchema = (t: Translator, isRealTime: boolean) =>
-  z.object({
+export const createAlertSettingsSchema = (
+  t: Translator,
+  isRealTime: boolean,
+  // ENTERPRISE/CLOUD only. An alert can be delivered to a destination OR to a
+  // linked workflow, so with workflows available the "destinations ≥ 1" rule
+  // becomes "at least ONE of the two". Defaults to false so OSS — and every
+  // existing caller/spec passing two args — keeps main's exact rule and message.
+  allowWorkflows = false,
+) => {
+  const base = z.object({
     trigger_condition: z.object({
       silence: makeSilenceSchema(t),
       period: isRealTime ? z.coerce.number() : makePeriodSchema(t),
     }),
-    destinations: makeDestinationsSchema(t),
+    // With workflows in play the per-field `min(1)` can't express the rule (it
+    // is cross-field), so it moves to the refinement below.
+    destinations: allowWorkflows
+      ? z.array(z.string()).optional()
+      : makeDestinationsSchema(t),
+    workflows: z.array(z.string()).optional(),
     creates_incident: alertSettingsCreatesIncidentSchema,
   });
+
+  if (!allowWorkflows) return base;
+
+  return base.superRefine((val, ctx) => {
+    const hasDestination = (val.destinations?.length ?? 0) > 0;
+    const hasWorkflow = (val.workflows?.length ?? 0) > 0;
+    if (hasDestination || hasWorkflow) return;
+    // Reported on `destinations` so it renders under the combined targets
+    // control (AlertSettings surfaces it via fieldError("destinations")).
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["destinations"],
+      message: t("alerts.destinationOrWorkflowRequired"),
+    });
+  });
+};
 
 export type AlertSettingsForm = z.infer<
   ReturnType<typeof createAlertSettingsSchema>

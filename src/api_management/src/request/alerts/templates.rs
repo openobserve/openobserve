@@ -350,7 +350,11 @@ pub async fn delete_template_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "Get system prebuilt templates", "category": "alerts"}))
+        ("x-o2-mcp" = json!({
+            "description": "Get system prebuilt templates",
+            "category": "alerts",
+            "summary_fields": ["name", "type", "isDefault", "title"]
+        }))
     )
 )]
 pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
