@@ -2,6 +2,10 @@
 // Feature: event(alert_fired) -> action(remote/pipeline destination), optional Condition/Function nodes.
 // Selectors reconciled against merged main (web/src/components/workflows/*, 2026-07-21). See
 // tests/ui-testing/MD_Files/features/workflows/ for the full test plan + findings (K9/K10 etc).
+// IMPORTANT — O2 component data-test pattern: OInput/OSelect/OTable render the consumer's
+// data-test on a NON-interactive wrapper (the <OInput data-test="x"> value lands on a <div>).
+// The fillable <input>/<textarea> is exposed as `x-field`; OTable's container is `o2-table-root`.
+// Always target the inner element for fill()/type(), never the wrapper.
 // NOTE: the canvas node-interaction selectors (trigger add-out/delete, palette-*) are NOT yet
 // present in merged markup — the nodes render on a vue-flow canvas. They feed only the parked
 // test.fixme cases and must be discovered live on an ENT build before those tests are enabled.
@@ -23,12 +27,15 @@ class WorkflowsPage {
     this.page = page;
     // Header / list
     this.addBtn = '[data-test="workflow-list-add-btn"]';
-    this.searchInput = '[data-test="workflow-list-search-input"]';
-    this.listTable = '[data-test="workflow-list-table"]';
+    // OInput/OTable put the consumer data-test on a NON-interactive wrapper; the real <input>
+    // is exposed as `<name>-field`, and OTable's container is `o2-table-root` (the consumer
+    // `workflow-list-table` never renders). Target those, not the wrapper.
+    this.searchInput = '[data-test="workflow-list-search-input-field"]';
+    this.listTable = '[data-test="o2-table-root"]';
     // Editor
     this.editorPage = '[data-test="workflow-editor-page"]';
-    this.nameField = '[data-test="workflow-editor-name"]';
-    this.descField = '[data-test="workflow-editor-description"]';
+    this.nameField = '[data-test="workflow-editor-name-field"]';
+    this.descField = '[data-test="workflow-editor-description-field"]';
     this.saveBtn = '[data-test="workflow-editor-save"]';
     this.testBtn = '[data-test="workflow-editor-test"]';
     this.cancelBtn = '[data-test="workflow-editor-cancel"]';
