@@ -165,9 +165,6 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
-    // Present only for composite alerts (Simple | Composite toggle). `null`
-    // means an ordinary single-query alert.
-    composite: null,
   };
 };
 
