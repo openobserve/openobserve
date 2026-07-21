@@ -262,23 +262,33 @@ pub async fn presign_artifacts(
     }
 }
 
-pub async fn job_artifact_urls(Json(body): Json<serde_json::Value>) -> Response {
+pub async fn job_artifact_urls(
+    Path(org_id): Path<String>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if let Err(resp) = authorize_probe(&headers, &org_id).await {
+            return resp;
+        }
         match serde_json::from_value::<
             o2_enterprise::enterprise::synthetics::job_api::ArtifactUrlsRequest,
         >(body)
         {
             Ok(req) => {
-                match o2_enterprise::enterprise::synthetics::job_api::artifact_urls(req).await {
+                match o2_enterprise::enterprise::synthetics::job_api::artifact_urls(req, &org_id)
+                    .await
+                {
                     Ok(resp) => MetaHttpResponse::json(resp),
                     Err(e) => {
+                        let msg = e.to_string();
+                        if msg.starts_with("forbidden") {
+                            return MetaHttpResponse::forbidden(msg);
+                        }
                         tracing::error!("[synthetics] artifact_urls: {e}");
-                        MetaHttpResponse::error(
-                            StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                            e.to_string(),
-                        )
-                        .into_response()
+                        MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
+                            .into_response()
                     }
                 }
             }
@@ -287,20 +297,33 @@ pub async fn job_artifact_urls(Json(body): Json<serde_json::Value>) -> Response 
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = body;
+        let _ = (org_id, headers, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
 
 pub async fn job_upload(
+    Path(org_id): Path<String>,
+    headers: axum::http::HeaderMap,
     Query(params): Query<std::collections::HashMap<String, String>>,
     body: axum::body::Bytes,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) = authorize_probe(&headers, &org_id).await {
+        return resp;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = &headers;
     let key = match params.get("key") {
         Some(k) => k.clone(),
         None => return MetaHttpResponse::bad_request("missing key param"),
     };
-    match infra::storage::put("default", &key, body).await {
+    // Keys are namespaced `synthetics/{org_id}/...` — reject a key that tries to
+    // write outside the caller's org (defense in depth over the token check).
+    if !key.starts_with(&format!("synthetics/{org_id}/")) {
+        return MetaHttpResponse::forbidden("artifact key does not belong to this org");
+    }
+    match infra::storage::put(&org_id, &key, body).await {
         Ok(_) => MetaHttpResponse::ok("uploaded"),
         Err(e) => {
             tracing::error!("[synthetics] job_upload: {e}");
@@ -836,9 +859,16 @@ pub async fn run_synthetic_now(
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
-pub async fn job_resolve(Json(body): Json<serde_json::Value>) -> Response {
+pub async fn job_resolve(
+    Path(org_id): Path<String>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        if let Err(resp) = authorize_probe(&headers, &org_id).await {
+            return resp;
+        }
         let req = match serde_json::from_value::<
             o2_enterprise::enterprise::synthetics::job_api::ResolveRequest,
         >(body)
@@ -848,10 +878,13 @@ pub async fn job_resolve(Json(body): Json<serde_json::Value>) -> Response {
                 return MetaHttpResponse::bad_request(e.to_string());
             }
         };
-        match o2_enterprise::enterprise::synthetics::job_api::resolve(req).await {
+        match o2_enterprise::enterprise::synthetics::job_api::resolve(req, &org_id).await {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 let msg = e.to_string();
+                if msg.starts_with("forbidden") {
+                    return MetaHttpResponse::forbidden(msg);
+                }
                 if msg.contains("not found") {
                     return MetaHttpResponse::not_found(msg);
                 }
@@ -863,7 +896,7 @@ pub async fn job_resolve(Json(body): Json<serde_json::Value>) -> Response {
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = body;
+        let _ = (org_id, headers, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -883,14 +916,15 @@ pub async fn job_resolve(Json(body): Json<serde_json::Value>) -> Response {
     ),
 )]
 pub async fn job_lease(
+    Path(org_id): Path<String>,
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let Some(org_id) = probe_token_org(&headers).await else {
-            return MetaHttpResponse::unauthorized("invalid probe token");
-        };
+        if let Err(resp) = authorize_probe(&headers, &org_id).await {
+            return resp;
+        }
         let req = match serde_json::from_value::<
             o2_enterprise::enterprise::synthetics::job_api::LeaseRequest,
         >(body)
@@ -915,7 +949,7 @@ pub async fn job_lease(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (headers, body);
+        let _ = (org_id, headers, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -934,10 +968,18 @@ pub async fn job_lease(
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
 )]
-pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
+pub async fn job_ack(
+    Path(org_id): Path<String>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Response {
     #[cfg(feature = "enterprise")]
     {
         use o2_enterprise::enterprise::synthetics::job_api::{AckBatchRequest, AckRequest};
+
+        if let Err(resp) = authorize_probe(&headers, &org_id).await {
+            return resp;
+        }
 
         // Batch of rich acks: {"acks": [{...}, ...]}. Cadence is the sender's
         // choice — browser probe acks per execution (array of one), protocol
@@ -951,7 +993,7 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
             let mut results = Vec::with_capacity(req.acks.len());
             for ack in req.acks {
                 let job_id = ack.job_id.clone();
-                match process_ack(ack).await {
+                match process_ack(ack, &org_id).await {
                     Ok(resp) => results.push(serde_json::json!({
                         "job_id": job_id,
                         "ok": true,
@@ -976,18 +1018,22 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
                 return MetaHttpResponse::bad_request(e.to_string());
             }
         };
-        match process_ack(req).await {
+        match process_ack(req, &org_id).await {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
+                let msg = e.to_string();
+                if msg.starts_with("forbidden") {
+                    return MetaHttpResponse::forbidden(msg);
+                }
                 tracing::error!("[synthetics] job_ack: {e}");
-                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
                     .into_response()
             }
         }
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = body;
+        let _ = (org_id, headers, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -998,13 +1044,14 @@ pub async fn job_ack(Json(body): Json<serde_json::Value>) -> Response {
 #[cfg(feature = "enterprise")]
 async fn process_ack(
     req: o2_enterprise::enterprise::synthetics::job_api::AckRequest,
+    token_org: &str,
 ) -> anyhow::Result<o2_enterprise::enterprise::synthetics::job_api::AckResponse> {
     let status = req.status.clone();
     let response_time_ms = req.response_time_ms;
     let error = req.error.clone();
     let checked_at = config::utils::time::now_micros();
 
-    let resp = o2_enterprise::enterprise::synthetics::job_api::ack(req).await?;
+    let resp = o2_enterprise::enterprise::synthetics::job_api::ack(req, token_org).await?;
 
     // Emit trigger usage record for synthetics telemetry.
     crate::service::self_reporting::publish_triggers_usage(
@@ -1065,6 +1112,22 @@ async fn probe_token_org(headers: &axum::http::HeaderMap) -> Option<String> {
         .map(|t| t.org_id)
 }
 
+/// Authorizes a probe request against the `{org_id}` in the path: the Basic
+/// `o2syn_` token must exist and belong to that org. Returns Ok(()) when the
+/// token org matches, Err(response) otherwise — this is the tenant boundary for
+/// every probe-facing route (the org in the URL, the token's org, and the
+/// job's org must all agree; the service layer enforces the last leg).
+#[cfg(feature = "enterprise")]
+async fn authorize_probe(headers: &axum::http::HeaderMap, org_id: &str) -> Result<(), Response> {
+    match probe_token_org(headers).await {
+        Some(token_org) if token_org == org_id => Ok(()),
+        Some(_) => Err(MetaHttpResponse::forbidden(
+            "probe token does not belong to this org",
+        )),
+        None => Err(MetaHttpResponse::unauthorized("invalid probe token")),
+    }
+}
+
 #[utoipa::path(
     post,
     path = "/synthetics/agent/register",
@@ -1081,14 +1144,15 @@ async fn probe_token_org(headers: &axum::http::HeaderMap) -> Option<String> {
     ),
 )]
 pub async fn agent_register(
+    Path(org_id): Path<String>,
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let Some(org_id) = probe_token_org(&headers).await else {
-            return MetaHttpResponse::unauthorized("invalid probe token");
-        };
+        if let Err(resp) = authorize_probe(&headers, &org_id).await {
+            return resp;
+        }
         let req = match serde_json::from_value::<
             o2_enterprise::enterprise::synthetics::agent::RegisterRequest,
         >(body)
@@ -1111,7 +1175,7 @@ pub async fn agent_register(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (headers, body);
+        let _ = (org_id, headers, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -1132,14 +1196,15 @@ pub async fn agent_register(
     ),
 )]
 pub async fn agent_heartbeat(
+    Path(org_id): Path<String>,
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let Some(org_id) = probe_token_org(&headers).await else {
-            return MetaHttpResponse::unauthorized("invalid probe token");
-        };
+        if let Err(resp) = authorize_probe(&headers, &org_id).await {
+            return resp;
+        }
         let req = match serde_json::from_value::<
             o2_enterprise::enterprise::synthetics::agent::HeartbeatRequest,
         >(body)
@@ -1162,7 +1227,7 @@ pub async fn agent_heartbeat(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (headers, body);
+        let _ = (org_id, headers, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }

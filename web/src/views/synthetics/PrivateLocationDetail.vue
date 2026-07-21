@@ -1,12 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
-  <div class="flex flex-col h-full p-0">
-    <AppPageHeader
-      :title="detail?.name || t('synthetics.privateLocations.detail.title')"
-      icon="location-on"
-      :back="{ label: t('synthetics.privateLocations.detail.back'), to: { name: 'synthetic' } }"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+  <OPageLayout
+    :title="detail?.name || t('synthetics.privateLocations.detail.title')"
+    icon="location-on"
+    :back="{ label: t('synthetics.privateLocations.detail.back'), to: { name: 'synthetic' } }"
+    bleed
+  >
       <template #title-trail>
         <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
           {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
@@ -33,7 +32,6 @@
           @click="load"
         />
       </template>
-    </AppPageHeader>
 
     <div class="flex-1 min-h-0 overflow-y-auto">
       <div v-if="detail" class="flex flex-col gap-6 p-6">
@@ -163,10 +161,11 @@
       :location-name="detail?.name"
       :location-id="detail?.id"
       :token="agentSetup?.token"
+      :org="agentSetup?.org"
       :o2-url="agentSetup?.o2_url"
       :script-url="agentSetup?.script_url"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -174,7 +173,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";

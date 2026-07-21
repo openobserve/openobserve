@@ -289,6 +289,7 @@ async function saveCheck() {
       <AgentSetupDrawer
         v-model:open="showAgentSetup"
         :token="agentSetup?.token"
+        :org="agentSetup?.org"
         :o2-url="agentSetup?.o2_url"
         :script-url="agentSetup?.script_url"
         :install="agentSetup?.install"

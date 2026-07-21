@@ -260,11 +260,11 @@ pub async fn validate_credentials(
         path_columns.pop();
     }
 
-    // Synthetics probe job + agent APIs — no org_id in path. Look up exclusively
-    // in synthetics_probe_tokens (o2syn_ prefix). Separate table from o2oi_
-    // ingest tokens.
-    let is_synthetics_job_path = path_columns.first() == Some(&"synthetics")
-        && matches!(path_columns.get(1), Some(&"jobs") | Some(&"agent"));
+    // Synthetics probe job + agent APIs — `/{org_id}/synthetics/{jobs,agent}/*`.
+    // Look up exclusively in synthetics_probe_tokens (o2syn_ prefix). Separate
+    // table from o2oi_ ingest tokens. The handler asserts token org == path org.
+    let is_synthetics_job_path = path_columns.get(1) == Some(&"synthetics")
+        && matches!(path_columns.get(2), Some(&"jobs") | Some(&"agent"));
     if is_synthetics_job_path
         && user_password
             .starts_with(infra::table::synthetics_probe_tokens::SYNTHETICS_PROBE_TOKEN_PREFIX)
@@ -777,10 +777,11 @@ async fn check_and_create_org(user_id: &str, method: &Method, path: &str) -> Res
     if path_columns[0].eq("node") || path_columns[0].eq("profile") {
         return Ok(());
     }
-    // Synthetics probe job + agent APIs have no org_id in path — skip org check
-    // (org is resolved from the o2syn_ token, not the path).
-    if path_columns[0].eq("synthetics")
-        && matches!(path_columns.get(1), Some(&"jobs") | Some(&"agent"))
+    // Synthetics probe job + agent APIs — `/{org_id}/synthetics/{jobs,agent}/*`.
+    // Skip org auto-create / user-membership: the caller is an o2syn_ probe
+    // token, not a user in the org. The handler validates token org == path org.
+    if path_columns.get(1).eq(&Some(&"synthetics"))
+        && matches!(path_columns.get(2), Some(&"jobs") | Some(&"agent"))
     {
         return Ok(());
     }

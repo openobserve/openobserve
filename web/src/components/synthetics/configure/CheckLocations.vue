@@ -34,6 +34,17 @@ function locationIcon(provider: string): string {
   return 'location-on'
 }
 
+/** "Name · Region", omitting the region when it's blank or a mechanical
+ *  duplicate of the name (private locations without a set region default to
+ *  a slug of their own name server-side, which reads as pointless noise). */
+function locationDisplayName(location: SyntheticsLocation): string {
+  const region = location.region?.trim()
+  if (!region || region.toLowerCase() === location.name.trim().toLowerCase()) {
+    return location.name
+  }
+  return `${location.name} · ${region}`
+}
+
 const publicLocations = computed(() => props.locations.filter((l) => l.kind !== 'private'))
 const privateLocations = computed(() => props.locations.filter((l) => l.kind === 'private'))
 
@@ -89,7 +100,7 @@ function agentSubtext(location: SyntheticsLocation): string {
           <template #label>
             <span class="flex items-center gap-1.5">
               <OIcon :name="locationIcon(location.provider)" size="sm" />
-              {{ location.name }} · {{ location.region }}
+              {{ locationDisplayName(location) }}
             </span>
           </template>
         </OCheckbox>
@@ -132,7 +143,7 @@ function agentSubtext(location: SyntheticsLocation): string {
                       "
                       :data-test="`synthetics-check-locations-status-${location.id}`"
                     />
-                    {{ location.name }} · {{ location.region }}
+                    {{ locationDisplayName(location) }}
                     <OTag size="xs" shape="rounded" variant="purple-soft">
                       {{ t('synthetics.locations.privateBadge') }}
                     </OTag>

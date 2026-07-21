@@ -273,6 +273,7 @@ export interface SyntheticsLocation {
  *  setup drawer composes per-platform install commands from. */
 export interface AgentSetup {
   token?: string
+  org: string
   o2_url: string
   script_url: string
   /** Legacy docker one-liner (drawer fallback when composing is impossible). */

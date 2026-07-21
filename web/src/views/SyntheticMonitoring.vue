@@ -61,6 +61,7 @@
           :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
           :show-folder-column="searchAcrossFolders"
+          :location-names="locationNames"
           data-test="synthetic-monitoring-monitors-table"
           :toggle-loading-map="toggleLoadingMap"
           :trigger-loading-map="triggerLoadingMap"
@@ -200,6 +201,7 @@
       :location-name="setupLocationName"
       :location-id="setupLocationId"
       :token="setupData?.token"
+      :org="setupData?.org"
       :o2-url="setupData?.o2_url"
       :script-url="setupData?.script_url"
     />
@@ -627,6 +629,9 @@ async function deleteLocation() {
 }
 
 const locationOpts = ref<{ label: string; value: string }[]>([{ label: t('synthetics.filters.allLocations'), value: 'all' }]);
+// id -> "Name (region)" — checks store locations as ids (KSUID for private,
+// "aws-us-east-1" for public); the table/tooltip need the human label.
+const locationNames = ref<Record<string, string>>({});
 
 async function loadLocations() {
   try {
@@ -635,8 +640,11 @@ async function loadLocations() {
       (res.data as any).locations ?? [];
     locationOpts.value = [
       { label: t('synthetics.filters.allLocations'), value: 'all' },
-      ...locations.map((loc) => ({ label: `${loc.name} (${loc.region})`, value: loc.name })),
+      ...locations.map((loc) => ({ label: `${loc.name} (${loc.region})`, value: loc.id })),
     ];
+    locationNames.value = Object.fromEntries(
+      locations.map((loc) => [loc.id, `${loc.name} (${loc.region})`]),
+    );
   } catch (err) {
     console.error('[synthetics] failed to load locations', err);
   }

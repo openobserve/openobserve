@@ -2421,7 +2421,7 @@
     "aiLabel": "AI Integrations",
     "azureSetup": {
       "activityLogsTitle": "Azure Activity Logs",
-      "activityLogsDescription": "Stream Azure subscription activity logs to OpenObserve via Event Hub. The ARM template sets up the Event Hub infrastructure \u2014 you then configure Azure to export logs to it.",
+      "activityLogsDescription": "Stream Azure subscription activity logs to OpenObserve via Event Hub. The ARM template sets up the Event Hub infrastructure — you then configure Azure to export logs to it.",
       "manualTitle": "Manual Configuration (for reference)",
       "searchPlaceholder": "Search Azure services...",
       "categoryAll": "All Services",
@@ -9333,7 +9333,8 @@
         "deleted": "Location deleted",
         "deleteFailed": "Failed to delete location",
         "copied": "Setup command copied",
-        "copyFailed": "Failed to copy to clipboard"
+        "copyFailed": "Failed to copy to clipboard",
+        "locationRequired": "Enter a location name before copying the install command."
       },
       "setup": {
         "title": "Set up a private agent",
@@ -9348,13 +9349,14 @@
         "browserNote": "Browser tests cannot run from private locations yet — protocol checks only (HTTP, TCP, TLS, SSH).",
         "locationNameLabel": "Location name",
         "locationNamePlaceholder": "Corp HQ",
-        "regionLabel": "Region (optional)",
-        "regionPlaceholder": "us-east",
         "tabDocker": "Docker",
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
         "tabWindows": "Windows",
-        "windowsSoon": "Coming soon"
+        "windowsSoon": "Coming soon",
+        "agentNameLabel": "Agent name (optional)",
+        "agentNamePlaceholder": "auto-generated from hostname",
+        "agentNameHint": "Leave blank to let the agent name itself from its hostname — useful when running multiple agents at one location."
       },
       "detail": {
         "title": "Private location",

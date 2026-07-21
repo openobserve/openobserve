@@ -1003,22 +1003,23 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/synthetics/{id}/runs/{run_id}", get(synthetics::get_run_detail))
                 // Synthetics — folder move (v2 prefix to match the shared MoveAcrossFolders utility)
                 .route("/v2/{org_id}/synthetics/move", patch(synthetics::move_synthetics))
-                // Synthetics — job API (no org prefix; authenticated via o2syn_ token)
-                .route("/synthetics/jobs/resolve", post(synthetics::job_resolve))
-                .route("/synthetics/jobs/lease", post(synthetics::job_lease))
-                .route("/synthetics/jobs/ack", post(synthetics::job_ack))
+                // Synthetics — job API (org-scoped path; authenticated via the
+                // o2syn_ token, whose org must match {org_id} in the path)
+                .route("/{org_id}/synthetics/jobs/resolve", post(synthetics::job_resolve))
+                .route("/{org_id}/synthetics/jobs/lease", post(synthetics::job_lease))
+                .route("/{org_id}/synthetics/jobs/ack", post(synthetics::job_ack))
                 .route(
-                    "/synthetics/jobs/artifact-urls",
+                    "/{org_id}/synthetics/jobs/artifact-urls",
                     post(synthetics::job_artifact_urls),
                 )
-                .route("/synthetics/jobs/upload", post(synthetics::job_upload))
-                // Synthetics — agent liveness API (no org prefix; o2syn_ token)
+                .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload))
+                // Synthetics — agent liveness API (org-scoped; o2syn_ token)
                 .route(
-                    "/synthetics/agent/register",
+                    "/{org_id}/synthetics/agent/register",
                     post(synthetics::agent_register),
                 )
                 .route(
-                    "/synthetics/agent/heartbeat",
+                    "/{org_id}/synthetics/agent/heartbeat",
                     post(synthetics::agent_heartbeat),
                 );
         }

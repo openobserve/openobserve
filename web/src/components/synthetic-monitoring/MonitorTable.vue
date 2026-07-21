@@ -133,7 +133,7 @@
     <!-- Locations with tooltip (monitors mode) -->
     <template #cell-locations="{ row }">
       <div class="flex items-center gap-1 cursor-default" @mouseenter="showLoc($event, (row as any).locations)" @mouseleave="hideLoc">
-        <span class="text-xs truncate max-w-[4.375rem]">{{ (row as any).locations[0] }}</span>
+        <span class="text-xs truncate max-w-[4.375rem]">{{ locationLabel((row as any).locations[0]) }}</span>
         <span v-if="(row as any).locations.length > 1" class="text-xs font-bold px-1 py-0.5 rounded-default bg-[var(--color-surface-subtle)] whitespace-nowrap shrink-0">+{{ (row as any).locations.length - 1 }}</span>
       </div>
     </template>
@@ -312,7 +312,7 @@
   <Teleport to="body">
     <div v-if="locTip.show" class="loc-float-tip" :style="{ left: locTip.x + 'px', top: locTip.y + 'px' }">
       <div v-for="l in locTip.locs" :key="l" class="loc-float-item">
-        <span class="loc-float-dot" />{{ l }}
+        <span class="loc-float-dot" />{{ locationLabel(l) }}
       </div>
     </div>
   </Teleport>
@@ -379,6 +379,10 @@ const props = withDefaults(defineProps<{
   showFolderColumn?: boolean
   bulkActionLoading?: boolean
   hasFilters?: boolean
+  /** location id -> "Name (region)", for resolving `check.locations` ids to a
+   *  human label. Falls back to the raw id when a location isn't in the map
+   *  (e.g. deleted since the check last ran). */
+  locationNames?: Record<string, string>
 }>(), {
   loading: false,
   footerTitle: 'Checks',
@@ -390,7 +394,12 @@ const props = withDefaults(defineProps<{
   showFolderColumn: false,
   bulkActionLoading: false,
   hasFilters: false,
+  locationNames: () => ({}),
 })
+
+function locationLabel(id: string): string {
+  return props.locationNames[id] ?? id
+}
 
 const emit = defineEmits<{
   'row-click': [row: any]

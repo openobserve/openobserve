@@ -24,22 +24,27 @@
 
         <!-- Composer: location inputs + platform tabs + composed command -->
         <template v-if="canCompose">
-          <div v-if="!locationId" class="flex gap-3">
+          <div class="flex flex-col gap-3 rounded-default border border-border-default p-3">
+            <div class="flex flex-col gap-1">
+              <OInput
+                v-model="draftAgentName"
+                :label="t('synthetics.privateLocations.setup.agentNameLabel')"
+                :placeholder="t('synthetics.privateLocations.setup.agentNamePlaceholder')"
+                size="sm"
+                data-test="synthetics-agent-setup-agent-name-input"
+              />
+              <p class="text-xs text-text-muted">
+                {{ t("synthetics.privateLocations.setup.agentNameHint") }}
+              </p>
+            </div>
             <OInput
+              v-if="!locationId"
               v-model="draftLocation"
               :label="t('synthetics.privateLocations.setup.locationNameLabel')"
               :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
+              required
               size="sm"
-              class="flex-1"
               data-test="synthetics-agent-setup-location-input"
-            />
-            <OInput
-              v-model="draftRegion"
-              :label="t('synthetics.privateLocations.setup.regionLabel')"
-              :placeholder="t('synthetics.privateLocations.setup.regionPlaceholder')"
-              size="sm"
-              class="flex-1"
-              data-test="synthetics-agent-setup-region-input"
             />
           </div>
 
@@ -151,6 +156,7 @@ const props = defineProps<{
   locationId?: string | null;
   /** Composer ingredients from GET /synthetics/agent-setup. */
   token?: string | null;
+  org?: string | null;
   o2Url?: string | null;
   scriptUrl?: string | null;
 }>();
@@ -160,12 +166,23 @@ const { t } = useI18n();
 
 const platform = ref<string | number>("docker");
 const draftLocation = ref("");
-const draftRegion = ref("");
+const draftAgentName = ref("");
+
+/** A non-empty starting point for the org-level composer — never blank, so a
+ *  user who copies without editing still gets a usable command. Regenerated
+ *  on every fresh open (not sticky), so two agents set up back-to-back don't
+ *  default to the same location name. */
+function generateDefaultLocationName(): string {
+  const suffix = Math.floor(1000 + Math.random() * 9000);
+  return `private-location-${suffix}`;
+}
 
 watch(
   () => props.open,
   (open) => {
-    if (open) draftLocation.value = props.locationName ?? "";
+    if (!open) return;
+    draftLocation.value = props.locationName || (props.locationId ? "" : generateDefaultLocationName());
+    draftAgentName.value = "";
   },
 );
 
@@ -178,14 +195,15 @@ const composedCommand = computed(() => {
     `curl -sSL ${props.scriptUrl} | bash -s -- \\`,
     `  --platform=${platform.value} \\`,
     `  --o2-url=${props.o2Url} \\`,
+    `  --org=${props.org || "<org>"} \\`,
     `  --token=${props.token || "<o2syn-token>"} \\`,
   ];
   if (props.locationId) {
     lines.push(`  --location-id=${props.locationId}`);
   } else {
     lines.push(`  --location="${draftLocation.value || "<location-name>"}"`);
-    if (draftRegion.value) lines.push(`  --region="${draftRegion.value}"`);
   }
+  if (draftAgentName.value) lines.push(`  --agent-name="${draftAgentName.value}"`);
   // Join continuation lines; the last line carries no trailing backslash.
   return lines
     .map((l, i) => (i === lines.length - 1 ? l.replace(/ \\$/, "") : l))
@@ -193,6 +211,12 @@ const composedCommand = computed(() => {
 });
 
 async function copyCommand() {
+  // Guard the unpinned flow: a blank location would copy the literal
+  // "<location-name>" placeholder into a real install command.
+  if (canCompose.value && !props.locationId && !draftLocation.value.trim()) {
+    toast({ variant: "error", message: t("synthetics.privateLocations.toast.locationRequired") });
+    return;
+  }
   const text = canCompose.value ? composedCommand.value : props.install;
   if (!text) return;
   try {
