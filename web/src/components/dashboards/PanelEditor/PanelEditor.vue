@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        dashboard mode) so its `my-2` margin isn't dead space. -->
                   <div
                     v-if="pageType === 'build' || resolvedConfig.showAddToDashboardButton"
-                    class="flex justify-between items-center my-2 mx-2"
+                    class="flex justify-between items-center px-2 py-2 border-b border-border-default"
                   >
                     <QueryTypeSelector
                       v-if="pageType === 'build'"
