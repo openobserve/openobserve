@@ -31,8 +31,7 @@ use infra::{
     },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-
-use crate::service::{
+use openobserve_core::service::{
     db::{
         sourcemaps::SOURCEMAP_PREFIX,
         workflows::{WORKFLOW_TRIGGER_PREFIX, WORKFLOWS_PREFIX},

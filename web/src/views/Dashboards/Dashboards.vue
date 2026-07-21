@@ -77,6 +77,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </div>
           </ODropdownItem>
+          <ODropdownSeparator />
+          <ODropdownItem
+            v-for="migration in migrationOptions"
+            :key="migration.key"
+            :data-test="`dashboard-migrate-${migration.key}`"
+            @select="openMigration(migration.url)"
+          >
+            <div class="flex items-center gap-2 w-full">
+              <div class="flex flex-col flex-1 min-w-0">
+                <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
+                <span class="text-xs text-dropdown-item-text opacity-60"
+                  >{{ t(`dashboard.${migration.descKey}`) }}</span
+                >
+              </div>
+              <OIcon
+                name="open-in-new"
+                size="xs"
+                class="shrink-0 text-dropdown-item-text opacity-60"
+              />
+            </div>
+          </ODropdownItem>
         </ODropdown>
         <!-- new dashboard button -->
         <OButton
@@ -504,6 +525,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -1065,6 +1087,17 @@ export default defineComponent({
           folder: activeFolderId.value || "default",
         },
       });
+    };
+
+    const migrationOptions = [
+      { key: "datadog",     url: "https://migration.openobserve.ai/datadog-to-o2",    labelKey: "migrateFromDatadog",     descKey: "migrateFromDatadogDesc" },
+      { key: "grafana",     url: "https://migration.openobserve.ai/grafana-to-o2",    labelKey: "migrateFromGrafana",     descKey: "migrateFromGrafanaDesc" },
+      { key: "kibana",      url: "https://migration.openobserve.ai/kibana-to-o2",     labelKey: "migrateFromKibana",      descKey: "migrateFromKibanaDesc" },
+      { key: "cloudwatch",  url: "https://migration.openobserve.ai/cloudwatch-to-o2", labelKey: "migrateFromCloudWatch",  descKey: "migrateFromCloudWatchDesc" },
+    ];
+
+    const openMigration = (url: string) => {
+      window.open(url, "_blank", "noopener,noreferrer");
     };
 
     const duplicateDashboard = async (
@@ -1682,6 +1715,8 @@ export default defineComponent({
       showAddDashboardFromGitHub,
       addDashboard,
       importDashboard,
+      migrationOptions,
+      openMigration,
       resultTotal,
       routeToViewD,
       showDeleteDialogFn,

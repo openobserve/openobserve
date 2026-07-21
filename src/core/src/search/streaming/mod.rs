@@ -46,7 +46,7 @@ use sqlparser::ast::VisitMut;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use vector_enrichment::TableRegistry;
+use transform::vector_enrichment::TableRegistry;
 
 #[cfg(feature = "enterprise")]
 use crate::service::{http::map_error_to_http_response, self_reporting::audit};
