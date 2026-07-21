@@ -5317,6 +5317,19 @@ export default defineComponent({
         titleIntervalId = null;
       }
 
+      // Clean up the trailing-edge streaming render timer. This matters more
+      // here than a typical unmount cleanup: we intentionally let the stream
+      // keep running (see detachCurrentStream above), so displayedStreamingContent
+      // may still be ticking as this instance dies and a flush is often pending.
+      // Left alone it fires after unmount and writes into this dead instance's
+      // chatMessages, keeping the whole setup closure alive across the routine
+      // home <-> sidebar hand-off.
+      if (streamingRenderFlushTimer) {
+        clearTimeout(streamingRenderFlushTimer);
+        streamingRenderFlushTimer = null;
+      }
+      pendingStreamingRenderContent = null;
+
       // We use separate O2AIChat instances (home inline tab + sidebar) and sync
       // them via the store: publish which chat is current + a "chatUpdated" pulse
       // so the SURVIVING instance loads it (its chatUpdated watch calls loadChat).
