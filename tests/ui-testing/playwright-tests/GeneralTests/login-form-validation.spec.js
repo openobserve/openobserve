@@ -1,4 +1,4 @@
-// tests/ui-testing/playwright-tests/login/loginValidation.spec.js
+// tests/ui-testing/playwright-tests/GeneralTests/login-form-validation.spec.js
 //
 // Client-side validation coverage for the migrated internal-user login form
 // (OForm + zod schema in web/src/components/login/Login.vue). Complements the
