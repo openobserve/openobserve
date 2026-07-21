@@ -51,7 +51,7 @@ async function validateEditionDialog(page, pm, editionConfig) {
   //    single broken link reports alongside the rest instead of masking them.
   testLogger.step('Verifying documentation link navigation for every feature');
   for (const feature of ENTERPRISE_FEATURES) {
-    const finalUrl = await ef.captureFeatureLinkUrl(feature.name);
+    const finalUrl = await ef.captureFeatureLinkUrl(feature.name, feature.expectedPath);
     testLogger.info(`Feature link resolved`, { feature: feature.name, slug: feature.slug, finalUrl });
     expect
       .soft(finalUrl, `"${feature.name}" (o2.ws/${feature.slug}) should land on openobserve.ai`)
@@ -65,7 +65,7 @@ async function validateEditionDialog(page, pm, editionConfig) {
   //    unclicked because it switches the active org to the meta org)
   for (const heroLink of editionConfig.heroLinkButtons) {
     testLogger.step(`Verifying hero button link: ${heroLink.label}`);
-    const finalUrl = await ef.clickAndCapturePopupUrl(heroLink.locator(ef));
+    const finalUrl = await ef.clickAndCapturePopupUrl(heroLink.locator(ef), heroLink.expectedPath);
     testLogger.info('Hero button link resolved', { button: heroLink.label, finalUrl });
     expect
       .soft(finalUrl, `"${heroLink.label}" should land on openobserve.ai`)
