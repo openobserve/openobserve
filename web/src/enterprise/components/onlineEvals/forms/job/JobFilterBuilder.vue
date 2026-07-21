@@ -2,12 +2,12 @@
   <div class="mb-4">
     <div class="flex flex-col gap-0.5 mb-2">
       <span
-        class="text-xs font-semibold text-text-heading"
+        class="text-compact leading-tight font-medium text-input-label-text"
         data-test="job-condition-builder-title"
         >{{ t(`onlineEvals.job.${purpose}.title`) }}</span
       >
       <span
-        class="text-2xs text-text-secondary"
+        class="text-xs text-input-help-text leading-none"
         data-test="job-condition-builder-hint"
         >{{ t(`onlineEvals.job.${purpose}.hint.${targetScope}`) }}</span
       >

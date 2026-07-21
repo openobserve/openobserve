@@ -8503,10 +8503,10 @@
         "eyebrow": "Eval Job",
         "refresh": "Refresh",
         "descriptionSection": "Description",
-        "targetSection": "Target",
+        "targetSection": "Evaluation Target",
         "streamLabel": "Stream",
         "streamTypeLabel": "Stream Type",
-        "targetScopeLabel": "Target Scope",
+        "targetScopeLabel": "Evaluate Each",
         "idleWindowLabel": "Idle Window",
         "maxAgeLabel": "Max Age",
         "filterLabel": "Filter",
@@ -8608,9 +8608,10 @@
         "chipSampling": "Sampling Control"
       },
       "descriptionPlaceholder": "What does this job monitor?",
-      "samplingValueHelp": "Enter a rate from 0 to 1. For example, 0.1 evaluates 10% of matching targets.",
-      "samplingValueAllHelp": "Not applicable when mode is All — every matched event will be evaluated.",
-      "samplingHelp": "Apply after Filter. Controls cost by sampling matched evaluation targets before task creation.",
+      "samplingValueHelp": "Enter a rate between 0 and 1.",
+      "samplingValuePreview": "Evaluates {percent}% of matched targets.",
+      "samplingValueAllHelp": "Every matched target is evaluated.",
+      "samplingHelp": "Runs after filtering, to control cost.",
       "presets": {
         "label": "Quick presets",
         "rootSpans": "Root spans only",
@@ -8618,24 +8619,25 @@
         "toolCalls": "Tool calls"
       },
       "backTo": "Back to Eval Jobs",
-      "createTitle": "Create Online Eval Job",
-      "editTitle": "Edit Online Eval Job",
+      "createTitle": "New Eval Job",
+      "editTitle": "Update Eval Job",
       "stepper": {
         "target": "Target",
         "scorers": "Scorers",
         "mapping": "Mapping",
         "sampling": "Sampling"
       },
-      "targetSection": "Target",
+      "detailsSection": "Details",
+      "targetSection": "Evaluation Target",
       "filteringSection": "Filtering",
       "scorersSection": "Scorers and mapping",
       "nameLabel": "Name",
       "namePlaceholder": "Production Faithfulness Monitor",
-      "streamLabel": "Input stream",
-      "streamPlaceholder": "Select Stream Name",
+      "streamLabel": "Stream",
+      "streamPlaceholder": "Select Stream",
       "streamTypeLabel": "Stream type",
       "streamTypePlaceholder": "traces",
-      "targetScopeLabel": "Target scope",
+      "targetScopeLabel": "Evaluate Each",
       "targetScopes": {
         "span": "Span",
         "trace": "Trace",
@@ -8677,8 +8679,8 @@
         "title": "Filter condition",
         "hint": {
           "span": "Only spans matching this condition enter sampling and scoring.",
-          "trace": "A trace becomes eligible when at least one of its spans matches this condition.",
-          "session": "A session becomes eligible when at least one span in the session matches this condition."
+          "trace": "A trace enters sampling and scoring if any of its spans match this condition.",
+          "session": "A session enters sampling and scoring if any of its spans match this condition."
         }
       },
       "selector": {

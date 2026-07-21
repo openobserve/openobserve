@@ -223,6 +223,40 @@ describe("JobFormPage", () => {
     expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
   });
 
+  // Regression: the help text read `formValues.samplingMode` instead of
+  // `formValues.value.samplingMode`. `formValues` is a TanStack store ref —
+  // templates auto-unwrap it, script does not — so the computed always saw
+  // `undefined` and silently stuck on the static example while the user typed.
+  it("previews the sampling rate as a live percentage", async () => {
+    wrapper = createWrapper();
+
+    setField(wrapper, "samplingMode", "rate");
+    setField(wrapper, "samplingValue", "0.211");
+    await wrapper.vm.$nextTick();
+
+    const help = wrapper
+      .find('[data-test="job-form-sampling-value-input"]')
+      .text();
+    expect(help).toContain("21.1%");
+    expect(help).not.toContain("Enter a rate");
+  });
+
+  // Cleared input must not keep asserting a percentage (or quote an example
+  // rate that isn't set) — it drops back to the range constraint.
+  it("falls back to the range hint when the rate is unusable", async () => {
+    wrapper = createWrapper();
+
+    setField(wrapper, "samplingMode", "rate");
+    setField(wrapper, "samplingValue", "");
+    await wrapper.vm.$nextTick();
+
+    const help = wrapper
+      .find('[data-test="job-form-sampling-value-input"]')
+      .text();
+    expect(help).toContain("Enter a rate between 0 and 1");
+    expect(help).not.toContain("%");
+  });
+
   it("defaults trace and session idle windows to 120 seconds", async () => {
     wrapper = createWrapper();
 
@@ -430,7 +464,9 @@ describe("JobFormPage", () => {
       );
     });
 
-    it("places sampling above filtering, with completion last", () => {
+    // Section order mirrors execution order: filter narrows the stream, then
+    // sampling takes a fraction of what matched (§OnlineEval-D15).
+    it("places filtering above sampling, with completion last", () => {
       wrapper = createWrapper({ mode: "edit", row: traceJob() });
       const sections = wrapper
         .findAll("section")
@@ -438,9 +474,10 @@ describe("JobFormPage", () => {
         .filter(Boolean);
 
       expect(sections).toEqual([
+        "job-form-details-section",
         "job-form-target-section",
-        "job-form-sampling-section",
         "job-form-filtering-section",
+        "job-form-sampling-section",
         "job-form-scorers-section",
         "job-form-completion-section",
       ]);

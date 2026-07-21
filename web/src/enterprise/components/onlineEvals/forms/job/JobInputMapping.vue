@@ -1,10 +1,10 @@
 ﻿<template>
   <div class="flex flex-col gap-2.5">
     <div class="flex flex-col gap-0.5">
-      <span class="text-xs font-semibold text-text-heading">{{
+      <span class="text-compact leading-tight font-medium text-input-label-text">{{
         t("onlineEvals.job.inputMapping.title")
       }}</span>
-      <span class="text-2xs text-text-secondary">{{
+      <span class="text-xs text-input-help-text leading-none">{{
         t(`onlineEvals.job.inputMapping.hint.${targetScope}`)
       }}</span>
     </div>

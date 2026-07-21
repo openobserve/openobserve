@@ -88,7 +88,7 @@
           v-if="formValues.fieldMode === 'default'"
           class="flex flex-col gap-2"
         >
-          <span class="text-2xs text-text-secondary">
+          <span class="text-xs text-input-help-text leading-none">
             {{ t("onlineEvals.job.spanSelector.defaultSchemaHelp") }}
           </span>
           <div class="flex flex-wrap gap-1">

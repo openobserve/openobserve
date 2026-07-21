@@ -40,10 +40,12 @@
       <div
         class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 [&_textarea]:max-h-[12.5rem] [&_textarea]:overflow-y-auto max-[68.75rem]:flex-[1_1_auto]"
       >
-        <!-- Target -->
+        <!-- Details — job identity only. Kept separate from Evaluation Target
+             so each heading actually describes its fields: naming the job and
+             choosing what it reads are different decisions. -->
         <section
           class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
-          data-test="job-form-target-section"
+          data-test="job-form-details-section"
         >
           <div
             class="flex items-center border-b border-border-default px-3 py-2.5"
@@ -53,7 +55,7 @@
             />
             <span
               class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-              >{{ t("onlineEvals.job.targetSection") }}</span
+              >{{ t("onlineEvals.job.detailsSection") }}</span
             >
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
@@ -73,6 +75,36 @@
               </OFormInput>
             </div>
 
+            <div class="[&_textarea]:max-h-[7.5rem]">
+              <OFormTextarea
+                name="description"
+                :label="t('onlineEvals.job.descriptionLabel')"
+                :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
+                size="sm"
+                :rows="3"
+                data-test="job-form-description-input"
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- Evaluation Target -->
+        <section
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          data-test="job-form-target-section"
+        >
+          <div
+            class="flex items-center border-b border-border-default px-3 py-2.5"
+          >
+            <div
+              class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent"
+            />
+            <span
+              class="text-compact font-semibold tracking-[0.01em] text-text-heading"
+              >{{ t("onlineEvals.job.targetSection") }}</span
+            >
+          </div>
+          <div class="flex flex-col gap-3 py-3.5 px-4">
             <div>
               <OFormSelect
                 name="targetScope"
@@ -103,17 +135,34 @@
                 </template>
               </OFormSelect>
             </div>
+          </div>
+        </section>
 
-            <div class="[&_textarea]:max-h-[7.5rem]">
-              <OFormTextarea
-                name="description"
-                :label="t('onlineEvals.job.descriptionLabel')"
-                :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
-                size="sm"
-                :rows="3"
-                data-test="job-form-description-input"
-              />
-            </div>
+        <!-- Filtering — before Sampling: the pipeline filters first, then
+             samples the matching subset (§OnlineEval-D15), so the form reads
+             in the same order the job actually executes. -->
+        <section
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          data-test="job-form-filtering-section"
+        >
+          <div
+            class="flex items-center border-b border-border-default px-3 py-2.5"
+          >
+            <div
+              class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent"
+            />
+            <span
+              class="text-compact font-semibold tracking-[0.01em] text-text-heading"
+              >{{ t("onlineEvals.job.filteringSection") }}</span
+            >
+          </div>
+          <div class="flex flex-col gap-3 py-3.5 px-4">
+            <JobFilterBuilder
+              name-prefix="filterGroup"
+              :target-scope="formValues.targetScope"
+              :stream-fields="streamFields"
+              data-test="job-form-filter-builder"
+            />
           </div>
         </section>
 
@@ -159,41 +208,11 @@
                   size="sm"
                   :required="formValues.samplingMode !== 'all'"
                   :disabled="formValues.samplingMode === 'all'"
-                  :help-text="
-                    formValues.samplingMode === 'all'
-                      ? t('onlineEvals.job.samplingValueAllHelp')
-                      : t('onlineEvals.job.samplingValueHelp')
-                  "
+                  :help-text="samplingValueHelp"
                   data-test="job-form-sampling-value-input"
                 />
               </div>
             </div>
-          </div>
-        </section>
-
-        <!-- Filtering -->
-        <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
-          data-test="job-form-filtering-section"
-        >
-          <div
-            class="flex items-center border-b border-border-default px-3 py-2.5"
-          >
-            <div
-              class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent"
-            />
-            <span
-              class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-              >{{ t("onlineEvals.job.filteringSection") }}</span
-            >
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-            <JobFilterBuilder
-              name-prefix="filterGroup"
-              :target-scope="formValues.targetScope"
-              :stream-fields="streamFields"
-              data-test="job-form-filter-builder"
-            />
           </div>
         </section>
 
@@ -253,7 +272,7 @@
             >
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
-            <div class="text-xs text-text-secondary">
+            <div class="text-xs text-input-help-text leading-none">
               {{
                 t(`onlineEvals.job.completionHelp.${formValues.targetScope}`)
               }}
@@ -387,7 +406,11 @@ import {
   valueOf,
 } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
-import { parseSamplingRate, samplingRateForForm } from "../utils/jobSampling";
+import {
+  parseSamplingRate,
+  samplingRateForForm,
+  samplingRatePercent,
+} from "../utils/jobSampling";
 import {
   buildJobFilterConditionPayload,
   buildOptionalJobConditionPayload,
@@ -480,6 +503,21 @@ const filterWhere = computed<string>(() => {
   } catch {
     return "";
   }
+});
+
+// Sampling help doubles as live feedback: once the rate parses to a usable
+// percentage we state the actual effect ("Evaluates 25% of matched targets"),
+// and fall back to the 0.1 example only while the field is empty or invalid —
+// that example is what teaches the 0–1 scale, so it earns its place then.
+const samplingValueHelp = computed<string>(() => {
+  if (formValues.value.samplingMode === "all") {
+    return t("onlineEvals.job.samplingValueAllHelp");
+  }
+
+  const percent = samplingRatePercent(formValues.value.samplingValue);
+  return percent === null
+    ? t("onlineEvals.job.samplingValueHelp")
+    : t("onlineEvals.job.samplingValuePreview", { percent });
 });
 
 // Pauses the match-count query while a condition is half-filled (column picked

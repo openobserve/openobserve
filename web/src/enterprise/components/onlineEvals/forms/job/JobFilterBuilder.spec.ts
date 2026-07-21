@@ -27,14 +27,20 @@ function mountBuilder(purpose?: "filter" | "endSignal") {
 }
 
 describe("JobFilterBuilder", () => {
-  it("keeps the eligibility filter copy by default", () => {
+  // The hint must say what matching actually leads to — "becomes eligible"
+  // left the user asking "eligible for what?", so all three scope variants
+  // name the same destination the span copy always did.
+  it("says what a matching trace goes on to enter", () => {
     const wrapper = mountBuilder();
     expect(
       wrapper.get('[data-test="job-condition-builder-title"]').text(),
     ).toBe("Filter condition");
-    expect(
-      wrapper.get('[data-test="job-condition-builder-hint"]').text(),
-    ).toContain("A trace becomes eligible");
+
+    const hint = wrapper
+      .get('[data-test="job-condition-builder-hint"]')
+      .text();
+    expect(hint).toContain("sampling and scoring");
+    expect(hint).not.toContain("eligible");
   });
 
   it("shows End Signal copy when used by completion settings", () => {

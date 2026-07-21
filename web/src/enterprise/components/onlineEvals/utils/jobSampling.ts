@@ -15,6 +15,24 @@ export function samplingRateForForm(value: unknown): string {
   return typeof rate === "number" && Number.isFinite(rate) ? String(rate) : "";
 }
 
+/**
+ * The rate as a display percentage, or `null` when the input isn't a usable
+ * rate yet (empty, non-numeric, or outside 0–1) — the caller then falls back
+ * to the static example hint instead of previewing a nonsense percentage.
+ *
+ * Rounded to one decimal so 1/3 reads as `33.3` rather than `33.33333333333333`,
+ * and float artifacts (0.29 * 100 = 28.999999999999996) collapse to `29`.
+ */
+export function samplingRatePercent(value: string | number): number | null {
+  const input = String(value).trim();
+  if (!input) return null;
+
+  const rate = Number(input);
+  if (!Number.isFinite(rate) || rate <= 0 || rate > 1) return null;
+
+  return Math.round(rate * 1000) / 10;
+}
+
 /** Validate and return the scalar rate used by the eval-job API. */
 export function parseSamplingRate(
   value: string | number,
