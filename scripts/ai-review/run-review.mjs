@@ -15,29 +15,37 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ─── Model provider selection ──────────────────────────────────────────────
 // The review runs against a single provider per invocation, chosen via env so the
 // same script can be launched once per provider (see .github/workflows/ai-code-review.yml,
-// which runs a glm + deepseek matrix for a side-by-side comparison). Everything defaults
-// to the original GLM-5.2 (Z.ai) setup, so an invocation with no REVIEW_* env set behaves
-// exactly as before.
+// whose matrix currently has a single deepseek leg). Everything defaults to that
+// DeepSeek-V4-Pro setup, so an invocation with no REVIEW_* env set still works.
 //
 // - REVIEW_PROVIDER_ID / REVIEW_MODEL_ID: opencode provider+model IDs (must match a
 //   provider/model registered in opencode.jsonc).
-// - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (GLM uses "max"; empty ⇒ omit).
+// - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (empty ⇒ omit).
 // - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
-// - REVIEW_LABEL: short human label used in the posted comment header (e.g. "GLM-5.2").
+// - REVIEW_LABEL: short human label used in the posted comment header (e.g. "DeepSeek-V4-Pro").
 // - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
-//   the two providers post/update independent comments and never clobber each other.
-const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "zai";
-const MODEL_ID = process.env.REVIEW_MODEL_ID || "glm-5.2";
-const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "max";
-const API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "GLM_API_KEY";
-const MODEL_LABEL = process.env.REVIEW_LABEL || "GLM-5.2";
+//   providers post/update independent comments and never clobber each other.
+const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
+const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-v4-pro";
+const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
+// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "DEEPSEEK_API_KEY"),
+// never the key itself — the value is read only via apiKey() below and is never logged or
+// posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs and
+// into a public PR comment on misconfiguration, so a malformed value must not become the
+// vehicle for leaking anything. This also keeps CodeQL's js/clear-text-logging taint analysis
+// from treating the *name* as the secret (it flags any `...API_KEY...` env read reaching a log).
+const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "DEEPSEEK_API_KEY";
+const API_KEY_VAR_NAME = /^[A-Z][A-Z0-9_]{0,63}$/.test(RAW_API_KEY_VAR_NAME)
+  ? RAW_API_KEY_VAR_NAME
+  : "DEEPSEEK_API_KEY";
+const MODEL_LABEL = process.env.REVIEW_LABEL || "DeepSeek-V4-Pro";
 const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
 
 function apiKey() {
   return process.env[API_KEY_VAR_NAME];
 }
 
-const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
+const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review-deepseek -->";
 
 // Every marker any provider leg may post. findExistingReviewComment matches on substring, so a
 // comment carrying a foreign marker gets claimed — and overwritten — by that other provider's
@@ -45,6 +53,8 @@ const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 // obey formatting instructions, so sanitizeReviewBody strips all of these and re-prepends only
 // REVIEW_MARKER: exactly one marker per comment, enforced in code rather than by the prompt.
 // Keep in sync with the `marker` values in .github/workflows/ai-code-review.yml.
+// Includes the retired GLM leg's marker so any leftover GLM comment text still gets
+// stripped from model output rather than resurfacing inside a DeepSeek comment.
 const ALL_REVIEW_MARKERS = [
   "<!-- ai-code-review -->",
   "<!-- ai-code-review-deepseek -->",
@@ -515,7 +525,7 @@ function assessRiskTier(filteredDiff) {
   return "full";
 }
 
-// ─── LLM calls (via `opencode serve`, GLM-5.2 max effort) ─────────────────
+// ─── LLM calls (via `opencode serve`) ──────────────────────────────────────
 //
 // Each reviewer/coordinator is a named agent in opencode.jsonc (ai-review-*), running
 // read-only against the checked-out repo via OpencodeServer + callOpencode below. Unlike
@@ -862,9 +872,8 @@ function sanitizeReviewBody(body) {
   const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
   cleaned = cleaned.replace(boundaryPattern, "");
 
-  // Strip EVERY known marker (not just ours) wherever it appears. The coordinator prompt's
-  // output template used to hardcode the GLM marker, so a DeepSeek run would carry both and
-  // be matched — and overwritten — by the GLM leg's findExistingReviewComment.
+  // Strip EVERY known marker (not just ours) wherever it appears, so a model that echoes a
+  // marker from the prompt or from a previous review can't end up carrying two of them.
   for (const marker of ALL_REVIEW_MARKERS) {
     cleaned = cleaned.split(marker).join("");
   }
@@ -878,8 +887,8 @@ function sanitizeReviewBody(body) {
   // Re-prepend exactly one marker — ours.
   cleaned = `${REVIEW_MARKER}\n${cleaned.trimStart()}`;
 
-  // Tag the review header with the model label so the GLM and DeepSeek comments are
-  // visually distinguishable on the PR. Tolerates trailing words ("AI Code Review Summary")
+  // Tag the review header with the model label so each provider's comment is visually
+  // identifiable on the PR. Tolerates trailing words ("AI Code Review Summary")
   // and any case; the negative lookahead for "(" keeps re-runs idempotent.
   cleaned = cleaned.replace(
     /^(#{1,3}[ \t]*AI Code Review\b)(?![ \t]*\()([ \t]*[^\n(]*)$/mi,
