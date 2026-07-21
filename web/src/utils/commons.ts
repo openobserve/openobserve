@@ -710,6 +710,40 @@ export const deleteDashboardById = async (
   }
 };
 
+/**
+ * Evict already-deleted dashboards from the cached per-folder lists.
+ *
+ * `deleteDashboardById` does this for the single-delete path. Bulk delete goes
+ * straight to the service, so without this the source folder keeps serving a
+ * stale list from cache (folder navigation is cache-first via
+ * `getAllDashboardsByFolderId`) and the deleted rows reappear until a manual
+ * refresh.
+ *
+ * @param idsByFolder folder id → dashboard ids deleted from that folder
+ */
+export const evictDashboardsFromCache = (
+  store: any,
+  idsByFolder: Map<string, string[]>,
+) => {
+  const allDashboardList = store.state.organizationData?.allDashboardList ?? {};
+  const next = { ...allDashboardList };
+  let changed = false;
+
+  idsByFolder.forEach((ids, folderId) => {
+    const cached = next[folderId];
+    if (!Array.isArray(cached)) return; // folder never fetched — nothing stale
+    const remaining = cached.filter(
+      (dashboard: any) => !ids.includes(dashboard.dashboardId),
+    );
+    if (remaining.length !== cached.length) {
+      next[folderId] = remaining;
+      changed = true;
+    }
+  });
+
+  if (changed) store.dispatch("setAllDashboardList", next);
+};
+
 export const getPanel = async (
   store: any,
   dashboardId: any,

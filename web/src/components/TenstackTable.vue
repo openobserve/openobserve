@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="header in headerGroup.headers"
               :key="header.id"
               :id="header.id"
-              class="px-2 relative table-head text-ellipsis!"
+              class="px-2 relative table-head text-ellipsis! group"
               :class="[
                 (header.column.columnDef.meta as any)?.align === 'center'
                   ? 'text-center!'
@@ -392,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
-                  class="invisible items-center absolute right-2 top-0 px-2 column-actions h-full flex"
+                  class="invisible items-center absolute right-2 top-0 px-2 column-actions h-full flex group-hover:visible bg-[var(--color-table-header-bg)]"
                   v-if="
                     (header.column.columnDef.meta as any)?.closable ||
                     (header.column.columnDef.meta as any)?.showWrap
@@ -401,11 +401,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
-                    name="cancel"
                     class="m-0 close-icon cursor-pointer text-icon-color"
+                    name="close"
                     :title="t('common.close')"
                     size="sm"
-                    @click="closeColumn(header.column.columnDef)"
+                    @click.stop="closeColumn(header.column.columnDef)"
                    />
                 </div>
               </div>

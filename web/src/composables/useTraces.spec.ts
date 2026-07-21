@@ -1125,7 +1125,7 @@ describe("useTraces", () => {
       expect(DEFAULT_TRACE_COLUMNS.traces).not.toContain("extra_field");
     });
 
-    it("should migrate old 'status' field to 'span_status' in spans mode", () => {
+    it("should keep 'status' field as-is in spans mode (no migration)", () => {
       const { searchObj, loadLocalLogFilterField, resetSearchObj } =
         useTraces();
       resetSearchObj();
@@ -1135,16 +1135,17 @@ describe("useTraces", () => {
         value: "migrate-stream",
       };
 
-      // Simulate a saved preference that still has the old "status" field
+      // Simulate a saved preference that has a "status" data field
       localTraceFilterStore.value["org-migrate_migrate-stream"] = {
         spans: ["operation_name", "status", "status_code"],
       };
 
       loadLocalLogFilterField("spans");
 
+      // "status" is a regular data field in spans mode — must remain unchanged
       expect(searchObj.data.stream.selectedFields).toEqual([
         "operation_name",
-        "span_status",
+        "status",
         "status_code",
       ]);
     });

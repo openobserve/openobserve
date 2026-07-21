@@ -20,6 +20,7 @@ import {
   getAllDashboards,
   getFoldersListByType,
   getAllDashboardsByFolderId,
+  evictDashboardsFromCache,
   getTabDataFromTabId,
   addPanel,
   addVariable,
@@ -488,6 +489,59 @@ describe("Commons Utility Functions", () => {
       await getAllDashboardsByFolderId(mockStore, folderId);
 
       expect(dashboardService.list).toHaveBeenCalled();
+    });
+  });
+
+  describe("evictDashboardsFromCache", () => {
+    it("should remove the given dashboards from their folder lists", () => {
+      mockStore.state.organizationData.allDashboardList = {
+        "folder-a": [{ dashboardId: "d1" }, { dashboardId: "d2" }],
+        "folder-b": [{ dashboardId: "d3" }],
+      };
+
+      evictDashboardsFromCache(
+        mockStore,
+        new Map([
+          ["folder-a", ["d1"]],
+          ["folder-b", ["d3"]],
+        ]),
+      );
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setAllDashboardList", {
+        "folder-a": [{ dashboardId: "d2" }],
+        "folder-b": [],
+      });
+    });
+
+    it("should leave other folders untouched", () => {
+      const untouched = [{ dashboardId: "d9" }];
+      mockStore.state.organizationData.allDashboardList = {
+        "folder-a": [{ dashboardId: "d1" }],
+        "folder-b": untouched,
+      };
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-a", ["d1"]]]));
+
+      const next = mockStore.dispatch.mock.calls[0][1];
+      expect(next["folder-b"]).toBe(untouched);
+    });
+
+    it("should not dispatch when nothing matched", () => {
+      mockStore.state.organizationData.allDashboardList = {
+        "folder-a": [{ dashboardId: "d1" }],
+      };
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-a", ["nope"]]]));
+
+      expect(mockStore.dispatch).not.toHaveBeenCalled();
+    });
+
+    it("should skip folders that were never fetched", () => {
+      mockStore.state.organizationData.allDashboardList = {};
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-x", ["d1"]]]));
+
+      expect(mockStore.dispatch).not.toHaveBeenCalled();
     });
   });
 

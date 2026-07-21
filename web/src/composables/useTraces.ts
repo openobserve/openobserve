@@ -287,18 +287,11 @@ const useTraces = () => {
       | undefined;
     const saved: Record<string, string[]> | undefined = stored?.[key];
 
-    let fields: string[] = [];
-    fields = saved?.[searchMode]?.length
-      ? saved?.[searchMode]
-      : [...DEFAULT_TRACE_COLUMNS[searchMode]];
+    const fields: string[] =
+      saved?.[searchMode]?.length
+        ? saved?.[searchMode]
+        : [...DEFAULT_TRACE_COLUMNS[searchMode]];
 
-    fields = fields.map((field: string) => {
-      if (field === "status" && searchMode === "spans") {
-        return "span_status";
-      } else {
-        return field;
-      }
-    });
     searchObj.data.stream.selectedFields = fields;
   };
 
