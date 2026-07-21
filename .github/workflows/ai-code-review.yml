@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # Concurrency is per-job (not workflow-level) so it can see `matrix`: keyed per-PR AND
-    # per-provider, the glm and deepseek legs get independent groups and don't cancel each other.
+    # per-provider, so provider legs get independent groups and don't cancel each other.
     concurrency:
       group: ai-review-${{ matrix.provider.name }}-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
       cancel-in-progress: true
@@ -30,20 +30,13 @@ jobs:
       issues: write
       actions: read
     strategy:
-      # Run both providers even if one fails, and let one provider's failure not sink the other.
+      # One provider's failure shouldn't sink the others.
       fail-fast: false
       matrix:
-        # One-week head-to-head: GLM-5.2 vs DeepSeek-V4-Pro, each posting its own PR comment.
+        # DeepSeek-V4-Pro is the sole reviewer (the GLM-5.2 head-to-head has ended).
         # Adding a provider? Also add its `marker` to ALL_REVIEW_MARKERS in run-review.mjs,
         # or the other legs will claim and overwrite this one's comment.
         provider:
-          - name: glm
-            label: GLM-5.2
-            provider_id: zai
-            model_id: glm-5.2
-            model_variant: max
-            api_key_env: GLM_API_KEY
-            marker: "<!-- ai-code-review -->"
           - name: deepseek
             label: DeepSeek-V4-Pro
             provider_id: deepseek-review
@@ -129,8 +122,7 @@ jobs:
           REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
           REVIEW_LABEL: ${{ matrix.provider.label }}
           REVIEW_MARKER: ${{ matrix.provider.marker }}
-          # Both keys are provided; run-review.mjs reads only the one named by REVIEW_API_KEY_ENV.
-          GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+          # run-review.mjs reads only the key named by REVIEW_API_KEY_ENV.
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
           O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
