@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-1 flex min-h-0">
       <ONavbar
         v-if="store.state.printMode !== true"
-        :links-list="linksList"
+        :links-list="navLinks"
         :mini-mode="miniMode"
         :visible="leftDrawerOpen"
         @menu-hover="handleMenuHover"
@@ -450,6 +450,17 @@ export default defineComponent({
       },
     ]);
 
+    // Reveal the rail only once its item list is settled — true immediately when
+    // config is cached, else set when getConfig() resolves. Avoids config-driven
+    // tiles popping in and shifting the layout.
+    const menuReady = ref(
+      !!(
+        store.state.zoConfig?.hasOwnProperty?.("version") &&
+        store.state.zoConfig.version != ""
+      ),
+    );
+    const navLinks = computed(() => (menuReady.value ? linksList.value : []));
+
     const langList = [
       {
         label: "English",
@@ -563,6 +574,7 @@ export default defineComponent({
             .leftNavigationLinks(linksList, t);
           filterMenus();
         }
+        menuReady.value = true;
         await nextTick();
         // if rum enabled then setUser to capture session details.
         if (store.state.zoConfig.rum?.enabled) {
@@ -1146,12 +1158,17 @@ export default defineComponent({
           await nextTick();
 
           filterMenus();
+          menuReady.value = true;
           // if rum enabled then setUser to capture session details.
           if (res.data.rum.enabled) {
             setRumUser();
           }
         })
-        .catch((error) => console.log(error));
+        .catch((error) => {
+          console.log(error);
+          // Fail open: reveal the base menu even if /config never resolves.
+          menuReady.value = true;
+        });
     };
 
     if (config.isCloud == "true") {
@@ -1313,6 +1330,7 @@ export default defineComponent({
       langList,
       selectedLanguage,
       linksList,
+      navLinks,
       selectedOrg,
       orgOptions,
       leftDrawerOpen: true,
