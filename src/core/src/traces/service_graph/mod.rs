@@ -45,6 +45,8 @@ pub use o2_enterprise::enterprise::service_graph::{
 };
 // Re-export processor for compactor
 pub use processor::process_service_graph;
+#[cfg(feature = "enterprise")]
+pub(crate) use processor::run_graph_search;
 
 #[cfg(test)]
 mod tests {

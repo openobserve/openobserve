@@ -178,6 +178,10 @@ beforeEach(() => {
   // Reset localStorage between tests so the dashboard's stream
   // initialisation doesn't bleed across cases.
   localStorage.clear();
+  // The dashboard defaults to Agent scope now ("the AI module is
+  // agent-centric"); this suite exercises the stream-mode paths, so opt into
+  // stream mode the way a returning user would — the persisted preference.
+  localStorage.setItem("llmInsights_filterMode", "stream");
   // Default streams response.
   mockGetStreams.mockResolvedValue({
     list: [
