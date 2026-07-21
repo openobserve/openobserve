@@ -38,7 +38,20 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
     };
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            return await fetch(url, requestOpts);
+            const response = await fetch(url, requestOpts);
+            // A 5xx is a transient backend blip, not a client error — alpha returns
+            // 503 Service Unavailable / 502 Bad Gateway on ingestion during load spikes,
+            // and a bare fetch treats those as a "successful" response so the caller threw
+            // on the first one (pipelines:180 hard-failed on a run with 4x 503 + 1x 502).
+            // Retry 5xx with backoff like a network error; a persistent 5xx still returns
+            // after maxRetries and the caller throws — nothing is masked.
+            if (response.status >= 500 && attempt < maxRetries) {
+                const backoffMs = 800 * (attempt + 1);
+                testLogger.warn('Transient 5xx from ingestion, retrying', { url, status: response.status, attempt: attempt + 1, maxRetries, backoffMs });
+                await new Promise((resolve) => setTimeout(resolve, backoffMs));
+                continue;
+            }
+            return response;
         } catch (err) {
             const message = String(err && err.message ? err.message : err);
             const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
