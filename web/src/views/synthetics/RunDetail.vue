@@ -626,6 +626,22 @@ const { t } = useI18n();
 const route = useRoute();
 const store = useStore();
 
+// id -> "Name (region)" — the run's location field is the raw id (KSUID for
+// private, "aws-us-east-1" for public); resolve it for display.
+const locationNames = ref<Record<string, string>>({});
+function locationLabel(id: string): string {
+  return locationNames.value[id] ?? id;
+}
+syntheticsService
+  .getLocations(store.state.selectedOrganization.identifier)
+  .then((res) => {
+    const locations: { id: string; name: string; region: string }[] = (res.data as any).locations ?? [];
+    locationNames.value = Object.fromEntries(
+      locations.map((loc) => [loc.id, `${loc.name} (${loc.region})`]),
+    );
+  })
+  .catch((err) => console.error("[synthetics] failed to load locations", err));
+
 // ── Source IDs — props in drawer mode, route params otherwise ────────────────
 const monitorId = computed(() =>
   props.drawerMode ? props.overrideMonitorId : String(route.params.id ?? ""),
@@ -1085,7 +1101,7 @@ const infoChips = computed(() => [
   },
   {
     label: t('synthetics.results.location'),
-    value: currentRun.value.location,
+    value: locationLabel(currentRun.value.location),
     icon: locationIcon(currentRun.value.location),
   },
 ]);
