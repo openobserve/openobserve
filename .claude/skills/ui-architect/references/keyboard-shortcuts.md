@@ -20,7 +20,7 @@ display, and its cheatsheet row never drift apart.
 
 Add an entry to the appropriate module group in `shortcutRegistry.ts`. Keys can
 be uniform (`key`) or platform-split (`keyForWindows` / `keyForMac`), and the
-description is an **i18n key** (add it to `web/src/locales/languages/en.json`
+description is an **i18n key** (add it to `web/src/locales/languages/en-US.json`
 under `shortcuts.actions.*`).
 
 ```ts

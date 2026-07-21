@@ -18,8 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import { createStore } from "vuex";
 
-// PerformanceFieldsDialog now wraps content in <ODialog> (migrated from
-// <q-dialog>). The dialog exposes:
+// PerformanceFieldsDialog now wraps content in <ODialog>. The dialog exposes:
 //   - prop  : open (v-model:open), persistent, size, title,
 //             primary-button-label, secondary-button-label
 //   - emits : update:open, click:primary, click:secondary
@@ -345,9 +344,9 @@ describe("PerformanceFieldsDialog", () => {
     it("should render correctly in light theme", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      // light theme applies the light surface/border classes
-      expect(wrapper.html()).toContain("bg-[#f5f5f5]");
-      expect(wrapper.html()).not.toContain("bg-[#1e1e1e]");
+      // The hex dark/light surfaces collapsed to a single theme-aware token.
+      expect(wrapper.html()).toContain("bg-surface-subtle");
+      expect(wrapper.html()).toContain("border-border-default");
     });
 
     it("should render correctly in dark theme", async () => {
@@ -360,8 +359,9 @@ describe("PerformanceFieldsDialog", () => {
 
       mountDialog([mockFtsFiled], true, darkStore);
       await flushPromises();
-      expect(wrapper.html()).toContain("bg-[#1e1e1e]");
-      expect(wrapper.html()).not.toContain("bg-[#f5f5f5]");
+      // Same theme-aware token is rendered in dark mode; the token resolves the color.
+      expect(wrapper.html()).toContain("bg-surface-subtle");
+      expect(wrapper.html()).toContain("border-border-default");
     });
   });
 });

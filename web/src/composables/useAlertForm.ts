@@ -64,8 +64,7 @@ import {
   type PayloadContext,
   type SaveAlertContext,
 } from "@/utils/alerts/alertPayload";
-// Pure cron helpers — used by the cron save gate in runImperativeQueryChecks
-// (re-homed from the pre-migration AlertSettings.validateFrequency).
+// Pure cron helpers — used by the cron save gate in runImperativeQueryChecks.
 import {
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
@@ -223,13 +222,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const addAlertForm: any = ref(null);
   const disableColor: any = ref("");
 
-  // ── Headless OForm (Rule ③ OWNER pattern) ─────────────────────────────────
+  // ── Headless OForm ────────────────────────────────────────────────────────
   // AddAlert OWNS the ONE form for the whole wizard (topbar scalars + the
-  // already-migrated descendant steps QueryConfig/AlertSettings bind their
-  // fields by nested `name=` into it). `formData` is a READ-VIEW of the form's
-  // values (form.useStore) — the SINGLE source of truth, no mirror. Every write
-  // goes through setF / resetForm; NEVER mutate the read-view directly (that
-  // bypasses TanStack). See START-HERE.md Rule ③.
+  // descendant steps QueryConfig/AlertSettings bind their fields by nested
+  // `name=` into it). `formData` is a READ-VIEW of the form's values
+  // (form.useStore) — the SINGLE source of truth, no mirror. Every write goes
+  // through setF / resetForm; NEVER mutate the read-view directly (that bypasses
+  // TanStack).
   /** The org's min evaluation frequency, in SECONDS (0 when unset — the schema
    *  then skips the floor rule rather than inventing one). */
   const minAutoRefreshInterval = (): number =>
@@ -534,9 +533,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const step4Ref = ref(null);
   const lastValidStep = ref(1);
 
-  // Topbar field refs (for focus-on-error only). The name/stream error states
-  // are now owned by the composed schema (inline OForm* field errors), so the
-  // old alertNameError / streamTypeError / streamNameError refs are removed.
+  // Topbar field refs (for focus-on-error only).
   const streamTypeRef = ref<any>(null);
   const streamNameRef = ref<any>(null);
   const anomalyNameRef = ref<any>(null);
@@ -1163,10 +1160,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // AlertSettings) is a DESCENDANT of the ONE AddAlert form, so their field
   // rules run through the composed schema (AddAlert.schema.ts) on the real save
   // path (handleSave → form.handleSubmit), and the non-schema query-text gates
-  // live in runImperativeQueryChecks. The old per-step `.validate()` calls are
-  // gone — the step1Ref one was a permanent no-op anyway (it points at the
-  // topbar OFormInput, a <script setup> component that exposes no validate()).
-  // Kept as a function so wizard navigation keeps its gate seam.
+  // live in runImperativeQueryChecks. Kept as a function so wizard navigation
+  // keeps its gate seam.
   const validateStep = async (_stepNumber: number) => {
     return true;
   };
@@ -1176,7 +1171,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   // Focus the first field showing a validation message. This used to query
-  // `.q-field--error` — a Quasar class with no producer left in the app after the
+  // a legacy error class — one with no producer left in the app after the
   // OForm migration, so it silently matched nothing and the "fix the highlighted
   // fields" toast pointed at a field we never actually focused. OInput/OSelect
   // render their message as [role="alert"] inside the field wrapper, so walk up
@@ -1247,7 +1242,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     });
   };
 
-  // Focus a topbar q-select/q-input by its Vue component ref
+  // Focus a topbar select/input by its Vue component ref
   const focusTopbarField = (fieldRef: any) => {
     nextTick(() => {
       const el = fieldRef?.value?.$el as HTMLElement | null;
@@ -2270,7 +2265,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         payload,
         activeFolderId.value,
       );
-      callAlert
+      // Hold the settled promise so onSubmit (and therefore the form's
+      // isSubmitting) spans the whole request — otherwise the Save button
+      // re-enables in the same tick and repeat clicks fire duplicate saves.
+      const request = callAlert
         .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
@@ -2297,7 +2295,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         alert_name: formData.value.name,
         page: "Add/Update Alert",
       });
-      return;
+      return request;
     } else {
       payload.folder_id = activeFolderId.value;
       callAlert = alertsService.create_by_alert_id(
@@ -2306,7 +2304,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         activeFolderId.value,
       );
 
-      callAlert
+      // Same as the update branch: returned below so isSubmitting spans the request.
+      const request = callAlert
         .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
@@ -2333,6 +2332,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         alert_name: formData.value.name,
         page: "Add/Update Alert",
       });
+      return request;
     }
   };
 

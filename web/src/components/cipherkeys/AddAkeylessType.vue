@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="cipher-keys-add-akeyless-type">
+  <div class="cipher-keys-add-akeyless-type space-y-2">
     <!-- Every editable control is an OForm* field bound to the parent OForm (in
          AddCipherKey.vue) by `name`; all rules (URL/HTML/regex + the conditional
          requireds) live in AddCipherKey.schema.ts. No manual error refs, no
@@ -39,10 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton data-test="add-cipher-key-akeyless-access-id-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && accessId != ''" @click="isUpdateAccessID = false">{{ t('common.cancel') }}</OButton>
     </div>
     <div v-else>
-      <label class="flex q-field mb-3">
+      <label class="flex mb-3">
         <b>{{ t('cipherKey.accessId') }}</b>
       </label>
-      <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ accessId }}</pre>
+      <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ accessId }}</pre>
       <OButton data-test="add-cipher-key-akeyless-access-id-input-update" variant="primary" size="sm-action" @click="isUpdateAccessID = true">{{ t('common.update') }}</OButton>
     </div>
     <OFormSelect
@@ -56,10 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="q-fieldset p-3 w-full border border-[lightgray] rounded relative"
+      class="p-3 w-full border border-[lightgray] rounded-default relative"
       v-if="authType != ''"
     >
-      <legend class="q-caption px-2 text-xs text-(--q-color-dark) ml-2 py-0 px-1">
+      <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">
         {{ getAuthenticationTypeLabel(authType) }}
         Configuration
       </legend>
@@ -75,10 +75,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton data-test="add-cipher-key-akeyless-access-key-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && accessKey != ''" @click="isUpdateAccessKey = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="flex q-field mb-3">
+          <label class="flex mb-3">
             <b>{{ t('cipherKey.accessKey') }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ accessKey }}</pre>
+          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ accessKey }}</pre>
           <OButton data-test="add-cipher-key-akeyless-access-key-input-update" variant="primary" size="sm-action" @click="isUpdateAccessKey = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
@@ -94,10 +94,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton data-test="add-cipher-key-akeyless-ldap-username-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && ldapUsername != ''" @click="isUpdateLDAPUsername = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="flex q-field mb-3">
+          <label class="flex mb-3">
             <b>{{ t('cipherKey.ldapUsername') }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ ldapUsername }}</pre>
+          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ ldapUsername }}</pre>
           <OButton data-test="add-cipher-key-akeyless-ldap-username-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPUsername = true">{{ t('common.update') }}</OButton>
         </div>
         <div v-if="!isUpdate || isUpdateLDAPPass || ldapPassword == ''">
@@ -113,10 +113,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton data-test="add-cipher-key-akeyless-ldap-password-input-cancel" variant="outline" size="sm-action" class="mt-2" v-if="isUpdate && ldapPassword != ''" @click="isUpdateLDAPPass = false">{{ t('common.cancel') }}</OButton>
         </div>
         <div v-else>
-          <label class="flex q-field mb-3">
+          <label class="flex mb-3">
             <b>{{ t('cipherKey.ldapPassword') }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-(--o2-border-input) p-[5px] mb-[5px]">{{ ldapPassword }}</pre>
+          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{ ldapPassword }}</pre>
           <OButton data-test="add-cipher-key-akeyless-ldap-password-input-update" variant="primary" size="sm-action" @click="isUpdateLDAPPass = true">{{ t('common.update') }}</OButton>
         </div>
       </div>
@@ -132,10 +132,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="q-fieldset p-3 w-full border border-[lightgray] rounded relative"
+      class="p-3 w-full border border-[lightgray] rounded-default relative"
       v-if="secretType != ''"
     >
-      <legend class="q-caption px-2 text-xs text-(--q-color-dark) ml-2 py-0 px-1">
+      <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">
         {{ getSecretOptionLabel(secretType) }}
         Configuration
       </legend>
@@ -264,11 +264,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Small consistent gap between every top-level field (inputs, selects,
-   fieldsets) so they don't render flush against each other. */
-.cipher-keys-add-akeyless-type > * + * {
-  margin-top: 0.5rem;
-}
-</style>

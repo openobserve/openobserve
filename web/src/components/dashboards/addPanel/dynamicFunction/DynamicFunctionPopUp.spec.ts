@@ -18,7 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import enLocaleFull from "@/locales/languages/en.json";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 
 const i18n = createI18n({

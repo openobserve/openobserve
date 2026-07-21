@@ -16,7 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import enLocaleFull from "@/locales/languages/en.json";
+import enLocaleFull from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
@@ -58,9 +58,9 @@ vi.mock("@/components/dashboards/panels/CustomChartRenderer.vue", () => ({
   },
 }));
 
-vi.mock("@/components/alerts/TagInput.vue", () => ({
+vi.mock("@/lib/forms/TagInput/OTagInput.vue", () => ({
   default: {
-    name: "TagInput",
+    name: "OTagInput",
     template:
       '<div data-test="tag-input" :data-model-value="JSON.stringify(modelValue)" />',
     props: ["modelValue", "placeholder", "label"],
@@ -224,8 +224,6 @@ function mountComponent(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        "q-menu": true,
-        "q-tooltip": true,
         ODialog: ODialogStub,
         ODrawer: ODrawerStub,
       },
@@ -537,7 +535,7 @@ describe("ServiceIdentitySetup", () => {
       // Drive the TagInput → editable list update through the v-model pipeline
       const tagInput = wrapper.find('[data-test="tag-input"]');
       expect(tagInput.exists()).toBe(true);
-      await tagInput.findComponent({ name: "TagInput" }).vm.$emit(
+      await tagInput.findComponent({ name: "OTagInput" }).vm.$emit(
         "update:modelValue",
         ["service.name", "k8s.deployment"],
       );

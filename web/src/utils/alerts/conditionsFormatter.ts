@@ -1,228 +1,27 @@
 /**
- * =============================================================================
- * SHARED UTILITY FOR FORMATTING V2 CONDITIONS INTO STRINGS
- * =============================================================================
+ * Shared utility for formatting V2 condition structures into strings. Used by:
+ * 1. UI Preview (FilterGroup.vue) - human-readable display of conditions
+ * 2. SQL Generation (alertQueryBuilder.ts) - WHERE clauses in SQL queries
  *
- * This module provides the core logic for converting V2 condition structures
- * into string representations. It's used by:
- * 1. UI Preview (FilterGroup.vue) - for displaying conditions in human-readable format
- * 2. SQL Generation (alertQueryBuilder.ts) - for building WHERE clauses in SQL queries
+ * V2 format:
+ *   Group:     { filterType: 'group', logicalOperator, groupId, conditions: [...] }
+ *   Condition: { filterType: 'condition', column, operator, value, logicalOperator, id }
  *
- * =============================================================================
- * V2 FORMAT STRUCTURE:
- * =============================================================================
+ * KEY INSIGHT — logical operator placement:
+ * The group's logicalOperator is NOT used when building the WHERE clause; it is
+ * only a UI default when adding new items to that group. Each item (condition or
+ * nested group) carries its own logicalOperator, which determines the operator
+ * that appears BEFORE that item (the first item at index 0 has no operator prefix).
  *
- * Group:
- * {
- *   filterType: 'group',
- *   logicalOperator: 'AND' | 'OR',  // NOT USED in WHERE clause generation!
- *                                    // Only used in UI as default when adding new items to this group
- *                                    // Each item's own logicalOperator determines the actual operator used
- *   groupId: 'uuid',
- *   conditions: [...]                // Array of conditions or nested groups
- * }
+ * Example conditions:
+ *   [ { column: 'age',    operator: '>', value: 30,       logicalOperator: 'AND' }, // index 0: no prefix
+ *     { column: 'city',   operator: '=', value: 'NYC',    logicalOperator: 'AND' }, // AND before
+ *     { column: 'status', operator: '=', value: 'active', logicalOperator: 'OR'  } ]// OR before
+ *   → "age > 30 AND city = 'NYC' OR status = 'active'"
  *
- * Condition:
- * {
- *   filterType: 'condition',
- *   column: 'age',
- *   operator: '>' | '=' | 'contains' | etc,
- *   value: any,
- *   logicalOperator: 'AND' | 'OR',  // Connects this item to PREVIOUS sibling (not used for index 0)
- *   id: 'uuid'
- * }
- *
- * =============================================================================
- * KEY INSIGHT: LOGICAL OPERATOR PLACEMENT
- * =============================================================================
- *
- * IMPORTANT: The group's logicalOperator field is NOT used when building the WHERE clause!
- *
- * Instead, each item (condition or nested group) has its own logicalOperator field that
- * determines the operator that appears BEFORE that item (except for the first item at index 0).
- *
- * The group's logicalOperator is only used in the UI as a default value when adding new
- * items to that group. It has no effect on the actual SQL generation.
- *
- * Example:
- * {
- *   filterType: 'group',
- *   logicalOperator: 'AND',  // ← This is IGNORED when building WHERE clause
- *   conditions: [
- *     { column: 'age', operator: '>', value: 30, logicalOperator: 'AND' },     // index 0: NO operator before
- *     { column: 'city', operator: '=', value: 'NYC', logicalOperator: 'AND' }, // index 1: AND before (from item's own field)
- *     { column: 'status', operator: '=', value: 'active', logicalOperator: 'OR' } // index 2: OR before (from item's own field)
- *   ]
- * }
- *
- * Result: "age > 30 AND city = 'NYC' OR status = 'active'"
- *          ↑ no operator  ↑ uses item[1].logicalOperator  ↑ uses item[2].logicalOperator
- *
- * =============================================================================
- * COMPLEX EXAMPLE: STEP-BY-STEP WALKTHROUGH
- * =============================================================================
- *
- * INPUT V2 STRUCTURE:
- * {
- *   filterType: 'group',
- *   logicalOperator: 'AND',  // ← ROOT GROUP: This field is IGNORED (not used in WHERE clause)
- *   conditions: [
- *     {
- *       filterType: 'condition',
- *       column: 'age',
- *       operator: '>',
- *       value: 18,
- *       logicalOperator: 'AND'
- *     },
- *     {
- *       filterType: 'condition',
- *       column: 'age',
- *       operator: '<',
- *       value: 65,
- *       logicalOperator: 'AND'
- *     },
- *     {
- *       filterType: 'group',
- *       logicalOperator: 'OR',      // ← NESTED GROUP: Also IGNORED (not used in WHERE clause)
- *                                    //   Only used in UI as default for new items added to this nested group
- *       conditions: [
- *         {
- *           filterType: 'condition',
- *           column: 'city',
- *           operator: '=',
- *           value: 'NYC',
- *           logicalOperator: 'OR'    // ← NESTED GROUP ITEM 0: This is IGNORED (index 0 never has operator prefix)
- *         },
- *         {
- *           filterType: 'condition',
- *           column: 'city',
- *           operator: '=',
- *           value: 'LA',
- *           logicalOperator: 'OR'    // ← NESTED GROUP ITEM 1: This IS USED (appears before this condition)
- *         }
- *       ],
- *       logicalOperator: 'AND'     // ← THIS IS USED: Connects THIS nested group to previous items in parent
- *     },
- *     {
- *       filterType: 'condition',
- *       column: 'status',
- *       operator: 'contains',
- *       value: 'premium',
- *       logicalOperator: 'AND'
- *     }
- *   ]
- * }
- *
- * PROCESSING STEPS (with sqlMode=true, formatValues=true):
- *
- * Step 1: Process condition at index 0
- *   - Input: { column='age', operator='>', value=18, logicalOperator='AND' }
- *   - Call formatValue('age', '>', 18, streamFieldsMap)
- *     → Check: streamFieldsMap['age']?.type === 'Int64' → TRUE
- *     → shouldNotQuote=true
- *     → Return: "18" (no quotes)
- *   - Call getFormattedCondition('age', '>', '18', sqlMode=true)
- *     → operator='>' matches case ">"
- *     → Return: "age > 18"
- *   - index=0, so NO operator prefix
- *   - Push to parts: "age > 18"
- *
- * Step 2: Process condition at index 1
- *   - Input: { column='age', operator='<', value=65, logicalOperator='AND' }
- *   - Call formatValue('age', '<', 65, streamFieldsMap)
- *     → Check: streamFieldsMap['age']?.type === 'Int64' → TRUE
- *     → Return: "65" (no quotes)
- *   - Call getFormattedCondition('age', '<', '65', sqlMode=true)
- *     → Return: "age < 65"
- *   - index=1, logicalOperator='AND', sqlMode=true
- *     → operator = 'AND'.toUpperCase() = "AND"
- *   - Push to parts: "AND age < 65"
- *
- * Step 3: Process nested group at index 2
- *   - Input: filterType='group' → Recursively call parseNode()
- *
- *   Inner Step 3a: Process first condition in nested group (index 0)
- *     - Input: { column='city', operator='=', value='NYC', logicalOperator='OR' }
- *     - formatValue('city', '=', 'NYC', streamFieldsMap)
- *       → Check: streamFieldsMap['city']?.type === 'String'
- *       → shouldNotQuote=false
- *       → Return: "'NYC'" (with quotes)
- *     - getFormattedCondition('city', '=', "'NYC'", sqlMode=true)
- *       → Return: "city = 'NYC'"
- *     - index=0 → NO operator prefix
- *     - Push: "city = 'NYC'"
- *
- *   Inner Step 3b: Process second condition in nested group (index 1)
- *     - Input: { column='city', operator='=', value='LA', logicalOperator='OR' }
- *     - formatValue('city', '=', 'LA', streamFieldsMap)
- *       → Return: "'LA'" (with quotes)
- *     - getFormattedCondition('city', '=', "'LA'", sqlMode=true)
- *       → Return: "city = 'LA'"
- *     - index=1, logicalOperator='OR', sqlMode=true
- *       → operator = "OR"
- *     - Push: "OR city = 'LA'"
- *
- *   Inner result: parts = ["city = 'NYC'", "OR city = 'LA'"]
- *   Inner join: "city = 'NYC' OR city = 'LA'"
- *
- *   - Wrap in parentheses: conditionStr = "(city = 'NYC' OR city = 'LA')"
- *   - Outer index=2, logicalOperator='AND'
- *   - Push to outer parts: "AND (city = 'NYC' OR city = 'LA')"
- *
- * Step 4: Process condition at index 3
- *   - Input: { column='status', operator='contains', value='premium', logicalOperator='AND' }
- *   - formatValue('status', 'contains', 'premium', streamFieldsMap)
- *     → Check: operator === 'contains' → TRUE
- *     → shouldNotQuote=true
- *     → Return: "premium" (no quotes - LIKE will handle it)
- *   - getFormattedCondition('status', 'contains', 'premium', sqlMode=true)
- *     → op.toLowerCase() = 'contains'
- *     → sqlMode=true → Return: "status LIKE '%premium%'"
- *   - index=3, logicalOperator='AND'
- *   - Push to parts: "AND status LIKE '%premium%'"
- *
- * Step 5: Join all parts
- *   parts = [
- *     "age > 18",
- *     "AND age < 65",
- *     "AND (city = 'NYC' OR city = 'LA')",
- *     "AND status LIKE '%premium%'"
- *   ]
- *
- *   Join with single space:
- *   result = "age > 18 AND age < 65 AND (city = 'NYC' OR city = 'LA') AND status LIKE '%premium%'"
- *
- * Step 6: Add WHERE prefix (if addWherePrefix=true)
- *   FINAL OUTPUT:
- *   "WHERE age > 18 AND age < 65 AND (city = 'NYC' OR city = 'LA') AND status LIKE '%premium%'"
- *
- * =============================================================================
- * DISPLAY MODE vs SQL MODE COMPARISON:
- * =============================================================================
- *
- * SAME INPUT, DIFFERENT MODES:
- *
- * DISPLAY MODE (sqlMode=false, formatValues=false):
- *   Options: { sqlMode: false, addWherePrefix: false, formatValues: false }
- *   Output: "age > '18' and age < '65' and (city = 'NYC' or city = 'LA') and status contains 'premium'"
- *
- *   Differences:
- *   - Logical operators: lowercase ('and', 'or')
- *   - Contains operator: kept as-is "status contains 'premium'"
- *   - No WHERE prefix
- *   - All values quoted (no type checking)
- *
- * SQL MODE (sqlMode=true, formatValues=true, addWherePrefix=true):
- *   Options: { sqlMode: true, addWherePrefix: true, formatValues: true, streamFieldsMap }
- *   Output: "WHERE age > 18 AND age < 65 AND (city = 'NYC' OR city = 'LA') AND status LIKE '%premium%'"
- *
- *   Differences:
- *   - Logical operators: uppercase ('AND', 'OR')
- *   - Contains operator: converted to LIKE "status LIKE '%premium%'"
- *   - WHERE prefix included
- *   - Type-aware quoting (Int64 no quotes, String with quotes)
- *
- * =============================================================================
+ * Display mode (sqlMode=false): lowercase and/or, `contains` kept as-is, all values quoted.
+ * SQL mode (sqlMode=true): uppercase AND/OR, `contains` → LIKE, type-aware quoting
+ * (Int64 unquoted, String quoted), optional WHERE prefix.
  */
 
 import type { StreamFieldsMap } from './alertQueryBuilder';

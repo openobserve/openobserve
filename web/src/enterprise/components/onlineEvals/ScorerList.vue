@@ -92,7 +92,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title">
+          <span class="text-xs font-normal">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
           </span>
           <OButton
@@ -116,15 +116,15 @@
         </template>
 
         <template #cell-produces="{ row }">
-          <span class="font-mono text-xs">{{ producesLabel(row) || "—" }}</span>
+          {{ producesLabel(row) || "—" }}
         </template>
 
         <template #cell-version="{ row }">
-          <span class="font-mono text-xs">v{{ row.version }}</span>
+          <span class="tabular-nums">v{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="font-mono text-xs">{{ usedByText(row) }}</span>
+          <span class="tabular-nums">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-actions="{ row }">

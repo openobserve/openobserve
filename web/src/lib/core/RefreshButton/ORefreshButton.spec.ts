@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import enLocale from "@/locales/languages/en.json";
+import enLocale from "@/locales/languages/en-US.json";
 import ORefreshButton from "./ORefreshButton.vue";
 
 // The component calls useI18n() in setup, so an i18n instance must be installed

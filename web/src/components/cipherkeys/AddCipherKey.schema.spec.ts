@@ -28,7 +28,7 @@ const addCipherKeySchema = makeAddCipherKeySchema((k: string) => i18n.global.t(k
 // Deep clone the defaults and apply a mutator so each case starts from a known
 // shape. The schema rules (incl. the conditional requireds in superRefine) are
 // exactly the ones the old per-field `:rules` + child `validate()` enforced — the
-// Quasar BEFORE baseline — so these tests double as the dropped-validation guard.
+// pre-migration BEFORE baseline — so these tests double as the dropped-validation guard.
 const build = (mutate: (v: AddCipherKeyForm) => void): AddCipherKeyForm => {
   const v = JSON.parse(JSON.stringify(addCipherKeyDefaults())) as AddCipherKeyForm;
   mutate(v);

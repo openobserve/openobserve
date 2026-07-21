@@ -3,7 +3,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import QueryTypeSelector from "./QueryTypeSelector.vue";
 import { reactive } from "vue";
-import enLocaleFull from "@/locales/languages/en.json";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock i18n.
 // The component was migrated to i18n; its dialog copy now comes from

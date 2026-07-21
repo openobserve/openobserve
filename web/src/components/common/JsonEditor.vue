@@ -1,7 +1,6 @@
 <template>
   <div
-    class="h-[calc(100vh-3.75rem)] flex min-h-0"
-    :class="store.state.theme === 'dark' ? 'bg-(--o2-primary-background)' : ''"
+    class="h-[calc(100vh-3.75rem)] flex min-h-0 dark:bg-surface-base"
   >
     <div class="flex flex-col flex-1 min-h-0 min-w-0">
       <div class="flex flex-col flex-1 min-h-0">
@@ -21,7 +20,7 @@
       <div
         v-if="validationErrors.length > 0"
         data-test="common-json-editor-validation-errors"
-        class="p-3 text-red-500 shrink-0 max-h-50 overflow-y-auto"
+        class="p-3 text-status-error-text shrink-0 max-h-50 overflow-y-auto"
       >
         <div class="font-bold mb-2">Please fix the following issues:</div>
         <ul class="ml-3">
@@ -50,7 +49,6 @@
     <div
       v-if="store.state.isAiChatEnabled"
       class="ml-2 w-[25vw] h-full"
-      :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
     >
       <O2AIChat
         class="h-full"
@@ -71,6 +69,7 @@ import config from "@/aws-exports";
 import { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
+import useTheme from "@/composables/useTheme";
 
 export default defineComponent({
   name: "JsonEditor",
@@ -107,6 +106,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const jsonContent = ref("");
     const isValidJson = ref(true);
     const queryEditorRef = ref();
@@ -235,7 +235,7 @@ export default defineComponent({
         return getImageURL('images/common/ai_icon_dark.svg')
       }
 
-      return store.state.theme === 'dark'
+      return isDark.value
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon_gradient.svg')
     })

@@ -52,12 +52,6 @@ const buildWrapper = (overrideProps: Record<string, any> = {}) =>
       provide: { store },
       stubs: {
         ODialog: ODialogStub,
-        "q-radio": {
-          template:
-            '<div class="q-radio-stub" @click="$emit(\'update:modelValue\', val)"><slot /></div>',
-          props: ["modelValue", "val"],
-          emits: ["update:modelValue"],
-        },
       },
     },
   });
@@ -188,7 +182,7 @@ describe("ResumePipelineDialog", () => {
       global: {
         plugins: [i18n],
         provide: { store },
-        stubs: { ODialog: ODialogStub, "q-radio": true },
+        stubs: { ODialog: ODialogStub },
       },
     });
     const dialog = localWrapper.findComponent(ODialogStub);

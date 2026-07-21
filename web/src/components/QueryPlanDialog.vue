@@ -26,29 +26,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSplitter
         v-model="splitterPosition"
         :horizontal="false"
-        separator-class="query-plan-splitter"
+        separator-class="relative before:content-[''] before:absolute before:left-1/2 before:inset-y-0 before:w-px before:bg-card-glass-border before:-translate-x-1/2 before:transition-[background-color,width] before:duration-200 hover:before:bg-accent hover:before:w-0.5"
         class="h-full"
       >
         <!-- Left Pane: SQL Query -->
         <template #before>
-          <section class="flex flex-col overflow-hidden bg-(--o2-card-background) h-full">
-            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--o2-card-bg) border-b border-solid border-(--o2-border-color)">
+          <section class="flex flex-col overflow-hidden bg-surface-base h-full">
+            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-card-glass-bg border-b border-solid border-card-glass-border">
               <div class="flex items-center gap-2">
-                <OIcon name="code" size="sm" class="text-(--o2-text-secondary)" />
-                <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--o2-text-heading) m-0 tracking-[0.01em]">SQL Query</h3>
+                <OIcon name="code" size="sm" class="text-text-secondary" />
+                <h3 class="text-(length:--text-sm) font-(--font-semibold) text-text-heading m-0 tracking-[0.01em]">SQL Query</h3>
               </div>
             </header>
             <div class="flex-1 overflow-y-auto p-4">
-              <pre class="sql-query-text [font-family:var(--font-mono)] text-[0.8125rem] leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-(--o2-code-bg) border border-solid border-(--o2-border-color) rounded-md text-(--o2-text-code) min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
+              <pre class="sql-query-text [font-family:var(--font-mono)] text-compact leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-code-bg border border-solid border-card-glass-border rounded-default text-text-code min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
             </div>
           </section>
         </template>
 
         <!-- Right Pane: Explain/Analyze Results -->
         <template #after>
-          <section class="flex flex-col overflow-hidden bg-(--o2-card-background) h-full">
-            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-(--o2-card-bg) border-b border-solid border-(--o2-border-color)">
-              <h3 class="text-(length:--text-sm) font-(--font-semibold) text-(--o2-text-heading) m-0 tracking-[0.01em]">
+          <section class="flex flex-col overflow-hidden bg-surface-base h-full">
+            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-card-glass-bg border-b border-solid border-card-glass-border">
+              <h3 class="text-(length:--text-sm) font-(--font-semibold) text-text-heading m-0 tracking-[0.01em]">
                 {{
                   showAnalyzeResults
                     ? t("search.analyzeResults")
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-if="loading" class="flex-1 flex items-center justify-center p-6">
               <div class="text-center">
                 <OSpinner variant="dots" size="lg" />
-                <div class="mt-3 text-(--o2-text-secondary) text-(length:--text-sm)">
+                <div class="mt-3 text-text-secondary text-(length:--text-sm)">
                   {{
                     isAnalyzing
                       ? t("search.runningAnalyze")
@@ -93,9 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mb-3"
               />
 
-              <div class="plan-surface flex-1 flex flex-col bg-(--o2-card-bg) border border-solid border-(--o2-border-color) rounded-lg overflow-hidden">
-                <div class="px-4 py-2.5 border-b border-solid border-(--o2-border-color) bg-(--o2-card-background)">
-                  <span class="text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase text-(--o2-text-label)">{{ t("search.executionPlan") }}</span>
+              <div class="plan-surface flex-1 flex flex-col bg-card-glass-bg border border-solid border-card-glass-border rounded-default overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-solid border-card-glass-border bg-surface-base">
+                  <span class="text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase text-text-label">{{ t("search.executionPlan") }}</span>
                 </div>
                 <div class="flex-1 overflow-y-auto py-3 px-4">
                   <QueryPlanTree
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :tree="planTree"
                     :is-analyze="true"
                   />
-                  <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--o2-text-muted)">
+                  <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-text-muted">
                     {{ t("search.noAnalyzePlanFound") }}
                   </div>
                 </div>
@@ -112,8 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- EXPLAIN view (tabs for logical/physical) -->
             <div v-else class="flex-1 overflow-y-auto flex flex-col p-4 gap-3">
-              <div class="plan-surface flex-1 flex flex-col bg-(--o2-card-bg) border border-solid border-(--o2-border-color) rounded-lg overflow-hidden">
-                <div class="border-b border-solid border-(--o2-border-color) px-2">
+              <div class="plan-surface flex-1 flex flex-col bg-card-glass-bg border border-solid border-card-glass-border rounded-default overflow-hidden">
+                <div class="border-b border-solid border-card-glass-border px-2">
                   <OTabs v-model="activeTab" dense align="left">
                     <OTab name="logical" :label="t('search.logicalPlan')" />
                     <OTab name="physical" :label="t('search.physicalPlan')" />
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tree="logicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--o2-text-muted)">
+                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-text-muted">
                         {{ t("search.noLogicalPlan") }}
                       </div>
                     </div>
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tree="physicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-(--o2-text-muted)">
+                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-text-muted">
                         {{ t("search.noPhysicalPlan") }}
                       </div>
                     </div>
@@ -227,7 +227,7 @@ export default defineComponent({
     const activeTab = ref("logical");
     const isAnalyzing = ref(false);
     const showAnalyzeResults = ref(false);
-    const splitterPosition = ref(50); // Split at 50%
+    const splitterPosition = ref(50);
 
     let { searchObj } = searchState();
 
@@ -236,7 +236,6 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
-    // Get SQL query from searchObj
     const sqlQuery = computed(() => {
       return props.searchObj?.data?.query || "";
     });
@@ -622,40 +621,20 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.plan-surface .o-tab-panels {
+<style scoped>
+/* keep(lib-override): stretch OTabPanels/OTabPanel library-internal DOM to fill the plan surface height */
+.plan-surface :deep(.o-tab-panels) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.plan-surface .o-tab-panel {
+.plan-surface :deep(.o-tab-panel) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.query-plan-splitter {
-  position: relative;
-}
-
-.query-plan-splitter::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background-color: var(--o2-border-color);
-  transform: translateX(-50%);
-  transition: background-color 0.2s ease, width 0.2s ease;
-}
-
-.query-plan-splitter:hover::before {
-  background-color: var(--o2-primary-color);
-  width: 2px;
 }
 </style>

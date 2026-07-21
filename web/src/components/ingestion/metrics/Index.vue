@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
       <div class="w-full h-full">
-        <div class="card-container h-full overflow-y-auto pt-0.5">
+        <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
           <router-view
             :title="ingestiontabs"
             :currOrgIdentifier="currOrgIdentifier"

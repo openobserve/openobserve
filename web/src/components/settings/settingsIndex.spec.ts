@@ -4,7 +4,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import enLocale from "@/locales/languages/en.json";
+import enLocale from "@/locales/languages/en-US.json";
 import SettingsIndex from "./index.vue";
 
 // Mock composables and config with factory functions
@@ -145,11 +145,11 @@ describe("SettingsIndex.vue", () => {
         },
         stubs: {
           "router-view": true,
-          PageLayout: {
+          OPageLayout: {
             template: '<div><slot name="sidebar" /><slot /></div>',
           },
           SectionRail: true,
-          AppPageHeader: true,
+          OPageHeader: true,
           ConstrainedPage: {
             template: "<div><slot /></div>",
           },

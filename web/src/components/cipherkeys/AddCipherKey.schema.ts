@@ -6,15 +6,12 @@
 // This is a COUPLED family: AddCipherKey orchestrates an OStepper whose children
 // (AddAkeylessType, AddEncryptionMechanism, AddOpenobserveType) render their
 // fields as `OForm*` controls connected to this single parent OForm by `name`.
-// Every field's rules live here, so the children stay purely presentational and
-// no child runs a hand-rolled `validate()` (the old anti-pattern).
+// Every field's rules live here, so the children stay purely presentational.
 //
 // All store-type-conditional requireds (Akeyless URL/regex/auth/secret branches,
 // the OpenObserve `local` secret, and the simple-algorithm requirement) live in
 // `superRefine`, keyed off `key.store.type` / `auth.type` / `store.type` /
-// `mechanism.type` — these are the same rules the old per-field `:rules` and the
-// children's `validate()` methods enforced (faithful to the Quasar BEFORE
-// baseline; truthy guards inverted into failing Zod constraints).
+// `mechanism.type`.
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
@@ -22,19 +19,19 @@
 import { z } from "zod";
 import { isValidResourceName, validateUrl } from "@/utils/zincutils";
 
-// name: alphanumeric + underscore + hyphen (the old `/^[a-zA-Z0-9_-]+$/` rule).
+// name: alphanumeric + underscore + hyphen.
 export const cipherKeyNameRegex = /^[a-zA-Z0-9_-]+$/;
 // access_id: alphanumeric + hyphen. A `*` quantifier (PASSES on ""), so it must
 // be paired with the required check in superRefine, not used standalone.
 export const akeylessAccessIdRegex = /^[a-zA-Z0-9-]*$/;
 // ldap username: alphanumeric + dot + underscore + hyphen.
 export const akeylessLdapUsernameRegex = /^[a-zA-Z0-9._-]+$/;
-// Anti-HTML guard for base_url (the old `!/<[^>]*>/.test(v)` rule).
+// Anti-HTML guard for base_url.
 const HTML_TAG_REGEX = /<[^>]*>/;
 
 // Built via a factory so every validation message is i18n-driven (pass useI18n's
 // `t`), matching the other migrated form schemas. The English wording is preserved
-// verbatim in the `cipherKey.*` keys (web/src/locales/languages/en.json): the
+// verbatim in the `cipherKey.*` keys (web/src/locales/languages/en-US.json): the
 // `providerTypeRequired` / `algorithmRequired` / `secretRequired` keys were already
 // i18n before the migration; the name/store/akeyless messages were hardcoded English
 // in the pre-migration code (validateName / validateAkeylessFields) and are now keyed
@@ -43,12 +40,11 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
   z
   .object({
     // Always-validated scalars (AddCipherKey's own fields).
-    // Hand-rolled cascade rather than `.min().max().regex().refine()`: the field
-    // reports only its FIRST issue, and the old validateName reported these four
-    // in this exact order. Chained ZodString checks always run before a trailing
-    // `.refine`, which would surface nameInvalidChars where the old form said
-    // nameInvalidResource (and make nameInvalidResource unreachable, since
-    // cipherKeyNameRegex is strictly stricter than isValidResourceName).
+    // Hand-rolled cascade rather than `.min().max().regex().refine()` so the field
+    // reports only its FIRST issue in this exact order: a trailing `.refine` would
+    // run after the chained ZodString checks and surface nameInvalidChars where
+    // nameInvalidResource should appear (cipherKeyNameRegex is stricter than
+    // isValidResourceName, making nameInvalidResource otherwise unreachable).
     name: z.string().superRefine((v, ctx) => {
       const fail = (message: string) =>
         ctx.addIssue({ code: z.ZodIssueCode.custom, message });
@@ -62,9 +58,9 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
       store: z.object({
         // Store type select (OpenObserve `local` vs `akeyless`) — required.
         type: z.string().min(1, t("cipherKey.typeRequired")),
-        // Akeyless sub-tree. Every field is form-owned (R1-strict) but only
-        // conditionally required (store.type === "akeyless") via superRefine, so
-        // the field-level shape is loose (defaults to "").
+        // Akeyless sub-tree. Every field is form-owned but only conditionally
+        // required (store.type === "akeyless") via superRefine, so the field-level
+        // shape is loose (defaults to "").
         akeyless: z.object({
           base_url: z.string().default(""),
           access_id: z.string().default(""),
@@ -81,7 +77,7 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
             static_secret: z.string().default(""),
             dfc: z.object({
               name: z.string().default(""),
-              // dfc.iv had NO rule in the original — optional, never required.
+              // dfc.iv is optional, never required.
               iv: z.string().default(""),
               encrypted_data: z.string().default(""),
             }),
@@ -117,8 +113,7 @@ export const makeAddCipherKeySchema = (t: (_key: string) => string) =>
     if (storeType === "akeyless") {
       const ak = val.key.store.akeyless;
 
-      // base_url: required → valid http(s) URL → no HTML tags (in that order,
-      // matching the old validateAkeylessFields cascade).
+      // base_url: required → valid http(s) URL → no HTML tags (in that order).
       if (!ak.base_url) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -250,7 +245,7 @@ export type AddCipherKeyForm = z.infer<
 
 // STATIC create defaults (typed factory — bound `:default-values` at mount).
 // Edit-mode prefill arrives async, so the component re-seeds via
-// `formRef.form.reset(record)` once the record loads (playbook §4).
+// `formRef.form.reset(record)` once the record loads.
 export const addCipherKeyDefaults = (): AddCipherKeyForm => ({
   name: "",
   key: {

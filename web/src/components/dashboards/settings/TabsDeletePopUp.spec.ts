@@ -26,7 +26,7 @@ import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 //   - missing named params interpolate to the literal "undefined" (String()),
 //     matching the "Delete undefined" assertion for a non-existent tab.
 vi.mock("vue-i18n", async () => {
-  const enLocale = (await import("@/locales/languages/en.json")).default as any;
+  const enLocale = (await import("@/locales/languages/en-US.json")).default as any;
   const resolve = (key: string): unknown =>
     key.split(".").reduce<any>((obj, part) => obj?.[part], enLocale);
   return {

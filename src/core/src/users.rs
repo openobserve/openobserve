@@ -1130,14 +1130,57 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
     }
 }
 
+/// Decides whether an invite should be surfaced to the invitee.
+///
+/// Split out of `list_user_invites` so the visibility rules can be unit tested
+/// without a database; `is_org_blocked` is injected for the same reason.
+#[cfg(feature = "cloud")]
+fn is_invite_visible(
+    org_id: &str,
+    status: &InviteStatus,
+    expires_at: i64,
+    only_pending: bool,
+    now: i64,
+    is_org_blocked: impl Fn(&str) -> bool,
+) -> bool {
+    // Invites for orgs that are pending_deletion or deleting are always hidden,
+    // independent of `only_pending`. The /invites route bypasses
+    // blocked_orgs_middleware (it is a SYSTEM_PREFIX), so this is the only gate on
+    // that path — without it a user is offered an invite to a soft-deleted org, and
+    // accepting it selects an org that no longer exists and logs them out. Matches
+    // how the org list (switcher) and JWT org resolution already gate on is_blocked.
+    if is_org_blocked(org_id) {
+        return false;
+    }
+
+    if only_pending {
+        return *status == InviteStatus::Pending && expires_at > now;
+    }
+
+    true
+}
+
 #[cfg(feature = "cloud")]
 pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Response, Error> {
     let result = db::user::list_user_invites(user_id).await;
     match result {
         Ok(res) => {
             let mut result: Vec<UserInvite> = Vec::with_capacity(res.len());
+            let now = chrono::Utc::now().timestamp_micros();
 
             for invite in res {
+                let status = InviteStatus::from(&invite.status);
+                if !is_invite_visible(
+                    &invite.org_id,
+                    &status,
+                    invite.expires_at,
+                    only_pending,
+                    now,
+                    db::org_status::is_blocked,
+                ) {
+                    continue;
+                }
+
                 result.push(UserInvite {
                     org_name: db::organization::get_org(&invite.org_id)
                         .await
@@ -1147,18 +1190,11 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Resp
                     org_id: invite.org_id,
                     token: invite.token,
                     inviter_id: invite.inviter_id,
-                    status: InviteStatus::from(&invite.status),
+                    status,
                     expires_at: invite.expires_at,
                 });
             }
 
-            if only_pending {
-                let now = chrono::Utc::now().timestamp_micros();
-
-                result.retain(|invite| {
-                    invite.status == InviteStatus::Pending && invite.expires_at > now
-                });
-            }
             Ok(MetaHttpResponse::json(UserInviteList { data: result }))
         }
         Err(e) => Ok(MetaHttpResponse::not_found(e.to_string())),
@@ -1871,5 +1907,193 @@ mod tests {
         let filtered = get_user_roles_by_org_id(roles, Some("org1"));
 
         assert_eq!(filtered.len(), 0);
+    }
+
+    // Visibility rules behind GET /api/invites (the pending-invitations screen, and
+    // the invitations shown at cloud login when the user has no orgs).
+    #[cfg(feature = "cloud")]
+    mod invite_visibility {
+        use super::*;
+
+        const NOW: i64 = 1_000_000;
+        const NOT_EXPIRED: i64 = 2_000_000;
+        const EXPIRED: i64 = 500_000;
+
+        /// Nothing is blocked — the "all orgs healthy" baseline.
+        fn none_blocked(_org_id: &str) -> bool {
+            false
+        }
+
+        /// Everything is blocked — stands in for pending_deletion / deleting.
+        fn all_blocked(_org_id: &str) -> bool {
+            true
+        }
+
+        #[test]
+        fn shows_pending_invite_for_an_active_org() {
+            let visible = is_invite_visible(
+                "active-org",
+                &InviteStatus::Pending,
+                NOT_EXPIRED,
+                true,
+                NOW,
+                none_blocked,
+            );
+
+            assert!(visible);
+        }
+
+        #[test]
+        fn hides_pending_invite_when_org_is_deleted() {
+            // The regression: a valid, unexpired, pending invite must still be
+            // withheld once its org is soft-deleted, or accepting it logs the user out.
+            let visible = is_invite_visible(
+                "deleted-org",
+                &InviteStatus::Pending,
+                NOT_EXPIRED,
+                true,
+                NOW,
+                all_blocked,
+            );
+
+            assert!(!visible);
+        }
+
+        #[test]
+        fn hides_invite_for_deleted_org_even_when_not_filtering_by_pending() {
+            // only_pending = false is the "list everything" path; the org gate
+            // must not be conditional on it.
+            let visible = is_invite_visible(
+                "deleted-org",
+                &InviteStatus::Pending,
+                NOT_EXPIRED,
+                false,
+                NOW,
+                all_blocked,
+            );
+
+            assert!(!visible);
+        }
+
+        #[test]
+        fn hides_invite_for_deleted_org_regardless_of_invite_status() {
+            for status in [
+                InviteStatus::Pending,
+                InviteStatus::Accepted,
+                InviteStatus::Rejected,
+                InviteStatus::Expired,
+            ] {
+                let visible =
+                    is_invite_visible("deleted-org", &status, NOT_EXPIRED, false, NOW, all_blocked);
+
+                assert!(!visible, "expected {status:?} invite to be hidden");
+            }
+        }
+
+        #[test]
+        fn blocks_only_the_deleted_org_and_leaves_others_visible() {
+            // Guards against passing the wrong org_id into the block check.
+            let is_org_blocked = |org_id: &str| org_id == "deleted-org";
+
+            let deleted = is_invite_visible(
+                "deleted-org",
+                &InviteStatus::Pending,
+                NOT_EXPIRED,
+                true,
+                NOW,
+                is_org_blocked,
+            );
+            let active = is_invite_visible(
+                "active-org",
+                &InviteStatus::Pending,
+                NOT_EXPIRED,
+                true,
+                NOW,
+                is_org_blocked,
+            );
+
+            assert!(!deleted);
+            assert!(active);
+        }
+
+        #[test]
+        fn hides_non_pending_invites_when_only_pending_is_set() {
+            for status in [
+                InviteStatus::Accepted,
+                InviteStatus::Rejected,
+                InviteStatus::Expired,
+            ] {
+                let visible =
+                    is_invite_visible("active-org", &status, NOT_EXPIRED, true, NOW, none_blocked);
+
+                assert!(!visible, "expected {status:?} invite to be hidden");
+            }
+        }
+
+        #[test]
+        fn shows_non_pending_invites_when_only_pending_is_not_set() {
+            let visible = is_invite_visible(
+                "active-org",
+                &InviteStatus::Accepted,
+                NOT_EXPIRED,
+                false,
+                NOW,
+                none_blocked,
+            );
+
+            assert!(visible);
+        }
+
+        #[test]
+        fn hides_expired_pending_invite_when_only_pending_is_set() {
+            let visible = is_invite_visible(
+                "active-org",
+                &InviteStatus::Pending,
+                EXPIRED,
+                true,
+                NOW,
+                none_blocked,
+            );
+
+            assert!(!visible);
+        }
+
+        #[test]
+        fn treats_an_invite_expiring_exactly_now_as_expired() {
+            // Boundary: the check is `expires_at > now`, not `>=`.
+            let visible = is_invite_visible(
+                "active-org",
+                &InviteStatus::Pending,
+                NOW,
+                true,
+                NOW,
+                none_blocked,
+            );
+
+            assert!(!visible);
+        }
+
+        #[test]
+        fn keeps_only_active_org_invites_when_filtering_a_mixed_list() {
+            // End-to-end shape of the bug report: the user holds invites to both a
+            // live org and a deleted one, and only the live one may reach the screen.
+            let is_org_blocked = |org_id: &str| org_id == "deleted-org";
+            let invites = [
+                ("active-org", InviteStatus::Pending, NOT_EXPIRED),
+                ("deleted-org", InviteStatus::Pending, NOT_EXPIRED),
+                ("active-org", InviteStatus::Accepted, NOT_EXPIRED),
+                ("expired-invite-org", InviteStatus::Pending, EXPIRED),
+            ];
+
+            let visible: Vec<&str> = invites
+                .iter()
+                .filter(|(org_id, status, expires_at)| {
+                    is_invite_visible(org_id, status, *expires_at, true, NOW, is_org_blocked)
+                })
+                .map(|(org_id, ..)| *org_id)
+                .collect();
+
+            assert_eq!(visible, vec!["active-org"]);
+        }
     }
 }

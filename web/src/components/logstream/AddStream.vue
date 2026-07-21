@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        The drawer owns the footer Cancel/Save (built-in ODrawer footer); its Save
        submits this form via `form-id="add-stream-node-form"`, so no inline
        buttons here. -->
-    <div v-else class="p-4 w-full">
+    <div v-else class="w-full">
       <OForm
         id="add-stream-node-form"
         :form="addStreamForm"
@@ -170,22 +170,19 @@ const { addStream, getStream } = useStreams();
 
 const store = useStore();
 
-// Scalar validation now lives in the co-located Zod schema. The retention rule
-// is conditional on org config (`data_retention_days`), captured here; the
-// stream-type half of the condition is read from the form in superRefine.
+// The retention rule is conditional on org config (`data_retention_days`),
+// captured here; the stream-type half of the condition is read from the form in
+// superRefine.
 const addStreamSchema = makeAddStreamSchema(
   !!(store.state.zoConfig.data_retention_days || false),
   t,
 );
 
-// Rule ③ OWNER pattern: this component OWNS <OForm> and must read form state
-// (stream_type) to drive the parent-side `v-if="showDataRetention"`. So create
-// the ONE form here with useOForm, hand it to <OForm :form="addStreamForm">, and
-// read it reactively with form.useStore — single source of truth, NO mirror.
-// The save is wired through useOForm({ onSubmit }), not @submit.
-// onSubmit fires only when the WHOLE schema passes — scalars AND the dynamic
-// `fields` rows (StreamFieldInputs is now form-mode, so an empty/invalid row
-// blocks submit and shows per-row errors). No separate validate() bridge.
+// This component owns <OForm> and reads form state (stream_type) to drive the
+// parent-side `v-if="showDataRetention"`, so the form is created here with
+// useOForm and read reactively with form.useStore. onSubmit fires only when the
+// whole schema passes — scalars and the dynamic `fields` rows (an empty/invalid
+// row blocks submit and shows per-row errors).
 const addStreamForm = useOForm<AddStreamForm>({
   defaultValues: addStreamDefaults(),
   schema: addStreamSchema,
@@ -194,21 +191,17 @@ const addStreamForm = useOForm<AddStreamForm>({
 
 const { track } = useReo();
 
-// Reactive READ of the form-owned stream_type (single source of truth) so
-// `showDataRetention` — which also depends on org config the schema can't read —
-// re-evaluates when the user changes the type. form.useStore tracks changes
-// (a `form.state.values` read inside a computed would not).
+// Read the form-owned stream_type so `showDataRetention` — which also depends on
+// org config the schema can't read — re-evaluates when the user changes the type.
+// Must use form.useStore; a `form.state.values` read inside a computed would not
+// track changes.
 const formStreamType = addStreamForm.useStore(
   (s: any) => (s.values.stream_type as string) ?? "",
 );
 
-// The form lives in this component's setup (owner pattern), so — unlike the old
-// in-dialog-body form — it is NOT recreated when the reka-ui overlay unmounts/
-// remounts its body on close→open. Reset to fresh defaults whenever the dialog
-// opens so each reopen starts blank (the equivalent of the old
-// `:default-values`-on-remount behavior). reset() also zeroes submissionAttempts
-// → no stale "required" errors flash. Dialog mode only; the inline pipeline form
-// has no `open` toggle.
+// Reset to fresh defaults whenever the dialog opens so each reopen starts blank.
+// reset() also zeroes submissionAttempts so no stale "required" errors flash.
+// Dialog mode only; the inline pipeline form has no `open` toggle.
 watch(
   () => props.open,
   (isOpen, wasOpen) => {
@@ -233,8 +226,8 @@ const showDataRetention = computed(
     formStreamType.value !== "enrichment_tables"
 );
 
-// `value` is the fully-validated @submit payload — scalars AND the `fields`
-// rows (StreamFieldInputs is form-mode now) — and the single source of truth.
+// `value` is the fully-validated submit payload — scalars and the `fields`
+// rows — the single source of truth.
 const saveStream = async (value: AddStreamForm) => {
   let isStreamPresent = false;
 
@@ -340,7 +333,6 @@ const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
       .replace(/ /g, "_")
       .replace(/-/g, "_");
     
-    // add to field list
     stream.fields.push(field);
 
     // process index types

@@ -81,7 +81,8 @@ export const GATE_PREDICATES: Record<
  */
 export interface NavGroupDef {
   key: string;
-  title: string;
+  /** i18n key for the group tile's label (resolved with t() at render). */
+  titleKey: string;
   icon: string;
   /** Where clicking the tile navigates (its first item). */
   parentLink: string;
@@ -99,7 +100,7 @@ export interface NavGroupDef {
 export const NAV_GROUPS: NavGroupDef[] = [
   {
     key: "data",
-    title: "Data",
+    titleKey: "menu.data",
     icon: "database",
     parentLink: "/streams",
     absorbs: ["streams", "pipeline", "ingestion"],
@@ -115,7 +116,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
   },
   {
     key: "dashboards",
-    title: "Dashboards",
+    titleKey: "menu.dashboard",
     icon: "dashboard",
     parentLink: "/dashboards",
     absorbs: ["dashboards", "reports"],
@@ -143,7 +144,10 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
  * is emitted at the position of its FIRST present absorbed item; the group's
  * other absorbed items are removed. Everything else stays exactly where it was.
  */
-export function groupNavLinks(links: NavItem[]): RailEntry[] {
+export function groupNavLinks(
+  links: NavItem[],
+  t: (key: string) => string = (k) => k,
+): RailEntry[] {
   const presentNames = new Set(links.map((l) => l.name));
 
   // Activate a group only when it has ≥1 present absorbed item AND ≥1 child
@@ -192,7 +196,7 @@ export function groupNavLinks(links: NavItem[]): RailEntry[] {
     result.push({
       type: "linkGroup",
       item: {
-        title: def.title,
+        title: t(def.titleKey),
         icon: def.icon,
         link: def.parentLink,
         name: def.key,

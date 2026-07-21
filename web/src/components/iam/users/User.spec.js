@@ -29,7 +29,7 @@ vi.mock("@/services/organizations", () => ({
 // calls produce the actual English text the notification assertions expect.
 vi.mock('vue-i18n', async (importOriginal) => {
   const actual = await importOriginal();
-  const en = (await import("@/locales/languages/en.json")).default;
+  const en = (await import("@/locales/languages/en-US.json")).default;
   const t = (key, params) => {
     const val = String(key)
       .split(".")

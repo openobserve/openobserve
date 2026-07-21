@@ -335,12 +335,9 @@ export const useSearchBar = () => {
       const streamFieldNames = new Set(
         allStreamFields.map((item) => item.name),
       );
-      // Clear carried-over display columns on stream change. The previous
-      // stream's selection (e.g. "log") is not a deliberate choice for the new
-      // stream, so we drop it and let the post-search fill-rate check pick a
-      // fresh default FTS column for the new stream.
+      // Clear carried-over display columns; the post-search fill-rate check
+      // then picks a fresh default FTS column for the new stream.
       searchObj.data.stream.selectedFields = [];
-      // The cleared selection is no longer a system pick from the old stream.
       searchObj.meta.isFtsDefaultColumn = false;
 
       // Update interesting fields list

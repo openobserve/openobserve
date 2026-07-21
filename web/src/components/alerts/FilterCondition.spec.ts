@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import FilterCondition from './FilterCondition.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
-import enMessages from '@/locales/languages/en.json';
+import enMessages from '@/locales/languages/en-US.json';
 import { nextTick, defineComponent, reactive } from 'vue';
 import { z } from 'zod';
 import OForm from '@/lib/forms/Form/OForm.vue';
@@ -243,7 +243,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
     });
   });
 
-  // TODO: filterColumns internal API was removed when q-select was replaced with OSelect.
+  // TODO: filterColumns internal API was removed when the select was replaced with OSelect.
   // These tests need rewriting against the new OSelect filter API.
   describe.skip('Filter Functionality Branch Coverage', () => {
     it('should reset filtered fields when filter value is empty', async () => {
@@ -357,26 +357,6 @@ describe('FilterCondition.vue Branch Coverage', () => {
   });
 
   describe('Event Emission Branch Coverage', () => {
-    it('should emit events on model updates', async () => {
-      const wrapper = mount(FilterCondition, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
-        },
-      });
-
-      // Test column update event — OSelect replaces QSelect post-migration
-      const columnSelect = wrapper.findComponent({ name: 'OSelect' });
-      await columnSelect.vm.$emit('update:model-value', 'field1');
-
-      // Should emit input:update event
-      expect(wrapper.emitted('input:update')).toBeTruthy();
-      expect(wrapper.emitted('input:update')?.[0]).toEqual(['conditions', defaultProps.condition]);
-    });
-
     it('should call delete, add, and add-group functions', async () => {
       const wrapper = mount(FilterCondition, {
         props: defaultProps,
@@ -617,40 +597,6 @@ describe('FilterCondition.vue Form Mode (namePrefix + OForm)', () => {
     expect(wrapper.text()).not.toContain('Field is required!');
   });
 
-  it('falls back to BARE mode when no namePrefix is passed — even inside an OForm (pipeline safety)', () => {
-    const { wrapper } = mountFormHost(makeCondition({ column: 'field1' }), {
-      namePrefix: '',
-    });
-
-    // No OForm* wrappers — the bare v-model controls render instead, so a
-    // form-owning consumer (pipeline's Condition.vue) is untouched until it
-    // opts in by passing a prefix.
-    expect(wrapper.findAllComponents(OFormSelect)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OFormInput)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OSelect).length).toBe(2);
-    expect(wrapper.findComponent(OInput).exists()).toBe(true);
-  });
-
-  it('falls back to BARE mode when namePrefix is set but no OForm context exists', () => {
-    const wrapper = mount(FilterCondition, {
-      props: {
-        condition: makeCondition({ column: 'field1' }),
-        streamFields,
-        index: 0,
-        label: 'and',
-        depth: 0,
-        isFirstInGroup: true,
-        namePrefix: 'tree.conditions[0]',
-      },
-      global: {
-        plugins: [mockI18n],
-        provide: { store: mockStore },
-      },
-    });
-
-    expect(wrapper.findAllComponents(OFormSelect)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OFormInput)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OSelect).length).toBe(2);
-    expect(wrapper.findComponent(OInput).exists()).toBe(true);
-  });
+  // Bare-mode fallback tests removed: FilterCondition is now form-mode only
+  // (all consumers pass a name-prefix inside an OForm); there is no bare v-else.
 });

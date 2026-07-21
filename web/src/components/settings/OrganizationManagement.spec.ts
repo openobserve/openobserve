@@ -29,7 +29,7 @@ import OrganizationManagement from "./OrganizationManagement.vue";
 import { extendTrialSchema } from "./OrganizationManagement.schema";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
-import enLocaleFull from "@/locales/languages/en.json";
+import enLocaleFull from "@/locales/languages/en-US.json";
 import { nextTick } from "vue";
 
 // ── Mock toast ──
@@ -300,16 +300,15 @@ describe("OrganizationManagement.vue", () => {
     it("should have correct column configuration", () => {
       wrapper = createWrapper();
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(9);
-      expect(columns[0].id).toBe("#");
-      expect(columns[1].id).toBe("name");
-      expect(columns[2].id).toBe("identifier");
-      expect(columns[3].id).toBe("subscription_status");
-      expect(columns[4].id).toBe("billing_provider");
-      expect(columns[5].id).toBe("created_on");
-      expect(columns[6].id).toBe("trial_expiry");
-      expect(columns[7].id).toBe("contract_end_date");
-      expect(columns[8].id).toBe("actions");
+      expect(columns).toHaveLength(8);
+      expect(columns[0].id).toBe("name");
+      expect(columns[1].id).toBe("identifier");
+      expect(columns[2].id).toBe("subscription_status");
+      expect(columns[3].id).toBe("billing_provider");
+      expect(columns[4].id).toBe("created_on");
+      expect(columns[5].id).toBe("trial_expiry");
+      expect(columns[6].id).toBe("contract_end_date");
+      expect(columns[7].id).toBe("actions");
     });
 
     it("should have subscription plans mapping", () => {
@@ -446,7 +445,6 @@ describe("OrganizationManagement.vue", () => {
 
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
-        "#": 1,
         id: 1,
         name: "Test Org 1",
         identifier: "test-org-1",
@@ -1071,7 +1069,7 @@ describe("OrganizationManagement.vue", () => {
 
     it("should render the title", () => {
       wrapper = createWrapper();
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       const title = wrapper.find(".app-page-header h1");
       expect(title.text()).toBe("Organization Management");
     });

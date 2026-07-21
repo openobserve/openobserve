@@ -17,11 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="m-3 mt-1">
     <div class="mb-4">
-      <div data-test="aws-config-page-title" class="text-2xl font-semibold leading-[1.3] m-0 mb-1.5" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#1a1a1a]'">
-        AWS Integrations
+      <div
+        data-test="aws-config-page-title"
+        class="text-2xl font-semibold leading-tight m-0 mb-1.5 text-text-heading"
+      >
+        {{ t("ingestion.awsSetup.title") }}
       </div>
-      <div data-test="aws-config-page-description" class="text-sm m-0 mb-4" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
-        Set up AWS monitoring in one click or configure individual services for granular control.
+      <div
+        data-test="aws-config-page-description"
+        class="text-sm m-0 mb-4 text-text-secondary"
+      >
+        {{ t("ingestion.awsSetup.description") }}
       </div>
 
       <OTabs
@@ -30,8 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="aws-tabs"
         align="left"
       >
-        <OTab name="quick-setup" label="Quick Setup" data-test="aws-quick-setup-tab" />
-        <OTab name="individual-services" label="Individual Services" data-test="aws-individual-services-tab" />
+        <OTab
+          name="quick-setup"
+          :label="t('ingestion.awsSetup.quickSetup')"
+          data-test="aws-quick-setup-tab"
+        />
+        <OTab
+          name="individual-services"
+          :label="t('ingestion.awsSetup.individualServices')"
+          data-test="aws-individual-services-tab"
+        />
       </OTabs>
     </div>
 
@@ -49,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="mt-8">
       <div class="mb-3">
-        <div class="text-base font-semibold m-0" :class="store.state.theme === 'dark' ? 'text-[#e0e0e0]' : 'text-[#333]'">
-          Manual Configuration
+        <div class="text-base font-semibold m-0 text-text-heading">
+          {{ t("ingestion.awsSetup.manualTitle") }}
         </div>
-        <div class="text-sm m-0" :class="store.state.theme === 'dark' ? 'text-[#b0b0b0]' : 'text-[#666]'">
-          Use these credentials for custom AWS integrations or manual setup.
+        <div class="text-sm m-0 text-text-secondary">
+          {{ t("ingestion.awsSetup.manualDescription") }}
         </div>
       </div>
       <CopyContent :content="content" />
@@ -68,6 +82,7 @@ import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
@@ -98,6 +113,7 @@ export default defineComponent({
     AWSIndividualServices,
   },
   setup(props) {
+    const { t } = useI18n();
     const store = useStore();
     const route = useRoute();
 
@@ -137,6 +153,7 @@ export default defineComponent({
 Access Key: [BASIC_PASSCODE]`;
 
     return {
+      t,
       store,
       config,
       endpoint,

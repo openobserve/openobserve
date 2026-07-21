@@ -20,7 +20,7 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
 
 - **Prefer the token-backed Tailwind utility** generated from the `--color-*`
   token — bare, **no `tw:` prefix** (the prefix was removed from this project;
-  `tw:bg-surface-base` no longer resolves): `bg-surface-base`, `text-text-primary`,
+  `tw:bg-surface-base` no longer resolves): `bg-surface-base`, `text-text-heading`,
   `border-border-default`, `bg-button-primary`, `bg-tabs-active-bg`. Grep existing
   views for the names already in use.
 - **Don't hand-write the arbitrary-value form when a utility exists.** Every
@@ -29,12 +29,15 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   guaranteed to exist and compiles to the **identical** CSS — the arbitrary value
   is just noisier. The utility name is the token minus the `--color-` prefix:
   ```html
-  <!-- avoid --> <div class="bg-[var(--color-surface-base)] text-[var(--color-text-primary)] border-[var(--color-border-default)]">
-  <!-- prefer --> <div class="bg-surface-base text-text-primary border-border-default">
+  <!-- avoid --> <div class="bg-[var(--color-surface-base)] text-[var(--color-text-heading)] border-[var(--color-border-default)]">
+  <!-- prefer --> <div class="bg-surface-base text-text-heading border-border-default">
   ```
-  (`--color-text-primary` → `text-text-primary`, `--color-surface-base` →
+  (`--color-text-heading` → `text-text-heading`, `--color-surface-base` →
   `bg-surface-base`, `--color-border-default` → `border-border-default`.) This also
   covers the v4 shorthand `bg-(--color-x)` — same rule, use `bg-x`.
+  > **Retired aliases** (CI-banned, `retiredTextAlias`): `text-text-primary` →
+  > `text-text-heading`, `text-text-caption` → `text-text-secondary`. The text
+  > hierarchy is heading / body / secondary / label / muted.
 - **Arbitrary `[var(--color-x)]` in a class is acceptable in only two cases:**
   1. the token has **no registered utility** — a var-only token defined in a plain
      `:root {}` and *not* re-declared in an `@theme inline` block (most domain /
@@ -47,12 +50,86 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   Otherwise, use the utility. (If you find yourself reaching for an arbitrary value
   for a token that *should* be a first-class utility, register it in `@theme inline`
   — see below — rather than scattering `[var(--color-x)]`.)
-- **Need the raw variable** (in a CSS file, or a rare `:style` binding for a
-  computed value)? Use the modern custom property only: `var(--color-text-primary)`,
-  `var(--color-surface-base)`. Never `var(--o2-*)`.
+- **Raw `var(--color-*)` in a `.vue` file is a counted bypass** (`rawVarInComponent`,
+  a ratcheted CI category). It is allowed **only** in the sanctioned residue where no
+  utility can reach: inside `:deep()`, `@keyframes`, `color-mix()`, `calc()`, SVG
+  `fill`/`stroke`, and `v-html`/JS-generated markup (e.g. an ECharts tooltip string).
+  Everywhere else use the utility; if the utility doesn't exist, **register the token**
+  (below) instead of reaching for `var()`. In a standalone `.css` file, `var(--color-*)`
+  is fine. Never `var(--o2-*)`.
 - **Never a literal** — no hex / `rgb()` / `rgba()` / `hsl()` / named colors in a
   component, and no magic `px` dimensions. (Literal hex is allowed in exactly one
   place: the raw palette in `base.css`, which nothing else references directly.)
+  Raw Tailwind palette utilities (`bg-gray-400`, `text-red-500`) don't even compile —
+  `palette-reset.css` clears the `--color-*` default namespace so only registered
+  tokens survive.
+- **Reuse before minting; one knob per decision.** Grep for an existing token first;
+  mint a new one only when it's genuinely needed and used. Never add a second name for
+  a value that already has one — an alias is a decision made twice that splits adoption
+  and can't be seen in review.
+- **British `grey-*`, not `gray-*`** — `grey-*`/`primary-*` are our project ramps; using
+  them raw in feature code is a ratcheted bypass (`rawProjectRamp`) — prefer a semantic
+  token (`text-text-secondary`, `bg-accent`). `gray-*` is Tailwind's un-themed default and
+  is banned (`rawPalette`).
+
+## Corner radius — two tiers + circle
+
+Radius is a token too, and it has exactly **three** app-facing values. Pick by role;
+never eyeball an arbitrary radius.
+
+| Utility | Token | Value | Use for |
+|---|---|---|---|
+| `rounded-default` | `--radius-default` | 4px | controls — buttons, inputs, chips, small icon buttons |
+| `rounded-surface` | `--radius-surface` | 12px | surfaces — dialogs, drawers, cards, panels, the app-shell content area |
+| `rounded-full` | `--radius-full` | ∞ | pills, avatars, status dots |
+
+Per-corner variants use the same names (`rounded-t-surface`, `rounded-s-default`).
+**Banned (all CI-enforced):** bare `rounded`, arbitrary `rounded-[10px]`, and the
+retired `rounded-{sm,md,lg,xl}` / `var(--radius-{sm,md,lg,xl})` — they were five names
+for one value and were deleted (`sm`/`md` → `default`, `lg`/`xl` → `surface`). Change
+`--radius-default` or `--radius-surface` in `base.css` to retune a whole tier at once.
+
+## Enforced by CI (it will fail the build)
+
+None of the above is advisory. Every PR runs, as **required** gating steps:
+
+- `lint:design:strict` — the design-consistency ratchet in **strict** mode. It counts
+  every bypass category (hardcoded hex/px, `arbRadius`, `bareRounded`, `retiredTextAlias`,
+  `retiredRadiusAlias`, `rawPalette`, `rawProjectRamp`, `rawVarInComponent`,
+  un-justified `<style>`, …). Zero-tolerance categories fail on the **first** occurrence;
+  ratcheted categories can **only shrink** — and strict mode leaves **no headroom**, so a
+  new raw token fails even in a file that still carries old debt. You cannot "use up" slack.
+- `lint:tokens` — every `var(--x)` must resolve to a defined token (no silent voids),
+  and **any** `--o2-*` used as a CSS custom property fails, fallback or not.
+- `lint:token-purity` — the token files stay pure (no class defs leaking in).
+- `lint:styles` (stylelint) — `color-no-hex` in `.vue` styles, the `.dark`-only
+  dark-selector rule, banned `var(--o2-*)` / retired `var(--color-text-primary/-caption)`
+  values, and **literal font stacks** (`font-family` must be `var(--font-sans)` /
+  `var(--font-mono)` — the design script's `literalFontFamily` category counts the
+  same thing in class arbitrary values), all at **error** severity.
+
+If a rule blocks you, fix the cause (use the utility, register the token, pick the tier) —
+raising the baseline is not the move.
+
+**The counters scan raw text — comments included.** A `16px` / `#fff` /
+`var(--color-*)` mentioned in a `<style>`-block comment, or a banned class pattern
+(`bg-gray-400`, `tw:`, `w-[320px]`, a retired alias) quoted verbatim in a
+template/JS comment, counts as debt exactly like real code and can fail
+`lint:design:strict`. Describe values in comments in `rem` or plain words instead
+of quoting the banned form.
+
+**The ratchet cuts both ways — improving also needs a baseline update.** In
+`--strict` mode the baseline must *equal* reality, so a PR that *reduces* debt
+(migrates a `var()`, deletes a debt-carrying file or `<style>` block) fails CI with
+"baseline is STALE". That failure is expected and good — lock the win in:
+
+```bash
+cd web && node scripts/check-design-consistency.mjs --baseline
+# commit the tightened scripts/design-debt-baseline.json with your change
+```
+
+Never hand-edit the baseline, and never re-baseline to *absorb a regression* — only
+to record an improvement (CI's regression check fails first if counts went up).
 
 ## The token files
 
@@ -62,7 +139,7 @@ Plain CSS, Tailwind v4, **no SCSS**. They live in
 | File | Holds |
 | --- | --- |
 | `base.css` | raw palette primitives (`--color-grey-*`, `--color-primary-*`, radius, shadow) + `@font-face` — the only place literal hex lives |
-| `semantic.css` | semantic/intent `--color-*` tokens, light `:root` (e.g. `--color-text-primary`, `--color-surface-base`, `--color-border-default`) |
+| `semantic.css` | semantic/intent `--color-*` tokens, light `:root` (e.g. `--color-text-heading`, `--color-surface-base`, `--color-border-default`) |
 | `component.css` | per-component `--color-*` tokens (e.g. `--color-button-primary`) |
 | `dark.css` | **all** dark-mode overrides, under `.dark` |
 
@@ -102,7 +179,7 @@ Never inline the literal you would have registered.
 
 There are two token vocabularies in the codebase: the modern `--color-*` set
 (registered in `@theme inline`, drives Tailwind utilities, proper `.dark`
-overrides) and a legacy **`--o2-*`** set (Quasar-era, `var()`-only, with its own
+overrides) and a legacy **`--o2-*`** set (retired, `var()`-only, with its own
 drifting `.body--dark` values). The legacy set is **being deleted**, and lint/CI
 is being wired to **fail the build** on any `--o2-*`. Treat it as already
 forbidden:
@@ -124,10 +201,10 @@ Most legacy tokens map to a same-meaning modern token — the heuristic is simpl
 | Legacy `--o2-*` | Modern `--color-*` |
 | --- | --- |
 | `--o2-text-heading` | `--color-text-heading` |
-| `--o2-text-primary` / `--o2-text-4` | `--color-text-primary` |
+| `--o2-text-primary` / `--o2-text-4` | `--color-text-heading` |
 | `--o2-text-body` | `--color-text-body` |
 | `--o2-text-secondary` / `--o2-text-2` | `--color-text-secondary` |
-| `--o2-text-caption` / `--o2-text-1` | `--color-text-caption` |
+| `--o2-text-caption` / `--o2-text-1` | `--color-text-secondary` |
 | `--o2-text-label` / `--o2-text-3` | `--color-text-label` |
 | `--o2-text-muted` | `--color-text-muted` |
 | `--o2-text-placeholder` | `--color-text-placeholder` |
@@ -147,7 +224,9 @@ Most legacy tokens map to a same-meaning modern token — the heuristic is simpl
 | `--o2-secondary-btn-bg` / `-text` / `-border` | `--color-button-secondary` / `-foreground` / `-border` |
 | `--o2-hover-accent` / `--o2-interactive-hover` | `--color-interactive-hover-bg` |
 
-**Authoritative source (always in-tree):** the token files themselves define both
+**Authoritative source (always in-tree):** the codemod's machine map is
+`web/scripts/o2-token-map.json` (`migrate` key — this is what the CI failure message
+points at), and the token files themselves define both
 vocabularies — `semantic.css` (light `--o2-*` and `--color-*` values) and
 `dark.css` (dark values). If a legacy token isn't in the table above, grep those
 files for its value and find the `--color-*` token that carries the same value:

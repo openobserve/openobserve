@@ -218,17 +218,19 @@ function handleNativeTimeChange(e: Event) {
 
 // ── Field wrapper classes ──────────────────────────────────────
 const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
-  sm: "h-8 text-xs",
-  md: "h-10 text-sm",
+  sm: "h-6 text-sm",
+  md: "h-8.5 text-sm",
 };
 
 const fieldClasses = computed(() => [
-  "flex items-center w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
   hasError.value
     ? "border-datepicker-error-border"
     : "border-datepicker-border hover:border-datepicker-hover-border",
+  "focus-within:border-datepicker-focus-border",
+  "focus-within:ring-[0.125rem] focus-within:ring-primary-500/25",
   props.disabled
     ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60 cursor-not-allowed"
     : "",
@@ -241,7 +243,7 @@ const fieldClasses = computed(() => [
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="text-xs font-medium text-datepicker-label leading-none flex items-center gap-1"
+      class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
     >
       <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
@@ -314,7 +316,7 @@ const fieldClasses = computed(() => [
         :side-offset="4"
         align="start"
         :class="[
-          'z-60 rounded-lg border shadow-md overflow-hidden bg-datepicker-popup-bg border-datepicker-popup-border outline-none',
+          'z-60 rounded-default border shadow-md overflow-hidden bg-datepicker-popup-bg border-datepicker-popup-border outline-none',
           withSeconds ? 'w-64' : 'w-56',
         ]"
         data-test="otime-popup"
@@ -326,7 +328,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'text-2xl font-semibold tabular-nums rounded-sm px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'hour'
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
@@ -338,7 +340,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'text-2xl font-semibold tabular-nums rounded-sm px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'minute'
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
@@ -351,7 +353,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'text-2xl font-semibold tabular-nums rounded-sm px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                  'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
                   clockMode === 'second'
                     ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                     : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
@@ -364,7 +366,7 @@ const fieldClasses = computed(() => [
 
           <!-- AM / PM horizontal pill -->
           <div
-            class="flex rounded-md border border-datepicker-border overflow-hidden ms-3 shrink-0"
+            class="flex rounded-default border border-datepicker-border overflow-hidden ms-3 shrink-0"
           >
             <button
               type="button"
@@ -523,8 +525,10 @@ const fieldClasses = computed(() => [
   </div>
 </template>
 
-<style>
-/* Hide the native browser clock picker dropdown */
+<style scoped>
+/* keep(lib-override:native-time): hide the browser's native clock-picker
+   indicator on <input type=time> (a custom analog-clock popover replaces it).
+   Scoped so the override only affects this component's input. */
 input[type="time"]::-webkit-calendar-picker-indicator {
   display: none;
 }

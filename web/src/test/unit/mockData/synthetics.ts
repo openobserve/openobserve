@@ -253,7 +253,7 @@ export const mockCapabilities = {
 export const mockTimelineSegment = {
   runId: "run-001",
   status: "passed" as const,
-  color: "var(--o2-status-success)",
+  color: "var(--color-badge-success-solid-bg)",
   title: "Passed",
   timestampMs: 1_700_000_000_000,
   executions: [
@@ -272,7 +272,7 @@ export const mockTimelineSegments = [
   {
     runId: "run-002",
     status: "failed" as const,
-    color: "var(--o2-status-danger)",
+    color: "var(--color-badge-error-solid-bg)",
     title: "Failed",
     timestampMs: 1_700_003_600_000,
     executions: [

@@ -17,9 +17,8 @@
  * Shared visual defaults for every heatmap the app draws.
  *
  * Three separate renderers build heatmaps — the PromQL converter, its
- * Prometheus-histogram mode, and the SQL converter — and they had drifted into
- * three different looks. These are the defaults all of them use, so a heatmap
- * looks like a heatmap wherever it appears.
+ * Prometheus-histogram mode, and the SQL converter — and share these defaults so
+ * a heatmap looks like a heatmap wherever it appears.
  *
  * This is presentation only. It says nothing about how the data is prepared:
  * the classic-histogram `le`-sort and de-accumulation stay opt-in behind
@@ -28,6 +27,7 @@
  */
 
 import { SPECTRAL_HEATMAP_STOPS } from "./promql/shared/spectral";
+import { chartColor } from "@/utils/chartTheme";
 
 /**
  * Stroke every cell in the panel background colour.
@@ -38,7 +38,7 @@ import { SPECTRAL_HEATMAP_STOPS } from "./promql/shared/spectral";
  */
 export function heatmapCellItemStyle(store: any) {
   return {
-    borderColor: store?.state?.theme === "dark" ? "#1e1e1e" : "#ffffff",
+    borderColor: chartColor("--color-surface-base"),
     borderWidth: 1,
   };
 }

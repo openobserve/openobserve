@@ -178,12 +178,6 @@ describe("QueryInspector", () => {
         stubs: {
           ODialog: ODialogStub,
           OButton: OButtonStub,
-          QInput: {
-            template:
-              '<input data-test="q-input" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" v-bind="$attrs"><slot name="prepend" /></input>',
-            props: ["modelValue", "placeholder", "dense", "color", "dark"],
-            emits: ["update:modelValue"],
-          },
           QIcon: {
             template: '<span data-test="OIcon" :class="name"><slot /></span>',
             props: ["name", "size"],

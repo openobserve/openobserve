@@ -5,34 +5,21 @@
 // Built via a factory so messages stay i18n-driven (`t`) and the per-instance
 // `isAlerts` prop can gate the alerts-only vs pipeline-only rules.
 //
-// Migration notes (form-migration-playbook / START-HERE Rule ①/②/④):
-//   • `name`/`url`/`emails` — genuinely user-typed → form-owned OFormInput; rules
-//     mirror the old hand-rolled `save()` error refs exactly.
-//   • `method`/`output_format`/`action_id`/`template` — form-owned OFormSelect.
-//   • `skip_tls_verify` — form-owned OFormSwitch (boolean).
-//   • `apiHeaders` — a Rule-① dynamic array-field (`apiHeaders[i].key/.value`),
-//     each row form-owned (playbook §2 array-field pattern); rebuilt into the
-//     `headers` map at submit. No per-row rule (blank starter row is valid).
-//   • `destination_type` / `type` — NOT <input>s: a custom card grid + app-tabs.
-//     Both are bridged into the form via `setFieldValue` from their own handlers
-//     (the sanctioned Rule-② bridge) so `superRefine` can branch on them.
+// `destination_type` / `type` are NOT <input>s: a custom card grid + app-tabs,
+// bridged into the form via `setFieldValue` from their own handlers so
+// `superRefine` can branch on them. `apiHeaders` is a dynamic array-field
+// (`apiHeaders[i].key/.value`), rebuilt into the `headers` map at submit; a
+// blank starter row is valid.
 //
-// SINGLE-FORM design (prebuilt + custom share ONE <OForm id="add-destination-form">):
-// there is NO nested child credential form any more. The per-type credential
-// fields render (via PrebuiltDestinationForm, now a presentational descendant)
-// as OForm* controls named `credentials.<key>` inside THIS form, so Enter/Save
-// submit the one form from anywhere and the schema validates everything together.
-// The prebuilt credential rules are composed in `superRefine` from the SAME
-// `getPrebuiltConfig().credentialFields` single source of truth (via
-// `makePrebuiltDestinationSchema`), re-homed under the `credentials.*` path.
-//
-// Rule-④ parity: the custom-only rules (url/method/email/action/output_format/
-// template) are scoped to NON-prebuilt paths — a prebuilt destination keeps the
-// default `type:"http"` (or `"email"` for the prebuilt email type), so without
-// that scoping the `type==="http"` url/method rule (and the `type==="email"`
-// emails rule) would fire on fields the prebuilt UI never renders and wrongly
-// block the save. The prebuilt-side `name` stays UN-required (the pre-migration
-// prebuilt save applied no name/template validation) — unchanged from before.
+// Prebuilt + custom share ONE <OForm id="add-destination-form">: the per-type
+// credential fields render (via PrebuiltDestinationForm) as OForm* controls
+// named `credentials.<key>` inside THIS form, so Enter/Save submit the one form
+// and the schema validates everything together. The prebuilt credential rules
+// are composed in `superRefine` from the same `getPrebuiltConfig().
+// credentialFields` source (via `makePrebuiltDestinationSchema`), under the
+// `credentials.*` path. The custom-only rules (url/method/email/action/
+// output_format/template) are scoped to NON-prebuilt paths so they do not fire
+// on fields the prebuilt UI never renders.
 //
 // Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
 // this file only describes WHAT is valid.
@@ -41,11 +28,6 @@ import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
 import { makePrebuiltDestinationSchema } from "./PrebuiltDestinationForm.schema";
 
-// Mirrors the old `save()` name gate:
-//   !name ? nameRequired : (!isValidResourceName(name) ? charsMsg : "")
-// nameRequired → i18n `common.nameRequired`; charsMsg → `alerts.validation.nameInvalidChars`.
-
-// Byte-identical to the old inline email-list regex in save().
 const EMAIL_LIST_REGEX =
   /^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(\s*[;,]\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))*$/;
 
@@ -88,8 +70,7 @@ export const makeAddDestinationSchema = (
       const isPrebuilt =
         isAlerts && !!val.destination_type && val.destination_type !== "custom";
 
-      // name: required + resource-name check. Scoped to NON-prebuilt paths —
-      // the pre-migration form never validated the prebuilt-side name.
+      // name: required + resource-name check. Scoped to NON-prebuilt paths.
       if (!isPrebuilt) {
         if (!trimmed(val.name)) {
           ctx.addIssue({
@@ -145,8 +126,7 @@ export const makeAddDestinationSchema = (
       }
 
       // emails: required + valid list for the CUSTOM email type. NOT for the
-      // prebuilt email type — it collects recipients via `credentials.recipients`
-      // (selectDestinationType sets type:"email" for it, so scope this out).
+      // prebuilt email type — it collects recipients via `credentials.recipients`.
       if (!isPrebuilt && val.type === "email") {
         if (!val.emails || !EMAIL_LIST_REGEX.test(String(val.emails))) {
           ctx.addIssue({

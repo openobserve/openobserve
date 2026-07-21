@@ -45,7 +45,7 @@ vi.mock("axios", () => ({
 
 // Mock utils cookies
 vi.mock("@/utils/cookies", () => ({
-  getLanguage: vi.fn(() => "en-gb")
+  getLanguage: vi.fn(() => "en-us")
 }));
 
 
@@ -87,11 +87,6 @@ describe("ImportRegexPattern", () => {
               return { jsonArrayOfObj, jsonStr, isImporting, jsonFiles, url, updateJsonArray };
             },
           },
-          "q-input": true,
-          "q-btn": true,
-          "q-separator": true,
-          "q-form": true,
-          "q-file": true,
           "app-tabs": {
             template: '<div :data-test="$attrs[\'data-test\']" :class="$attrs.class"><slot></slot></div>',
             props: ['tabs', 'activeTab'],

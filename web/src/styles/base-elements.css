@@ -1,0 +1,331 @@
+/* Copyright 2026 OpenObserve Inc. */
+/* ============================================================
+   BASE ELEMENTS — the app's element reset / typography layer.
+   ============================================================
+   The ONE legitimate global stylesheet (O2_STYLE_MIGRATION_PLAN.md §3.2).
+   Element selectors here are RESETS, not classes — they style bare HTML the
+   app renders everywhere (html/body, headings, links, ::placeholder,
+   scrollbars, @media print).
+
+   Receives, from lib/styles/tokens/component.css during W1:
+     F4  element typography / reset   (W1.b)
+     F16 global scrollbar theming     (W1.a)
+     F18 @media print overrides       (W1.a)
+
+   RULES:
+   - Everything lives in `@layer base` so any utility beats it.
+   - Colours via var(--color-*) only — never a raw hex.
+   - rem units (1px hairline borders excepted).
+   - Element/pseudo-element selectors ONLY. A `.class` rule does not belong
+     here — it goes to utilities.css (last resort) or a component (preferred).
+   - Imported from tailwind.css at component.css's original position so the
+     cascade order is unchanged (plan risk R10).
+   ============================================================ */
+
+/* ── F16 — global scrollbar theming (from component.css, W1.a) ──────────────
+   Safe to sit in `@layer base`: no Tailwind utility targets scrollbars, so
+   nothing in a later layer can outrank these. Values are unchanged; the raw
+   `--color-grey-*` refs became semantic `--color-scrollbar-*` tokens.
+   The ~21 per-file `::-webkit-scrollbar` copies in .vue style blocks are
+   redundant with this and get deleted in W2.b. */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 0.5625rem;
+    height: 0.5625rem;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-scrollbar-thumb);
+    border-radius: 0.375rem;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-scrollbar-thumb-hover);
+    background-clip: content-box;
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar-thumb) transparent;
+  }
+
+  /* The dark thumb/hover colours come from the tokens above; only the Firefox
+     shorthand needs re-stating, since it takes the colour as a value. */
+  .dark * {
+    scrollbar-color: var(--color-scrollbar-thumb) transparent;
+  }
+}
+
+/* ── F18 — print overrides (from component.css, W1.a) ───────────────────────
+   Verbatim move. Printable dashboards/reports are a product requirement (§9.3).
+   These are `!important`, so they outrank normal utility declarations
+   regardless of which layer they sit in. */
+@layer base {
+  @media print {
+    .h-full,
+    .h-\[calc\(100vh-105px\)\],
+    .overflow-y-auto,
+    .overflow-auto,
+    .overflow-hidden,
+    .min-h-0,
+    .flex-1 {
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+
+    .o2-app-header,
+    .o2-sidebar,
+    .o2-sidebar-right {
+      display: none !important;
+    }
+  }
+}
+
+/* Print MODE (store.state.printMode, dashboard print/report capture): body must
+   release its overflow so the full page height is capturable. Was
+   `.printMode body { … }` in MainLayout.vue — dead as written, because
+   `.printMode` sits on a div INSIDE body, so "body as descendant of .printMode"
+   matches nothing. `:has()` expresses the intended relationship. */
+body:has(.printMode) {
+  overflow: auto !important;
+}
+
+/* ── F4 — element typography / reset (from component.css, W1.b) ─────────────
+   Verbatim move. The two @layer base sub-blocks keep their layer; the
+   html/body/::placeholder rules stay unlayered exactly as they were —
+   re-layering decisions belong to W2.d, after visual verification. */
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html {
+  overflow: hidden;
+}
+
+body {
+  background: var(--color-theme-body-bg-primary);
+  overflow: hidden;
+  color: var(--color-text-body);
+  font-family: var(--font-sans);
+  font-size: var(--text-compact);
+  font-weight: var(--font-normal);
+  line-height: var(--leading-base);
+}
+
+/*
+ * Element typography resets must live in `@layer base` so Tailwind utilities
+ * (which live in `@layer utilities`) can override them. Unlayered rules beat
+ * any layered rule regardless of specificity, so leaving these outside a layer
+ * would silently suppress utilities like `mb-4` / `text-base` applied to
+ * bare <p>/<h2>/… elements.
+ */
+@layer base {
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-text-heading);
+  margin: 0;
+}
+
+h1 {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-2xl);
+  letter-spacing: var(--tracking-tight);
+}
+
+h2 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-xl);
+  letter-spacing: var(--tracking-normal);
+}
+
+h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-lg);
+  letter-spacing: var(--tracking-normal);
+}
+
+h4 {
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-md);
+  letter-spacing: var(--tracking-normal);
+}
+
+h5 {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-base);
+  letter-spacing: var(--tracking-normal);
+}
+
+h6 {
+  font-size: var(--text-compact);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-sm);
+  letter-spacing: var(--tracking-normal);
+}
+
+p {
+  color: var(--color-text-body);
+  font-size: var(--text-sm);
+  line-height: var(--leading-base);
+  margin: 0;
+}
+
+a {
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-text-link-hover);
+  text-decoration: underline;
+}
+
+small {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+label:not(.o-input-label) {
+  font-size: var(--text-compact);
+  color: var(--color-text-label);
+  font-weight: var(--font-normal);
+}
+}
+
+@layer base {
+  code {
+    font-family: var(--font-mono);
+    font-size: var(--text-compact);
+    color: var(--color-text-code);
+    font-feature-settings: "tnum";
+    letter-spacing: -0.2px;
+  }
+
+  pre,
+  kbd,
+  samp,
+  .log-line {
+    font-family: var(--font-mono);
+    font-size: var(--text-compact);
+    line-height: 1.6;
+  }
+}
+
+::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+/* ── F7 — interaction affordances (from component.css, W1.b) ────────────────
+   Verbatim move, deliberately UNLAYERED (as before): cursor affordances for
+   every button-ish element, disabled/draggable cursors, text-input carets,
+   and the destructive-icon hover tint keyed on [data-o2-variant] /
+   [data-destructive-icon]. These are app-wide behavioural affordances on
+   semantic attributes — the one CSS family that legitimately styles other
+   components' DOM from a global sheet. */
+button:not(:disabled):not([aria-disabled="true"]),
+a[href]:not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]):not([disabled]),
+[role="tab"]:not([aria-disabled="true"]):not([disabled]),
+[role="menuitem"]:not([aria-disabled="true"]):not([disabled]),
+[role="option"]:not([aria-disabled="true"]):not([disabled]),
+[role="switch"]:not(:disabled):not([aria-disabled="true"]),
+[role="checkbox"]:not(:disabled):not([aria-disabled="true"]),
+[role="radio"]:not(:disabled):not([aria-disabled="true"]),
+label:has(input:not(:disabled)),
+summary,
+select:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="file"]:not(:disabled),
+input[type="submit"]:not(:disabled),
+input[type="reset"]:not(:disabled),
+input[type="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+button[aria-disabled="true"],
+input:disabled,
+select:disabled,
+textarea:disabled,
+[disabled],
+[aria-disabled="true"],
+.is-disabled {
+  cursor: not-allowed !important;
+}
+
+[draggable="true"],
+.draggable,
+.drag-handle {
+  cursor: grab;
+}
+
+[draggable="true"]:active,
+.draggable:active,
+.drag-handle:active,
+.is-dragging,
+[data-dragging="true"] {
+  cursor: grabbing !important;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="url"],
+input[type="tel"],
+textarea {
+  cursor: text;
+}
+
+input[type="text"]:disabled,
+input[type="email"]:disabled,
+input[type="password"]:disabled,
+input[type="number"]:disabled,
+input[type="search"]:disabled,
+input[type="url"]:disabled,
+input[type="tel"]:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+[data-o2-variant="destructive"] [data-destructive-icon="true"],
+[data-o2-variant="outline-destructive"] [data-destructive-icon="true"],
+[data-o2-variant="ghost-destructive"] [data-destructive-icon="true"] {
+  color: inherit !important;
+}
+
+button:has([data-destructive-icon="true"]):hover,
+a:has([data-destructive-icon="true"]):hover,
+[role="button"]:has([data-destructive-icon="true"]):hover {
+  background-color: var(--color-error-100, #fee2e2) !important;
+}
+
+html.dark button:has([data-destructive-icon="true"]):hover,
+.dark button:has([data-destructive-icon="true"]):hover,
+html.dark a:has([data-destructive-icon="true"]):hover,
+.dark a:has([data-destructive-icon="true"]):hover,
+html.dark [role="button"]:has([data-destructive-icon="true"]):hover,
+.dark [role="button"]:has([data-destructive-icon="true"]):hover {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+}
+
+html.dark [data-destructive-icon="true"]:hover,
+.dark [data-destructive-icon="true"]:hover {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+}

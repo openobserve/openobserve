@@ -586,8 +586,9 @@ describe("CustomChartRenderer", () => {
       wrapper = createWrapper();
       
       const chartElement = wrapper.find('[data-test="chart-renderer"]');
-      expect(chartElement.attributes('style')).toContain('height: 100%');
-      expect(chartElement.attributes('style')).toContain('width: 100%');
+      // Sizing moved from an inline style to Tailwind utilities.
+      expect(chartElement.classes()).toContain('h-full');
+      expect(chartElement.classes()).toContain('w-full');
     });
 
     it("should have correct element ID", () => {

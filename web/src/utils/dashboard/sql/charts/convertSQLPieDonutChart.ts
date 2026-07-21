@@ -15,6 +15,7 @@
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { getSeriesColor } from "../../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 import {
   getChartDimensions,
   applyPieDonutChartAlignment,
@@ -26,7 +27,7 @@ import { type SQLContext } from "../shared/types";
 /**
  * Applies chart-specific options for: pie AND donut
  *
- * Mutates `ctx.options` in place, exactly as the original switch cases did.
+ * Mutates `ctx.options` in place.
  */
 export function applyPieDonutChart(ctx: SQLContext): void {
   const {
@@ -55,11 +56,10 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     options.tooltip = {
       trigger: "item",
       textStyle: {
-        color: store.state.theme === "dark" ? "#fff" : "#000",
+        color: chartColor("--color-tooltip-text"),
         fontSize: 12,
       },
-      backgroundColor:
-        store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+      backgroundColor: chartColor("--color-tooltip-bg"),
       formatter: function (name: any) {
         try {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
@@ -206,11 +206,10 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     options.tooltip = {
       trigger: "item",
       textStyle: {
-        color: store.state.theme === "dark" ? "#fff" : "#000",
+        color: chartColor("--color-tooltip-text"),
         fontSize: 12,
       },
-      backgroundColor:
-        store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+      backgroundColor: chartColor("--color-tooltip-bg"),
       formatter: function (name: any) {
         try {
           // show tooltip for hovered panel only for other we only need axis so just return empty string

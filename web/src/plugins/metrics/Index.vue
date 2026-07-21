@@ -15,19 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll flex flex-col h-full" data-test="metrics-page">
-    <!-- Standard page header: title + icon + all query controls on ONE line
-         (syntax guide, legends, date range, refresh, Run). No extra toolbar row. -->
-    <AppPageHeader
-      :title="t('search.metrics')"
-      icon="bar-chart"
-      :back="{
-        label: t('search.metrics'),
-        onClick: goBackToExplorer,
-        dataTest: 'metrics-editor-back-btn',
-      }"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+  <OPageLayout
+    data-test="metrics-page"
+    :title="t('search.metrics')"
+    icon="bar-chart"
+    :back="{
+      label: t('search.metrics'),
+      onClick: goBackToExplorer,
+      dataTest: 'metrics-editor-back-btn',
+    }"
+    bleed
+  >
       <template #actions>
         <syntax-guide-metrics />
         <MetricLegends />
@@ -93,8 +91,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </template>
-    </AppPageHeader>
-
     <!-- PanelEditor Content Area -->
     <PanelEditor
       ref="panelEditorRef"
@@ -114,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardPanelData="dashboardPanelData"
       @save="addPanelToDashboard"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -136,7 +132,7 @@ import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { isEqual, debounce } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
@@ -176,7 +172,7 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
-    AppPageHeader,
+    OPageLayout,
     DateTimePickerDashboard,
     SyntaxGuideMetrics,
     MetricLegends,

@@ -13,9 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { ref, computed } from "vue";
+import { ref, reactive, computed } from "vue";
+import {
+  getMetricsConfig,
+  encodeMetricsConfig,
+  decodeMetricsConfig,
+} from "@/composables/metrics/metricsUrlState";
 
 /**
  * These test the EXPLORER'S WIRING, not the grid's logic.
@@ -99,12 +104,23 @@ vi.mock("vuex", async (importOriginal) => ({
     state: { selectedOrganization: { identifier: "org1" }, theme: "light" },
   }),
 }));
+// Controllable route/router so the URL-state tests can seed `route.query` before
+// mount (hydration) and inspect `router.replace` (sync). `name` must be "metrics"
+// or syncVisualizeUrl and the route.query watcher short-circuit.
+const routerState = vi.hoisted(() => ({
+  replace: vi.fn().mockResolvedValue(undefined),
+  push: vi.fn(),
+  query: {} as Record<string, any>,
+}));
 vi.mock("vue-router", () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn().mockResolvedValue(undefined),
+  useRouter: () => ({ push: routerState.push, replace: routerState.replace }),
+  useRoute: () => ({
+    get query() {
+      return routerState.query;
+    },
+    name: "metrics",
+    fullPath: "/metrics",
   }),
-  useRoute: () => ({ query: {} }),
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
@@ -123,11 +139,16 @@ const CARD = { name: "http_requests_total", unsupported: false, cardKind: "count
  *  visualize mode instead of sweeping the Explore grid. */
 const visualizeRunQuery = vi.fn();
 
+/** The panel state the stubbed Visualize pane exposes to its parent — the parent
+ *  reads it to build the `metrics_data` blob. Set per test before entering
+ *  Visualize; null/query-less means "blank canvas, nothing to share". */
+let visualizePanel: any = null;
+
 const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
   mount(MetricsExplorer, {
     global: {
       stubs: {
-        AppPageHeader: true,
+        OPageHeader: true,
         DateTimePickerDashboard: true,
         AutoRefreshInterval: true,
         MetricCard: true,
@@ -167,9 +188,13 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
         // behaviour is covered by MetricsVisualize.spec. Keep the data-test so the
         // mode-switch assertions still find it.
         MetricsVisualize: {
-          // Exposes runQuery like the real pane — the toolbar refresh drives it
-          // in visualize mode.
-          setup: () => ({ runQuery: visualizeRunQuery }),
+          // Exposes runQuery + dashboardPanelData like the real pane — the toolbar
+          // refresh drives runQuery, and the parent reads dashboardPanelData to
+          // encode the shareable blob.
+          setup: () => ({
+            runQuery: visualizeRunQuery,
+            dashboardPanelData: visualizePanel,
+          }),
           template:
             '<div data-test="metrics-explorer-visualize">visualize</div>',
         },
@@ -182,6 +207,8 @@ describe("MetricsExplorer wiring", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     grid.pagedCards.value = [CARD];
+    routerState.query = {};
+    visualizePanel = null;
   });
 
   describe("a label filter must not leave the visible cards on skeletons", () => {
@@ -675,6 +702,212 @@ describe("MetricsExplorer wiring", () => {
       zoomOn(wrapper, {});
 
       expect(setCustomDate).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Visualize is URL-driven: the built chart serializes to `metrics_data` so a
+   * refresh / a shared link restores it IN-PAGE (the router keeps mode=visualize
+   * in the explorer). Grid modes already live in the URL, so they just share the
+   * current address. These pin the three seams — encode (share), decode
+   * (hydrate), and the continuous write (sync).
+   */
+  describe("Visualize URL state — share, hydrate, sync", () => {
+    const paramBlob = (href: string) => {
+      const raw = new URL(href).searchParams.get("metrics_data");
+      return raw ? decodeMetricsConfig(raw) : null;
+    };
+
+    const enterVisualizeWith = async (wrapper: any, query = "up") => {
+      visualizePanel = reactive({
+        data: { type: "line", queries: [{ query, fields: {} }] },
+        layout: {},
+      });
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+    };
+
+    describe("shareUrl", () => {
+      it("is the plain current URL in grid modes — state already lives there", () => {
+        const wrapper = mountExplorer();
+        expect((wrapper.vm as any).mode).toBe("explore");
+        expect((wrapper.vm as any).shareUrl).toBe(window.location.href);
+        expect((wrapper.vm as any).shareUrl).not.toContain("metrics_data");
+      });
+
+      it("carries the encoded chart as metrics_data in Visualize", async () => {
+        const wrapper = mountExplorer();
+        await enterVisualizeWith(wrapper, "sum(rate(http_requests_total[5m]))");
+
+        const blob = paramBlob((wrapper.vm as any).shareUrl);
+        expect(blob?.data?.queries?.[0]?.query).toBe(
+          "sum(rate(http_requests_total[5m]))",
+        );
+      });
+
+      it("drops volatile keys (id/title) from the shared blob", async () => {
+        const wrapper = mountExplorer();
+        visualizePanel = reactive({
+          data: {
+            id: "panel-1",
+            title: "My Chart",
+            type: "line",
+            queries: [{ query: "up", fields: {} }],
+          },
+          layout: {},
+        });
+        (wrapper.vm as any).setMode("visualize");
+        await wrapper.vm.$nextTick();
+        await wrapper.vm.$nextTick();
+
+        const blob = paramBlob((wrapper.vm as any).shareUrl);
+        expect(blob?.data).not.toHaveProperty("id");
+        expect(blob?.data).not.toHaveProperty("title");
+        expect(blob?.data?.type).toBe("line");
+      });
+
+      it("omits metrics_data on a blank Visualize (no query yet)", async () => {
+        const wrapper = mountExplorer();
+        visualizePanel = reactive({
+          data: { queries: [{ query: "" }] },
+          layout: {},
+        });
+        (wrapper.vm as any).setMode("visualize");
+        await wrapper.vm.$nextTick();
+
+        expect((wrapper.vm as any).shareUrl).not.toContain("metrics_data");
+      });
+    });
+
+    describe("hydrate on load", () => {
+      const blobFor = (data: any) =>
+        encodeMetricsConfig(getMetricsConfig({ data }));
+
+      it("seeds Visualize from a metrics_data URL on mount", () => {
+        routerState.query = {
+          mode: "visualize",
+          metrics_data: blobFor({
+            type: "bar",
+            queries: [{ query: "up", fields: {} }],
+          }),
+        };
+
+        const wrapper = mountExplorer();
+
+        expect((wrapper.vm as any).mode).toBe("visualize");
+        expect((wrapper.vm as any).visualizeSeed).toEqual({
+          type: "bar",
+          queries: [{ query: "up", fields: {} }],
+        });
+      });
+
+      it("ignores metrics_data when the mode is not Visualize", () => {
+        routerState.query = {
+          mode: "explore",
+          metrics_data: blobFor({ type: "bar", queries: [{ query: "up" }] }),
+        };
+
+        const wrapper = mountExplorer();
+
+        expect((wrapper.vm as any).visualizeSeed).toBeNull();
+      });
+
+      it("leaves the seed untouched when there is no metrics_data", () => {
+        routerState.query = { mode: "visualize" };
+        const wrapper = mountExplorer();
+        expect((wrapper.vm as any).visualizeSeed).toBeNull();
+      });
+
+      it("ignores a malformed blob rather than throwing", () => {
+        routerState.query = { mode: "visualize", metrics_data: "not-base64!!" };
+        expect(() => mountExplorer()).not.toThrow();
+        // no seed built from garbage
+      });
+    });
+
+    describe("sync to URL", () => {
+      beforeEach(() => vi.useFakeTimers());
+      afterEach(() => vi.useRealTimers());
+
+      const blobWrites = () =>
+        routerState.replace.mock.calls
+          .map((c: any) => c[0]?.query?.metrics_data)
+          .filter(Boolean);
+
+      it("writes the blob to the URL when a chart is built in Visualize", async () => {
+        const wrapper = mountExplorer();
+        await enterVisualizeWith(wrapper, "node_load1");
+        vi.advanceTimersByTime(300);
+
+        const wrote = blobWrites().at(-1);
+        expect(wrote).toBeTruthy();
+        expect(decodeMetricsConfig(wrote)?.data?.queries?.[0]?.query).toBe(
+          "node_load1",
+        );
+      });
+
+      it("strips a stale blob from the URL when leaving Visualize", async () => {
+        routerState.query = { metrics_data: "stale", org_identifier: "org1" };
+        const wrapper = mountExplorer();
+        await enterVisualizeWith(wrapper, "up");
+        vi.advanceTimersByTime(300);
+        routerState.replace.mockClear();
+
+        (wrapper.vm as any).setMode("explore");
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(300);
+
+        const stripped = routerState.replace.mock.calls.some(
+          (c: any) => c[0]?.query && !("metrics_data" in c[0].query),
+        );
+        expect(stripped).toBe(true);
+      });
+
+      it("does not touch metrics_data while in a grid mode", async () => {
+        const wrapper = mountExplorer();
+        // A pure grid interaction (sort change) fires syncUrlState, never the
+        // visualize writer.
+        grid.sortBy.value = "z-a";
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(300);
+
+        expect(blobWrites()).toHaveLength(0);
+      });
+    });
+  });
+
+  /**
+   * The "No metrics match" empty state offers one action card per remedy, gated
+   * on that remedy actually being able to change the result. Favorites ignores
+   * prefix/suffix/type, so "Clear prefix/suffix/type" must not appear there.
+   */
+  describe("empty-state remedies gate on what would actually help", () => {
+    const actionIds = (wrapper: any) =>
+      (wrapper.vm as any).noMatchActions.map((a: any) => a.id);
+
+    it("offers Clear prefix/suffix/type in Explore when a facet is selected", () => {
+      const wrapper = mountExplorer();
+      grid.showFavoritesOnly.value = false;
+      grid.selectedPrefixes.value = new Set(["envoy_cluster"]);
+
+      expect(actionIds(wrapper)).toContain("clear-facets");
+
+      grid.selectedPrefixes.value = new Set(); // reset shared mock
+    });
+
+    it("hides Clear prefix/suffix/type in Favorites — those facets are ignored there", () => {
+      const wrapper = mountExplorer();
+      grid.showFavoritesOnly.value = true;
+      grid.selectedPrefixes.value = new Set(["envoy_cluster"]);
+
+      const ids = actionIds(wrapper);
+      expect(ids).not.toContain("clear-facets");
+      // The favorites-specific remedy is still offered.
+      expect(ids).toContain("clear-favorites");
+
+      grid.showFavoritesOnly.value = false; // reset shared mock
+      grid.selectedPrefixes.value = new Set();
     });
   });
 });

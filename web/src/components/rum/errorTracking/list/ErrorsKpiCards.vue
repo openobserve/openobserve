@@ -23,11 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <article
       v-for="card in cards"
       :key="card.key"
-      class="card-container flex flex-col items-start rounded-lg border border-border-default px-2.5 py-1.5 min-w-0"
+      class="bg-card-glass-bg flex flex-col items-start rounded-default border border-border-default px-2.5 py-1.5 min-w-0"
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
-        class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-[var(--o2-text-label)]"
+        class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-text-label"
       >
         {{ card.label }}
         <OTag
@@ -125,7 +125,7 @@ const cards = computed(() => {
         kpis.crashFreePct === null ? "—" : `${kpis.crashFreePct.toFixed(1)}%`,
       valueClass:
         kpis.crashFreePct !== null && kpis.crashFreePct < CRASH_FREE_FAIR_MIN
-          ? "text-[var(--o2-severity-error-color)]"
+          ? "text-severity-error-color"
           : "",
       caption: t("rum.sessionsHitError", {
         errorSessions: addCommasToNumber(kpis.errorSessions),
@@ -149,7 +149,7 @@ const cards = computed(() => {
       label: t("rum.newIssues"),
       value: String(kpis.newIssues),
       valueClass:
-        kpis.newIssues > 0 ? "text-[var(--o2-severity-error-color)]" : "",
+        kpis.newIssues > 0 ? "text-severity-error-color" : "",
       caption: kpis.deployVersion
         ? t("rum.firstSeenSinceDeploy", { version: kpis.deployVersion })
         : t("rum.firstSeenInWindow"),

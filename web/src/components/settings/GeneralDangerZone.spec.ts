@@ -153,7 +153,7 @@ describe("General settings Danger Zone", () => {
       ["ja", "危険ゾーン", "管理者のみ"],
       ["de", "Gefahrenzone", "Nur Administratoren"],
     ])("renders the panel in %s", async (locale, header, ownerFact) => {
-      // Only en-gb is bundled; every other locale is a lazy chunk. main.ts awaits
+      // Only en-us is bundled; every other locale is a lazy chunk. main.ts awaits
       // this before mounting, so mirror that here rather than assuming the
       // messages are already registered.
       await loadLocaleMessages(locale);

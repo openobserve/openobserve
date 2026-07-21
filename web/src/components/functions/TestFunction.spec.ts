@@ -4,7 +4,7 @@ import TestFunction from './TestFunction.vue';
 import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { nextTick } from 'vue';
-import enLocale from '@/locales/languages/en.json';
+import enLocale from '@/locales/languages/en-US.json';
 
 // Mock dependencies
 vi.mock('@/composables/useStreams', () => ({

@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    DARK MODE TOKEN OVERRIDES
    Overrides semantic (and component) tokens for dark themes.
    ============================================================ */
@@ -6,25 +6,18 @@
 :root.dark,
 .dark :root,
 .dark {
-    /*
-     * Tell the browser to render native UI (date/time/color picker icons,
-     * scrollbars, autofill backgrounds, etc.) in dark theme. Without this,
-     * Chromium's default ::-webkit-calendar-picker-indicator stays dark
-     * gray and disappears against the dark input background. This is
-     * inherited by every descendant, so a single declaration on the dark
-     * root flips every native widget at once.
-     */
+    /* Dark theme for native UI (date/time/color pickers, scrollbars,
+       autofill); inherited by all descendants. Without it Chromium's
+       calendar-picker icon stays dark gray and vanishes on dark inputs. */
     color-scheme: dark;
 
-    /* ═══════════════════════════════════════════════════════════
-       DARK MODE FOUNDATION — tune these ~16 values to taste.
-       Everything below (surfaces, borders, text, and the per-component
-       overrides further down) references ONLY these vars, so the whole
-       dark theme is tuned from here without touching components.
+    /* DARK MODE FOUNDATION — tune these ~16 values to taste. Everything
+       below (surfaces, borders, text, per-component overrides) references
+       ONLY these vars, so the whole dark theme is tuned from here.
 
-       Elevation order (deepest → lightest), preserving the light-mode
+       Elevation order (deepest → lightest) preserves the light-mode
        relationship (subtle < panel < base < overlay) so cards LIFT and
-       sub-rails RECEDE — that's what creates visible "sections":
+       sub-rails RECEDE — what creates visible "sections":
 
          chrome   top bar / left rail / gutter behind the card  (deepest)
          well     recessed fills, segmented-control track
@@ -36,19 +29,18 @@
         1. BASE (the content card) is clearly LIGHTER than the chrome behind
            it, so the card visibly floats off the frame.
         2. Borders read clearly ABOVE the surface they outline — a border
-           close to its background is invisible (the bug this fixes).
+           close to its background is invisible.
 
-       Accents stay on the teal brand palette (--color-primary-*), which is
-       theme-driven at runtime (utils/theme.ts) — no accent is hardcoded here.
-       Surfaces are a neutral slate. Want warmer/cooler? Nudge the hex below.
-       ═══════════════════════════════════════════════════════════ */
+       Accents stay on the teal brand palette (--color-primary-*), theme-driven
+       at runtime (utils/theme.ts). Surfaces are a neutral slate; nudge the hex
+       below to go warmer/cooler. */
 
-    /* Surfaces — VS Code Dark+ exact values.
-       chrome  = title bar + activity bar (icon strip)   #333333
-       panel   = sidebar / folder list                   #252526
-       base    = editor / main content canvas            #1E1E1E
-       well    = recessed / segmented track              #2D2D2D
-       overlay = menus, dropdowns, tooltips              #202020 */
+    /* Surfaces — role of each elevation step:
+       chrome  = title bar + activity-bar strip
+       panel   = sidebar / folder list
+       base    = editor / main content canvas
+       well    = recessed / segmented track
+       overlay = menus, dropdowns, tooltips */
     --d-chrome:    #0E0F11;  /* title bar + left activity-bar strip             */
     --d-base:      #0d1117;  /* MAIN: content card + table canvas               */
     --d-well:      #2D2D2D;  /* recessed wells, segmented-control track         */
@@ -61,10 +53,11 @@
     --d-border:        #454545;  /* default: card / input / table / rail edges  */
     --d-border-strong: #6B6B6B;  /* strong: checkbox / radio / file outlines    */
 
-    /* Text — VS Code editor foreground scale */
-    --d-text:      #D4D4D4;  /* primary text, headings, record names            */
-    --d-text-2:    #AAAAAA;  /* secondary: body, nav, labels                    */
-    --d-text-3:    #858585;  /* metadata, captions, column heads, IDs           */
+    /* Text — mapped straight to the registered --color-grey-* palette in the
+       block below (mirrors light mode, where each tier = a grey step). No
+       separate --d-text* anchors: they were just hardcoded hex standing in for
+       grey shades, which flattened the hierarchy (body==secondary, and
+       label==muted==disabled==placeholder all landed on one value). */
 
     /* Row / item states on the content surface */
     --d-hover:     var(--color-primary-900);  /* row & list-item hover — MATCHES
@@ -73,21 +66,56 @@
                              /* selected row — teal-tinted (brand signal)       */
     --d-zebra:     #252526;  /* striped-row bg — VS Code list alternating row    */
 
-    /* --- Text (mapped to the foundation) --- */
-    --color-text-heading:     var(--d-text);   /* h1-h6, modal titles */
-    --color-text-primary:     var(--d-text);   /* alias for heading */
-    --color-text-soft:        var(--d-text);   /* feeds --color-select-text (OSelect trigger value). Soft variant: var(--d-text-2) */
-    --color-text-body:        var(--d-text-2); /* paragraphs, default body */
-    --color-text-secondary:   var(--d-text-2); /* supporting text, descriptions */
-    --color-text-caption:     var(--d-text-3); /* captions, footnotes, timestamps */
-    --color-text-label:       var(--d-text-3); /* form labels, metadata */
-    --color-text-muted:       var(--d-text-3); /* disabled, de-emphasized */
-    --color-text-disabled:    var(--d-text-3);
-    --color-text-placeholder: var(--d-text-3); /* input placeholders */
+    /* --- Text — grey palette steps, one per tier (light half of the ramp) --- */
+    --color-text-heading:     var(--color-grey-200); /* h1-h6, modal titles — brightest */
+    --color-text-soft:        var(--color-grey-200); /* feeds --color-select-text (OSelect trigger value) */
+    --color-text-body:        var(--color-grey-300); /* paragraphs, default body */
+    --color-text-secondary:   var(--color-grey-400); /* supporting text, descriptions */
+    --color-text-label:       var(--color-grey-500); /* form labels, metadata */
+    --color-text-muted:       var(--color-grey-500); /* de-emphasized */
+    --color-text-disabled:    var(--color-grey-600); /* dimmer than labels so disabled reads disabled */
+    --color-text-placeholder: var(--color-grey-500); /* input placeholders — dim but legible, above disabled */
     --color-text-link:        var(--color-primary-400);  /* clickable links (teal) */
     --color-text-link-hover:  var(--color-primary-300);  /* link hover state (teal) */
-    --color-text-code:        var(--d-text-2);           /* inline code, monospace */
+    --color-text-code:        var(--color-grey-300);     /* inline code, monospace */
     --color-text-inverse:     var(--color-grey-900);     /* text on light/colored bg */
+    --color-accent:           var(--color-primary-400);  /* brand accent — lighter shade for dark surfaces */
+    --color-sql-accent:       #A78BFA;                    /* SQL/query violet — lighter for dark surfaces */
+    --color-function-accent:  var(--color-blue-400);      /* VRL-function blue - lighter for dark surfaces */
+    --color-tool-thread-accent-text: #6dd170;             /* tool-thread green - lighter for dark surfaces */
+    /* Trace DAG node-type palette (dark) — lighter step per hue */
+    --color-dag-node-generation: #66bb6a;
+    --color-dag-node-embedding:  #64b5f6;
+    --color-dag-node-agent:      #ce93d8;
+    --color-dag-node-tool:       #ffb74d;
+    --color-dag-node-chain:      #7986cb;
+    --color-dag-node-retriever:  #4dd0e1;
+    --color-dag-node-task:       #4db6ac;
+    --color-dag-node-evaluator:  #f48fb1;
+    --color-dag-node-workflow:   #b39ddb;
+    --color-dag-node-rerank:     #4fc3f7;
+    --color-dag-node-guardrail:  #ef5350;
+    --color-dag-node-event:      #ffd54f;
+    --color-dag-node-default:    #9e9e9e;
+    /* Code syntax highlighting — GitHub dark palette */
+    --color-syntax-bg:       #0d1117;
+    --color-syntax-text:     #c9d1d9;
+    --color-syntax-keyword:  #ff7b72;
+    --color-syntax-function: #d2a8ff;
+    --color-syntax-number:   #79c0ff;
+    --color-syntax-string:   #a5d6ff;
+    --color-syntax-builtin:  #ffa657;
+    --color-syntax-comment:  #8b949e;
+    --color-syntax-tag:      #7ee787;
+    --color-syntax-bullet:   #f2cc60;
+    --color-syntax-addition-fg: #aff5b4;
+    --color-syntax-addition-bg: #033a16;
+    --color-syntax-deletion-fg: #ffdcd7;
+    --color-syntax-deletion-bg: #67060c;
+    /* AI idle washes are denser in dark for legibility */
+    --color-gradient-ai-subtle: linear-gradient(135deg, rgba(139,92,246,0.5) 0%, rgba(236,72,153,0.5) 100%);
+    --color-chat-bubble-user: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
+    --color-chat-bubble-ai:   linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
 
     /* --- Surfaces (mapped — elevation order preserved from light mode) --- */
     --color-surface-base:         var(--d-base);    /* content card + table canvas (lifted) */
@@ -95,6 +123,9 @@
     --color-surface-overlay:      var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
     --color-surface-subtle:       var(--d-well);    /* recessed fills, segmented track */
     --color-surface-subtle-hover: var(--d-panel);   /* hover on a recessed fill (one step up) */
+    /* Accent-tinted interaction surfaces — dark accent hover/active values. */
+    --color-surface-accent-hover:  var(--color-primary-900);
+    --color-surface-accent-active: var(--color-primary-800);
     --color-surface-chrome:        var(--d-chrome);  /* top bar + left rail */
     --color-surface-chrome-deeper: var(--d-chrome);  /* gutter behind card (same frame) */
 
@@ -107,32 +138,36 @@
 
     /* ---- Button overrides ---- */
 
+    /* primary — disabled fill: the light-mode value (--color-primary-300, a
+       light lavender) left the white foreground text near-invisible on dark
+       surfaces (~2:1). Use a dark, desaturated teal so the shared white label
+       keeps a strong, readable contrast while still reading as muted/disabled. */
+    --color-button-primary-disabled: color-mix(in srgb, var(--color-primary-600) 30%, var(--color-surface-overlay));
+
     /* secondary (darkened surface) */
-    --o2-secondary-btn-bg: var(--color-surface-overlay);
-    --o2-secondary-btn-text: var(--color-text-primary);
-    --o2-secondary-btn-border: var(--color-border-subtle, rgba(255,255,255,0.12));
-    --color-button-secondary: var(--o2-secondary-btn-bg);
-    --color-button-secondary-hover: var(--color-primary-900);
-    --color-button-secondary-active: var(--color-primary-800);
+    --color-button-secondary: var(--color-surface-overlay);
+    --color-button-secondary-foreground: var(--color-text-heading);
+    --color-button-secondary-border: var(--color-border-subtle, rgba(255,255,255,0.12));
+    --color-button-secondary-hover: var(--color-surface-accent-hover);
+    --color-button-secondary-active: var(--color-surface-accent-active);
     --color-button-secondary-disabled: var(--color-surface-overlay);
-    --color-button-secondary-foreground: var(--o2-secondary-btn-text);
 
     /* outline */
-    --color-button-outline-text: var(--color-text-primary);
+    --color-button-outline-text: var(--color-text-heading);
     --color-button-outline-border: var(--color-border-default);
     --color-button-outline-hover-bg: var(--color-primary-900);
     --color-button-outline-hover-border: var(--color-border-strong);
-    --color-button-outline-active-bg: var(--color-primary-800);
+    --color-button-outline-active-bg: var(--color-surface-accent-active);
 
     /* ghost */
-    --color-button-ghost-text: var(--color-text-primary);
-    --color-button-ghost-hover-bg: var(--color-primary-900);
-    --color-button-ghost-active-bg: var(--color-primary-800);
+    --color-button-ghost-text: var(--color-text-heading);
+    --color-button-ghost-hover-bg: var(--color-surface-accent-hover);
+    --color-button-ghost-active-bg: var(--color-surface-accent-active);
 
     /* ghost-primary */
     --color-button-ghost-primary-text: var(--color-primary-400);
-    --color-button-ghost-primary-hover-bg: var(--color-primary-900);
-    --color-button-ghost-primary-active-bg: var(--color-primary-800);
+    --color-button-ghost-primary-hover-bg: var(--color-surface-accent-hover);
+    --color-button-ghost-primary-active-bg: var(--color-surface-accent-active);
 
     /* ghost-destructive */
     --color-button-ghost-destructive-text: var(--color-error-400);
@@ -146,27 +181,25 @@
 
     /* ghost-muted */
     --color-button-ghost-muted-hover-text: var(--color-primary-400);
-    --color-button-ghost-muted-hover-bg: var(--color-primary-900);
-    --color-button-ghost-muted-active-bg: var(--color-primary-800);
+    --color-button-ghost-muted-hover-bg: var(--color-surface-accent-hover);
+    --color-button-ghost-muted-active-bg: var(--color-surface-accent-active);
 
     /* ghost-subtle */
-    --color-button-ghost-subtle-hover-bg: var(--color-primary-900);
-    --color-button-ghost-subtle-active-bg: var(--color-primary-800);
+    --color-button-ghost-subtle-hover-bg: var(--color-surface-accent-hover);
+    --color-button-ghost-subtle-active-bg: var(--color-surface-accent-active);
 
     /* destructive */
     --color-button-destructive-focus-ring: var(--color-error-300);
 
-    /* ButtonGroup ΓÇö divider inherits from border-default override above */
-
     /* Dropdown */
-    --color-dropdown-item-hover-bg: var(--color-primary-900);
-    --color-dropdown-item-active-bg: var(--color-primary-800);
+    --color-dropdown-item-hover-bg: var(--color-surface-accent-hover);
+    --color-dropdown-item-active-bg: var(--color-surface-accent-active);
     --color-dropdown-item-destructive-text: var(--color-error-400);
     --color-dropdown-item-destructive-hover-bg: var(--color-surface-overlay);
 
     /* Tooltip */
     --color-tooltip-bg: var(--d-overlay);
-    --color-tooltip-text: var(--d-text);
+    --color-tooltip-text: var(--color-text-heading);
     --color-tooltip-border: var(--d-border);
     --color-tooltip-arrow: var(--d-overlay);
 
@@ -176,14 +209,14 @@
     --color-toggle-item-active-text: var(--color-white);
 
     /* Tabs */
-    --color-tabs-active-bg: var(--color-primary-800);
+    --color-tabs-active-bg: var(--color-surface-accent-active);
     --color-tabs-active-text: var(--color-white);
     --color-tabs-hover-bg: var(--color-primary-900);
     --color-tabs-bar-border: var(--color-grey-700);
 
     /* Collapsible */
     --color-collapsible-trigger-hover-bg: var(--color-primary-900);
-    --color-collapsible-trigger-active-bg: var(--color-primary-800);
+    --color-collapsible-trigger-active-bg: var(--color-surface-accent-active);
 
     /* OFieldList / OFieldRow / OFieldLabel */
     --color-field-list-row-hover-bg:   var(--color-primary-900);
@@ -226,8 +259,8 @@
     --color-badge-error-soft-text: var(--color-error-400);
 
     /* info (blue): brighten for dark bg */
-    --color-badge-info-ol-border: var(--color-info-200);
-    --color-badge-info-ol-text:   var(--color-info-200);
+    --color-badge-info-ol-border: var(--color-blue-200);
+    --color-badge-info-ol-text:   var(--color-blue-200);
 
     /* purple: brighten for dark bg */
     --color-badge-purple-ol-border: var(--color-purple-400);
@@ -297,7 +330,7 @@
     --color-input-border: var(--color-border-default);
     --color-input-disabled-bg: var(--d-well);
     --color-input-disabled-text: var(--color-text-secondary);
-    --color-input-placeholder: var(--color-text-disabled);
+    --color-input-placeholder: var(--color-text-placeholder);
     --color-input-error-text: var(--color-error-400);
     --color-input-border-error: var(--color-error-400);
 
@@ -306,13 +339,13 @@
     --color-select-border: var(--color-border-default);
     --color-select-disabled-bg: var(--d-well);
     --color-select-disabled-text: var(--color-text-secondary);
-    --color-select-placeholder: var(--color-text-disabled);
+    --color-select-placeholder: var(--color-text-placeholder);
     --color-select-error-text: var(--color-error-400);
     --color-select-border-error: var(--color-error-400);
     --color-select-content-bg: var(--color-surface-overlay);
     --color-select-content-border: var(--color-border-default);
-    --color-select-item-hover-bg: var(--color-primary-900);
-    --color-select-item-selected-bg: var(--color-primary-800);
+    --color-select-item-hover-bg: var(--color-surface-accent-hover);
+    --color-select-item-selected-bg: var(--color-surface-accent-active);
     --color-select-item-selected-text: var(--color-primary-200);
     --color-select-item-disabled: var(--color-text-disabled);
 
@@ -377,20 +410,20 @@
     /* DatePicker calendar popup */
     --color-datepicker-popup-bg: var(--color-surface-overlay);
     --color-datepicker-popup-border: var(--color-border-default);
-    --color-datepicker-day-hover-bg: var(--color-primary-900);
+    --color-datepicker-day-hover-bg: var(--color-surface-accent-hover);
     --color-datepicker-day-selected-bg: var(--color-primary-500);
     --color-datepicker-day-today-border: var(--color-primary-400);
     --color-datepicker-day-outside-text: var(--color-text-disabled);
-    --color-datepicker-nav-hover-bg: var(--color-primary-900);
+    --color-datepicker-nav-hover-bg: var(--color-surface-accent-hover);
     --color-datepicker-day-range-bg: var(--color-primary-900);
     --color-datepicker-day-range-text: var(--color-primary-200);
     --color-datepicker-clock-face-bg: var(--color-surface-panel);
     --color-datepicker-clock-header-bg: var(--color-primary-800);
     --color-datepicker-clock-selected-bg: var(--color-primary-500);
-    --color-datepicker-clock-hover-bg: var(--color-primary-900);
+    --color-datepicker-clock-hover-bg: var(--color-surface-accent-hover);
     --color-datepicker-relative-btn-bg: var(--color-surface-panel);
     --color-datepicker-relative-btn-selected-bg: var(--color-primary-500);
-    --color-datepicker-relative-btn-hover-bg: var(--color-primary-900);
+    --color-datepicker-relative-btn-hover-bg: var(--color-surface-accent-hover);
 
     /* Color picker */
     --color-colorpicker-popup-bg: var(--color-surface-overlay);
@@ -404,12 +437,12 @@
     --color-dialog-bg: var(--color-surface-base);
     --color-dialog-border: var(--d-border);
     --color-dialog-header-bg: var(--color-surface-panel);
-    --color-dialog-header-text: var(--d-text);
+    --color-dialog-header-text: var(--color-text-heading);
     --color-dialog-header-border: var(--d-border);
-    --color-dialog-content-text: var(--d-text);
+    --color-dialog-content-text: var(--color-text-heading);
     --color-dialog-footer-bg: var(--color-surface-panel);
     --color-dialog-footer-border: var(--d-border);
-    --color-dialog-close-text: var(--d-text-3);
+    --color-dialog-close-text: var(--color-text-muted);
     --color-dialog-close-hover-bg: var(--d-divider);
     --color-dialog-close-active-bg: var(--d-border);
 
@@ -452,9 +485,9 @@
     /* Banner (OBanner) */
     --color-banner-default-bg:     var(--color-grey-800);
     --color-banner-default-text:   var(--color-grey-200);
-    --color-banner-info-bg:        color-mix(in srgb, var(--color-info-800) 20%, transparent);
-    --color-banner-info-border:    var(--color-info-700);
-    --color-banner-info-text:      var(--color-info-100);
+    --color-banner-info-bg:        color-mix(in srgb, var(--color-blue-800) 20%, transparent);
+    --color-banner-info-border:    var(--color-blue-700);
+    --color-banner-info-text:      var(--color-blue-100);
     --color-banner-success-bg:     color-mix(in srgb, var(--color-success-900) 20%, transparent);
     --color-banner-success-border: var(--color-success-700);
     --color-banner-success-text:   var(--color-success-100);
@@ -467,208 +500,74 @@
     --color-banner-error-soft-border: var(--color-error-700);
     --color-banner-error-soft-text:   var(--color-error-100);
 
-    /* Note Container */
-    --color-note-bg:               color-mix(in srgb, var(--color-warning-900) 15%, transparent);
-    --color-note-border:           var(--color-note-dark-border);
-    --color-note-text:             var(--color-note-dark-text);
-    --color-note-highlight:        var(--color-note-highlight-dark);
-    --color-note-emphasis:         var(--color-grey-300);
-    --color-note-code:             var(--color-note-code-dark);
+    /* usage-report severity banners (dark) */
+    --color-usage-banner-success-bg: linear-gradient(to right, transparent 60%, #24262F 70%, #2C3934 100%);
+    --color-usage-banner-error-border:   #dc2626;
+    --color-usage-banner-error-bg:       linear-gradient(to right, transparent 60%, #2d1f1f 70%, #3d2020 100%);
+    --color-usage-banner-warning-border: #a08530;
+    --color-usage-banner-warning-bg:     linear-gradient(to right, transparent 60%, #2d2a1f 70%, #3d3520 100%);
+
 }
 
-/* ── Legacy semantic tokens (_variables.scss dark mode) ── */
-.body--dark {
-  --o2-theme-mode: #112027;
-  --o2-primary-background: #2B2D30;
-  --o2-secondary-background: #F0F1F2;
-  --o2-muted-background: #CEDDD6;
-  --o2-text-heading:     #F0F1F2;
-  --o2-text-primary:     var(--o2-text-heading);
-  --o2-text-body:        #CEDDD6;
-  --o2-text-secondary:   #B4B8BF;
-  --o2-text-caption:     #9DA0A8;
-  --o2-text-label:       #868A91;
-  --o2-text-muted:       #6F737A;
-  --o2-text-placeholder: #6F737A;
-  --o2-text-link:        #525BAD;
-  --o2-text-link-hover:  #454D93;
-  --o2-text-code:        #B4B8BF;
-  --o2-text-inverse:     #2B2D30;
-  --o2-text-4: var(--o2-text-heading);
-  --o2-text-2: var(--o2-text-secondary);
-  --o2-text-1: var(--o2-text-caption);
-  --o2-text-3: var(--o2-text-label);
-  --o2-card-background: #2B2D30;
-  --o2-card-text: #D3D3D3;
-  --o2-popover-background: #F0F1F2;
-  --o2-popover-text: #D3D3D3;
-  --o2-code-bg: #2B2D30;
-  --o2-border: #868A91;
-  --o2-border-input: #B4B8BF;
-  --o2-primary-color: var(--color-primary-400);
-  --o2-primary-foreground: #1E1F22;
-  --o2-hover-accent: color-mix(in srgb, var(--o2-theme-color) 20%, rgb(39, 39, 39));
-  --color-interactive-hover-bg: color-mix(in srgb, var(--o2-theme-color) 20%, rgb(39, 39, 39));
-  --o2-destructive-foreground: #1E1F22;
-  --o2-focus-ring: #3A4180;
-  --o2-hover-shadow: rgba(0, 0, 0, 0.6);
-  --o2-hover-gray: color-mix(in srgb, var(--o2-theme-color) 8%, rgb(38, 38, 38));
-  --o2-bg-gray: color-mix(in srgb, var(--o2-theme-color) 5%, rgb(42, 42, 42));
-  --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
-  --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
-  --o2-scrollbar-thumb-bg: color-mix(in srgb, #3F7994 20%, white);
-  --o2-scrollbar-thumb-hover-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
-  --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
-  --o2-theme-color: #112027;
-  --o2-dark-theme-color: #3F7994;
-  --o2-body-primary-bg: rgba(14, 19, 29, 0.01);
-  --o2-body-secondary-bg: rgba(14, 19, 29, 0.4);
-  --o2-primary-btn-bg: var(--o2-dark-theme-color);
-  --o2-primary-btn-text: #FFFFFF;
-  --q-primary: var(--o2-theme-color);
-  --o2-toggle-track-bg: var(--o2-dark-theme-color);
-  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-dark-theme-color) 30%, rgb(100, 100, 100));
-  --o2-card-bg: var(--color-surface-base);
-  --o2-card-bg-solid: var(--color-surface-base);
-  --o2-header-menu-bg: color-mix(in srgb, #19191e 90%, white);
-  --o2-border-color: rgba(255, 255, 255, 0.40);
-  --o2-border-2: rgba(255, 255, 255, 0.12);
-  --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
-  --o2-menu-gradient-start: rgba(89, 155, 174, 0.3);
-  --o2-menu-gradient-end: rgba(48, 193, 233, 0.3);
-  --o2-menu-border-color: #3F7994;
-  --o2-menu-color: #FFFFFF;
-  --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 80%, white);
-  --o2-sticky-col-header-bg: #565656;
-  --o2-pivot-header-border: rgba(255, 255, 255, 0.12);
-  --o2-table-actions-bg: #1f2223;
-  /* Legacy log-table row tokens alias the OTable --color-table-row-* tokens
-     (see semantic.css), which are themselves dark-paired further down this
-     file — so no separate dark override is needed here. Kept as aliases for
-     any code that still references the light-mode names. */
-  --o2-log-table-row-bg: var(--color-surface-base);
-  --o2-log-table-row-alt-bg: var(--color-table-row-striped-bg);
-  --o2-log-table-row-hover: var(--color-table-row-hover-bg);
-  --o2-log-table-row-border: var(--color-table-row-divider);
-  --o2-log-table-header-bg: var(--color-table-header-bg);
-  --o2-tab-bg: color-mix(in srgb, white 20%, var(--o2-theme-color));
-  --o2-tab-text-color: #FFFFFF;
-  --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, #112027);
-  --o2-actions-column-shawdow: rgba(125, 125, 125, 0.694);
-  --q-primary: var(--o2-dark-theme-color);
-  --o2-json-key: #f67a7aff;
-  --o2-json-string: #6EE7B7;
-  --o2-json-number: #60A5FA;
-  --o2-json-boolean: #A5B4FC;
-  --o2-json-null: #9CA3AF;
-  --o2-json-object: #D1D5DB;
-  --o2-input-label-text-color: #BDBDBD;
-  --tw-border-style: #e5e7eb;
-  --o2-trace-surface: #2B2D30;
-  --o2-trace-border: #5A5D63;
-  --o2-trace-text-primary: #F0F1F2;
-  --o2-trace-text-secondary: #B4B8BF;
-  --o2-trace-hover: #393840;
-  --o2-trace-selected: #D4E2FF;
-  --o2-latency-p95: #5586f7;
-  --o2-latency-p99: #ef8e43;
-  --o2-error-tag-bg: #681a1a;
-  --o2-error-tag-text: #f9cbcb;
-  --o2-status-success-text: #A0DBA5;
-  --o2-status-success-bg: #253627;
-  --o2-status-info-text: #A1AFFF;
-  --o2-status-info-bg: #181829;
-  --o2-status-warning-text: #E37774;
-  --o2-status-warning-bg: #402929;
-  --o2-status-error-text: #EB938D;
-  --o2-status-error-bg: #402929;
-  /* New --color-status-* tokens — same dark values as the --o2-status-* set
-     above, so both systems render identically in dark mode. */
-  --color-status-success-text: #A0DBA5;
-  --color-status-success-bg: #253627;
-  --color-status-info-text: #A1AFFF;
-  --color-status-info-bg: #181829;
-  --color-status-warning-text: #E37774;
-  --color-status-warning-bg: #402929;
+/* ── Theme-driven runtime tokens, dark mode (utils/theme.ts) ──
+   See semantic.css for the light-mode defaults + rationale. */
+:root.dark,
+.dark :root,
+.dark {
+  --color-theme-accent: #112027;
+  --color-theme-table-header-bg: color-mix(in srgb, var(--color-theme-accent) 80%, white);
+  --color-theme-tab-bg: color-mix(in srgb, white 20%, var(--color-theme-accent));
+  --color-theme-tab-bg-inactive: color-mix(in srgb, var(--color-theme-accent) 10%, #112027);
+  --color-theme-menu-color: #FFFFFF;
+  --color-theme-menu-gradient-start: rgba(89, 155, 174, 0.3);
+  --color-theme-menu-gradient-end: rgba(48, 193, 233, 0.3);
+  --color-theme-body-bg-primary: rgba(14, 19, 29, 0.01);
+  --color-theme-body-bg-secondary: rgba(14, 19, 29, 0.4);
+  --color-theme-header-menu-bg: color-mix(in srgb, #19191e 90%, white);
+
+  /* Shared hover + surface accent formula */
+  --color-interactive-hover-bg: color-mix(in srgb, var(--color-theme-accent) 20%, rgb(39, 39, 39));
+
+  /* Status/semantic colors driven by utils/theme.ts */
+  --color-status-negative: #E37774;
+  --color-status-positive: #89CC8E;
   --color-status-error-text: #EB938D;
   --color-status-error-bg: #402929;
+  --color-status-success-text: #A0DBA5;
+  --color-status-success-bg: #253627;
   /* Favorite (filled heart) — lighter rose (rose-400) so it reads clearly on
      dark surfaces without vibrating the way a saturated rose-500 would. */
   --color-favorite: #FB7185;
-  /* Log-severity colors — aligned with STATUS_COLORS_DARK in statusParser.ts */
-  --o2-severity-error-color: #D95C5C;
-  --o2-severity-warning-color: #D4944A;
-  --o2-status-neutral-text: #9DA0A8;
-  --o2-status-neutral-bg: #2B2D30;
-  --o2-span-kind-client-text: #A1AFFF;
-  --o2-span-kind-client-bg: #181829;
-  --o2-span-kind-server-text: #A0DBA5;
-  --o2-span-kind-server-bg: #253627;
-  --o2-span-kind-producer-text: #C4A0F3;
-  --o2-span-kind-producer-bg: #2F2936;
-  --o2-span-kind-consumer-text: #60C0B5;
-  --o2-span-kind-consumer-bg: #1D3838;
-  --o2-span-kind-internal-text: #9DA0A8;
-  --o2-span-kind-internal-bg: #2B2D30;
-  --o2-positive: #89CC8E;
-  --o2-negative: #E37774;
-  --o2-warning: #F2C55C;
-  --o2-info: #588CF3;
-  --o2-gray: #868A91;
-  --o2-service-health-healthy: #52c41a;
-  --o2-service-health-degraded: #faad14;
-  --o2-service-health-warning: #fa8c16;
-  --o2-service-health-critical: #f5222d;
-  --o2-section-header-bg: #28292a;
-  --o2-tag-grey-1: #565b60;
-  --o2-tag-grey-2: #313234;
-  --o2-wildcard-header-blue-bg: #F5F8FE;
-  --o2-wildcard-header-blue-text: #588CF3;
-  --o2-wildcard-header-green-bg: #253627;
-  --o2-wildcard-header-green-text: #89CC8E;
-  --o2-wildcard-header-orange-bg: #402929;
-  --o2-wildcard-header-orange-text: #E37774;
-  --o2-wildcard-header-purple-bg: #2F2936;
-  --o2-wildcard-header-purple-text: #A571E6;
-  --o2-wildcard-header-grey-bg: #2B2D30;
-  --o2-wildcard-header-grey-text: #B4B8BF;
-  --o2-wildcard-bar-blue: #88ADF7;
-  --o2-wildcard-bar-green: #5FAD65;
-  --o2-wildcard-bar-orange: #DB5C5C;
-  --o2-wildcard-bar-purple: #955AE0;
-  --o2-wildcard-bar-grey: #6F737A;
-  --o2-label-chip-ip-bg:       #253627;
-  --o2-label-chip-ip-text:     #89CC8E;
-  --o2-label-chip-ipv4-bg:     #253627;
-  --o2-label-chip-ipv4-text:   #89CC8E;
-  --o2-label-chip-ipv6-bg:     #253627;
-  --o2-label-chip-ipv6-text:   #89CC8E;
-  --o2-label-chip-method-bg:   #5E3838;
-  --o2-label-chip-method-text: #F2B1AA;
-  --o2-label-chip-url-bg:      #22264A;
-  --o2-label-chip-url-text:    #A1AFFF;
-  --o2-label-chip-num-bg:      #402929;
-  --o2-label-chip-num-text:    #E37774;
-  --o2-label-chip-float-bg:    #402929;
-  --o2-label-chip-float-text:  #E37774;
-  --o2-label-chip-hex-bg:      #3D3223;
-  --o2-label-chip-hex-text:    #F7DE8B;
-  --o2-label-chip-ts-bg:       #2F2936;
-  --o2-label-chip-ts-text:     #A571E6;
-  --o2-label-chip-date-bg:     #2F2936;
-  --o2-label-chip-date-text:   #A571E6;
-  --o2-label-chip-time-bg:     #2F2936;
-  --o2-label-chip-time-text:   #A571E6;
-  --o2-label-chip-id-bg:       #1D3838;
-  --o2-label-chip-id-text:     #9BDDD6;
-  --o2-label-chip-email-bg:    #402929;
-  --o2-label-chip-email-text:  #EB938D;
-  --o2-label-chip-str-bg:      #393840;
-  --o2-label-chip-str-text:    #B4B8BF;
-  --o2-label-chip-default-bg:  #393840;
-  --o2-label-chip-default-text: #B4B8BF;
-  --o2-label-chip-pattern-bg:  #393840;
-  --o2-label-chip-pattern-text: #88ADF7;
+}
+
+/* ── Domain data-viz: label chips, dark mode ── */
+:root.dark,
+.dark :root,
+.dark {
+  --color-label-chip-ip-bg:      #253627;
+  --color-label-chip-ip-text:    #89CC8E;
+  --color-label-chip-method-bg:  #5E3838;
+  --color-label-chip-method-text: #F2B1AA;
+  --color-label-chip-url-bg:     #22264A;
+  --color-label-chip-url-text:   #A1AFFF;
+  --color-label-chip-num-bg:     #402929;
+  --color-label-chip-num-text:   #E37774;
+  --color-label-chip-float-bg:   #402929;
+  --color-label-chip-float-text: #E37774;
+  --color-label-chip-hex-bg:     #3D3223;
+  --color-label-chip-hex-text:   #F7DE8B;
+  --color-label-chip-ts-bg:      #2F2936;
+  --color-label-chip-ts-text:    #A571E6;
+  --color-label-chip-id-bg:      #1D3838;
+  --color-label-chip-id-text:    #9BDDD6;
+  --color-label-chip-email-bg:   #402929;
+  --color-label-chip-email-text: #EB938D;
+  --color-label-chip-str-bg:     #393840;
+  --color-label-chip-str-text:   #B4B8BF;
+  --color-label-chip-default-bg: #393840;
+  --color-label-chip-default-text: #B4B8BF;
+  --color-label-chip-pattern-bg: #393840;
+  --color-label-chip-pattern-text: #88ADF7;
 }
 
 /* ToggleGroup — primary variant dark overrides */
@@ -676,7 +575,7 @@
     --color-toggle-track-bg: var(--color-primary-900);
     --color-toggle-border: var(--color-primary-700);
     --color-toggle-item-hover-bg: var(--color-primary-950);
-    --color-toggle-item-active-bg: var(--color-primary-800);
+    --color-toggle-item-active-bg: var(--color-surface-accent-active);
     --color-toggle-item-active-text: var(--color-primary-200);
 }
 
@@ -703,7 +602,7 @@
     --color-toast-action-text:    var(--color-primary-400);
     --color-toast-action-hover:   var(--color-primary-300);
 
-    /* ── OTable (dark) — pulled onto the elevation ladder ─── */
+    /* OTable (dark) */
     --color-table-header-bg: var(--d-overlay);          /* header band lifts off rows */
     --color-table-row-hover-bg: var(--d-hover);        /* neutral hover (not teal-washed) */
     --color-table-row-selected-bg: var(--d-selected);  /* teal-tinted selection */
@@ -713,4 +612,99 @@
     --color-table-sort-icon-active: var(--color-primary-400);
     --color-table-streaming-bar: var(--color-primary-400);
     --color-table-row-expanded-bg: var(--d-overlay);
+}
+/* Domain data-viz & color tokens (dark) */
+:root.dark,
+.dark :root,
+.dark {
+  --color-actions-column-shadow: rgba(125, 125, 125, 0.694);
+  --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 5%, rgb(42, 42, 42));
+  /* Form field label — dark steps. #c4c4c4 has no palette equivalent. */
+  --color-input-label-text: var(--color-grey-200);
+  --color-input-label-text-disabled: #c4c4c4;
+  /* Global scrollbar treatment — dark steps. */
+  --color-scrollbar-thumb:       var(--color-grey-700);
+  --color-scrollbar-thumb-hover: var(--color-grey-600);
+  /* Lighter teal step so the VRL section bar stays visible on dark surfaces.
+     (--color-promo-* is deliberately NOT overridden — promo art is theme-independent.) */
+  --color-section-accent-secondary: var(--color-teal-400);
+  --color-card-glass-border: rgba(255, 255, 255, 0.40);
+  --color-card-glass-bg: var(--color-surface-base);
+  --color-card-glass-solid: var(--color-surface-base);
+  --color-error-tag-bg: #681a1a;
+  --color-error-tag-text: #f9cbcb;
+  --color-focus-ring: #3A4180;
+  --color-gray: #868A91;
+  --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 8%, rgb(38, 38, 38));
+  --color-hover-shadow: rgba(0, 0, 0, 0.6);
+  --color-info: #588CF3;
+  --color-json-boolean: #A5B4FC;
+  --color-json-key: #f67a7aff;
+  --color-json-null: #9CA3AF;
+  --color-json-number: #60A5FA;
+  --color-json-object: #D1D5DB;
+  --color-json-string: #6EE7B7;
+  --color-latency-p95: #5586f7;
+  --color-log-table-header-bg: var(--color-table-header-bg);
+  --color-log-table-row-bg: #21242c;
+  --color-log-table-row-border: rgba(255, 255, 255, 0.14);
+  --color-log-table-row-hover: #3a4a78;
+  --color-pivot-header-border: rgba(255, 255, 255, 0.12);
+  --color-section-header-bg: #28292a;
+  --color-severity-error-color: #D95C5C;
+  --color-severity-warning-color: #D4944A;
+  --color-status-info-bg: #181829;
+  --color-status-info-text: #A1AFFF;
+  --color-status-neutral-text: #9DA0A8;
+  /* Warning must stay visually distinct from error on dark surfaces;
+     uses the app's dark warning amber (same formula as banner-warning-bg). */
+  --color-status-warning-bg: color-mix(in srgb, var(--color-warning-900) 20%, transparent);
+  --color-status-warning-text: var(--color-warning);
+  --color-sticky-col-header-bg: #565656;
+  --color-tab-text-color: #FFFFFF;
+  --color-trace-border: #5A5D63;
+  --color-trace-hover: #393840;
+  --color-trace-selected: #D4E2FF;
+  --color-trace-surface: #2B2D30;
+  --color-trace-text-primary: #F0F1F2;
+  --color-trace-text-secondary: #B4B8BF;
+  --color-warning: #F2C55C;
+  --color-wildcard-bar-blue: #7BA0F5;
+  --color-wildcard-bar-green: #5FAD65;
+  --color-wildcard-bar-orange: #DB5C5C;
+  --color-wildcard-bar-purple: #955AE0;
+
+  /* Field-type chips — dark treatment mirrors the label-chip families by
+     hue (darken pastel bg toward surface, lighten text 1–2 steps). */
+  --color-field-type-boolean-bg: #5E3838;   /* red family (cf. method chip) */
+  --color-field-type-boolean-text: #F2B1AA;
+  --color-field-type-float-bg: #2F2936;      /* purple family (cf. ts chip) */
+  --color-field-type-float-text: #A571E6;
+  --color-field-type-number-bg: #3D3223;     /* amber family (cf. hex chip) */
+  --color-field-type-number-text: #F7DE8B;
+  --color-field-type-string-bg: #253627;     /* green family (cf. ip chip) */
+  --color-field-type-string-text: #89CC8E;
+  --color-field-type-timestamp-bg: #22264A;  /* blue family (cf. url chip) */
+  --color-field-type-timestamp-text: #A1AFFF;
+
+  /* Service-health — lightened ~1 step for dark-surface contrast. */
+  --color-service-health-critical: #FF5A5A;
+  --color-service-health-degraded: #FFC53D;
+  --color-service-health-healthy: #73D13D;
+  --color-service-health-warning: #FFA940;
+
+  /* Soft-tinted icon chips — dark accent tint (mirrors the badge-soft
+     treatment) so a chip reads as a faint coloured square, not a bright
+     light block on the dark canvas. */
+  --color-icon-chip-primary-bg:   color-mix(in srgb, var(--color-primary-400) 15%, transparent);
+  --color-icon-chip-primary-text: var(--color-primary-300);
+  --color-icon-chip-success-bg:   color-mix(in srgb, var(--color-success-500) 15%, transparent);
+  --color-icon-chip-success-text: var(--color-success-400);
+  --color-icon-chip-warning-bg:   color-mix(in srgb, var(--color-warning-400) 15%, transparent);
+  --color-icon-chip-warning-text: var(--color-warning-400);
+
+  /* Misc dark overrides. */
+  --color-cancel-query-bg: #7A3838;
+  --color-highlight-bg: #747474;
+  --color-icon-color: #5e5e5e;
 }

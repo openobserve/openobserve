@@ -212,9 +212,8 @@ export class IamPage {
 
     async clickCopyToken() {
 
-        // ODialog renders via reka-ui's DialogPortal, not a
-        // #q-portal--dialog--N container, so scope by the token dialog's
-        // own data-test attribute instead.
+        // ODialog renders via reka-ui's DialogPortal, so scope by the token
+        // dialog's own data-test attribute instead.
         await this.tokenCopyButton.click();
 
     }

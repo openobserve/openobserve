@@ -16,15 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col h-full p-0">
-    <div class="flex flex-col h-full">
-      <!-- Standard section header: title only. Search moved into the table toolbar. -->
-      <AppPageHeader
-        :title="t('settings.organizationManagement')"
-        icon="lan"
-        :subtitle="t('settings.organizationManagementPage.subtitle')"
-        class="shrink-0 px-4 border-b border-border-default"
-      />
-      <div class="card-container flex-1 min-h-0 mt-2.5 overflow-hidden">
+    <OPageLayout
+      :title="t('settings.organizationManagement')"
+      icon="lan"
+      :subtitle="t('settings.organizationManagementPage.subtitle')"
+      bleed
+    >
+      <div class="bg-card-glass-bg flex-1 min-h-0 mt-2.5 overflow-hidden">
       <OTable
         :frame="false"
         data-test="org-management-list-table"
@@ -37,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        show-index
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="org-management-list"
@@ -129,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-xs-circle"
               icon-left="cloud-done"
               disabled
-              class="text-green-500"
+              class="text-status-positive"
               data-test="org-management-storage-enabled-btn"
             >
               <OTooltip :content="t('settings.organizationManagementPage.storageEnabled')" />
@@ -138,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </OPageLayout>
 
     <!-- Extend Trial Dialog -->
     <ODialog
@@ -167,10 +166,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="page"
               @click="extendedTrial = page"
               :class="[
-                'cursor-pointer px-2 py-1 border border-gray-300',
+                'cursor-pointer px-2 py-1 border border-border-default',
                 extendedTrial === page
-                  ? 'bg-(--o2-primary-btn-bg) text-(--o2-primary-btn-text) border-(--o2-primary-btn-bg)'
-                  : 'bg-white text-gray-700 border-gray-300',
+                  ? 'bg-button-primary text-button-primary-foreground border-button-primary'
+                  : 'bg-surface-base text-text-body border-border-default',
               ]"
             >
               {{ page }}
@@ -214,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
-          class="text-xs text-gray-500"
+          class="text-xs text-text-secondary"
         >
           {{ t('settings.organizationManagementPage.currentEndDate', { date: formatMicrosToDate(contractDataRow.contract_end_date) }) }}
         </div>
@@ -248,7 +247,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import orgStorageService from "@/services/org_storage";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import {
@@ -262,7 +261,7 @@ import {
 export default defineComponent({
   name: "PageAlerts",
   components: {
-    AppPageHeader,
+    OPageLayout,
     OEmptyState,
     OButton,
     ODialog,
@@ -328,13 +327,6 @@ export default defineComponent({
     });
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: 50,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("settings.org_name"),
@@ -450,7 +442,6 @@ export default defineComponent({
           const responseData = response.data.data;
           for (let i = 0; i < responseData.length; i++) {
             data.push({
-              "#": i + 1,
               id: responseData[i].id,
               name: responseData[i].name,
               identifier: responseData[i].identifier,

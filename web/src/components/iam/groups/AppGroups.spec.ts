@@ -132,7 +132,7 @@ describe("AppGroups Component", () => {
   describe("Component Mounting", () => {
     it("renders the component correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       expect(wrapper.find(".app-page-header").exists()).toBe(true);
     });
 
@@ -163,11 +163,13 @@ describe("AppGroups Component", () => {
     });
 
     it("has correct table columns structure", () => {
+      // The row-index ("#") column is now the built-in OTable `show-index`
+      // gutter, not a member of `columns`, so only the real data columns remain.
       expect(wrapper.vm.columns).toBeDefined();
-      expect(wrapper.vm.columns).toHaveLength(3);
-      
+      expect(wrapper.vm.columns).toHaveLength(2);
+
       const columnNames = wrapper.vm.columns.map((col: any) => col.id);
-      expect(columnNames).toContain("#");
+      expect(columnNames).not.toContain("#");
       expect(columnNames).toContain("group_name");
       expect(columnNames).toContain("actions");
     });
@@ -187,19 +189,8 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.rows[2].group_name).toBe("users");
     });
 
-    it("formats row numbers correctly", async () => {
-      const { getGroups } = await import("@/services/iam");
-      vi.mocked(getGroups).mockResolvedValue(
-        createMockAxiosResponse(["group1", "group2", "group3"]) as any
-      );
-
-      await wrapper.vm.setupGroups();
-      await flushPromises();
-
-      expect(wrapper.vm.rows[0]["#"]).toBe("01");
-      expect(wrapper.vm.rows[1]["#"]).toBe("02");
-      expect(wrapper.vm.rows[2]["#"]).toBe("03");
-    });
+    // Row numbering moved to OTable's built-in `show-index` (zero-padded,
+    // covered by OTable's own spec); pages no longer inject a "#" data field.
   });
 
   describe("Search Functionality", () => {

@@ -18,18 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="alert-list-page" class="h-full">
-    <PageLayout
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
+    <OPageLayout bleed
+      :title="t('logStream.header')"
+      title-data-test="log-stream-title-text"
+      :subtitle="t('logStream.subtitle')"
+      icon="window"
     >
-      <!-- Row 1: standard header — title + actions only. The stream-type filter
-           and search moved into the table's own toolbar below. -->
-      <template #header>
-        <AppPageHeader
-          :title="t('logStream.header')"
-          title-data-test="log-stream-title-text"
-          :subtitle="t('logStream.subtitle')"
-          icon="window"
-        >
           <template #actions>
             <OButton
               v-if="isSchemaUDSEnabled"
@@ -41,10 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t(`logStream.add`) }}
             </OButton>
           </template>
-        </AppPageHeader>
-      </template>
 
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
       <OTable
         data-test="log-stream-table"
         :data="logStream"
@@ -68,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="streams-log-stream-list"
-        style="width: 100%; height: 100%"
+        class="w-full h-full"
       >
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
@@ -134,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             `dashboard-name-cell-<name>` pattern in Dashboards.vue.
           -->
           <template #cell-name="{ row }">
-            <span :data-test="`log-stream-name-cell-${row.name}`" class="text-text-primary">{{ row.name }}</span>
+            <span :data-test="`log-stream-name-cell-${row.name}`" class="text-text-body">{{ row.name }}</span>
           </template>
           <template #cell-actions="{ row }">
              <div class="flex items-center actions-container">
@@ -219,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center justify-between w-full py-2"
             >
               <div
-                class="flex items-center w-full o2-table-footer-title"
+                class="flex items-center w-full text-xs font-normal"
               >
                 {{ scope.totalRows }} Stream(s)
                 <OButton
@@ -238,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </div>
-    </PageLayout>
+    </OPageLayout>
 
     <SchemaIndex v-if="showIndexSchemaDialog" v-model="schemaData" v-model:open="showIndexSchemaDialog" @close="showIndexSchemaDialog = false" />
 
@@ -262,12 +254,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-3 py-1">
         <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
         <div
-          class="w-full flex items-center gap-2 text-sm text-gray-500"
+          class="w-full flex items-center gap-2 text-sm text-text-secondary"
         >
           <OCheckbox
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="text-(--o2-text-secondary) text-xs font-medium">
+          <span class="text-text-secondary text-xs font-medium">
             {{ t("logStream.deleteAssociatedAlertsPipelines") }}
           </span>
         </div>
@@ -287,12 +279,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex flex-col gap-3 py-1">
         <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
         <div
-          class="w-full flex items-center gap-2 text-sm text-gray-500"
+          class="w-full flex items-center gap-2 text-sm text-text-secondary"
         >
           <OCheckbox
             v-model="deleteAssociatedAlertsPipelines"
           />
-          <span class="text-(--o2-text-secondary) text-xs font-medium">
+          <span class="text-text-secondary text-xs font-medium">
             Delete all Pipelines and Alerts associated with the selected streams
           </span>
         </div>
@@ -318,8 +310,7 @@ import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import streamService from "../services/stream";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -351,8 +342,7 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "PageLogStream",
   components: {
-    PageLayout,
-    AppPageHeader,
+    OPageLayout,
     SchemaIndex,
     OEmptyState,
     EmptyStateIngestionChip,

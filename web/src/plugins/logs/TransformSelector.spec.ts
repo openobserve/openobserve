@@ -24,7 +24,7 @@ import TransformSelector from "./TransformSelector.vue";
 // interpolation). Resolve that migrated namespace from the real en.json messages so
 // those assertions pass, while continuing to echo keys everywhere else.
 vi.mock("vue-i18n", async () => {
-  const enLocale = (await import("@/locales/languages/en.json")).default as Record<
+  const enLocale = (await import("@/locales/languages/en-US.json")).default as Record<
     string,
     any
   >;

@@ -11,7 +11,7 @@ import DashboardJsonEditor from "./DashboardJsonEditor.vue";
 // key-passthrough behavior every other test relies on (e.g. the ODrawer
 // title/label assertions that check the raw keys).
 vi.mock("vue-i18n", async () => {
-  const enLocale = (await import("@/locales/languages/en.json"))
+  const enLocale = (await import("@/locales/languages/en-US.json"))
     .default as Record<string, any>;
   const resolve = (key: string): unknown =>
     key
