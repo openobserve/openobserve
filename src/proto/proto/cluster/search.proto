@@ -60,7 +60,8 @@ message SearchPartitionRequest {
     string               org_id = 2;
     string          stream_type = 3;
     bytes               request = 5;
-    bool   skip_max_query_range = 6; 
+    bool   skip_max_query_range = 6;
+    int64      max_query_range = 7;
 }
 
 message SearchPartitionResponse {

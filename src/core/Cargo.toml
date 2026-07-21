@@ -12,6 +12,7 @@ path = "src/lib.rs"
 default = []
 enterprise = [
     "db/enterprise",
+    "audit/enterprise",
     "dep:aws-config",
     "dep:aws-credential-types",
     "dep:o2_dex",
@@ -22,6 +23,7 @@ enterprise = [
     "promql/enterprise",
     "search/enterprise",
     "search_service/enterprise",
+    "usage_reporting/enterprise",
 ]
 cloud = [
     "db/cloud",
@@ -46,11 +48,13 @@ vortex = [
 
 [dependencies]
 db.workspace = true
+audit.workspace = true
 common.workspace = true
 transform.workspace = true
 promql.workspace = true
 search.workspace = true
 search_service.workspace = true
+usage_reporting.workspace = true
 axum.workspace = true
 http.workspace = true
 http-body-util.workspace = true

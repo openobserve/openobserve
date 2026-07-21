@@ -19,7 +19,9 @@ use config::{cache_instance_id, ider};
 use crate::service::db::metas;
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    crate::search_hooks::init();
+    usage_reporting::set_batch_publisher(crate::self_reporting::persistence::publish_batch);
+    #[cfg(feature = "enterprise")]
+    audit::set_audit_publisher(crate::self_reporting::publish_audit);
     let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {

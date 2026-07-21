@@ -170,6 +170,7 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
         &partition_req,
         Some(RoleGroup::Interactive),
         true,
+        0,
     )
     .await?;
 

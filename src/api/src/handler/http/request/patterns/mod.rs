@@ -192,6 +192,13 @@ pub async fn extract_patterns(
 
         // Spawn the search task with pattern extraction enabled
         let trace_id_clone = trace_id.clone();
+        let max_query_range = crate::service::stream_utils::get_max_query_range(
+            &stream_names,
+            &org_id,
+            &user_id,
+            config::meta::stream::StreamType::Logs,
+        )
+        .await;
         tokio::spawn(async move {
             streaming::process_search_stream_request(
                 org_id,
@@ -200,6 +207,7 @@ pub async fn extract_patterns(
                 req,
                 config::meta::stream::StreamType::Logs,
                 stream_names, // Use resolved stream names from SQL
+                max_query_range,
                 config::meta::sql::OrderBy::default(),
                 tracing::Span::current(),
                 tx,

@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::cmp::max;
-
 use chrono::Utc;
 use config::{
     get_config,
@@ -22,7 +20,7 @@ use config::{
 };
 use infra::{cache::stats, errors::Error, file_list::FileId, schema::unwrap_stream_settings};
 
-use crate::{hooks::get_settings_max_query_range, partition::sql_context::PartitionSqlContext};
+use crate::partition::sql_context::PartitionSqlContext;
 
 /// Result of collecting stream file information across all streams in a query.
 pub struct StreamFiles {
@@ -38,7 +36,7 @@ pub struct StreamFiles {
 /// or using approximate partitioning).
 pub async fn collect_stream_files(
     trace_id: &str,
-    user_id: Option<&str>,
+    max_query_range_in_hour: i64,
     ctx: &PartitionSqlContext,
 ) -> Result<StreamFiles, Error> {
     let start = std::time::Instant::now();
@@ -52,8 +50,7 @@ pub async fn collect_stream_files(
     let query_duration_secs = (time_range.1 - time_range.0) / 1000 / 1000;
 
     let mut files = Vec::with_capacity(schemas.len() * 10);
-    let mut max_query_range = 0;
-    let mut max_query_range_in_hour = 0;
+    let max_query_range = max_query_range_in_hour * 3600 * 1_000_000;
 
     for (stream, schema) in schemas.iter() {
         let stream_type = stream.get_stream_type(stream_type);
@@ -75,11 +72,6 @@ pub async fn collect_stream_files(
                 time_range,
             )
             .await?;
-            let settings_max_query_range =
-                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
-                    .await;
-            max_query_range = max(max_query_range, settings_max_query_range * 3600 * 1_000_000);
-            max_query_range_in_hour = max(max_query_range_in_hour, settings_max_query_range);
             files.extend(stream_files);
         } else {
             let data_retention = if stream_settings.data_retention > 0 {

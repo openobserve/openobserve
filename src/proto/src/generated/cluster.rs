@@ -1013,6 +1013,8 @@ pub struct SearchPartitionRequest {
     pub request: ::prost::alloc::vec::Vec<u8>,
     #[prost(bool, tag = "6")]
     pub skip_max_query_range: bool,
+    #[prost(int64, tag = "7")]
+    pub max_query_range: i64,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SearchPartitionResponse {

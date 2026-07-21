@@ -251,6 +251,8 @@ members = [
     "src/cipher",
     "src/db",
     "src/search_service",
+    "src/usage_reporting",
+    "src/audit",
     "src/promql",
     "src/jobs",
     "src/mcp",
@@ -289,6 +291,8 @@ search = { path = "src/search" }
 openobserve-cipher = { path = "src/cipher" }
 db = { path = "src/db" }
 search_service = { path = "src/search_service" }
+usage_reporting = { path = "src/usage_reporting" }
+audit = { path = "src/audit" }
 promql = { path = "src/promql" }
 openobserve-api = { path = "src/api" }
 openobserve-api-management = { path = "src/api_management" }

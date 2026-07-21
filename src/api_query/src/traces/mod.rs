@@ -1332,7 +1332,13 @@ async fn process_latest_traces_stream(
     let partitions = match SearchService::search_partition(
         &trace_id,
         &org_id,
-        Some(user_id.as_str()),
+        crate::common::utils::stream::get_max_query_range(
+            std::slice::from_ref(&stream_name),
+            &org_id,
+            &user_id,
+            stream_type,
+        )
+        .await,
         stream_type,
         &partition_req,
         false,

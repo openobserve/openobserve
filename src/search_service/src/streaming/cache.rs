@@ -29,11 +29,11 @@ use log;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tokio::sync::mpsc;
+use usage_reporting::report_request_usage_stats;
 
 use super::sorting::order_search_results;
 use crate::{
     cache,
-    hooks::report_request_usage_stats,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
 };
 
@@ -230,6 +230,7 @@ pub async fn handle_cache_responses_and_deltas(
                     accumulated_results,
                     &mut curr_res_size,
                     user_id,
+                    max_query_range,
                     &mut remaining_query_range,
                     cached_search_duration,
                     cache_order_by,
@@ -279,6 +280,7 @@ pub async fn handle_cache_responses_and_deltas(
                 accumulated_results,
                 &mut curr_res_size,
                 user_id,
+                max_query_range,
                 &mut remaining_query_range,
                 cached_search_duration,
                 cache_order_by,

@@ -52,11 +52,11 @@ use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
 use transform::{get_all_transform_keys, init_vrl_runtime};
+use usage_reporting::{http_report_metrics, report_request_usage_stats};
 
 use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
-    hooks::{http_report_metrics, report_request_usage_stats},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     sql::RE_SELECT_FROM,
 };

@@ -1,0 +1,16 @@
+[package]
+name = "usage_reporting"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+enterprise = ["config/enterprise"]
+
+[dependencies]
+chrono.workspace = true
+config.workspace = true
+log.workspace = true
+tokio.workspace = true

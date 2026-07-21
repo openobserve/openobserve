@@ -40,6 +40,7 @@ use sql::Sql;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use transform::{get_all_transform_keys, init_vrl_runtime};
+use usage_reporting::report_request_usage_stats;
 #[cfg(feature = "enterprise")]
 use {
     crate::partition::aggregate::prepare_streaming_aggregate,
@@ -53,7 +54,6 @@ use {
     tracing::info_span,
 };
 
-use self::hooks::report_request_usage_stats;
 use crate::{
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     partition::{
@@ -71,7 +71,6 @@ pub mod file_list_dump;
 pub mod grpc;
 pub mod grpc_search;
 pub mod grpc_server;
-pub mod hooks;
 pub mod partition;
 mod searcher;
 pub mod streaming;
@@ -595,7 +594,7 @@ pub async fn search_multi(
 pub async fn search_partition(
     trace_id: &str,
     org_id: &str,
-    user_id: Option<&str>,
+    max_query_range: i64,
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
@@ -607,7 +606,7 @@ pub async fn search_partition(
 
     let ctx = PartitionSqlContext::new(req, org_id, stream_type).await?;
 
-    let stream_files = collect_stream_files(trace_id, user_id, &ctx).await?;
+    let stream_files = collect_stream_files(trace_id, max_query_range, &ctx).await?;
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
@@ -998,18 +997,18 @@ pub fn server_internal_error(error: impl ToString) -> Error {
 pub async fn search_partition_multi(
     trace_id: &str,
     org_id: &str,
-    user_id: &str,
+    max_query_ranges: &[i64],
     stream_type: StreamType,
     req: &search::MultiSearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut res = search::SearchPartitionResponse::default();
     let mut total_rec = 0;
     let mut is_histogram_eligible = true;
-    for query in &req.sql {
+    for (index, query) in req.sql.iter().enumerate() {
         match search_partition(
             trace_id,
             org_id,
-            Some(user_id),
+            max_query_ranges.get(index).copied().unwrap_or_default(),
             stream_type,
             &search::SearchPartitionRequest {
                 start_time: req.start_time,

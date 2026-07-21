@@ -1582,10 +1582,22 @@ pub async fn search_partition(
         }
     }
 
+    let stream_names = match resolve_stream_names(&req.sql) {
+        Ok(stream_names) => stream_names,
+        Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
+    };
+    let max_query_range = crate::common::utils::stream::get_max_query_range(
+        &stream_names,
+        &org_id,
+        user_id,
+        stream_type,
+    )
+    .await;
+
     let search_res = SearchService::search_partition(
         &trace_id,
         &org_id,
-        Some(user_id),
+        max_query_range,
         stream_type,
         &req,
         false,

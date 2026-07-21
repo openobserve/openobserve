@@ -186,6 +186,7 @@ pub async fn grpc_search_partition(
     in_req: &search::SearchPartitionRequest,
     role_group: Option<RoleGroup>,
     skip_max_query_range: bool,
+    max_query_range: i64,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut nodes = cluster::get_cached_online_querier_nodes(role_group)
         .await
@@ -221,6 +222,7 @@ pub async fn grpc_search_partition(
                 stream_type: stream_type.to_string(),
                 request: req,
                 skip_max_query_range,
+                max_query_range,
             });
             let node = Arc::new(node) as _;
             let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
