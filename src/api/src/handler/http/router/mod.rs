@@ -158,7 +158,7 @@ pub(crate) fn is_origin_allowed(request_origin: &[u8], web_url: &str) -> bool {
 
 /// If `resp` is a 401 for an MCP endpoint, attach the RFC 9728 `WWW-Authenticate`
 /// header so MCP clients start the OAuth flow. No-op for every other route/status.
-fn maybe_add_mcp_www_authenticate(uri: &Uri, mut resp: Response) -> Response {
+fn maybe_add_mcp_www_authenticate(uri: &Uri, resp: Response) -> Response {
     if resp.status() != StatusCode::UNAUTHORIZED {
         return resp;
     }
@@ -187,10 +187,14 @@ fn maybe_add_mcp_www_authenticate(uri: &Uri, mut resp: Response) -> Response {
             path // e.g. "/api/default/mcp"
         );
         let value = format!(r#"Bearer resource_metadata="{resource_meta}""#);
+        let mut resp = resp;
         if let Ok(hv) = header::HeaderValue::from_str(&value) {
             resp.headers_mut().insert(header::WWW_AUTHENTICATE, hv);
         }
+        return resp;
     }
+
+    #[cfg(not(feature = "enterprise"))]
     resp
 }
 
