@@ -6,7 +6,6 @@ import { mapWireSteps } from '@/utils/synthetics/mapRecordedStep'
 import type {
   BrowserStep,
   RecorderCommand,
-  RecorderCommandEnvelope,
   RecorderMode,
   RecorderPortInbound,
   RecorderStartResponse,
@@ -19,19 +18,19 @@ import type {
 } from '@/types/synthetics'
 import { substituteVariables } from '@/utils/synthetics/mapRecordedStep'
 
-const RECORDING_PORT_NAME = 'synthetics-recorder'
-
 /**
  * Encapsulates all communication with the OpenObserve Extension (playwright-crx)
- * over Chrome's externally_connectable messaging. Components never touch
- * `chrome.*` directly — they drive recording through this composable's state and
- * methods. See ../playwright-crx/.docs/synthetics-recorder.md → "Web-side integration".
+ * via the content-script bridge (window.postMessage). Works on any origin —
+ * cloud, self-hosted, localhost. No externally_connectable or chrome.runtime.* needed.
+ * Components never touch the transport directly — they drive recording through this
+ * composable's state and methods. See ../playwright-crx/.docs/synthetics-recorder-prd.md.
  */
 const useSyntheticsRecorder = () => {
-  // Extension public key/id to match the extension
-  const extensionId = "hliehalmlioilejmkoaidkdmplalamki";
+  // Bridge transport — replaces chrome.runtime.* with window.postMessage.
+  // Works on any origin: cloud, self-hosted, localhost. No externally_connectable needed.
+  // The content script (content.js) on the OO page acts as a relay: postMessage ↔ internal Port ↔ SW.
 
-  const isSupported = ref(typeof chrome !== 'undefined' && !!chrome.runtime)
+  const isSupported = ref(typeof window !== 'undefined')
   const isInstalled = ref(false)
   const isRecording = ref(false)
   const liveSteps = ref<BrowserStep[]>([])
@@ -44,63 +43,114 @@ const useSyntheticsRecorder = () => {
   const stepResults = reactive<Map<string, StepReplayResult>>(new Map())
   const activeStepId = ref<string | null>(null)
 
-  let port: ChromePort | null = null
   // Synchronous callback invoked when recording stops externally (user closes the extension
   // window without clicking "Stop"). BrowserJourney sets this to commit the steps immediately,
   // avoiding the timing race inherent in watching a reactive ref across async boundaries.
   let onExternalStop: ((steps: BrowserStep[]) => void) | null = null
 
-  function getRuntime(): ChromeRuntime | null {
-    if (typeof chrome === 'undefined' || !chrome.runtime) return null
-    return chrome.runtime
+  // ---- Bridge transport ----
+
+  const BRIDGE_CHANNEL = 'oo-bridge';
+  const COMMAND_TIMEOUT_MS = 5000;
+
+  let nonceCounter = 0;
+  function nextNonce(): string {
+    return `${Date.now()}_${nonceCounter++}_${Math.random().toString(36).slice(2, 8)}`;
   }
 
-  /** Promisified one-shot command send. Resolves `null` when the extension is unreachable. */
-  function sendCommand<T>(command: RecorderCommand): Promise<T | null> {
-    const runtime = getRuntime()
-    if (!runtime) {
-      error.value = 'Chrome extension messaging is not available in this browser.'
-      return Promise.resolve(null)
+  // Pending one-shot command responses (nonce → resolve)
+  const pendingCommands = new Map<string, (response: any) => void>();
+
+  // Streaming data handlers (registered by bridgeConnect)
+  let bridgeDataHandler: ((msg: any) => void) | null = null;
+  let bridgeDisconnectHandler: (() => void) | null = null;
+
+  // Global message listener — processes all bridge messages from the content script.
+  window.addEventListener('message', (event: MessageEvent) => {
+    console.log("MEssage", event);
+    if (event.source !== window) return;
+    if (event.data?.ch !== BRIDGE_CHANNEL) return;
+    if (event.data?.dir !== 'to-page') return;
+
+    const { nonce, msg } = event.data;
+
+    // Bridge disconnection notification
+    if (msg?.type === 'bridge-disconnected') {
+      bridgeDisconnectHandler?.();
+      return;
     }
-    const envelope: RecorderCommandEnvelope = { type: 'synthetics-command', command }
-    return new Promise((resolve) => {
-      runtime.sendMessage(extensionId, envelope, (response) => {
-        if (runtime.lastError) {
-          resolve(null)
-          return
-        }
-        resolve((response as T) ?? null)
-      })
-    })
+
+    // Resolve pending command promise by nonce
+    if (nonce && pendingCommands.has(nonce)) {
+      const resolve = pendingCommands.get(nonce)!;
+      pendingCommands.delete(nonce);
+      resolve(msg?.response ?? msg);
+      return;
+    }
+
+    // Also resolve if msg is a synthetics-response with its own nonce
+    if (msg?.type === 'synthetics-response' && msg.nonce && pendingCommands.has(msg.nonce)) {
+      const resolve = pendingCommands.get(msg.nonce)!;
+      pendingCommands.delete(msg.nonce);
+      resolve(msg.response);
+      return;
+    }
+
+    // Streaming data push (synthetics-recorder type) → data handler
+    bridgeDataHandler?.(msg);
+  });
+
+  /** One-shot command via postMessage. Resolves `null` when the extension is unreachable. */
+  function sendCommand<T>(command: RecorderCommand): Promise<T | null> {
+    const nonce = nextNonce();
+
+    const timeout = new Promise<null>(resolve =>
+      setTimeout(() => {
+        pendingCommands.delete(nonce);
+        resolve(null);
+      }, COMMAND_TIMEOUT_MS),
+    );
+
+    const promise = new Promise<T | null>(resolve => {
+      pendingCommands.set(nonce, resolve);
+    });
+
+    window.postMessage(
+      { ch: BRIDGE_CHANNEL, dir: 'to-ext', nonce, msg: { type: 'synthetics-command', command } },
+      '*',
+    );
+
+    return Promise.race([promise, timeout]);
   }
 
   /**
    * Ping the extension to learn whether it is reachable. The extension's
-   * getStatus reply has no `installed` flag — any non-null response (no
-   * `chrome.runtime.lastError`) means it is installed and connectable.
+   * getStatus reply has no `installed` flag — any non-null response means
+   * it is installed and connectable.
    */
   async function detectExtension(): Promise<boolean> {
+    // Wake the content script's bridge. The content script defaults to
+    // overlay mode on all pages — this probe tells it to open a bridge
+    // port to the service worker so we can send commands.
+    window.postMessage({ ch: 'oo-bridge-probe' }, '*');
+    // Give the content script time to open the port before sending the
+    // first command. 150ms is generous for a local postMessage round-trip
+    // and chrome.runtime.connect call.
+    await new Promise(r => setTimeout(r, 200));
+
     const status = await sendCommand<RecorderStatus>({ action: 'getStatus' })
     isInstalled.value = status !== null
     if (status?.isRecording) isRecording.value = true
     return isInstalled.value
   }
 
-  function teardownPort() {
-    if (port) {
-      console.log("terdown---");
-      port.onMessage.removeListener(handlePortMessage)
-      port.disconnect()
-      port = null
-    }
-  }
-
   // The extension pushes `{ type:'synthetics-recorder', recordingId, payload }`
   // data events (discriminated by `payload.method`) and `synthetics-response`
-  // command acks over the port. We consume the data events; acks are ignored
-  // since commands use the one-shot sendMessage request/response path.
-  function handlePortMessage(message: unknown) {
+  // command acks over the bridge. We consume the data events; acks are resolved
+  // by sendCommand's nonce-based promise.
+  function handleBridgeData(message: unknown) {
     const msg = message as RecorderPortInbound;
+    console.log("MEssage ---", message);
     if (msg.type !== 'synthetics-recorder') return
     const { payload } = msg
     switch (payload.method) {
@@ -140,37 +190,18 @@ const useSyntheticsRecorder = () => {
     }
   }
 
-  // Open the long-lived port the extension streams events over. Guarded because
-  // a stale extension context (e.g. extension reloaded after the page loaded)
-  // makes `connect`/`onMessage` throw "Extension context invalidated".
-  function connectPort(): boolean {
-    const runtime = getRuntime()
-    if (!runtime) {
-      error.value = 'Chrome extension messaging is not available in this browser.'
-      return false
-    }
-    try {
-      port = runtime.connect(extensionId, { name: RECORDING_PORT_NAME })
-      port.onMessage.addListener(handlePortMessage)
-      port.onDisconnect.addListener(() => {
-        port = null
-        // If recording is still active (no recordingStopped received yet), commit via callback.
-        // This covers the case where the port drops without a recordingStopped message
-        // (e.g. the extension tab crashes or the window is closed).
-        if (onExternalStop && isRecording.value) {
-          onExternalStop([...liveSteps.value])
-        }
-        isRecording.value = false
-      })
-      return true
-    } catch (err) {
-      port = null
-      error.value =
-        err instanceof Error && /context invalidated/i.test(err.message)
-          ? 'The recorder extension was reloaded — please refresh this page and try again.'
-          : 'Could not connect to the recorder extension.'
-      return false
-    }
+  // "Connection" via bridge — registers handlers for streaming data and disconnect.
+  function bridgeConnect(): boolean {
+    bridgeDataHandler = handleBridgeData;
+    return true;
+  }
+
+  function bridgeDisconnect(): void {
+    bridgeDataHandler = null;
+    bridgeDisconnectHandler = null;
+    // Reject all pending commands
+    pendingCommands.forEach(resolve => resolve(null));
+    pendingCommands.clear();
   }
 
   /**
@@ -185,12 +216,20 @@ const useSyntheticsRecorder = () => {
     currentUrl.value = targetUrl
     mode.value = 'recording'
 
-    if (!connectPort()) return
+    bridgeConnect()
+    bridgeDisconnectHandler = () => {
+      if (onExternalStop && isRecording.value) {
+        onExternalStop([...liveSteps.value])
+      }
+      isRecording.value = false
+    }
 
+    console.log("Start Recording -----");
     const res = await sendCommand<RecorderStartResponse>({ action: 'startRecording', targetUrl })
     if (!res?.success) {
+      console.debug("Disconnect ---", res);
       error.value = res?.error || 'Failed to start recording.'
-      teardownPort()
+      bridgeDisconnect()
       return
     }
     isRecording.value = true
@@ -208,8 +247,9 @@ const useSyntheticsRecorder = () => {
     onExternalStop = null
     await sendCommand<RecorderStopResponse>({ action: 'stopRecording' })
     const steps = [...liveSteps.value]
-    isRecording.value = false // set before teardown so onDisconnect's guard sees isRecording=false
-    teardownPort()
+    isRecording.value = false // set before disconnect so onDisconnect's guard sees isRecording=false
+    console.log("Disconnect ---");
+    bridgeDisconnect()
     liveSteps.value = []
     onExternalStop = savedOnExternalStop
     return steps
@@ -222,7 +262,8 @@ const useSyntheticsRecorder = () => {
     const steps = [...liveSteps.value]
     sendCommand({ action: 'stopRecording' }) // fire-and-forget
     isRecording.value = false
-    teardownPort()
+    console.log("Disconnect ---");
+    bridgeDisconnect()
     liveSteps.value = []
     return steps
   }
@@ -236,7 +277,8 @@ const useSyntheticsRecorder = () => {
   function cancelRecording() {
     // Null the callback so onDisconnect doesn't commit discarded steps.
     onExternalStop = null
-    teardownPort()
+    console.log("Disconnect ---");
+    bridgeDisconnect()
     liveSteps.value = []
     isRecording.value = false
   }
@@ -271,13 +313,12 @@ const useSyntheticsRecorder = () => {
       ? steps.map(s => substituteVariables(s, vars))
       : steps
 
-    // Ensure port is open so stepReplayResult events flow through handlePortMessage.
-    teardownPort() // discard any previous port (recording)
-    if (!connectPort()) {
-      error.value = 'Could not connect to the recorder extension.'
-      replayPhase.value = 'idle'
-      isReplaying.value = false
-      return null
+    // Ensure bridge is connected so stepReplayResult events flow through handleBridgeData.
+    console.log("Disconnect ---");
+    bridgeDisconnect() // discard any previous session
+    bridgeConnect()
+    bridgeDisconnectHandler = () => {
+      isRecording.value = false
     }
 
     const res = await sendCommand<ReplayResponse>({ action: 'replay', steps: resolvedSteps, targetUrl, auth, headers, cookies })
@@ -311,7 +352,8 @@ const useSyntheticsRecorder = () => {
 
   /** Release the port; call from the host component's onUnmounted. */
   function cleanup() {
-    teardownPort()
+    console.log("Disconnect ---");
+    bridgeDisconnect()
   }
 
   return {

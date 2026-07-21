@@ -159,6 +159,14 @@ export type RecorderPortInbound =
   | RecorderPortMessage
   | { type: 'synthetics-response'; response: unknown }
 
+// ---- Bridge transport types (content-script relay, replaces chrome.runtime.*) ----
+
+export type TrustResponse =
+  | { type: 'trust-required'; origin: string; nonce: string }
+  | { type: 'trust-granted'; origin: string; nonce: string }
+  | { type: 'trust-denied'; origin: string; nonce: string }
+  | { type: 'bridge-disconnected' }
+
 /**
  * Check types creatable from the UI. Only types both the control plane and the
  * probes run end-to-end today — dns/ping/api exist server-side but have no
