@@ -15,21 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OPageLayout
     data-test="add-enrichment-table-page"
-    class="flex flex-col px-2.5 h-[calc(100vh-var(--navbar-height)-0.875rem)]"
+    class="h-[calc(100vh-var(--navbar-height)-0.875rem)]"
+    :title="isUpdating ? t('function.updateEnrichmentTable') : t('function.addEnrichmentTable')"
+    title-data-test="add-enrichment-table-title"
+    :back="{
+      label: t('function.enrichmentTables'),
+      onClick: () => $emit('cancel:hideform'),
+      dataTest: 'add-enrichment-table-back-btn',
+    }"
   >
-    <!-- Standard app header: back tile + title (Save/Cancel stay in the footer). -->
-    <AppPageHeader
-      :title="isUpdating ? t('function.updateEnrichmentTable') : t('function.addEnrichmentTable')"
-      title-data-test="add-enrichment-table-title"
-      :back="{
-        label: t('function.enrichmentTables'),
-        onClick: () => $emit('cancel:hideform'),
-        dataTest: 'add-enrichment-table-back-btn',
-      }"
-      class="-mx-2.5 px-4 border-b border-border-default mb-2 shrink-0"
-    />
 
     <!-- Inline page form. Save lives in the footer INSIDE the <OForm>, so it is a
          native type="submit" (Enter submits) — no form-id needed. -->
@@ -40,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form content -->
-      <div class="card-container flex-1 min-h-0 mb-2 flex flex-col overflow-y-auto p-4">
+      <div class="bg-card-glass-bg flex-1 min-h-0 mb-2 flex flex-col overflow-y-auto p-4">
         <div class="flex flex-col gap-4 max-w-[40rem]">
             <OFormInput
               name="name"
@@ -53,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Data Source Selection (only for new tables) -->
             <div v-if="!isUpdating" class="flex flex-col gap-2">
-              <div class="text-gray-500 font-bold">{{ t('function.dataSource') }}</div>
+              <div class="text-text-label font-bold">{{ t('function.dataSource') }}</div>
               <OFormOptionGroup
                 name="source"
                 data-test="add-enrichment-table-source"
@@ -81,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
             <div v-if="isUpdating && formData.source === 'url'" class="flex flex-col gap-2">
-              <div class="text-gray-500 font-bold">Update Mode</div>
+              <div class="text-text-label font-bold">Update Mode</div>
               <OFormOptionGroup
                 name="updateMode"
                 data-test="add-enrichment-table-update-mode"
@@ -95,25 +91,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isUpdating && formData.source === 'url' && formData.urlJobs && formData.urlJobs.length > 0"
               class="flex flex-col gap-2"
             >
-              <div class="text-gray-500 font-bold text-[0.8125rem]">
+              <div class="text-text-label font-bold text-compact">
                 Existing URLs ({{ formData.urlJobs.length }})
               </div>
-              <div class="rounded-md border border-[var(--o2-border-color)] bg-gray-50 p-2 flex flex-col gap-1">
+              <div class="rounded-default border border-card-glass-border bg-surface-panel p-2 flex flex-col gap-1">
                 <div v-for="(job, index) in formData.urlJobs" :key="job.id">
                   <div class="flex items-center gap-2">
-                    <span class="font-medium text-gray-400 text-xs">{{ Number(index) + 1 }}.</span>
+                    <span class="font-medium text-text-secondary text-xs">{{ Number(index) + 1 }}.</span>
                     <OIcon
                       :name="job.status === 'completed' ? 'check-circle' : job.status === 'failed' ? 'warning' : job.status === 'processing' ? 'sync' : 'schedule'"
                       size="sm"
                       :class="[
-                        job.status === 'processing' ? '[animation:rotate_2s_linear_infinite]' : '',
-                        job.status === 'completed' ? 'text-[var(--o2-positive)]' :
-                        job.status === 'failed' ? 'text-[var(--o2-negative)]' :
-                        job.status === 'processing' ? 'text-[var(--o2-primary)]' :
-                        'text-gray-500'
+                        job.status === 'processing' ? 'animate-[spin_2s_linear_infinite]' : '',
+                        job.status === 'completed' ? 'text-status-positive' :
+                        job.status === 'failed' ? 'text-status-negative' :
+                        job.status === 'processing' ? 'text-accent' :
+                        'text-icon-color'
                       ]"
                     />
-                    <div class="text-gray-500 text-[0.8125rem] break-all">
+                    <div class="text-text-secondary text-compact break-all">
                       {{ job.url }}
                     </div>
                   </div>
@@ -125,12 +121,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Mode explanation (always show for URL-based tables in edit mode) -->
             <div
               v-if="isUpdating && formData.source === 'url'"
-              class="text-sm text-gray-600 p-3 rounded-lg"
+              class="text-sm text-text-secondary p-3 rounded-default"
               :class="{
-                'bg-blue-50': formData.updateMode === 'reload',
-                'bg-green-50': formData.updateMode === 'append',
-                'bg-yellow-50': formData.updateMode === 'replace_failed',
-                'bg-orange-50': formData.updateMode === 'replace'
+                'bg-status-info-bg': formData.updateMode === 'reload',
+                'bg-status-success-bg': formData.updateMode === 'append',
+                'bg-status-warning-bg': formData.updateMode === 'replace_failed',
+                'bg-status-error-bg': formData.updateMode === 'replace'
               }"
             >
               <template v-if="formData.updateMode === 'reload'">
@@ -138,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template v-else-if="formData.updateMode === 'append'">
                 <strong>Append Mode:</strong> Add a new URL to existing ones. Data from all URLs will be combined.
-                <div class="mt-2 text-orange-700">
+                <div class="mt-2 text-status-warning-text">
                   <strong>Important:</strong> The new CSV file must have the same columns as the existing data. The enrichment table schema cannot be changed.
                 </div>
               </template>
@@ -174,14 +170,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <pre
               v-if="compilationErr"
-              class="font-bold text-sm text-red-600 whitespace-pre-wrap"
+              class="font-bold text-sm text-status-error-text whitespace-pre-wrap"
             >{{ compilationErr }}</pre>
           </div>
       </div>
 
       <!-- Footer -->
       <div
-        class="card-container flex items-center justify-end -mx-2.5 px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
+        class="bg-card-glass-bg flex items-center justify-end -mx-2.5 px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
       >
         <OButton
           data-test="add-enrichment-table-cancel-btn"
@@ -203,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </OForm>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -224,7 +220,7 @@ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import {
   makeAddEnrichmentTableSchema,
   type AddEnrichmentTableForm,
@@ -244,7 +240,7 @@ export const defaultValue: any = () => {
 export default defineComponent({
   name: "AddEnrichmentTable",
   components: { OSeparator, OButton, OForm, OFormInput, OFormFile, OFormOptionGroup, OFormSwitch,
-    OIcon, AppPageHeader,
+    OIcon, OPageLayout,
 },
   props: {
     modelValue: {
@@ -496,13 +492,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-</style>

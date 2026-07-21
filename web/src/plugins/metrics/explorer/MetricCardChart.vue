@@ -78,10 +78,7 @@ export default defineComponent({
   },
   /**
    * `zoom` carries ECharts' `{start, end}` (epoch ms) from a drag-select on the
-   * chart. The converter already builds the dataZoom toolbox for any time-series
-   * panel and ChartRenderer already arms the drag cursor — the gesture was live
-   * on cards all along, it just had no listener, so a drag zoomed and then
-   * silently restored. Forwarding it is the whole fix.
+   * chart.
    *
    * Not emitted for the heatmap: its x-axis is categorical (one column per
    * bucket), so the converter withholds the toolbox there anyway.
@@ -103,9 +100,8 @@ export default defineComponent({
      *
      * The shared formatter applies no magnitude scaling to `numbers`/`custom`
      * units, so a rate of 0.004 c/s renders as a column of identical "0.00"
-     * ticks at the default 2 decimals. Scaling the precision to the series is a
-     * card-local presentation fix; giving those units real magnitude scaling
-     * (m/µ prefixes) is the proper fix and belongs in convertDataIntoUnitValue.
+     * ticks at the default 2 decimals. Scaling the precision to the series keeps
+     * the axis readable.
      */
     const adaptiveDecimals = () => {
       let max = 0;
@@ -169,18 +165,11 @@ export default defineComponent({
      *
      * `convertPromQLData` sets `xAxis.min`/`max` only while a panel is streaming;
      * a settled chart is left to ECharts, which scales the axis to the data it was
-     * given. On a dashboard that is close enough, because a panel-sized query
-     * comes back with points spread across the whole range. A card is not: a
-     * sparsely-scraped metric can come back with a handful of points, or ONE — and
-     * ECharts, asked to lay out a time axis around a single timestamp, invents a
-     * span of its own, which it rounds out to about two days. So a card whose
-     * picker said "Past 3 Hours" drew an axis two days wide, and the chart
-     * disagreed with the control that produced it.
-     *
-     * The window is the truth here and we already know it, so we state it rather
-     * than letting the axis be inferred from however much data happened to come
-     * back. Charts also stay comparable across the grid — every card spans the
-     * same window, so a spike at the same x is the same moment.
+     * given. A card with very few points (a sparsely-scraped metric can return
+     * ONE) makes ECharts invent a span of its own — widened out to about two days
+     * — so the axis disagrees with the picker. State the known window instead.
+     * This also keeps every card spanning the same window, so a spike at the same
+     * x is the same moment.
      *
      * Not applied to the heatmap: its x-axis is categorical (one column per
      * bucket), so a time min/max means nothing there.
@@ -248,9 +237,8 @@ export default defineComponent({
 
           if (props.chartType === "heatmap") {
             // Keep the colour bar — without it the cells are just colours with
-            // no scale, which is most of what made these charts unreadable. It
-            // was overlapping the plot only because it defaulted to a full-size
-            // legend; sized down and pinned under the axis, it fits.
+            // no scale. Sized down and pinned under the axis so it doesn't
+            // overlap the plot.
             if (options.visualMap) {
               options.visualMap = {
                 ...options.visualMap,
@@ -272,8 +260,7 @@ export default defineComponent({
             // Thin the bucket labels to what a card can actually render, but
             // ALWAYS keep the top row. A histogram's `+Inf` bucket is the one
             // that says "and everything slower than this", and ECharts'
-            // `hideOverlap` was dropping it — labelling all 19 rows instead just
-            // produces an illegible smear.
+            // `hideOverlap` would otherwise drop it.
             if (options.yAxis) {
               const rowCount = options.yAxis.data?.length ?? 0;
               const step = Math.max(1, Math.ceil(rowCount / 8));
@@ -284,9 +271,7 @@ export default defineComponent({
                 overflow: "truncate",
                 hideOverlap: false,
                 // Count DOWN from the top row, so `+Inf` is always labelled and
-                // the spacing stays even. Anchoring at the bottom and then
-                // force-adding the last index made the top two labels adjacent
-                // (5px apart on a card) — they collided and `+Inf` lost.
+                // the spacing stays even.
                 interval: (index: number) =>
                   (rowCount - 1 - index) % step === 0,
               };
@@ -337,11 +322,7 @@ export default defineComponent({
       resizeObserver = null;
     });
 
-    // Everything `render` reads. `unitCustom` / `bucketUnit` / `bucketUnitCustom`
-    // and `queries` were missing, so a card that switched between two variants
-    // sharing a chart type and a canonical unit — the unit is `custom` in both,
-    // only `unit_custom` differs ("c/s" vs "s/s") — kept formatting its cells with
-    // the superseded unit until something else forced a redraw.
+    // Everything `render` reads.
     watch(
       () => [
         props.results,

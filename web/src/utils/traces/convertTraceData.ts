@@ -311,8 +311,8 @@ export const convertServiceGraphToTree = (
   // A row's visual height is the LARGER of its node symbol and its TWO-LINE label
   // (a bold name line + a smaller "N req" line). Both must fit inside the pitch
   // (with a breathing gap) or rows collide. The two-line label is the real
-  // driver here — budgeting a single line (as before) let the "req" line overlap
-  // the next node. So size everything against the pitch as a whole.
+  // driver here — budgeting only a single line lets the "req" line overlap the
+  // next node, so size everything against the pitch as a whole.
   const ROW_GAP = 6; // min clear space between adjacent rows
   const avail = Math.max(10, pitch - ROW_GAP);
   // Two-line label total height ≈ nameFont*1.35 + reqFont*1.35, with req ≈ 0.83×

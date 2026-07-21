@@ -41,21 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 1"
           :navigable="step > 1"
         >
-          <div class="text-sm font-medium mb-3" style="font-weight: 500">
-            Select Destination Type <span class="text-red">*</span>
+          <div class="text-sm font-medium mb-3">
+            Select Destination Type <span class="text-status-error-text">*</span>
           </div>
           <div class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 mb-4">
             <div
               v-for="destType in destinationTypes"
               :key="destType.value"
               :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card relative flex flex-col items-center justify-center py-[20px] px-3 border-2 rounded-xl cursor-pointer [transition:all_0.3s_ease] min-h-[120px] hover:-translate-y-0.5"
-              :class="[
-                { selected: destinationType === destType.value },
-                store.state.theme === 'dark'
-                  ? 'border-[#424242] bg-[#1e1e1e] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                  : 'border-[var(--o2-border)] bg-white hover:border-[var(--o2-border-color)] hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
-              ]"
+              class="destination-type-card group relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-default cursor-pointer [transition:all_0.3s_ease] min-h-30 hover:-translate-y-0.5 hover:border-card-glass-border hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
+              :class="destinationType === destType.value
+                ? 'selected border-card-glass-border bg-status-info-bg shadow-[0_0.25rem_1rem_color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)]'
+                : 'border-border-default bg-surface-base'"
               @click="form.setFieldValue('destination_type', destType.value)"
             >
               <img
@@ -68,12 +65,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 :name="destType.icon"
                 size="lg"
-                class="card-icon mb-2 text-[#666] [transition:color_0.3s_ease]"
+                class="card-icon mb-2 text-icon-color [transition:color_0.3s_ease] group-[.selected]:text-card-glass-border"
               />
-              <div class="card-label text-[13px] font-medium text-center leading-[1.3] mt-1 text-[var(--o2-text-primary)]">{{ destType.label }}</div>
+              <div class="card-label text-compact font-medium text-center leading-[1.3] mt-1 text-text-body group-[.selected]:text-text-body">{{ destType.label }}</div>
               <div
                 v-if="destinationType === destType.value"
-                class="absolute top-[0.375rem] right-[0.375rem] w-5 h-5 rounded-full overflow-hidden bg-[var(--o2-positive)] text-white flex items-center justify-center z-[1]"
+                class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full overflow-hidden bg-status-positive text-text-inverse flex items-center justify-center z-[1]"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                 <OIcon name="check" size="xs" />
@@ -90,14 +87,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 2"
           :navigable="step > 2"
         >
-          <div class="text-sm font-medium mb-4" style="font-weight: 500">
+          <div class="text-sm font-medium mb-4">
             Connection Details
           </div>
 
           <div class="flex flex-col gap-4">
             <!-- Name is the destination's identifier — it can't be changed once
-                 created, so lock it in edit mode (parity with the pre-migration
-                 AddDestination form, which rendered it readonly + disabled). -->
+                 created, so lock it in edit mode. -->
             <OFormInput
               data-test="add-destination-name-input"
               name="name"
@@ -206,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Destination-specific Metadata Section -->
           <div v-if="showMetadataFields" class="flex flex-col gap-4 mt-4">
-            <div class="w-full text-[14px] font-bold text-(--o2-input-label-text-color)">
+            <div class="w-full text-sm font-bold text-input-label">
               Metadata Configuration
             </div>
 
@@ -284,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="flex flex-col gap-1 mt-4">
-            <div class="o-input-label leading-tight flex items-center">
+            <div class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center">
               Headers
             </div>
             <div class="flex flex-col gap-2">
@@ -342,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Connection Notes Card -->
           <OCard
-            class="connection-notes-card rounded-lg border border-[#e3f2fd] mb-6 mt-4 bg-(--color-banner-info-bg)!"
+            class="connection-notes-card rounded-default border border-banner-info-border mb-6 mt-4 bg-banner-info-bg!"
           >
             <OCardSection role="body">
               <div class="flex items-center mb-2">
@@ -367,11 +363,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ol>
                 <div
                   v-if="connectionNotes.example"
-                  class="mt-2 p-2 rounded-md text-[13px]"
-                  :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-white'"
+                  class="mt-2 p-2 rounded-default text-compact bg-surface-base"
                 >
                   <strong>Example:</strong>
-                  <code class="ml-1 bg-transparent p-0 font-[Monaco,Menlo,'Ubuntu_Mono',monospace] text-[#1976d2]">{{ connectionNotes.example }}</code>
+                  <code class="ml-1 bg-transparent p-0 font-mono text-text-link">{{ connectionNotes.example }}</code>
                 </div>
               </div>
             </OCardSection>
@@ -469,7 +464,6 @@ const store = useStore();
 const { t } = useI18n();
 
 // Co-located Zod schema (factory keeps the required message i18n-driven).
-// Named after the form per the playbook house style.
 const destinationSchema = makeDestinationSchema(t);
 
 const isEditMode = computed(() => !!props.destination);
@@ -535,7 +529,7 @@ const step = ref(1);
 
 // A single Headers row. Matches the schema's `headerRowSchema` ({ key, value }).
 // No `uuid` — the dynamic array-field keys rows by index and add/remove operate
-// on the form's `headers` array by index (playbook §2).
+// on the form's `headers` array by index.
 type HeaderRow = { key: string; value: string };
 
 // Helper function to get default headers for each destination type
@@ -601,7 +595,7 @@ const endpointForType = (type: string): string => {
   }
 };
 
-// ── Rule ③ OWNER pattern: single source of truth = the TanStack form ──────────
+// ── OWNER pattern: single source of truth = the TanStack form ─────────────────
 // This component OWNS <OForm> and drives all conditional rendering (the
 // destination-type card grid, the per-type/per-output_format v-ifs) off the
 // form's own state. It creates the form here with useOForm, reads it reactively
@@ -668,20 +662,17 @@ const apiHeaders = form.useStore(
   (s: any) => (s.values.headers ?? []) as HeaderRow[],
 );
 
-// ── Preserved cross-field side effect: defaulting on a REAL destination_type
-//    change ──────────────────────────────────────────────────────────────────
-// What the old destination_type watch did (set method/output_format/esbulk_index
-// /url_endpoint + reset headers), now reading + writing the SAME form. Guard
+// ── Cross-field side effect: defaulting on a REAL destination_type change ──────
+// Sets method/output_format/esbulk_index/url_endpoint + resets headers. Guard
 // `prev !== undefined` so the initial seed does NOT clobber edit-prefill, and
-// skip in edit mode (the old watch did the same). `{ flush: "sync" }` matches the
-// old store-subscription timing so the cross-field resets land before any
-// subsequent same-tick write (both Stream and StreamSelection needed it).
+// skip in edit mode. `{ flush: "sync" }` so the cross-field resets land before
+// any subsequent same-tick write.
 watch(
   form.useStore((s: any) => s.values.destination_type),
   (newType, prev) => {
     if (prev === undefined || newType === prev) return;
-    // Skip while seeding an edit record (prefill) or in edit mode (the old watch
-    // also skipped edit mode) — the reset already carries the correct values.
+    // Skip while seeding an edit record (prefill) or in edit mode — the reset
+    // already carries the correct values.
     if (isPrefilling || isEditMode.value) return;
 
     if (newType !== "custom") {
@@ -736,9 +727,8 @@ watch(
   { flush: "sync" },
 );
 
-// Function to populate the form when editing an existing destination. Builds the
-// full edit record and seeds it onto the form via `form.reset(record)` — NOT a
-// per-field mirror loop (Rule ③).
+// Populate the form when editing an existing destination. Builds the full edit
+// record and seeds it onto the form via `form.reset(record)`.
 const populateFormForEdit = (destination: any) => {
   const record: DestinationForm = {
     name: destination.name || "",
@@ -1156,8 +1146,7 @@ const createDestination = (value?: DestinationForm) => {
     // `template` is an alert-destination-model field this pipeline form never
     // edits (there is no template input). Round-trip the existing value from the
     // edit record so editing a destination that carries a template does not wipe
-    // it — exact parity with the pre-migration payload (`destination.template ||
-    // ""`). In create mode `props.destination` is undefined → "".
+    // it. In create mode `props.destination` is undefined → "".
     template: props.destination?.template || "",
     headers: headers,
     name: name,
@@ -1258,7 +1247,7 @@ const resetForm = () => {
 
 // Expose functions for testing. `form` is the single source of truth — tests
 // read field values via `form.state.values` and set them via
-// `form.setFieldValue` (there is NO `formData` mirror anymore).
+// `form.setFieldValue`.
 defineExpose({
   getUUID,
   createDestination,
@@ -1287,33 +1276,3 @@ defineExpose({
   formUrl,
 });
 </script>
-
-<style>
-.destination-type-card.selected {
-  border-color: var(--o2-border-color);
-  background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
-  box-shadow: 0 4px 16px rgba(25, 118, 210, 0.2);
-}
-
-.destination-type-card.selected .card-icon {
-  color: var(--o2-border-color);
-}
-
-.destination-type-card.selected .card-label {
-  color: #333333;
-}
-
-.dark .destination-type-card.selected {
-  border-color: #5d9cec;
-  background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%);
-  box-shadow: 0 4px 16px rgba(93, 156, 236, 0.25);
-}
-
-.dark .destination-type-card.selected .card-icon {
-  color: #5d9cec;
-}
-
-.dark .destination-type-card.selected .card-label {
-  color: #ffffff;
-}
-</style>

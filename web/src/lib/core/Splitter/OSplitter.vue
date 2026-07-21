@@ -31,8 +31,8 @@
         'select-none',
         'relative',
         'z-10',
-        'focus:outline-2 focus:outline-(--o2-primary-color) focus:-outline-offset-2',
-        disable ? 'cursor-default! opacity-50' : '',
+        'focus:outline-2 focus:outline-accent focus:-outline-offset-2',
+        disable ? 'cursor-default! opacity-50 pointer-events-none' : '',
         horizontal ? 'h-px w-full cursor-row-resize' : 'h-full cursor-col-resize',
         separatorClass
       ]"
@@ -167,3 +167,28 @@ watch(() => props.modelValue, (newValue) => {
   currentValue.value = newValue
 }, { immediate: true })
 </script>
+
+<style scoped>
+/* keep(complex-state): `.field-list-separator` is a public modifier on
+   this component's separator element — it can ONLY arrive through the
+   `separatorClass` prop (plugins/logs/Index.vue and
+   dashboards/PanelEditor/PanelEditor.vue x2 pass it), so no consumer's scope can
+   reach the element and the hover affordance has to be declared here. The ::after
+   pseudo-element has no markup of its own to carry utilities. Migrated from
+   styles/utilities.css (W2.b). */
+.field-list-separator::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0.125rem;
+  background-color: transparent;
+  transition: background-color 0.3s;
+}
+
+.field-list-separator:hover::after {
+  background-color: var(--color-accent);
+}
+</style>

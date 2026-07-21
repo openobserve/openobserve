@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="replace-query-checkbox"
         />
         <div
-          class="text-xs mt-1 ml-7 text-gray-500 dark:text-gray-400"
+          class="text-xs mt-1 ml-7 text-text-secondary"
         >
           {{ t('dashboard.customChartConfirmDialog.exampleQueryInserted') }}
         </div>

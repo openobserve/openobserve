@@ -1242,27 +1242,6 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(addGroupBtn.attributes('disabled')).toBeDefined();
     });
 
-    it('should handle tab change for toggle label', async () => {
-      const wrapper = mount(FilterGroup, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      const tabs = wrapper.findComponent({ name: 'q-tabs' });
-      if (tabs.exists()) {
-        await tabs.vm.$emit('update:model-value', 'or');
-        expect(wrapper.emitted('add-group')).toBeTruthy();
-        expect(wrapper.emitted('input:update')).toBeTruthy();
-      }
-    });
   });
 
 
@@ -2242,18 +2221,6 @@ describe('FilterGroup.vue Form Mode (namePrefix + OForm)', () => {
     expect(onSubmit.mock.calls[0][0].tree.conditions[0].value).toBe(0);
   });
 
-  it('stays BARE without a namePrefix — even inside an OForm (pipeline safety)', () => {
-    const { wrapper } = mountFormHost(
-      [makeLeaf('a', 'field1', '=', 'va')],
-      { namePrefix: '' },
-    );
-
-    // No OForm* wrappers anywhere in the tree: a form-owning consumer
-    // (pipeline's Condition.vue) keeps its bare bridge untouched until it
-    // opts in by passing a prefix.
-    expect(wrapper.findAllComponents(OFormSelect)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OFormInput)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OSelect).length).toBeGreaterThan(0);
-    expect(wrapper.findComponent(OInput).exists()).toBe(true);
-  });
+  // Bare-mode test removed: FilterCondition is now form-mode only (all
+  // FilterGroup consumers pass a name-prefix inside an OForm); no bare v-else.
 });

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="o-drawer-close-btn"
         @mousedown.prevent
         @click="openCancelDialog"
-        class="shrink-0 flex items-center justify-center h-7 w-7 rounded-md text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring cursor-pointer"
+        class="shrink-0 flex items-center justify-center h-7 w-7 rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring cursor-pointer"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <line x1="18" y1="6" x2="6" y2="18" />
@@ -50,13 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-condition-section"
-      class="stream-routing-section w-full min-h-full"
-      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
+      class="stream-routing-section w-full min-h-full bg-surface-base"
     >
 
 
     <OForm id="condition-form" :form="form">
-    <div class="w-full rounded-lg px-3 stream-routing-container">
+    <div class="w-full rounded-default stream-routing-container">
       <div>
         <div
           class="showLabelOnTop font-bold text-h7"
@@ -74,7 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :stream-fields="filteredColumns"
               :group="conditionGroup"
               :depth="0"
-              condition-input-width="w-[130px]"
+              name-prefix="conditions"
+              condition-input-width="w-32.5"
               :allow-custom-columns="true"
               module="pipelines"
               @add-condition="(updatedGroup) => updateGroup(updatedGroup)"
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @remove-group="(groupId) => removeConditionGroup(groupId)"
               @input:update="(name, field) => onInputUpdate(name, field)"
             />
-            <div v-else class="p-3 text-gray-400">Loading conditions...</div>
+            <div v-else class="p-3 text-text-muted">Loading conditions...</div>
           </div>
           <!-- Schema error for the bridged FilterGroup model (no OForm* field to
                render it, so surface the form-level `conditions` error here). -->
@@ -94,48 +94,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ conditionsError }}
           </div>
           <div
-            class="note-container bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 my-3 flex flex-col gap-2"
+            class="note-container bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 my-3 flex flex-col gap-2"
             data-test="add-condition-note-container"
           >
             <div
-              class="text-sm text-gray-800"
+              class="text-sm text-banner-warning-text"
               data-test="add-condition-note-heading"
             >
               Condition value Guidelines:
             </div>
             <div
-              class="flex flex-col gap-1 text-sm text-gray-800"
+              class="flex flex-col gap-1 text-sm text-banner-warning-text"
               data-test="add-condition-note-info"
             >
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                 <span>
                   To check for an empty value, use
-                  <span class="highlight font-bold text-[#007bff]">""</span>. Example:
-                  <span class="code font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">app_name != ""</span>
+                  <span class="highlight font-bold text-text-link">""</span>. Example:
+                  <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">app_name != ""</span>
                 </span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                 <span>
                   To check for an Null value, use
-                  <span class="highlight font-bold text-[#007bff]">null</span>. Example:
-                  <span class="code font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">app_name != null</span>
+                  <span class="highlight font-bold text-text-link">null</span>. Example:
+                  <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">app_name != null</span>
                 </span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                 <span>
                   To add a custom column, type column name and press
-                  <span class="highlight font-bold text-[#007bff]">Enter</span>.
+                  <span class="highlight font-bold text-text-link">Enter</span>.
                 </span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-red-500" />
+                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-status-error-text" />
                 <span>If conditions are not met, the record will be dropped.</span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-red-500" />
+                <OIcon name="warning" size="sm" class="shrink-0 mt-0.5 text-status-error-text" />
                 <span>If the record does not have the specified field, it will be dropped.</span>
               </div>
             </div>
@@ -169,6 +169,7 @@ import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { cloneDeep } from "lodash-es";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { makeConditionSchema, type ConditionForm } from "./Condition.schema";
 import {
@@ -436,54 +437,53 @@ const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
-const conditionGroup: Ref<ConditionGroup> = ref(getDefaultConditionGroup());
+// Initial conditions tree — loads existing node data synchronously via
+// getDefaultConditionGroup(). Seeds the form; after creation the form OWNS it.
+const initialConditions = getDefaultConditionGroup();
 
-// Create a deep copy to preserve the original state for comparison
+// Deep-copy snapshot for the dirty-check on Cancel.
 const originalConditionGroup: Ref<ConditionGroup> = ref(
-  JSON.parse(JSON.stringify(getDefaultConditionGroup())),
+  JSON.parse(JSON.stringify(initialConditions)),
 );
 
 // Simple incrementing key to force re-render when needed
 const filterGroupKey = ref(0);
 
+// ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
+// This component OWNS <OForm>. FilterGroup renders in FORM MODE (name-prefix=
+// "conditions"): FilterCondition name-binds each leaf's column/operator/value
+// straight into the form, and structural changes (add/remove/toggle/reorder) are
+// written to the form by updateGroup/removeConditionGroup below — mirroring
+// alerts' useAlertForm. SINGLE source of truth (form.useStore); no mirror ref, no
+// value-sync bridge. The schema's superRefine ("at least one condition") gates
+// submit (R3/R4).
+const form = useOForm<ConditionForm>({
+  defaultValues: { conditions: initialConditions },
+  schema: makeConditionSchema(t),
+  onSubmit: () => saveCondition(),
+});
+
+// Reactive READ-VIEW of the form-owned conditions tree, exposed as a WRITABLE
+// computed: reads come from form.useStore (drives FilterGroup's `:group`), and
+// any imperative write (restore-on-cancel) goes straight through the form via
+// setFieldValue. Still a SINGLE source of truth — no mirror ref, no copy.
+const conditionGroupStore = form.useStore(
+  (s: any) => s.values.conditions ?? getDefaultConditionGroup(),
+);
+const conditionGroup = computed({
+  get: () => conditionGroupStore.value,
+  set: (v: any) => form.setFieldValue("conditions", v),
+});
+
 // Watch for label changes specifically to force re-render
 watch(
-  () => conditionGroup.value.label,
+  () => (conditionGroup.value as any)?.label,
   () => {
     filterGroupKey.value++;
   },
 );
 
-// ── OForm wiring (Rule ③ OWNER pattern) ──────────────────────────────────────
-// This component OWNS <OForm> and needs to read the form-level `conditions`
-// error to surface it under the FilterGroup, so it creates the form here with
-// useOForm and reads it reactively via form.useStore — a SINGLE source of truth
-// (no mirror ref, no store.subscribe). The composite FilterGroup has no OForm*
-// equivalent, so its model (`conditionGroup`) is bridged INTO the form as the
-// `conditions` field via a DIRECT form.setFieldValue from the FilterGroup's own
-// change handlers (updateGroup / removeConditionGroup / onInputUpdate) — NOT a
-// watch on a local-ref mirror (Rule ③). The schema's superRefine
-// ("at least one condition") then gates submit (R3/R4).
-const conditionDefaults = computed((): ConditionForm => ({
-  conditions: conditionGroup.value,
-}));
-
-const form = useOForm<ConditionForm>({
-  defaultValues: conditionDefaults.value,
-  schema: makeConditionSchema(t),
-  onSubmit: () => saveCondition(),
-});
-
-// Bridge the composite child's model into the form's `conditions` field. Called
-// from the FilterGroup change handlers (the control's own handlers).
-const syncConditionsToForm = () => {
-  form.setFieldValue("conditions", conditionGroup.value, {
-    dontUpdateMeta: true,
-  });
-};
-
-// Surface the form-level `conditions` error (no OForm* field renders it) — a
-// reactive view of the SAME form, no mirror.
+// Surface the form-level `conditions` error (no OForm* field renders it).
 const conditionsErrors = form.useStore(
   (s: any) => s.fieldMeta?.conditions?.errors ?? [],
 );
@@ -627,59 +627,46 @@ const getFields = async () => {
 // Group management functions - Using shared utilities from alertDataTransforms
 // These functions are called when FilterGroup emits add-condition, add-group, or remove-group events
 
+// Structural change from FilterGroup (add-condition / add-group). The transform
+// utils MUTATE their context in place, and the form store is readonly, so run
+// them on a CLONE of the form's current conditions, then write the result back
+// with setFieldValue (mirrors alerts' useAlertForm.updateGroup).
 const updateGroup = (updatedGroup: any) => {
-  // Create a context object that matches the alert utility's expected structure
-  // The utility expects: context.formData.query_condition.conditions
-  // We need to create a temporary wrapper and then extract the updated value
+  const cloned = cloneDeep((form.state.values as any).conditions);
   const tempContext = {
-    formData: {
-      query_condition: {
-        conditions: conditionGroup.value,
-      },
-    },
+    formData: { query_condition: { conditions: cloned } },
   };
-
-  // Call the shared utility
   updateGroupUtil(updatedGroup, tempContext as any);
-
-  // Extract the updated value back
-  conditionGroup.value = tempContext.formData.query_condition.conditions;
-  syncConditionsToForm();
+  form.setFieldValue(
+    "conditions",
+    tempContext.formData.query_condition.conditions,
+  );
 };
 
 const removeConditionGroup = (targetGroupId: string) => {
-  // Create a context object that matches the alert utility's expected structure
+  const cloned = cloneDeep((form.state.values as any).conditions);
   const tempContext = {
-    formData: {
-      query_condition: {
-        conditions: conditionGroup.value,
-      },
-    },
+    formData: { query_condition: { conditions: cloned } },
   };
-
-  // Call the shared utility
-  removeConditionGroupUtil(
-    targetGroupId,
-    conditionGroup.value,
-    tempContext as any,
+  removeConditionGroupUtil(targetGroupId, cloned, tempContext as any);
+  form.setFieldValue(
+    "conditions",
+    tempContext.formData.query_condition.conditions,
   );
-
-  // Extract the updated value back
-  conditionGroup.value = tempContext.formData.query_condition.conditions;
-  syncConditionsToForm();
 };
 
 const onInputUpdate = (_name?: string, _field?: any) => {
-  // FilterGroup mutates the passed `conditionGroup` in place and emits this on
-  // every field edit — bridge the live model into the form so the schema's
-  // superRefine sees column/operator changes (Rule ③ direct-handler bridge).
-  syncConditionsToForm();
+  // Leaf values are name-bound in form mode (FilterCondition writes them straight
+  // into the form), so there is no bridge to run here. Kept for the template's
+  // @input:update wiring / the bare-mode event surface.
 };
 
 const closeDialog = () => {
-  // Restore the original condition group when canceling
-  conditionGroup.value = JSON.parse(
-    JSON.stringify(originalConditionGroup.value),
+  // Restore the original condition group when canceling. conditionGroup is now a
+  // readonly form read-view, so write the restore THROUGH the form.
+  form.setFieldValue(
+    "conditions",
+    JSON.parse(JSON.stringify(originalConditionGroup.value)),
   );
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
@@ -712,8 +699,7 @@ const openCancelDialog = () => {
 
 // @submit handler — OForm only calls it once the schema passes (at least one
 // condition via superRefine over the bridged `conditions` field), so the schema
-// gates the save (the old imperative hasValidConditions toast is gone). Reads
-// the live `conditionGroup` (the bridged source of truth).
+// gates the save. Reads the live `conditionGroup` (the bridged source of truth).
 const saveCondition = async () => {
   try {
     // V2: Send directly to backend (no transformation needed)
@@ -721,7 +707,8 @@ const saveCondition = async () => {
     let conditionData = {
       node_type: "condition",
       version: 2, // Numeric version for consistency with alerts
-      conditions: conditionGroup.value,
+      // Detach from the readonly form read-view before handing to addNode.
+      conditions: cloneDeep((form.state.values as any).conditions),
     };
 
     // Ensure currentSelectedNodeData has proper structure
@@ -789,37 +776,42 @@ const deleteRoute = () => {
 
 </script>
 
-<style>
-/* Override FilterGroup styles for pipeline context */
-/* Force the root group box to span the full drawer width (FilterGroup defaults to w-fit) */
-.pipeline-filter-group-wrapper > .el-border {
+<style scoped>
+/* keep(lib-override): retarget the shared FilterGroup component's internal DOM
+   (.filter-group-box / .group-container / .group-border / .conditions-input and its
+   inline margin-left styling) for the pipeline drawer context — not addressable via
+   template utilities. */
+
+/* Force the root group box to span the full drawer width (FilterGroup defaults to w-fit).
+   Also drop its `mt-4`: as the first element in the drawer body it has no preceding
+   label to space from, and that margin collapses to the body's content edge, adding a
+   1rem gap on top of the drawer's own 0.75rem inset. Root box only (`>`) — nested groups
+   and alerts' FilterGroup keep their mt-4. */
+.pipeline-filter-group-wrapper > :deep(.filter-group-box) {
   width: 100% !important;
+  margin-top: 0 !important;
 }
 
-.pipeline-filter-group-wrapper .group-container {
+.pipeline-filter-group-wrapper :deep(.group-container) {
   white-space: normal !important;
   overflow-x: visible !important;
   max-width: 100%;
+  pointer-events: auto;
 }
 
 /* Reduce margins for nested groups in pipeline */
-.pipeline-filter-group-wrapper [style*="margin-left"] {
-  margin-left: 10px !important;
+.pipeline-filter-group-wrapper :deep([style*="margin-left"]) {
+  margin-left: 0.625rem !important;
 }
 
 /* Ensure conditions fit width */
-.pipeline-filter-group-wrapper .conditions-input {
-  min-width: 120px !important;
-  max-width: 200px;
+.pipeline-filter-group-wrapper :deep(.conditions-input) {
+  min-width: 7.5rem !important;
+  max-width: 12.5rem;
 }
 
 /* Ensure group borders don't overflow */
-.pipeline-filter-group-wrapper .group-border {
-  max-width: calc(100% - 20px);
-}
-
-/* Ensure FilterGroup container doesn't interfere with clicks */
-.pipeline-filter-group-wrapper .group-container {
-  pointer-events: auto;
+.pipeline-filter-group-wrapper :deep(.group-border) {
+  max-width: calc(100% - 1.25rem);
 }
 </style>

@@ -1,16 +1,16 @@
 <template>
-  <aside class="eval-form-page__side eval-form-page__side--test p-0">
-    <section class="eval-test-panel min-h-full p-5 bg-(--color-surface-base) rounded-md shadow-[0_0_0.313rem_0.063rem_var(--o2-hover-shadow)]">
+  <aside class="eval-form-page__side eval-form-page__side--test p-0 max-[60rem]:border-l-0 max-[60rem]:border-t max-[60rem]:border-border-default">
+    <section class="eval-test-panel min-h-full p-5 bg-surface-base rounded-default shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
       <!-- Header -->
       <div class="flex flex-col gap-1">
-        <h3 class="m-0 text-(--color-text-heading) text-sm font-bold">{{ t("onlineEvals.scorer.testPanel.title") }}</h3>
-        <p class="m-0 text-(--color-text-secondary) text-xs leading-[1.45]">{{ t("onlineEvals.scorer.testPanel.hint") }}</p>
+        <h3 class="m-0 text-text-heading text-sm font-bold">{{ t("onlineEvals.scorer.testPanel.title") }}</h3>
+        <p class="m-0 text-text-secondary text-xs leading-[1.45]">{{ t("onlineEvals.scorer.testPanel.hint") }}</p>
       </div>
 
       <!-- Variable inputs -->
       <div v-if="variables.length" class="eval-test-panel__fields flex flex-col gap-3">
-        <div v-for="variable in variables" :key="variable" class="flex flex-col gap-[6px]">
-          <label class="text-(--color-text-primary) font-semibold text-xs [font-family:var(--o2-font-mono)]">{{ formatTemplateVariable(variable) }}</label>
+        <div v-for="variable in variables" :key="variable" class="flex flex-col gap-1.5">
+          <label class="text-text-label font-semibold text-xs font-mono">{{ formatTemplateVariable(variable) }}</label>
           <textarea
             :value="inputs[variable]"
             :rows="variable === 'metadata' ? 2 : 3"
@@ -20,19 +20,19 @@
               })
             "
             :data-test="`scorer-test-input-${variable}`"
-            class="w-full box-border border border-(--color-border-default) rounded bg-(--color-surface-base) text-(--color-text-primary) font-normal text-xs [font-family:var(--o2-font)] leading-normal py-2 px-[9px] [resize:vertical] max-h-[160px] overflow-y-auto"
+            class="w-full box-border border border-border-default rounded-default bg-surface-base text-text-body font-normal text-xs font-sans leading-normal py-2 px-2.25 [resize:vertical] max-h-40 overflow-y-auto placeholder:text-text-muted focus:outline-none focus:border-primary-600"
             @input="
               updateInput(variable, ($event.target as HTMLTextAreaElement).value)
             "
           />
         </div>
       </div>
-      <div v-else class="eval-test-panel__empty text-(--color-text-secondary) text-xs py-[10px] px-3 border border-(--color-border-default) rounded-md bg-(--color-surface-base) [&_code]:[font-family:var(--o2-font-mono)] [&_code]:font-semibold [&_code]:text-(--color-text-primary)">
+      <div v-else class="eval-test-panel__empty text-text-secondary text-xs py-2.5 px-3 border border-border-default rounded-default bg-surface-base [&_code]:font-mono [&_code]:font-semibold [&_code]:text-text-body">
         {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{ t("onlineEvals.scorer.testPanel.emptySuffix") }}
       </div>
 
       <!-- Run -->
-      <div class="eval-test-panel__actions flex flex-col items-start gap-[6px] mt-[14px]">
+      <div class="eval-test-panel__actions flex flex-col items-start gap-1.5 mt-3.5">
         <OButton
           variant="primary"
           size="sm-action"
@@ -46,7 +46,7 @@
         </OButton>
         <span
           v-if="!canRun && state !== 'running'"
-          class="text-[11px] italic text-(--color-text-secondary)"
+          class="text-2xs italic text-text-secondary"
           data-test="scorer-test-disabled-hint"
         >
           {{ t("onlineEvals.scorer.testPanel.disabledHint") }}
@@ -56,48 +56,48 @@
       <!-- Result — only shown once a test has run (no idle placeholder box). -->
       <div
         v-if="state !== 'idle'"
-        class="flex flex-col gap-2 mt-4 p-3 border border-(--color-border-default) rounded-md bg-(--color-surface-base) text-(--color-text-secondary) text-xs"
-        :class="{ 'border-[color-mix(in_srgb,var(--color-status-success-text)_35%,var(--color-border-default))]': state === 'success', 'border-[color-mix(in_srgb,var(--color-status-error-text)_35%,var(--color-border-default))] text-(--color-status-error-text)': state === 'error' }"
+        class="flex flex-col gap-2 mt-4 p-3 border border-border-default rounded-default bg-surface-base text-text-secondary text-xs"
+        :class="{ 'border-[color-mix(in_srgb,var(--color-status-success-text)_35%,var(--color-border-default))]': state === 'success', 'border-[color-mix(in_srgb,var(--color-status-error-text)_35%,var(--color-border-default))] text-status-error-text': state === 'error' }"
         data-test="scorer-test-result"
       >
         <template v-if="state === 'running'">
-          <span class="text-(--color-text-secondary)">{{ t("onlineEvals.scorer.testPanel.stateRunning") }}</span>
+          <span class="text-text-secondary">{{ t("onlineEvals.scorer.testPanel.stateRunning") }}</span>
         </template>
 
         <template v-else-if="state === 'success' && result">
-          <strong class="text-(--color-text-primary) text-[13px] font-semibold">{{ t("onlineEvals.scorer.testPanel.successHeader") }}</strong>
-          <dl class="eval-test-panel__result-grid grid gap-x-3 gap-y-1 m-0 text-(--color-text-secondary) text-xs" style="grid-template-columns: max-content 1fr">
+          <strong class="text-text-heading text-compact font-semibold">{{ t("onlineEvals.scorer.testPanel.successHeader") }}</strong>
+          <dl class="eval-test-panel__result-grid grid gap-x-3 gap-y-1 m-0 text-text-secondary text-xs" style="grid-template-columns: max-content 1fr">
             <template v-if="displayValue !== null">
-              <dt class="text-(--color-text-secondary) font-medium">{{ t("onlineEvals.scorer.testPanel.resultScore") }}</dt>
-              <dd class="eval-test-panel__result-score m-0 text-(--color-grey-600) font-bold text-[13px] [font-family:var(--o2-font-mono)]">{{ displayValue }}</dd>
+              <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultScore") }}</dt>
+              <dd class="eval-test-panel__result-score m-0 text-text-secondary font-bold text-compact font-mono">{{ displayValue }}</dd>
             </template>
             <template v-if="latencyLabel">
-              <dt class="text-(--color-text-secondary) font-medium">{{ t("onlineEvals.scorer.testPanel.resultLatency") }}</dt>
-              <dd class="m-0 text-(--color-text-primary)">{{ latencyLabel }}</dd>
+              <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultLatency") }}</dt>
+              <dd class="m-0 text-text-body">{{ latencyLabel }}</dd>
             </template>
             <template v-if="modelLabel">
-              <dt class="text-(--color-text-secondary) font-medium">{{ t("onlineEvals.scorer.testPanel.resultModel") }}</dt>
-              <dd class="eval-test-panel__result-mono m-0 text-(--color-text-primary) font-medium text-xs [font-family:var(--o2-font-mono)]">{{ modelLabel }}</dd>
+              <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultModel") }}</dt>
+              <dd class="eval-test-panel__result-mono m-0 text-text-body font-medium text-xs font-mono">{{ modelLabel }}</dd>
             </template>
             <template v-if="tokensLabel">
-              <dt class="text-(--color-text-secondary) font-medium">{{ t("onlineEvals.scorer.testPanel.resultTokens") }}</dt>
-              <dd class="m-0 text-(--color-text-primary)">{{ tokensLabel }}</dd>
+              <dt class="text-text-secondary font-medium">{{ t("onlineEvals.scorer.testPanel.resultTokens") }}</dt>
+              <dd class="m-0 text-text-body">{{ tokensLabel }}</dd>
             </template>
           </dl>
-          <details v-if="reasoningText" class="eval-test-panel__details border-t border-(--color-border-default) pt-2 text-(--color-text-secondary)">
-            <summary class="cursor-pointer text-(--color-text-primary) text-xs font-semibold">{{ t("onlineEvals.scorer.testPanel.resultReasoning") }}</summary>
-            <p class="m-0 mt-[6px] text-(--color-text-secondary) font-normal text-[11.5px] [font-family:var(--o2-font-mono)] whitespace-pre-wrap break-words">{{ reasoningText }}</p>
+          <details v-if="reasoningText" class="eval-test-panel__details border-t border-border-default pt-2 text-text-secondary">
+            <summary class="cursor-pointer text-text-heading text-xs font-semibold">{{ t("onlineEvals.scorer.testPanel.resultReasoning") }}</summary>
+            <p class="m-0 mt-1.5 text-text-secondary font-normal text-2xs font-mono whitespace-pre-wrap break-words">{{ reasoningText }}</p>
           </details>
-          <details v-if="rawResponseText" class="eval-test-panel__details border-t border-(--color-border-default) pt-2 text-(--color-text-secondary)">
-            <summary class="cursor-pointer text-(--color-text-primary) text-xs font-semibold">{{ t("onlineEvals.scorer.testPanel.resultRaw") }}</summary>
-            <pre class="m-0 mt-[6px] text-(--color-text-secondary) font-normal text-[11.5px] [font-family:var(--o2-font-mono)] whitespace-pre-wrap break-words">{{ rawResponseText }}</pre>
+          <details v-if="rawResponseText" class="eval-test-panel__details border-t border-border-default pt-2 text-text-secondary">
+            <summary class="cursor-pointer text-text-heading text-xs font-semibold">{{ t("onlineEvals.scorer.testPanel.resultRaw") }}</summary>
+            <pre class="m-0 mt-1.5 text-text-secondary font-normal text-2xs font-mono whitespace-pre-wrap break-words">{{ rawResponseText }}</pre>
           </details>
         </template>
 
         <template v-else>
-          <strong class="text-[13px] font-semibold">{{ t("onlineEvals.scorer.testPanel.errorHeader") }}</strong>
-          <p class="eval-test-panel__error-message m-0 text-(--color-status-error-text) text-xs whitespace-pre-wrap break-words">{{ errorText }}</p>
-          <p v-if="latencyLabel" class="eval-test-panel__error-meta m-0 text-(--color-text-secondary) text-[11.5px]">
+          <strong class="text-compact font-semibold">{{ t("onlineEvals.scorer.testPanel.errorHeader") }}</strong>
+          <p class="eval-test-panel__error-message m-0 text-status-error-text text-xs whitespace-pre-wrap break-words">{{ errorText }}</p>
+          <p v-if="latencyLabel" class="eval-test-panel__error-meta m-0 text-text-secondary text-2xs">
             {{ t("onlineEvals.scorer.testPanel.resultLatency") }}: {{ latencyLabel }}
           </p>
         </template>
@@ -205,15 +205,3 @@ const errorText = computed(
     t("onlineEvals.scorer.testPanel.errorFallback"),
 );
 </script>
-
-<style>
-/* :focus and ::placeholder cannot be expressed inline. */
-.eval-test-panel textarea::placeholder {
-  color: var(--color-text-muted);
-}
-
-.eval-test-panel textarea:focus {
-  outline: none;
-  border-color: var(--color-primary-600, #3f7994);
-}
-</style>

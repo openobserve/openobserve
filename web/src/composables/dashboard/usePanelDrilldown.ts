@@ -317,7 +317,7 @@ export function usePanelDrilldown({
             placeHolder: `{{${variable.name}}}`,
             value: queryType === "sql" ? value : variable.value.join("|"),
           },
-          // Dollar-sign forms (existing)
+          // Dollar-sign forms
           {
             placeHolder: `\${${variable.name}:csv}`,
             value: variable.value.join(","),

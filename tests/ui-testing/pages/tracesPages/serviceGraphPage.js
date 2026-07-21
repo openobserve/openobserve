@@ -16,7 +16,7 @@ export class ServiceGraphPage {
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
 
-    // ===== VIEW TOGGLE BUTTONS (SearchBar.vue — q-btn with .selected class) =====
+    // ===== VIEW TOGGLE BUTTONS (SearchBar.vue — button with .selected class) =====
     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
     this.treeViewTab = '[data-test="service-graph-tree-view-btn"]';
 

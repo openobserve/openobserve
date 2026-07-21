@@ -89,6 +89,8 @@ withDefaults(
 </script>
 
 <style scoped>
+/* keep(keyframes): single-consumer SVG animation choreography (offset-path
+   travel, stroke draw, staged opacity) — none of it expressible as utilities. */
 /* ── Path appears ─────────────────────────────────────────────────────────── */
 .es-path {
   animation: es-path-show 3.5s ease-in-out infinite;

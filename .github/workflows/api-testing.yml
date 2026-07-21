@@ -112,7 +112,7 @@ jobs:
         run: cargo build --features mimalloc
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11.6"
 
@@ -240,7 +240,7 @@ jobs:
         run: cargo build --features mimalloc
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11.6"
 
@@ -362,7 +362,7 @@ jobs:
       - name: Build OpenObserve debug binary
         run: cargo build --features mimalloc
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "3.11.6" }
 
       - name: Setup rye
@@ -471,7 +471,7 @@ jobs:
         run: cargo build --features mimalloc
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11.6"
 

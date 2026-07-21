@@ -30,15 +30,15 @@
               :placeholder="t('crossLinks.urlPlaceholder')"
               data-test="cross-link-url-input"
             />
-            <div class="text-xs mt-1" style="color: var(--o2-text-muted)">
+            <div class="text-xs mt-1 text-text-muted">
               {{ t("crossLinks.urlHint") }}
             </div>
           </div>
 
           <!-- Fields -->
           <div class="mb-2">
-            <label class="block text-sm font-semibold mb-1" style="color: var(--o2-text-primary)">{{ t("crossLinks.fields") }}</label>
-            <div class="text-xs mb-2" style="color: var(--o2-text-muted)">
+            <label class="block text-sm font-semibold mb-1 text-text-heading">{{ t("crossLinks.fields") }}</label>
+            <div class="text-xs mb-2 text-text-muted">
               {{ t("crossLinks.fieldsHint") }}
             </div>
             <div v-if="formFields.length > 0" class="flex flex-wrap gap-1 mb-2">
@@ -46,7 +46,7 @@
                 v-for="(field, idx) in formFields"
                 :key="idx"
                 type="selectionChip"
-                class="max-w-[250px]"
+                class="max-w-62.5"
                 :data-test="`cross-link-field-chip-${idx}`"
               >
                 <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>

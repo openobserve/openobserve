@@ -7,6 +7,70 @@ import prettier from "eslint-plugin-prettier";
 import cypress from "eslint-plugin-cypress";
 import fs from "fs";
 
+// Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue/.ts
+// file's raw text — catches Tailwind arbitrary-value usages in templates
+// (e.g. class="bg-[var(--o2-*)]"), <style> blocks, and JS string literals.
+// This is the enforcing gate for the --o2- ban (stylelint can't allowlist values).
+//
+// ALLOWLIST: EMPTY on purpose. Every `--o2-*` custom property is a hard error —
+// including the ones that still "work" at runtime (OTable tree indents, row-status,
+// the dynamic `--o2-span-*` palette). The goal is to eliminate the --o2-* vocabulary
+// entirely, so these must be renamed off the namespace (to a --color-* token, a
+// Tailwind utility, or a non-o2 runtime custom property). Do NOT add exemptions here;
+// fixing the underlying usage is the only way to make this rule pass.
+const O2_ALLOWLIST = new Set([]);
+const O2_ALLOW_PREFIXES = [];
+
+// A `--o2-*` is a banned CSS custom property only when USED as one: inside var(),
+// a Tailwind shorthand/arbitrary bracket, or as a declaration / `:style` key
+// (immediately followed by `:`). The `--o2-` prefix also collides with the
+// OpenObserve collector's CLI flags (e.g. the k8s installer's `--o2-<flag>=<value>`
+// URL flag) and with prose/comments that name them — those are NOT CSS tokens and
+// must not trip the ban. This is the same discrimination as scripts/check-css-tokens.mjs.
+const isO2CssUsage = (text, index, name) => {
+  const before = text.slice(Math.max(0, index - 8), index);
+  const after = text.slice(index + name.length, index + name.length + 4);
+  return (
+    /var\(\s*$/.test(before) || // var(--o2-*
+    /[A-Za-z0-9\]]-\(\s*$/.test(before) || // bg-(--o2-*  (Tailwind shorthand)
+    /\[\s*$/.test(before) || // [--o2-*  (arbitrary property/value)
+    /^\s*['"]?\s*:/.test(after) // --o2-*:  or  '--o2-*':  (decl / :style key)
+  );
+};
+
+const noLegacyO2Tokens = {
+  rules: {
+    "no-legacy-o2-tokens": {
+      meta: { type: "problem", docs: { description: "Ban legacy --o2-* CSS custom properties" } },
+      create(context) {
+        const allowed = (name) =>
+          O2_ALLOWLIST.has(name) || O2_ALLOW_PREFIXES.some((re) => re.test(name));
+        return {
+          Program() {
+            const sourceCode = context.sourceCode ?? context.getSourceCode();
+            const text = sourceCode.getText();
+            const re = /--o2-[A-Za-z0-9-]+/g;
+            let match;
+            while ((match = re.exec(text))) {
+              if (allowed(match[0])) continue;
+              if (!isO2CssUsage(text, match.index, match[0])) continue; // CLI flag / prose
+              const start = match.index;
+              const end = start + match[0].length;
+              context.report({
+                loc: {
+                  start: sourceCode.getLocFromIndex(start),
+                  end: sourceCode.getLocFromIndex(end),
+                },
+                message: `Legacy CSS token "${match[0]}" is banned. Use the modern --color-* token or a Tailwind utility.`,
+              });
+            }
+          },
+        };
+      },
+    },
+  },
+};
+
 // Read .gitignore to use as ignore patterns
 const gitignore = fs.existsSync(".gitignore")
   ? fs
@@ -44,8 +108,28 @@ export default [
       vue,
       "@typescript-eslint": typescript,
       prettier,
+      "local": noLegacyO2Tokens,
     },
     rules: {
+      "local/no-legacy-o2-tokens": ["error"],
+
+      // Dark-mode schema (O2_TOKEN_MIGRATION_PLAN §3.R.3) — warn now, error at Phase G.
+      // The two sanctioned seams (useTheme.ts / chartTheme.ts) turn this off below.
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector:
+            "BinaryExpression[operator=/^[!=]==?$/] > MemberExpression[property.name='theme']",
+          message:
+            "Dark mode has one JS seam: useTheme().isDark or chartColor(). Do not compare store.state.theme (§3.R).",
+        },
+        {
+          selector: "VariableDeclarator[id.name=/^(isDark|isDarkMode|darkMode)$/]",
+          message: "Import useTheme() instead of a private isDark flag (§3.R).",
+        },
+      ],
+      // Every <style> block must be scoped (§3.H) — warn now, error at Phase F.
+      "vue/enforce-style-attribute": ["warn", { allow: ["scoped", "module"] }],
       // Disable noisy rules inherited from recommended configs
       "prettier/prettier": "off",
       "no-unused-vars": "off",
@@ -86,276 +170,14 @@ export default [
       "vue/no-ref-as-operand": "off",
       "vue/multi-word-component-names": "off",
 
-      // Enforced rules
-      "vue/no-restricted-html-elements": [
-        "error",
-        // Dropdown / list
-        {
-          element: "q-menu",
-          message:
-            'Use <ODropdown> from "@/lib/overlay/Dropdown/ODropdown.vue" instead of <q-menu>.',
-        },
-        {
-          element: "q-list",
-          message:
-            'Drop <q-list> inside <ODropdown> (not needed), or replace standalone <q-list> with a native <ul> / <div> + Tailwind.',
-        },
-        {
-          element: "q-item",
-          message:
-            'Use <ODropdownItem> from "@/lib/overlay/Dropdown/ODropdownItem.vue" (inside <ODropdown>), or a native <li> / <div> + Tailwind (display rows).',
-        },
-        {
-          element: "q-item-section",
-          message:
-            "Use <ODropdownItem>'s #icon-left / #default / #icon-right slots (inside <ODropdown>), or a native <div class=\"flex ...\"> (display).",
-        },
-        {
-          element: "q-item-label",
-          message:
-            'Use plain text / <span class="text-sm">, <span class="block text-xs text-muted-foreground"> (caption), or <ODropdownGroup :label="..."> (header) instead of <q-item-label>.',
-        },
-        // Button
-        {
-          element: "q-btn",
-          message: 'Use <OButton> from "@/lib/core/Button/OButton.vue" instead of <q-btn>.',
-        },
-        {
-          element: "q-btn-group",
-          message: 'Use <OButtonGroup> from "@/lib/core/Button/OButtonGroup.vue" instead of <q-btn-group>.',
-        },
-        {
-          element: "q-btn-toggle",
-          message: 'Use <OToggleGroup> from "@/lib/core/ToggleGroup/OToggleGroup.vue" instead of <q-btn-toggle>.',
-        },
-        {
-          element: "q-btn-dropdown",
-          message: 'Use <OButton> with <ODropdown> instead of <q-btn-dropdown>.',
-        },
-        // Tabs
-        {
-          element: "q-tabs",
-          message: 'Use <OTabs> from "@/lib/navigation/Tabs/OTabs.vue" instead of <q-tabs>.',
-        },
-        {
-          element: "q-tab",
-          message: 'Use <OTab> from "@/lib/navigation/Tabs/OTab.vue" instead of <q-tab>.',
-        },
-        {
-          element: "q-tab-panels",
-          message: 'Use <OTabPanels> from "@/lib/navigation/Tabs/OTabPanels.vue" instead of <q-tab-panels>.',
-        },
-        {
-          element: "q-tab-panel",
-          message: 'Use <OTabPanel> from "@/lib/navigation/Tabs/OTabPanel.vue" instead of <q-tab-panel>.',
-        },
-        {
-          element: "q-route-tab",
-          message: 'Use <ORouteTab> from "@/lib/navigation/Tabs/ORouteTab.vue" instead of <q-route-tab>.',
-        },
-        // Toolbar / layout primitives
-        {
-          element: "q-bar",
-          message: "Use a plain <div> instead of <q-bar>.",
-        },
-        {
-          element: "q-toolbar",
-          message: "Use a plain <div> instead of <q-toolbar>.",
-        },
-        {
-          element: "q-toolbar-title",
-          message: "Remove <q-toolbar-title> — use a plain <div> or <span> for the title content.",
-        },
-        // Icon
-        {
-          element: "q-icon",
-          message: 'Use <OIcon> from "@/lib/core/Icon/OIcon.vue" instead of <q-icon>. To add a new icon update OIcon.icons.ts.',
-        },
-        // Overlay
-        {
-          element: "q-dialog",
-          message: 'Use <ODialog> from "@/lib/overlay/Dialog/ODialog.vue" for modals, or <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" for side-panel drawers, instead of <q-dialog>.',
-        },
-        {
-          element: "q-tooltip",
-          message: 'Use <OTooltip> from "@/lib/overlay/Tooltip/OTooltip.vue" instead of <q-tooltip>.',
-        },
-        {
-          element: "q-drawer",
-          message: 'Use <ODrawer> from "@/lib/overlay/Drawer/ODrawer.vue" instead of <q-drawer>.',
-        },
-        // Badge / chip / avatar / image
-        {
-          element: "q-badge",
-          message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-badge>.',
-        },
-        {
-          element: "q-chip",
-          message: 'Use <OBadge> from "@/lib/core/Badge/OBadge.vue" instead of <q-chip>.',
-        },
-        {
-          element: "q-avatar",
-          message: 'Use a plain <div class="rounded-full ..."> wrapper with an inner <OIcon> or <img> instead of <q-avatar>.',
-        },
-        {
-          element: "q-img",
-          message: "Use a native <img> element instead of <q-img>. q-img features (lazy load, aspect-ratio, spinner) are not used anywhere in this codebase.",
-        },
-        // Card
-        {
-          element: "q-card",
-          message: 'Use <OCard> from "@/lib/core/Card/OCard.vue" instead of <q-card>.',
-        },
-        {
-          element: "q-card-actions",
-          message: 'Use <OCardActions> from "@/lib/core/Card/OCardActions.vue" instead of <q-card-actions>.',
-        },
-        {
-          element: "q-card-section",
-          message: 'Use <OCardSection> from "@/lib/core/Card/OCardSection.vue" instead of <q-card-section>.',
-        },
-        // Collapsible / separator / splitter
-        {
-          element: "q-expansion-item",
-          message: 'Use <OCollapsible> from "@/lib/core/Collapsible/OCollapsible.vue" instead of <q-expansion-item>.',
-        },
-        {
-          element: "q-separator",
-          message: 'Use <OSeparator> from "@/lib/core/Separator/OSeparator.vue" instead of <q-separator>.',
-        },
-        {
-          element: "q-splitter",
-          message: 'Use <OSplitter> from "@/lib/core/Splitter/OSplitter.vue" instead of <q-splitter>.',
-        },
-        // Navigation
-        {
-          element: "q-pagination",
-          message: 'Use <OPagination> from "@/lib/navigation/Pagination/OPagination.vue" instead of <q-pagination>.',
-        },
-        {
-          element: "q-stepper",
-          message: 'Use <OStepper> from "@/lib/navigation/Stepper/OStepper.vue" instead of <q-stepper>.',
-        },
-        {
-          element: "q-step",
-          message: 'Use <OStep> from "@/lib/navigation/Stepper/OStep.vue" instead of <q-step>.',
-        },
-        {
-          element: "q-stepper-navigation",
-          message: "Remove <q-stepper-navigation> — place Back/Continue buttons in a single nav div outside </OStepper>.",
-        },
-        // Data display
-        {
-          element: "q-table",
-          message: 'Use <OTable> from "@/lib/core/Table/OTable.vue" instead of <q-table>.',
-        },
-        {
-          element: "q-timeline",
-          message: 'Use <OTimeline> from "@/lib/data/Timeline/OTimeline.vue" instead of <q-timeline>.',
-        },
-        {
-          element: "q-timeline-entry",
-          message: 'Use <OTimelineItem> from "@/lib/data/Timeline/OTimelineItem.vue" instead of <q-timeline-entry>.',
-        },
-        {
-          element: "q-tree",
-          message: 'Use <OTree> from "@/lib/data/Tree/OTree.vue" instead of <q-tree>.',
-        },
-        {
-          element: "q-virtual-scroll",
-          message: 'Use <OVirtualScroll> from "@/lib/core/VirtualScroll/OVirtualScroll.vue" instead of <q-virtual-scroll>.',
-        },
-        // Feedback / loading
-        {
-          element: "q-spinner",
-          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner>.',
-        },
-        {
-          element: "q-spinner-hourglass",
-          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-hourglass>.',
-        },
-        {
-          element: "q-spinner-dots",
-          message: 'Use <OSpinner variant="dots"> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-dots>.',
-        },
-        {
-          element: "q-spinner-gears",
-          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-spinner-gears>.',
-        },
-        {
-          element: "q-circular-progress",
-          message: 'Use <OSpinner> from "@/lib/feedback/Spinner/OSpinner.vue" instead of <q-circular-progress>.',
-        },
-        {
-          element: "q-linear-progress",
-          message: 'Use <OProgressBar> from "@/lib/data/ProgressBar/OProgressBar.vue" instead of <q-linear-progress>.',
-        },
-        {
-          element: "q-inner-loading",
-          message: 'Use <OInnerLoading> from "@/lib/feedback/InnerLoading/OInnerLoading.vue" instead of <q-inner-loading>.',
-        },
-        {
-          element: "q-skeleton",
-          message: 'Use <OSkeleton> from "@/lib/feedback/Skeleton/OSkeleton.vue" instead of <q-skeleton>.',
-        },
-        {
-          element: "q-banner",
-          message: 'Use <OBanner> from "@/lib/feedback/Banner/OBanner.vue" instead of <q-banner>.',
-        },
-        // Forms
-        {
-          element: "q-form",
-          message: 'Use <OForm> from "@/lib/forms/Form/OForm.vue" instead of <q-form>.',
-        },
-        {
-          element: "q-input",
-          message: 'Use <OInput> from "@/lib/forms/Input/OInput.vue" instead of <q-input>. For textarea use <OTextarea>. For form-bound fields use <OFormInput> / <OFormTextarea>.',
-        },
-        {
-          element: "q-select",
-          message: 'Use <OSelect> from "@/lib/forms/Select/OSelect.vue" instead of <q-select>. For form-bound fields use <OFormSelect>.',
-        },
-        {
-          element: "q-checkbox",
-          message: 'Use <OCheckbox> / <OCheckboxGroup> from "@/lib/forms/Checkbox/OCheckbox.vue" instead of <q-checkbox>. For form-bound fields use <OFormCheckbox>.',
-        },
-        {
-          element: "q-radio",
-          message: 'Use <ORadio> inside <ORadioGroup> from "@/lib/forms/Radio/" instead of <q-radio>. Wrap items in <ORadioGroup v-model="...">.',
-        },
-        {
-          element: "q-toggle",
-          message: 'Use <OSwitch> from "@/lib/forms/Switch/OSwitch.vue" instead of <q-toggle>. For form-bound fields use <OFormSwitch>.',
-        },
-        {
-          element: "q-slider",
-          message: 'Use <OSlider> from "@/lib/forms/Slider/OSlider.vue" instead of <q-slider>. For form-bound fields use <OFormSlider>.',
-        },
-        {
-          element: "q-range",
-          message: 'Use <ORange> from "@/lib/forms/Range/ORange.vue" instead of <q-range>. For form-bound fields use <OFormRange>.',
-        },
-        {
-          element: "q-file",
-          message: 'Use <OFile> from "@/lib/forms/File/OFile.vue" instead of <q-file>. For form-bound fields use <OFormFile>.',
-        },
-        {
-          element: "q-date",
-          message: 'Use <ODate> from "@/lib/forms/Date/ODate.vue" instead of <q-date>. For form-bound fields use <OFormDate>.',
-        },
-        {
-          element: "q-time",
-          message: 'Use <OTime> from "@/lib/forms/Time/OTime.vue" instead of <q-time>. For form-bound fields use <OFormTime>.',
-        },
-        {
-          element: "q-color",
-          message: 'Use <OColor> from "@/lib/forms/Color/OColor.vue" instead of <q-color>. For form-bound fields use <OFormColor>.',
-        },
-        {
-          element: "q-option-group",
-          message: 'Use <OOptionGroup> from "@/lib/forms/OptionGroup/OOptionGroup.vue" instead of <q-option-group>. For form-bound fields use <OFormOptionGroup>.',
-        },
-      ],
+    },
+  },
+  {
+    // The two sanctioned dark-mode seams (§3.R.1) — the only files allowed to
+    // compare store.state.theme / declare an isDark flag.
+    files: ["src/composables/useTheme.ts", "src/utils/chartTheme.ts"],
+    rules: {
+      "no-restricted-syntax": "off",
     },
   },
   {

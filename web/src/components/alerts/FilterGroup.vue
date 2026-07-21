@@ -1,21 +1,18 @@
 ﻿<template>
     <!-- Preview Section (only for root level) -->
     <div v-if="depth === 0 && showSqlPreview && previewString"
-         class="mb-2 p-2 rounded border w-full max-h-[3.2em] overflow-y-auto"
-         :class="store.state.theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-300'">
+         class="mb-2 p-2 rounded-default border w-full max-h-[3.2em] overflow-y-auto bg-surface-panel border-border-default">
       <div class="flex items-start gap-1 min-w-0">
-        <span class="font-medium text-xs flex-shrink-0 leading-[1.3]"
-              :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'">
+        <span class="font-medium text-xs flex-shrink-0 leading-[1.3] text-text-body">
           {{ t('alerts.filters.previewLabel') }}
         </span>
-        <span class="text-[10px] font-mono leading-[1.3] min-w-0 break-words"
-              :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'">
+        <span class="text-3xs font-mono leading-[1.3] min-w-0 break-words text-text-secondary">
           {{ previewString }}
         </span>
       </div>
     </div>
 
-    <div :class="[`  px-2 mb-2 el-border el-border-radius `,
+    <div :class="[`  px-2 mb-2 filter-group-box border border-card-glass-border rounded-default `,
         'mt-4',
         store.state.isAiChatEnabled ? 'w-full' : 'xl:w-fit'
     ]"
@@ -47,11 +44,11 @@
         </OToggleGroup>
       </div>
       <!-- Spacer for root group to maintain consistent spacing -->
-      <div v-else class="h-[14px]"></div>
+      <div v-else class="h-3.5"></div>
 
       <!-- Group content -->
 
-      <div v-if="isOpen" class="overflow-x-auto group-container" :class="store.state.theme === 'dark' ? 'dark-mode-group' : 'light-mode-group'">
+      <div v-if="isOpen" class="overflow-x-auto group-container">
         <!-- Items in group (V2 uses 'conditions' array) -->
         <div class="ml-2 whitespace-nowrap " v-for="(item, index) in props.group.conditions" :key="index">
           <FilterGroup
@@ -103,8 +100,8 @@
             variant="ghost-primary"
             @click="addCondition(props.group.groupId)"
             >
-            <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="text-[0.75rem] font-bold">{{ t('alerts.conditions.condition') }}</span>
+            <OIcon class="mr-1 font-bold rounded-full border" size="xs" name="add" />
+            <span class="text-xs font-bold">{{ t('alerts.conditions.condition') }}</span>
             <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
@@ -115,8 +112,8 @@
             @click="addGroup(props.group.groupId)"
             :disabled="depth >= 2"
             >
-            <OIcon class="mr-1 font-bold" size="xs" style="border-radius: 50%; border: 1px solid;" name="add" />
-            <span class="text-[0.75rem] font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
+            <OIcon class="mr-1 font-bold rounded-full border" size="xs" name="add" />
+            <span class="text-xs font-bold">{{ t('alerts.conditions.conditionGroup') }}</span>
             <OTooltip v-if="depth < 2" :delay="300" :content="t('alerts.conditions.addConditionGroupTooltip')" />
             <OTooltip v-else :delay="300" :content="t('alerts.conditions.maxDepthReachedTooltip')" />
         </OButton>
@@ -128,7 +125,7 @@
             @click="reorderItems()"
             >
             <OIcon class="mr-1 font-bold" size="xs" name="swap-vert" />
-            <span class="text-[0.75rem] font-bold">{{ t('alerts.filters.reorder') }}</span>
+            <span class="text-xs font-bold">{{ t('alerts.filters.reorder') }}</span>
             <OTooltip :delay="300" :content="t('alerts.filters.reorderTooltip')" />
         </OButton>
      </div>
@@ -149,6 +146,7 @@
     import { cloneDeep } from 'lodash-es';
     import FilterCondition from './FilterCondition.vue';
     import { useStore } from 'vuex';
+    import useTheme from '@/composables/useTheme';
     import OButton from '@/lib/core/Button/OButton.vue';
     import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
     import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
@@ -213,18 +211,17 @@
         validator: (value: string) => ['alerts', 'pipelines'].includes(value),
     },
     /**
-     * Dual-mode switch (alerts-migration.md §A). When set, this group passes
-     * the prefix down recursively — the child at index i (leaf condition OR
-     * nested group) gets `${namePrefix}.conditions[${i}]` — so every
-     * FilterCondition binds its OForm* fields into the injected TanStack form
-     * at the exact nested path. When empty (default): today's BARE behavior,
-     * unchanged (pipeline's NodeForm/Condition.vue consumes it bare —
-     * a permanent, sanctioned mode).
+     * Dual-mode switch. When set, this group passes the prefix down
+     * recursively — the child at index i (leaf condition OR nested group) gets
+     * `${namePrefix}.conditions[${i}]` — so every FilterCondition binds its
+     * OForm* fields into the injected TanStack form at the exact nested path.
+     * When empty (default): bare behavior (pipeline's NodeForm/Condition.vue
+     * consumes it bare).
      *
-     * 🔑 The v-for `:key` MUST stay the array INDEX: the OForm* fields bind by
-     * index-based name and do NOT re-bind when the name changes — a stable-id
-     * key would leave rendered inputs shifted/blank after a mid-list delete
-     * (START-HERE Rule ①).
+     * GOTCHA: the v-for `:key` MUST stay the array INDEX — the OForm* fields
+     * bind by index-based name and do NOT re-bind when the name changes; a
+     * stable-id key would leave rendered inputs shifted/blank after a mid-list
+     * delete.
      */
     namePrefix: {
         type: String,
@@ -249,9 +246,9 @@
   const showPreview = ref(true);
 
   const store = useStore();
+  const { isDark } = useTheme();
   const { t } = useI18n();
 
-  // V2: Use logicalOperator (AND/OR) instead of label (and/or)
   const label = ref(props.group.logicalOperator?.toLowerCase() || 'and');
 
   const confirmDialog = ref({
@@ -267,30 +264,21 @@
   // `groups` in place (performRemoveCondition et al) — assigning it raw makes
   // those writes silently fail ("target is readonly").
   //
-  // NOT deep. `deep: true` was correct pre-migration, when formData was a plain
-  // `ref()` mutated IN PLACE — the object identity never changed, so a deep watch
-  // was the only way to see an edit. The form store replaces values IMMUTABLY on
-  // every change, so props.group already arrives as a new reference and a
-  // reference watch sees every edit.
-  //
-  // Keeping both was the worst of the two models: deep fired on every nested
-  // mutation, and each firing cloneDeep'd the whole subtree — once per nested
-  // FilterGroup. That is what put ~213ms of scripting into a single click.
+  // Intentionally NOT deep: the form store replaces values immutably on every
+  // change, so props.group arrives as a new reference and a reference watch
+  // sees every edit. A deep watch would cloneDeep the whole subtree on every
+  // nested mutation, once per nested FilterGroup.
   watch(() => props.group, (newGroup) => {
     groups.value = cloneDeep(newGroup);
-    // V2: Use logicalOperator instead of label
     label.value = newGroup.logicalOperator?.toLowerCase() || 'and';
   });
 
   // Bare-mode consumers (e.g. pipeline's NodeForm/Condition.vue) edit props.group's
-  // leaf conditions IN PLACE via v-model. That never changes props.group's
-  // reference, so the intentionally non-deep sync watch above does not fire and
-  // `groups` (the working clone) goes STALE — missing the typed column/operator/
-  // value. The structural handlers below run only on explicit button clicks
-  // (add / remove / toggle / reorder), so refreshing the clone from the live prop
-  // at that point is cheap and captures those in-place edits BEFORE we mutate and
-  // emit. Without it, emitting the stale clone makes the ancestor replace the whole
-  // group and wipe the user's typed values on every structural change.
+  // leaf conditions IN PLACE via v-model, which never changes props.group's
+  // reference, so the non-deep watch above doesn't fire and `groups` goes STALE.
+  // The structural handlers below run only on explicit button clicks, so refresh
+  // the clone from the live prop there — otherwise emitting the stale clone makes
+  // the ancestor wipe the user's typed values on every structural change.
   const syncWorkingCopyFromProp = () => {
     groups.value = cloneDeep(props.group);
   };
@@ -326,11 +314,8 @@
     return false;
   }
   
-  // NOTE: `groups` is a MUTABLE deep clone of `props.group` (which is the READONLY
-  // form read-view in alerts mode). The handlers mutate the clone in place and
-  // emit it; the ancestor writes it back through the form (setFieldValue), which
-  // re-syncs `props.group` → the clone via the watch below. Mutating the readonly
-  // prop directly silently fails ("target is readonly") so add/remove did nothing.
+  // Handlers mutate the clone `groups` (never the readonly `props.group`) and emit
+  // it; the ancestor writes it back through the form, re-syncing via the watch above.
   const addCondition = (groupId: string) => {
     // Capture any in-place bare-mode leaf edits before mutating + emitting.
     syncWorkingCopyFromProp();
@@ -376,7 +361,6 @@
   const toggleLabel = (newLabel?: string) => {
     // Capture any in-place bare-mode leaf edits before mutating + emitting.
     syncWorkingCopyFromProp();
-    // V2: Use logicalOperator instead of label
     // If newLabel is provided, use it; otherwise toggle
     if (newLabel) {
       groups.value.logicalOperator = newLabel.toUpperCase();
@@ -390,7 +374,6 @@
   const removeCondition = (id: string) => {
     // Capture any in-place bare-mode leaf edits before reading/mutating + emitting.
     syncWorkingCopyFromProp();
-    // V2: Use conditions array instead of items
     // First, check what will happen after removing this condition
     const itemsAfterRemoval = groups.value.conditions.filter((item: any) => item.id !== id);
     const hasConditionsAfterRemoval = itemsAfterRemoval.some((item: any) => !isGroup(item));
@@ -407,8 +390,7 @@
         message: t('alerts.filters.deleteConditionMessage'),
         // Pluralized by vue-i18n (`one | other`). This branch is guarded by
         // `subGroupCount > 0`, so n is always >= 1 and vue-i18n's default rule
-        // (1 -> one, >=2 -> other) reproduces the previous hand-rolled
-        // `subGroupCount > 1 ? 's' : ''` output exactly.
+        // (1 -> one, >=2 -> other) applies.
         warningMessage: t(
           'alerts.filters.deleteConditionSubGroupWarning',
           { count: subGroupCount },
@@ -430,7 +412,6 @@
     // Capture any in-place bare-mode leaf edits before mutating + emitting (this
     // may run deferred from the confirm-dialog okCallback).
     syncWorkingCopyFromProp();
-    // V2: Use conditions array instead of items
     groups.value.conditions = groups.value.conditions.filter((item: any) => item.id !== id);
 
     // Check if there are any conditions left (not sub-groups)
@@ -452,7 +433,6 @@
   const reorderItems = () => {
     // Capture any in-place bare-mode leaf edits before mutating + emitting.
     syncWorkingCopyFromProp();
-    // V2: Use conditions array instead of items
     // Separate conditions and groups
     const conditions = groups.value.conditions.filter((item: any) => !isGroup(item));
     const subGroups = groups.value.conditions.filter((item: any) => isGroup(item));
@@ -501,9 +481,7 @@ function hslToCSS(h: number, s: number, l: number) {
   return `hsl(${h}, ${s}%, ${l}%)`;
 }
 const computedStyleMap = computed(() => {
-  const isDark = store.state.theme === 'dark';
-
-  if (isDark) {
+  if (isDark.value) {
     const baseColor = '#212121';
     const { h, s, l } = hexToHSL(baseColor);
     const newLightness = Math.min(l + props.depth * 1, 90); // 1% per depth step
@@ -574,38 +552,26 @@ defineExpose({
 
   </script>
 
-  <style>
+  <style scoped>
+    /* keep(scrollbar): ::-webkit-scrollbar pseudo-elements and scrollbar-color have no utility equivalent. */
 
-    .group-container.dark-mode-group {
-      scrollbar-color: #818181 var(--o2-primary-background); /* thumb color, track color */
-    }
-
-    .group-container.light-mode-group {
-      scrollbar-color: #999 #ffffff;
+    .group-container {
+      scrollbar-color: var(--color-border-strong) var(--color-surface-base); /* thumb color, track color */
     }
 
     /* For more control using WebKit scrollbar styling */
     .group-container::-webkit-scrollbar {
-      width: 8px;
-      height: 4px !important;
+      width: 0.5rem;
+      height: 0.25rem !important;
     }
 
-    .group-container.dark-mode-group::-webkit-scrollbar-track {
-      background: red;
+    .group-container::-webkit-scrollbar-track {
+      background: var(--color-surface-base);
     }
 
-    .group-container.dark-mode-group::-webkit-scrollbar-thumb {
-      background-color: #b10000;
-      border-radius: 4px;
-    }
-
-    .group-container.light-mode-group::-webkit-scrollbar-track {
-      background: #ffffff;
-    }
-
-    .group-container.light-mode-group::-webkit-scrollbar-thumb {
-      background-color: #999;
-      border-radius: 4px;
+    .group-container::-webkit-scrollbar-thumb {
+      background-color: var(--color-border-strong);
+      border-radius: var(--radius-default);
     }
 
   </style>

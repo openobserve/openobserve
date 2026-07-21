@@ -25,7 +25,7 @@ import { getFoldersListByType } from '@/utils/commons'
 import syntheticsService from '@/services/synthetics'
 import destinationService from '@/services/alert_destination'
 import { toast } from '@/lib/feedback/Toast/useToast'
-import AppPageHeader from '@/components/common/AppPageHeader.vue'
+import OPageLayout from '@/lib/core/PageLayout/OPageLayout.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue'
@@ -241,12 +241,11 @@ async function saveCheck() {
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
-    <AppPageHeader
-      :title="headerTitle"
-      :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
-      class="shrink-0 px-4 border-b border-border-default"
-    />
+  <OPageLayout
+    :title="headerTitle"
+    :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
+    bleed
+  >
 
     <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
     <template v-else>
@@ -310,5 +309,5 @@ async function saveCheck() {
         <p class="py-2">{{ t('synthetics.newCheck.unsavedBody') }}</p>
       </ODialog>
     </template>
-  </div>
+  </OPageLayout>
 </template>

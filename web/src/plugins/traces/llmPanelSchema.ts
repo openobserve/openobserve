@@ -16,24 +16,17 @@
 /**
  * Build a **dashboard panel schema** (version 2) from an LLM Insights panel
  * definition, so the panel can render through the shared
- * `PanelSchemaRenderer` (the same engine dashboards use) instead of our
- * hand-rolled echarts in `LLMTrendPanel.vue`.
- *
- * Why: `PanelSchemaRenderer` already owns timezone conversion (via
- * `applyCustomSQLTimeSeries` → `toZonedTime(store.state.timezone)`),
- * tooltips, axes, legends, units, lazy-loading and error states. Rendering
- * through it gives the LLM Insights trends the exact same behaviour as
- * dashboards — including correct, user-selected timezone — for free.
+ * `PanelSchemaRenderer` (the same engine dashboards use). This gives the LLM
+ * Insights trends the same behaviour as dashboards — timezone conversion,
+ * tooltips, axes, legends, units, lazy-loading and error states.
  *
  * The query is passed as a fully-rendered **custom SQL** string
  * (`customQuery: true`); the renderer fetches its own data. Column→axis
  * mapping is derived from the panel def's `query.timeField` / `seriesField`
- * / `valueField` (the same fields the legacy renderer used), so the SQL
- * output aliases (`ts`, `model`, `cost`, …) line up with `fields.x/y/breakdown`.
+ * / `valueField`, so the SQL output aliases (`ts`, `model`, `cost`, …) line
+ * up with `fields.x/y/breakdown`.
  *
- * Migration is incremental: only panel types present in `TYPE_MAP` are
- * convertible today (start with stacked-area). Others keep using
- * `LLMTrendPanel` until added here.
+ * Only panel types present in `TYPE_MAP` are convertible.
  */
 
 import type { LLMPanelDef } from "./config/llmInsightsPanels";
@@ -105,11 +98,8 @@ export function buildLLMPanelSchema(opts: {
     description: "",
     type: chartType,
     config: {
-      // A legend only earns its space when there's more than one series.
-      // Single-series panels (bars by model, single-series area) are already
-      // labelled by their axis + title, so the legend is pure redundancy.
-      // Multi-series panels keep it — a breakdown (stacked-area by model) or
-      // multiple value series (grouped percentile bars: p50/p90/p95/p99).
+      // Legend only when there's more than one series; single-series panels are
+      // already labelled by their axis + title.
       show_legends: !!breakdownName || (panel.series?.length ?? 0) > 1,
       legends_position: "bottom",
       // "numbers" → compact K/M/B/T suffixes (3.5M); "milliseconds" → ms/s/m
@@ -123,8 +113,7 @@ export function buildLLMPanelSchema(opts: {
             : "numbers",
       unit_custom: "",
       decimals: 2,
-      // Bucket gaps read as a continued line rather than a hole — mirrors the
-      // legacy renderer, which filled missing (bucket, series) cells with 0.
+      // Bucket gaps read as a continued line rather than a hole.
       connect_nulls: true,
       no_value_replacement: "",
       // Render a dot at each data point. LLM traffic is often sparse — a window
@@ -132,12 +121,10 @@ export function buildLLMPanelSchema(opts: {
       // draw a lone point (it'd be invisible). Symbols make single-bucket
       // windows show up as a dot. (`show_symbol` → echarts `showSymbol`.)
       show_symbol: true,
-      // Rounded (smooth) connectors between points — the trend area charts read
-      // cleaner as smooth curves than the default sharp/linear zig-zag. Only
-      // affects line/area panels; bar panels ignore it.
+      // Smooth connectors between points. Only affects line/area panels; bar
+      // panels ignore it.
       line_interpolation: "smooth",
-      // Slightly thicker line for a more solid, polished trend curve (default is
-      // 1.5). Keeps the per-point dots but makes the connecting line read cleaner.
+      // Slightly thicker line than the 1.5 default.
       line_thickness: 2.5,
       axis_border_show: true,
       wrap_table_cells: false,

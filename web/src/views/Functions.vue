@@ -15,23 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Sections that bring their OWN page header (Functions, Enrichment Tables
+       each render a full OPageLayout) are rendered DIRECTLY — exactly like any
+       normal top-level page. Wrapping them in the shell's OPageLayout too nested
+       two page layouts and pushed their header down (a top gap). Pipelines and
+       the pipeline detail sub-pages have no own-header, so the shell owns theirs. -->
+  <RouterView v-if="sectionOwnsHeader" v-slot="{ Component }">
+    <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+  </RouterView>
+
   <!-- Pipelines is a frequently-used workspace, so it has NO landing hub (that
        would add a click every visit). It lands straight on the default section
        and uses the same breadcrumb section-switcher for fast lateral nav:
          Stream Pipelines ▾            (› Edit Pipeline on a detail page)
        Page actions (and the detail-view teleport target) live in the bar. -->
-  <div class="h-full min-h-0 flex flex-col">
+  <OPageLayout v-else bleed>
+    <template #header v-if="showPipelineActions || isDetailView">
     <!-- This row hosts page actions: the pipelines-list buttons or the detail
          teleport target. Section pages (functions/enrichment/eval) render
          nothing here — their content components have their own headers. -->
-    <AppPageHeader
-      v-if="showPipelineActions || isDetailView"
+    <OPageHeader
       :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
       :subtitle="showPipelineActions ? t('pipeline.subtitle') : ''"
       :icon="showPipelineActions ? 'lan' : undefined"
       :back="detailBack"
       :tabs-below="showPipelineActions"
-      class="px-4 border-b border-border-default"
+      class="border-b border-border-default"
     >
       <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
            title on the list page; hidden on detail sub-pages (editor/history).
@@ -125,18 +134,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="pipeline-detail-actions"
         />
       </template>
-    </AppPageHeader>
+    </OPageHeader>
+    </template>
 
     <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
       <RouterView v-slot="{ Component }">
         <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
       </RouterView>
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -160,7 +171,8 @@ import config from "@/aws-exports";
 export default defineComponent({
   name: "AppFunctions",
   components: {
-    AppPageHeader,
+    OPageHeader,
+    OPageLayout,
     PipelineSectionTabs,
     OButton,
     ODropdown,
@@ -230,6 +242,15 @@ export default defineComponent({
     // Header actions live on the Pipelines index page only.
     const showPipelineActions = computed(() => routeName.value === "pipelines");
 
+    // Sections that render their OWN OPageLayout header (Functions, Enrichment
+    // Tables). They're rendered directly instead of nested inside the shell's
+    // OPageLayout, so their header sits flush at the top like any normal page.
+    const sectionOwnsHeader = computed(
+      () =>
+        routeName.value === "functionList" ||
+        routeName.value === "enrichmentTables",
+    );
+
     // Responsive: collapse secondary actions into an overflow menu when narrow.
     const windowWidth = ref(window.innerWidth);
     const onWindowResize = () => {
@@ -288,6 +309,7 @@ export default defineComponent({
       breadcrumbLabel,
       detailBack,
       showPipelineActions,
+      sectionOwnsHeader,
       shouldCollapseActions,
       goToAddPipeline,
       goToImportPipeline,

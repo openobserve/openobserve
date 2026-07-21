@@ -98,7 +98,7 @@ function titleClasses(step: StepRegistration): string {
 function triggerClasses(step: StepRegistration): string {
   const base = [
     'flex flex-row items-center gap-2 px-2 py-1.5',
-    'rounded-md outline-none select-none',
+    'rounded-default outline-none select-none',
     'transition-colors duration-150',
   ].join(' ')
   if (canNavigateTo(step)) {
@@ -128,7 +128,7 @@ function triggerClasses(step: StepRegistration): string {
       v-if="isHorizontal"
       role="list"
       aria-label="Steps"
-      class="sticky top-0 z-10 flex items-start w-full pb-2 bg-[var(--o2-primary-background)]!"
+      class="sticky top-0 z-10 flex items-start w-full pb-2 bg-surface-base!"
     >
       <template v-for="(step, index) in sortedSteps" :key="step.name">
         <!-- Step trigger (indicator circle + title) -->
@@ -158,7 +158,7 @@ function triggerClasses(step: StepRegistration): string {
               <span :class="titleClasses(step)">{{ step.title }}</span>
               <span
                 v-if="step.description"
-                class="text-[11px] text-text-secondary mt-0.5 leading-tight"
+                class="text-2xs text-text-secondary mt-0.5 leading-tight"
               >
                 {{ step.description }}
               </span>
@@ -169,7 +169,7 @@ function triggerClasses(step: StepRegistration): string {
         <!-- Connector line between consecutive steps -->
         <div
           v-if="index < sortedSteps.length - 1"
-          class="h-px flex-1 shrink mt-[22px] mx-1 min-w-[8px]"
+          class="h-px flex-1 shrink mt-5.5 mx-1 min-w-2"
           :class="step.done ? 'bg-stepper-connector-done' : 'bg-stepper-connector'"
           aria-hidden="true"
         />

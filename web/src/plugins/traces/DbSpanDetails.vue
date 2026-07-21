@@ -102,14 +102,14 @@ const metadataRows = computed(() =>
             v-for="row in metadataRows"
             :key="row.key"
             :data-test="`traces-db-span-details-tag-${row.key}`"
-            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.85rem]"
+            class="inline-flex items-center gap-1 rounded-default px-2 py-1 text-sm"
             style="
-              background: var(--o2-card-background);
-              border: 1px solid var(--o2-border);
-              color: var(--o2-text-primary);
+              background: var(--color-surface-base);
+              border: 1px solid var(--color-border-default);
+              color: var(--color-text-heading);
             "
           >
-            <span style="color: var(--o2-text-secondary)"
+            <span class="text-text-secondary"
               >{{ row.label }}:</span
             >
             <span class="break-all">{{ row.value }}</span>
@@ -123,7 +123,7 @@ const metadataRows = computed(() =>
       data-test="traces-db-span-details-query-editor"
     >
       <OCardSection
-        class="flex-1 flex flex-col p-0 min-h-[18.75rem] p-[0.375rem]!"
+        class="flex-1 flex flex-col p-0 min-h-[18.75rem] p-1.5!"
       >
         <CodeQueryEditor
           v-if="queryText"
@@ -138,8 +138,7 @@ const metadataRows = computed(() =>
         <div
           v-else
           data-test="traces-db-span-details-no-query"
-          class="p-4 text-sm"
-          style="color: var(--o2-text-secondary)"
+          class="p-4 text-sm text-text-secondary"
         >
           {{ t("traces.dbSpanDetails.noQueryText") }}
         </div>
@@ -155,30 +154,29 @@ const metadataRows = computed(() =>
       <div class="py-2 px-3">
           <div class="grid grid-cols-2 gap-x-4 gap-y-1">
             <template v-if="span.db_response_returned_rows">
-              <div class="text-xs" style="color: var(--o2-text-secondary)">
+              <div class="text-xs text-text-secondary">
                 {{ t("traces.dbSpanDetails.rowsReturned") }}
               </div>
               <div class="text-xs">{{ span.db_response_returned_rows }}</div>
             </template>
             <template v-if="span.db_operation_batch_size">
-              <div class="text-xs" style="color: var(--o2-text-secondary)">
+              <div class="text-xs text-text-secondary">
                 {{ t("traces.dbSpanDetails.batchSize") }}
               </div>
               <div class="text-xs">{{ span.db_operation_batch_size }}</div>
             </template>
             <template v-if="span.db_query_summary">
-              <div class="text-xs" style="color: var(--o2-text-secondary)">
+              <div class="text-xs text-text-secondary">
                 {{ t("traces.dbSpanDetails.querySummary") }}
               </div>
               <div class="text-xs">{{ span.db_query_summary }}</div>
             </template>
             <template v-if="span.db_response_status_code">
-              <div class="text-xs" style="color: var(--o2-text-secondary)">
+              <div class="text-xs text-text-secondary">
                 {{ t("traces.dbSpanDetails.responseStatus") }}
               </div>
               <div
-                class="text-xs"
-                style="color: var(--o2-status-error-text)"
+                class="text-xs text-status-error-text"
               >
                 {{ span.db_response_status_code }}
               </div>

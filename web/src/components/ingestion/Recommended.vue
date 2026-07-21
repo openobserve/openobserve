@@ -20,11 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="ingestTabType"
     :tabs="recommendedTabs"
     :splitter-width="270"
+    searchable
+    search-data-test="recommended-list-search-input"
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >
     <div class="w-full h-full">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <div class="overflow-auto h-full pt-1.5">
           <router-view
             :title="tabs"

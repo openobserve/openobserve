@@ -78,12 +78,8 @@ export interface PromqlBuilderQuery {
 }
 
 /**
- * How the step picker groups the catalog.
- *
- * Grouping is ours to choose — PromQL has no notion of it. We cut it by what a
- * step DOES to the data, which is the question someone building a query is
- * actually asking: turn a counter into a rate, collapse series together, do
- * arithmetic, ask about the clock.
+ * How the step picker groups the catalog. Grouping is ours to choose — PromQL
+ * has no notion of it; we group by what a step DOES to the data.
  */
 export enum PromqlStepGroup {
   /** Counter -> per-second rate, and anything else that reads over a window. */
@@ -186,22 +182,17 @@ export enum PromqlStepId {
 }
 
 /**
- * Step ids as panels saved before the scalar-math steps were renamed.
+ * Legacy step ids for the scalar-math steps under their old names.
  *
  * A dashboard persists the step id verbatim, so an id that has ever been
- * written to a panel cannot simply stop being understood — a panel saved last
- * year has to keep rendering. Every id is therefore READ through
- * {@link normalizeStepId}, and the builder rewrites what it reads (see
- * {@link normalizeSteps}), so a panel is upgraded to the current ids the next
- * time it is saved.
+ * written to a panel must keep resolving. Every id is READ through
+ * {@link normalizeStepId}, and {@link normalizeSteps} rewrites it so a panel is
+ * upgraded to the current ids the next time it is saved.
  *
- * That is the path to RETIRING this table — but it is not retirable yet, and it
- * cannot be retired on the strength of frontend saves alone. A panel only
- * migrates when someone opens it in the builder and the dashboard is then
- * saved; a panel nobody edits keeps its old ids indefinitely. Removing an entry
- * here is therefore safe only once a backfill has been run over stored
- * dashboards and none is left holding one. Until then, deleting an entry
- * silently breaks every panel that still has it: the scalar step stops
+ * GOTCHA: do not delete an entry until a backfill has run over stored
+ * dashboards. A panel only migrates when someone opens it in the builder and
+ * saves; a panel nobody edits keeps its old ids indefinitely. Deleting an entry
+ * silently breaks every panel that still has it — the scalar step stops
  * resolving and vanishes from the rendered query, changing the numbers on the
  * chart with nothing to indicate it happened.
  */

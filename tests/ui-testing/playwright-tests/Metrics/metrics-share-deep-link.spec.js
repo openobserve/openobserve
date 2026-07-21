@@ -422,8 +422,12 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
       testLogger.warn('Share success toast not detected after loading');
     });
 
-    // Loading should be cleared after completion
-    await page.waitForTimeout(500);
+    // Loading should be cleared after completion. Poll the real loading state until
+    // it clears rather than sleeping a fixed 500ms and asserting into a race.
+    await expect.poll(
+      async () => await pm.metricsPage.isShareButtonLoading(),
+      { timeout: 10000, intervals: [200, 400, 800] }
+    ).toBe(false);
     const isLoadingAfter = await pm.metricsPage.isShareButtonLoading();
     testLogger.info(`Share button loading after completion: ${isLoadingAfter}`);
     expect(isLoadingAfter).toBe(false);

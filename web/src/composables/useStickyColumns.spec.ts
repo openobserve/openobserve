@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import { useStickyColumns } from "./useStickyColumns";
+import { chartColor } from "@/utils/chartTheme";
 
 describe("useStickyColumns", () => {
   let mockProps: any;
@@ -218,7 +219,7 @@ describe("useStickyColumns", () => {
         position: "sticky",
         left: "0px",
         "z-index": 2,
-        "background-color": "#fff",
+        "background-color": chartColor("--color-surface-base"),
         "box-shadow": "4px 0 8px rgba(0, 0, 0, 0.15)",
       });
     });
@@ -250,22 +251,23 @@ describe("useStickyColumns", () => {
       expect(style.left).toBe("0px");
     });
 
-    it("should apply dark theme background color", () => {
+    it("should apply the surface-base token color in dark theme", () => {
       mockStore.state.theme = "dark";
       composable = useStickyColumns(mockProps, mockStore);
 
       const style = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
 
-      expect(style["background-color"]).toBe("#1a1a1a");
+      // Background is now the resolved --color-surface-base token (theme-independent in jsdom)
+      expect(style["background-color"]).toBe(chartColor("--color-surface-base"));
     });
 
-    it("should apply light theme background color", () => {
+    it("should apply the surface-base token color in light theme", () => {
       mockStore.state.theme = "light";
       composable = useStickyColumns(mockProps, mockStore);
 
       const style = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
 
-      expect(style["background-color"]).toBe("#fff");
+      expect(style["background-color"]).toBe(chartColor("--color-surface-base"));
     });
   });
 
@@ -314,8 +316,8 @@ describe("useStickyColumns", () => {
 
       const style = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
 
-      // Theme determines background color
-      expect(style["background-color"]).toBe("#1a1a1a");
+      // Background color is driven by the --color-surface-base token
+      expect(style["background-color"]).toBe(chartColor("--color-surface-base"));
     });
 
     it("should skip offset calculation for non-sticky columns", () => {
@@ -540,19 +542,20 @@ describe("useStickyColumns", () => {
       expect(composable.stickyColumnOffsets.value).toBeDefined();
     });
 
-    it("should update style when theme changes in store", () => {
+    it("should return the token-driven color regardless of theme", () => {
       mockProps.columns = [{ name: "col1", sticky: true }];
       mockStore.state.theme = "light";
       composable = useStickyColumns(mockProps, mockStore);
 
       const style1 = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
-      expect(style1["background-color"]).toBe("#fff");
+      expect(style1["background-color"]).toBe(chartColor("--color-surface-base"));
 
-      // After theme change, getStickyColumnStyle should return new color
+      // The color now comes from the --color-surface-base token, which resolves the
+      // same in jsdom for both themes (dark handled by CSS, not JS).
       mockStore.state.theme = "dark";
 
       const style2 = composable.getStickyColumnStyle({ sticky: true, name: "col1" });
-      expect(style2["background-color"]).toBe("#1a1a1a");
+      expect(style2["background-color"]).toBe(chartColor("--color-surface-base"));
     });
 
     it("should handle immediate watcher execution", () => {

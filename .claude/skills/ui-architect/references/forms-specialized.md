@@ -32,7 +32,7 @@ The `OForm` container + `useOForm` composable own field registration, validation
 - `defaultValues` (`T` — required on the normal path; supplied via `useOForm()` on the headless `:form` path) — initial values for every field; keys must match each field's `name`
 - `schema` (`unknown` — Zod / Standard Schema; optional) — validates the whole form, mapped to fields by `name`
 - `onSubmit` (`(values: T) => unknown | Promise<unknown>`) — written `@submit="handler"` in templates; awaited
-- `greedy` (`boolean`, default `false`) — validate every field instead of stopping on the first error (mirrors q-form `greedy`)
+- `greedy` (`boolean`, default `false`) — validate every field instead of stopping at the first error
 - `form` (`OFormInstance`) — an externally-created form from `useOForm()`; when present OForm uses it instead of creating its own
 
 **Slots:** default only — scoped as `{ isSubmitting, canSubmit }`.

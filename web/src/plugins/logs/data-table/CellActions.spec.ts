@@ -86,16 +86,18 @@ describe("CellActions", () => {
 
   // ── backgroundClass computed ──────────────────────────────────────────────────
   describe("backgroundClass computed", () => {
-    it("applies dark background class in dark theme", () => {
+    // The dark/light pair collapsed to a single semantic token; the overlay now
+    // always renders bg-surface-base and dark mode is handled by the token itself.
+    it("applies the surface-base background token in dark theme", () => {
       mockStore.state.theme = "dark";
       const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("bg-black");
+      expect(wrapper.find(".field_overlay").classes()).toContain("bg-surface-base");
     });
 
-    it("applies light background class in light theme", () => {
+    it("applies the surface-base background token in light theme", () => {
       mockStore.state.theme = "light";
       const wrapper = mountComponent();
-      expect(wrapper.find(".field_overlay").classes()).toContain("bg-white");
+      expect(wrapper.find(".field_overlay").classes()).toContain("bg-surface-base");
     });
   });
 

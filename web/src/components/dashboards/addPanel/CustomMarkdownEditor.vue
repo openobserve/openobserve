@@ -17,39 +17,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-markdown-editor-container"
-    class="card-container"
-    style="width: 100%; height: 100%; overflow: hidden"
+    class="bg-card-glass-bg w-full h-full overflow-hidden"
   >
-    <div
+    <div class="w-full h-full"
       data-test="dashboard-custom-markdown-editor-inner"
-      style="width: 100%; height: 100%"
     >
       <OSplitter
         v-model="splitterModel"
-        style="width: 100%; height: 100% !important"
+        class="w-full h-full!"
         @update:modelValue="layoutSplitterUpdated"
         data-test="dashboard-markdown-editor-splitter"
       >
         <template #before>
           <div
             data-test="dashboard-custom-markdown-editor-flex-col"
-            class="flex flex-col"
-            style="height: 100%; display: flex; flex-direction: column;"
+            class="flex flex-col h-full"
           >
-            <CodeQueryEditor
+            <CodeQueryEditor class="h-full flex-1"
               language="markdown"
               v-model:query="markdownContent"
               :debounceTime="500"
               @update:query="onEditorValueChange"
               data-test="dashboard-markdown-editor"
-              style="height: 100%; flex: 1;"
             />
           </div>
         </template>
         <template #separator>
           <div
             data-test="dashboard-custom-markdown-editor-splitter-separator"
-            class="w-1 h-full bg-[var(--o2-border,#e5e7eb)] transition-colors hover:bg-orange-500"
+            class="w-1 h-full bg-border-default transition-colors hover:bg-table-resize-handle"
           ></div>
         </template>
         <template #after>
@@ -119,9 +115,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
-}
-</style>

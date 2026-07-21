@@ -144,7 +144,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
   "sidebar-toggle": [
-    "bg-surface-panel text-button-ghost-text border border-border-default shadow-sm",
+    "bg-surface-panel text-button-ghost-text border border-border-default",
     "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover",
     "enabled:active:bg-button-ghost-active-bg",
     "focus-visible:ring-[3px] focus-visible:ring-button-ghost-focus-ring",
@@ -152,16 +152,16 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // AI-themed gradient — purple→pink gradient background, white text
   "ai-gradient": [
-    "bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)] text-white border-0",
+    "bg-[image:var(--color-gradient-ai)] text-white border-0",
     "enabled:hover:shadow-[0_4px_12px_rgba(139,92,246,0.4)]",
     "enabled:active:opacity-90",
-    "focus-visible:ring-[3px] focus-visible:ring-[#8B5CF6]",
+    "focus-visible:ring-[3px] focus-visible:ring-ai-accent",
     "disabled:opacity-40",
   ].join(" "),
   // On-dark primary — white background with primary color text, for use on dark gradient panels
   "on-dark-primary": [
     "bg-white text-primary-600 font-bold border-0 shadow-md",
-    "enabled:hover:shadow-xl",
+    "enabled:hover:shadow-lg",
     "enabled:active:opacity-90",
     "focus-visible:ring-[3px] focus-visible:ring-white/50",
     "disabled:opacity-50",
@@ -177,20 +177,20 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // Destination preview buttons — brand-colored CTAs inside alert destination preview cards
   // preview-slack: Slack green (#007a5a)
   "preview-slack": [
-    "bg-[#007a5a] text-white border-0 !rounded !text-sm !h-auto !py-2 !px-3",
-    "enabled:hover:bg-[#005a42]",
+    "bg-brand-slack text-text-inverse border-0 !rounded !text-sm !h-auto !py-2 !px-3",
+    "enabled:hover:bg-brand-slack-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-teams: Microsoft Teams purple (#6264a7)
   "preview-teams": [
-    "bg-[#6264a7] text-white border-0 !rounded !h-auto !py-2 !px-4",
-    "enabled:hover:bg-[#464775]",
+    "bg-brand-teams text-text-inverse border-0 !rounded !h-auto !py-2 !px-4",
+    "enabled:hover:bg-brand-teams-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-email: Email blue (#007bff)
   "preview-email": [
-    "bg-[#007bff] text-white border-0 !rounded !h-auto !py-3 !px-6",
-    "enabled:hover:bg-[#0056b3]",
+    "bg-brand-email text-text-inverse border-0 !rounded !h-auto !py-3 !px-6",
+    "enabled:hover:bg-brand-email-hover",
     "disabled:opacity-60",
   ].join(" "),
   // preview-action: Generic action button for destination previews with no brand color
@@ -201,9 +201,9 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
   "webinar-dismiss": [
-    "bg-transparent border-0 text-[#1e3a8a] underline font-bold text-[0.8125rem] whitespace-nowrap",
+    "bg-transparent border-0 text-promo-webinar-link underline font-bold text-compact whitespace-nowrap",
     "!h-auto !p-0",
-    "enabled:hover:text-[#1e40af]",
+    "enabled:hover:text-promo-webinar-link-hover",
     "disabled:opacity-60",
   ].join(" "),
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
@@ -218,7 +218,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
   "pricing-chip": [
     "bg-transparent text-inherit border border-border-default",
-    "!rounded-[20px] !text-xs !font-medium !h-auto !py-[5px] !px-[14px] !gap-[6px]",
+    "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
     "transition-colors duration-150",
     "enabled:hover:border-primary-600 enabled:hover:text-primary-600 enabled:hover:bg-button-ghost-hover-bg",
     "disabled:opacity-60",
@@ -226,43 +226,43 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
 };
 
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
-  xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded",
-  // 34px control height per HANDOFF §11 — the workhorse compact button that
-  // pairs with 34px inputs in toolbars/headers. (radius 8 = rounded-lg per §11.)
-  sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-lg",
+  xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded-default",
+  // 34px control height — the workhorse compact button that pairs with 34px
+  // inputs in toolbars/headers. (radius 8 = rounded-default.)
+  sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
   "sm-toolbar":
-    "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-md",
+    "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
-  chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded leading-none",
+  chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
-  "chip-12": "h-6 ps-2 pe-1.5 !text-[12px] gap-1 rounded leading-none",
+  "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
   "sm-action":
-    "h-[2.125rem] ps-3 pe-3 min-w-[80px] text-sm gap-2 rounded-lg",
-  md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-lg",
-  lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-lg",
-  icon: "size-6 p-0 rounded-md gap-x-0",
-  "icon-xs": "h-[30px] px-2 text-[18px] rounded-md gap-x-0",
+    "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
+  md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
+  lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-default",
+  icon: "size-6 p-0 rounded-default gap-x-0",
+  "icon-xs": "h-7.5 px-2 text-lg rounded-default gap-x-0",
   // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
   "icon-xs-circle": "size-6 p-0 rounded-full gap-x-0",
   // 28px square — matches xs chip height for paired close/remove buttons
-  "icon-xs-sq": "h-7 w-7 p-0 rounded-md gap-x-0",
+  "icon-xs-sq": "h-7 w-7 p-0 rounded-default gap-x-0",
   // 24px square — matches chip size for paired close/remove buttons
-  "icon-chip": "h-6 w-6 p-0 rounded gap-x-0",
-  "icon-sm": "h-8 w-8 p-0 rounded-md gap-x-0",
-  "icon-md": "h-10 w-10 p-0 rounded-lg gap-x-0",
-  "icon-lg": "h-12 w-12 p-0 rounded-lg gap-x-0",
+  "icon-chip": "h-6 w-6 p-0 rounded-default gap-x-0",
+  "icon-sm": "h-8 w-8 p-0 rounded-default gap-x-0",
+  "icon-md": "h-10 w-10 p-0 rounded-default gap-x-0",
+  "icon-lg": "h-12 w-12 p-0 rounded-default gap-x-0",
   "icon-circle": "size-8 p-0 rounded-full gap-x-0",
   "icon-circle-sm": "size-7 p-0 rounded-full gap-x-0",
   // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
-  "icon-toolbar": "size-[1.875rem] p-0 rounded-md gap-x-0",
-  // 26px rounded-lg — compact modern icon button for panel header collapse/expand
-  "icon-panel": "size-[1.625rem] p-0 rounded-lg gap-x-0",
+  "icon-toolbar": "size-[1.875rem] p-0 rounded-default gap-x-0",
+  // 26px rounded-default — compact modern icon button for panel header collapse/expand
+  "icon-panel": "size-[1.625rem] p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
   "sidebar-button":
-    "h-8 w-3 p-0 rounded-sm overflow-hidden gap-x-0",
+    "h-8 w-3 p-0 rounded-default overflow-hidden gap-x-0",
 };
 
 const activeClasses = [

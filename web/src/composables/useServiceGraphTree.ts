@@ -43,7 +43,6 @@ export interface ServiceGraphEdge {
 
 /**
  * Composable for ServiceGraph tree visualization
- * Extracts and reuses the tree logic from convertServiceGraphToTree function
  */
 export function useServiceGraphTree(
   graphData: Ref<ServiceGraphData>,
@@ -51,14 +50,13 @@ export function useServiceGraphTree(
 ) {
   /**
    * Transform service graph data (nodes + edges) to TreeNode format
-   * Reuses the exact logic from convertServiceGraphToTree
    */
   const transformServiceGraphToTree = (data: ServiceGraphData): TreeNode[] => {
     if (!data || !data.nodes || !data.edges) {
       return []
     }
 
-    // Build adjacency maps for edges (same logic as original function)
+    // Build adjacency maps for edges
     const edgesMap = new Map<string, ServiceGraphEdge[]>()
     data.edges.forEach((edge: ServiceGraphEdge) => {
       if (!edgesMap.has(edge.from)) {
@@ -85,7 +83,7 @@ export function useServiceGraphTree(
     // Track all visited nodes across all trees to find orphaned components
     const globalVisited = new Set<string>()
 
-    // Helper to build tree recursively (same logic as original)
+    // Helper to build tree recursively
     const buildTree = (
       nodeId: string,
       visited = new Set<string>(),
@@ -181,7 +179,7 @@ export function useServiceGraphTree(
   }
 
   /**
-   * Get health-based color using the same thresholds as original ServiceGraph
+   * Get health-based color
    */
   const getHealthColor = (errorRate: number, isDarkMode: boolean): string => {
     const green = isDarkMode ? "#10b981" : "#52c41a"

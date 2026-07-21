@@ -22,12 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="$emit('add-fields')"
   >
     <div v-if="fieldsByType.fts.length > 0" class="mb-2">
-      <div class="text-xs text-weight-medium mb-1">
+      <div class="text-xs font-medium mb-1">
         Full Text Search ({{ fieldsByType.fts.length }})
       </div>
       <div
-        class="p-2 max-h-50 overflow-y-auto border rounded"
-        :class="store.state.theme === 'dark' ? 'border-[#3a3a3a] bg-[#1e1e1e]' : 'border-(--o2-border) bg-[#f5f5f5]'"
+        class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
       >
         <OTag
           v-for="field in fieldsByType.fts"
@@ -52,12 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-if="fieldsByType.secondaryIndex.length > 0">
-      <div class="text-xs text-weight-medium mb-1">
+      <div class="text-xs font-medium mb-1">
         Secondary Index ({{ fieldsByType.secondaryIndex.length }})
       </div>
       <div
-        class="p-2 max-h-50 overflow-y-auto border rounded"
-        :class="store.state.theme === 'dark' ? 'border-[#3a3a3a] bg-[#1e1e1e]' : 'border-(--o2-border) bg-[#f5f5f5]'"
+        class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
       >
         <OTag
           v-for="field in fieldsByType.secondaryIndex"
@@ -85,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, PropType } from "vue";
-import { useStore } from "vuex";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -111,8 +108,6 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "add-fields", "skip", "remove-field"],
   setup(props) {
-    const store = useStore();
-
     // Computed property to group missing fields by type
     const fieldsByType = computed(() => {
       return {
@@ -124,7 +119,6 @@ export default defineComponent({
     });
 
     return {
-      store,
       fieldsByType,
     };
   },

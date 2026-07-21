@@ -7,7 +7,7 @@
     type="smoothstep"
   />
   <EdgeLabelRenderer>
-    <!-- Delete button removed - use keyboard delete instead -->
+    <!-- Edge deletion handled via keyboard delete -->
   </EdgeLabelRenderer>
 </template>
 
@@ -70,9 +70,6 @@ const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } =
 const path = computed(() => getBezierPath(props))
 
 let clickTimeout = null
-
-// Edge click handling moved to PipelineFlow.vue using VueFlow events
-// These handlers are no longer used but kept for backwards compatibility
 </script>
 
 <script>

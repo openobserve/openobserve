@@ -77,7 +77,7 @@ function fmtDuration(ms: number) {
         <div class="absolute inset-0 bg-black/40" @click="emit('close')" />
 
         <!-- Drawer panel -->
-        <div class="relative z-10 w-full max-w-2xl h-full border-l border-border-default flex flex-col overflow-hidden shadow-2xl" style="background: var(--color-surface-base, #18181b)">
+        <div class="relative z-10 w-full max-w-2xl h-full border-l border-border-default flex flex-col overflow-hidden shadow-lg bg-surface-base">
 
           <!-- Header -->
           <div class="flex items-center gap-3 px-5 py-4 border-b border-border-default shrink-0">
@@ -98,7 +98,7 @@ function fmtDuration(ms: number) {
                 v-if="execution.traceKey"
                 :href="artifactUrlFn(execution.traceKey)"
                 target="_blank"
-                class="inline-flex items-center gap-1 text-xs font-medium text-text-link border border-current rounded px-2 py-1 hover:opacity-80"
+                class="inline-flex items-center gap-1 text-xs font-medium text-text-link border border-current rounded-default px-2 py-1 hover:opacity-80"
               >
                 <OIcon name="download" size="xs" />
                 trace.zip
@@ -116,7 +116,7 @@ function fmtDuration(ms: number) {
           <!-- Error banner (probe crash) -->
           <div
             v-if="execution.error && !execution.steps.length"
-            class="mx-5 mt-4 rounded border border-[var(--color-warning-500)]/30 bg-[var(--color-warning-500)]/10 px-4 py-3 shrink-0"
+            class="mx-5 mt-4 rounded-default border border-[var(--color-warning-500)]/30 bg-[var(--color-warning-500)]/10 px-4 py-3 shrink-0"
           >
             <p class="text-xs font-semibold text-[var(--color-warning-600)] mb-1">{{ t('synthetics.executionDetail.probeError') }}</p>
             <p class="text-xs text-[var(--color-warning-600)] font-mono whitespace-pre-wrap leading-relaxed">{{ execution.error }}</p>
@@ -132,7 +132,7 @@ function fmtDuration(ms: number) {
               <div
                 v-for="(step, i) in mergedSteps"
                 :key="step.stepId"
-                class="rounded-lg border overflow-hidden"
+                class="rounded-default border overflow-hidden"
                 :class="step.status === 'fail' ? 'border-[var(--color-error-500)]/40' : 'border-border-default'"
               >
                 <!-- Step header -->
@@ -141,14 +141,14 @@ function fmtDuration(ms: number) {
                   :class="step.status === 'fail' ? 'bg-[var(--color-error-500)]/10' : 'bg-surface-panel'"
                 >
                   <span
-                    class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-white text-[0.6rem] font-bold mt-0.5"
+                    class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-white text-3xs font-bold mt-0.5"
                     :class="step.status === 'fail' ? 'bg-[var(--color-error-500)]' : 'bg-[var(--color-success-600)]'"
                   >{{ i + 1 }}</span>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-text-heading truncate" :title="step.name">
                       {{ step.name || step.stepId }}
                     </p>
-                    <p class="text-[0.65rem] text-text-muted font-mono mt-0.5 truncate" :title="step.stepId">
+                    <p class="text-3xs text-text-muted font-mono mt-0.5 truncate" :title="step.stepId">
                       {{ step.stepId }}
                     </p>
                   </div>

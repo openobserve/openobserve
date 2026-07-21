@@ -33,12 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <AppPageHeader
+      <OPageHeader
         v-if="showTabs"
         :title="t('rum.title')"
+        :subtitle="t('rum.subtitle')"
         icon="devices"
         tabs-below
-        class="shrink-0 px-4"
+        class="shrink-0"
       >
         <template #tabs>
           <OTabs v-model="activeTab" align="left" @change="changeTab">
@@ -50,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OTabs>
         </template>
-      </AppPageHeader>
+      </OPageHeader>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
           <keep-alive
@@ -144,7 +145,7 @@ import { useI18n } from "vue-i18n";
 import useRum from "@/composables/rum/useRum";
 import useStreams from "@/composables/useStreams";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";

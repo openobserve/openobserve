@@ -1101,11 +1101,11 @@ describe("EventDetailDrawerContent", () => {
   // ==========================================================================
 
   describe.skip("Event type styling", () => {
-    it.skip("applies bg-red-100 class to badge for error event type", async () => {
+    it.skip("applies bg-error-100 class to badge for error event type", async () => {
       // Skip: class-based assertions are forbidden by test standards
       await wrapper.setProps({ event: createMockEvent({ type: "error" }) });
       await flushPromises();
-      expect(wrapper.find(".bg-red-100").exists()).toBe(true);
+      expect(wrapper.find(".bg-error-100").exists()).toBe(true);
     });
 
     it.skip("applies bg-blue-100 class to badge for action event type", () => {
@@ -1113,11 +1113,11 @@ describe("EventDetailDrawerContent", () => {
       expect(wrapper.find(".bg-blue-100").exists()).toBe(true);
     });
 
-    it.skip("applies bg-green-100 class to badge for view event type", async () => {
+    it.skip("applies bg-success-100 class to badge for view event type", async () => {
       // Skip: class-based assertions are forbidden by test standards
       await wrapper.setProps({ event: createMockEvent({ type: "view" }) });
       await flushPromises();
-      expect(wrapper.find(".bg-green-100").exists()).toBe(true);
+      expect(wrapper.find(".bg-success-100").exists()).toBe(true);
     });
 
     it.skip("applies bg-grey-100 class to badge for unknown event type", async () => {

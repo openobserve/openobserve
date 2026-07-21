@@ -45,7 +45,7 @@ const goToMcp = () => {
 <template>
   <div class="p-2" data-test="mcp-cross-link">
     <div
-      class="flex flex-col items-start gap-3 rounded-lg border border-border-default bg-surface-panel p-6 max-w-3xl"
+      class="flex flex-col items-start gap-3 rounded-surface border border-border-default bg-surface-panel p-6 max-w-3xl"
     >
       <div class="flex items-center gap-2">
         <OIcon name="mcp" size="md" />

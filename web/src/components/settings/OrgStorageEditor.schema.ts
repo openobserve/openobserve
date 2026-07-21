@@ -2,18 +2,13 @@
 //
 // Provider-discriminated validation schema for OrgStorageEditor.vue. The storage
 // provider is chosen from a custom card grid (not an <input>), so it is bridged
-// into the form as `selectedProvider` (the documented sanctioned discriminator
-// bridge, as CreateDestinationForm does) and `superRefine` branches on it.
+// into the form as `selectedProvider` and `superRefine` branches on it.
 //
-// Restores the original BEFORE rules (truthy→Zod inversion) — every per-provider
-// credential was `(v)=>!!v?.trim() || t(<key>)`:
-//   • AwsCredentials  → bucket_name, access_key, secret_key required (trim)
-//   • AzureCredentials→ storage_account, bucket_name, secret_key required
-//   • GcpCredentials  → bucket_name, access_key required
-//   • AwsRoleArn      → bucket_name, region, role_arn, external_id required
-//
-// Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
-// this file only describes WHAT is valid.
+// Per-provider required credentials (all trimmed):
+//   • AwsCredentials  → bucket_name, access_key, secret_key
+//   • AzureCredentials→ storage_account, bucket_name, secret_key
+//   • GcpCredentials  → bucket_name, access_key
+//   • AwsRoleArn      → bucket_name, region, role_arn, external_id
 
 import { z } from "zod";
 

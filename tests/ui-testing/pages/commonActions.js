@@ -138,7 +138,7 @@ export class CommonActions {
      */
     async scrollAndFindOption(optionName, optionType) {
         // Target the visible dropdown — OSelect (Reka Listbox) post-migration,
-        // q-select (.q-menu) pre-migration.
+        // legacy select pre-migration.
         const dropdown = this.page.locator('[data-test$="-popover"]').first();
 
         // Fast path for the migrated OSelect: it renders a ListboxFilter search input
@@ -284,8 +284,11 @@ export class CommonActions {
         // concurrent CI load the wizard's stream-list fetch can run before registration
         // completes, so the freshly-ingested stream never renders as an option (the exact
         // failure seen for auto_playwright_stream). Mirrors initializeAlertTestStream.
+        // 90s budget to match initializeAlertTestStream — cloud stream registration under
+        // concurrent full-suite load can exceed 60s; a late-but-present stream avoids the
+        // downstream "wizard stream dropdown empty" flake. Returns immediately once registered.
         let registered = false;
-        for (let i = 0; i < 20 && !registered; i++) {
+        for (let i = 0; i < 90 && !registered; i++) {
             const listResp = await this.page.request.get(listUrl, { headers }).catch(() => null);
             if (listResp && listResp.ok()) {
                 const body = await listResp.json().catch(() => null);
@@ -377,9 +380,24 @@ export class CommonActions {
         // page immediately after this call; if the SPA fetches its stream list before
         // registration completes, the stale list is cached and the alert wizard's
         // stream dropdown never shows the stream.
+        // Registration MUST complete before the caller's page load — the alert wizard's
+        // stream dropdown is populated from the SPA's stream-list fetch at page load, so a
+        // stream that registers after that never renders as an option. Budget = 90s (was 15s):
+        // on the shared cloud alpha org the streams-list registration routinely exceeds 60s
+        // while the full multi-shard suite ingests concurrently (global-setup budgets 90s for
+        // the same indexing). Empirically ~40% of the self-seeded alert_e2e_* / alert_import_*
+        // streams missed a 60s window under full load; 90s matches the proven global-setup cap.
+        // Returns the instant the stream registers, so the healthy case stays fast.
+        //
+        // NON-FATAL on timeout: don't throw. The stream IS ingested and will register shortly;
+        // the caller does template/folder setup (tens of seconds) then reloads before the
+        // wizard opens, giving registration extra real time. Throwing here turned a slow-but-
+        // recoverable registration into a hard test failure in beforeEach. Surface it as a
+        // warning and let the point-of-use stream selection be the real gate.
         const listUrl = `${baseUrl}/api/${orgName}/streams?type=logs`;
+        const maxWaitSeconds = 90;
         let registered = false;
-        for (let i = 0; i < 15 && !registered; i++) {
+        for (let i = 0; i < maxWaitSeconds && !registered; i++) {
             const listResp = await this.page.request.get(listUrl, { headers }).catch(() => null);
             if (listResp && listResp.ok()) {
                 const body = await listResp.json().catch(() => null);
@@ -388,12 +406,13 @@ export class CommonActions {
             if (!registered) await this.page.waitForTimeout(1000);
         }
         if (!registered) {
-            throw new Error(`Stream ${streamName} did not appear in streams list within 15s of ingestion`);
+            testLogger.warn(`Stream ${streamName} not confirmed in streams list within ${maxWaitSeconds}s of ingestion — proceeding; point-of-use selection will retry`, { streamName });
         }
 
-        testLogger.info(`Successfully initialized stream: ${streamName}`);
+        testLogger.info(`Initialized stream: ${streamName}`, { registered });
         return {
             streamName,
+            registered,
             columns: ['city', 'country', 'status', 'age', 'test_run_id', 'test_timestamp', 'message']
         };
     }
