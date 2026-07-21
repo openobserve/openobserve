@@ -9,12 +9,13 @@
       @cancel="closeForm"
     />
 
-    <template v-else>
-      <AppPageHeader
-        icon="smart-toy"
-        :subtitle="'LLM providers for online evaluations'"
-        class="shrink-0 px-4 border-b border-border-default"
-      >
+    <OPageLayout
+      v-else
+      icon="smart-toy"
+      :subtitle="t('settings.llmProvidersSettings.subtitle')"
+      bleed
+      :scroll="false"
+    >
         <template #title>
           <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
         </template>
@@ -28,7 +29,6 @@
             {{ t("llmProviders.newButton") }}
           </OButton>
         </template>
-      </AppPageHeader>
 
       <div v-if="isLoading" class="flex flex-1 items-center justify-center">
         <OSpinner size="md" />
@@ -63,6 +63,7 @@
           :global-filter="searchQuery"
           :show-global-filter="false"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-llm-providers"
@@ -78,7 +79,7 @@
               class="flex-1"
               :placeholder="t('llmProviders.searchPlaceholder')"
               data-test="llm-providers-search-input"
-            />
+              />
           </template>
           <template #toolbar-trailing>
             <OButton
@@ -119,7 +120,7 @@
               type="providerDefaultFlag"
               value="default"
             />
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -146,7 +147,7 @@
           </template>
         </OTable>
       </div>
-    </template>
+    </OPageLayout>
 
     <ConfirmDialog
       v-model="confirmDeleteOpen"
@@ -182,8 +183,8 @@ import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat"
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -203,14 +204,6 @@ const pendingDeleteRow = ref<Provider | null>(null);
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
 const columns = computed(() => [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    sortable: false,
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("llmProviders.columns.name"),
@@ -281,10 +274,7 @@ const filteredProviders = computed(() => {
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(query)),
       );
-  return filtered.map((row, index) => ({
-    ...row,
-    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
-  }));
+  return filtered;
 });
 
 onBeforeMount(async () => {

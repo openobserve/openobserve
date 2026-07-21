@@ -184,6 +184,13 @@ export function buildPanelDataForCard(
   return {
     type: chartType,
     queryType: "promql",
+    // The dashboard Panel struct requires this — it is a bare `String`, with no
+    // `#[serde(default)]` (config/src/meta/dashboards/v8/mod.rs:106), so a panel
+    // POSTed without it fails to deserialize outright: "missing field
+    // `description`". The drill-in never noticed, because it hands this object to
+    // the panel editor, which fills its own defaults before any save. Convert-to-
+    // dashboard POSTs it straight to the API, so the field has to be real here.
+    description: "",
     queries,
     config,
   };

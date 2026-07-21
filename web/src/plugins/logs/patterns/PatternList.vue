@@ -20,16 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!loading && patterns?.length > 0" class="flex flex-col">
       <!-- Table Header -->
       <div
-        class="flex items-center border-b border-[var(--o2-border-color)]"
-        style="background: var(--o2-table-header-bg); min-width: 100%"
+        class="flex items-center border-b border-table-header-border bg-table-header-bg min-w-full"
       >
         <!-- Pattern Column Header -->
         <div
           class="flex-1 min-w-0 px-2 relative table-head text-ellipsis text-left"
         >
           <span
-            class="font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-gray-500'"
+            class="font-medium text-table-header-text text-xs"
           >
             {{ t("search.patternColumnHeader") }}
           </span>
@@ -40,16 +38,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-24 flex-shrink-0 px-2 relative table-head text-ellipsis text-right"
         >
           <span
-            class="font-bold"
-            :class="store.state.theme === 'dark' ? 'text-white' : 'text-gray-500'"
+            class="font-medium text-table-header-text text-xs"
           >
             {{ t("search.occurrenceColumnHeader") }}
           </span>
         </div>
 
-        <!-- Actions Column - No Header -->
+        <!-- Actions Column - No Header (width matches PatternCard's actions) -->
         <div
-          class="w-24 flex-shrink-0 px-2 relative table-head"
+          class="w-20 flex-shrink-0 px-2 relative table-head"
         ></div>
       </div>
 
@@ -97,18 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="pattern-list-loading-skeleton"
       aria-busy="true"
       aria-live="polite"
-      aria-label="Extracting patterns from logs"
+      :aria-label="t('logs.patternList.extractingPatterns')"
     >
       <!-- Header skeleton -->
       <div
-        class="min-h-8 flex items-center border-b border-[var(--o2-border-color)]"
-        style="background: var(--o2-table-header-bg); min-width: 100%"
+        class="min-h-8 flex items-center border-b border-table-header-border bg-table-header-bg min-w-full"
       >
         <div class="flex-1 min-w-0 px-2">
-          <span class="pattern-skel-pill inline-block h-3 w-16 rounded-sm" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-3 w-16 rounded-default" aria-hidden="true" />
         </div>
         <div class="w-24 flex-shrink-0 px-2 flex justify-end">
-          <span class="pattern-skel-pill inline-block h-3 w-14 rounded-sm" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-3 w-14 rounded-default" aria-hidden="true" />
         </div>
         <div class="w-20 flex-shrink-0 px-2" />
       </div>
@@ -117,19 +113,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(skeletonWidth, n) in SKELETON_WIDTHS"
         :key="n"
-        class="pattern-skel-row flex items-center border-b border-[var(--color-table-row-divider)] relative opacity-0 h-8 bg-[var(--o2-log-table-row-bg,transparent)]"
+        class="pattern-skel-row flex items-center border-b border-table-row-divider relative opacity-0 h-8 bg-log-table-row-bg"
         :style="{ animationDelay: `${n * 40}ms` }"
       >
         <!-- Left accent bar -->
         <span class="absolute left-0 inset-y-0 w-1 pattern-skel-pill" aria-hidden="true" />
         <!-- Pattern column -->
         <div class="flex-1 min-w-0 px-2 pl-3">
-          <span class="pattern-skel-pill inline-block h-3 rounded-sm" :class="skeletonWidth" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-3 rounded-default" :class="skeletonWidth" aria-hidden="true" />
         </div>
         <!-- Count column -->
         <div class="w-24 flex-shrink-0 px-2 flex flex-col items-end gap-1">
-          <span class="pattern-skel-pill inline-block h-3 w-12 rounded-sm" aria-hidden="true" />
-          <span class="pattern-skel-pill inline-block h-2 w-10 rounded-sm" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-3 w-12 rounded-default" aria-hidden="true" />
+          <span class="pattern-skel-pill inline-block h-2 w-10 rounded-default" aria-hidden="true" />
         </div>
         <!-- Actions column — 3 icon-sized circles -->
         <div class="w-20 flex-shrink-0 px-2 flex items-center justify-center gap-1">
@@ -173,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Bottom spacer so the last row isn't flush with the container edge -->
     <div v-if="!loading && patterns?.length > 0" class="h-4" />
 
-    <!-- Wildcard hover popover (outside q-virtual-scroll to avoid DOM recycling conflicts) -->
+    <!-- Wildcard hover popover (outside the virtual scroller to avoid DOM recycling conflicts) -->
     <WildcardValuePopover
       :visible="!!hoveredToken"
       :token="hoveredToken?.token ?? ''"
@@ -226,7 +222,7 @@ const props = defineProps<{
   loading: boolean;
   totalLogsAnalyzed?: number;
   wrap?: boolean;
-  /** External scroll container passed to q-virtual-scroll's scroll-target. */
+  /** External scroll container passed to the virtual scroller's scroll-target. */
   scrollTarget?: HTMLElement | null;
   /** Selected stream's doc time range (µs) — from the logs Index. */
   streamDocTimeRange?: { min: number; max: number };
@@ -281,11 +277,13 @@ const jumpTargetSublabel = computed(() => {
   const formatted = DateTime.fromMillis(r.max / 1000)
     .setZone(zone)
     .toFormat("MMM d, yyyy HH:mm:ss");
-  return `Last data: ${formatted} (${zone})`;
+  return t("logs.patternList.lastData", { formatted, zone });
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): skeleton-loader shimmer + row-in @keyframes and the
+   prefers-reduced-motion opt-out cannot be expressed as Tailwind utilities. */
 /* ── Pattern list loading skeleton ────────────────────────────────────────
    Matches the shimmer style used by the logs table (TenstackTable.vue)
    but at the slightly lighter grey-100 / grey-600 palette for visual parity. */
@@ -298,18 +296,18 @@ const jumpTargetSublabel = computed(() => {
   background: linear-gradient(
     90deg,
     var(--color-grey-100) 0%,
-    rgba(255, 255, 255, 0.65) 50%,
+    color-mix(in srgb, var(--color-white) 65%, transparent) 50%,
     var(--color-grey-100) 100%
   );
   background-size: 200% 100%;
   animation: pattern-skel-shimmer 1.5s ease-in-out infinite;
 }
 
-.body--dark .pattern-skel-pill {
+.dark .pattern-skel-pill {
   background: linear-gradient(
     90deg,
     var(--color-grey-600) 0%,
-    rgba(255, 255, 255, 0.03) 50%,
+    color-mix(in srgb, var(--color-white) 3%, transparent) 50%,
     var(--color-grey-600) 100%
   );
 }
@@ -320,7 +318,7 @@ const jumpTargetSublabel = computed(() => {
 }
 
 @keyframes pattern-skel-row-in {
-  from { opacity: 0; transform: translateY(2px); }
+  from { opacity: 0; transform: translateY(0.125rem); }
   to   { opacity: 1; transform: translateY(0); }
 }
 

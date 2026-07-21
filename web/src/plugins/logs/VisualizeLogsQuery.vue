@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: 100%; width: 100%">
+  <div class="h-full w-full">
     <!-- PanelEditor Content Area (no header for logs visualization) -->
     <PanelEditor
       ref="panelEditorRef"
@@ -144,6 +144,7 @@ export default defineComponent({
     // Allowed chart types for logs visualization
     const allowedChartTypes = [
       "area",
+      "area-stacked",
       "bar",
       "h-bar",
       "line",
@@ -179,7 +180,7 @@ export default defineComponent({
         isSimpleSelectAllQuery(logsPageQuery)
       ) {
         showErrorNotification(
-          "Select * query is not supported for visualization.",
+          t("logs.visualizeLogsQuery.selectAllNotSupported"),
         );
         // Prevent the change by not updating the type
         return;
@@ -274,7 +275,7 @@ export default defineComponent({
         // set errors into errorData
         props.errorData.errors = errors;
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("logs.visualizeLogsQuery.fixErrorsAndRetry"),
         );
         return;
       } else {

@@ -128,6 +128,15 @@ export interface CardPreview {
   lastTriggeredAt: number | null;
   /** Cached data whose window is a different LENGTH from the selected one. */
   cachedDataDiffersFromTimeRange: boolean;
+  /**
+   * The window this preview's data was FETCHED for (µs), when it came from the
+   * persisted cache — `null` on the live path, where the fetched window IS the
+   * selected one.
+   *
+   * The card's x-axis is pinned to this in preference to the selected window, so
+   * cached points are drawn against the time they actually describe.
+   */
+  cachedTimeRange?: { start_time: number; end_time: number } | null;
   /** The function actually in effect — reflects a ⚙ override, not the default. */
   footerLabel: string;
 }
@@ -197,15 +206,16 @@ const PREVIEW_STATE_LIMIT = 300;
 /**
  * Page one holds this many cards; "Show more" reveals another increment.
  *
- * The page size is not a rendering budget — the grid is row-virtualised, so only
- * ~10 cards are ever in the DOM regardless — and it is not an upfront query
- * budget either, since a card only queries once it scrolls within a viewport of
- * the window. What it IS is a cap on how much an idle scroll can cost: a user
- * flicking down the page will query every card they pass, so the page size sets
- * the ceiling on that. 30 keeps a casual scroll cheap; anyone who actually wants
- * more is one click away.
+ * This is an upfront query budget: `hideEmptyPanels` defaults on and emptiness
+ * is only knowable by asking, so `sweepSlice` queries the WHOLE slice on load —
+ * not just what is on screen. Kept small because the backend already times out
+ * on heavy metrics and most answers are thrown away (a typical org hides two
+ * thirds as empty).
+ *
+ * 8 is four rows of the 2-up grid — a bit more than a screenful — and divides
+ * evenly by both column counts the grid uses (2, and 1 when narrow).
  */
-export const INITIAL_PAGE_SIZE = 30;
+export const INITIAL_PAGE_SIZE = 8;
 
 /**
  * How long the slice must hold still before we query what is in it. Long enough
@@ -213,8 +223,13 @@ export const INITIAL_PAGE_SIZE = 30;
  * enough that it feels like part of the same paint.
  */
 export const SWEEP_DEBOUNCE_MS = 250;
-/** Four rows of the 3-up grid per click. */
-export const PAGE_SIZE_INCREMENT = 12;
+/**
+ * Cards revealed per "Show more" click — three rows of the 2-up grid.
+ *
+ * Six lands just past the fold, so the click feels like "a bit more" rather than
+ * "a whole new page". The button's label is computed from this constant.
+ */
+export const PAGE_SIZE_INCREMENT = 6;
 
 /** Cards are ~40-60 points wide; a coarse step keeps preview responses tiny. */
 const PREVIEW_POINTS = 50;
@@ -283,6 +298,13 @@ export function useMetricsExplorerGrid() {
   const showFavoritesOnly = ref(false);
 
   /**
+   * The grid is not on screen (e.g. the page is in Visualize mode). While paused,
+   * slice changes do NOT sweep: there is no visible grid to fill, and re-querying
+   * every card for a hidden view is pure waste. The caller sets this from its mode.
+   */
+  const paused = ref(false);
+
+  /**
    * Drop cards whose query came back with no samples. On by default: a grid of
    * hatched "No data" placeholders is noise, and most orgs carry a long tail of
    * metrics that are registered but never written to.
@@ -328,6 +350,10 @@ export function useMetricsExplorerGrid() {
   /* ------------------------------------------------- local (per-browser) */
 
   const overrides = ref<Record<string, FnOverride>>({});
+
+  // The scratchpad's pinned metrics — a persisted (localStorage, org-keyed)
+  // working set of hand-picked metrics. `toggleFavorite` is its writer, and the
+  // Workspace tab shows exactly this set (via showFavoritesOnly).
   const favorites = ref<string[]>([]);
 
   const loadLocalState = () => {
@@ -445,11 +471,8 @@ export function useMetricsExplorerGrid() {
 
   /**
    * The load currently in flight, so a second caller AWAITS it instead of
-   * returning early. `ensureSchemas` used to answer `void` while
-   * `schemaLoading` was true — but `loadLabelValues` awaits it precisely to
-   * read `labelsByStream` on the next line, so the early return handed it an
-   * empty map, its fan-out matched no streams, and the resulting `[]` was
-   * cached as this label's answer for the whole session.
+   * returning early — callers like `loadLabelValues` read `labelsByStream`
+   * immediately after awaiting, so an early return would hand them an empty map.
    */
   let schemaInFlight: Promise<void> | null = null;
 
@@ -507,20 +530,14 @@ export function useMetricsExplorerGrid() {
 
   /**
    * Do we KNOW the label membership — not "did we finish trying to find out".
-   *
-   * `schemaLoaded` is set even when the load FAILS (that is what stops it
-   * retrying on every keystroke), so gating eligibility on it meant a failed
-   * load left an empty `labelsByStream` behind a flag that said "loaded". Every
-   * card then failed the membership test and the grid went blank the moment a
-   * chip was added — the exact opposite of the fail-open it documents. Without
-   * membership data we cannot prove a card ineligible, so we do not claim it is.
+   * `schemaLoaded` is set even when the load FAILS, so it cannot answer this:
+   * without membership data we cannot prove a card ineligible, so we do not
+   * claim it is (fail open).
    *
    * A `computed`, NOT an `Object.keys` call inside `isLabelEligible`: that runs
-   * once per card across five separate passes (`filteredCards`,
-   * `emptyHiddenCount` and the three facet counts), so materialising a
-   * 3,000-element key array in it cost ~90ms per keystroke on a large org — the
-   * search box visibly stuttered on every character. `labelsByStream` is a
-   * shallowRef, so this recomputes only when the map is actually replaced.
+   * once per card across five separate passes, so materialising a 3,000-element
+   * key array in it cost ~90ms per keystroke on a large org. `labelsByStream` is
+   * a shallowRef, so this recomputes only when the map is actually replaced.
    */
   const membershipKnown = computed(
     () => Object.keys(labelsByStream.value).length > 0,
@@ -531,7 +548,7 @@ export function useMetricsExplorerGrid() {
    * variant reads carries that label.
    *
    * The PromQL engine silently ignores a matcher on a stream that lacks the
-   * label (`apply_matchers` in src/service/promql/utils.rs), so an ineligible
+   * label (`apply_matchers` in src/promql/src/utils.rs), so an ineligible
    * card would quietly render unfiltered data. Narrowing the grid — rather than
    * charting a lie — is what makes the chips safe.
    */
@@ -622,25 +639,30 @@ export function useMetricsExplorerGrid() {
       !matchesSearch(card.name, card.help, searchTerm.value)
     )
       return false;
+    const applyFacets = !showFavoritesOnly.value;
     if (
+      applyFacets &&
       except !== "type" &&
       selectedTypes.value.size > 0 &&
       !selectedTypes.value.has(card.typeFilterBucket)
     )
       return false;
     if (
+      applyFacets &&
       except !== "prefix" &&
       selectedPrefixes.value.size > 0 &&
       !selectedPrefixes.value.has(prefixOf(card.name))
     )
       return false;
     if (
+      applyFacets &&
       except !== "suffix" &&
       selectedSuffixes.value.size > 0 &&
       !selectedSuffixes.value.has(suffixOf(card.name))
     )
       return false;
     if (except !== "label" && !isLabelEligible(card)) return false;
+    // The Workspace tab (showFavoritesOnly) narrows to the scratchpad's pins.
     if (showFavoritesOnly.value && !favorites.value.includes(card.name))
       return false;
     if (
@@ -907,13 +929,9 @@ export function useMetricsExplorerGrid() {
    * The org's scrape interval — the SAME field the panel substitution resolves
    * `$__rate_interval` against (usePanelVariableSubstitution).
    *
-   * The rate window is `max(step + scrape, 4 * scrape)`. Assuming a scrape
-   * interval of our own here meant a card charted a metric with different
-   * smoothing from the panel you land on when you click it: `[4m]` on the card
-   * against `[1m]` in the editor, for the same metric at the same range. One
-   * source of truth, so the drill-in is what you actually clicked — and if the
-   * number is wrong, it is wrong in one place for the whole product rather than
-   * in two places that disagree.
+   * The rate window is `max(step + scrape, 4 * scrape)`. One source of truth, so
+   * a card charts a metric with the same smoothing as the panel you land on when
+   * you click it, rather than two places that disagree.
    */
   const scrapeIntervalSeconds = computed(
     () =>
@@ -928,14 +946,11 @@ export function useMetricsExplorerGrid() {
   /**
    * How many points a card's preview asks for. Heatmaps are coarser.
    *
-   * EVERY derivation must go through this, including the default below. The rate
-   * window is computed from the point count, and above ~2h of range the
-   * 4x-scrape floor stops dominating, so 40 points and 50 points produce
-   * genuinely different queries: at 6h, `[10m]` against `[8m12s]`. Callers that
-   * took the old `PREVIEW_POINTS` default therefore disagreed with the ones that
-   * used `pointsFor` — a histogram card CHARTED one query and handed a different
-   * one to the editor on click, and the dialog's default tile could not hit the
-   * cache entry the card had just filled.
+   * EVERY derivation must go through this. The rate window is computed from the
+   * point count, and above ~2h of range the 4x-scrape floor stops dominating, so
+   * 40 points and 50 points produce genuinely different queries (at 6h, `[10m]`
+   * against `[8m12s]`). A caller using a different point count would generate a
+   * query the card, editor and dialog tile could not share via the cache.
    */
   const pointsFor = (card: MetricCard) =>
     card.chartType === "heatmap" ? HEATMAP_POINTS : PREVIEW_POINTS;
@@ -1058,9 +1073,8 @@ export function useMetricsExplorerGrid() {
   /**
    * Drops a card's rendered preview and abandons whatever it still has running.
    *
-   * The queue is keyed on the generated query string, never on the card name —
-   * cancelling `card:<name>` matched nothing and silently left the superseded
-   * query holding a concurrency slot.
+   * The queue is keyed on the generated query string, never on the card name, so
+   * cancellation must go through the card's query keys.
    *
    * @param alsoCancel keys the card occupied under a state it has since left.
    *   `previewKeysOf` can only describe the CURRENT state, so a caller that
@@ -1301,11 +1315,18 @@ export function useMetricsExplorerGrid() {
     const window = timeRange.value;
     const range = cached.cacheTimeRange ?? {};
 
-    // Same rule the dashboards use: compare the DURATION of the window, not its
-    // absolute bounds. Cached data fetched for an older window is still shown —
-    // the card reports exactly how old it is through `lastTriggeredAt`, the way
-    // a panel's "Last Refreshed" clock does — and is flagged only when the
-    // selected range is a different LENGTH from the one it was fetched for.
+    // Same rule the dashboards use (usePanelDataLoader.ts:853): compare the
+    // DURATION of the window, not its absolute bounds. Cached data fetched for an
+    // older window is still shown — the card reports exactly how old it is
+    // through `lastTriggeredAt`, the way a panel's "Last Refreshed" clock does —
+    // and the ⚠ is raised only when the selected range is a different LENGTH from
+    // the one it was fetched for.
+    //
+    // Bounds drift is NOT flagged here, and must not be: re-opening the grid on a
+    // relative range ("Past 15 Minutes") re-stamps the window to `now` on every
+    // mount, so every restored card would wear a warning that told the user
+    // nothing. The honest answer to drift is to draw the data on ITS OWN axis
+    // (`cachedTimeRange` below) and let `lastTriggeredAt` say how old it is.
     const differs =
       window.end_time - window.start_time !== range.end_time - range.start_time;
 
@@ -1318,6 +1339,18 @@ export function useMetricsExplorerGrid() {
       bucketUnit: defaults.bucketUnit,
       stale: false,
       nanGuardApplied: !!cached.value.nanGuardApplied,
+      /**
+       * The window this data was actually FETCHED for — not the one currently
+       * selected. The card pins its x-axis to this so a relative range that
+       * re-stamps `timeRange` to `now` on every mount does not march the axis
+       * forward while the cached points underneath stay put. Same idea as the
+       * dashboards restoring `metadata` and pinning from the QUERY's window
+       * (usePanelDataLoader.ts:841), carried on the preview.
+       */
+      cachedTimeRange:
+        range.start_time && range.end_time
+          ? { start_time: range.start_time, end_time: range.end_time }
+          : null,
       // Persisted, because this path decides emptiness too — and it fires no
       // query, so it has no way to re-derive it. Without it a sparse card would
       // paint fine on the live path and then vanish from the grid on the next
@@ -1407,6 +1440,29 @@ export function useMetricsExplorerGrid() {
 
     const step = computeStepSeconds(rangeSeconds.value, points);
 
+    // Already resolved — reuse it, fire NO query. A card that already has a
+    // SETTLED preview (done/no-data/unavailable) is just being re-triggered
+    // because it scrolled back into view or its body remounted (e.g. flipping
+    // Explore↔Visualize). Re-running would flash a loading state and re-hit the
+    // backend for a result the card already shows — exactly what a dashboard
+    // panel avoids on revisit.
+    //
+    // This is safe without a per-query validity check because previews are
+    // WINDOW-scoped: any time-range change wipes `previews.value` (see
+    // `setTimeRange`), and a ⚙ override re-requests with `skipCache`. So an
+    // existing settled preview is always valid for the current query+window.
+    // `skipCache` (refresh / time-range change / override) still forces a real
+    // re-query, and an `error`/`loading` preview falls through to retry.
+    const settled = previews.value[card.name];
+    if (
+      !opts?.skipCache &&
+      settled &&
+      settled.status !== "loading" &&
+      settled.status !== "error"
+    ) {
+      return;
+    }
+
     // Paint from the persisted result and fire no query at all — the same deal a
     // dashboard panel gets on revisit. Matters more here than there: a first
     // screenful is ~60 queries against a backend that already times out on the
@@ -1438,6 +1494,10 @@ export function useMetricsExplorerGrid() {
       sparse: false,
       lastTriggeredAt: existing?.lastTriggeredAt ?? null,
       cachedDataDiffersFromTimeRange: false,
+      // Carried with `results` above: a re-query keeps the OLD chart on screen
+      // while it runs, so the axis must keep describing that old data until the
+      // new data lands.
+      cachedTimeRange: existing?.cachedTimeRange ?? null,
       footerLabel: resolved.footerLabel,
     };
 
@@ -1509,6 +1569,11 @@ export function useMetricsExplorerGrid() {
         // cache-restored card tell the user how old its data actually is.
         lastTriggeredAt: Date.now(),
         cachedDataDiffersFromTimeRange: false,
+        // A real fetch just answered for the SELECTED window, so the card's axis
+        // must go back to tracking it. Stated rather than left undefined: this
+        // object replaces a possibly cache-restored one, and inheriting its
+        // window would pin a freshly-queried chart to a stale axis.
+        cachedTimeRange: null,
         footerLabel: resolved.footerLabel,
       };
       markEmptiness(card.name, !results.some(hasSamples) && !sparse);
@@ -1556,6 +1621,11 @@ export function useMetricsExplorerGrid() {
         lastTriggeredAt: existing?.lastTriggeredAt ?? null,
         cachedDataDiffersFromTimeRange:
           existing?.cachedDataDiffersFromTimeRange ?? false,
+        // Carried with `results`: this path KEEPS the previous chart up, so it
+        // must keep the window that chart is true of. Dropping it would pin the
+        // surviving points to the selected window — the drift bug again, but only
+        // for cards whose refresh failed.
+        cachedTimeRange: existing?.cachedTimeRange ?? null,
         footerLabel: resolved.footerLabel,
       };
     }
@@ -1636,13 +1706,6 @@ export function useMetricsExplorerGrid() {
     queue.clearCache();
   };
 
-  /**
-   * Runs one query for a ⚙-dialog tile.
-   *
-   * Deliberately shares the grid's scheduler and cache: dialog tiles outrank
-   * background grid work while the dialog is open, and a tile whose query the
-   * grid already ran is a cache hit rather than a second request.
-   */
   /** Distinguishes dialog interest from card interest on the same query. */
   const DIALOG_OWNER = "\u0000dialog";
 
@@ -1695,15 +1758,13 @@ export function useMetricsExplorerGrid() {
    *
    * The names are WINDOW-SCOPED: `labels` is asked over `start_time`/`end_time`,
    * so a label that only exists on a job that ran last week is absent from a
-   * 15-minute window and present in a 30-day one. Caching them for the life of
-   * the page, as this did, meant the picker kept offering the first window's
-   * answer forever — widen the range to go looking for a label, and the label
-   * still would not be there.
+   * 15-minute window and present in a 30-day one — the picker must re-ask when
+   * the window changes.
    *
-   * A plain `labelNames.value = []` would not be enough: a request already in
-   * flight for the OLD window would land afterwards and repopulate the list with
-   * exactly the stale answer we were trying to drop. The generation is what lets
-   * that late response identify itself as obsolete and do nothing.
+   * A plain `labelNames.value = []` is not enough: a request already in flight
+   * for the OLD window would land afterwards and repopulate the list with the
+   * stale answer. The generation lets that late response identify itself as
+   * obsolete and do nothing.
    */
   let labelNamesGeneration = 0;
 
@@ -1995,11 +2056,19 @@ export function useMetricsExplorerGrid() {
    * The slice moved. Debounced because it moves on every keystroke of a search,
    * and each one would otherwise fire — then immediately cancel — a slice's worth
    * of queries.
+   *
+   * Skipped entirely while `paused` — the grid is not on screen (the page is in
+   * Visualize), so there is nothing to sweep FOR. Without this, merely switching
+   * away re-computes the slice (the pinned-only narrowing flips, filters are
+   * re-applied) and the grid answers by re-querying every card — ~40 requests for
+   * a view the user just left.
    */
   watch([pageSlice, hideEmptyPanels], () => {
+    if (paused.value) return;
     if (sweepTimer) clearTimeout(sweepTimer);
     sweepTimer = setTimeout(() => {
       sweepTimer = null;
+      if (paused.value) return;
       sweepSlice();
     }, SWEEP_DEBOUNCE_MS);
   });
@@ -2119,6 +2188,7 @@ export function useMetricsExplorerGrid() {
     viewMode,
     activeRail,
     showFavoritesOnly,
+    paused,
     hideEmptyPanels,
     emptyHiddenCount,
     activeFilterCount,

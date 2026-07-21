@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'min-h-screen', 'h-screen', 'flex', 'flex-col']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'w-full', 'transition-[width]', 'duration-300', 'ease-[ease]', 'min-h-screen', 'h-screen', 'flex', 'flex-col']"
   >
     <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
-        class="bg-[var(--o2-primary-btn-bg)] text-[var(--o2-primary-btn-text)] text-center"
+        class="bg-button-primary text-button-primary-foreground text-center"
       >
         <WebinarBanner variant="header" />
       </div>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="flex flex-col min-h-0 bg-[var(--color-surface-chrome-deeper)] pr-2 pb-2"
+          class="flex flex-col min-h-0 bg-surface-chrome-deeper pr-2 pb-2"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -79,10 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
+          <!-- Content card — all pages render inside this. The border stays present in both
+               themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
-            :class="store.state.theme === 'dark' ? 'border border-border-default' : ''"
+            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-surface overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
               v-if="isLoading"
@@ -101,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="store.state.isAiChatEnabled && isLoading"
           class="o2-sidebar o2-sidebar-right overflow-y-auto sticky top-[var(--navbar-height,2.25rem)] self-start shrink-0"
           :class="[
-            store.state.theme == 'dark'
+            isDark
               ? 'dark-mode-chat-container'
               : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
@@ -161,6 +162,7 @@ import {
   invalidateLoginData,
   getDueDays,
   trialPeriodAllowedPath,
+  emptyDataAllowedPaths,
 } from "../utils/zincutils";
 
 import {
@@ -175,6 +177,7 @@ import {
   onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
 
@@ -293,6 +296,7 @@ export default defineComponent({
   },
   setup() {
     const store: any = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
     const { t } = useI18n();
     const miniMode = ref(false);
@@ -346,6 +350,16 @@ export default defineComponent({
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
         Boolean(store.state.zoConfig?.online_evals_enabled)
+      );
+    });
+
+    // Backend `/config` flag `synthetics_enabled` — controlled by enterprise
+    // `O2_SYNTHETICS_ENABLED`. Reactive so the menu picks it up regardless of
+    // whether the config response arrived before or after mount.
+    const isSyntheticsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.synthetics_enabled)
       );
     });
 
@@ -434,7 +448,7 @@ export default defineComponent({
     const langList = [
       {
         label: "English",
-        code: "en-gb",
+        code: "en-us",
       },
       {
         label: "Türkçe",
@@ -479,6 +493,18 @@ export default defineComponent({
       {
         label: "Português",
         code: "pt",
+      },
+      {
+        label: "Русский",
+        code: "ru",
+      },
+      {
+        label: "Polski",
+        code: "pl",
+      },
+      {
+        label: "Tiếng Việt",
+        code: "vi",
       },
     ];
 
@@ -614,9 +640,47 @@ export default defineComponent({
     // ever flips at runtime), keep the menu in sync.
     watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
+    const updateSyntheticMenu = () => {
+      const existingIndex = linksList.value.findIndex(
+        (l: any) => l.name === "synthetic",
+      );
+
+      if (!isSyntheticsEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+
+      const incidentIndex = linksList.value.findIndex(
+        (l: any) => l.name === "incidentList",
+      );
+      const alertIndex = linksList.value.findIndex(
+        (l: any) => l.name === "alertList",
+      );
+      const insertAt =
+        incidentIndex !== -1
+          ? incidentIndex + 1
+          : alertIndex !== -1
+            ? alertIndex + 1
+            : linksList.value.length;
+
+      linksList.value.splice(insertAt, 0, {
+        title: t("menu.synthetic"),
+        icon: "radar",
+        link: "/synthetic",
+        name: "synthetic",
+      });
+    };
+
+    // Keep the menu in sync if /config resolves after mount.
+    watch(isSyntheticsEnabled, () => updateSyntheticMenu(), {
+      immediate: false,
+    });
+
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateSyntheticMenu();
       updateAIObservabilityMenu();
 
       const disableMenus = new Set(
@@ -647,6 +711,7 @@ export default defineComponent({
         link: "/reports",
         name: "reports",
       });
+      filterMenus();
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.
@@ -717,10 +782,16 @@ export default defineComponent({
         });
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
-          // IAM is org-setup, not data consumption — don't bounce out
-          // of IAM screens just because no streams exist yet.
+          // IAM is org-setup, not data consumption — don't bounce out of IAM
+          // screens just because no streams exist yet. General Settings is exempt
+          // because it hosts the Danger Zone: switching to an empty org must still
+          // leave the admin able to delete it. Mirrors the routeGuard exemptions —
+          // General only, not the rest of the Settings tree.
           const currentPath = router.currentRoute.value.path || "";
-          if (currentPath.indexOf("/iam") !== -1) {
+          if (
+            currentPath.indexOf("/iam") !== -1 ||
+            emptyDataAllowedPaths.indexOf(currentPath.replace(/\/$/, "")) !== -1
+          ) {
             return;
           }
           toast({
@@ -1124,7 +1195,7 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
-      if (store.state.theme === "dark") {
+      if (isDark.value) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
 
@@ -1202,6 +1273,7 @@ export default defineComponent({
     useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
 
     return {
+      isDark,
       t,
       router,
       store,
@@ -1305,10 +1377,16 @@ export default defineComponent({
 });
 </script>
 
-
-<style>
-/* Print mode — hide header + sidebar, show body overflow */
-.printMode body {
-  overflow: auto !important;
+<style scoped>
+/* keep(print): This layout's root is the ONLY writer of `.printMode` (store.state.printMode,
+   above), so the rule can only ever fire on descendants of that root — but
+   `.hideOnPrintMode` is placed by other components (VariableAdHocValueSelector,
+   pipeline/PipelineEditor, Dashboards/ViewDashboard) that render through
+   <router-view> and so do not carry this scope id. :deep() pierces to them while
+   keeping the ancestor condition scoped to the owner. */
+.printMode :deep(.hideOnPrintMode) {
+  display: none;
 }
 </style>
+
+

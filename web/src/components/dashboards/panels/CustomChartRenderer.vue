@@ -17,13 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
+  <div class="h-full w-full"
     data-test="chart-renderer"
     ref="chartRef"
     id="chart"
     @mouseover="handleMouseOver"
     @mouseleave="handleMouseLeave"
-    style="height: 100%; width: 100%"
   ></div>
 </template>
 
@@ -38,6 +37,7 @@ import {
   inject,
 } from "vue";
 import * as echarts from "echarts";
+import { useI18n } from "vue-i18n";
 
 // Import all components and renderers once for generic usage
 import {
@@ -51,6 +51,7 @@ import {
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 
 import DOMPurify from "dompurify";
+import { withChartFont } from "@/utils/fonts";
 
 // Register necessary components
 echarts.use([
@@ -83,6 +84,7 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
+    const { t } = useI18n();
     const chartRef = ref(null);
     let chart = null;
 
@@ -93,7 +95,7 @@ export default defineComponent({
           return new Function(`return ${obj}`)(); // Convert string to function
         } catch (error) {
           emit({
-            message: `Error while executing the code: ${error.message}`,
+            message: t("dashboard.customChartRenderer.errorExecutingCodeWithMessage", { message: error.message }),
             code: "",
           });
         }
@@ -146,7 +148,7 @@ export default defineComponent({
       try {
         const convertedData = convertStringToFunction(props.data);
         const safeChartOptions = deepSanitize(convertedData);
-        chart.setOption(safeChartOptions);
+        chart.setOption(withChartFont(safeChartOptions));
 
         if (convertedData.o2_events) {
           // Add event listeners for custom interactions
@@ -159,7 +161,7 @@ export default defineComponent({
         }
       } catch (e) {
         emit({
-          message: "Error while executing the code",
+          message: t("dashboard.customChartRenderer.errorExecutingCode"),
           code: "",
         });
       }

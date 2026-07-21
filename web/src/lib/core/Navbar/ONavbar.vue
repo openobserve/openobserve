@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer navbar-links o2-navbar-scroll flex flex-col bg-[var(--color-surface-chrome-deeper)] shrink-0 min-h-0 overflow-y-auto w-[5.5rem] pb-1"
+    class="left-drawer o2-navbar-scroll flex flex-col bg-surface-chrome-deeper shrink-0 min-h-0 overflow-y-auto w-[5.5rem] pb-1"
     @keydown="handleKeydown"
   >
     <!-- Three rail-entry shapes (see navGroups.ts):
@@ -32,7 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          - group:     a pure flyout group with no page of its own (click toggles);
                       supported here but not currently emitted by groupNavLinks.
          `pinBottom` groups float to the foot of the rail via the flex spacer. -->
-    <div class="flex flex-col flex-1 min-h-0 gap-y-1">
+    <div class="relative flex flex-col flex-1 min-h-0 gap-y-1">
+      <!-- Single sliding-selection pill: tracks the active rail tile and slides to
+           it on navigation. Active MenuLinks defer their fill to this (see
+           RailIndicatorActiveKey). Snaps (no slide) on mount/reflow/reveal. -->
+      <div
+        ref="indicatorRef"
+        aria-hidden="true"
+        :class="indicatorClass"
+        :style="indicatorStyle"
+      />
       <template
         v-for="entry in topEntries"
         :key="
@@ -85,13 +94,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * Left sidebar navigation bar. Renders a list of MenuLink items with keyboard
  * navigation (ArrowUp/ArrowDown) and Tab trapping.
  */
-import { computed } from "vue";
+import {
+  computed,
+  provide,
+  ref,
+  watch,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+} from "vue";
+import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import type {
   NavbarProps,
   NavbarEmits,
   NavbarSlots,
   RailEntry,
 } from "./ONavbar.types";
+import { RailIndicatorActiveKey } from "./ONavbar.types";
 import { groupNavLinks } from "./navGroups";
 import MenuLink from "@/components/MenuLink.vue";
 import ONavGroup from "./ONavGroup.vue";
@@ -107,10 +127,15 @@ const emit = defineEmits<NavbarEmits>();
 
 defineSlots<NavbarSlots>();
 
+const { t } = useI18n();
+
 // Reshape the flat link list into rail entries: daily-use links stay top-level,
 // config / occasional items fold into flyout groups. Split out pinned-bottom
-// groups so the template can float them to the foot of the rail.
-const railEntries = computed<RailEntry[]>(() => groupNavLinks(props.linksList));
+// groups so the template can float them to the foot of the rail. `t` is passed
+// so group tile labels are localized (and re-resolve on language change).
+const railEntries = computed<RailEntry[]>(() =>
+  groupNavLinks(props.linksList, t),
+);
 const topEntries = computed(() =>
   railEntries.value.filter((e) => !(e.type === "group" && e.pinBottom)),
 );
@@ -119,6 +144,95 @@ const bottomEntries = computed(
     railEntries.value.filter(
       (e) => e.type === "group" && e.pinBottom,
     ) as Extract<RailEntry, { type: "group" }>[],
+);
+
+// ── Sliding-selection pill ──────────────────────────────────────────────────
+// One indicator tracks the active rail tile (.nav-menu-item--active) and slides
+// to it when the route changes. Same approach as OToggleGroup: animate only real
+// selection changes; snap on mount, reflow and reveal; skip measuring while the
+// rail is hidden so a bogus 0-position is never stored.
+const router: any = useRouter();
+
+const indicatorRef = ref<HTMLElement | null>(null);
+const indicatorStyle = ref<Record<string, string>>({});
+const indicatorVisible = ref(false);
+const hasValidPosition = ref(false);
+const transitionOn = ref(false);
+
+let resizeObserver: ResizeObserver | null = null;
+
+const measure = (animated: boolean) => {
+  const indicator = indicatorRef.value;
+  const list = indicator?.parentElement;
+  if (!indicator || !list) return;
+
+  const active = list.querySelector<HTMLElement>(".nav-menu-item--active");
+  // Skip while hidden/unlaid-out (e.g. the rail is v-show'd off) — measuring here
+  // would store a 0-position and slide the pill in from the corner on reveal.
+  if (!active || active.offsetParent === null) {
+    indicatorVisible.value = false;
+    return;
+  }
+
+  const listRect = list.getBoundingClientRect();
+  const activeRect = active.getBoundingClientRect();
+  if (activeRect.height === 0) {
+    indicatorVisible.value = false;
+    return;
+  }
+
+  transitionOn.value = animated && hasValidPosition.value;
+  hasValidPosition.value = true;
+  indicatorVisible.value = true;
+  indicatorStyle.value = {
+    width: `${activeRect.width}px`,
+    height: `${activeRect.height}px`,
+    transform: `translate(${activeRect.left - listRect.left}px, ${activeRect.top - listRect.top}px)`,
+  };
+};
+
+// Slide to the newly-active tile when the route changes …
+watch(
+  () => router.currentRoute.value.fullPath,
+  async () => {
+    await nextTick();
+    measure(true);
+  },
+);
+
+onMounted(async () => {
+  await nextTick();
+  measure(false);
+  // … but snap (not slide) when tile sizes/visibility change — reflow, the rail
+  // being revealed, labels rewrapping — none of which are user selections.
+  const list = indicatorRef.value?.parentElement;
+  if (list && typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(() => measure(false));
+    resizeObserver.observe(list);
+  }
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
+
+// Theme-aware pill via `dark:` utilities (no JS theme branch, so ONavbar needs no
+// store): mirrors MenuLink's own active pill — white + primary accent in light;
+// tinted selected pill + lighter accent in dark, where a white pill would vanish
+// on the near-black rail.
+const indicatorClass = computed(() => [
+  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border-l-2",
+  "bg-surface-base border-primary-600 dark:bg-tabs-active-bg dark:border-primary-400",
+  transitionOn.value &&
+    "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
+  indicatorVisible.value ? "opacity-100" : "opacity-0",
+]);
+
+// Tiles read this to know whether to defer their fill to the sliding pill.
+provide(
+  RailIndicatorActiveKey,
+  computed(() => indicatorVisible.value),
 );
 
 const NAV_KEYS = ["ArrowDown", "ArrowUp", "Tab"] as const;
@@ -176,17 +290,12 @@ function handleKeydown(event: KeyboardEvent) {
 }
 </script>
 
-<style>
-/* Thin overlay scrollbar: hidden at rest, revealed on hover, and — crucially —
-   it never reserves layout width, so there is no empty strip beside the labels.
-
-   A styled WebKit scrollbar is normally a classic, space-reserving bar (that is
-   what previously pushed the labels inward and clipped "Management"). The only
-   way a native scrollbar floats *over* content instead of reserving space is
-   `overflow: overlay`, which Blink/WebKit honor. Firefox doesn't support it, so
-   it falls back to `scrollbar-width: none` — a hidden bar that also reserves
-   nothing. Either way the rail keeps its full width and still scrolls via
-   wheel, trackpad, and the ArrowUp/ArrowDown keyboard handler above. */
+<style scoped>
+/* keep(scrollbar): thin overlay scrollbar — hidden at rest, revealed on hover,
+   and never reserves layout width (so no empty strip beside the labels).
+   `overflow: overlay` (Blink/WebKit) floats the bar over content; Firefox falls
+   back to `scrollbar-width: none`. WebKit scrollbar pseudo-elements and the
+   @supports/overlay behaviour can't be expressed as utilities. */
 .o2-navbar-scroll {
   scrollbar-width: none; /* Firefox: hidden, reserves nothing */
   -ms-overflow-style: none; /* legacy Edge/IE */
@@ -197,23 +306,18 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 .o2-navbar-scroll::-webkit-scrollbar {
-  width: 6px;
+  width: 0.375rem;
 }
 .o2-navbar-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 .o2-navbar-scroll::-webkit-scrollbar-thumb {
   background-color: transparent;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   transition: background-color 150ms ease;
 }
 /* Reveal the thumb only while the rail is hovered. */
 .o2-navbar-scroll:hover::-webkit-scrollbar-thumb {
-  background-color: var(--color-border-soft, rgba(148, 163, 184, 0.5));
-}
-
-/* Right border only in dark mode — light mode uses shadow on the content card */
-:global(.body--dark) .o2-navbar-scroll {
-  border-right: 1px solid var(--o2-border-color);
+  background-color: var(--color-scrollbar-thumb);
 }
 </style>

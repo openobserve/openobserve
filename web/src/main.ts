@@ -17,8 +17,12 @@ import { createApp } from "vue";
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
-import i18n from "./locales";
+import i18n, { getLocale, loadLocaleMessages } from "./locales";
 import "./styles/tailwind.css";
+// Global generated-content stylesheet: syntax classes (.log-key, .log-string, …)
+// applied to v-html-highlighted log output across logs/traces/RUM. Loaded once
+// here instead of re-@imported inside each consumer's <style> block.
+import "./assets/styles/log-highlighting.css";
 import config from "./aws-exports";
 import configService from "./services/config";
 
@@ -274,4 +278,12 @@ router.onError(async (error) => {
   }
 });
 
-app.mount("#app");
+// Ensure the active locale's messages are loaded (en-us is bundled; any other
+// language is fetched as a code-split chunk) before the first render.
+loadLocaleMessages(getLocale())
+  // On a locale-chunk load failure, fall back to the bundled en-us messages
+  // (no console noise). The app must mount regardless.
+  .catch(() => {})
+  .finally(() => {
+    app.mount("#app");
+  });

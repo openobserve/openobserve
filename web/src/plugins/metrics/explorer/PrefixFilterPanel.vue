@@ -19,9 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-col min-h-0"
     :data-test="`metrics-explorer-${mode}-panel`"
   >
-    <!-- The rail's own search — narrows the facet list, not the grid. Clear
-         lives in the title row above, beside the panel's name. -->
-    <div class="px-3 pb-2">
+    <!-- The rail's own search — narrows the facet LIST, not the grid. Its own
+         inline ✕ clears the SEARCH TEXT only. Clearing the selected FILTERS is a
+         separate, explicitly-labelled row below, so the two are never confused. -->
+    <!-- px-2 matches the facet toggle's horizontal padding above, so the search
+         box's edges line up with the Prefix/Suffix/Type control. -->
+    <div class="px-2 pb-2">
       <OInput
         v-model="search"
         size="sm"
@@ -30,6 +33,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="searchAriaLabel"
         :data-test="`metrics-explorer-${mode}-search`"
       />
+    </div>
+
+    <!-- "Clear filters" — acts on the SELECTED facets (not the search box). Both
+         the count and the button are ALWAYS present (no disappearing controls):
+         the count reads "0 selected" and the button is disabled when nothing is
+         selected, so the row never changes size and the control is always
+         discoverable. Distinct from the search box's own inline ✕, which clears
+         the search text. -->
+    <div class="flex items-center justify-between gap-2 px-3 pb-2">
+      <span class="text-xs text-text-secondary tabular-nums">
+        {{ t("metrics.explorer.facets.selectedCount", { count: selected.size }) }}
+      </span>
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        :disabled="!hasSelection"
+        :data-test="`metrics-explorer-${mode}-clear`"
+        @click="emit('clear')"
+      >
+        {{ t("metrics.explorer.facets.clearFilters") }}
+      </OButton>
     </div>
 
     <!-- Scrollable, keyboard-navigable checkbox list. -->
@@ -42,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="facet in visibleFacets"
         :key="facet.id"
-        class="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-surface-subtle"
+        class="flex items-center justify-between gap-2 px-2 py-1 rounded-default hover:bg-surface-subtle"
         :class="{ 'bg-surface-subtle': selected.has(facet.id) }"
       >
         <OCheckbox
@@ -70,19 +94,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="countChip"
           value="neutral"
           size="xs"
-          shape="rounded"
+          shape="rounded-default"
           :data-test="`metrics-explorer-${mode}-count-${facet.id}`"
           >{{ facet.count }}</OTag
         >
       </div>
 
-      <div
+      <OEmptyState
         v-if="!visibleFacets.length"
-        class="px-2 py-3 text-xs text-text-secondary"
+        size="inline"
+        icon="search-off"
+        :title="emptyLabel"
         :data-test="`metrics-explorer-${mode}-empty`"
-      >
-        {{ emptyLabel }}
-      </div>
+      />
     </div>
   </div>
 </template>
@@ -92,7 +116,9 @@ import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 /** A rail facet. Counts are recomputed by the caller against the OTHER active
  *  filters, so this component only ever renders them. */
@@ -106,11 +132,15 @@ const props = defineProps<{
   mode: "prefix" | "suffix";
   facets: Facet[];
   selected: Set<string>;
+  /** Whether this facet has any selection — drives the "Clear filters" row. */
+  hasSelection?: boolean;
 }>();
 
 const emit = defineEmits<{
   /** Always a NEW Set — never a mutation of the prop. */
   (e: "update:selected", value: Set<string>): void;
+  /** Clear THIS facet's selection (distinct from the search box's own clear). */
+  (e: "clear"): void;
 }>();
 
 const { t } = useI18n();

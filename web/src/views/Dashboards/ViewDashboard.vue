@@ -29,64 +29,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       class="h-full"
     >
-      <PageLayout
+      <OPageLayout bleed
         :main-panel="false"
         :header-class="
           isFullscreen || store.state.printMode === true
             ? 'stickyHeader fullscreenHeader bg-surface-panel'
             : 'shrink-0'
         "
+        :subtitle="folderNameFromFolderId"
+        :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
+        :back="
+          !isFullscreen && store.state.printMode !== true
+            ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
+            : undefined
+        "
       >
-        <template #header>
-          <!-- Normal mode: the icon tile is a Back button (→ dashboards list).
-               Fullscreen/print hide the chrome, so there we keep the module icon
-               as the only on-screen branding (no back affordance). -->
-          <AppPageHeader
-            :subtitle="folderNameFromFolderId"
-            :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
-            :back="
-              !isFullscreen && store.state.printMode !== true
-                ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
-                : undefined
-            "
-            class="px-4 border-b border-border-default"
-          >
           <template #title>
             <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
           </template>
           <template #actions>
-            <!-- Primary place to set this dashboard as the org-wide home
-                 dashboard: labeled so the action is discoverable (a bare
-                 pushpin icon read as cryptic). Collapses to filled-pin +
-                 "Home dashboard" once set. -->
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
-              size="sm-toolbar"
-              :class="
-                isHome(dashboardId)
-                  ? 'text-primary border border-button-outline-border'
-                  : ''
-              "
-              @click="toggleHomeDashboard"
-              data-test="dashboard-view-set-home-btn"
-              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
-            >
-              {{
-                isHome(dashboardId)
-                  ? t("dashboard.isHomeDashboard")
-                  : t("dashboard.setAsHome")
-              }}
-            </OButton>
-            <OTooltip
-              v-if="!isFullscreen && store.state.printMode !== true"
-              :content="
-                isHome(dashboardId)
-                  ? t('dashboard.removeFromHome')
-                  : t('dashboard.setAsHomeDesc')
-              "
-            />
+            <!-- Add panel is the most-used action, so it leads the toolbar. -->
             <OButton
               v-if="!isFullscreen"
               v-show="store.state.printMode !== true"
@@ -102,17 +64,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ml-2"
             ref="refDateTime"
             v-model="selectedDate"
-          /> -->
+            /> -->
             <!-- for Print Mode -->
             <!-- if time is relative, show start and end time -->
             <!-- format: YYYY/MM/DD HH:mm - YYYY/MM/DD HH:mm (TIMEZONE) -->
-            <div
+            <div class="pt-1.25"
               v-if="
                 store.state.printMode === true &&
                 currentTimeObj.start_time &&
                 currentTimeObj.end_time
               "
-              style="padding-top: 5px"
             >
               {{ timeString }} ({{ store.state.timezone }})
             </div>
@@ -121,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedDate"
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
-              class="dashboard-icons h-[30px] [transition:all_0.2s_ease]"
+              class="dashboard-icons h-7.5 [transition:all_0.2s_ease]"
               size="sm"
               v-model="selectedDate"
               :initialTimezone="initialTimezone"
@@ -136,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state?.zoConfig?.min_auto_refresh_interval || 5
               "
               @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode h-[30px] [transition:all_0.2s_ease]"
+              class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
               size="sm"
             />
             <OButton
@@ -161,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-refresh-btn"
               icon-left="refresh"
             >
-              <OTooltip :content="isVariablesChanged ? 'Refresh to apply latest variable changes' : 'Refresh'" shortcut-id="dashboardRefresh" />
+              <OTooltip :content="isVariablesChanged ? t('dashboard.viewDashboard.refreshToApplyVariables') : t('dashboard.viewDashboard.refresh')" shortcut-id="dashboardRefresh" />
             </OButton>
 
             <ExportDashboard
@@ -194,8 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
-              <template #icon-left
-                ><OIcon
+              <template #icon-left><OIcon
                   :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
               /></template>
               <OTooltip :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')" />
@@ -207,8 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
-              <template #icon-left
-                ><OIcon
+              <template #icon-left><OIcon
                   :name="
                     isFullscreen ? 'fullscreen-exit' : 'fullscreen'
                   " size="sm"
@@ -223,8 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openScheduledReports"
               data-test="view-dashboard-scheduled-reports"
             >
-              <template #icon-left
-                ><OIcon name="description" size="sm"
+              <template #icon-left><OIcon name="description" size="sm"
               /></template>
               <OTooltip :content="t('dashboard.scheduledDashboards')" />
             </OButton>
@@ -239,9 +197,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTooltip :content="t('dashboard.editJson')" />
             </OButton>
+            <!-- Pin as org-wide home dashboard: a low-frequency, set-once
+                 action, so it sits at the far right, icon-only. Filled pin +
+                 highlighted variant signal the "already home" state. -->
+            <OButton
+              v-if="!isFullscreen"
+              v-show="store.state.printMode !== true"
+              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
+              size="icon-toolbar"
+              :class="
+                isHome(dashboardId)
+                  ? 'text-primary border border-button-outline-border'
+                  : ''
+              "
+              @click="toggleHomeDashboard"
+              data-test="dashboard-view-set-home-btn"
+              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+            >
+              <OTooltip
+                :content="
+                  isHome(dashboardId)
+                    ? t('dashboard.removeFromHome')
+                    : t('dashboard.setAsHomeDesc')
+                "
+              />
+            </OButton>
           </template>
-          </AppPageHeader>
-        </template>
 
         <RenderDashboardCharts
         :frame="false"
@@ -279,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @searchRequestTraceIds="searchRequestTraceIds"
         :runId="runId"
         @update:runId="updateRunId"
-      />
+        />
       <DashboardSettings
         v-model:open="showDashboardSettingsDialog"
         @refresh="loadDashboard"
@@ -309,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :dashboard-data="currentDashboardData.data"
           :save-json-dashboard="saveJsonDashboard"
         />
-      </PageLayout>
+      </OPageLayout>
     </div>
   </div>
 </template>
@@ -369,9 +350,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import type { BreadcrumbItem } from "@/components/common/AppBreadcrumb.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
@@ -403,8 +382,7 @@ export default defineComponent({
   name: "ViewDashboard",
   emits: ["onDeletePanel"],
   components: {
-    PageLayout,
-    AppPageHeader,
+    OPageLayout,
     OSeparator,
     DateTimePickerDashboard,
     ShareButton,
@@ -478,7 +456,7 @@ export default defineComponent({
         setHomeDashboard(org, {
           dashboardId: id,
           folderId: (folderId.value as string) ?? "default",
-          label: currentDashboardData.data?.title ?? "Dashboard",
+          label: currentDashboardData.data?.title ?? t("dashboard.viewDashboard.dashboard"),
         });
       }
     };
@@ -592,11 +570,10 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       // ONLY update the live variables data - DO NOT update URL
       // URL updates should happen ONLY after commitAll() is called (on refresh button click)
-      // This follows the __global mechanism from the main branch design
       Object.assign(variablesData, data);
 
-      // NOTE: URL sync has been moved to refreshData() after commitAll()
-      // This ensures URL only reflects COMMITTED variable values, not live changes
+      // URL sync happens in refreshData() after commitAll(), so the URL reflects
+      // only COMMITTED variable values, not live changes
     };
 
     const refreshedVariablesDataUpdated = (variablesData: any) => {
@@ -698,7 +675,7 @@ export default defineComponent({
       contextRegistry.register("dashboards", dashboardProvider);
       contextRegistry.setActive("dashboards");
 
-      // NEW: Compute panel times after dashboard loads
+      // Compute panel times after dashboard loads
       // Wait for next tick to ensure dateTimePicker is initialized
       await nextTick();
       if (dateTimePicker.value) {
@@ -784,7 +761,7 @@ export default defineComponent({
           !Object.keys(dashboard).length
         ) {
           showErrorNotification(
-            "Dashboard not found or has been deleted. Redirecting to dashboard list.",
+            t("dashboard.viewDashboard.dashboardNotFound"),
           );
           goBackToDashboardList();
           return;
@@ -792,7 +769,7 @@ export default defineComponent({
       } catch (error: any) {
         showErrorNotification(
           error?.message ||
-            "Failed to load dashboard. Redirecting to dashboard list.",
+            t("dashboard.viewDashboard.failedToLoadDashboard"),
         );
         goBackToDashboardList();
         return;
@@ -893,7 +870,7 @@ export default defineComponent({
       await renderDashboardChartsRef?.value?.saveDashboardData?.execute?.();
     };
 
-    // ===== Panel Time Configuration (NEW FEATURE) =====
+    // ===== Panel Time Configuration =====
 
     // Helper: Convert picker format to time object
     const convertPickerToTimeObj = (pickerValue: any) => {
@@ -922,7 +899,7 @@ export default defineComponent({
       return null;
     };
 
-    // Compute effective time for a specific panel (v4.0)
+    // Compute effective time for a specific panel
     // Priority: 1. URL params (highest) → 2. panel_time_range → 3. global time AS-IS
     const computePanelTime = (panel: any, globalTime: any) => {
       if (!panel) return globalTime;
@@ -1283,17 +1260,7 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // Breadcrumb root crumb → dashboards list (module root; folder defaults).
-    const goToDashboardList = () => {
-      return router.push({
-        path: "/dashboards",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
-    // back button / folder crumb → dashboards list scoped to the current folder.
+    // back button → dashboards list scoped to the current folder.
     const goBackToDashboardList = () => {
       return router.push({
         path: "/dashboards",
@@ -1303,34 +1270,6 @@ export default defineComponent({
         },
       });
     };
-
-    // Level-3 ancestor path: Dashboards › <Folder> › <Dashboard> (current).
-    // The two parent crumbs now have distinct targets (root vs current folder)
-    // and the current dashboard is the terminal, non-interactive crumb.
-    const breadcrumbItems = computed<BreadcrumbItem[]>(() => {
-      const items: BreadcrumbItem[] = [
-        {
-          label: t("dashboard.header"),
-          onClick: goToDashboardList,
-          dataTest: "dashboard-back-btn",
-        },
-        {
-          label: folderNameFromFolderId.value,
-          onClick: goBackToDashboardList,
-          title: folderNameFromFolderId.value,
-          dataTest: "dashboard-view-folder-breadcrumb",
-        },
-      ];
-      const title = currentDashboardData.data?.title;
-      if (title) {
-        items.push({
-          label: title,
-          title,
-          dataTest: "dashboard-view-current",
-        });
-      }
-      return items;
-    });
 
     //add panel
     const addPanelData = () => {
@@ -1652,7 +1591,7 @@ export default defineComponent({
         );
         await loadDashboard();
 
-        showPositiveNotification("Panel deleted successfully", {
+        showPositiveNotification(t("dashboard.viewDashboard.panelDeleted"), {
           timeout: 2000,
         });
       } catch (error: any) {
@@ -1660,10 +1599,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Panel deletion failed",
+              t("dashboard.viewDashboard.panelDeletionFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Panel deletion failed", {
+          showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelDeletionFailed"), {
             timeout: 2000,
           });
         }
@@ -1683,7 +1622,7 @@ export default defineComponent({
         );
         await loadDashboard();
 
-        showPositiveNotification("Panel moved successfully!", {
+        showPositiveNotification(t("dashboard.viewDashboard.panelMoved"), {
           timeout: 2000,
         });
       } catch (error: any) {
@@ -1691,10 +1630,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Panel move failed",
+              t("dashboard.viewDashboard.panelMoveFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Panel move failed", {
+          showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelMoveFailed"), {
             timeout: 2000,
           });
         }
@@ -1759,7 +1698,7 @@ export default defineComponent({
           scheduledReports.value = response.data;
         })
         .catch((error) => {
-          showErrorNotification(error?.message || "Failed to fetch reports");
+          showErrorNotification(error?.message || t("dashboard.viewDashboard.failedToFetchReports"));
           isLoadingReports.value = false;
         })
         .finally(() => {
@@ -1873,12 +1812,12 @@ export default defineComponent({
           await loadDashboard();
         } else {
           showErrorNotification(
-            "Failed to update dashboard JSON: Save method not available",
+            t("dashboard.viewDashboard.failedToUpdateJson"),
           );
         }
       } catch (error) {
         showErrorNotification(
-          error?.message || "Failed to save dashboard changes",
+          error?.message || t("dashboard.viewDashboard.failedToSaveChanges"),
         );
       } finally {
         showJsonEditorDialog.value = false;
@@ -1989,7 +1928,6 @@ export default defineComponent({
       savePanelLayout,
       renderDashboardChartsRef,
       folderNameFromFolderId,
-      breadcrumbItems,
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,
@@ -2002,6 +1940,11 @@ export default defineComponent({
 </script>
 
 <style>
+/* keep(complex-state): fullscreen / sticky-header / print-mode toggled state
+   classes (compound .stickyHeader.fullscreenHeader chain + high z-index stacking)
+   plus a @media print block that must reach external ancestors
+   (.o2-app-root, main, .o2-content-scroll, .scroll) — none expressible as
+   component-scoped utilities, so the block stays an unscoped global. */
 .stickyHeader {
   position: sticky;
   top: 0;
@@ -2009,7 +1952,7 @@ export default defineComponent({
 }
 
 .stickyHeader.fullscreenHeader {
-  top: 0px;
+  top: 0;
   z-index: 5100 !important;
 }
 
@@ -2022,14 +1965,14 @@ export default defineComponent({
   z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: var(--o2-primary-background, #ffffff) !important;
+  background-color: var(--color-surface-base) !important;
 }
 
 .print-mode-container {
   /* Grow to the dashboard's natural content height and let the app's outer
      scroll wrapper (MainLayout's .o2-content-scroll) do the scrolling — the same
      model the @media print block below relies on. Pinning a viewport height here
-     (100vh or 100%) capped the subtree, and PageLayout's body (overflow-hidden)
+     (100vh or 100%) capped the subtree, and OPageLayout's body (overflow-hidden)
      then clipped the trailing panels, so tall dashboards could never be scrolled
      to the bottom. `overflow: visible` keeps the sticky header pinned to the
      outer scroll wrapper rather than to a dead inner scroll box. */

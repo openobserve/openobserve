@@ -1,8 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center">
-    <!-- <div class="mb-2 title" :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
     <div
-      class="flex flex-nowrap items-center mb-1 gap-x-1"
+      class="flex flex-nowrap items-center mb-2 mr-4 gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -10,21 +9,19 @@
         v-model="adhocVariables[index].name"
         :debounce="1000"
         data-test="dashboard-variable-adhoc-name-selector"
-        placeholder="Enter Name"
+        :placeholder="t('dashboard.variableAdHocValueSelector.enterName')"
         @update:model-value="updateModelValueOfSelect(index, $event)"
         class="flex-1"
       />
-      <OSelect
+      <OSelect class="w-auto"
         v-model="adhocVariables[index].operator"
         :options="operatorOptions"
-        style="width: auto"
         data-test="dashboard-variable-adhoc-operator-selector"
       />
-      <OInput
+      <OInput class="w-31.25"
         v-model="adhocVariables[index].value"
-        placeholder="Enter Value"
+        :placeholder="t('dashboard.variableAdHocValueSelector.enterValue')"
         :debounce="1000"
-        style="width: 125px"
         data-test="dashboard-variable-adhoc-value-selector"
         @update:model-value="emitValue()"
       />
@@ -37,7 +34,7 @@
         icon-left="close"
       >
       </OButton>
-      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'">AND</div> -->
+      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" class="bg-surface-subtle-hover">AND</div> -->
     </div>
     <OButton
       variant="ghost"
@@ -47,7 +44,7 @@
       data-test="dashboard-variable-adhoc-add-selector"
     >
       <DynamicFilterIcon />
-      <OTooltip content="Add Dynamic Filter" />
+      <OTooltip :content="t('dashboard.variableAdHocValueSelector.addDynamicFilter')" />
     </OButton>
   </div>
 </template>
@@ -56,6 +53,7 @@
 import { defineComponent, ref, toRef, watch, type Ref, toRefs } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -70,6 +68,7 @@ export default defineComponent({
 
   setup(props: any, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
     const operatorOptions = [
       { label: "=", value: "=" },
       { label: "!=", value: "!=" },
@@ -122,13 +121,9 @@ export default defineComponent({
       removeField,
       updateModelValueOfSelect,
       store,
+      t,
     };
   },
 });
 </script>
 
-<style>
-.printMode .hideOnPrintMode {
-  display: none;
-}
-</style>

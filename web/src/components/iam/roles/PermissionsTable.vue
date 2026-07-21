@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length && !loading"
-        class="w-full text-center mt-4 font-bold text-gray-600"
-        style="margin-top: 64px; font-size: 18px"
+        class="w-full text-center mt-4 font-bold text-text-secondary"
+        style="margin-top: 64px; font-size: var(--text-lg)"
       >
-        <span> No Permissions Selected </span>
+        <span> {{ t('iam.permissionsTable.noPermissionsSelected') }} </span>
       </div>
       <div
         data-test="edit-role-permissions-table-loading-resources-loader"
@@ -47,11 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
       >
         <OSpinner size="xs" class="my-2 mx-0 mr-2" />
-        <div>Loading Resources...</div>
+        <div>{{ t('iam.permissionsTable.loadingResources') }}</div>
       </div>
       <div
         v-if="level && getFilteredRows.length === 50"
-        class="py-2 text-left text-gray-700 bg-white relative"
+        class="py-2 text-left text-text-body bg-surface-base relative"
         :style="{
           paddingLeft: level
             ? parent.has_entities
@@ -63,8 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '',
         }"
       >
-        Showing <span class="font-bold"> Top 50 </span> resources (Search to get
-        specific resource)
+        {{ t('iam.permissionsTable.showing') }} <span class="font-bold"> {{ t('iam.permissionsTable.top50') }} </span> {{ t('iam.permissionsTable.resourcesSearchHint') }}
       </div>
       <div
         :data-test="`edit-role-${parent ? parent.name : 'main'}-permissions-table`"
@@ -128,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="edit-role-permissions-table-no-resources-title"
               class="py-2 px-4 text-sm text-text-secondary"
             >
-              No Resources Present
+              {{ t('iam.permissionsTable.noResourcesPresent') }}
             </div>
           </template>
         </OTable>
@@ -358,10 +357,11 @@ defineExpose({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(complex-state): :deep override of the OTable header cell height */
 .iam-permissions-table {
-  th{
-    height: 48px !important;
+  :deep(th) {
+    height: 3rem !important;
   }
 }
 </style>

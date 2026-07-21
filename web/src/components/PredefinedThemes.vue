@@ -64,18 +64,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             :data-test="`predefined-themes-apply-btn-${mode}-${themeNameSlug(theme.name)}`"
-            class="flex items-center w-full py-2 px-3 border rounded-lg cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
+            class="flex items-center w-full py-2 px-3 border rounded-default cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]"
             :class="isThemeApplied(theme, mode)
-              ? 'border-(--o2-primary-color) bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
-              : 'border-(--o2-border-color) bg-(--o2-card-bg) hover:border-(--o2-primary-color) hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
+              ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
+              : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'"
             :aria-pressed="isThemeApplied(theme, mode)"
             :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
             @click="applyTheme(theme, mode)"
           >
-            <span class="w-8 h-8 rounded border border-(--o2-border-color) shrink-0 relative" :style="swatchStyle(theme[mode])" />
+            <span class="w-8 h-8 rounded-default border border-card-glass-border shrink-0 relative" :style="swatchStyle(theme[mode])" />
             <span class="ml-2 min-w-0 flex-1 text-left">
               <span class="block text-sm font-medium truncate">{{ themeDisplayName(theme.name) }}</span>
-              <span class="block text-xs text-gray-400 truncate">{{ theme[mode].themeColor }}</span>
+              <span class="block text-xs text-text-secondary truncate">{{ theme[mode].themeColor }}</span>
             </span>
             <OTag
               v-if="isThemeApplied(theme, mode)"
@@ -91,24 +91,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             :data-test="`predefined-themes-card-${mode}-custom-color`"
-            class="flex items-center w-full py-2 px-3 border border-dashed rounded-lg cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
+            class="flex items-center w-full py-2 px-3 border border-dashed rounded-default cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]"
             :class="isCustomThemeApplied(mode)
-              ? 'border-(--o2-primary-color) bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
-              : 'border-(--o2-border-color) bg-(--o2-card-bg) hover:border-(--o2-primary-color) hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
+              ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
+              : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'"
             :aria-pressed="isCustomThemeApplied(mode)"
             aria-label="Pick a custom theme color"
             @click="openColorPicker(mode)"
           >
             <span
               :data-test="`predefined-themes-custom-color-preview-${mode}`"
-              class="w-8 h-8 rounded border border-(--o2-border-color) shrink-0 relative"
+              class="w-8 h-8 rounded-default border border-card-glass-border shrink-0 relative"
               :style="{ backgroundColor: mode === 'light' ? customLightColor : customDarkColor }"
             >
               <OIcon name="colorize" size="sm" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
             </span>
             <span class="ml-2 min-w-0 flex-1 text-left">
               <span class="block text-sm font-medium truncate">Custom Color</span>
-              <span class="block text-xs text-gray-400 truncate">
+              <span class="block text-xs text-text-secondary truncate">
                 {{ isCustomThemeApplied(mode)
                   ? (mode === 'light' ? customLightColor : customDarkColor)
                   : 'Pick any brand hex' }}
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection class="pt-0 pb-2 px-2">
       <OSeparator class="mb-2" />
       <div
-        class="text-xs text-gray-400 flex items-start gap-1 italic"
+        class="text-xs text-text-secondary flex items-start gap-1 italic"
       >
         <OIcon name="info-outline" size="xs" class="mt-0.5" />
         <span
@@ -171,7 +171,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { useStore } from "vuex";
-import { applyThemeColors } from "@/utils/theme";
+import { useTheme } from "@/composables/useTheme";
+import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { applyThemeForMode, applyCurrentTheme } from "@/utils/themeManager";
 import {
   PREDEFINED_THEMES,
@@ -186,6 +187,7 @@ import {
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const store = useStore();
+    const { isDark } = useTheme();
 const { isOpen } = usePredefinedThemes();
 const dialogOpen = ref(false);
 const activeTab = ref("light");
@@ -256,7 +258,7 @@ watch(isOpen, (val) => {
   dialogOpen.value = val;
   // When dialog opens, sync activeTab with current store theme
   if (val) {
-    activeTab.value = store.state.theme === "dark" ? "dark" : "light";
+    activeTab.value = isDark.value ? "dark" : "light";
   }
 });
 
@@ -269,11 +271,13 @@ watch(dialogOpen, (val) => {
 watch(activeTab, (newTab) => {
   const newTheme = newTab === "dark" ? "dark" : "light";
   if (store.state.theme !== newTheme) {
-    // Update theme in store and localStorage
-    store.dispatch("appTheme", newTheme);
     localStorage.setItem("theme", newTheme);
-    // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
+    // Update store and toggle .dark on <html> (Tailwind dark variant) inside
+    // switchThemeMode so the mode flip cross-fades as one frame.
+    switchThemeMode(newTheme, () => {
+      store.dispatch("appTheme", newTheme);
+      document.documentElement.classList.toggle("dark", newTheme === "dark");
+    });
   }
 });
 
@@ -346,7 +350,7 @@ onMounted(() => {
           store.state.tempThemeColors?.dark;
         if (hasTempColors) return;
 
-        const bodyMode = document.body.classList.contains("body--dark")
+        const bodyMode = document.documentElement.classList.contains("dark")
           ? "dark"
           : "light";
         applyThemeForMode(bodyMode, store);
@@ -354,7 +358,7 @@ onMounted(() => {
     });
   });
 
-  observer.observe(document.body, {
+  observer.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["class"],
   });

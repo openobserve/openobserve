@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -31,11 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
-          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
           {{ t('modelPricing.errorValidations') }}
         </div>
-        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">{{ t('modelPricing.outputMessages') }}</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('modelPricing.outputMessages') }}</div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="flex-1 min-h-0 overflow-auto resize-none">
           <!-- Model Pricing Errors Section -->
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span
                     data-test="model-pricing-import-name-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'model_pricing_name'
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <span
                     data-test="model-pricing-import-pattern-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'model_pricing_pattern'
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </span>
-                  <span class="text-red" v-else>{{ errorMessage }}</span>
+                  <span class="text-status-negative" v-else>{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
@@ -113,11 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{
                   'py-1.25 text-sm font-bold': true,
                   'text-green ': val.success,
-                  'text-red': !val.success,
+                  'text-status-negative': !val.success,
                 }"
                 :data-test="`model-pricing-import-creation-${index}-message`"
               >
-                <pre class="creators-message" style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; max-width: 100%;">{{ val.message }}</pre>
+                <pre class="creators-message whitespace-pre-wrap max-w-full" style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;">{{ val.message }}</pre>
               </div>
             </div>
           </div>
@@ -216,7 +216,7 @@ async function importJson({ jsonStr: jsonString }: any) {
 
   try {
     if (!jsonString || jsonString.trim() === "") {
-      throw new Error("JSON string is empty");
+      throw new Error(t("settings.importModelPricing.jsonEmpty"));
     }
 
     const parsedJson = JSON.parse(jsonString);
@@ -225,7 +225,7 @@ async function importJson({ jsonStr: jsonString }: any) {
       : [parsedJson];
   } catch (e: any) {
     toast({
-      message: e.message || "Invalid JSON format",
+      message: e.message || t("settings.importModelPricing.invalidJsonFormat"),
       variant: "error",
     });
     return;
@@ -242,7 +242,10 @@ async function importJson({ jsonStr: jsonString }: any) {
       modelPricingErrorsToDisplay.value.push([
         {
           field: "model_pricing_name",
-          message: `Model pricing - ${index + 1}: duplicate name "${jsonObj.name}" within this import batch. Each model must have a unique name.`,
+          message: t("settings.importModelPricing.duplicateNameInBatch", {
+            index: index + 1,
+            name: jsonObj.name,
+          }),
         },
       ]);
       continue;
@@ -256,7 +259,14 @@ async function importJson({ jsonStr: jsonString }: any) {
 
   if (successCount === totalCount) {
     toast({
-      message: `Successfully imported ${successCount} model pricing definition${successCount !== 1 ? "s" : ""}`,
+      message:
+        successCount !== 1
+          ? t("settings.importModelPricing.importedPlural", {
+              count: successCount,
+            })
+          : t("settings.importModelPricing.importedSingular", {
+              count: successCount,
+            }),
       variant: "success",
     });
 
@@ -290,7 +300,7 @@ async function processJsonObject(jsonObj: any, index: number) {
     return created;
   } catch (e: any) {
     toast({
-      message: "Error importing model pricing. Please check the JSON format.",
+      message: t("settings.importModelPricing.errorImporting"),
       variant: "error",
     });
     return false;
@@ -302,7 +312,7 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
     modelPricingErrorsToDisplay.value.push([
       {
         field: "model_pricing_name",
-        message: `Model pricing - ${index}: name is required`,
+        message: t("settings.importModelPricing.nameRequired", { index }),
       },
     ]);
     return false;
@@ -316,7 +326,9 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
     modelPricingErrorsToDisplay.value.push([
       {
         field: "model_pricing_pattern",
-        message: `Model pricing - ${index}: match_pattern is required`,
+        message: t("settings.importModelPricing.matchPatternRequired", {
+          index,
+        }),
       },
     ]);
     return false;
@@ -327,7 +339,10 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
     modelPricingErrorsToDisplay.value.push([
       {
         field: "model_pricing_name",
-        message: `Model pricing - ${index}: a model with name "${jsonObj.name}" already exists. Please choose a different name.`,
+        message: t("settings.importModelPricing.nameAlreadyExists", {
+          index,
+          name: jsonObj.name,
+        }),
       },
     ]);
     return false;
@@ -335,7 +350,7 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
 
   if (!Array.isArray(jsonObj.tiers) || jsonObj.tiers.length === 0) {
     modelPricingErrorsToDisplay.value.push([
-      `Model pricing - ${index}: tiers must be a non-empty array`,
+      t("settings.importModelPricing.tiersNonEmpty", { index }),
     ]);
     return false;
   }
@@ -347,7 +362,10 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
         modelPricingErrorsToDisplay.value.push([
           {
             field: "model_pricing_name",
-            message: `Model pricing - ${index}: usage key "${key}" cannot be a pure integer`,
+            message: t("settings.importModelPricing.usageKeyInteger", {
+              index,
+              key,
+            }),
           },
         ]);
         return false;
@@ -356,7 +374,10 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
         modelPricingErrorsToDisplay.value.push([
           {
             field: "model_pricing_name",
-            message: `Model pricing - ${index}: usage key "${key}" must not contain spaces`,
+            message: t("settings.importModelPricing.usageKeySpaces", {
+              index,
+              key,
+            }),
           },
         ]);
         return false;
@@ -378,24 +399,35 @@ async function createModelPricing(jsonObj: any, index: number) {
     });
     modelPricingCreators.value.push({
       success: true,
-      message: `Model pricing - ${index}: "${jsonObj.name}" created successfully`,
+      message: t("settings.importModelPricing.createdSuccessfully", {
+        index,
+        name: jsonObj.name,
+      }),
     });
     return true;
   } catch (error: any) {
     const errorMessage =
-      error?.response?.data?.message || "Unknown error";
+      error?.response?.data?.message ||
+      t("settings.importModelPricing.unknownError");
 
     // Skip bottom snackbar for 403 — global interceptor already shows persistent top banner.
     if (error?.response?.status !== 403) {
       toast({
-        message: `Failed to import "${jsonObj.name}": ${errorMessage}`,
+        message: t("settings.importModelPricing.failedToImport", {
+          name: jsonObj.name,
+          error: errorMessage,
+        }),
         variant: "error",
       });
     }
 
     modelPricingCreators.value.push({
       success: false,
-      message: `Model pricing - ${index}: "${jsonObj.name}" creation failed\n Reason: ${errorMessage}`,
+      message: t("settings.importModelPricing.creationFailed", {
+        index,
+        name: jsonObj.name,
+        reason: errorMessage,
+      }),
     });
     return false;
   }

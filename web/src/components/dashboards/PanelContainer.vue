@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="h-full flex flex-col rounded-lg overflow-hidden"
+    class="h-full flex flex-col rounded-default overflow-hidden"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <div
-        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-subtle rounded-t-lg"
+        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-default rounded-t-default"
         :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-(--color-text-primary) tracking-[0.02em]"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-heading tracking-[0.02em]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="format-list-bulleted"
           data-test="dashboard-show-legends-btn"
         >
-          <OTooltip content="Show Legends" side="bottom" align="end" />
+          <OTooltip :content="t('dashboard.panelContainer.showLegends')" side="bottom" align="end" />
         </OButton>
 
         <!-- Add Annotations button -->
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="panel-schema-renderer-annotation-button"
         >
           <OIcon :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'" size="sm" />
-          <OTooltip :content="PanleSchemaRendererRef?.isAddAnnotationMode ? 'Exit Annotations Mode' : 'Add Annotations'" side="bottom" align="end" />
+          <OTooltip :content="PanleSchemaRendererRef?.isAddAnnotationMode ? t('dashboard.panelContainer.exitAnnotationsMode') : t('dashboard.panelContainer.addAnnotations')" side="bottom" align="end" />
         </OButton>
 
         <OIcon
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
           icon-left="warning"
         >
-          <OTooltip side="bottom" align="end" max-width="13.75rem" content="Some dynamic variables are not applied because the field is not present in the query's stream. Open Query Inspector to see all the details of the variables and queries executed to render this panel" />
+          <OTooltip side="bottom" align="end" max-width="13.75rem" :content="t('dashboard.panelContainer.dependentAdhocVariableWarning')" />
         </OButton>
         <!-- show error here -->
         <PanelErrorButtons
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onPanelModifyClick('Refresh')"
             icon-left="cached"
           >
-            Refresh Cache &amp; Reload
+            {{ t("dashboard.panelContainer.refreshCacheReload") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="!simplifiedPanelView"
@@ -632,7 +632,7 @@ export default defineComponent({
 
     const onLogPanel = async () => {
       const showNotification = showPositiveNotification(
-        "Redirecting to logs page",
+        t("dashboard.panelContainer.redirectingToLogs"),
         {
         },
       );
@@ -694,7 +694,7 @@ export default defineComponent({
       // Show a loading spinner notification.
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t("dashboard.panelContainer.pleaseWait"),
               timeout: 0,
 });
 

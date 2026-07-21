@@ -1,6 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 import { describe, expect, it, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, config } from "@vue/test-utils";
+import i18n from "@/locales";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: {

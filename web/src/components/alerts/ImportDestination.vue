@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,25 +17,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <base-import
     ref="baseImportRef"
-    title="Import Destination"
+    :title="t('alert_destinations.import.title')"
     test-prefix="destination"
     :is-importing="isDestinationImporting"
     container-class=""
-    container-style=""
     @back="arrowBackFn"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default min-w-100">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
-          {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
+          {{ destinationErrorsToDisplay.length > 0 ? t('alert_destinations.import.errorValidations') : t('alert_destinations.import.outputMessages') }}
         </div>
-        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('alert_destinations.import.outputMessages') }}</div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-100">
           <!-- Destination Errors Section -->
@@ -59,14 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Destination Name Error -->
                   <span
                     data-test="destination-import-name-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'destination_name'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OInput
                         data-test="destination-import-name-input"
                         :model-value="userSelectedDestinationName[index] || ''"
@@ -74,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           userSelectedDestinationName[index] = val;
                           updateDestinationName(val, index);
                         }"
-                        :label="'Destination Name *'"
+                        :label="t('alert_destinations.import.destinationName') + ' *'"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -83,14 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- URL Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'url'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OInput
                         data-test="destination-import-url-input"
                         :model-value="userSelectedDestinationUrl[index] || ''"
@@ -98,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           userSelectedDestinationUrl[index] = val;
                           updateDestinationUrl(val, index);
                         }"
-                        :label="'Destination URL *'"
+                        :label="t('alert_destinations.import.destinationUrl') + ' *'"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -107,14 +106,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Type Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'type'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OSelect
                         data-test="destination-import-type-input"
                         :model-value="userSelectedDestinationType[index] || ''"
@@ -123,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           updateDestinationType(val, index);
                         }"
                         :options="destinationTypes"
-                        :label="'Destination Type *'"
+                        :label="t('alert_destinations.destination_type') + ' *'"
                         class="py-2 showLabelOnTop no-case"
                       />
                     </div>
@@ -131,14 +130,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Method Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'method'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OSelect
                         data-test="destination-import-method-input"
                         :model-value="userSelectedDestinationMethod[index] || ''"
@@ -147,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           updateDestinationMethod(val, index);
                         }"
                         :options="destinationMethods"
-                        :label="'Destination Method *'"
+                        :label="t('alert_destinations.import.destinationMethod') + ' *'"
                         class="py-2 showLabelOnTop no-case"
                       />
                     </div>
@@ -155,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Template Name Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'template_name'
@@ -169,29 +168,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="(val) => {
                           userSelectedTemplates[index] = val;
                           updateDestinationTemplate(val, index);
-                          templateErrors[index] = val ? '' : 'Field is required!';
+                          templateErrors[index] = getCorrectionRequiredError(val);
                         }"
                         :options="filteredTemplates"
-                        label="Templates *"
+                        :label="t('alert_destinations.import.templates') + ' *'"
                         class="py-2 showLabelOnTop no-case"
                         :error="!!templateErrors[index]"
                         :error-message="templateErrors[index]"
                         @search="filterTemplates"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
 
                   <!-- Email Input Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'email_input'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OInput
                         data-test="destination-import-emails-input"
                         :model-value="userSelectedEmails[index] || ''"
@@ -199,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           userSelectedEmails[index] = val;
                           updateDestinationEmails(val, index);
                         }"
-                        :label="'Emails (comma separated) *'"
+                        :label="t('alert_destinations.import.emails') + ' *'"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -208,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Action ID Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'action_id'
@@ -222,31 +220,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="(val) => {
                           userSelectedActionId[index] = val;
                           updateDestinationAction(val, index);
-                          actionErrors[index] = val ? '' : 'Field is required!';
+                          actionErrors[index] = getCorrectionRequiredError(val);
                         }"
                         :options="filteredActions"
-                        label="Actions *"
+                        :label="t('alert_destinations.import.actions') + ' *'"
                         labelKey="label"
                         valueKey="value"
-                        class="py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case w-75!"
                         :error="!!actionErrors[index]"
                         :error-message="actionErrors[index]"
                         @search="filterActions"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
 
                   <!-- Skip TLS Verify Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'skip_tls_verify'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OSwitch
                         data-test="destination-import-skip-tls-verify-input"
                         :model-value="userSelectedSkipTlsVerify[index] ?? false"
@@ -257,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </span>
 
-                  <span class="text-red" v-else>{{ errorMessage }}</span>
+                  <span class="text-status-negative" v-else>{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
@@ -269,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-base mb-2.5 uppercase text-primary"
               data-test="destination-import-creation-title"
             >
-              Destination Creation
+              {{ t('alert_destinations.import.destinationCreation') }}
             </div>
             <div
               class="error-list"
@@ -281,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{
                   'font-bold py-1.25 px-0 text-sm wrap-break-word': true,
                   'text-green ': val.success,
-                  'text-red': !val.success,
+                  'text-status-negative': !val.success,
                 }"
                 :data-test="`destination-import-creation-${index}-message`"
               >
@@ -551,13 +548,19 @@ export default defineComponent({
       destinationErrorsToDisplay.value.forEach((errorGroup, idx) => {
         for (const msg of errorGroup) {
           if (typeof msg === 'object') {
-            if (msg.field === 'template_name' && !userSelectedTemplates.value[idx]) {
-              templateErrors[idx] = 'Field is required!';
-              hasCorrectionErrors = true;
+            if (msg.field === 'template_name') {
+              const requiredError = getCorrectionRequiredError(userSelectedTemplates.value[idx]);
+              if (requiredError) {
+                templateErrors[idx] = requiredError;
+                hasCorrectionErrors = true;
+              }
             }
-            if (msg.field === 'action_id' && !userSelectedActionId.value[idx]) {
-              actionErrors[idx] = 'Field is required!';
-              hasCorrectionErrors = true;
+            if (msg.field === 'action_id') {
+              const requiredError = getCorrectionRequiredError(userSelectedActionId.value[idx]);
+              if (requiredError) {
+                actionErrors[idx] = requiredError;
+                hasCorrectionErrors = true;
+              }
             }
           }
         }
@@ -572,7 +575,7 @@ export default defineComponent({
 
       try {
         if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
+          throw new Error(t("alert_destinations.import.jsonStringEmpty"));
         }
 
         const parsedJson = JSON.parse(jsonString);
@@ -581,7 +584,7 @@ export default defineComponent({
           : [parsedJson];
       } catch (e: any) {
         toast({
-          message: e.message || "Invalid JSON format",
+          message: e.message || t("alert_destinations.import.invalidJsonFormat"),
           variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
@@ -604,7 +607,7 @@ export default defineComponent({
 
       if (successCount === totalCount) {
         toast({
-          message: `Successfully imported destination(s)`,
+          message: t("alert_destinations.import.importSuccess"),
           variant: "success",
         });
 
@@ -642,12 +645,19 @@ export default defineComponent({
         return false;
       } catch (e: any) {
         toast({
-          message: "Error importing Destination please check the JSON",
+          message: t("alert_destinations.import.importError"),
           variant: "error",
         });
         return false;
       }
     };
+
+    // Single source of truth for the correction "required" rule. The template
+    // and action correction controls plus the pre-import correction gate below
+    // all defer to this instead of re-deriving the required message inline, so
+    // the destination JS validator owns the rule in one place.
+    const getCorrectionRequiredError = (value: any): string =>
+      value ? "" : t("alerts.validation.fieldRequired");
 
     const validateDestinationInputs = async (input: any, index: number) => {
       let destinationErrors: (string | { message: string; field: string })[] =
@@ -660,7 +670,7 @@ export default defineComponent({
         input.name.trim() === ""
       ) {
         destinationErrors.push({
-          message: `Destination - ${index}: The "name" field is required and should be a valid string.`,
+          message: t("alert_destinations.import.nameRequired", { index }),
           field: "destination_name",
         });
       } else if (
@@ -669,7 +679,10 @@ export default defineComponent({
         )
       ) {
         destinationErrors.push({
-          message: `Destination - ${index}: "${input.name}" already exists`,
+          message: t("alert_destinations.import.nameExists", {
+            index,
+            name: input.name,
+          }),
           field: "destination_name",
         });
       }
@@ -682,7 +695,7 @@ export default defineComponent({
          input.type !== "action")
       ) {
         destinationErrors.push({
-          message: `Destination - ${index}: The "type" field must be either "email", "http", or "action"`,
+          message: t("alert_destinations.import.typeInvalid", { index }),
           field: "type",
         });
       }
@@ -690,7 +703,7 @@ export default defineComponent({
       // Check if action type is supported when actions are not enabled
       if (input.type === "action" && !isActionsEnabled.value) {
         destinationErrors.push(
-          `Destination - ${index}: 'action' type is not supported.`,
+          t("alert_destinations.import.actionTypeNotSupported", { index }),
         );
       }
 
@@ -705,7 +718,11 @@ export default defineComponent({
         !availableActions.includes(input.action_id)
       ) {
         destinationErrors.push({
-          message: `Destination - ${index}: action "${input.action_id}" does not exist for type "${input.type}"`,
+          message: t("alert_destinations.import.actionNotFound", {
+            index,
+            actionId: input.action_id,
+            type: input.type,
+          }),
           field: "action_id",
         });
       }
@@ -714,7 +731,7 @@ export default defineComponent({
       if (input.type === "http") {
         if (!input.url || typeof input.url !== "string" || input.url.trim() === "") {
           destinationErrors.push({
-            message: `Destination - ${index}: The "url" field is required for http type destinations.`,
+            message: t("alert_destinations.import.urlRequired", { index }),
             field: "url",
           });
         }
@@ -724,14 +741,14 @@ export default defineComponent({
           !["post", "get", "put"].includes(input.method.toLowerCase())
         ) {
           destinationErrors.push({
-            message: `Destination - ${index}: The "method" field must be one of "post", "get", or "put"`,
+            message: t("alert_destinations.import.methodInvalid", { index }),
             field: "method",
           });
         }
 
         if (!input.template || typeof input.template !== "string") {
           destinationErrors.push({
-            message: `Destination - ${index}: The "template" field is required for http type destinations.`,
+            message: t("alert_destinations.import.templateRequiredHttp", { index }),
             field: "template_name",
           });
         }
@@ -742,7 +759,7 @@ export default defineComponent({
           typeof input.skip_tls_verify !== "boolean"
         ) {
           destinationErrors.push({
-            message: `Destination - ${index}: The "skip_tls_verify" field is required and should be a boolean value`,
+            message: t("alert_destinations.import.skipTlsVerifyRequired", { index }),
             field: "skip_tls_verify",
           });
         }
@@ -751,7 +768,7 @@ export default defineComponent({
         if (input.headers !== undefined) {
           if (typeof input.headers !== "object" || Array.isArray(input.headers)) {
             destinationErrors.push(
-              `Destination - ${index}: 'headers' should be an object for http type`,
+              t("alert_destinations.import.headersMustBeObject", { index }),
             );
           }
         }
@@ -762,7 +779,7 @@ export default defineComponent({
         // Validate URL should not be present for email type
         if (input.url) {
           destinationErrors.push(
-            `Destination - ${index}: 'url' should not be provided for email type`,
+            t("alert_destinations.import.urlNotAllowedEmail", { index }),
           );
         }
 
@@ -772,26 +789,26 @@ export default defineComponent({
           Object.keys(input.headers).length !== 0
         ) {
           destinationErrors.push(
-            `Destination - ${index}: 'headers' should not be provided for email type`,
+            t("alert_destinations.import.headersNotAllowedEmail", { index }),
           );
         }
 
         // Validate emails array with stricter validation
         if (!input.emails || !Array.isArray(input.emails) || input.emails.length === 0) {
           destinationErrors.push({
-            message: `Destination - ${index}: The "emails" field is required and should be an array for email type destinations.`,
+            message: t("alert_destinations.import.emailsRequired", { index }),
             field: "email_input",
           });
         } else if (input.emails.some((email: any) => typeof email !== "string")) {
           destinationErrors.push({
-            message: `Destination - ${index}: 'emails' should be an array of strings for email type`,
+            message: t("alert_destinations.import.emailsMustBeStrings", { index }),
             field: "email_input",
           });
         }
 
         if (!input.template || typeof input.template !== "string") {
           destinationErrors.push({
-            message: `Destination - ${index}: The "template" field is required for email type destinations.`,
+            message: t("alert_destinations.import.templateRequiredEmail", { index }),
             field: "template_name",
           });
         }
@@ -809,7 +826,11 @@ export default defineComponent({
 
         if (!availableTemplates.includes(input.template)) {
           destinationErrors.push({
-            message: `Destination - ${index}: template "${input.template}" does not exist for type "${input.type}"`,
+            message: t("alert_destinations.import.templateNotFound", {
+              index,
+              template: input.template,
+              type: input.type,
+            }),
             field: "template_name",
           });
         }
@@ -819,7 +840,7 @@ export default defineComponent({
       if (isActionsEnabled.value) {
         if (input.action_id && typeof input.action_id !== "string") {
           destinationErrors.push({
-            message: `Destination - ${index}: The "action_id" field must be a valid string.`,
+            message: t("alert_destinations.import.actionIdInvalid", { index }),
             field: "action_id",
           });
         }
@@ -842,7 +863,10 @@ export default defineComponent({
         });
 
         destinationCreators.value.push({
-          message: `Destination - ${index}: "${input.name}" created successfully \nNote: please remove the created destination object ${input.name} from the json file `,
+          message: t("alert_destinations.import.createSuccess", {
+            index,
+            name: input.name,
+          }),
           success: true,
         });
 
@@ -851,7 +875,13 @@ export default defineComponent({
         return true;
       } catch (error: any) {
         destinationCreators.value.push({
-          message: `Destination - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          message: t("alert_destinations.import.createFailed", {
+            index,
+            name: input.name,
+            reason:
+              error?.response?.data?.message ||
+              t("alert_destinations.import.unknownError"),
+          }),
           success: false,
         });
         return false;
@@ -900,6 +930,7 @@ export default defineComponent({
       filterTemplates,
       filterActions,
       getServiceActions,
+      getCorrectionRequiredError,
       arrowBackFn,
       isDestinationImporting,
       store,

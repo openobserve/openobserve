@@ -74,11 +74,11 @@ describe("OTag shape", () => {
   });
   it("fieldType (dtype chip) renders rounded, matching the wildcard pattern chip", () => {
     const html = mount(OTag, { props: { type: "fieldType", value: "string" } }).html();
-    expect(html.includes("rounded-md")).toBe(true);
+    expect(html.includes("rounded-default")).toBe(true);
   });
-  it("groups that opt into rounded render rounded-md", () => {
+  it("groups that opt into rounded render rounded-default", () => {
     const html = mount(OTag, { props: { type: "logsResultChip", value: "neutral" } }).html();
-    expect(html.includes("rounded-md")).toBe(true);
+    expect(html.includes("rounded-default")).toBe(true);
   });
   it("group-declared class is merged onto the badge (qualityStatus naked dot)", () => {
     const html = mount(OTag, { props: { type: "qualityStatus", value: "healthy" } }).html();

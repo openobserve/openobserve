@@ -15,18 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="edit-group-section" class="flex flex-col h-full">
-    <!-- Sub-page header: the listing's icon becomes a Back button (→ Groups). -->
-    <AppPageHeader
-      :title="groupDetails.group_name"
-      :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
-      class="shrink-0 px-4 border-b border-border-default"
-    />
+  <OPageLayout
+    data-test="edit-group-section"
+    :title="groupDetails.group_name"
+    :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
+    bleed
+  >
     <div
       data-test="edit-group-section-title"
-      class="px-2.5 pt-2.5 pb-[0.625rem] flex-shrink-0"
+      class="px-page-edge pt-2.5 pb-2.5 flex-shrink-0"
     >
-    <div class="card-container py-3">
+    <div class="bg-card-glass-bg py-3">
     <AppTabs
       data-test="edit-group-tabs"
       :tabs="tabs"
@@ -66,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex justify-end w-full flex-shrink-0"
       style="z-index: 2"
     >
-      <div class="card-container w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
+      <div class="bg-card-glass-bg w-full py-2 px-page-edge justify-end flex gap-2 border-t border-border-default">
       <OButton
         data-test="edit-group-cancel-btn"
         variant="outline"
@@ -92,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="onLeaveConfirm(false)"
       v-model="leaveConfirm.show"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -102,7 +101,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useI18n } from "vue-i18n";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
@@ -192,13 +191,13 @@ const tabs = computed(() => {
   const baseTabs = [
     {
       value: "roles",
-      label: "Roles",
+      label: t('iam.editGroup.roles'),
       icon: "shield",
       dirty: isRolesDirty.value,
     },
     {
       value: "users",
-      label: "Users",
+      label: t('iam.editGroup.users'),
       icon: "group",
       dirty: isUsersDirty.value,
     },
@@ -207,7 +206,7 @@ const tabs = computed(() => {
   if (store.state.zoConfig.service_account_enabled) {
     baseTabs.push({
       value: "serviceAccounts",
-      label: "Service Accounts",
+      label: t('iam.editGroup.serviceAccounts'),
       icon: "smart-toy",
       dirty: isServiceAccountsDirty.value,
     });
@@ -231,7 +230,7 @@ const getGroupDetails = () => {
     .catch((err) => {
       console.log(err);
       toast({
-        message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
+        message: err?.message || t('iam.editGroup.groupNotFound'),
         variant: "error",
       });
       router.push({
@@ -272,7 +271,7 @@ const saveGroupChanges = () => {
   ) {
     toast({
       variant: "info",
-      message: `No updates detected.`,
+      message: t('iam.editGroup.noUpdates'),
     });
 
     return;
@@ -286,7 +285,7 @@ const saveGroupChanges = () => {
     .then((res) => {
       toast({
         variant: "success",
-        message: `Updated group successfully!`,
+        message: t('iam.editGroup.updateSuccess'),
       });
 
       // Reset Roles
@@ -329,7 +328,7 @@ const saveGroupChanges = () => {
       if(err.response.status != 403){
         toast({
           variant: "error",
-          message: "Error while updating group!",
+          message: t('iam.editGroup.updateError'),
         });
       }
     });

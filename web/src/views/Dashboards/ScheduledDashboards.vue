@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer data-test="scheduled-dashboards-drawer"
+    bleed
     :open="open"
     :width="60"
     :title="t('dashboard.scheduledDashboards')"
@@ -23,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <div class="flex items-center justify-end gap-2">
-        <div class="app-tabs-container h-[36px]">
+        <div class="app-tabs-container h-9">
           <AppTabs
             class="tabs-selection-container"
             :tabs="scheduledReportTypeTabs"
@@ -42,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="alert-list-add-alert-btn"
           @click="createScheduledReport"
-          >{{ t("dashboard.newReport") }}</OButton
+        >{{ t("dashboard.newReport") }}</OButton
         >
       </div>
     </template>
@@ -50,9 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="scheduled-dashboards-container"
       class="scheduled-dashboards h-fit"
-      :class="store.state.theme === 'dark' ? 'dark-mode bg-[var(--color-surface-panel)]' : 'bg-white'"
     >
-    <OTable
+    <OTable class="w-full"
       data-test="scheduled-dashboard-table"
       :data="displayReports"
       :columns="columns"
@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size-options="perPageOptionsList"
       :show-global-filter="false"
       :default-columns="false"
+      show-index
       :loading="loading"
-      style="width: 100%"
     >
       <template #cell-name="{ row }">
         <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unit="us"
             mode="absolute"
             :timezone="store.state.timezone"
-            empty-label="Never"
+            :empty-label="t('dashboard.scheduledDashboardsPage.never')"
           />
         </span>
       </template>
@@ -131,7 +131,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps({
   open: {
@@ -223,9 +223,8 @@ onMounted(() => {
 
 const formatReports = () => {
   props.reports.length > 0 &&
-    props.reports.forEach((report: any, index) => {
+    props.reports.forEach((report: any) => {
       scheduledReports.value.push({
-        "#": index + 1,
         name: report.name,
         tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
         time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
@@ -261,25 +260,9 @@ const filterReports = () => {
       scheduledReports.value as ScheduledDashboardReport[]
     ).filter((report) => !report.isCached);
   }
-
-  formattedReports.value = formattedReports.value.map(
-    (report: any, index: number) => {
-      return {
-        ...report,
-        "#": index + 1,
-      };
-    },
-  );
 };
 
 const columns: OTableColumnDef[] = [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    meta: { align: "left" },
-    size: TABLE_INDEX_COL_SIZE,
-  },
   {
     id: "name",
     header: t("reports.name"),
@@ -362,27 +345,37 @@ const openReport = (row: any) => {
 
 const getFrequencyValue = (frequency: any) => {
   if (frequency.type === "cron") {
-    return `Cron ${frequency.cron}`;
+    return t("dashboard.scheduledDashboardsPage.cronFrequency", {
+      cron: frequency.cron,
+    });
   } else {
     switch (frequency.type) {
       case "once":
-        return `Once`;
+        return t("dashboard.scheduledDashboardsPage.once");
       case "hours":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Hours" : "Hour"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyHours", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyHour");
       case "weeks":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Weeks" : "Week"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyWeeks", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyWeek");
       case "months":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Months" : "Month"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyMonths", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyMonth");
       case "days":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
-          frequency.interval > 1 ? "Days" : "Day"
-        }`;
+        return frequency.interval > 1
+          ? t("dashboard.scheduledDashboardsPage.everyDays", {
+              interval: frequency.interval,
+            })
+          : t("dashboard.scheduledDashboardsPage.everyDay");
       default:
         return "";
     }
@@ -391,7 +384,7 @@ const getFrequencyValue = (frequency: any) => {
 
 const getTimeRangeValue = (dateTime: any) => {
   if (dateTime.type === "relative") {
-    return `Past ${dateTime.period}`;
+    return t("dashboard.scheduledDashboardsPage.past", { period: dateTime.period });
   } else {
     const startDateTime = convertUnixToDateFormat(dateTime.from);
     const endDateTime = convertUnixToDateFormat(dateTime.to);
@@ -400,43 +393,32 @@ const getTimeRangeValue = (dateTime: any) => {
 };
 </script>
 
-<style>
-.dark-mode.scheduled-dashboards .rum-tabs {
-  border: 1px solid #464646;
-}
-
-.dark-mode.scheduled-dashboards .rum-tab:hover {
-  background: #464646;
-}
-
-.dark-mode.scheduled-dashboards .rum-tab.active {
-  background: #5960b2;
-  color: #ffffff !important;
-}
-
-.scheduled-dashboards thead tr {
+<style scoped>
+/* keep(lib-override:o2-table.rum-tabs): table header-row background and the pill-style
+   time-range tabs — target OTable / tab child DOM reached via :deep(). */
+.scheduled-dashboards :deep(thead tr) {
   background-color: var(--color-table-header-bg);
 }
 
-.scheduled-dashboards .rum-tabs {
-  border: 1px solid #eaeaea;
+.scheduled-dashboards :deep(.rum-tabs) {
+  border: 1px solid var(--color-border-default);
   height: fit-content;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   overflow: hidden;
 }
 
-.scheduled-dashboards .rum-tab {
+.scheduled-dashboards :deep(.rum-tab) {
   width: fit-content !important;
-  padding: 4px 12px !important;
+  padding: 0.25rem 0.75rem !important;
   border: none !important;
 }
 
-.scheduled-dashboards .rum-tab:hover {
-  background: #eaeaea;
+.scheduled-dashboards :deep(.rum-tab:hover) {
+  background: var(--color-surface-subtle-hover);
 }
 
-.scheduled-dashboards .rum-tab.active {
-  background: #5960b2;
-  color: #ffffff !important;
+.scheduled-dashboards :deep(.rum-tab.active) {
+  background: var(--color-brand-indigo);
+  color: var(--color-white) !important;
 }
 </style>

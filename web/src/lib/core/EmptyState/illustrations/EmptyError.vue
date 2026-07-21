@@ -73,11 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- bowed head, face hidden in hands -->
       <g class="es-head">
-        <ellipse cx="198" cy="184" rx="15" ry="15" fill="#f0c29a" transform="rotate(18 198 184)" />
-        <path d="M183 180 Q182 164 199 163 Q216 165 214 182 Q214 172 206 170 Q210 175 208 182 Q200 171 191 174 Q185 176 184 184 Z" fill="#5b4a3a" />
+        <ellipse cx="198" cy="184" rx="15" ry="15" fill="var(--color-illustration-sand)" transform="rotate(18 198 184)" />
+        <path d="M183 180 Q182 164 199 163 Q216 165 214 182 Q214 172 206 170 Q210 175 208 182 Q200 171 191 174 Q185 176 184 184 Z" fill="var(--color-illustration-umber)" />
         <!-- hands covering the face -->
-        <ellipse cx="190" cy="190" rx="5" ry="6" fill="#f0c29a" transform="rotate(20 190 190)" />
-        <ellipse cx="205" cy="188" rx="5" ry="6" fill="#e8b48c" transform="rotate(20 205 188)" />
+        <ellipse cx="190" cy="190" rx="5" ry="6" fill="var(--color-illustration-sand)" transform="rotate(20 190 190)" />
+        <ellipse cx="205" cy="188" rx="5" ry="6" fill="var(--color-illustration-tan)" transform="rotate(20 205 188)" />
       </g>
     </g>
   </svg>
@@ -90,7 +90,13 @@ withDefaults(
 );
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies from unscoped blocks — a global name collision where the
+   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
+   keyframe names per component, which ends the collision. All selectors and the
+   es-static gate live in this file's own template. */
 .es-warn,
 .es-frag {
   transform-box: fill-box;

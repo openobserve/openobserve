@@ -1,6 +1,6 @@
 <template>
   <div data-test="promql-metric-selector" class="mb-2">
-    <div style="display: flex; flex-direction: row" class="pl-3">
+    <div class="pl-3 flex flex-row">
       <div
         data-test="promql-metric-selector-label"
         class="text-sm whitespace-nowrap flex items-center min-w-32.5"
@@ -10,14 +10,14 @@
         <OSelect
           v-model="selectedMetric"
           :options="metrics"
-          label="Metric Name"
+          :label="t('metrics.metricSelector.metricName')"
           class="showLabelOnTop min-w-75 max-w-125"
           @update:model-value="onMetricSelect"
           clearable
           data-test="metric-selector"
         >
           <template #empty>
-            {{ loading ? "Loading metrics..." : "No metrics found" }}
+            {{ loading ? t('metrics.metricSelector.loadingMetrics') : t('metrics.metricSelector.noMetricsFound') }}
           </template>
         </OSelect>
       </div>

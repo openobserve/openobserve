@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +12,43 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const REVIEW_MARKER = "<!-- ai-code-review -->";
+// ─── Model provider selection ──────────────────────────────────────────────
+// The review runs against a single provider per invocation, chosen via env so the
+// same script can be launched once per provider (see .github/workflows/ai-code-review.yml,
+// which runs a glm + deepseek matrix for a side-by-side comparison). Everything defaults
+// to the original GLM-5.2 (Z.ai) setup, so an invocation with no REVIEW_* env set behaves
+// exactly as before.
+//
+// - REVIEW_PROVIDER_ID / REVIEW_MODEL_ID: opencode provider+model IDs (must match a
+//   provider/model registered in opencode.jsonc).
+// - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (GLM uses "max"; empty ⇒ omit).
+// - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
+// - REVIEW_LABEL: short human label used in the posted comment header (e.g. "GLM-5.2").
+// - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
+//   the two providers post/update independent comments and never clobber each other.
+const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "zai";
+const MODEL_ID = process.env.REVIEW_MODEL_ID || "glm-5.2";
+const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "max";
+const API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "GLM_API_KEY";
+const MODEL_LABEL = process.env.REVIEW_LABEL || "GLM-5.2";
+const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
+
+function apiKey() {
+  return process.env[API_KEY_VAR_NAME];
+}
+
+const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
+
+// Every marker any provider leg may post. findExistingReviewComment matches on substring, so a
+// comment carrying a foreign marker gets claimed — and overwritten — by that other provider's
+// leg. The coordinator prompt is now told not to emit markers at all, but models don't reliably
+// obey formatting instructions, so sanitizeReviewBody strips all of these and re-prepends only
+// REVIEW_MARKER: exactly one marker per comment, enforced in code rather than by the prompt.
+// Keep in sync with the `marker` values in .github/workflows/ai-code-review.yml.
+const ALL_REVIEW_MARKERS = [
+  "<!-- ai-code-review -->",
+  "<!-- ai-code-review-deepseek -->",
+];
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
 const OVERALL_TIMEOUT_MS = 20 * 60 * 1000;
@@ -30,61 +66,62 @@ const NOISE_EXTENSIONS = [".min.js", ".min.css", ".bundle.js", ".map", ".svg"];
 const NOISE_GENERATED_MARKERS = ["@generated", "auto-generated", "DO NOT EDIT", "Generated file"];
 
 // ─── Agent definitions ─────────────────────────────────────────────────────
+// Model/agent execution is delegated to `opencode serve` (see OpencodeServer below).
+// Each key here maps to an agent of the same name (`ai-review-<key>`) registered in
+// opencode.jsonc, all running with read-only repo tools.
+// One shared agent set serves every provider: the model is overridden per-call from env
+// (see callOpencode), so these names are provider-agnostic by design.
 const AGENTS = {
   security: {
     name: "Security Reviewer",
     promptFile: "agents/security.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-security",
     fileFocus: f => /\.rs$|\.toml$|auth|authz|oauth|token|crypto|secret|password|unsafe/.test(f),
   },
   "code-quality": {
     name: "Code Quality Reviewer",
     promptFile: "agents/code-quality.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-code-quality",
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.js$/.test(f),
   },
   performance: {
     name: "Performance Reviewer",
     promptFile: "agents/performance.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-performance",
     fileFocus: f => /\.rs$|\.ts$|\.vue$|\.sql$/.test(f),
   },
   documentation: {
     name: "Documentation Reviewer",
     promptFile: "agents/documentation.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-documentation",
     fileFocus: () => true,
   },
   release: {
     name: "Release Reviewer",
     promptFile: "agents/release.md",
-    model: "deepseek-chat",
-    modelFamily: "deepseek",
+    opencodeAgent: "ai-review-release",
     fileFocus: f => /Cargo\.toml|package\.json|\.sql$|migration|Migration|\.yml$|Dockerfile|docker/.test(f),
   },
 };
 
 // ─── Risk tiers ────────────────────────────────────────────────────────────
+const COORDINATOR_AGENT = "ai-review-coordinator";
 const RISK_TIERS = {
   trivial: {
     maxLines: 10,
     maxFiles: 20,
     agents: ["code-quality"],
-    coordinatorModel: "deepseek-chat",
+    coordinatorAgent: COORDINATOR_AGENT,
   },
   lite: {
     maxLines: 100,
     maxFiles: 20,
     agents: ["code-quality", "documentation"],
-    coordinatorModel: "deepseek-chat",
+    coordinatorAgent: COORDINATOR_AGENT,
   },
   full: {
     agents: ["security", "code-quality", "performance", "documentation", "release"],
-    coordinatorModel: "deepseek-chat",
+    coordinatorAgent: COORDINATOR_AGENT,
   },
 };
 
@@ -478,87 +515,189 @@ function assessRiskTier(filteredDiff) {
   return "full";
 }
 
-// ─── LLM calls (DeepSeek only) ─────────────────────────────────────────────
+// ─── LLM calls (via `opencode serve`, GLM-5.2 max effort) ─────────────────
+//
+// Each reviewer/coordinator is a named agent in opencode.jsonc (ai-review-*), running
+// read-only against the checked-out repo via OpencodeServer + callOpencode below. Unlike
+// a bare chat-completion call, opencode agents can Read/Grep the actual codebase around
+// the diff, not just the diff text — that repo context is the main quality lever over the
+// old DeepSeek-only approach.
 
-async function callDeepSeek(systemPrompt, userPrompt, model, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new Error("DEEPSEEK_API_KEY not set");
+class OpencodeServer {
+  constructor() {
+    this.proc = null;
+    this.baseUrl = "";
+    this.starting = null;
+  }
 
+  async ensureStarted() {
+    if (this.baseUrl) return this.baseUrl;
+    if (this.starting) return this.starting;
+
+    this.starting = (async () => {
+      if (!apiKey()) throw new Error(`${API_KEY_VAR_NAME} not set`);
+
+      const proc = spawn("opencode", ["serve", "--hostname", "127.0.0.1", "--port", "0"], {
+        cwd: resolve(__dirname, "../.."),
+        env: { ...process.env },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      this.proc = proc;
+
+      let stderrTail = "";
+      proc.stderr.on("data", chunk => {
+        stderrTail = (stderrTail + chunk.toString()).slice(-4000);
+      });
+
+      const urlPattern = /opencode server listening on (http:\/\/[^\s]+)/;
+      const url = await new Promise((resolvePromise, rejectPromise) => {
+        let buf = "";
+        const onData = chunk => {
+          buf += chunk.toString();
+          const match = urlPattern.exec(buf) || urlPattern.exec(stderrTail);
+          if (match) {
+            cleanup();
+            resolvePromise(match[1]);
+          }
+        };
+        const onExit = code => {
+          cleanup();
+          rejectPromise(new Error(`opencode serve exited early (code ${code}): ${stderrTail}`));
+        };
+        const cleanup = () => {
+          proc.stdout.off("data", onData);
+          proc.stderr.off("data", onData);
+          proc.off("exit", onExit);
+        };
+        proc.stdout.on("data", onData);
+        proc.stderr.on("data", onData);
+        proc.on("exit", onExit);
+        setTimeout(() => {
+          cleanup();
+          rejectPromise(new Error(`opencode serve did not start within 30s: ${stderrTail}`));
+        }, 30_000);
+      });
+
+      proc.on("exit", () => {
+        this.baseUrl = "";
+        this.proc = null;
+      });
+
+      this.baseUrl = url;
+      return url;
+    })();
+
+    try {
+      return await this.starting;
+    } finally {
+      this.starting = null;
+    }
+  }
+
+  stop() {
+    if (this.proc && !this.proc.killed) {
+      this.proc.kill("SIGTERM");
+    }
+    this.proc = null;
+    this.baseUrl = "";
+  }
+}
+
+const OPENCODE = new OpencodeServer();
+
+function extractText(parts) {
+  return (parts || [])
+    .filter(p => p.type === "text")
+    .map(p => p.text || "")
+    .join("\n")
+    .trim();
+}
+
+async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
     "gen_ai.operation.name": traceOptions.operationName || "chat",
-    "gen_ai.system": "deepseek",
-    "gen_ai.request.model": model || "deepseek-chat",
-    "gen_ai.request.temperature": 0,
-    "gen_ai.request.max_tokens": 8192,
+    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.request.model": MODEL_ID,
+    "gen_ai.request.reasoning_effort": MODEL_VARIANT || "default",
     "ai.agent.key": traceOptions.agentKey,
     "ai.agent.name": traceOptions.agentName,
     "gen_ai.agent.name": traceOptions.agentName,
-    "server.address": "api.deepseek.com",
-    "url.full": "https://api.deepseek.com/v1/chat/completions",
-    "http.request.method": "POST",
+    "opencode.agent": agentName,
     "timeout.ms": timeoutMs,
   }, traceOptions.parentSpan);
 
-  const messages = [
-    { role: "system", content: systemPrompt.slice(0, 100_000) },
-    { role: "user", content: userPrompt.slice(0, 150_000) },
-  ];
+  const truncatedSystem = systemPrompt.slice(0, 100_000);
+  const truncatedUser = userPrompt.slice(0, 150_000);
 
   TRACE.setSpanAttributes(llmSpan, {
-    "gen_ai.input.messages": JSON.stringify(messages),
-    "gen_ai.prompt.0.role": messages[0].role,
-    "gen_ai.prompt.0.content": messages[0].content,
-    "gen_ai.prompt.1.role": messages[1].role,
-    "gen_ai.prompt.1.content": messages[1].content,
-    "gen_ai.prompt.system.content_length": messages[0].content.length,
-    "gen_ai.prompt.user.content_length": messages[1].content.length,
+    "gen_ai.prompt.system.content_length": truncatedSystem.length,
+    "gen_ai.prompt.user.content_length": truncatedUser.length,
   });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const resp = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    const baseUrl = await OPENCODE.ensureStarted();
+
+    const sessionResp = await fetch(`${baseUrl}/session`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model || "deepseek-chat",
-        messages,
-        temperature: 0.0,
-        max_tokens: 8192,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: `ai-review:${traceOptions.agentKey || agentName}` }),
       signal: controller.signal,
     });
-    TRACE.setSpanAttributes(llmSpan, { "http.response.status_code": resp.status });
-
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`DeepSeek API error ${resp.status}: ${err.slice(0, 500)}`);
+    if (!sessionResp.ok) {
+      throw new Error(`opencode session.create failed ${sessionResp.status}: ${(await sessionResp.text()).slice(0, 500)}`);
     }
+    const session = await sessionResp.json();
 
-    const data = await resp.json();
-    const responseId = data.id || "";
-    const text = data.choices?.[0]?.message?.content || "";
-    const finishReasons = data.choices?.map(choice => choice.finish_reason).filter(Boolean);
-    TRACE.setSpanAttributes(llmSpan, {
-      "gen_ai.output.messages": JSON.stringify([{ role: "assistant", content: text }]),
-      "gen_ai.completion.0.role": "assistant",
-      "gen_ai.completion.0.content": text,
-      "gen_ai.completion.0.content_length": text.length,
-      "gen_ai.response.id": responseId,
-      "gen_ai.response.model": data.model,
-      "gen_ai.response.finish_reasons": finishReasons,
-    });
-    TRACE.endSpan(llmSpan, {
-      "gen_ai.response.id": responseId,
-      "gen_ai.response.model": data.model,
-      "gen_ai.response.finish_reasons": finishReasons,
-      "gen_ai.response.text_length": text.length,
-    });
-    return { text, responseId };
+    try {
+      const messageResp = await fetch(`${baseUrl}/session/${session.id}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agent: agentName,
+          model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
+          ...(MODEL_VARIANT ? { variant: MODEL_VARIANT } : {}),
+          system: truncatedSystem,
+          parts: [{ type: "text", text: truncatedUser }],
+        }),
+        signal: controller.signal,
+      });
+      TRACE.setSpanAttributes(llmSpan, { "http.response.status_code": messageResp.status });
+
+      if (!messageResp.ok) {
+        const err = await messageResp.text();
+        throw new Error(`opencode session.prompt failed ${messageResp.status}: ${err.slice(0, 500)}`);
+      }
+
+      const data = await messageResp.json();
+      if (data.info?.error) {
+        const errInfo = data.info.error;
+        const message = errInfo.data?.message || errInfo.name || JSON.stringify(errInfo).slice(0, 500);
+        throw new Error(`opencode agent error (${errInfo.name || "unknown"}): ${message}`);
+      }
+
+      const text = extractText(data.parts);
+      const responseId = data.info?.id || "";
+
+      TRACE.setSpanAttributes(llmSpan, {
+        "gen_ai.output.messages": JSON.stringify([{ role: "assistant", content: text }]),
+        "gen_ai.completion.0.role": "assistant",
+        "gen_ai.completion.0.content": text,
+        "gen_ai.completion.0.content_length": text.length,
+        "gen_ai.response.id": responseId,
+        "gen_ai.response.model": MODEL_ID,
+      });
+      TRACE.endSpan(llmSpan, {
+        "gen_ai.response.id": responseId,
+        "gen_ai.response.model": MODEL_ID,
+        "gen_ai.response.text_length": text.length,
+      });
+      return { text, responseId };
+    } finally {
+      fetch(`${baseUrl}/session/${session.id}`, { method: "DELETE" }).catch(() => {});
+    }
   } catch (err) {
     TRACE.endSpan(llmSpan, {}, err);
     throw err;
@@ -604,18 +743,17 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     "ai.agent.key": agentKey,
     "ai.agent.name": agentDef.name,
     "gen_ai.agent.name": agentDef.name,
-    "gen_ai.system": agentDef.modelFamily,
-    "gen_ai.request.model": agentDef.model,
+    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.request.model": MODEL_ID,
   }, parentSpan);
 
-  const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY);
-  if (!hasDeepSeek) {
-    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — DEEPSEEK_API_KEY not set`);
+  if (!apiKey()) {
+    console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — ${API_KEY_VAR_NAME} not set`);
     TRACE.endSpan(reviewerSpan, {
       "review.skipped": true,
-      "review.error": "DEEPSEEK_API_KEY not set",
+      "review.error": `${API_KEY_VAR_NAME} not set`,
     });
-    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: "DEEPSEEK_API_KEY not set", genAIResponseId: "" };
+    return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: `${API_KEY_VAR_NAME} not set`, genAIResponseId: "" };
   }
 
   const systemPrompt = readPrompt("shared-rules.md");
@@ -648,14 +786,14 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
   const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
 
-  console.log(`[${isoNow()}] Starting ${agentDef.name} (deepseek/${agentDef.model})`);
+  console.log(`[${isoNow()}] Starting ${agentDef.name} (${MODEL_SLUG}, ${agentDef.opencodeAgent})`);
   const start = Date.now();
 
   try {
-    const completion = await callDeepSeek(
+    const completion = await callOpencode(
+      agentDef.opencodeAgent,
       fullSystem,
       userPrompt,
-      agentDef.model,
       AGENT_TIMEOUT_MS,
       {
         parentSpan: reviewerSpan,
@@ -724,10 +862,29 @@ function sanitizeReviewBody(body) {
   const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
   cleaned = cleaned.replace(boundaryPattern, "");
 
-  // Ensure the marker is at the very start
-  if (!cleaned.trimStart().startsWith(REVIEW_MARKER)) {
-    cleaned = REVIEW_MARKER + "\n" + cleaned.replace(REVIEW_MARKER, "");
+  // Strip EVERY known marker (not just ours) wherever it appears. The coordinator prompt's
+  // output template used to hardcode the GLM marker, so a DeepSeek run would carry both and
+  // be matched — and overwritten — by the GLM leg's findExistingReviewComment.
+  for (const marker of ALL_REVIEW_MARKERS) {
+    cleaned = cleaned.split(marker).join("");
   }
+
+  // Drop any preamble the model emitted before the review proper ("Now I have all the
+  // context. Let me produce the consolidated review."). Runs after marker stripping so a
+  // leading marker can't anchor the search at index 0 and mask the preamble behind it.
+  const headingAt = cleaned.search(/^#{1,3}[ \t]*AI Code Review\b/mi);
+  if (headingAt > 0) cleaned = cleaned.slice(headingAt);
+
+  // Re-prepend exactly one marker — ours.
+  cleaned = `${REVIEW_MARKER}\n${cleaned.trimStart()}`;
+
+  // Tag the review header with the model label so the GLM and DeepSeek comments are
+  // visually distinguishable on the PR. Tolerates trailing words ("AI Code Review Summary")
+  // and any case; the negative lookahead for "(" keeps re-runs idempotent.
+  cleaned = cleaned.replace(
+    /^(#{1,3}[ \t]*AI Code Review\b)(?![ \t]*\()([ \t]*[^\n(]*)$/mi,
+    `$1 (${MODEL_LABEL})$2`,
+  );
 
   return cleaned.trim();
 }
@@ -769,24 +926,24 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
   ].join("\n");
 
   const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
-  const coordinatorModel = tierConfig.coordinatorModel || "deepseek-chat";
+  const coordinatorAgent = tierConfig.coordinatorAgent || COORDINATOR_AGENT;
   const coordinatorSpan = TRACE.startSpan("ai_review.coordinator", {
     "review.agent.key": "coordinator",
     "review.agent.name": "Coordinator",
     "ai.agent.key": "coordinator",
     "ai.agent.name": "Coordinator",
     "gen_ai.agent.name": "Coordinator",
-    "gen_ai.system": "deepseek",
-    "gen_ai.request.model": coordinatorModel,
+    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.request.model": MODEL_ID,
     "review.risk_tier": tier,
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
     "review.failed_agents": agentResults.filter(r => r.error).length,
   }, parentSpan);
 
-  console.log(`[${isoNow()}] Running coordinator (${coordinatorModel})`);
+  console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
 
   try {
-    const completion = await callDeepSeek(`${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, coordinatorModel, AGENT_TIMEOUT_MS, {
+    const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, AGENT_TIMEOUT_MS, {
       parentSpan: coordinatorSpan,
       agentKey: "coordinator",
       agentName: "Coordinator",
@@ -848,26 +1005,36 @@ function buildFallbackReview(agentResults, tier, failedAgents) {
 LGTM — No issues found by automated reviewers.
 
 <details>
-<summary>Review Details</summary>
+<summary>Review details</summary>
+
 - Risk tier: ${tier}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
+
 </details>`;
   }
 
-  const byCategory = {};
+  const findingLine = f => {
+    const loc = f.file && f.line && f.line !== "0" ? `\`${f.file}:${f.line}\` ` : f.file ? `\`${f.file}\` ` : "";
+    const cat = f.category ? `**[${f.category.charAt(0).toUpperCase() + f.category.slice(1)}]** ` : "";
+    const fix = f.suggestion ? ` (→ ${f.suggestion})` : "";
+    return `- ${loc}${cat}${f.summary}${fix}`;
+  };
+
+  const bySeverity = { critical: [], warning: [], suggestion: [] };
   for (const f of sorted) {
-    const cat = (f.category || "general").toLowerCase();
-    (byCategory[cat] ||= []).push(f);
+    const sev = (f.severity || "suggestion").toLowerCase();
+    (bySeverity[sev in bySeverity ? sev : "suggestion"]).push(f);
   }
 
   const sections = [];
-  for (const [cat, findings] of Object.entries(byCategory)) {
-    sections.push(`### ${cat.charAt(0).toUpperCase() + cat.slice(1)}`);
-    for (const f of findings) {
-      const loc = f.file && f.line ? `\`${f.file}:${f.line}\`` : f.file ? `\`${f.file}\`` : "";
-      sections.push(`- **${(f.severity || "suggestion").toUpperCase()}** ${loc ? `${loc} — ` : ""}${f.summary}`);
-      if (f.suggestion) sections.push(`  - Fix: ${f.suggestion}`);
-    }
+  if (bySeverity.critical.length > 0) {
+    sections.push(`#### 🔴 Blockers`, ...bySeverity.critical.map(findingLine), "");
+  }
+  if (bySeverity.warning.length > 0) {
+    sections.push(`#### 🟡 Warnings`, ...bySeverity.warning.map(findingLine), "");
+  }
+  if (bySeverity.suggestion.length > 0) {
+    sections.push(`#### 🔵 Suggestions`, ...bySeverity.suggestion.map(findingLine), "");
   }
 
   const failureNote = failedAgents.length > 0
@@ -883,15 +1050,21 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
 
 ### Decision: approved_with_comments
 
-${deduped.length > 0 ? `Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.` : ""}${failureNote}${dedupNote}
+Automated review — ${failedAgents.length > 0 ? "some reviewers failed and " : ""}coordinator consolidation was skipped. Findings below are deduplicated but un-judged.${failureNote}${dedupNote}
+
+**Findings:** 🔴 ${bySeverity.critical.length} blocker · 🟡 ${bySeverity.warning.length} warning · 🔵 ${bySeverity.suggestion.length} suggestion
+
+<details>
+<summary>Show findings (${sorted.length})</summary>
 
 ${sections.join("\n")}
 
-<details>
-<summary>Review Details</summary>
+---
+
 - Risk tier: ${tier}
 - Reviewers completed: ${agentResults.filter(r => !r.error).map(r => r.agentName).join(", ") || "none"}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
+
 </details>`;
 }
 
@@ -951,18 +1124,27 @@ async function main() {
     console.log(`[${isoNow()}] AI Code Review started for PR #${prNumber}`);
     console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
 
-    const hasDeepSeek = Boolean(process.env.DEEPSEEK_API_KEY);
-    if (!hasDeepSeek) {
-      console.warn(`[${isoNow()}] DEEPSEEK_API_KEY not set. Skipping AI Code Review.`);
-      outcome = "skipped";
+    if (!apiKey()) {
+      outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,
-        "review.skip_reason": "missing_deepseek_api_key",
+        "review.skip_reason": "missing_api_key",
       });
-      return;
+      // A missing key is a CI/secrets misconfiguration, not a "nothing to review" case —
+      // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
+      // dropping to zero can't slip by as a green check. Also post to the PR so it's
+      // visible without digging into Actions logs.
+      const message = `${API_KEY_VAR_NAME} is not set. AI Code Review (${MODEL_LABEL}) did not run for this PR — this is a CI misconfiguration, not a skip.`;
+      console.error(`[${isoNow()}] ${message}`);
+      try {
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n## AI Code Review (${MODEL_LABEL})\n\n### Decision: error\n\n⚠️ ${message} Please confirm the \`${API_KEY_VAR_NAME}\` secret is provisioned.`);
+      } catch (postErr) {
+        console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
+      }
+      throw new Error(message);
     }
 
-    console.log(`[${isoNow()}] DeepSeek: configured`);
+    console.log(`[${isoNow()}] ${MODEL_SLUG} (via opencode serve): configured`);
 
     // 1. Get PR diff
     console.log(`[${isoNow()}] Fetching PR diff...`);
@@ -1083,10 +1265,49 @@ async function main() {
     });
     console.log(`[${isoNow()}] All reviewers complete. Total findings: ${totalFindings}, Failures: ${failedAgents.length}`);
 
-    // 7. Coordinator pass
-    const coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
-    let finalReview = coordinatorResult.text;
-    const responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
+    // 7. Coordinator pass — unless nothing survived to coordinate.
+    //
+    // If EVERY reviewer failed there are no findings to consolidate, so the coordinator can
+    // only produce "no issues found" — which reads as an approval on a PR that was never
+    // actually reviewed. That is strictly worse than posting nothing: it is a green light
+    // manufactured from a total outage. Report the failure instead, skip the coordinator
+    // (saving another AGENT_TIMEOUT_MS of waiting on a provider that is already failing),
+    // and exit non-zero so the check surfaces as red.
+    const allAgentsFailed = results.length > 0 && failedAgents.length === results.length;
+    let finalReview;
+    let responseIds = reviewerResponseIds;
+
+    if (allAgentsFailed) {
+      outcome = "all_agents_failed";
+      exitCode = 1;
+      const detail = failedAgents
+        .map(r => `- ${r.agentName}: ${r.error}`)
+        .join("\n");
+      console.error(`[${isoNow()}] All ${results.length} reviewers failed — skipping coordinator and reporting failure.`);
+      TRACE.setSpanAttributes(rootSpan, {
+        "review.all_agents_failed": true,
+        "review.coordinator_skipped": true,
+      });
+      finalReview = [
+        `## AI Code Review (${MODEL_LABEL})`,
+        ``,
+        `### Decision: error`,
+        ``,
+        `⚠️ **This PR was not reviewed.** All ${results.length} reviewers failed against \`${MODEL_SLUG}\`, so there are no findings to report — this is an infrastructure failure, not an approval.`,
+        ``,
+        `<details>`,
+        `<summary>Reviewer failures (${failedAgents.length})</summary>`,
+        ``,
+        detail,
+        ``,
+        `</details>`,
+      ].join("\n");
+    } else {
+      const coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
+      finalReview = coordinatorResult.text;
+      responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
+    }
+
     TRACE.setSpanAttributes(rootSpan, {
       "gen_ai.response.ids": responseIds,
       "gen_ai.response.count": responseIds.length,
@@ -1121,11 +1342,20 @@ async function main() {
       throw err;
     }
 
+    // The failure notice is posted above so it is visible on the PR; now fail the check too,
+    // so a total reviewer outage can't pass as a green tick. Thrown after the comment lands
+    // (not at detection time) to guarantee both happen.
+    if (allAgentsFailed) {
+      const err = new Error(`All ${results.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
+      err.suppressFatalLog = true;
+      throw err;
+    }
+
     console.log(`[${isoNow()}] AI Code Review complete for PR #${prNumber}`);
   } catch (err) {
     rootError = err;
     exitCode = 1;
-    outcome = "failure";
+    if (outcome !== "misconfigured" && outcome !== "all_agents_failed") outcome = "failure";
     throw err;
   } finally {
     TRACE.endSpan(rootSpan, {
@@ -1133,6 +1363,7 @@ async function main() {
       "process.exit_code": exitCode,
     }, rootError);
     activeRootSpan = null;
+    OPENCODE.stop();
   }
 }
 
@@ -1146,6 +1377,7 @@ const timeout = setTimeout(() => {
     "workflow.outcome": "timeout",
     "process.exit_code": 1,
   }, err);
+  OPENCODE.stop();
   TRACE.flush().finally(() => process.exit(1));
 }, OVERALL_TIMEOUT_MS);
 

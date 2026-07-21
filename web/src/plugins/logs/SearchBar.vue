@@ -16,11 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="logs-search-bar-component"
     id="searchBarComponent"
   >
-    <div class="flex m-0! p-[0.375rem]! items-center! w-full overflow-hidden border-b solid border-b-[var(--o2-border-color)]">
+    <div class="flex m-0! p-1.5! items-center! w-full overflow-hidden border-b solid border-b-card-glass-border">
       <div
         ref="toolbarLeftRef"
         class="flex items-center gap-1 flex-nowrap flex-1 min-w-0"
@@ -197,16 +196,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-saved-views-pinned"
           class="p-0 element-box-shadow border border-button-outline-border"
         >
-          <OButton
-            data-test="logs-search-bar-saved-views-pinned-list-btn"
-            variant="ghost"
-            size="icon-toolbar"
-            @click="openSavedViewsList"
+          <!-- A real dropdown, not a modal: one click to open, one click to
+               apply. The heavyweight list dialog stays reachable via Manage. -->
+          <ODropdown
+            :open="savedViewsDropdownOpen"
+            side="bottom"
+            align="start"
+            @update:open="onSavedViewsDropdownOpenChange"
           >
-            <OIcon name="saved-search" size="sm" />
-            <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
-            <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
-          </OButton>
+            <template #trigger>
+              <OButton
+                data-test="logs-search-bar-saved-views-pinned-list-btn"
+                variant="ghost"
+                size="icon-toolbar"
+              >
+                <OIcon name="saved-search" size="sm" />
+                <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
+                <OTooltip
+                  :content="t('search.listSavedViews')"
+                  :side-offset="2"
+                />
+              </OButton>
+            </template>
+            <ODropdownGroup :label="t('search.savedViewsLabel')">
+              <div
+                v-if="searchObj.loadingSavedView"
+                class="flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary"
+              >
+                <OSpinner size="xs" />
+                {{ t("confirmDialog.loading") }}
+              </div>
+              <template v-else-if="sortedSavedViews.length">
+                <ODropdownItem
+                  v-for="view in sortedSavedViews"
+                  :key="view.view_id"
+                  :data-test="`logs-search-bar-saved-views-menu-apply-${view.view_name}`"
+                  @select="applySavedView(view)"
+                >
+                  <template #icon-left>
+                    <OIcon
+                      :name="
+                        favoriteViews.includes(view.view_id)
+                          ? 'favorite'
+                          : 'saved-search'
+                      "
+                      size="sm"
+                      :class="
+                        favoriteViews.includes(view.view_id)
+                          ? 'text-favorite'
+                          : ''
+                      "
+                    />
+                  </template>
+                  <span class="truncate max-w-56">{{ view.view_name }}</span>
+                  <template #icon-right>
+                    <OButton
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      icon-left="edit"
+                      class="ms-auto"
+                      :title="t('search.updateSavedViewWithCurrent')"
+                      :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
+                      @click.stop.prevent="quickUpdateSavedView(view)"
+                    />
+                  </template>
+                </ODropdownItem>
+              </template>
+              <ODropdownItem v-else disabled>
+                {{ t("search.savedViewsNotFound") }}
+              </ODropdownItem>
+            </ODropdownGroup>
+            <ODropdownSeparator />
+            <ODropdownItem
+              icon-left="save"
+              data-test="logs-search-bar-saved-views-menu-create"
+              @select="fnSavedView"
+            >
+              {{ t("search.createSavedView") }}
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="settings"
+              data-test="logs-search-bar-saved-views-menu-manage"
+              @select="openSavedViewsList"
+            >
+              {{ t("search.manageSavedViews") }}
+            </ODropdownItem>
+          </ODropdown>
           <OButton
             data-test="logs-search-bar-saved-views-pinned-create-btn"
             variant="ghost"
@@ -233,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="p-1! ml-1 [border:0.0625rem_solid_var(--color-button-outline-border)]! rounded-md [transition:all_0.2s_ease] min-h-[1.875rem]! text-xs font-medium hover:bg-(--color-button-outline-hover-bg) element-box-shadow"
+              class="p-1! ml-1 [border:0.0625rem_solid_var(--color-button-outline-border)]! rounded-default [transition:all_0.2s_ease] min-h-[1.875rem]! text-xs font-medium hover:bg-button-outline-hover-bg element-box-shadow"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
@@ -250,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <OIcon name="code" size="sm" />
                 </span>
               </template>
@@ -284,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="resetFilters"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <OIcon name="restart-alt" size="sm" />
                 </span>
               </template>
@@ -297,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <OIcon name="bar-chart" size="sm" />
                 </span>
               </template>
@@ -329,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="handleQuickMode"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <OIcon name="bolt" size="sm" />
                 </span>
               </template>
@@ -361,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0 [font-family:var(--font-mono,monospace)] text-[var(--text-sm)] italic [font-weight:var(--font-bold)] text-(--o2-primary-color)">fx</span>
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0 font-mono text-compact italic font-bold text-accent">fx</span>
               </template>
               {{ t('search.functionEditorLabel') }}
               <template #icon-right>
@@ -406,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openSavedViewsList"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <OIcon name="format-list-bulleted" size="sm" />
                 </span>
               </template>
@@ -419,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="fnSavedView"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <OIcon name="add" size="sm" />
                 </span>
               </template>
@@ -507,7 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="showSearchHistoryfn"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <OIcon name="history" size="sm" />
                 </span>
               </template>
@@ -525,10 +600,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="relative flex items-center gap-2 py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] cursor-pointer select-none hover:bg-(--color-interactive-hover-bg) search-download-item"
-              :class="{ 'cursor-not-allowed! text-(--o2-text-muted) hover:bg-transparent!': isDownloadDisabled }"
+              class="relative flex items-center gap-2 py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item before:content-[''] before:absolute before:top-0 before:right-full before:w-2.5 before:h-full"
+              :class="{ 'cursor-not-allowed! text-text-muted hover:bg-transparent!': isDownloadDisabled }"
             >
-              <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+              <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                 <OIcon size="sm" name="download" />
               </span>
               <span class="flex-1 whitespace-nowrap">{{ t("search.downloadTable") }}</span>
@@ -536,13 +611,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-(--color-dropdown-bg) [border:0.063rem_solid_var(--o2-border-color)] rounded-md [box-shadow:0_0.5rem_1.5rem_var(--o2-hover-shadow)] py-1 px-0 z-[9999]"
+                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-dropdown-bg [border:0.063rem_solid_var(--color-card-glass-border)] rounded-default [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] py-1 px-0 z-[9999]"
                 data-test="search-download-submenu"
               >
                 <button
                   type="button"
                   data-test="search-download-csv-btn"
-                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-(--o2-text-body) hover:bg-(--color-interactive-hover-bg)"
+                  class="flex items-center gap-2.5 w-full py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
                 >
                   <OIcon name="grid-on" size="sm" />
@@ -551,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-json-btn"
-                  class="flex items-center gap-[0.625rem] w-full py-[0.375rem] px-3 text-[var(--text-base)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-(--o2-text-body) hover:bg-(--color-interactive-hover-bg)"
+                  class="flex items-center gap-2.5 w-full py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
                   @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
                 >
                   <OIcon name="data-object" size="sm" />
@@ -566,10 +641,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="toggleCustomDownloadDialog"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <img
                     :src="customRangeIcon"
-                    alt="Custom Range"
+                    :alt="t('logs.searchBar.customRangeAlt')"
                     class="w-4 h-4"
                   />
                 </span>
@@ -590,10 +665,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="createScheduleJob"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <img
                     :src="createScheduledSearchIcon"
-                    alt="Create Scheduled Search"
+                    :alt="t('logs.searchBar.createScheduledSearchAlt')"
                     class="w-4 h-4"
                   />
                 </span>
@@ -609,10 +684,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="routeToSearchSchedule"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <img
                     :src="listScheduledSearchIcon"
-                    alt="List Scheduled Search"
+                    :alt="t('logs.searchBar.listScheduledSearchAlt')"
                     class="w-4 h-4"
                   />
                 </span>
@@ -638,7 +713,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openSearchInspectDialog"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <OIcon name="troubleshoot" size="sm" />
                 </span>
               </template>
@@ -660,7 +735,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openExplainDialog"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-(--o2-section-header-bg) text-(--o2-text-secondary) shrink-0">
+                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
                   <OIcon name="lightbulb" size="sm" />
                 </span>
               </template>
@@ -690,7 +765,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
-          <span class="[font-family:var(--font-mono,monospace)] text-sm italic font-bold text-(--o2-primary-color) shrink-0">fx</span>
+          <span class="font-mono text-sm italic font-bold text-accent shrink-0">fx</span>
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
@@ -722,7 +797,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="search-time order-2">
           <div class="flex">
             <OButtonGroup
-              class="p-0 mr-1 element-box-shadow el-border"
+              class="p-0 mr-1 element-box-shadow border border-card-glass-border"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -746,12 +821,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </template>
                 <div
-                  class="p-2 min-w-[240px]"
+                  class="p-2 min-w-60"
                   data-test="logs-search-bar-region-menu"
                 >
                   <OInput
                     clearable
-                    class="mb-[0.375rem]! indexlist-search-input mx-2 mt-2"
+                    class="mb-1.5! indexlist-search-input mx-2 mt-2"
                     v-model="regionFilter"
                     :label="t('search.regionFilterMsg')"
                   />
@@ -783,7 +858,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.cancel')"
                   variant="ghost"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
+                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! rounded-e-none!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -811,9 +886,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="p-0 h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
-                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
-                    '[border-radius:0.375rem_0_0_0.375rem]!',
+                      ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
+                      : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -827,7 +902,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <OSeparator class="h-[1.875rem]! w-[1px]" vertical />
+                <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -839,14 +914,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
-                          ? 'bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]!'
+                          ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(
                                 isNaturalLanguageDetected &&
                                 !searchObj.meta.nlpMode
                               )
-                            ? 'bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
-                        '[border-radius:0_0.375rem_0.375rem_0]!',
+                        'rounded-s-none! rounded-e-default!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -871,7 +946,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <p
                     v-else
-                    class="text-xs text-[var(--o2-text-caption)] text-center px-3 py-2"
+                    class="text-xs text-text-secondary text-center px-3 py-2"
                   >
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
@@ -885,7 +960,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.cancel')"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]! element-box-shadow [border-radius:0.375rem_0_0_0.375rem]!"
+                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! rounded-e-none!"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -914,9 +989,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="p-0 h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'o2-ai-generate-button [border-radius:0.375rem_0_0_0.375rem]!'
-                      : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
-                    '[border-radius:0.375rem_0_0_0.375rem]!',
+                      ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
+                      : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -930,7 +1005,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("search.runQuery")
                   }}
                 </OButton>
-                <OSeparator class="h-[1.875rem]! w-[1px]" vertical />
+                <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
@@ -942,14 +1017,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
-                          ? 'bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]!'
+                          ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(
                                 isNaturalLanguageDetected &&
                                 !searchObj.meta.nlpMode
                               )
-                            ? 'bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
-                        '[border-radius:0_0.375rem_0.375rem_0]!',
+                        'rounded-s-none! rounded-e-default!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -974,7 +1049,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                   <p
                     v-else
-                    class="text-xs text-[var(--o2-text-caption)] text-center px-3 py-2"
+                    class="text-xs text-text-secondary text-center px-3 py-2"
                   >
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
@@ -992,7 +1067,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]! element-box-shadow rounded-md"
+                class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-default"
                 @click="cancelPatterns"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1010,11 +1085,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="p-0 h-[1.875rem]! [font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]! element-box-shadow"
+                class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow"
                 :class="
                   config.isEnterprise == 'true'
-                    ? '[border-radius:0.375rem_0_0_0.375rem]!'
-                    : 'rounded-md'
+                    ? 'rounded-s-default! rounded-e-none!'
+                    : 'rounded-default'
                 "
                 @click="cancelQuery"
                 >{{ t("search.cancel") }}</OButton
@@ -1039,10 +1114,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : '[font-weight:var(--font-medium)]! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
+                    : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                   store.state.zoConfig.auto_query_enabled
-                    ? '[border-radius:0.375rem_0_0_0.375rem]!'
-                    : 'rounded-md',
+                    ? 'rounded-s-default! rounded-e-none!'
+                    : 'rounded-default',
                 ]"
                 @click="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -1087,7 +1162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
               <OSeparator
                 v-if="store.state.zoConfig.auto_query_enabled"
-                class="h-[1.875rem]! w-[1px]"
+                class="h-[1.875rem]! w-px"
                 vertical
               />
               <ODropdown
@@ -1108,16 +1183,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           !!searchObj.data.searchWebSocketTraceIds.length) &&
                         (searchObj.loading == true ||
                           searchObj.loadingHistogram == true))
-                        ? 'bg-[var(--o2-cancel-query-bg)]! text-[var(--o2-primary-btn-text)]!'
+                        ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !(
                               isNaturalLanguageDetected &&
                               !searchObj.meta.nlpMode
                             )
-                          ? 'bg-[var(--o2-primary-btn-bg)]! text-[var(--o2-primary-btn-text)]! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]'
+                          ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                           : '',
                       store.state.zoConfig.auto_query_enabled
-                        ? '[border-radius:0_0.375rem_0.375rem_0]!'
-                        : 'rounded-md',
+                        ? 'rounded-s-none! rounded-e-default!'
+                        : 'rounded-default',
                     ]"
                   >
                     <OIcon name="arrow-drop-down" size="sm" />
@@ -1163,7 +1238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                       "
                       size="sm"
-                      :class="searchObj.meta.liveMode ? 'text-[var(--o2-primary)]' : ''"
+                      :class="searchObj.meta.liveMode ? 'text-accent' : ''"
                     />
                   </template>
                   <span>
@@ -1174,7 +1249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : t("search.turnOnLiveMode")
                       }}
                     </div>
-                    <div class="text-xs text-[var(--o2-text-secondary)]">
+                    <div class="text-xs text-text-secondary">
                       {{ t("search.liveModeTooltip") }}
                     </div>
                   </span>
@@ -1182,7 +1257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- NLP mode: info message -->
                 <p
                   v-if="isNaturalLanguageDetected && !searchObj.meta.nlpMode"
-                  class="text-xs text-[var(--o2-text-caption)] text-center px-3 py-2"
+                  class="text-xs text-text-secondary text-center px-3 py-2"
                 >
                   {{ t("nlMode.noAdditionalOptions") }}
                 </p>
@@ -1207,11 +1282,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
          the right (4px wrapper + 6px), aligning with the results panel below.
          data-fullscreen is a stable test hook exposing the fullscreen state
-         (the styling itself is driven by the inline `isFocused` class binding). -->
+         (the styling itself is driven by the inline `isFocused` class binding).
+         Expanded state carries no border/radius/shadow of its own: the editor
+         fills the area it is given, and the panel chrome around it already
+         supplies the frame — a second curved, shadowed edge on top of it just
+         reads as a stray card. -->
     <div
       ref="editorContainerRef"
       class="flex relative query-editor-container w-full overflow-visible"
-      :class="{ 'overflow-hidden! bg-[var(--o2-body-primary-bg)]! border border-[var(--o2-border-color)] rounded-md [box-shadow:0_0.5rem_2rem_rgba(0,0,0,0.18)]': isFocused }"
+      :class="{ 'overflow-hidden! bg-theme-body-bg-primary!': isFocused }"
       :data-fullscreen="isFocused ? 'true' : 'false'"
       :style="editorFullscreenStyle"
     >
@@ -1222,7 +1301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="absolute! z-[51] top-[0.1875rem] right-[0.25rem] [border:1px_solid_var(--o2-border-color)]! rounded-md w-[30px]! h-[30px]! min-w-[30px]! min-h-[30px]!"
+        class="absolute! z-[51] top-[0.1875rem] right-1 [border:1px_solid_var(--color-card-glass-border)]! rounded-default w-7.5! h-7.5! min-w-7.5! min-h-7.5!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1235,7 +1314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="searchObj.config.fnSplitterLimit"
           :horizontal="false"
           :separator="!!searchObj.data.transformType"
-          separator-class="w-px! bg-[var(--o2-border-color)]"
+          separator-class="w-px! bg-card-glass-border"
         >
           <template #before>
             <div
@@ -1354,7 +1433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="warning" size="md" class="mx-2" />
                       <span
-                        class="text-red-500 p-2 font-semibold"
+                        class="text-status-error-text p-2 font-semibold"
                         >{{ t('search.vrlOnlyForTableWarning') }}</span
                       >
                     </div>
@@ -1432,8 +1511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div>
         <div
-          class="text-sm font-semibold leading-tight pr-2"
-          :class="store.state.theme === 'dark' ? 'text-[#e5e5e5]' : 'text-[#262626]'"
+          class="text-sm font-semibold leading-tight pr-2 text-text-label"
         >{{ t("search.fileType") }}</div>
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
@@ -1583,7 +1661,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("search.maxEventsScheduleJob") }}
       </div>
       <div class="opacity-80 text-left mapping-warning-msg mt-3">
-        <OIcon name="warning" size="sm" class="mr-2 text-red-500" />
+        <OIcon name="warning" size="sm" class="mr-2 text-status-error-text" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
@@ -1644,10 +1722,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div data-test="logs-search-saved-view-list" class="flex">
             <div
               class="flex flex-col"
-              :class="localSavedViews.length > 0 ? 'border-r border-[var(--o2-border-color)]' : ''"
+              :class="localSavedViews.length > 0 ? 'border-r border-card-glass-border' : ''"
               :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
             >
-              <div style="max-height: 486px; min-height: 280px; display: flex; flex-direction: column;">
+              <div class="flex flex-col" style="max-height: 486px; min-height: 280px">
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
                 :data="searchObj.data.savedViews"
@@ -1656,7 +1734,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :global-filter="searchObj.data.savedViewFilterFields"
                 :page-size="rowsPerPage"
                 :page-size-options="[10, 20, 50]"
-                class="saved-view-table full-height o2-table-hide-header"
+                class="saved-view-table h-full! max-h-full o2-table-hide-header"
               >
                 <template #top>
                   <div class="px-2 py-2 w-full min-w-0 box-border">
@@ -1673,7 +1751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="searchObj.loadingSavedView == true"
                     class="w-full p-2"
                   >
-                    <div class="text-sm font-medium text-weight-bold">
+                    <div class="text-sm font-medium font-bold">
                       <OSpinner size="xs" />
                       {{ t("confirmDialog.loading") }}
                     </div>
@@ -1696,7 +1774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-0.5">
                     <OButton
                       :title="t('common.favourite')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
@@ -1714,11 +1792,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : 'favorite-border'
                         "
                         size="xs"
+                        :class="
+                          favoriteViews.includes(row.view_id)
+                            ? 'text-favorite'
+                            : ''
+                        "
                       />
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn`"
@@ -1728,7 +1811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn`"
@@ -1756,18 +1839,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex flex-col w-[40%] ml-0 pl-3"
               v-if="localSavedViews.length > 0"
             >
-              <div style="max-height: 480px; min-height: 280px; display: flex; flex-direction: column;">
+              <div class="flex flex-col" style="max-height: 480px; min-height: 280px">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
                 :data="localSavedViews"
                 :columns="savedViewColumns"
                 row-key="view_id"
                 pagination="none"
-                class="saved-view-table full-height o2-table-hide-header"
+                class="saved-view-table h-full! max-h-full o2-table-hide-header"
               >
                 <template #top>
                   <div
-                    class="p-2 font-bold favorite-label text-xs uppercase tracking-wide text-muted-foreground"
+                    class="p-2 font-bold text-xs leading-6 uppercase tracking-wide text-muted-foreground"
                   >
                     {{ t("search.favoriteViews") }}
                   </div>
@@ -1790,17 +1873,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-0.5">
                     <OButton
                       :title="t('common.favourite')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="handleFavoriteSavedView(row, true)"
                     >
-                      <OIcon name="favorite" size="xs" />
+                      <OIcon name="favorite" size="xs" class="text-favorite" />
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn`"
@@ -1810,7 +1893,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="logs-saved-view-icon action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn`"
@@ -1848,6 +1931,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1956,6 +2040,7 @@ import {
   makeSavedViewSchema,
   type SavedViewForm,
 } from "./SearchBar.SavedView.schema";
+import { sortSavedViews } from "./savedViewsSort";
 import {
   makeSavedFunctionSchema,
   type SavedFunctionForm,
@@ -2100,7 +2185,7 @@ export default defineComponent({
       if (this.searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
-          message: "No stream available to update save view.",
+          message: this.t('logs.searchBar.noStreamUpdateView'),
         });
         return;
       }
@@ -2126,14 +2211,14 @@ export default defineComponent({
       let initNumber = parseInt(this.downloadCustomInitialNumber);
       if (initNumber < 0) {
         toast({
-          message: "Initial number must be positive number.",
+          message: this.t('logs.searchBar.initialNumberPositive'),
           variant: "warning",
         });
         return;
       }
       if (!this.searchObj?.data?.customDownloadQueryObj?.query) {
         toast({
-          message: "Please run a query first before downloading.",
+          message: this.t('logs.searchBar.runQueryBeforeDownload'),
           variant: "warning",
         });
         return;
@@ -2158,7 +2243,7 @@ export default defineComponent({
             this.downloadLogs(res.data.hits, this.downloadCustomFileType);
           } else {
             toast({
-              message: "No data found to download.",
+              message: this.t('logs.searchBar.noDataToDownload'),
               variant: "warning",
             });
           }
@@ -2186,6 +2271,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const { showErrorNotification } = useNotifications();
     const rowsPerPage = ref(10);
     const savedViewColumns = [
@@ -2309,12 +2395,10 @@ export default defineComponent({
         if (open) savedFunctionForm.reset(savedFunctionDefaults.value);
       },
     );
-    // Parity with the pre-migration toggle handler (main cleared the name on
-    // every mode switch: `isSavedFunctionAction = $event; savedFunctionName = ''`).
     // Clear ONLY the create-mode name field when the mode changes so toggling
     // update→create shows a blank input, not a stale name (the update select is
-    // untouched). `dontUpdateMeta`/`dontValidate` mirror the old naked assignment
-    // — no touched/dirty marking, no premature "required" flash.
+    // untouched). `dontUpdateMeta`/`dontValidate` avoid touched/dirty marking
+    // and a premature "required" flash.
     watch(savedFunctionMode, () => {
       savedFunctionForm.setFieldValue("savedFunctionName", "", {
         dontUpdateMeta: true,
@@ -2584,13 +2668,13 @@ export default defineComponent({
 
     const transformTypes = computed(() => {
       return [
-        { label: "Function", value: "function" },
-        { label: "Action", value: "action" },
+        { label: t('logs.searchBar.transformTypeFunction'), value: "function" },
+        { label: t('logs.searchBar.transformTypeAction'), value: "action" },
       ];
     });
 
     const showFunctionEditor = computed(() => {
-      // IF actions are disabled, we are reverting to the old behavior of function editor
+      // When actions are disabled, fall back to the transform-editor toggle
       if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
 
       return searchObj.data.transformType === "function";
@@ -2646,7 +2730,7 @@ export default defineComponent({
         ) {
           if (!checkFnQuery(searchObj.data.tempFunctionContent)) {
             toast({
-              message: "Job Context have been removed",
+              message: t('logs.searchBar.jobContextRemoved'),
               variant: "info",
             });
             searchObj.meta.jobId = "";
@@ -2662,7 +2746,7 @@ export default defineComponent({
       (val) => {
         if (val == true && searchObj.meta.jobId != "") {
           toast({
-            message: "Histogram is not available for scheduled search",
+            message: t('logs.searchBar.histogramNotAvailableScheduled'),
             variant: "info",
           });
           searchObj.meta.showHistogram = false;
@@ -2721,10 +2805,10 @@ export default defineComponent({
         searchObj.data.selectedTransform?.type === "action" &&
         searchObj.data.selectedTransform?.name
       ) {
-        return `${searchObj.data.selectedTransform?.name} action applied successfully. Run Query to see results.`;
+        return t('logs.searchBar.actionAppliedRunQuery', { name: searchObj.data.selectedTransform?.name });
       }
 
-      return "Select an action to apply";
+      return t('logs.searchBar.selectActionToApply');
     });
 
     const updateAutoComplete = (value) => {
@@ -2978,7 +3062,7 @@ export default defineComponent({
         ) {
           if (!checkQuery(value)) {
             toast({
-              message: "Job Context have been removed",
+              message: t('logs.searchBar.jobContextRemoved'),
               variant: "info",
             });
             searchObj.meta.jobId = "";
@@ -3038,7 +3122,7 @@ export default defineComponent({
           // User-visible warning so the silent rewrite isn't invisible.
           toast({
             variant: "warning",
-            message: `Selected range exceeds the ${searchObj.data.datetime.queryRangeRestrictionInHour}-hour limit. Start time was adjusted to fit.`,
+            message: t('logs.searchBar.rangeExceedsLimit', { hours: searchObj.data.datetime.queryRangeRestrictionInHour }),
           });
 
           value.startTime = newStartTime;
@@ -3169,7 +3253,7 @@ export default defineComponent({
 
       if (!data || data.length === 0) {
         toast({
-          message: "No data found to download.",
+          message: t('logs.searchBar.noDataToDownload'),
           variant: "warning",
         });
         return;
@@ -3210,7 +3294,7 @@ export default defineComponent({
         showDownloadMenu.value = false;
         toast({
           variant: "error",
-          message: "Error downloading logs",
+          message: t('logs.searchBar.errorDownloadingLogs'),
         });
       }
     };
@@ -3275,7 +3359,7 @@ export default defineComponent({
     });
 
     // @submit handler — the schema already gated the name/select per mode
-    // (required + the restored alphanumeric regexes), so there is no imperative
+    // (required + alphanumeric regexes), so there is no imperative
     // field validation here. The content check is a NON-form guard (about the
     // function-editor content). Loading is form-driven (OForm awaits this).
     // Declared as a hoisted function so useOForm (above) can reference it.
@@ -3289,8 +3373,7 @@ export default defineComponent({
       if (content.trim() == "") {
         toast({
           variant: "warning",
-          message:
-            "The function field must contain a value and cannot be left empty.",
+          message: t('logs.searchBar.functionFieldRequired'),
         });
         return;
       }
@@ -3328,7 +3411,7 @@ export default defineComponent({
             variant: "error",
             message:
               JSON.stringify(err.response.data["message"]) ||
-              "Function creation failed",
+              t('logs.searchBar.functionCreationFailed'),
             timeout: 5000,
           });
         }
@@ -3350,7 +3433,7 @@ export default defineComponent({
         .then((res: { data: any }) => {
           toast({
             variant: "success",
-            message: "Function updated successfully.",
+            message: t('logs.searchBar.functionUpdatedSuccess'),
           });
 
           const transformIndex = searchObj.data.transforms.findIndex(
@@ -3373,7 +3456,7 @@ export default defineComponent({
             variant: "error",
             message:
               JSON.stringify(err.response.data["message"]) ||
-              "Function updation failed",
+              t('logs.searchBar.functionUpdationFailed'),
             timeout: 5000,
           });
         });
@@ -3404,7 +3487,7 @@ export default defineComponent({
       if (flag) {
         toast({
           variant: "success",
-          message: `${fnValue.name} function applied successfully.`,
+          message: t('logs.searchBar.functionAppliedSuccess', { name: fnValue.name }),
         });
       }
 
@@ -3426,7 +3509,7 @@ export default defineComponent({
       if (content == "") {
         toast({
           variant: "error",
-          message: "No function definition found.",
+          message: t('logs.searchBar.noFunctionDefinition'),
         });
         return;
       }
@@ -3478,7 +3561,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
-          message: "No stream available to save view.",
+          message: t('logs.searchBar.noStreamSaveView'),
         });
         return;
       }
@@ -3490,6 +3573,33 @@ export default defineComponent({
     const openSavedViewsList = () => {
       loadSavedView();
       savedViewsListDialog.value = true;
+    };
+
+    // ── Saved views quick dropdown (pinned toolbar) ──────────────────────
+    // Controlled open state so a quick update can close the menu itself.
+    const savedViewsDropdownOpen = ref(false);
+    const onSavedViewsDropdownOpenChange = (open: boolean) => {
+      savedViewsDropdownOpen.value = open;
+      // Lazy-fetch the list the first time the menu opens.
+      if (open) loadSavedView();
+    };
+
+    const sortedSavedViews = computed(() =>
+      sortSavedViews(searchObj.data.savedViews, favoriteViews.value),
+    );
+
+    // One-click overwrite of a view with the current search state — no list
+    // dialog, no stacked confirm dialog.
+    const quickUpdateSavedView = (item: any) => {
+      if (searchObj.data.stream.selectedStream.length == 0) {
+        toast({
+          variant: "error",
+          message: t('logs.searchBar.noStreamUpdateView'),
+        });
+        return;
+      }
+      savedViewsDropdownOpen.value = false;
+      updateSavedViews(item.view_id, item.view_name);
     };
 
     // Common function to restore visualization data and sync to URL
@@ -3925,7 +4035,7 @@ export default defineComponent({
             updateEditorWidth();
 
             toast({
-              message: `${item.view_name} view applied successfully.`,
+              message: t('logs.searchBar.viewAppliedSuccess', { name: item.view_name }),
               variant: "success",
             });
             setTimeout(async () => {
@@ -3991,7 +4101,7 @@ export default defineComponent({
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
-            message: `Error while applying saved view.`,
+            message: t('logs.searchBar.errorApplyingSavedView'),
             variant: "error",
           });
           console.log("Error while applying saved view", err);
@@ -3999,7 +4109,7 @@ export default defineComponent({
     };
 
     // @submit handler — the schema already gated the name (required + the
-    // restored `/^[A-Za-z0-9 _-]+$/` alphanumeric rule) in create mode and the
+    // `/^[A-Za-z0-9 _-]+$/` alphanumeric rule) in create mode and the
     // selected view in update mode, so there is no imperative validation here.
     // Loading is form-driven (OForm awaits createSavedViews).
     const handleSavedView = async (value: SavedViewForm) => {
@@ -4007,8 +4117,8 @@ export default defineComponent({
         await createSavedViews(value.savedViewName);
       }
       // The update branch is intentionally a no-op: updating from this dialog
-      // was disabled (the legacy logic was commented out); the schema still
-      // requires a selected view so this path can't run with an empty select.
+      // is disabled; the schema still requires a selected view so this path
+      // can't run with an empty select.
     };
 
     const deleteSavedViews = async () => {
@@ -4120,7 +4230,7 @@ export default defineComponent({
       try {
         if (viewName.trim() == "") {
           toast({
-            message: `Please provide valid view name.`,
+            message: t('logs.searchBar.provideValidViewName'),
             variant: "warning",
           });
           return;
@@ -4168,7 +4278,7 @@ export default defineComponent({
       } catch (e: any) {
         isSavedViewAction.value = "create";
         toast({
-          message: `Error while saving view: ${e}`,
+          message: t('logs.searchBar.errorSavingView', { e }),
           variant: "error",
         });
         console.log("Error while saving view", e);
@@ -4183,7 +4293,7 @@ export default defineComponent({
         };
 
         const dismiss = toast({
-          message: "Updating saved view...",
+          message: t('logs.searchBar.updatingSavedView'),
           variant: "loading",
           timeout: 0,
         });
@@ -4228,7 +4338,7 @@ export default defineComponent({
       } catch (e: any) {
         isSavedViewAction.value = "create";
         toast({
-          message: `Error while saving view: ${e}`,
+          message: t('logs.searchBar.errorSavingView', { e }),
           variant: "error",
         });
         console.log("Error while saving view", e);
@@ -4453,7 +4563,7 @@ export default defineComponent({
       if (!flag) {
         if (favoriteViews.value.length >= 10) {
           toast({
-            message: "You can only save 10 views.",
+            message: t('logs.searchBar.maxViewsLimit'),
             variant: "warning",
           });
           return;
@@ -4466,14 +4576,14 @@ export default defineComponent({
 
         useLocalSavedView(localSavedView);
         toast({
-          message: "View added to favorites.",
+          message: t('logs.searchBar.viewAddedFavorites'),
           variant: "success",
         });
       } else {
         // alert(favoriteViews.value.length)
         // moveItemsToTop(localSavedView, favoriteViews.value);
         toast({
-          message: "View removed from favorites.",
+          message: t('logs.searchBar.viewRemovedFavorites'),
           variant: "success",
         });
       }
@@ -4770,7 +4880,7 @@ export default defineComponent({
       if (!searchObj.data.transformType === "function" && isFocused.value) {
         return {
           width: `calc(100 - ${searchObj.config.fnSplitterModel})%`,
-          borderBottom: "0.125rem solid var(--o2-border-color)",
+          borderBottom: "0.125rem solid var(--color-card-glass-border)",
         };
       } else {
         return {
@@ -4803,7 +4913,7 @@ export default defineComponent({
       return (
         "img:" +
         getImageURL(
-          store.state.theme === "dark"
+          isDark.value
             ? "images/common/function_dark.svg"
             : "images/common/function.svg",
         )
@@ -4830,7 +4940,7 @@ export default defineComponent({
         ) {
           toast({
             variant: "error",
-            message: "Please select a stream before scheduling a job",
+            message: t('logs.searchBar.selectStreamBeforeSchedule'),
           });
           return;
         }
@@ -4927,7 +5037,7 @@ export default defineComponent({
 
     const updateActionSelection = (item: any) => {
       toast({
-        message: `${item?.name} action applied successfully`,
+        message: t('logs.searchBar.actionAppliedSuccess', { name: item?.name }),
         variant: "success",
       });
     };
@@ -4950,47 +5060,47 @@ export default defineComponent({
     const visualizeIcon = computed(() => {
       return searchObj.meta.logsVisualizeToggle === "visualize"
         ? getImageURL("images/common/visualize_icon_light.svg")
-        : store.state.theme == "dark"
+        : isDark.value
           ? getImageURL("images/common/visualize_icon_light.svg")
           : getImageURL("images/common/visualize_icon_dark.svg");
     });
     const histogramIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/bar_chart_histogram_light.svg")
         : getImageURL("images/common/bar_chart_histogram.svg");
     });
     const sqlIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/hugeicons_sql_light.svg")
         : getImageURL("images/common/hugeicons_sql.svg");
     });
     const quickModeIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/quick_mode_light.svg")
         : getImageURL("images/common/quick_mode.svg");
     });
     const searchHistoryIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/search_history_light.svg")
         : getImageURL("images/common/search_history.svg");
     });
     const downloadTableIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/download_table_light.svg")
         : getImageURL("images/common/download_table.svg");
     });
     const customRangeIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/custom_range_light.svg")
         : getImageURL("images/common/custom_range.svg");
     });
     const createScheduledSearchIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/create_scheduled_search_light.svg")
         : getImageURL("images/common/create_scheduled_search.svg");
     });
     const listScheduledSearchIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/list_scheduled_search_light.svg")
         : getImageURL("images/common/list_scheduled_search.svg");
     });
@@ -5078,6 +5188,10 @@ export default defineComponent({
       fnSavedView,
       openSavedViewsList,
       applySavedView,
+      savedViewsDropdownOpen,
+      onSavedViewsDropdownOpenChange,
+      sortedSavedViews,
+      quickUpdateSavedView,
       isSavedViewAction,
       // Saved-view OForm (schema returned from setup() so the Options-API
       // template resolves :schema; a bare import would be out of scope).
@@ -5259,10 +5373,10 @@ export default defineComponent({
       return this.searchObj.meta.showTransformEditor;
     },
     confirmMessage() {
-      return "Are you sure you want to update the function?";
+      return this.t('logs.searchBar.confirmUpdateFunction');
     },
     confirmMessageSavedView() {
-      return "Are you sure you want to update the saved view?";
+      return this.t('logs.searchBar.confirmUpdateSavedViewMsg');
     },
     resetFunction() {
       return this.searchObj.data.tempFunctionName;
@@ -5530,60 +5644,89 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.search-download-item::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 100%;
-  width: 0.625rem;
-  height: 100%;
-}
-
-
-/* When function editor is open, move AI button flush to the right of the query panel */
-.fn-editor-open .ai-floating-button {
-  right: 0.25rem;
-}
-
-
-.o2-table-hide-header thead {
-  display: none;
-}
-
-.saved-view-table .action-btn-hover {
+<style scoped>
+/* keep(complex-state): every selector below reaches into OTable's internal DOM
+   (its <td>, its border/pagination wrappers, its footer chip) from the
+   .saved-view-table modifier this file puts on the OTable root, so they need
+   :deep() rather than template utilities — the markup is not ours to annotate. */
+.saved-view-table :deep(.action-btn-hover) {
   opacity: 0;
   transition: opacity 0.15s;
 }
 
-.saved-view-table tr:hover .action-btn-hover {
+.saved-view-table :deep(tr:hover .action-btn-hover) {
   opacity: 1;
 }
 
 /* Remove outer box border so both panels blend into the dialog background
-   Exclude elements that also have rounded-md (OInput wrapper) so the
+   Exclude elements that also have rounded-default (OInput wrapper) so the
    search input keeps its visible border. */
-.saved-view-table .border:not(.rounded-md) {
+.saved-view-table :deep(.border:not(.rounded-default)) {
   border: none;
 }
 
 /* Normalize cell background and strip the auto-pin shadow
    (isAction columns are auto-pinned right by OTable, which adds an inline box-shadow) */
-.saved-view-table td {
+.saved-view-table :deep(td) {
   background: transparent;
   box-shadow: none !important;
+  padding: 0;
+  height: 1.5625rem !important;
+  min-height: 1.5625rem !important;
+}
+
+/* ── .logs-search-bar-component: the root modifier this file puts on its own
+   wrapper. The rest of the former global block (18 nested rules — .reset-filters,
+   .toggle-container, .ddlWrapper/.listWrapper, .savedview-dropdown, #logsQueryEditor,
+   #fnEditor, the legacy `> .row` rules, …) targeted DOM that no longer exists
+   and was deleted rather than moved. */
+.logs-search-bar-component {
+  height: 100%;
+  overflow: visible;
+}
+
+.logs-search-bar-component .download-logs-btn {
+  height: 1.875rem;
+  border-radius: var(--radius-default);
+  transition: all 0.2s ease;
+}
+
+.logs-search-bar-component .download-logs-btn:hover {
+  background-color: var(--color-interactive-hover-bg);
+}
+
+.logs-search-bar-component .query-editor-container {
+  height: calc(100% - 2.9rem) !important;
+}
+
+/* padding-left intentionally outranks the `px-1` utility on this button — that
+   is the pre-existing computed result. */
+.logs-search-bar-component .region-dropdown-btn {
+  text-transform: capitalize;
+  font-weight: 600;
+  font-size: var(--text-xs);
+  padding-left: 0.5rem;
+  height: 1.875rem;
+  padding-top: 0.1875rem;
+  border-radius: var(--radius-default);
+}
+
+/* keep(lib-override:o2): .saved-view-item is rendered by the Function/Transform
+   selector child components, so it needs :deep(). The !important outranks the
+   px-3/py-2 utilities TransformSelector puts on the same node. */
+.logs-search-bar-component :deep(.saved-view-item) {
+  padding: 0.125rem 0.25rem !important;
 }
 
 /* Remove pagination top separator */
-.saved-view-table .border-t {
+.saved-view-table :deep(.border-t) {
   border-top: none;
 }
 
 /* Hide the redundant total-count chip on the left — "of N" on the right already shows it */
-.saved-view-table [data-test="o2-table-pagination-bottom"] .o2-table-footer-title {
+.saved-view-table :deep([data-test="o2-table-pagination-bottom"] [data-test="o2-table-pagination-actions"]) {
   display: none;
 }
-
 
 /* Query editor placeholder text styling is global (styles/tailwind.css) —
    shared with traces, RUM sessions, RUM error tracking, and alerts. */

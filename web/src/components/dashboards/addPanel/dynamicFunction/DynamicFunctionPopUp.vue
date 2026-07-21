@@ -7,11 +7,11 @@
         : 'flex flex-col gap-y-2'
     "
   >
-    <div style="width: auto; flex-shrink: 0;">
-      <div class="font-semibold text-[13px] pb-3" data-test="dynamic-function-popup-property-label">Property</div>
-      <div style="display: flex; flex-direction: column; gap: 14px">
+    <div class="w-auto shrink-0">
+      <div class="font-semibold text-compact pb-3" data-test="dynamic-function-popup-property-label">{{ t('dashboard.dynamicFunctionPopUp.property') }}</div>
+      <div class="flex flex-col gap-3.5">
         <div>
-          <div class="text-[13px] font-normal leading-[70%] pb-0.75" data-test="dynamic-function-popup-label-text">Label</div>
+          <div class="text-compact font-normal leading-[70%] pb-0.75" data-test="dynamic-function-popup-label-text">{{ t('dashboard.dynamicFunctionPopUp.label') }}</div>
           <OInput
             v-model="fields.label"
             size="sm"
@@ -20,7 +20,7 @@
           />
         </div>
         <div>
-          <div class="text-[13px] font-normal leading-[70%] pb-0.75">Alias</div>
+          <div class="text-compact font-normal leading-[70%] pb-0.75">{{ t('dashboard.dynamicFunctionPopUp.alias') }}</div>
           <OInput
             v-model="fields.alias"
             size="sm"
@@ -52,13 +52,13 @@
       >
         <OTab
           name="build"
-          label="Build"
+          :label="t('dashboard.dynamicFunctionPopUp.build')"
           class="flex-1"
           data-test="dynamic-function-popup-tab-build"
         />
         <OTab
           name="raw"
-          label="Raw"
+          :label="t('dashboard.dynamicFunctionPopUp.raw')"
           class="flex-1"
           data-test="dynamic-function-popup-tab-raw"
         />
@@ -72,8 +72,8 @@
         animated
       >
         <OTabPanel name="build">
-          <div class="pt-2" style="max-height: 26.25rem; overflow: auto;">
-            <div class="font-semibold text-[13px] pb-3">Configuration</div>
+          <div class="pt-2 max-h-105 overflow-auto">
+            <div class="font-semibold text-compact pb-3">{{ t('dashboard.dynamicFunctionPopUp.configuration') }}</div>
             <SelectFunction
               v-model="fields"
               data-test="dynamic-function-popup-select-function"
@@ -83,8 +83,8 @@
         </OTabPanel>
         <OTabPanel name="raw">
           <div class="pt-2">
-            <div style="display: flex; width: 100%">
-              <div style="width: 100%; padding-right: 0.75rem">
+            <div class="flex w-full">
+              <div class="w-full pr-3">
                 <RawQueryBuilder
                   v-model="fields"
                   data-test="dynamic-function-popup-raw-query-builder"
@@ -100,7 +100,7 @@
         v-if="!customQuery && !fields.isDerived && allowAggregation"
       >
         <div class="flex items-center gap-2 mb-2">
-          <span class="font-bold">Having</span>
+          <span class="font-bold">{{ t('dashboard.dynamicFunctionPopUp.having') }}</span>
 
           <OButton
             variant="outline"
@@ -110,7 +110,7 @@
             data-test="dynamic-function-popup-having-add-btn"
             icon-left="add"
           >
-            Add
+            {{ t('dashboard.dynamicFunctionPopUp.add') }}
           </OButton>
         </div>
 
@@ -121,7 +121,7 @@
           <OSelect
             v-model="getHavingCondition().operator"
             :options="havingOperators"
-            class="w-[60px]"
+            class="w-15"
             data-test="dynamic-function-popup-having-operator"
           />
 
@@ -129,7 +129,7 @@
             v-model.number="getHavingCondition().value"
             class="w-1/2"
             type="number"
-            placeholder="Value"
+            :placeholder="t('dashboard.dynamicFunctionPopUp.value')"
             data-test="dynamic-function-popup-having-value"
           />
 
@@ -147,14 +147,14 @@
         <div>
           <OCheckbox
             v-model="fields.treatAsNonTimestamp"
-            label="Mark this field as non-timestamp"
+            :label="t('dashboard.dynamicFunctionPopUp.markAsNonTimestamp')"
             data-test="dynamic-function-popup-treat-as-non-timestamp"
           />
         </div>
         <div class="mt-1">
           <OCheckbox
             v-model="fields.showFieldAsJson"
-            label="Render Data as JSON / Array"
+            :label="t('dashboard.dynamicFunctionPopUp.renderDataAsJson')"
             data-test="dynamic-function-popup-show-field-as-json"
           />
         </div>

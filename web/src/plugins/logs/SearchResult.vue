@@ -18,20 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="flex flex-col full-height"
-    style="
-      overflow: hidden !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      height: 100%;
-    "
+    class="flex flex-col h-full max-h-full overflow-hidden"
   >
     <div
-      class="search-list full-height w-full flex flex-col"
+      class="h-full max-h-full overflow-hidden w-full flex flex-col"
       ref="searchListContainer"
     >
       <!-- Section header: static at top -->
-      <div class="flex items-center h-[2.25rem] shrink-0 result-bar bg-surface-panel">
+      <div class="flex items-center h-9 shrink-0 border-b border-card-glass-border bg-card-glass-bg">
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           variant="outline"
@@ -45,13 +39,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
           />
           <OTooltip
-            :content="searchObj.meta.showFields ? 'Collapse Fields' : 'Open Fields'"
+            :content="searchObj.meta.showFields ? t('logs.searchResult.collapseFields') : t('logs.searchResult.openFields')"
             side="bottom"
             shortcut-id="logsToggleSidebar"
           />
         </OButton>
         <div
-          class="flex-1 min-w-0 text-left pl-2 bg-amber-500 text-white rounded"
+          class="flex-1 min-w-0 text-left pl-2 bg-warning text-text-inverse rounded-default"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -61,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="flex-1 min-w-0 text-left pl-2 warning flex items-center flex-wrap gap-1.5"
+          class="flex-1 min-w-0 text-left pl-2 text-warning flex items-center flex-wrap gap-1.5"
           data-test="logs-search-result-title"
           :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
           :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
@@ -95,12 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="logsResultChip"
                 value="neutral"
                 data-test="logs-result-events-chip"
-              >{{ patternChips.events }} events</OTag>
+              >{{ patternChips.events }} {{ t('logs.searchResult.events') }}</OTag>
               <OTag
                 type="logsResultChip"
                 value="neutral"
                 data-test="logs-result-patterns-chip"
-              >{{ patternChips.patterns }} patterns</OTag>
+              >{{ patternChips.patterns }} {{ t('logs.searchResult.patterns') }}</OTag>
               <OTag
                 type="logsResultChip"
                 value="info"
@@ -110,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="truncate min-w-0">{{ patternSummaryText }}</span>
           </template>
           <span v-if="searchObj.loadingCounter" class="shrink-0">
-            <OSpinner size="xs" class="search-spinner" />
+            <OSpinner size="xs" class="mx-auto block" />
           </span>
           <div
             v-else-if="
@@ -118,19 +112,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="shrink-0 cursor-pointer"
-            :class="
-              store.state.theme == 'dark'
-                ? 'histogram-unavailable-text'
-                : 'histogram-unavailable-text-light'
-            "
+            class="shrink-0 cursor-pointer text-warning"
           >
             <OIcon name="info-outline" size="sm"> </OIcon>
             <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
           </div>
         </div>
 
-        <div class="flex-none pr-2 pagination-block flex items-center justify-end gap-1">
+        <div class="flex-none pr-2 flex items-center justify-end gap-1">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -182,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- INLINE BUTTONS (wider container) -->
           <template v-else>
             <!-- Refresh in bordered wrapper -->
-            <div class="inline-flex items-center border border-[var(--o2-border-color)] rounded-md px-1 h-6 overflow-hidden">
+            <div class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 overflow-hidden">
               <ORefreshButton
                 :last-run-at="searchObj.meta.lastRunAt"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
@@ -276,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Combined scroll area: histogram + logs/patterns scroll together -->
-      <div class="flex-1 overflow-y-auto overflow-x-hidden" ref="scrollContainerRef">
+      <div class="flex-1 overflow-auto" ref="scrollContainerRef">
         <div
           ref="histogramRef"
           :class="[
@@ -312,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="histogramChart"
               data-test="logs-search-result-bar-chart"
               :data="plotChart"
-              style="width: 100%; height: 100%"
+              class="w-full h-full"
               @updated:dataZoom="onChartUpdate"
             />
           </div>
@@ -359,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             size="inline"
             icon="bar-chart"
-            title="No Data"
+            :title="t('logs.searchResult.noData')"
             :backdrop="false"
             data-test="logs-search-no-data-histogram"
             class="histogram-empty !min-h-0 !p-2"
@@ -400,8 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchObj.data.histogram.errorCode != -1
             "
           >
-            <OIcon name="warning" size="xs"></OIcon> Error
-            while fetching histogram data.
+            <OIcon name="warning" size="xs"></OIcon> {{ t('logs.searchResult.histogramFetchError') }}
             <OButton
               variant="secondary"
               size="sm"
@@ -463,13 +451,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="oo-pin-tooltip__row-actions">
                 <span
                   class="oo-pin-tooltip__action oo-pin-tooltip__action--include"
-                  title="include"
+                  :title="t('logs.searchResult.include')"
                   @click.stop="applyPinnedFilter(row.rawValue, 'include')"
                   >=</span
                 >
                 <span
                   class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude"
-                  title="exclude"
+                  :title="t('logs.searchResult.exclude')"
                   @click.stop="applyPinnedFilter(row.rawValue, 'exclude')"
                   >≠</span
                 >
@@ -503,8 +491,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.meta.showHistogram ||
               (searchObj.meta.showHistogram &&
                 searchObj.data.histogram.errorCode == -1)
-                ? 'table-container--without-histogram'
-                : 'table-container--with-histogram',
+                ? 'min-h-full!'
+                : 'min-h-[calc(100%-6.25rem)]!',
             ]"
             @update:columnSizes="handleColumnSizesUpdate"
             @update:columnOrder="handleColumnOrderUpdate"
@@ -528,8 +516,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram &&
               searchObj.data.histogram.errorCode == -1)
-              ? 'table-container--without-histogram'
-              : 'table-container--with-histogram',
+              ? 'min-h-full!'
+              : 'min-h-[calc(100%-6.25rem)]!',
           ]"
         >
           <!-- Patterns List -->
@@ -554,6 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end combined scroll area -->
 
       <ODrawer
+        bleed
         lazy
         data-test="logs-search-result-detail-dialog"
         v-model:open="searchObj.meta.showDetailTab"
@@ -576,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :correlation-loading="correlationLoading"
           :correlation-error="correlationError"
           :initial-tab="detailTableInitialTab"
-          class="detail-table-dialog"
+          class="rounded-default"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
           :totalLength="parseInt(searchObj.data.queryResults.hits.length)"
           :highlight-query="searchObj.data.highlightQuery"
@@ -668,6 +657,7 @@ import {
 } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 
 import { byString } from "../../utils/json";
@@ -883,8 +873,7 @@ export default defineComponent({
         ) {
           toast({
             variant: "error",
-            message:
-              "Page number is out of range. Please provide valid page number.",
+            message: this.t("logs.searchResult.pageOutOfRange"),
             timeout: 1000,
           });
           this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
@@ -968,6 +957,7 @@ export default defineComponent({
     // https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const searchListContainer = ref<HTMLElement | null>(null);
 
     // Responsive: observe the outer container (reacts to splitter + window resize)
@@ -1165,7 +1155,7 @@ export default defineComponent({
 
     // Watch for theme color changes in localStorage
     const handleThemeColorChange = () => {
-      const currentMode = store.state.theme === "dark" ? "dark" : "light";
+      const currentMode = isDark.value ? "dark" : "light";
       const appliedThemeName = localStorage.getItem(
         THEME_STORAGE_KEYS[currentMode].appliedName,
       );
@@ -1183,7 +1173,7 @@ export default defineComponent({
 
     // Re-render stacked chart with correct palette when dark/light mode switches
     watch(
-      () => store.state.theme,
+      () => isDark.value,
       () => reDrawChart(),
     );
 
@@ -1360,7 +1350,7 @@ export default defineComponent({
             xData,
             breakdownSeries,
             { ...chartParams, breakdownField: breakdownField ?? null },
-            store.state.theme === "dark",
+            isDark.value,
           );
         } else {
           plotChart.value = convertLogData(xData, yData, chartParams);
@@ -1464,13 +1454,13 @@ export default defineComponent({
 
         if (!result) {
           console.warn("[SearchResult] No correlation result returned");
-          correlationError.value = "No matching service found for correlation";
+          correlationError.value = t("logs.searchResult.noMatchingService");
           return;
         }
 
         if (!result.correlationData) {
           console.warn("[SearchResult] No correlation data in result");
-          correlationError.value = "Unable to retrieve correlation data";
+          correlationError.value = t("logs.searchResult.unableToRetrieveCorrelation");
           return;
         }
 
@@ -1554,7 +1544,9 @@ export default defineComponent({
           );
           toast({
             variant: "info",
-            message: `No metric streams found for service "${result.correlationData.service_name}"`,
+            message: t("logs.searchResult.noMetricStreams", {
+              service: result.correlationData.service_name,
+            }),
           });
         }
 
@@ -1565,7 +1557,9 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("[SearchResult] Error in openCorrelationFromLog:", err);
-        correlationError.value = `Correlation error: ${err.message || err}`;
+        correlationError.value = t("logs.searchResult.correlationError", {
+          error: err.message || err,
+        });
         correlationDashboardProps.value = null;
       } finally {
         correlationLoading.value = false;
@@ -1649,7 +1643,7 @@ export default defineComponent({
     const copyLogToClipboard = (log: any, copyAsJson: boolean = true) => {
       const copyData = copyAsJson ? JSON.stringify(log) : log;
       copyToClipboard(copyData, {
-        successMessage: "Content Copied Successfully!",
+        successMessage: t("logs.searchResult.contentCopied"),
         timeout: 1000,
       });
     };
@@ -1760,7 +1754,7 @@ export default defineComponent({
       if (!traceId) {
         toast({
           variant: "warning",
-          message: "No trace ID available for inspection",
+          message: t("logs.searchResult.noTraceIdForInspection"),
         });
         return;
       }
@@ -1925,6 +1919,7 @@ export default defineComponent({
     });
 
     return {
+      isDark,
       t,
       store,
       config,
@@ -2086,3 +2081,305 @@ export default defineComponent({
 });
 </script>
 
+
+<style lang="scss" scoped>
+/* keep(generated-content): pin-breakdown tooltip. The rows are built from data
+   via v-for with per-row inline colours, and the whole tooltip is
+   <Teleport to="body">; Vue still stamps the scope id onto teleported nodes, so
+   `scoped` reaches it. Surfaces/borders/text use the theme-flipping tokens;
+   include/exclude actions use --color-status-info-* / --color-status-error-*
+   with color-mix tints. */
+.oo-pin-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+}
+
+.oo-pin-tooltip {
+  position: fixed;
+  z-index: 9999;
+  min-width: 12.5rem;
+  max-height: 20vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--color-surface-base);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-lg);
+  padding: 0.5rem 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-heading);
+  outline: none;
+
+  &__time {
+    font-size: var(--text-2xs);
+    font-weight: 500;
+    opacity: 0.65;
+    padding: 0 0.625rem 0.25rem;
+    margin-bottom: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-grey-500) 15%, transparent);
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 1px 0.625rem;
+    transition: background 0.1s;
+
+    &:hover {
+      background: color-mix(in srgb, var(--color-grey-500) 12%, transparent);
+    }
+  }
+
+  &__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &__name {
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  &__count {
+    font-weight: 600;
+    min-width: 2rem;
+    text-align: right;
+    transition: opacity 0.1s;
+  }
+
+  &__row-actions {
+    display: flex;
+    gap: 0.1875rem;
+    flex-shrink: 0;
+    margin-left: 0.25rem;
+  }
+
+  &__action {
+    width: 1.375rem;
+    height: 1.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-default);
+    cursor: pointer;
+    font-size: var(--text-compact);
+    font-weight: 700;
+    line-height: 1;
+
+    &--include {
+      background: color-mix(in srgb, var(--color-status-info-text) 12%, transparent);
+      color: var(--color-status-info-text);
+
+      &:hover {
+        background: color-mix(in srgb, var(--color-status-info-text) 25%, transparent);
+      }
+    }
+
+    &--exclude {
+      background: color-mix(in srgb, var(--color-status-error-text) 8%, transparent);
+      color: var(--color-status-error-text);
+
+      &:hover {
+        background: color-mix(in srgb, var(--color-status-error-text) 20%, transparent);
+      }
+    }
+  }
+}
+
+/* keep(lib-override:opagination): reaches into the OPagination/OSelect-rendered
+   button DOM to compress the pagination controls into the results toolbar. */
+.paginator-section {
+  line-height: 1.5rem;
+  max-height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.25rem;
+  background: color-mix(in srgb, var(--color-white) 10%, transparent);
+  backdrop-filter: blur(0.625rem);
+  margin-top: 0;
+  overflow: visible;
+
+  :deep(.o-pagination__btn) {
+    padding: 0.125rem 0.25rem !important;
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    min-width: 1.5rem !important;
+    font-size: var(--text-xs) !important;
+    border-radius: 0.25rem !important;
+    line-height: 1rem !important;
+
+    svg {
+      width: 1rem !important;
+      height: 1rem !important;
+    }
+  }
+}
+
+.select-pagination {
+  position: relative;
+  width: 4rem !important;
+  height: 1.5rem !important;
+  margin-top: 0;
+
+  :deep(button) {
+    height: 1.5rem !important;
+    min-height: 1.5rem !important;
+    font-size: var(--text-xs) !important;
+    padding-inline: 0.5rem !important;
+  }
+}
+/* keep(keyframes): the histogram skeleton's shimmer @keyframes and the
+   animation: that references it must stay in the same scoped block so Vue
+   renames both consistently. */
+.histogram-container {
+  border-radius: 0.5rem;
+  position: relative;
+
+  &--visible {
+    height: 6.25rem;
+    padding-top: 0.25rem;
+    opacity: 1;
+    transition: all 0.3s ease-in-out;
+  }
+
+  &--hidden {
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all 0.3s ease-in-out;
+  }
+}
+
+.histogram-chart {
+  /* Explicit height (not just max-height): the ChartRenderer inside sizes
+     with h-full, and a percentage height collapses to 0 against an
+     auto-height parent — which renders an empty histogram strip. */
+  height: 6rem;
+  max-height: 6.25rem;
+  border-radius: 0.5rem;
+}
+
+.histogram-empty {
+  height: 6.25rem;
+  border-radius: 0.5rem;
+
+  &__message {
+    min-height: 2rem;
+  }
+}
+
+.histogram-skeleton {
+  --hsk-bar:     var(--color-grey-100);
+  --hsk-shimmer: color-mix(in srgb, var(--color-white) 65%, transparent);
+
+  .dark & {
+    --hsk-bar:     var(--color-grey-700);
+    --hsk-shimmer: color-mix(in srgb, var(--color-white) 6%, transparent);
+  }
+
+  height: 6.25rem;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.25rem;
+  overflow: hidden;
+
+  &__main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+  }
+
+  &__y-axis {
+    width: 2.25rem;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-right: 0.3125rem;
+    padding-bottom: 0.125rem;
+  }
+
+  &__y-label {
+    height: 0.4375rem;
+    border-radius: 0.125rem;
+    background-color: var(--hsk-bar);
+  }
+
+  &__plot {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--color-card-glass-border);
+    border-bottom: 1px solid var(--color-card-glass-border);
+  }
+
+  &__bars {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.125rem;
+    padding: 0.25rem 0.25rem 0;
+    overflow: hidden;
+    position: relative;
+
+    &::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent        0%,
+        transparent       20%,
+        var(--hsk-shimmer) 50%,
+        transparent       80%,
+        transparent       100%
+      );
+      animation: histogram-bar-shimmer 1.6s ease-in-out infinite;
+      pointer-events: none;
+    }
+  }
+
+  &__bar {
+    flex: 0 0 0.4375rem;
+    flex-shrink: 0;
+    border-radius: 0.0625rem 0.0625rem 0 0;
+    background-color: var(--hsk-bar);
+  }
+
+  &__x-axis {
+    display: flex;
+    justify-content: space-between;
+    padding-left: 2.25rem;
+    padding-top: 0.1875rem;
+  }
+
+  &__x-label {
+    width: 2.25rem;
+    height: 0.4375rem;
+    border-radius: 0.125rem;
+    background-color: var(--color-skeleton-base);
+  }
+}
+
+@keyframes histogram-bar-shimmer {
+  from { left: -100%; }
+  to   { left: 100%; }
+}
+
+.histogram-error {
+  margin: 0.5rem 0;
+  border-radius: 0.5rem;
+
+  &__message {
+    min-height: 2rem;
+  }
+}
+</style>

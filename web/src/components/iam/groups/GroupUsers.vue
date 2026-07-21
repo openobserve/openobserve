@@ -18,15 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col h-full">
     <div
       data-test="iam-users-selection-filters"
-      class="flex justify-start px-3 py-2 card-container flex-shrink-0"
+      class="flex justify-start px-3 py-2 bg-card-glass-bg flex-shrink-0"
     >
       <div data-test="iam-users-selection-show-toggle" class="mr-3">
         <div class="flex items-center">
           <span
             data-test="iam-users-selection-show-text"
-            style="font-size: 14px"
+            style="font-size: var(--text-sm)"
           >
-            Show
+            {{ t("iam.groupUsers.show") }}
           </span>
           <OToggleGroup
             class="ml-1"
@@ -52,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="h-[36px] w-[200px]"
-          placeholder="Search User"
+          class="h-9 w-50"
+          :placeholder="t('iam.groupUsers.searchUser')"
         />
       </div>
 
@@ -73,12 +73,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchable
           class="organizationlist"
           @update:model-value="updateOrganization"
-          placeholder="Select Organization"
+          :placeholder="t('iam.groupUsers.selectOrganization')"
         />
 
         </div>
     </div>
-    <div data-test="iam-users-selection-table" class="flex-1 min-h-0 card-container">
+    <div data-test="iam-users-selection-table" class="flex-1 min-h-0 bg-card-glass-bg">
       <OTable
         :data="rows"
         :columns="columns"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`iam-external-user-warning-icon-${row.email}`"
               />
               <template #content>
-                <div style="font-size: 12px; line-height: 1.5;">
+                <div style="font-size: var(--text-xs); line-height: 1.5;">
                   <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
                   <div class="mt-1">{{ t("iam.externalUserWarningMessage") }}</div>
                 </div>
@@ -157,7 +157,7 @@ import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({
@@ -194,16 +194,17 @@ const rows: Ref<any[]> = ref([]);
 const usersDisplay = ref("selected");
 
 const store = useStore();
-const orgOptions = ref([{ label: "All", value: "all" }]);
+const { t } = useI18n();
+const orgOptions = ref([{ label: t("iam.groupUsers.all"), value: "all" }]);
 const selectedOrg = ref(orgOptions.value[0]);
 const orgList = ref([...orgOptions.value]);
 const usersDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.groupUsers.all"),
     value: "all",
   },
   {
-    label: "Selected",
+    label: t("iam.groupUsers.selected"),
     value: "selected",
   },
 ];
@@ -216,7 +217,6 @@ const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
     );
   });
 };
-const { t } = useI18n();
 
 const userSearchKey = ref("");
 
@@ -235,7 +235,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       header: "",
       accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: TABLE_INDEX_COL_SIZE,
+    size: TABLE_CHECKBOX_COL_SIZE,
       minSize: 32,
       maxSize: 40,
       meta: { align: "center", compactPadding: true },
@@ -257,7 +257,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   if (store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org) {
     baseColumns.push({
       id: "organization",
-      header: "Organizations",
+      header: t("iam.groupUsers.organizations"),
       accessorKey: "org",
       sortable: true,
       resizable: true,
@@ -293,7 +293,7 @@ onBeforeMount(async () => {
     otherOrgOptions.sort((a:any, b:any) => a.label.localeCompare(b.label));
 
     // Prepend "All" option to the sorted list
-    orgOptions.value = [{ label: "All", value: "all" }, ...otherOrgOptions];
+    orgOptions.value = [{ label: t("iam.groupUsers.all"), value: "all" }, ...otherOrgOptions];
   }
   selectedOrg.value = orgOptions.value[0]; // Default to "All"
 });
@@ -353,10 +353,9 @@ const getchOrgUsers = async () => {
     );
 
     usersState.users = cloneDeep(
-      data.map((user: any, index: number) => {
+      data.map((user: any) => {
         return {
           email: user.email,
-          "#": index + 1,
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
           role: user.role,
@@ -366,9 +365,8 @@ const getchOrgUsers = async () => {
     );
 
     users.value = cloneDeep(usersState.users).map(
-      (user: any, index: number) => {
+      (user: any) => {
         return {
-          "#": index + 1,
           email: user.email,
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.org,

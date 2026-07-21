@@ -15,14 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard section header: title + description + Create action. -->
-    <AppPageHeader
+  <OPageLayout
       :title="t('ingestion.tokenManagementTitle')"
       title-data-test="ingestion-tokens-title-text"
-      icon="key"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+      icon="key" bleed>
       <!-- Full explanation lives in this info tooltip; the subtitle below is a
            truncated preview so neither overruns the Create action button. -->
       <template #title-trail>
@@ -50,10 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('ingestion.createTokenBtn') }}
         </OButton>
       </template>
-    </AppPageHeader>
 
     <div class="w-full flex-1 min-h-0 overflow-hidden">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <OTable
           :frame="false"
           :data="tokens"
@@ -172,12 +167,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showRevealedDialog = false"
     >
       <!-- Primary: the ready-to-paste Authorization credential. -->
-      <div class="mb-1 text-xs font-medium text-text-primary">
+      <div class="mb-1 text-xs font-medium text-text-label">
         {{ t('ingestion.authHeaderLabel') }}
       </div>
       <div
-        class="p-2.5 border border-dashed rounded border-gray-400 mb-1"
-        :class="store.state.theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'"
+        class="p-2.5 border border-dashed rounded-default border-border-default mb-1 bg-surface-subtle"
       >
         <code
           class="break-all font-mono text-sm"
@@ -205,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -213,7 +207,7 @@ import { ref, computed, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -249,7 +243,7 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { AppPageHeader, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OForm, OFormInput, OTable, OCodeCell, OUserCell },
+  components: { OPageLayout, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OForm, OFormInput, OTable, OCodeCell, OUserCell },
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -284,7 +278,7 @@ export default defineComponent({
         hideable: true,
         size: COL.name,
         minSize: 160,
-        meta: { align: "left", cellClass: 'pl-4!', headerClass: 'pl-4!', flex: true },
+        meta: { align: "left", flex: true },
       },
       {
         id: "token",
@@ -387,13 +381,15 @@ export default defineComponent({
         store.dispatch("setOrgTokens", tokens.value);
         toast({
           variant: "success",
-          message: `Token ${enabled ? "enabled" : "disabled"} successfully.`,
+          message: enabled
+            ? t("iam.ingestionTokensPage.tokenEnabledSuccess")
+            : t("iam.ingestionTokensPage.tokenDisabledSuccess"),
           timeout: 3000,
         });
       } catch (e: any) {
         toast({
           variant: "error",
-          message: e.response?.data?.message || "Failed to update token.",
+          message: e.response?.data?.message || t("iam.ingestionTokensPage.tokenUpdateError"),
           timeout: 5000,
         });
       } finally {

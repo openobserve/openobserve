@@ -32,13 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="hasQuery" class="mt-4">
         <OCheckbox
           v-model="replaceQuery"
-          label="Also replace query with example query"
+          :label="t('dashboard.customChartConfirmDialog.alsoReplaceQuery')"
           data-test="replace-query-checkbox"
         />
         <div
-          class="text-xs mt-1 ml-7 text-gray-500 dark:text-gray-400"
+          class="text-xs mt-1 ml-7 text-text-secondary"
         >
-          The example query will be inserted into the query editor
+          {{ t('dashboard.customChartConfirmDialog.exampleQueryInserted') }}
         </div>
       </div>
     </div>

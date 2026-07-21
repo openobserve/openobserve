@@ -91,8 +91,8 @@ export class LogsPage {
         // OInput convention §4: drive the auto-derived `-field` inner native input for fill().
         this.savedViewNameInput = '[data-test="add-alert-name-input-field"]';
         // Saved view dialog (SearchBar.vue:1654) and saved function dialog (SearchBar.vue:1703) were both migrated
-        // from q-dialog to ODialog. Tests historically shared a single save-button selector because the legacy
-        // q-dialog used the same data-test on both. With ODialog each dialog has its own primary button, so the
+        // from the legacy dialog to ODialog. Tests historically shared a single save-button selector because the legacy
+        // dialog used the same data-test on both. With ODialog each dialog has its own primary button, so the
         // selector matches whichever dialog is currently open (they are mutually exclusive).
         this.savedViewDialogSave = '[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]';
         this.savedViewDialog = '[data-test="search-bar-store-state-saved-view-dialog"]';
@@ -186,7 +186,7 @@ export class LogsPage {
         this.savedFunctionNameInput = '[data-test="saved-function-name-input"]';
         // OInput convention (AGENT_RULES §4): inner native <input> carries `-field` suffix
         this.savedFunctionNameInputField = '[data-test="saved-function-name-input-field"]';
-        this.qNotifyWarning = '#q-notify div';
+        this.qNotifyWarning = '[role="alert"]';
         this.qPageContainer = '[data-test="logs-page-container"]';
         this.cmContent = '.view-lines';
         this.cmLine = '.view-line';
@@ -900,7 +900,7 @@ export class LogsPage {
         //    wrapper down to its single `button` child instead.
         //  - Option:  [data-test="log-search-index-list-select-stream-option"]
         //             [data-test-value="<stream>"]   (rendered into a portalled popover by OSelect).
-        // The legacy q-select `log-search-index-list-stream-toggle-*` data-test is no longer
+        // The legacy select `log-search-index-list-stream-toggle-*` data-test is no longer
         // emitted, so we open the popover and pick the option directly. The retry loop
         // re-opens the popover on miss to handle the case where the stream list streams in
         // late after page navigation — matching the original 5-attempt retry semantic.
@@ -997,7 +997,7 @@ export class LogsPage {
 
     async deselectStream(streamName) {
         testLogger.info(`Deselecting stream: ${streamName}`);
-        // Legacy q-select used `log-search-index-list-stream-toggle-<name> div`;
+        // Legacy select used `log-search-index-list-stream-toggle-<name> div`;
         // post-OSelect migration that data-test is gone. Pick the same option
         // by `data-test-value` — toggling an already-selected option deselects
         // it in OSelect's multi-mode (selectionBehavior=toggle).
@@ -1575,7 +1575,7 @@ export class LogsPage {
         await quickMode.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
         await this.page.locator(this.utilitiesMenuButton).click();
         await quickMode.waitFor({ state: 'visible', timeout: 10000 });
-        // Click the q-item directly - it has @click="handleQuickMode" handler.
+        // Click the menu option directly - it has @click="handleQuickMode" handler.
         // force:true bypasses the stability check; the popper portal animates so the
         // element can be transiently re-laid-out, but the click is still committed.
         await quickMode.click({ force: true });
@@ -1659,8 +1659,11 @@ export class LogsPage {
         const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
         if (isInline) {
             // Normal viewport: the OSwitch inner button carries data-state="unchecked" when OFF.
+            // The Reka OSwitch animates the checked→unchecked transition, and under CI load the
+            // settled state can appear >5s after the toggle+execute — poll longer (still asserts
+            // the real end-state, not an arbitrary sleep) to avoid the flaky 5s ceiling.
             const switchUnchecked = inlineBtn.locator('[data-state="unchecked"]');
-            await expect(switchUnchecked).toBeVisible({ timeout: 5000 });
+            await expect(switchUnchecked).toBeVisible({ timeout: 15000 });
             return;
         }
         // Narrow-viewport fallback: check state via the utilities menu item.
@@ -1669,7 +1672,7 @@ export class LogsPage {
         const isMenuVisible = await histogramMenuItem.isVisible({ timeout: 2000 }).catch(() => false);
         if (isMenuVisible) {
             const switchEl = this.page.locator(`[data-test="logs-search-bar-menu-histogram-btn"] [data-state="unchecked"]`).first();
-            await expect(switchEl).toBeVisible({ timeout: 5000 });
+            await expect(switchEl).toBeVisible({ timeout: 15000 });
         }
         await this.page.keyboard.press('Escape').catch(() => {});
     }
@@ -1866,7 +1869,7 @@ export class LogsPage {
         const resultsDropdown = this.page.locator(this.recordsPerPageDropdown);
         await resultsDropdown.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
         await resultsDropdown.click({ force: true });
-        // Records-per-page is OSelect (Reka Listbox) post-migration, q-select pre.
+        // Records-per-page is OSelect (Reka Listbox) post-migration, the legacy select pre.
         await this.page.waitForTimeout(500);
         // Target option by data-test-value (OSelect emits `${parent}-option` + data-test-value).
         const option10 = this.page.locator(this.recordsPerPageOption(10)).first();
@@ -2063,19 +2066,24 @@ export class LogsPage {
         const field = 'kubernetes_pod_name';
         const editor = this.page.locator(this.queryEditor);
 
-        // Quick mode ON gates the star icons via v-if="showQuickMode".
-        // If the field list items are not visible, turn quick mode on and retry.
+        // Quick mode ON gates the star (ⓘ) icons via v-if="showQuickMode".
+        // Root cause of prior CI flakiness: an instant isVisible() check raced
+        // the field list re-rendering after the query completed, then toggled
+        // quick mode (already ON) which churned the utilities menu without
+        // helping. Instead: assert quick mode ON once (idempotent — safe whether
+        // the caller enabled it or not), then WAIT deterministically for the
+        // field list to render its interesting buttons. Slow CI runners need the
+        // wait, not a toggle.
         const fieldItem = this.page.locator('[data-test^="log-search-index-list-interesting-"]').first();
-        for (let attempt = 1; attempt <= 2; attempt++) {
-            const isVisible = await fieldItem.isVisible().catch(() => false);
-            if (isVisible) break;
-            testLogger.warn(`Field list items not visible (attempt ${attempt}/2) — turning quick mode on`);
+        await this.ensureQuickModeState(true);
+        try {
+            await fieldItem.waitFor({ state: 'visible', timeout: 20000 });
+        } catch {
+            // Fallback: a stray earlier toggle may have flipped quick mode off —
+            // re-assert and wait once more before giving up.
+            testLogger.warn('Interesting-field buttons not visible after 20s — re-asserting quick mode and waiting');
             await this.ensureQuickModeState(true);
-            // Wait for the field list to populate after quick mode toggle
-            await fieldItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        }
-        if (!(await fieldItem.isVisible().catch(() => false))) {
-            throw new Error('Field list items still not visible after 2 quick-mode retries');
+            await fieldItem.waitFor({ state: 'visible', timeout: 15000 });
         }
 
         await this.fillIndexFieldSearchInput(field);
@@ -2466,8 +2474,47 @@ export class LogsPage {
         return await this.page.locator(this.relative15MinButton).click({ force: true });
     }
 
+    /**
+     * Best-effort wait until the Run-query button is idle — not in its "Cancel query"
+     * in-flight variant and not disabled/busy. Lets the search toolbar (and any popover
+     * anchored to it — date picker, refresh-interval dropdown) settle before we interact,
+     * so a reflow can't shift the target mid-click. Resolves on timeout so callers still
+     * proceed.
+     */
+    async _waitForQueryButtonIdle(timeout = 30000) {
+        await this.page.waitForFunction((selector) => {
+            const el = document.querySelector(selector);
+            if (!el) return true;
+            const disabled = el.hasAttribute('disabled')
+                || el.getAttribute('aria-disabled') === 'true'
+                || el.getAttribute('aria-busy') === 'true';
+            const text = (el.textContent || '').trim();
+            const title = (el.getAttribute('title') || '').trim();
+            const isCancel = text.includes('Cancel') || title.toLowerCase().includes('cancel');
+            return !disabled && !isCancel;
+        }, this.queryButton, { timeout }).catch(() => {});
+    }
+
     async clickRelative6WeeksButton() {
-        return await this.page.locator(this.relative6WeeksButton).click({ force: true });
+        const btn = this.page.locator(this.relative6WeeksButton);
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        // The date picker is a popover anchored to the toolbar; an in-flight auto-search
+        // reflows the toolbar and repositions the popover, so the preset can shift under
+        // the pointer and the click misses (range stays "Past 15 Minutes"). Let the
+        // toolbar settle first, then click (no force), and verify the trigger label
+        // actually updated — retry once if the Reka toggle dropped the click mid-animation.
+        await this._waitForQueryButtonIdle();
+        await btn.click();
+        const applied = await this.page
+            .locator(this.dateTimeButton)
+            .filter({ hasText: 'Past 6 Weeks' })
+            .first()
+            .waitFor({ state: 'visible', timeout: 3000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!applied) {
+            await btn.click().catch(() => {});
+        }
     }
 
     // Deterministic wait helpers for date-picker popover buttons — replace
@@ -2590,7 +2637,27 @@ export class LogsPage {
     }
 
     async clickRefreshButton() {
-        return await this.page.locator(this.queryButton).click({ force: true });
+        // The Run-query button (logs-search-bar-refresh-btn) swaps to a "Cancel query"
+        // variant while a prior / auto search is in flight, and is briefly disabled or
+        // detached (v-if/v-else swap) during that transition. A plain force-click then
+        // either cancels the in-flight search or lands on a not-visible/detached node
+        // ("element is not visible" flake — seen on histogram/VRL tests). Wait for the
+        // run-mode variant to be visible AND idle (not Cancel, not disabled/aria-busy)
+        // before clicking so we deterministically click Run — no force needed.
+        const btn = this.page.locator(this.queryButton);
+        await btn.waitFor({ state: 'visible', timeout: 15000 });
+        await this.page.waitForFunction((selector) => {
+            const el = document.querySelector(selector);
+            if (!el) return false;
+            const disabled = el.hasAttribute('disabled')
+                || el.getAttribute('aria-disabled') === 'true'
+                || el.getAttribute('aria-busy') === 'true';
+            const text = (el.textContent || '').trim();
+            const title = (el.getAttribute('title') || '').trim();
+            const isCancel = text.includes('Cancel') || title.toLowerCase().includes('cancel');
+            return !disabled && !isCancel;
+        }, this.queryButton, { timeout: 30000 });
+        return await btn.click();
     }
 
     /**
@@ -3057,14 +3124,14 @@ export class LogsPage {
         // This method clicks the search input inside the saved views dialog
         //
         // Why this needs special handling:
-        // The search input is inside a q-table's #top template slot. When the table's
+        // The search input is inside the table's #top template slot. When the table's
         // data updates (e.g., after applying a saved view), the entire #top template
         // gets re-rendered, causing the input element to be detached and recreated.
         //
         // The problem was exacerbated by:
         // 1. debounce="1" (now changed to 300) - caused rapid re-renders
         // 2. Table data updating from ongoing searches
-        // 3. Invalid HTML structure (q-tr inside #top-right - now fixed)
+        // 3. Invalid HTML structure (a table row inside #top-right - now fixed)
         //
         // Even with those fixes, if a search just completed, the table might still
         // be updating its pagination/data, making the input unstable for a brief moment.
@@ -3879,7 +3946,7 @@ export class LogsPage {
             await inputLocator.fill('');
         } else {
             // pressSequentially fires per-character input events that reliably
-            // trigger the q-input's debounced update:model-value chain.
+            // trigger the input's debounced update:model-value chain.
             // force:true bypasses Monaco editor's <span class="highlight">code</span>
             // overlay that can intercept pointer events on the splitter panel.
             await inputLocator.click({ clickCount: 3, force: true });
@@ -3888,6 +3955,29 @@ export class LogsPage {
         // Wait deterministically for the input value to reflect the typed text —
         // this confirms the debounced model-value chain has settled.
         await expect(inputLocator).toHaveValue(text || '', { timeout: 5000 });
+    }
+
+    /**
+     * Wait until the field-list sidebar has actually been populated from the stream
+     * schema. The sidebar renders one expandable row per schema field
+     * (data-test="log-search-expand-<field>-field-btn"); on slow/cloud environments
+     * the schema fetch that follows stream selection can lag well past any fixed
+     * sleep, leaving the list empty. Downstream field-search / add-to-table steps then
+     * see zero fields and fail non-deterministically (fieldCount === 0, "field expand
+     * button not found"). Gate on the first expandable field row rendering so callers
+     * always operate against a populated list — a deterministic replacement for
+     * arbitrary waitForTimeout() buffers after stream selection / refresh.
+     * The expandable rows only render once the stream's fields have indexed VALUES,
+     * so this doubles as a data-ready gate. Cloud/alpha indexing after ingestion can
+     * lag well past 30s under parallel load (the global setup itself allows 90s), so
+     * the default timeout is deliberately generous rather than arbitrary.
+     * @param {number} timeout - max wait for the schema-driven field list to render
+     */
+    async waitForFieldListReady(timeout = 60000) {
+        await this.page
+            .locator('[data-test^="log-search-expand-"]')
+            .first()
+            .waitFor({ state: 'visible', timeout });
     }
 
     async clickExpandLabel(label) {
@@ -4136,6 +4226,19 @@ export class LogsPage {
         await button.waitFor({ state: 'visible', timeout: 10000 });
         // Wait for button to become enabled
         await expect(button).toBeEnabled({ timeout: 10000 });
+        // The refresh-interval dropdown is a popover anchored to the toolbar; while an
+        // auto-search is in flight the toolbar reflows and the popover repositions, so
+        // the option never reaches Playwright's "stable" state and a plain click times
+        // out (~45s). Wait for the Run-query button to leave its in-flight (Cancel/busy)
+        // state so the toolbar — and thus the popover — settles before clicking.
+        await this.page.waitForFunction((selector) => {
+            const el = document.querySelector(selector);
+            if (!el) return true; // toolbar not found → nothing to reflow
+            const busy = el.getAttribute('aria-busy') === 'true';
+            const text = (el.textContent || '').trim();
+            const title = (el.getAttribute('title') || '').trim();
+            return !busy && !text.includes('Cancel') && !title.toLowerCase().includes('cancel');
+        }, this.queryButton, { timeout: 30000 }).catch(() => {});
         return await button.click();
     }
 
@@ -4355,6 +4458,16 @@ export class LogsPage {
         }
         await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
         await btnLocator.click({ force: true });
+    }
+
+    /**
+     * Multistream variant: hover the LAST rendered field row (a field can appear
+     * once per selected stream, so target the last occurrence) to render its
+     * action buttons, then click the interesting-field (ⓘ) toggle on that row.
+     */
+    async hoverAndClickInterestingFieldLast(field) {
+        await this.page.locator(this.fieldListItem(field)).last().hover();
+        await this.page.locator(this.interestingFieldBtn(field)).last().click({ force: true });
     }
 
     /**
@@ -5111,23 +5224,26 @@ export class LogsPage {
     }
 
     async enableQuickModeIfDisabled() {
-        // The "interesting fields" toggle button in FieldListPagination only renders
-        // when showQuickMode = true — use it as a fast pre-check before opening the menu.
-        // Post-FieldListPagination migration the data-test gained a `logs-page-` prefix;
-        // match both so the helper works for both legacy and current builds.
+        // Fast pre-check: the "interesting fields" toggle item (data-test
+        // "logs-interesting-fields-btn") is rendered by FieldListPagination ONLY in the
+        // no-user-defined-schema branch AND only when showQuickMode is true, so its
+        // presence is a reliable "quick mode already on" signal. It is intentionally
+        // absent on user-defined-schema streams (cloud/enterprise) — in that case we
+        // fall through and verify the actual switch state via the utilities menu.
         const quickModeIndicator = this.page.locator(
-            '[data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"]',
+            '[data-test="logs-interesting-fields-btn"]',
         ).first();
-        // Quick Mode may also be implicitly "on" when the user-defined-schema toggle
-        // group is rendered — in that case the interesting-fields button is intentionally
-        // hidden and there's nothing to enable.
-        const toggleGroupIndicator = this.page.locator(
-            '[data-test="logs-page-fields-list-user-defined-schema-toggle"], [data-test="logs-page-field-list-user-defined-schema-toggle"]',
-        ).first();
+        // NOTE: the user-defined-schema toggle group (data-test
+        // "logs-page-field-list-user-defined-schema-toggle") is NOT a reliable
+        // quick-mode signal — FieldListPagination renders it whenever the stream
+        // exposes a user-defined schema (showUserDefinedSchemaToggle), regardless of
+        // searchObj.meta.quickMode. The per-field interesting (star) buttons are gated
+        // purely on quickMode (FieldRow/FieldExpansion `v-if="showQuickMode"`), so we
+        // must verify the actual Quick Mode switch state via the utilities menu rather
+        // than infer "quick mode is on" from the sidebar toggle group. Treating the
+        // toggle group as an indicator made all interesting-field tests fail on cloud/
+        // enterprise streams (which always surface a user-defined schema).
         if (await quickModeIndicator.isVisible().catch(() => false)) {
-            return;
-        }
-        if (await toggleGroupIndicator.isVisible().catch(() => false)) {
             return;
         }
 
@@ -5174,11 +5290,15 @@ export class LogsPage {
         // popper still intercepts pointer events on the page (query editor clicks fail).
         await quickModeItem.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
-        // Wait deterministically for either field-list branch to surface in the sidebar.
-        await Promise.any([
-            quickModeIndicator.waitFor({ state: 'visible', timeout: 8000 }),
-            toggleGroupIndicator.waitFor({ state: 'visible', timeout: 8000 }),
-        ]).catch(() => {});
+        // Confirm Quick Mode actually took effect: the per-field interesting (star)
+        // buttons only render when searchObj.meta.quickMode is true. Wait for one to
+        // surface (best-effort — ensureFieldIsInteresting has its own retry loop that
+        // re-applies the field-search filter if the button hasn't appeared yet).
+        await this.page
+            .locator('[data-test^="log-search-index-list-interesting-"]')
+            .first()
+            .waitFor({ state: 'visible', timeout: 8000 })
+            .catch(() => {});
     }
 
     async clickTimestampField() {
@@ -5610,7 +5730,7 @@ export class LogsPage {
         await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await this.page.keyboard.press("Backspace");
         // Drive the editor through Monaco's executeEdits API instead of keystrokes —
-        // typing into the search bar is intercepted by the q-input which has a
+        // typing into the search bar is intercepted by the input which has a
         // debounced model-value chain that races the test's read. The Monaco model
         // commits synchronously through executeEdits.
         await this.page.evaluate(({ selector, text }) => {
@@ -5797,7 +5917,7 @@ export class LogsPage {
     }
 
     async toggleStreamSelection(streamName) {
-        // Post-OSelect-migration: the legacy q-select toggle data-test
+        // Post-OSelect-migration: the legacy select toggle data-test
         // `log-search-index-list-stream-toggle-<name>` is no longer emitted.
         // Pick the OSelect option whose `data-test-value` matches streamName.
         // Caller must ensure the popover is open (e.g. via fillStreamFilter).
@@ -6547,6 +6667,17 @@ export class LogsPage {
      * Get severity colors from all visible log rows
      * Returns array of {severity, color} objects
      */
+    /**
+     * Count the per-row severity status-color bars currently rendered in the results
+     * table. Mirrors the selector getSeverityColors() reads, so callers can poll for the
+     * table to actually paint its rows before reading colors (avoids a fixed sleep).
+     */
+    async countSeverityColorBars() {
+        return await this.page
+            .locator('tbody tr[data-index] [data-test="log-table-row-status-color"]')
+            .count();
+    }
+
     async getSeverityColors() {
         return await this.page.evaluate(() => {
             const rows = document.querySelectorAll('tbody tr[data-index]');
@@ -6996,20 +7127,21 @@ export class LogsPage {
     async clickShareLinkAndExpectSuccess() {
         await this.clickShareLinkButton();
 
-        // Wait for success notification
-        const notification = this.page.locator(this.successNotification);
-        await notification.waitFor({ state: 'visible', timeout: 15000 });
-
-        const notificationText = await notification.textContent();
-        const isSuccess = notificationText.includes(this.linkCopiedSuccessText);
-
-        if (isSuccess) {
+        // Wait for the SUCCESS toast specifically (.first() to tolerate a lingering
+        // "Running query cancelled successfully" info toast from a prior refresh — the
+        // broad any-variant selector otherwise matches 2 toasts and trips strict mode,
+        // which was the CI flake on this P0 test).
+        const successToast = this.page
+            .locator(`[data-test-variant="success"][data-test-message*="${this.linkCopiedSuccessText}"]`)
+            .first();
+        try {
+            await successToast.waitFor({ state: 'visible', timeout: 15000 });
             testLogger.info('Share link success notification appeared');
-        } else {
-            testLogger.warn('Notification appeared but was not success message', { text: notificationText });
+            return true;
+        } catch (e) {
+            testLogger.warn('Share link success notification did not appear');
+            return false;
         }
-
-        return isSuccess;
     }
 
     /**
@@ -7031,8 +7163,13 @@ export class LogsPage {
     async clickShareLinkAndExpectNotification() {
         await this.clickShareLinkButton();
 
-        // Wait for any notification
-        const notification = this.page.locator(this.successNotification);
+        // Wait for the share-RESULT toast specifically — the "Link Copied Successfully!"
+        // success toast OR the "Error while copy link" error toast — matched by message
+        // and .first(). This skips an unrelated "Running query cancelled" info toast that
+        // can coexist, which would otherwise trip strict mode on the broad selector.
+        const notification = this.page
+            .locator(`[data-test-message*="${this.linkCopiedSuccessText}"], [data-test-message*="${this.errorCopyingLinkText}"]`)
+            .first();
         try {
             await notification.waitFor({ state: 'visible', timeout: 15000 });
             const notificationText = await notification.textContent();
@@ -7152,11 +7289,22 @@ export class LogsPage {
      * @returns {Promise<string>} The shared URL
      */
     async clickShareLinkAndGetUrl() {
+        // Ensure the current search state is fully committed to the URL before sharing.
+        // The share API builds the short URL from the current query params; if we click
+        // while the SPA is still writing them (e.g. right after clickRefresh) the short
+        // URL can capture a partial state (missing query / sql_mode).
+        await this._waitForUrlStable(5000);
+
         await this.clickShareLinkButton();
 
-        // Wait for success notification
-        const notification = this.page.locator(this.successNotification);
-        await notification.waitFor({ state: 'visible', timeout: 15000 });
+        // Wait for the SUCCESS ("Link Copied Successfully!") toast specifically, using
+        // .first(). A clickRefresh just before sharing can leave a "Running query
+        // cancelled successfully" info toast on screen; the broad any-variant
+        // successNotification selector then matches 2 toasts and trips strict mode.
+        const successToast = this.page
+            .locator(`[data-test-variant="success"][data-test-message*="${this.linkCopiedSuccessText}"]`)
+            .first();
+        await successToast.waitFor({ state: 'visible', timeout: 15000 });
 
         // Read the URL from clipboard
         let sharedUrl = await this.readClipboard();
@@ -7259,12 +7407,122 @@ export class LogsPage {
             // Once URL leaves /short/, let the SPA settle via load-state events
             await this.page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
             await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+            // After leaving /short/ the SPA re-hydrates search state and rewrites the URL
+            // query params in STAGES (stream → time → sql_mode/query → show_histogram/quick_mode).
+            // On a slow/loaded CI runner networkidle can fire mid-rewrite, so a bare
+            // captureCurrentState() here reads partial state (e.g. show_histogram=null,
+            // empty query). Wait until the URL stops changing before returning so callers
+            // observe the fully-restored state deterministically.
+            await this._waitForUrlStable(8000);
             const finalUrl = await this.getCurrentUrl();
             testLogger.info('Redirect complete', { finalUrl });
         } catch (e) {
             const currentUrl = await this.getCurrentUrl();
             testLogger.warn('Redirect timeout - URL may still be changing', { currentUrl });
         }
+    }
+
+    /**
+     * Resolve once the URL stops changing (debounce). Uses expect.poll's wait engine —
+     * no fixed waitForTimeout. Requires the same URL to be observed on consecutive polls
+     * before treating it as settled, so staged SPA param rewrites finish first.
+     * Best-effort: swallows timeout (a genuinely live-updating URL just returns after the
+     * budget) so callers always proceed.
+     * @param {number} timeout - Max time to wait in ms
+     */
+    async _waitForUrlStable(timeout = 8000) {
+        let lastUrl = null;
+        let stableStreak = 0;
+        try {
+            await expect.poll(
+                async () => {
+                    const url = await this.getCurrentUrl();
+                    if (url === lastUrl) {
+                        stableStreak += 1;
+                    } else {
+                        stableStreak = 0;
+                        lastUrl = url;
+                    }
+                    // Same URL seen on 3 consecutive polls => the staged rewrites are done.
+                    return stableStreak >= 2;
+                },
+                { timeout, intervals: [300, 300, 500, 500, 800] }
+            ).toBe(true);
+        } catch (e) {
+            testLogger.warn('URL did not fully stabilize within budget', { lastUrl });
+        }
+    }
+
+    /**
+     * Wait until the current URL contains a given query param key (optionally with a
+     * specific value), then return its value. After a share-link short-URL redirect the
+     * SPA repopulates URL params asynchronously, so reading captureCurrentState()
+     * immediately can observe a param as null. Polls via Playwright's wait engine.
+     * @param {string} key - the query param name, e.g. 'show_histogram'
+     * @param {string|null} expectedValue - if provided, wait until the value equals this
+     * @param {number} timeout
+     * @param {boolean} required - when true, THROW if the param never appears/matches within
+     *   the budget (use before an action that must observe a committed state, e.g. requiring
+     *   sql_mode=true before sharing so the short URL can't capture a non-SQL state). When
+     *   false (default) it is best-effort: it logs a warning and returns the current value.
+     * @returns {Promise<string|null>} the param value once present (null if it never appears)
+     */
+    async waitForUrlParam(key, expectedValue = null, timeout = 20000, required = false) {
+        try {
+            await expect.poll(
+                async () => {
+                    const params = this.parseUrlParams(await this.getCurrentUrl());
+                    const val = params[key] ?? null;
+                    if (val === null) return false;
+                    return expectedValue === null ? true : val === expectedValue;
+                },
+                { timeout, intervals: [200, 500, 1000] }
+            ).toBe(true);
+        } catch (e) {
+            if (required) {
+                const actual = this.parseUrlParams(await this.getCurrentUrl())[key] ?? null;
+                throw new Error(
+                    `Required URL param "${key}"${expectedValue !== null ? `="${expectedValue}"` : ''} never appeared within ${timeout}ms (actual: ${actual})`
+                );
+            }
+            testLogger.warn('URL param did not appear within budget', { key, expectedValue });
+        }
+        const params = this.parseUrlParams(await this.getCurrentUrl());
+        return params[key] ?? null;
+    }
+
+    /**
+     * Deterministically set up SQL mode + an exact query and COMMIT it to the URL, so a
+     * subsequent share captures sql_mode=true + the query in the short URL.
+     *
+     * Combines the two mechanisms that each alone were flaky on CI:
+     *  - enableSqlModeIfNeeded() sets searchObj.meta.sqlMode=true via Vue (this — not editor
+     *    content — is what the app writes to the URL as sql_mode; writing SELECT text alone
+     *    does NOT reliably flip the flag).
+     *  - setQueryEditorContent() writes the exact query via Monaco executeEdits with a verify
+     *    poll (reliable, unlike clearAndFillQueryEditor whose focus-sensitive Ctrl+A select-all
+     *    silently appended → a doubled query on CI).
+     * Then runQueryAndWaitForResults() commits without cancelling the in-flight auto-search,
+     * and we confirm sql_mode landed in the URL. The whole sequence retries once if the flag
+     * didn't commit (the occasional Vue-mutation miss under load), then strict-asserts.
+     * @param {string} query - the SQL query to set (must be a SELECT ... FROM ...)
+     */
+    async setupSqlQueryForShare(query) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            await this.enableSqlModeIfNeeded();
+            await this.setQueryEditorContent(query);
+            await this.waitForQueryEditorContent(query.split(/\s+/)[0]); // first token, e.g. SELECT
+            await this.runQueryAndWaitForResults();
+            const committed = await this.waitForUrlParam('sql_mode', 'true', 15000, false);
+            if (committed === 'true') {
+                testLogger.info('setupSqlQueryForShare: sql_mode committed to URL', { attempt });
+                return;
+            }
+            testLogger.warn(`setupSqlQueryForShare: sql_mode not committed (attempt ${attempt}) — retrying`);
+        }
+        // Still not committed after the retry — fail fast with a clear message rather than
+        // sharing a non-SQL state that would fail confusingly at the post-redirect editor read.
+        await this.waitForUrlParam('sql_mode', 'true', 5000, true);
     }
 
     /**
@@ -8237,6 +8495,77 @@ export class LogsPage {
             timeout: timeout
         });
         testLogger.info('Monaco query editor is visible');
+    }
+
+    /**
+     * Wait until the Monaco query editor is visible AND its model has finished
+     * (lazy-)loading with non-empty content, optionally containing an expected
+     * substring. Deterministic replacement for `waitForQueryEditorVisible()` +
+     * `waitForTimeout(n)` when reading editor text after a share-link / short-URL
+     * redirect or a saved-view apply: the editor host can become "visible" before
+     * the SPA re-hydrates the query from restored state, so getQueryEditorText()
+     * momentarily returns "" and a fixed wait races the pre-fill. Polls the live
+     * monaco model value via Playwright's wait engine — no waitForTimeout.
+     * @param {string|null} expectedSubstring - if provided, wait until the text contains it (case-insensitive)
+     * @param {number} timeout - poll ceiling; returns the instant content appears, so a
+     *   larger value only tolerates slow CI hydration (lazy-load + short-URL redirect +
+     *   SPA re-hydrate) — it never slows the happy path.
+     * @returns {Promise<string>} the editor text once ready
+     */
+    async waitForQueryEditorContent(expectedSubstring = null, timeout = 45000) {
+        await this.waitForQueryEditorVisible(timeout);
+        await expect.poll(
+            async () => {
+                const text = await this.getQueryEditorText();
+                if (!text) return false;
+                if (expectedSubstring) {
+                    return text.toLowerCase().includes(expectedSubstring.toLowerCase());
+                }
+                return text.trim().length > 0;
+            },
+            {
+                timeout,
+                intervals: [200, 500, 1000, 2000],
+                message: expectedSubstring
+                    ? `query editor never contained "${expectedSubstring}"`
+                    : 'query editor never became non-empty',
+            }
+        ).toBe(true);
+        const text = await this.getQueryEditorText();
+        testLogger.info('Query editor content ready', {
+            length: text?.length ?? 0,
+            expectedSubstring,
+        });
+        return text;
+    }
+
+    /**
+     * Wait for the Monaco editor to prefill with the restored query AFTER a share-link
+     * short-URL redirect. The editor is lazy-loaded and, after the extra short-URL
+     * resolution hop, occasionally finishes mounting without applying the query from the
+     * (already-resolved) URL — leaving it empty. A DIRECT load of that same resolved URL
+     * prefills reliably (the URL-query-param prefill path), so if the first wait window
+     * comes up empty we reload the resolved URL once to re-trigger that reliable path,
+     * then wait again. This is a deterministic self-heal grounded in a known-good code
+     * path — not a blind retry — and only kicks in on the (rare) empty-editor race.
+     * @param {string} expectedSubstring
+     * @param {number} firstWindow - initial poll ceiling before attempting the reload
+     * @param {number} secondWindow - poll ceiling after the reload
+     * @returns {Promise<string>} the editor text once ready
+     */
+    async waitForRedirectedQueryEditorContent(expectedSubstring, firstWindow = 20000, secondWindow = 30000) {
+        try {
+            return await this.waitForQueryEditorContent(expectedSubstring, firstWindow);
+        } catch (e) {
+            testLogger.warn('Editor empty after redirect — reloading the resolved URL to re-trigger URL-param prefill', {
+                expectedSubstring,
+                url: await this.getCurrentUrl(),
+            });
+            await this.page.reload();
+            await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            return await this.waitForQueryEditorContent(expectedSubstring, secondWindow);
+        }
     }
 
     /**

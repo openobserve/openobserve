@@ -13,6 +13,91 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { invalidateChartTheme } from "@/utils/chartTheme";
+
+/**
+ * Run a light↔dark mode switch inside a View Transition so the whole page
+ * cross-fades as one frame. Without this, elements that carry their own CSS
+ * color transitions (inputs, selects, buttons) animate to the new theme a beat
+ * after everything else snaps, which reads as a flash.
+ *
+ * Every DOM write of the switch (the `.dark` class toggle, store dispatch,
+ * applyThemeColors) must happen inside `applyChanges` so the transition
+ * captures them together.
+ *
+ * Applies instantly (no fade) when:
+ * - the requested mode is already active — callers sync each other, and a
+ *   second startViewTransition would cancel the fade already running;
+ * - the View Transitions API is unavailable;
+ * - the user prefers reduced motion.
+ */
+export const switchThemeMode = (
+  mode: "light" | "dark",
+  applyChanges: () => void,
+): void => {
+  const root = document.documentElement;
+  const alreadyApplied = root.classList.contains("dark") === (mode === "dark");
+  const doc = document as Document & {
+    startViewTransition?: (callback: () => void) => {
+      finished: Promise<void>;
+    };
+  };
+
+  if (alreadyApplied) {
+    applyChanges();
+    return;
+  }
+
+  // Freeze per-element CSS transitions (inputs, buttons carry their own
+  // `transition-colors`) while the switch is in flight, so every element snaps
+  // to its final color inside the sweep instead of animating a beat behind the
+  // rest of the page. The matching CSS lives in styles/tailwind.css.
+  const freeze = () => root.classList.add("theme-switching");
+  const unfreeze = () => root.classList.remove("theme-switching");
+
+  if (
+    typeof doc.startViewTransition !== "function" ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  ) {
+    freeze();
+    applyChanges();
+    // Two frames: let the new colors paint before transitions re-enable.
+    requestAnimationFrame(() => requestAnimationFrame(unfreeze));
+    return;
+  }
+
+  // The visual itself (soft top→bottom curtain sweep) is defined entirely in
+  // CSS on the ::view-transition pseudos in styles/tailwind.css.
+  const transition = doc.startViewTransition(() => {
+    freeze();
+    applyChanges();
+  });
+  transition.finished.then(unfreeze, unfreeze);
+};
+
+/**
+ * Resolve a design-token CSS custom property to its concrete value at runtime.
+ *
+ * Charts (ECharts options, SVG data-URI symbols, canvas) can't use CSS `var()` —
+ * they need a literal color string. This reads the token from the document root
+ * so the single source of truth stays the token layer (`lib/styles/tokens/*`),
+ * not a hardcoded hex. `fallback` is returned when the token is unset or the DOM
+ * is unavailable (SSR / unit tests), so callers still get a sensible value.
+ *
+ * @param token   - Token name, with or without the leading `--` (e.g. "--color-indigo-500")
+ * @param fallback - Value to use if the token can't be read
+ */
+export const cssToken = (token: string, fallback: string): string => {
+  if (typeof document === "undefined" || !document.documentElement) {
+    return fallback;
+  }
+  const name = token.startsWith("--") ? token : `--${token}`;
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  return value || fallback;
+};
+
 /**
  * Helper function to convert hex color to rgba
  * @param hex - Hex color code (e.g., "#3F7994")
@@ -88,6 +173,10 @@ const generatePrimaryPalette = (baseHex: string): Record<string, string> => {
     '700': mixColors(baseHex, '#000000', 80),
     '800': mixColors(baseHex, '#000000', 60),
     '900': mixColors(baseHex, '#000000', 40),
+    // 950 continues the linear −20 step (700:80 → 800:60 → 900:40 → 950:20).
+    // dark.css consumes --color-primary-950 for two surfaces. For the default
+    // #3F7994 base, 20% reproduces the stock teal #0d181e (13/63 ≈ 0.20).
+    '950': mixColors(baseHex, '#000000', 20),
   };
 };
 
@@ -110,16 +199,11 @@ const syncO2LibraryTokens = (themeColor: string): void => {
  * @param isDefault - Whether this is the default theme
  */
 export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isDefault: boolean = false, semanticColors?: SemanticColors) => {
-  const isDarkMode = mode === "dark";
+  const darkModeActive = mode === "dark";
 
-  // Toggle .dark class on <html> for the O2 component library (Tailwind dark variant)
-  document.documentElement.classList.toggle('dark', isDarkMode);
-
-  // Toggle the legacy `body.body--dark` / `body.body--light` compat classes so existing
-  // selectors (~200 across SCSS/Vue) and `document.body.classList.contains('body--dark')`
-  // JS checks continue to work.
-  document.body.classList.toggle('body--dark', isDarkMode);
-  document.body.classList.toggle('body--light', !isDarkMode);
+  // Toggle .dark class on <html> for the O2 component library (Tailwind dark
+  // variant). `.dark` on <html> is the single dark-mode signal.
+  document.documentElement.classList.toggle('dark', darkModeActive);
 
   // Sync O2 library tokens with the custom theme color.
   // When using the default theme, clear any previously-set inline primary palette so
@@ -133,57 +217,56 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
     syncO2LibraryTokens(themeColor);
   }
 
-  if (isDarkMode) {
+  if (darkModeActive) {
     // Apply dark mode theme color
     const rgbaColor = hexToRgba(themeColor, 10);
-    document.body.style.setProperty('--o2-dark-theme-color', rgbaColor);
-    document.body.style.setProperty('--o2-theme-color', rgbaColor);
+    document.body.style.setProperty('--color-theme-accent', rgbaColor);
 
     // Apply table header background color (80% theme color mixed with 20% black for dark mode)
     const tableHeaderBg = mixColors(themeColor, '#000000', 40);
-    document.body.style.setProperty('--o2-table-header-bg', tableHeaderBg);
+    document.body.style.setProperty('--color-theme-table-header-bg', tableHeaderBg);
 
     // Apply tab background colors for dark mode
-    // --o2-tab-bg: 20% white + 80% theme color (inverted from light mode)
+    // --color-theme-tab-bg: 20% white + 80% theme color (inverted from light mode)
     const tabBg = hexToRgba(themeColor,3); // 0.8 alpha (80% theme color)
-    document.body.style.setProperty('--o2-tab-bg', tabBg);
+    document.body.style.setProperty('--color-theme-tab-bg', tabBg);
 
-    // --o2-inactive-tab-bg: 10% theme color mixed with dark background
+    // --color-theme-tab-bg-inactive: 10% theme color mixed with dark background
     const inactiveTabBg = hexToRgba(themeColor, 1); // 0.1 alpha (10% theme color)
-    document.body.style.setProperty('--o2-inactive-tab-bg', inactiveTabBg);
+    document.body.style.setProperty('--color-theme-tab-bg-inactive', inactiveTabBg);
 
     // // Apply header menu background color for dark mode (30% theme color)
     // const headerMenuBg = hexToRgba(themeColor, 2); // 0.3 alpha (30% theme color)
-    // document.body.style.setProperty('--o2-header-menu-bg', headerMenuBg);
+    // document.body.style.setProperty('--color-theme-header-menu-bg', headerMenuBg);
 
     // Apply menu gradient colors
     if (isDefault) {
       // Use default menu gradient colors
-      document.body.style.setProperty('--o2-menu-gradient-start', 'rgba(89, 155, 174, 0.3)');
-      document.body.style.setProperty('--o2-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
+      document.body.style.setProperty('--color-theme-menu-gradient-start', 'rgba(89, 155, 174, 0.3)');
+      document.body.style.setProperty('--color-theme-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
       // Use default menu color for dark mode
-      document.body.style.setProperty('--o2-menu-color', '#FFFFFF');
+      document.body.style.setProperty('--color-theme-menu-color', '#FFFFFF');
     } else {
       // Calculate menu gradient from theme color
       const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
       const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      document.body.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
-      document.body.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
+      document.body.style.setProperty('--color-theme-menu-gradient-start', menuGradientStart);
+      document.body.style.setProperty('--color-theme-menu-gradient-end', menuGradientEnd);
       // Use theme color as menu color for dark mode
-      document.body.style.setProperty('--o2-menu-color', themeColor);
+      document.body.style.setProperty('--color-theme-menu-color', themeColor);
     }
 
     // Clear light mode variables
-    document.documentElement.style.removeProperty('--o2-theme-color');
-    document.documentElement.style.removeProperty('--o2-body-primary-bg');
-    document.documentElement.style.removeProperty('--o2-body-secondary-bg');
-    document.documentElement.style.removeProperty('--o2-table-header-bg');
-    document.documentElement.style.removeProperty('--o2-tab-bg');
-    document.documentElement.style.removeProperty('--o2-inactive-tab-bg');
-    document.documentElement.style.removeProperty('--o2-header-menu-bg');
-    document.documentElement.style.removeProperty('--o2-menu-gradient-start');
-    document.documentElement.style.removeProperty('--o2-menu-gradient-end');
-    document.documentElement.style.removeProperty('--o2-menu-color');
+    document.documentElement.style.removeProperty('--color-theme-accent');
+    document.documentElement.style.removeProperty('--color-theme-body-bg-primary');
+    document.documentElement.style.removeProperty('--color-theme-body-bg-secondary');
+    document.documentElement.style.removeProperty('--color-theme-table-header-bg');
+    document.documentElement.style.removeProperty('--color-theme-tab-bg');
+    document.documentElement.style.removeProperty('--color-theme-tab-bg-inactive');
+    document.documentElement.style.removeProperty('--color-theme-header-menu-bg');
+    document.documentElement.style.removeProperty('--color-theme-menu-gradient-start');
+    document.documentElement.style.removeProperty('--color-theme-menu-gradient-end');
+    document.documentElement.style.removeProperty('--color-theme-menu-color');
     // Page background = a single near-black color with a subtle theme tint (no
     // gradient), mirroring the light-mode single-tint treatment.
     const darkBodyBg = mixColors(themeColor, '#000000', 8); // 8% theme + 92% black
@@ -191,71 +274,71 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
   } else {
     // Apply light mode theme color
     const rgbaColor = hexToRgba(themeColor, 10);
-    document.documentElement.style.setProperty('--o2-theme-color', rgbaColor);
+    document.documentElement.style.setProperty('--color-theme-accent', rgbaColor);
 
     // Auto-calculate and apply background colors based on theme color.
     // primaryBg (1%) is reused as a subtle surface tint by other components
-    // (QueryInspector, .bg-white) — keep it. secondaryBg is kept for legacy
-    // .o2-custom-bg consumers.
+    // (QueryInspector, .bg-white) — keep it. secondaryBg is the far stop of the
+    // page-background gradient on alerts/AddDestination.vue + alerts/AddTemplate.vue.
     const primaryBg = hexToRgba(themeColor, 0.1); // 0.01 alpha (1%)
     const secondaryBg = hexToRgba(themeColor, 4); // 0.4 alpha (40%)
 
-    document.documentElement.style.setProperty('--o2-body-primary-bg', primaryBg);
-    document.documentElement.style.setProperty('--o2-body-secondary-bg', secondaryBg);
+    document.documentElement.style.setProperty('--color-theme-body-bg-primary', primaryBg);
+    document.documentElement.style.setProperty('--color-theme-body-bg-secondary', secondaryBg);
 
     // Page background = a single, subtle primary tint (no gradient) so the muted
     // area around the white content card reads as one calm color — matching the
     // page chrome (surface-chrome = primary-100).
-    const bodyBg = hexToRgba(themeColor, 0.5); // ~0.05 alpha — a calm, barely-tinted backdrop (was 0.10, read as too bright)
+    const bodyBg = hexToRgba(themeColor, 0.5); // ~0.05 alpha — a calm, barely-tinted backdrop
     document.body.style.setProperty('background', bodyBg, 'important');
 
     // Apply table header background color (80% theme color mixed with 20% white)
     const tableHeaderBg = mixColors(themeColor, '#FFFFFF', 30);
-    document.documentElement.style.setProperty('--o2-table-header-bg', tableHeaderBg);
+    document.documentElement.style.setProperty('--color-theme-table-header-bg', tableHeaderBg);
 
     // Apply tab background colors for light mode
-    // --o2-tab-bg: 20% theme color + 80% white
+    // --color-theme-tab-bg: 20% theme color + 80% white
     const tabBg = hexToRgba(themeColor, 2); // 0.2 alpha (20% theme color)
-    document.documentElement.style.setProperty('--o2-tab-bg', tabBg);
+    document.documentElement.style.setProperty('--color-theme-tab-bg', tabBg);
 
-    // --o2-inactive-tab-bg: 10% theme color + 90% white
+    // --color-theme-tab-bg-inactive: 10% theme color + 90% white
     const inactiveTabBg = hexToRgba(themeColor, 1); // 0.1 alpha (10% theme color)
-    document.documentElement.style.setProperty('--o2-inactive-tab-bg', inactiveTabBg);
+    document.documentElement.style.setProperty('--color-theme-tab-bg-inactive', inactiveTabBg);
 
 
     // Apply menu gradient colors
     if (isDefault) {
       // Use default menu gradient colors
-      document.documentElement.style.setProperty('--o2-menu-gradient-start', 'rgba(89, 175, 199, 0.3)');
-      document.documentElement.style.setProperty('--o2-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
+      document.documentElement.style.setProperty('--color-theme-menu-gradient-start', 'rgba(89, 175, 199, 0.3)');
+      document.documentElement.style.setProperty('--color-theme-menu-gradient-end', 'rgba(48, 193, 233, 0.3)');
       // Use default menu color for light mode
-      document.documentElement.style.setProperty('--o2-menu-color', '#3F7994');
+      document.documentElement.style.setProperty('--color-theme-menu-color', '#3F7994');
     } else {
       // Calculate menu gradient from theme color
       const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
       const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      document.documentElement.style.setProperty('--o2-menu-gradient-start', menuGradientStart);
-      document.documentElement.style.setProperty('--o2-menu-gradient-end', menuGradientEnd);
+      document.documentElement.style.setProperty('--color-theme-menu-gradient-start', menuGradientStart);
+      document.documentElement.style.setProperty('--color-theme-menu-gradient-end', menuGradientEnd);
       // Use theme color as menu color for light mode
-      document.documentElement.style.setProperty('--o2-menu-color', themeColor);
+      document.documentElement.style.setProperty('--color-theme-menu-color', themeColor);
     }
 
     // Clear dark mode variables
-    document.body.style.removeProperty('--o2-dark-theme-color');
-    document.body.style.removeProperty('--o2-table-header-bg');
-    document.body.style.removeProperty('--o2-tab-bg');
-    document.body.style.removeProperty('--o2-inactive-tab-bg');
-    document.body.style.removeProperty('--o2-header-menu-bg');
-    document.body.style.removeProperty('--o2-menu-gradient-start');
-    document.body.style.removeProperty('--o2-menu-gradient-end');
-    document.body.style.removeProperty('--o2-menu-color');
+    document.body.style.removeProperty('--color-theme-accent');
+    document.body.style.removeProperty('--color-theme-table-header-bg');
+    document.body.style.removeProperty('--color-theme-tab-bg');
+    document.body.style.removeProperty('--color-theme-tab-bg-inactive');
+    document.body.style.removeProperty('--color-theme-header-menu-bg');
+    document.body.style.removeProperty('--color-theme-menu-gradient-start');
+    document.body.style.removeProperty('--color-theme-menu-gradient-end');
+    document.body.style.removeProperty('--color-theme-menu-color');
   }
 
   // Apply semantic colors (O2 Signature triadic theme and any future multi-color themes)
   const semanticTokenNames = [
-    '--o2-negative', '--o2-status-error-text', '--o2-status-error-bg',
-    '--o2-positive', '--o2-status-success-text', '--o2-status-success-bg',
-    '--o2-secondary-btn-bg', '--o2-secondary-btn-text', '--o2-secondary-btn-border',
+    '--color-status-negative', '--color-status-error-text', '--color-status-error-bg',
+    '--color-status-positive', '--color-status-success-text', '--color-status-success-bg',
+    '--color-button-secondary', '--color-button-secondary-foreground', '--color-button-secondary-border',
     '--color-button-outline-text', '--color-button-outline-border',
     '--color-button-ghost-text',
   ];
@@ -265,16 +348,16 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
       document.body.style.removeProperty(t);
       document.documentElement.style.removeProperty(t);
     });
-    const target = isDarkMode ? document.body : document.documentElement;
-    target.style.setProperty('--o2-negative', semanticColors.error);
-    target.style.setProperty('--o2-status-error-text', semanticColors.errorText);
-    target.style.setProperty('--o2-status-error-bg', semanticColors.errorBg);
-    target.style.setProperty('--o2-positive', semanticColors.success);
-    target.style.setProperty('--o2-status-success-text', semanticColors.successText);
-    target.style.setProperty('--o2-status-success-bg', semanticColors.successBg);
-    target.style.setProperty('--o2-secondary-btn-bg', semanticColors.secondaryBtnBg);
-    target.style.setProperty('--o2-secondary-btn-text', semanticColors.secondaryBtnText);
-    target.style.setProperty('--o2-secondary-btn-border', semanticColors.secondaryBtnBorder);
+    const target = darkModeActive ? document.body : document.documentElement;
+    target.style.setProperty('--color-status-negative', semanticColors.error);
+    target.style.setProperty('--color-status-error-text', semanticColors.errorText);
+    target.style.setProperty('--color-status-error-bg', semanticColors.errorBg);
+    target.style.setProperty('--color-status-positive', semanticColors.success);
+    target.style.setProperty('--color-status-success-text', semanticColors.successText);
+    target.style.setProperty('--color-status-success-bg', semanticColors.successBg);
+    target.style.setProperty('--color-button-secondary', semanticColors.secondaryBtnBg);
+    target.style.setProperty('--color-button-secondary-foreground', semanticColors.secondaryBtnText);
+    target.style.setProperty('--color-button-secondary-border', semanticColors.secondaryBtnBorder);
     if (semanticColors.outlineText) target.style.setProperty('--color-button-outline-text', semanticColors.outlineText);
     if (semanticColors.outlineBorder) target.style.setProperty('--color-button-outline-border', semanticColors.outlineBorder);
     if (semanticColors.ghostText) target.style.setProperty('--color-button-ghost-text', semanticColors.ghostText);
@@ -284,6 +367,9 @@ export const applyThemeColors = (themeColor: string, mode: "light" | "dark", isD
       document.body.style.removeProperty(t);
     });
   }
+
+  // Invalidate the resolved-token cache so charts read fresh values on theme change.
+  invalidateChartTheme();
 
   // Dispatch event to notify components (like SearchResult) to re-render
   window.dispatchEvent(new CustomEvent('themeColorChanged'));

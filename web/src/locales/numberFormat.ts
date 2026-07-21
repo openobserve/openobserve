@@ -16,8 +16,8 @@
 import { getLanguage } from "@/utils/cookies";
 
 // App language codes are not all valid BCP-47, so map them for Intl.NumberFormat.
-const APP_LOCALE_TO_BCP47: Record<string, string> = {
-  "en-gb": "en-GB",
+export const APP_LOCALE_TO_BCP47: Record<string, string> = {
+  "en-us": "en-US",
   "tr-turk": "tr-TR",
   "zh-cn": "zh-CN",
   "zh-tw": "zh-TW",
@@ -29,11 +29,14 @@ const APP_LOCALE_TO_BCP47: Record<string, string> = {
   ko: "ko-KR",
   nl: "nl-NL",
   pt: "pt-PT",
+  ru: "ru-RU",
+  pl: "pl-PL",
+  vi: "vi-VN",
 };
 
-// Resolve the active app language without importing the i18n instance — kept
-// standalone so widely-used utils don't pull `createI18n` into their import
-// graph (which breaks specs that partially mock vue-i18n).
+// Resolve the active app language without importing the i18n instance, so
+// widely-used utils don't pull `createI18n` into their import graph (which
+// breaks specs that partially mock vue-i18n).
 const resolveAppLanguage = (): string => {
   const cookieLanguage = getLanguage();
   if (cookieLanguage) return cookieLanguage;
@@ -42,12 +45,12 @@ const resolveAppLanguage = (): string => {
   const match = Object.keys(APP_LOCALE_TO_BCP47).find(
     (code) => navLanguage.indexOf(code) > -1,
   );
-  return match ?? "en-gb";
+  return match ?? "en-us";
 };
 
 /**
  * Returns a BCP-47 locale tag for the user's selected UI language, suitable for
- * `Intl.NumberFormat`. Falls back to "en-GB" for unmapped languages.
+ * `Intl.NumberFormat`. Falls back to "en-US" for unmapped languages.
  */
 export const getNumberLocale = (): string =>
-  APP_LOCALE_TO_BCP47[resolveAppLanguage()] ?? "en-GB";
+  APP_LOCALE_TO_BCP47[resolveAppLanguage()] ?? "en-US";

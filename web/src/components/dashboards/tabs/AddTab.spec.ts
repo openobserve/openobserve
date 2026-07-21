@@ -28,6 +28,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import AddTab from "./AddTab.vue";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock vue-router
 const mockRoute = {
@@ -41,17 +42,36 @@ vi.mock("vue-router", () => ({
 }));
 
 // Mock vue-i18n
+// Inline overrides the assertions depend on. These are merged on top of the
+// real en locale so every migrated key resolves to its actual English text
+// while these explicit values still win.
+const inlineOverrides: any = {
+  "dashboard.nameRequired": "Name is required",
+  "dashboard.cancel": "Cancel",
+  "dashboard.save": "Save",
+  "dashboard.name": "Name",
+  "dashboard.newTab": "Add Tab",
+  "dashboard.editTab": "Edit Tab",
+};
+
+// Resolve a dotted key path against the full en.json locale.
+const resolveFromLocale = (key: string): string | undefined => {
+  return key
+    .split(".")
+    .reduce(
+      (acc: any, part: string) =>
+        acc && typeof acc === "object" ? acc[part] : undefined,
+      enLocaleFull as any,
+    );
+};
+
 const mockI18n = {
   t: (key: string) => {
-    const translations: any = {
-      "dashboard.nameRequired": "Name is required",
-      "dashboard.cancel": "Cancel",
-      "dashboard.save": "Save",
-      "dashboard.name": "Name",
-      "dashboard.newTab": "Add Tab",
-      "dashboard.editTab": "Edit Tab",
-    };
-    return translations[key] || key;
+    if (Object.prototype.hasOwnProperty.call(inlineOverrides, key)) {
+      return inlineOverrides[key];
+    }
+    const resolved = resolveFromLocale(key);
+    return typeof resolved === "string" ? resolved : key;
   },
 };
 

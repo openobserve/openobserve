@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <transition name="slide-fade">
       <div
         v-if="show"
-        class="charts-wrapper py-0! min-h-[8.5rem] h-[10rem] overflow-hidden will-change-[transform,opacity]"
+        class="charts-wrapper py-0! min-h-[8.5rem] h-40 overflow-hidden will-change-[transform,opacity]"
       >
         <div class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-[0_2px_8px_rgba(255,255,255,0.08)]">
           <RenderDashboardCharts
@@ -87,7 +87,6 @@ import { deepCopy, formatTimeWithSuffix } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
-import useParser from "@/composables/useParser";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -119,7 +118,7 @@ const emit = defineEmits<{
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
-const { searchObj } = useTraces();
+const { searchObj, tracesParser } = useTraces();
 const { t } = useI18n();
 
 
@@ -208,7 +207,6 @@ const contextMenuPosition = ref({ x: 0, y: 0 });
 const contextMenuValue = ref(0);
 const contextMenuFieldName = ref("");
 const contextMenuData = ref<any>(null);
-const sqlParser = ref<any>(null);
 
 const getBaseFilters = () => {
   let baseFilters = [];
@@ -232,13 +230,13 @@ const getBaseFilters = () => {
   if (effectiveFilter.value?.trim().length) {
     const parsed = parseDurationWhereClause(
       effectiveFilter.value.trim(),
-      sqlParser.value,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
     baseFilters.push(
       parseSpanKindWhereClause(
         typeof parsed === "string" ? parsed : effectiveFilter.value.trim(),
-        sqlParser.value,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       ),
     );
@@ -275,7 +273,7 @@ const loadDashboard = async () => {
           // and span_kind labels back to numeric OTEL keys.
           const parsedFilter = parseDurationWhereClause(
             effectiveFilter.value.trim(),
-            sqlParser.value,
+            tracesParser.value,
             searchObj.data.stream.selectedStream.value,
           );
           errorFilters.push(
@@ -283,7 +281,7 @@ const loadDashboard = async () => {
               typeof parsedFilter === "string"
                 ? parsedFilter
                 : effectiveFilter.value.trim(),
-              sqlParser.value,
+              tracesParser.value,
               searchObj.data.stream.selectedStream.value,
             ),
           );
@@ -702,10 +700,8 @@ const stopAutoRefresh = () => {
   }
 };
 
-onMounted(async () => {
+onMounted(() => {
   loadDashboard();
-  const { sqlParser: loadSqlParser } = useParser();
-  sqlParser.value = await loadSqlParser();
 });
 
 onBeforeUnmount(() => {
@@ -724,16 +720,25 @@ defineExpose({
 });
 </script>
 
-<style>
-.traces-metrics-dashboard .card-container {
-  box-shadow: none;
+<style scoped>
+/* keep(lib-override:render-dashboard-charts): RenderDashboardCharts renders its
+   own DOM (reached via :deep). Tighten the side padding AND collapse the top
+   padding/margin it adds for full dashboards (container pt-2 + inner .displayDiv
+   mt-2 = 1rem). In this compact traces view the charts live in a fixed h-40
+   (10rem) overflow-hidden wrapper, so that extra 1rem pushes the plot past the
+   clip line and cuts off the x-axis. Zeroing it restores the main-branch fit. */
+.charts-wrapper :deep(.render-dashboard-charts-container) {
+  padding-left: 0.2rem;
+  padding-right: 0.2rem;
+  padding-top: 0;
 }
 
-.traces-metrics-dashboard .card-container :first-child {
-  padding: 0 0.0625rem !important;
+.charts-wrapper :deep(.displayDiv) {
+  margin-top: 0;
 }
 
-/* Slide fade transition */
+/* keep(complex-state): slide-fade-* drive the <transition name="slide-fade">
+   reveal (enter/leave phases) — Tailwind can't express transition-group state. */
 .slide-fade-enter-active,
 .slide-fade-leave-active {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -741,31 +746,25 @@ defineExpose({
 
 .slide-fade-enter-from {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-0.625rem);
   max-height: 0;
 }
 
 .slide-fade-enter-to {
   opacity: 1;
   transform: translateY(0);
-  max-height: 500px;
+  max-height: 31.25rem;
 }
 
 .slide-fade-leave-from {
   opacity: 1;
   transform: translateY(0);
-  max-height: 500px;
+  max-height: 31.25rem;
 }
 
 .slide-fade-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-0.625rem);
   max-height: 0;
 }
-
-.charts-wrapper .render-dashboard-charts-container {
-  padding-left: 0.2rem;
-  padding-right: 0.2rem;
-}
-
 </style>

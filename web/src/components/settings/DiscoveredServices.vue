@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex flex-col w-full h-full bg-(--o2-card-bg) discovered-services"
-    :class="{ 'ds-dark': store.state.theme === 'dark' }"
+    class="flex flex-col w-full h-full bg-card-glass-bg discovered-services"
   >
     <!-- Loading State -->
     <div v-if="loading" class="flex flex-1 items-center justify-center">
@@ -28,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="error" class="flex flex-col flex-1 items-center justify-center gap-3">
       <OIcon
         name="error-outline"
-        class="text-red-500" style="width: 3rem; height: 3rem;" />
-      <div class="text-base text-red-500">{{ error }}</div>
+        class="text-status-error-text" style="width: 3rem; height: 3rem;" />
+      <div class="text-base text-status-error-text">{{ error }}</div>
       <OButton
         data-test="retry-discovered-services-btn"
         variant="outline"
@@ -69,22 +68,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="flex flex-col flex-1 min-h-0 pt-3">
       <!-- Info banner -->
       <div
-        class="info-banner shrink-0 mb-3 mx-4 rounded-lg flex items-center gap-3 py-3 px-4 bg-[rgba(59,130,246,0.04)] border border-[rgba(59,130,246,0.15)]"
-        :class="store.state.theme === 'dark' ? 'bg-[rgba(59,130,246,0.08)] border-[rgba(59,130,246,0.25)]' : ''"
+        class="info-banner shrink-0 mb-3 mx-page-edge rounded-default flex items-center gap-3 py-3 px-4 bg-banner-info-bg border border-banner-info-border"
       >
         <OIcon
           name="info"
           size="md"
-          class="shrink-0 info-banner-icon text-[#1d4ed8]"
-          :class="store.state.theme === 'dark' ? 'text-[#93c5fd]' : ''"
+          class="shrink-0 info-banner-icon text-status-info-text"
         />
         <div
-          class="text-sm leading-relaxed info-banner-text text-[#374151]"
-          :class="store.state.theme === 'dark' ? 'text-[#d1d5db]' : ''"
+          class="text-sm leading-relaxed info-banner-text text-text-body"
         >
           {{ t("settings.correlation.discoveredServicesDescription") }}
           <a
-            class="cursor-pointer inline-block mx-1 px-2 py-0.5 rounded text-xs font-semibold no-underline align-middle border border-[#3b82f6] text-[#2563eb] bg-[rgba(59,130,246,0.08)] transition-[background] duration-[150ms] hover:bg-[rgba(59,130,246,0.18)] dark:border-[#60a5fa] dark:text-[#93c5fd] dark:bg-[rgba(96,165,250,0.12)] dark:hover:bg-[rgba(96,165,250,0.22)]"
+            class="cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
             @click.prevent="$emit('navigate-to-configuration')"
             >{{ t("settings.correlation.goToConfiguration") }}</a
           >
@@ -93,9 +89,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Header with title -->
-      <div class="card-container shrink-0 mb-[0.625rem]">
+      <div class="bg-card-glass-bg shrink-0 mb-2.5">
         <div
-          class="services-header-bar flex justify-between items-center w-full py-3 px-4 h-[4.25rem]"
+          class="services-header-bar flex justify-between items-center w-full py-3 px-page-edge h-[4.25rem]"
         >
           <div
             class="text-xl tracking-[0.005em] font-[600]"
@@ -105,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- Filter bar -->
           <div class="flex items-center gap-2">
-            <span class="text-md text-gray-400 whitespace-nowrap">{{
+            <span class="text-md text-text-muted whitespace-nowrap">{{
               t("settings.correlation.filterBy")
             }}</span>
             <OSelect
@@ -117,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchable
               :placeholder="t('settings.correlation.selectFieldPlaceholder')"
               data-test="service-filter-key"
-              class="o2-search-input filter-select min-w-[10rem]"
+              class="o2-search-input filter-select min-w-40"
               @update:model-value="filterValue = null"
             />
             <span>
@@ -129,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="!filterKey"
                 :placeholder="t('settings.correlation.selectValuePlaceholder')"
                 data-test="service-filter-value"
-                class="o2-search-input filter-select min-w-[10rem]"
+                class="o2-search-input filter-select min-w-40"
               />
               <OTooltip v-if="!filterKey" :content="t('settings.correlation.selectFieldFirst')" side="top" />
             </span>
@@ -215,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTag>
               </div>
               <div v-else class="flex items-center gap-2 flex-wrap">
-                <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-[0.625rem] text-[0.6875rem] font-semibold border whitespace-nowrap shrink-0" :class="store.state.theme === 'dark' ? 'bg-[rgba(109,40,217,0.2)] text-[#c4b5fd] border-[#7c3aed]' : 'bg-[#ede9fe] text-[#5b21b6] border-[#a78bfa]'">{{ row.set_id }}</span>
+                <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border">{{ row.set_id }}</span>
                 <ODimensionChip
                   v-for="[key, value] in Object.entries(
                     row.disambiguation,
@@ -226,8 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <span
                   v-if="Object.keys(row.disambiguation).length === 0"
-                  class="text-xs italic no-dimensions-text text-[#9ca3af]"
-                  :class="store.state.theme === 'dark' ? 'text-[#6b7280]' : ''"
+                  class="text-xs italic no-dimensions-text text-text-muted"
                   >{{ t("settings.correlation.noDimensions") }}</span
                 >
               </div>
@@ -321,9 +316,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom -->
             <template #bottom>
               <div
-                class="bottom-btn flex items-center justify-between w-full h-[2.25rem]"
+                class="flex items-center justify-between w-full h-9"
               >
-                <div class="o2-table-footer-title w-[15.625rem] mr-md">
+                <div class="text-xs font-normal w-[15.625rem] mr-md">
                   {{
                     filteredGroupCount === 1
                       ? t("settings.correlation.serviceCountSingular", {
@@ -348,6 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Service detail side panel -->
     <ODrawer
+      bleed
       :open="!!selectedService"
       @update:open="
         (val) => {
@@ -359,14 +355,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="service-side-panel"
     >
       <template #header-right>
-        <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-[0.625rem] text-[0.6875rem] font-semibold border whitespace-nowrap shrink-0" :class="store.state.theme === 'dark' ? 'bg-[rgba(109,40,217,0.2)] text-[#c4b5fd] border-[#7c3aed]' : 'bg-[#ede9fe] text-[#5b21b6] border-[#a78bfa]'">{{ selectedService?.set_id }}</span>
+        <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border">{{ selectedService?.set_id }}</span>
       </template>
 
       <!-- Default set warning banner -->
       <div
         v-if="selectedService?.set_id === 'default'"
-        class="panel-warning-banner flex items-start gap-[0.625rem] py-3 px-5 bg-[rgba(234,179,8,0.08)] border-b border-b-[rgba(234,179,8,0.25)] text-[#854d0e]"
-        :class="store.state.theme === 'dark' ? 'bg-[rgba(234,179,8,0.1)] border-b-[rgba(234,179,8,0.3)] text-[#fde68a]' : ''"
+        class="panel-warning-banner flex items-start gap-2.5 py-3 px-5 bg-banner-warning-bg border-b border-b-banner-warning-border text-banner-warning-text"
       >
         <OIcon name="info-outline" size="sm" class="shrink-0 mt-0.5" />
         <div class="text-xs leading-relaxed">
@@ -382,8 +377,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Scrollable body -->
       <div class="panel-body flex-1 overflow-y-auto p-0">
         <!-- Instance Identity -->
-        <div class="panel-block py-4 px-5 border-b border-b-[#f3f4f6]" :class="store.state.theme === 'dark' ? 'border-b-[#1f2937]' : ''">
-          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-[#9ca3af] mb-[0.625rem]">
+        <div class="panel-block py-4 px-5 border-b border-b-border-default">
+          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5">
             {{ t("settings.correlation.instanceIdentity") }}
           </div>
           <div
@@ -402,14 +397,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="value"
             />
           </div>
-          <div v-else class="panel-empty-text text-[0.8125rem] text-[#9ca3af] italic" :class="store.state.theme === 'dark' ? 'text-[#6b7280]' : ''">
+          <div v-else class="panel-empty-text text-compact text-text-muted italic">
             {{ t("settings.correlation.noDimensionsCatchAll") }}
           </div>
         </div>
 
         <!-- Stream Sources -->
-        <div class="panel-block py-4 px-5 border-b border-b-[#f3f4f6]" :class="store.state.theme === 'dark' ? 'border-b-[#1f2937]' : ''">
-          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-[#9ca3af] mb-[0.625rem]">
+        <div class="panel-block py-4 px-5 border-b border-b-border-default">
+          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5">
             {{ t("settings.correlation.streamSources") }}
           </div>
           <div class="flex flex-col gap-3">
@@ -427,8 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.logs_streams"
                     :key="stream"
-                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded text-[0.6875rem] font-mono border whitespace-nowrap"
-                    :class="store.state.theme === 'dark' ? 'bg-[#1f2937] text-[#d1d5db] border-[#374151]' : 'bg-[#f3f4f6] text-[#374151] border-[#e5e7eb]'"
+                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-default text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
                     >{{ stream }}</span
                   >
                 </div>
@@ -451,8 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.traces_streams"
                     :key="stream"
-                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded text-[0.6875rem] font-mono border whitespace-nowrap"
-                    :class="store.state.theme === 'dark' ? 'bg-[#1f2937] text-[#d1d5db] border-[#374151]' : 'bg-[#f3f4f6] text-[#374151] border-[#e5e7eb]'"
+                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-default text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
                     >{{ stream }}</span
                   >
                 </div>
@@ -475,8 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.metrics_streams"
                     :key="stream"
-                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded text-[0.6875rem] font-mono border whitespace-nowrap"
-                    :class="store.state.theme === 'dark' ? 'bg-[#1f2937] text-[#d1d5db] border-[#374151]' : 'bg-[#f3f4f6] text-[#374151] border-[#e5e7eb]'"
+                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-default text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
                     >{{ stream }}</span
                   >
                 </div>
@@ -491,9 +483,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selectedService &&
             Object.keys(selectedService.field_name_mapping ?? {}).length > 0
           "
-          class="panel-block py-4 px-5 border-b border-b-[#f3f4f6]" :class="store.state.theme === 'dark' ? 'border-b-[#1f2937]' : ''"
+          class="panel-block py-4 px-5 border-b border-b-border-default"
         >
-          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-[#9ca3af] mb-[0.625rem]">
+          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5">
             {{ t("settings.correlation.fieldNameMapping") }}
           </div>
           <div class="panel-mapping-grid">
@@ -503,13 +495,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ).sort(([a], [b]) => a.localeCompare(b))"
               :key="raw"
             >
-              <span class="mapping-key font-mono text-[0.6875rem] py-[0.0625rem] px-[0.375rem] rounded border whitespace-nowrap" :class="store.state.theme === 'dark' ? 'bg-[#1f2937] text-[#d1d5db] border-[#374151]' : 'bg-[#f3f4f6] text-[#374151] border-[#e5e7eb]'">{{ raw }}</span>
+              <span class="mapping-key font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-surface-subtle text-text-body border-border-default">{{ raw }}</span>
               <OIcon
                 name="arrow-forward"
                 size="xs"
-                class="text-gray-400 justify-self-center"
+                class="text-text-muted justify-self-center"
               />
-              <span class="mapping-val font-mono text-[0.6875rem] py-[0.0625rem] px-[0.375rem] rounded border whitespace-nowrap" :class="store.state.theme === 'dark' ? 'bg-[rgba(6,95,70,0.2)] text-[#6ee7b7] border-[#065f46]' : 'bg-[#ecfdf5] text-[#065f46] border-[#a7f3d0]'">{{ mapped }}</span>
+              <span class="mapping-val font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-badge-success-soft-bg text-badge-success-soft-text border-badge-success-ol-border">{{ mapped }}</span>
             </template>
           </div>
         </div>
@@ -886,7 +878,7 @@ const loadServices = async (isRefresh = false) => {
   try {
     const orgId = store.state.selectedOrganization?.identifier;
     if (!orgId) {
-      throw new Error("No organization selected");
+      throw new Error(t("settings.discoveredServices.noOrganizationSelected"));
     }
 
     const response = await serviceStreamsService.getServicesList(orgId);
@@ -899,7 +891,7 @@ const loadServices = async (isRefresh = false) => {
     }));
   } catch (err: any) {
     console.error("Failed to load services:", err);
-    error.value = err?.message || "Failed to load services";
+    error.value = err?.message || t("settings.discoveredServices.failedToLoadServices");
   } finally {
     loading.value = false;
     refreshing.value = false;
@@ -917,7 +909,7 @@ const doResetServices = async () => {
   try {
     const orgId = store.state.selectedOrganization?.identifier;
     if (!orgId) {
-      throw new Error("No organization selected");
+      throw new Error(t("settings.discoveredServices.noOrganizationSelected"));
     }
 
     const response = await serviceStreamsService.resetServices(orgId);

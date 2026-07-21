@@ -2,8 +2,9 @@
 
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { useSlots } from "vue";
+import { computed, ref, watch, useSlots } from "vue";
 import OTableBodyRow from "./OTableBodyRow.vue";
+import { VueDraggableNext } from "vue-draggable-next";
 
 const props = defineProps<{
   rows: Row<any>[];
@@ -28,6 +29,14 @@ const props = defineProps<{
   rowClass?: string | ((row: any) => string);
   rowStyleFn?: (row: any) => Record<string, any>;
   loading?: boolean;
+  /** Enable drag-and-drop row reordering. */
+  enableRowReorder?: boolean;
+  /** Per-row predicate disabling drag for that row. */
+  disableRowReorder?: (row: any) => boolean;
+  /** When true, the global filter is active — drag is auto-disabled. */
+  globalFilterActive?: boolean;
+  /** Unique row identifier field (used as VueDraggableNext item-key). */
+  rowKey?: string;
   /** Virtual scroll: virtual items from useTableVirtualization */
   virtualRows?: { index: number; start: number; size: number; key: number }[];
   /** Virtual scroll: total height of the virtual container */
@@ -58,21 +67,138 @@ const emit = defineEmits<{
   "cell-click": [
     params: { columnId: string; row: any; value: any },
   ];
+  "row-reorder": [data: any[]];
 }>();
 
 const slots = useSlots();
+
+// When every row's disableRowReorder returns true, fall back to non-draggable body
+const allRowsDisabled = computed(() => {
+  if (!props.disableRowReorder || !props.rows.length) return false;
+  return props.rows.every((r) => props.disableRowReorder!(r.original));
+});
+
+const rowReorderEnabled = computed(() =>
+  props.enableRowReorder && !props.globalFilterActive && !allRowsDisabled.value
+);
+
+// ── Row reorder state ──────────────────────────────────────────────
+
+// Local working copy synced from rows — suppressed during drag
+const draggableModel = ref<any[]>([]);
+const isDragging = ref(false);
+
+watch(
+  () => props.rows,
+  (rows) => {
+    if (isDragging.value) return;
+    draggableModel.value = rows.map((r) => r.original);
+  },
+  { immediate: true },
+);
+
+// Map original data → TanStack Row for rendering inside the draggable
+const rowByOriginal = computed(() => {
+  const map = new Map<any, Row<any>>();
+  for (const r of props.rows) {
+    map.set(r.original, r);
+  }
+  return map;
+});
+
+function onDragStart() {
+  isDragging.value = true;
+}
+
+function onDragEnd() {
+  isDragging.value = false;
+  emit("row-reorder", [...draggableModel.value]);
+}
+
+function isRowDraggable(row: any): boolean {
+  if (props.disableRowReorder) return !props.disableRowReorder(row);
+  return true;
+}
 
 const isVirtual = () => !!(props.virtualRows && props.virtualRows.length > 0);
 
 function getRowForIndex(index: number) {
   return props.rows[index];
 }
+
+/** Get the TanStack Row from a draggable model item (plain data). */
+function getRowForItem(item: any): Row<any> {
+  return rowByOriginal.value.get(item) ?? props.rows[0];
+}
 </script>
 
 <template>
-  <!-- Normal (non-virtual) body -->
+  <!-- Normal draggable body -->
+  <VueDraggableNext
+    v-if="!isVirtual() && rowReorderEnabled"
+    v-model="draggableModel"
+    :item-key="rowKey || 'id'"
+    tag="tbody"
+    handle="[data-test='o2-table-row-drag-handle']"
+    :animation="200"
+    ghost-class="o2-table-drag-ghost"
+    drag-class="o2-table-drag-dragging"
+    data-test="o2-table-body"
+    @start="onDragStart"
+    @end="onDragEnd"
+  >
+    <OTableBodyRow
+      v-for="item in draggableModel"
+      :key="item.id ?? draggableModel.indexOf(item)"
+      :row="getRowForItem(item)"
+      :table="table"
+      :clickable="clickable"
+      :selection-enabled="selectionEnabled"
+      :selection-multiple="selectionMultiple"
+      :is-row-selected="isRowSelectedFn?.(item)"
+      :is-row-selectable="isRowSelectable"
+      :expansion-enabled="expansionEnabled"
+      :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(item) : true"
+      :is-expanded="isExpandedFn?.(item)"
+      :highlight-text="highlightText"
+      :should-highlight-column="shouldHighlightColumn"
+      :get-highlighted-html="getHighlightedHtml"
+      :wrap="wrap"
+      :dense="dense"
+      :bordered="bordered"
+      :striped="striped"
+      :row-class-fn="rowClass"
+      :row-style-fn="rowStyleFn"
+      :status-bar-color="getStatusBarColor?.(item)"
+      :enable-cell-copy="enableCellCopy"
+      :get-cell-style="getCellStyle"
+      :enable-row-reorder="true"
+      :row-draggable="isRowDraggable(item)"
+      @toggle-selection="emit('toggle-selection', $event)"
+      @toggle-expansion="emit('toggle-expansion', $event)"
+      @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
+      @row-dblclick="(row: any, evt: MouseEvent) => emit('row-dblclick', row, evt)"
+      @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
+      @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
+      @cell-click="emit('cell-click', $event)"
+    >
+      <!-- Pass through named cell slots from parent -->
+      <template
+        v-for="(_, slotName) in slots"
+        :key="slotName"
+        #[slotName]="slotProps"
+      >
+        <slot :name="slotName" v-bind="slotProps" />
+      </template>
+      <template v-if="slots.expansion" #expansion="expSlotProps">
+        <slot name="expansion" v-bind="expSlotProps" />
+      </template>
+    </OTableBodyRow>
+  </VueDraggableNext>
+
+  <!-- Normal (non-virtual, non-draggable) body -->
   <tbody
-    v-if="!isVirtual()"
+    v-else-if="!isVirtual()"
     data-test="o2-table-body"
   >
     <OTableBodyRow
@@ -100,6 +226,8 @@ function getRowForIndex(index: number) {
       :status-bar-color="getStatusBarColor?.(row.original)"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
+      :enable-row-reorder="props.enableRowReorder"
+      :row-draggable="false"
       @toggle-selection="emit('toggle-selection', $event)"
       @toggle-expansion="emit('toggle-expansion', $event)"
       @row-click="(row: any, evt: MouseEvent) => emit('row-click', row, evt)"
@@ -195,3 +323,19 @@ function getRowForIndex(index: number) {
     </tr>
   </tbody>
 </template>
+
+<style scoped>
+/* keep(third-party): VueDraggableNext applies these classes to row clones at
+   RUNTIME (ghost / dragging); no template ever writes them, so they cannot be
+   utilities. Scoped still matches — the clones keep the row's data-v attr. */
+.o2-table-drag-ghost {
+  opacity: 0.3;
+  background: var(--color-primary-50);
+  border: 1px dashed var(--color-accent);
+  border-radius: 0.375rem;
+}
+.o2-table-drag-dragging {
+  opacity: 0.5;
+  box-shadow: var(--shadow-lg);
+}
+</style>

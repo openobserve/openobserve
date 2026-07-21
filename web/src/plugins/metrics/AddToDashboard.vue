@@ -3,7 +3,7 @@
     :open="open"
     size="md"
     :title="t('dashboard.addDashboard')"
-    secondary-button-label="Cancel"
+    :secondary-button-label="t('metrics.addToDashboardPage.cancel')"
     :primary-button-label="t('metrics.add')"
     form-id="add-to-dashboard-form"
     data-test="add-to-dashboard-dialog"
@@ -41,7 +41,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, type Ref } from "vue";
+import { defineComponent, ref, watch, type Ref, type PropType } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
@@ -79,6 +79,16 @@ export default defineComponent({
       type: Object,
       required: true,
     },
+    /**
+     * Multi-panel mode (metrics "Convert to dashboard"): an array of panel-schema
+     * `data` objects to add as SEPARATE panels in one go. When empty (the
+     * default), the component keeps its original single-panel behaviour driven by
+     * `dashboardPanelData` — so its existing consumers are untouched.
+     */
+    panels: {
+      type: Array as PropType<any[]>,
+      default: () => [],
+    },
   },
   emits: ["save", "update:open"],
   setup(props, { emit }) {
@@ -96,7 +106,7 @@ export default defineComponent({
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
 
-    // Fetch folders only when the drawer opens (matches old q-dialog behaviour where the
+    // Fetch folders only when the drawer opens (matches old dialog behaviour where the
     // component mounted only on first open). Avoids an eager API call on page load.
     // On close, reset the non-form dropdown state (folder/dashboard/tab). The
     // form-owned `panelTitle` needs no manual reset — ODialog unmounts the body
@@ -135,25 +145,43 @@ export default defineComponent({
     ) => {
       let dismiss = function () {};
 
+      const multi = props.panels && props.panels.length > 0;
       try {
         dismiss = toast({
-          message: "Please wait while we add the panel to the dashboard",
+          message: multi
+            ? t("metrics.addToDashboardPage.addingPanels")
+            : t("metrics.addToDashboardPage.addingPanel"),
           variant: "loading",
           timeout: 0,
         });
-        props.dashboardPanelData.data.id = getPanelId();
-        // panel name will come from add to dashboard component
-        props.dashboardPanelData.data.title = panelTitle;
-        // to create panel dashboard id, paneldata and folderId is required
-        await addPanel(
-          store,
-          dashboardId,
-          props.dashboardPanelData.data,
-          folderId,
-          tabId,
-        );
+
+        if (multi) {
+          // Convert-to-dashboard: add each metric as its own panel. addPanel
+          // auto-positions each one (side-by-side, then wrapping), so N calls
+          // lay out an N-panel grid. Each needs a fresh panel id; the title comes
+          // from the panel data (per-metric), falling back to the form title.
+          for (const panelData of props.panels) {
+            panelData.id = getPanelId();
+            if (!panelData.title) panelData.title = panelTitle;
+            await addPanel(store, dashboardId, panelData, folderId, tabId);
+          }
+        } else {
+          props.dashboardPanelData.data.id = getPanelId();
+          // panel name will come from add to dashboard component
+          props.dashboardPanelData.data.title = panelTitle;
+          // to create panel dashboard id, paneldata and folderId is required
+          await addPanel(
+            store,
+            dashboardId,
+            props.dashboardPanelData.data,
+            folderId,
+            tabId,
+          );
+        }
         toast({
-          message: "Panel added to dashboard",
+          message: multi
+            ? t("metrics.addToDashboardPage.panelsAdded")
+            : t("metrics.addToDashboardPage.panelAdded"),
           variant: "success",
         });
         router.push({
@@ -165,10 +193,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Error while adding panel",
+              t("metrics.addToDashboardPage.errorAddingPanel"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Error while adding panel");
+          showErrorNotification(error?.message ?? t("metrics.addToDashboardPage.errorAddingPanel"));
         }
       } finally {
         dismiss();
@@ -183,12 +211,12 @@ export default defineComponent({
       // if selected dashoboard is null
       if (selectedDashboard.value == null) {
         toast({
-          message: "Please select a dashboard",
+          message: t("metrics.addToDashboardPage.selectDashboard"),
           variant: "error",
         });
       } else if (activeTabId.value == null) {
         toast({
-          message: "Please select a tab",
+          message: t("metrics.addToDashboardPage.selectTab"),
           variant: "error",
         });
       } else {

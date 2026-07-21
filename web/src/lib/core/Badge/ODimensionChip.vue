@@ -27,7 +27,7 @@ withDefaults(
     value: string | number;
     /** Optional display override for the key segment (e.g. a shortened key). */
     keyLabel?: string;
-    /** Show a `key=value` hover tooltip. Default false (main had none). */
+    /** Show a `key=value` hover tooltip. Default false. */
     tooltip?: boolean;
   }>(),
   { tooltip: false },
@@ -38,7 +38,7 @@ withDefaults(
   <span class="inline-flex min-w-0 max-w-full">
     <OTag
       :variant="dimensionVariant(dimKey)"
-      shape="rounded"
+      shape="rounded-default"
       class="min-w-0 !p-0 overflow-hidden"
     >
       <span class="inline-flex items-stretch min-w-0">

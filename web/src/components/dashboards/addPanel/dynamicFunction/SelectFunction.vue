@@ -3,7 +3,7 @@
     <div class="w-60 flex-none">
       <OSelect
         v-model="fields.functionName"
-        label="Select Function"
+        :label="t('dashboard.selectFunction.selectFunction')"
         label-position="inside"
         :options="filteredFunctions"
         data-test="dashboard-function-dropdown"
@@ -23,10 +23,10 @@
             class="flex"
             :style="{ marginLeft: isChild ? '-48px' : '0px' }"
           >
-            <div class="mr-2 relative w-3" style="min-height: 50px">
+            <div class="mr-2 relative w-3 min-h-12.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="absolute top-0 w-px bg-[#001495] opacity-50"
+                class="absolute top-0 w-px bg-accent opacity-50"
                 :style="{
                   bottom:
                     argIndex === fields.args.length - 1
@@ -37,7 +37,7 @@
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="absolute" style="top: 30px; left: 5px">
+              <div class="absolute top-7.5 left-1.25 text-text-secondary">
                 <SubTaskArrow />
               </div>
             </div>
@@ -92,7 +92,7 @@
                   <OInput
                     type="text"
                     v-model="fields.args[argIndex].value"
-                    placeholder="Enter string"
+                    :placeholder="t('dashboard.selectFunction.enterString')"
                     class="w-full"
                     :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
                   />
@@ -102,7 +102,7 @@
                   v-if="fields.args[argIndex]?.type === 'number'"
                   type="number"
                   v-model.number="fields.args[argIndex].value"
-                  placeholder="Enter number"
+                  :placeholder="t('dashboard.selectFunction.enterNumber')"
                   class="w-52"
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
@@ -159,13 +159,14 @@
       class="mt-3"
       :data-test="`dashboard-function-dropdown-add-argument-button`"
     >
-      + Add
+      + {{ t('dashboard.selectFunction.add') }}
     </OButton>
   </div>
 </template>
 
 <script lang="ts">
 import { ref, watch, toRef, computed, inject } from "vue";
+import { useI18n } from "vue-i18n";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
@@ -206,6 +207,7 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+    const { t } = useI18n();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
@@ -505,7 +507,7 @@ export default {
       const funcValidation: any = getValidationForFunction(functionName);
 
       if (!funcValidation) {
-        return `Parameter ${argIndex + 1}`;
+        return t("dashboard.selectFunction.parameter", { n: argIndex + 1 });
       }
 
       const argsValidation = funcValidation?.args || [];
@@ -520,11 +522,13 @@ export default {
 
       // Return the label from validation, or fallback to default
       return (
-        argsValidation[adjustedIndex]?.label || `Parameter ${argIndex + 1}`
+        argsValidation[adjustedIndex]?.label ||
+        t("dashboard.selectFunction.parameter", { n: argIndex + 1 })
       );
     };
 
     return {
+      t,
       fields,
       // availableFunctions,
       getValidationForFunction,
@@ -549,13 +553,15 @@ export default {
 };
 </script>
 
-<style>
-/* Make the trigger compact - only show the icon + chevron (no label text) */
-.arg-type-select span[class~="flex-1"][class~="truncate"] {
+<style scoped>
+/* keep(lib-override:OSelect): compact the arg-type OSelect trigger to icon +
+   chevron only — hides the internal label span and tightens the trigger button,
+   which live in the select's own DOM and aren't reachable via utilities. */
+.arg-type-select :deep(span[class~="flex-1"][class~="truncate"]) {
   display: none !important;
 }
 
-.arg-type-select button[type="button"] {
+.arg-type-select :deep(button[type="button"]) {
   min-width: 2rem;
   padding-inline-end: 1.5rem !important;
 }

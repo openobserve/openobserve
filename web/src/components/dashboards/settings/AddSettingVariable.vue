@@ -21,8 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </DashboardHeader>
 
       <div
-        class="overflow-y-auto px-[3px] pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded"
-        :class="store.state.theme === 'dark' ? '[scrollbar-color:#4b5563_transparent] [&::-webkit-scrollbar-thumb]:bg-[#4b5563]' : '[scrollbar-color:#d1d5db_transparent] [&::-webkit-scrollbar-thumb]:bg-[#d1d5db]'"
+        class="overflow-y-auto px-0.75 pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-default [scrollbar-color:var(--color-border-strong)_transparent] [&::-webkit-scrollbar-thumb]:bg-border-strong"
       >
         <OForm
           greedy
@@ -50,9 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OFormSelect
                 name="selectedTabs"
-                help-text="Variables will be available only in the selected tabs."
+                :help-text="t('dashboard.addSettingVariable.helpTextTabs')"
                 :options="tabsOptions"
-                label="Select tabs"
+                :label="t('dashboard.addSettingVariable.selectTabs')"
                 multiple
                 searchable
                 @update:model-value="updatePanels()"
@@ -70,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OFormSelect
                 name="selectedPanels"
-                help-text="Variables will be available only in the selected panels."
+                :help-text="t('dashboard.addSettingVariable.helpTextPanels')"
                 :options="groupedPanelsOptions"
-                label="Select panels"
+                :label="t('dashboard.addSettingVariable.selectPanels')"
                 multiple
                 searchable
                 class="mb-3"
@@ -184,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-max-record-size"
                 >
                   <template #tooltip
-                    ><OTooltip :content="t('dashboard.maxRecordSize')"
+><OTooltip :content="t('dashboard.maxRecordSize')"
                   /></template>
                 </OFormInput>
               </div>
@@ -194,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-query-values-filter"
                     class="text-base font-bold"
                   >
-                    Filters
+                    {{ t('dashboard.addSettingVariable.filters') }}
                   </div>
                   <OTooltip max-width="250px">
                     <OIcon
@@ -205,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <template #content>
                       {{ t('dashboard.filterInfoTooltip') }}
-                      <span class="bg-highlight" :class="store.state.theme === 'dark' ? 'bg-[#747474]' : 'bg-[#e7e6e6]'">$variableName</span>.
+                      <span class="bg-highlight-bg px-1.25">$variableName</span>.
                     </template>
                   </OTooltip>
                 </div>
@@ -221,15 +220,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       labelKey="name"
                       valueKey="name"
                       searchable
-                      :placeholder="filter.name ? '' : 'Select Field'"
+                      :placeholder="filter.name ? '' : t('dashboard.addSettingVariable.selectFieldPlaceholder')"
                       :title="filter.name || undefined"
                       @update:model-value="filterUpdated(index, $event)"
                       data-test="dashboard-query-values-filter-name-selector"
                       class="flex-2 min-w-0"
                     >
                       <template #empty>
-                        <span class="italic text-gray-400"
-                          >{{ t('dashboard.noDataFound') }}</span
+                        <span class="italic text-text-secondary"
+>{{ t('dashboard.noDataFound') }}</span
                         >
                       </template>
                     </OFormSelect>
@@ -268,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       search-regex="(?:^|[^$])\$?(\w+)"
                       :debounce="1000"
                       class="flex-2 min-w-0"
-                      placeholder="Enter Value"
+                      :placeholder="t('dashboard.addSettingVariable.enterValueCap')"
                       :data-test="`dashboard-query-values-filter-value-selector-${index}`"
                     />
                     <!-- Fixed input-height wrapper keeps the delete button
@@ -300,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- show error if filter has cycle -->
-                <div v-show="filterCycleError" style="color: red" data-test="dashboard-variable-cycle-error">
+                <div v-show="filterCycleError" class="text-status-error-text" data-test="dashboard-variable-cycle-error">
                   {{ filterCycleError }}
                 </div>
               </div>
@@ -324,14 +323,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="variableData.type == 'custom'">
             <div class="flex">
               <div class="w-6"></div>
-              <div class="flex-1 font-semibold text-gray-500">
+              <div class="flex-1 font-semibold text-text-label">
                 {{ t('common.label') }}
               </div>
-              <div class="flex-1 font-semibold text-gray-500">
+              <div class="flex-1 font-semibold text-text-label">
                 {{ t('common.value') }}
               </div>
               <div class="w-12 flex items-center justify-center">
-                <span v-if="!variableData.multiSelect"> Default </span>
+                <span v-if="!variableData.multiSelect"> {{ t('dashboard.addSettingVariable.default') }} </span>
                 <OCheckbox
                   v-if="variableData.multiSelect"
                   v-model="customSelectAllModel"
@@ -339,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="onCustomSelectAllClick"
                 >
                   <template #tooltip
-                    ><OTooltip :content="t('dashboard.defaultSelectAll')"
+><OTooltip :content="t('dashboard.defaultSelectAll')"
                   /></template>
                 </OCheckbox>
               </div>
@@ -355,13 +354,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="`options[${index}].label`"
                 class="flex-1 mr-2"
                 :data-test="`dashboard-custom-variable-${index}-label`"
-                :placeholder="'Label ' + (index + 1)"
+                :placeholder="t('dashboard.addSettingVariable.labelPlaceholder', { n: index + 1 })"
               />
               <OFormInput
                 :name="`options[${index}].value`"
                 class="flex-1 mr-2"
                 :data-test="`dashboard-custom-variable-${index}-value`"
-                :placeholder="'Value ' + (index + 1)"
+                :placeholder="t('dashboard.addSettingVariable.valuePlaceholder', { n: index + 1 })"
               />
               <div class="flex w-12 item-center justify-center">
                 <OFormCheckbox
@@ -411,25 +410,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
             <div class="mt-1.5 mb-1.5">
-              <div class="mt-1.25 mb-1.25 text-sm font-semibold" :class="store.state.theme === 'dark' ? 'text-[#999999]' : 'text-[#666666]'">{{ t('dashboard.byDefaultSelect') }}</div>
+              <div class="mt-1.25 mb-1.25 text-sm font-semibold text-text-secondary">{{ t('dashboard.byDefaultSelect') }}</div>
               <OFormToggleGroup name="selectAllValueForMultiSelect">
                 <OToggleGroupItem
                   value="first"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-first-value"
-                  >{{ t('dashboard.firstValue') }}</OToggleGroupItem
+                >{{ t('dashboard.firstValue') }}</OToggleGroupItem
                 >
                 <OToggleGroupItem
                   value="all"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-all-values"
-                  >{{ t('dashboard.allValues') }}</OToggleGroupItem
+                >{{ t('dashboard.allValues') }}</OToggleGroupItem
                 >
                 <OToggleGroupItem
                   value="custom"
                   size="sm"
                   data-test="dashboard-multi-select-default-value-toggle-custom"
-                  >{{ t('dashboard.customValue') }}</OToggleGroupItem
+                >{{ t('dashboard.customValue') }}</OToggleGroupItem
                 >
               </OFormToggleGroup>
             </div>
@@ -445,13 +444,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? variableData.customMultiSelectValue
                   : [variableData.customMultiSelectValue[0]]"
                 :key="index"
-                class="mt-3"
-                style="flex-wrap: wrap"
+                class="mt-3 flex-wrap"
               >
-                <div class="flex mr-2" style="width: 50%">
+                <div class="flex mr-2 w-1/2">
                   <OFormInput
                     :name="`customMultiSelectValue[${index}]`"
-                    placeholder="Enter value"
+                    :placeholder="t('dashboard.addSettingVariable.enterValue')"
                     :data-test="`dashboard-variable-custom-value-${index}`"
                   />
                   <OButton
@@ -468,8 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="variableData.multiSelect"
-                class="flex"
-                style="width: 50%"
+                class="flex w-1/2"
               >
                 <OButton
                   variant="outline"
@@ -513,8 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="sticky bottom-0 left-0 w-full py-3 px-4 flex justify-end gap-3 z-10 border-t"
-        :class="store.state.theme === 'dark' ? 'border-t-[#333] [box-shadow:rgb(20,20,20)_0px_-4px_7px_0px]' : 'border-t-[#eee] [box-shadow:rgb(240,240,240)_0px_-4px_7px_0px]'"
+        class="sticky bottom-0 left-0 w-full py-3 px-4 flex justify-end gap-3 z-10 border-t border-t-border-default [box-shadow:var(--color-grey-150)_0_-0.25rem_0.4375rem_0] dark:[box-shadow:var(--color-grey-900)_0_-0.25rem_0.4375rem_0]"
       >
         <OButton
           variant="outline"
@@ -522,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="isSavingVariable"
           @click="close"
           data-test="dashboard-variable-cancel-btn"
-          >{{ t("dashboard.cancel") }}</OButton
+        >{{ t("dashboard.cancel") }}</OButton
         >
         <OButton
           variant="primary"
@@ -531,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           form="add-setting-variable-form"
           :loading="isSavingVariable"
           data-test="dashboard-variable-save-btn"
-          >{{ t("dashboard.save") }}</OButton
+        >{{ t("dashboard.save") }}</OButton
         >
       </div>
     </div>
@@ -611,7 +607,7 @@ export default defineComponent({
     // Store dashboard data
     const dashboardData = ref<any>({ tabs: [] });
 
-    // ── OForm owner wiring (rule ②/③: the form is the SOLE source, no mirror) ──
+    // ── OForm owner wiring: the form is the SOLE source, no mirror ──
     // Every field is name=-owned inside <OForm>, but the v-if/v-for live in THIS
     // component's render scope (the owner), so it creates the form with useOForm
     // and reads it reactively with form.useStore — ONE source of truth, no copy.
@@ -659,13 +655,13 @@ export default defineComponent({
     const formRemove = (name: string, index: number) =>
       form.removeFieldValue(name, index);
 
-    // Reactive READS of the form values (rule ③: form.useStore, NOT a local copy).
+    // Reactive READS of the form values (form.useStore, NOT a local copy).
     const formValues = form.useStore((s: any) => s.values);
     const selectedTabs = form.useStore((s: any) => s.values?.selectedTabs ?? []);
     const selectedPanels = form.useStore(
       (s: any) => s.values?.selectedPanels ?? [],
     );
-    // Two-way FACADE over the form (rule ③: NO stored copy) — every existing
+    // Two-way FACADE over the form (no stored copy) — every existing
     // `variableData.x` read delegates to form.useStore and every top-level write
     // delegates to form.setFieldValue, so the form stays the single source of
     // truth. (Nested writes must use setFormField with a dotted path.)
@@ -736,7 +732,7 @@ export default defineComponent({
       ) {
         return [
           {
-            label: "Current Panel",
+            label: t("dashboard.addSettingVariable.currentPanel"),
             value: "current_panel",
             isCurrentPanel: true,
           },
@@ -753,7 +749,7 @@ export default defineComponent({
           // But only if NOT editing an existing panel
           if (props.isFromAddPanel && !isEditingPanel) {
             panelOptions.push({
-              label: "Current Panel",
+              label: t("dashboard.addSettingVariable.currentPanel"),
               value: "current_panel",
               isCurrentPanel: true,
             });
@@ -822,9 +818,9 @@ export default defineComponent({
     const customSelectAllModel: any = ref(false);
 
     const scopeOptions = computed(() => [
-      { label: "Global", value: "global" },
-      { label: "Selected Tabs", value: "tabs" },
-      { label: "Selected Panels", value: "panels" },
+      { label: t("dashboard.addSettingVariable.scopeGlobal"), value: "global" },
+      { label: t("dashboard.addSettingVariable.scopeSelectedTabs"), value: "tabs" },
+      { label: t("dashboard.addSettingVariable.scopeSelectedPanels"), value: "panels" },
     ]);
 
     const streamTypeOptions = computed(() =>
@@ -948,8 +944,8 @@ export default defineComponent({
           );
 
           if (variable) {
-            // Edit-prefill arrives async — seed the form via reset (rule ②:
-            // form is the source; the read-only projection picks it up).
+            // Edit-prefill arrives async — seed the form via reset; the
+            // read-only projection picks it up.
             await nextTick();
             form.reset(mapVariableToForm(variable));
 
@@ -985,11 +981,11 @@ export default defineComponent({
           }
         }
       } catch (error) {
-        showErrorNotification("Failed to load dashboard data");
+        showErrorNotification(t("dashboard.addSettingVariable.failedToLoadDashboard"));
       }
     });
 
-    // Modify the watch on scope — reset tab/panel selections via the form.
+    // Watch on scope — reset tab/panel selections via the form.
     watch(
       () => variableData.scope,
       (newScope) => {
@@ -1006,7 +1002,7 @@ export default defineComponent({
       },
     );
 
-    // Modify updatePanels function — prune the panel selection via the form.
+    // updatePanels — prune the panel selection via the form.
     const updatePanels = () => {
       if (variableData.scope === "panels" && selectedTabs.value.length > 0) {
         const validPanelIds = dashboardData.value.tabs
@@ -1095,7 +1091,7 @@ export default defineComponent({
 
             if (!isVariableReference) {
               // Only show error if it's NOT a variable reference
-              showErrorNotification(error ?? "Failed to get stream fields", {
+              showErrorNotification(error ?? t("dashboard.addSettingVariable.failedToGetStreamFields"), {
                 timeout: 2000,
               });
             }
@@ -1129,7 +1125,7 @@ export default defineComponent({
     // The validated @submit payload, captured for the useLoading save wrapper.
     let submitValue: AddSettingVariableForm | null = null;
 
-    // Build the saved variable from the validated form value (rule ②): map
+    // Build the saved variable from the validated form value: map
     // selectedTabs/selectedPanels → tabs/panels, drop query_data for non-query
     // types, reset multi-select config for non-list types.
     const buildVariablePayload = (value: AddSettingVariableForm): any => {
@@ -1207,10 +1203,10 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                "Variable update failed",
+                t("dashboard.addSettingVariable.variableUpdateFailed"),
             );
           } else {
-            showErrorNotification(error.message ?? "Variable update failed", {
+            showErrorNotification(error.message ?? t("dashboard.addSettingVariable.variableUpdateFailed"), {
               timeout: 2000,
             });
           }
@@ -1229,10 +1225,10 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                "Variable creation failed",
+                t("dashboard.addSettingVariable.variableCreationFailed"),
             );
           } else {
-            showErrorNotification(error.message ?? "Variable creation failed", {
+            showErrorNotification(error.message ?? t("dashboard.addSettingVariable.variableCreationFailed"), {
               timeout: 2000,
             });
           }
@@ -1286,9 +1282,10 @@ export default defineComponent({
         const hasCycle = isGraphHasCycle(variablesDependencyGraph);
         if (hasCycle) {
           // filter has cycle, so show error and return
-          filterCycleError.value = `Variables has cycle: ${hasCycle.join(
-            "->",
-          )} -> ${hasCycle[0]}`;
+          filterCycleError.value = t(
+            "dashboard.addSettingVariable.variablesHasCycle",
+            { path: `${hasCycle.join("->")} -> ${hasCycle[0]}` },
+          );
           return true;
         }
 
@@ -1299,8 +1296,8 @@ export default defineComponent({
         showErrorNotification(
           err?.message ??
             (editMode.value
-              ? "Variable update failed"
-              : "Variable creation failed"),
+              ? t("dashboard.addSettingVariable.variableUpdateFailed")
+              : t("dashboard.addSettingVariable.variableCreationFailed")),
         );
         return true;
       }
@@ -1308,11 +1305,11 @@ export default defineComponent({
 
     // @submit fires ONLY after the Zod schema passes — including the per-row
     // rules for the form-owned filter[]/options[] arrays (name/operator/value
-    // and label/value, restoring §4 #6/#7). Here we only run the cross-field
-    // checks that can't be expressed in Zod, then save.
+    // and label/value). Here we only run the cross-field checks that can't be
+    // expressed in Zod, then save.
     const onSubmit = async (value: AddSettingVariableForm) => {
-      // The validated value is the source of truth (rule ②); stash it for the
-      // save wrapper.
+      // The validated value is the source of truth; stash it for the save
+      // wrapper.
       submitValue = value;
 
       // When in AddPanel mode, check for duplicate variable names client-side
@@ -1322,7 +1319,7 @@ export default defineComponent({
           (v: any) => v.name === value.name && v.name !== props.variableName,
         );
         if (isDuplicate) {
-          showErrorNotification(`Variable with same name already exists.`);
+          showErrorNotification(t("dashboard.addSettingVariable.variableNameExists"));
           return;
         }
       }
@@ -1338,7 +1335,7 @@ export default defineComponent({
         value.type === "custom" &&
         (value.options ?? []).every((option: any) => !option.selected)
       ) {
-        showErrorNotification("Select at least one default option");
+        showErrorNotification(t("dashboard.addSettingVariable.selectAtLeastOneOption"));
         return;
       }
 
@@ -1351,8 +1348,8 @@ export default defineComponent({
         showErrorNotification(
           err?.message ??
             (editMode.value
-              ? "Variable update failed"
-              : "Variable creation failed"),
+              ? t("dashboard.addSettingVariable.variableUpdateFailed")
+              : t("dashboard.addSettingVariable.variableCreationFailed")),
         );
       });
     };
@@ -1437,7 +1434,7 @@ export default defineComponent({
           stream?.includes("$") || stream?.includes("{{");
 
         if (!isVariableReference) {
-          showErrorNotification(error ?? "Failed to get stream fields", {
+          showErrorNotification(error ?? t("dashboard.addSettingVariable.failedToGetStreamFields"), {
             timeout: 2000,
           });
         }
@@ -1518,7 +1515,7 @@ export default defineComponent({
       }));
     });
 
-    // Merged stream options: variables + streams for q-select
+    // Merged stream options: variables + streams for the select
     const mergedStreamOptions = computed(() => {
       const variableItems = dashboardVariablesFilterItems.value.map(
         (v: any) => ({ name: v.value }),
@@ -1531,7 +1528,7 @@ export default defineComponent({
         ...o,
         _displayLabel:
           o.name?.startsWith("$") || o.name?.startsWith("{{")
-            ? `${o.name} (variable)`
+            ? t("dashboard.addSettingVariable.variableSuffix", { name: o.name })
             : o.name,
       })),
     );
@@ -1549,7 +1546,7 @@ export default defineComponent({
         ...o,
         _displayLabel:
           o.name?.startsWith("$") || o.name?.startsWith("{{")
-            ? `${o.name} (variable)`
+            ? t("dashboard.addSettingVariable.variableSuffix", { name: o.name })
             : o.name,
       })),
     );

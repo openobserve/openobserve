@@ -21,11 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mr-4 items-center">
         <img
           :src="ip"
-          alt="IP"
+          :alt="t('rum.ipLabel')"
           class="mr-2 inline-block w-[1.875rem]! h-auto!"
         />
         <div class="inline-block">
-          <div class="pl-1">IP</div>
+          <div class="pl-1">{{ t("rum.ipLabel") }}</div>
           <span class="pl-1"> {{ error.ip }} </span>
         </div>
       </div>
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mx-4 items-center">
         <img
           :src="browserIcon"
-          alt="Chrome"
+          :alt="t('rum.browserImageAlt')"
           class="mr-3 inline-block h-auto w-[1.875rem]"
         />
         <div class="inline-block">
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mx-4 items-center">
         <img
           :src="osIcon"
-          alt="OS"
+          :alt="t('rum.osImageAlt')"
           class="mr-3 inline-block h-auto w-[1.875rem]"
         />
         <div class="inline-block">
@@ -136,9 +136,9 @@ const getOsIcon = () => {
 };
 
 const getOsVersion = computed(() => {
-  let version = "Version ";
+  let version = t("rum.versionPrefix");
 
-  if (!props.error.user_agent_os_major) return version + "Unknown";
+  if (!props.error.user_agent_os_major) return version + t("rum.unknown");
 
   if (props.error.user_agent_os_major)
     version += props.error.user_agent_os_major;
@@ -153,9 +153,9 @@ const getOsVersion = computed(() => {
 });
 
 const getBrowserVersion = computed(() => {
-  let version = "Version ";
+  let version = t("rum.versionPrefix");
 
-  if (!props.error.user_agent_user_agent_major) return version + "Unknown";
+  if (!props.error.user_agent_user_agent_major) return version + t("rum.unknown");
 
   if (props.error.user_agent_user_agent_major)
     version += props.error.user_agent_user_agent_major;
@@ -175,13 +175,13 @@ const getTags = computed(() => {
     url: props.error.view_url,
     handled: props.error.error_handling === "handled",
     location: getLocation(),
-    service: props.error.service || "Unknown",
-    source: props.error.source || "Unknown",
+    service: props.error.service || t("rum.unknown"),
+    source: props.error.source || t("rum.unknown"),
     device: getDevice(),
     browser: props.error.user_agent_user_agent_family,
     level: "error",
     sdk_version: props.error.sdk_version,
-    user_email: props.error.usr_email || "Unknown User",
+    user_email: props.error.usr_email || t("rum.unknownUser"),
   };
 });
 
@@ -190,7 +190,7 @@ const getDevice = () => {
     !props.error.user_agent_device_brand &&
     !props.error.user_agent_device_family
   )
-    return "Unknown";
+    return t("rum.unknown");
 
   if (!props.error.user_agent_device_brand)
     return props.error.user_agent_device_family;
@@ -207,7 +207,7 @@ const getDevice = () => {
 
 const getLocation = () => {
   if (!props.error.geo_info_country && !props.error.geo_info_city)
-    return "Unknown";
+    return t("rum.unknown");
   if (!props.error.geo_info_country) return props.error.geo_info_city;
   if (!props.error.geo_info_city) return props.error.geo_info_country;
 

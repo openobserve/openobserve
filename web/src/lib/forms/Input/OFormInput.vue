@@ -47,9 +47,7 @@ if (import.meta.env.DEV && !form) {
         :size="props.size"
         :width="props.width"
         :model-value="field.state.value"
-        :error="
-          !$slots.error && field.state.meta.errors.length > 0
-        "
+        :error="field.state.meta.errors.length > 0"
         :error-message="
           !$slots.error && field.state.meta.errors.length > 0
             ? firstFieldError(field.state.meta.errors)
@@ -79,10 +77,12 @@ if (import.meta.env.DEV && !form) {
           <slot name="append" />
         </template>
       </OInput>
-      <!-- #error slot: when provided the consumer OWNS the message and OInput's
-           built-in error (border + inline text) is suppressed above. Rendered
-           after OInput so it can escape a composite border; may be left empty
-           purely to suppress. -->
+      <!-- #error slot: when provided the consumer OWNS the message — only the
+           inline TEXT is suppressed above (error-message is left undefined). The
+           invalid STATE still reaches OInput, so the field keeps its red border:
+           a narrow field that re-homes its message must still look invalid.
+           Rendered after OInput so it can escape a composite border; may be left
+           empty purely to suppress the text. -->
       <template v-if="$slots.error">
         <slot name="error" />
       </template>

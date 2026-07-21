@@ -11,11 +11,11 @@
     <div
       v-if="isAIMode"
       :data-test="`${dataTestPrefix}-ai-input-bar`"
-      :class="['bg-[linear-gradient(135deg,rgba(139,92,246,0.05)_0%,rgba(236,72,153,0.05)_100%)] border-b border-b-(--o2-border-color) h-9 flex items-center gap-2 px-2 shrink-0 z-10', props.hasExpandButton && 'pr-10']"
+      :class="['bg-[image:var(--color-gradient-ai-faint)] border-b border-b-card-glass-border h-9 flex items-center gap-2 px-2 shrink-0 z-10', props.hasExpandButton && 'pr-10']"
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
-        <img :src="nlpIcon" alt="AI" class="w-[20px] h-[20px] shrink-0" />
+        <img :src="nlpIcon" alt="AI" class="w-5 h-5 shrink-0" />
         <OSpinner variant="dots" size="xs" />
         <span class="text-sm flex-1 truncate">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
         <OButton
@@ -24,7 +24,7 @@
           icon-left="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
-          class="text-[#e74c3c]! transition-all! duration-200! hover:bg-[rgba(231,76,60,0.1)] shrink-0"
+          class="text-status-error-text! transition-all! duration-200! hover:bg-[rgba(231,76,60,0.1)] shrink-0"
         >
           <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
@@ -39,7 +39,7 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" alt="AI" class="w-[20px] h-[20px]" />
+            <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
           </template>
         </OInput>
         <!-- Send Button -->
@@ -50,7 +50,7 @@
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! text-white! transition-all! duration-200! min-w-7! min-h-7! w-7! h-7! enabled:hover:-translate-y-px enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! enabled:active:translate-y-0 disabled:opacity-40! disabled:bg-[#ccc]!"
+          class="bg-[image:var(--color-gradient-ai)]! text-text-inverse! transition-all! duration-200! min-w-7! min-h-7! w-7! h-7! enabled:hover:-translate-y-px enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! enabled:active:translate-y-0 disabled:opacity-40! disabled:bg-surface-subtle!"
         >
           <OTooltip v-if="props.disableAi && props.disableAiReason" :content="props.disableAiReason" />
           <OTooltip v-else-if="!aiInputText.trim()" :content="props.aiTooltip || t('search.enterPrompt')" />
@@ -102,10 +102,10 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="nlpMode = true"
-        class="group absolute! top-0.75 z-100 bg-[linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! w-7.5! h-7.5! min-w-7.5! min-h-7.5! rounded-md hover:bg-[linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
+        class="group absolute! top-0.75 z-100 bg-[image:var(--color-gradient-ai-subtle)]! text-text-inverse! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! w-7.5! h-7.5! min-w-7.5! min-h-7.5! rounded-default hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
-        <img :src="nlpIcon" alt="AI Mode" class="w-[18px] h-[18px] transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert" />
+        <img :src="nlpIcon" alt="AI Mode" class="w-4.5 h-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert" />
         <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
       </OButton>
     </div>
@@ -116,6 +116,7 @@
 import { ref, computed, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
+import { useTheme } from '@/composables/useTheme';
 import CodeQueryEditor from '@/components/CodeQueryEditor.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
@@ -194,6 +195,7 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18n();
+const { isDark } = useTheme();
 
 // Language state
 const currentLanguage = ref<Language>(props.defaultLanguage);
@@ -232,7 +234,7 @@ const currentChatId = ref<number | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
 
 const nlpIcon = computed(() => {
-  return store.state.theme === 'dark'
+  return isDark.value
     ? getImageURL('images/common/ai_icon_dark.svg')
     : getImageURL('images/common/ai_icon_gradient.svg');
 });

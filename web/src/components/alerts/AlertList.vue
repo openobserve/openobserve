@@ -21,15 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="flex flex-col h-full"
   >
-    <PageLayout
+    <OPageLayout bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
+      :title="t('alerts.header')"
+      :subtitle="t('alerts.subtitle')"
+      icon="shield-alert-outline"
     >
-      <!-- Row 1: standard header — title + actions only (Import/Add). The alert
-           type toggle, search and folder scope moved into the table toolbar. -->
-      <template #header>
-        <AppPageHeader :title="t('alerts.header')" :subtitle="t('alerts.subtitle')" icon="shield-alert-outline">
           <template #actions>
             <!-- Import button -->
             <OButton
@@ -65,15 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >{{ t(`alerts.add`) }}</OButton>
           </template>
-        </AppPageHeader>
-      </template>
 
     <div
       data-test="alert-list-splitter"
       class="flex-1 flex min-h-0"
     >
       <!-- Left: FolderList -->
-      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+      <div class="shrink-0 h-full w-rail">
         <div class="h-full">
           <FolderList
             type="alerts"
@@ -83,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right: Table -->
       <div class="flex-1 min-w-0 h-full">
-        <div class="h-full card-container">
+        <div class="h-full bg-card-glass-bg">
               <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <OTable
                 :frame="false"
@@ -189,26 +184,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="row.is_real_time === 'anomaly'"
                       name="query-stats"
                       size="sm"
-                      class="text-blue-600 shrink-0"
+                      class="text-status-info-text shrink-0"
                     />
                     <OIcon
                       v-else-if="row.is_real_time"
                       name="bolt"
                       size="sm"
-                      class="text-orange-500 shrink-0"
+                      class="text-status-warning-text shrink-0"
                     />
                     <OIcon
                       v-else
                       name="schedule"
                       size="sm"
-                      class="text-gray-400 shrink-0"
+                      class="text-icon-color shrink-0"
                     />
                     <span class="truncate">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
                     v-if="row.name"
                     :content="row.name"
-                    content-class="max-w-[400px] whitespace-normal break-words text-xs"
+                    content-class="max-w-100 whitespace-normal break-words text-xs"
                   />
                 </template>
 
@@ -258,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :content="row.last_error"
                     />
                   </span>
-                  <span v-else class="text-text-primary">—</span>
+                  <span v-else class="text-text-body">—</span>
                 </template>
 
                 <template #cell-period="{ row }">
@@ -428,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           Re-train
                         </ODropdownItem>
                       </template>
-                      <!-- Regular alerts: existing Trigger Alert item -->
+                      <!-- Regular alerts: Trigger Alert item -->
                       <ODropdownItem
                         v-else
                         :data-test="`alert-list-${row.name}-trigger-alert`"
@@ -475,11 +470,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #bottom>
-                  <div class="flex w-full justify-between items-center h-[48px]">
+                  <div class="flex w-full justify-between items-center h-12 gap-1">
                     <div
-                      class="o2-table-footer-title flex items-center w-[200px] mr-md"
+                      class="text-xs font-normal flex items-center min-w-25"
                     >
-                      {{ resultTotal }} {{ t("alerts.header") }}
+                      <template v-if="selectedAlerts.length > 0">{{ selectedAlerts.length }} of {{ resultTotal }} selected</template>
+                      <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
                     </div>
 
                     <OButton
@@ -487,63 +483,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-list-move-across-folders-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="drive-file-move"
                       @click="moveMultipleAlerts"
-                    >
-                      <OIcon name="drive-file-move" size="sm" />
-                      <span class="ml-2">Move</span>
-                    </OButton>
+                    >Move</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-export-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="download"
                       @click="multipleExportAlert"
-                    >
-                      <OIcon name="download" size="sm" />
-                      <span class="ml-2">Export</span>
-                    </OButton>
+                    >Export</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-pause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="pause"
                       @click="bulkToggleAlerts('pause')"
-                    >
-                      <OIcon name="pause" size="sm" class="text-button-ghost-destructive-text" />
-                      <span class="ml-2">Pause</span>
-                    </OButton>
+                    >Pause</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
                       variant="outline"
                       size="sm"
-                      class="mr-2"
+                      icon-left="play-arrow"
                       @click="bulkToggleAlerts('resume')"
-                    >
-                      <OIcon name="play-arrow" size="sm" class="text-button-ghost-success-text" />
-                      <span class="ml-2">Resume</span>
-                    </OButton>
+                    >Resume</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
                       variant="outline-destructive"
                       size="sm"
-                      class="mr-2"
+                      icon-left="delete"
                       @click="openBulkDeleteDialog"
-                    >
-                      <OIcon name="delete" size="sm" />
-                      <span class="ml-2">Delete</span>
-                    </OButton>
+                    >Delete</OButton>
                   </div>
                 </template>
               </OTable>
         </div>
       </div>
     </div>
-    </PageLayout>
+    </OPageLayout>
     <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
         v-model="formData"
@@ -672,8 +653,7 @@ import {
   computed,
   reactive,
 } from "vue";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -738,8 +718,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "AlertList",
   components: {
-    PageLayout,
-    AppPageHeader,
+    OPageLayout,
     OSeparator,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
@@ -904,39 +883,11 @@ export default defineComponent({
       showAlertDetailsDrawer.value = true;
     };
 
-    // Handle ESC key and click outside to close drawer
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && showAlertDetailsDrawer.value) {
-        showAlertDetailsDrawer.value = false;
-      }
-    };
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!showAlertDetailsDrawer.value) return;
-
-      const target = event.target as HTMLElement;
-
-      // Check if clicked element is the backdrop or outside drawer content
-      if (
-        target.classList.contains("q-drawer__backdrop") ||
-        target.classList.contains("q-layout__shadow")
-      ) {
-        showAlertDetailsDrawer.value = false;
-        return;
-      }
-
-      // Check if the click is outside the drawer content
-      const drawerElement = document.querySelector(
-        ".alert-details-drawer .q-drawer__content",
-      );
-      if (drawerElement && !drawerElement.contains(target)) {
-        showAlertDetailsDrawer.value = false;
-      }
-    };
+    // ESC and click-outside dismissal are handled by ODrawer itself (reka-ui
+    // DismissableLayer → @escape-key-down / @interact-outside), which also knows
+    // to ignore clicks inside portaled dropdowns opened from within the drawer.
 
     onMounted(() => {
-      document.addEventListener("keydown", handleKeyDown);
-      document.addEventListener("click", handleClickOutside, true);
       window.addEventListener("resize", onWindowResize);
     });
 
@@ -966,11 +917,6 @@ export default defineComponent({
     );
 
     const filteredResults: Ref<any[]> = ref([]);
-
-    onBeforeUnmount(() => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("click", handleClickOutside, true);
-    });
 
     const activeFolderToMove = ref("default");
 
@@ -2792,14 +2738,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-@media (max-width: 1440px) {
-  .app-tabs-container .o2-tab {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-    min-width: auto !important;
-  }
-}
-
-</style>

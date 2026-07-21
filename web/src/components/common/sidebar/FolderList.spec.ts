@@ -205,6 +205,58 @@ describe('FolderList.vue', () => {
       // Component emits update:activeFolderId on initialization, so we check it exists
       expect(wrapper.emitted('update:activeFolderId')).toBeTruthy()
     })
+
+    it('re-emits update:activeFolderId when the ALREADY-ACTIVE folder is clicked', async () => {
+      // The v-model watcher only fires on change, so without the explicit
+      // click re-emit a click on the active tab would be silent — and the
+      // dashboards favorites view could never react to it.
+      expect(wrapper.vm.activeFolderId).toBe('default')
+      const before = wrapper.emitted('update:activeFolderId')?.length ?? 0
+
+      await wrapper
+        .find('[data-test="dashboard-folder-tab-default"]')
+        .trigger('click')
+
+      const events = wrapper.emitted('update:activeFolderId') ?? []
+      expect(events.length).toBeGreaterThan(before)
+      expect(events[events.length - 1]).toEqual(['default'])
+    })
+
+    it('renders a Favorites entry FIRST when show-favorites is on', async () => {
+      const favWrapper = mount(FolderList, {
+        global: {
+          plugins: [i18n],
+          stubs: { AddFolder: AddFolderStub, ConfirmDialog: ConfirmDialogStub },
+          mocks: { $store: mockStore },
+          provide: { store: mockStore },
+        },
+        props: { type: 'dashboards', showFavorites: true },
+      })
+
+      expect(
+        favWrapper.find('[data-test="dashboard-folder-tab-__favorites__"]').exists(),
+      ).toBe(true)
+      // Above everything, including Default.
+      expect(favWrapper.vm.filteredTabs[0].folderId).toBe('__favorites__')
+      expect(favWrapper.vm.filteredTabs[1].folderId).toBe('default')
+      favWrapper.unmount()
+    })
+
+    it('does NOT render the Favorites entry without the prop (alerts/reports)', () => {
+      // The default wrapper is type=alerts with no show-favorites.
+      expect(
+        wrapper.find('[data-test="dashboard-folder-tab-__favorites__"]').exists(),
+      ).toBe(false)
+    })
+
+    it('does not re-emit from a click on a NON-active tab (change path owns that)', async () => {
+      // The click re-emit is only for the already-active tab; a different tab
+      // emits via the v-model watcher (covered by the watcher tests below),
+      // so the click handler itself must stay silent for it.
+      const before = wrapper.emitted('update:activeFolderId')?.length ?? 0
+      wrapper.vm.onTabClick('folder1') // not the active folder
+      expect(wrapper.emitted('update:activeFolderId')?.length ?? 0).toBe(before)
+    })
   })
 
   describe('Component Props', () => {
@@ -752,7 +804,7 @@ describe('FolderList.vue', () => {
 
     it('should render AddFolder with v-model:open bound to showAddFolderDialog', async () => {
       // After migration, AddFolder owns the overlay surface itself via
-      // v-model:open — there is no q-dialog wrapper anymore.
+      // v-model:open — there is no dialog wrapper anymore.
       const addFolder = wrapper.find('[data-test="add-folder-stub"]')
       expect(addFolder.exists()).toBe(true)
       expect(addFolder.attributes('data-open')).toBe('false')
@@ -928,7 +980,9 @@ describe('FolderList.vue', () => {
         props: { type: 'alerts' }
       })
       
-      expect(missingWrapper.vm.filteredTabs).toBeUndefined()
+      // Missing foldersByType resolves to an empty rail, not undefined —
+      // the template's v-for never sees a non-iterable.
+      expect(missingWrapper.vm.filteredTabs).toEqual([])
       missingWrapper.unmount()
     })
 

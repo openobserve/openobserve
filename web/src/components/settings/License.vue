@@ -13,7 +13,7 @@
     >
       <div class="col-span-1 min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <OCard class="mb-4 border border-solid border-[var(--o2-border-color)]">
+          <OCard class="mb-4 border border-solid border-card-glass-border">
             <OCardSection role="body">
               <div class="text-xl font-semibold">{{ t("about.no_license_found") }}</div>
               <div class="mt-2 text-sm">
@@ -36,7 +36,7 @@
             </OCardSection>
           </OCard>
 
-          <OCard class="border border-solid border-[var(--o2-border-color)]">
+          <OCard class="border border-solid border-card-glass-border">
             <OCardSection role="body">
               <div class="text-base font-medium mb-3">
                 {{ t("about.enter_license_key") }}
@@ -56,10 +56,10 @@
                   style="min-height: 200px"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                  <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
+                  <div class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-default backdrop-blur-md transition-all duration-200 dark:shadow-md">
                     <OIcon
                       name="check-circle"
-                      class="text-green-600 mr-2"
+                      class="text-status-positive mr-2"
                       size="md"
                     />
                     <span class="text-sm">{{
@@ -83,25 +83,25 @@
         </div>
 
         <div v-else>
-          <OCard class="border border-solid border-[var(--o2-border-color)]">
+          <OCard class="border border-solid border-card-glass-border">
             <OCardSection role="body">
               <div class="text-xl font-semibold mb-3">{{ t("about.license_info") }}</div>
-              <table class="w-full border-collapse border border-solid border-[var(--color-table-header-border)]">
+              <table class="w-full border-collapse border border-solid border-table-header-border">
                 <tbody>
-                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
+                  <tr class="border-b border-solid border-table-row-divider">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">
                       {{ t("about.installation_id") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.installation_id }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
+                  <tr class="border-b border-solid border-table-row-divider">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">
                       {{ t("about.license_id") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.license_id }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
+                  <tr class="border-b border-solid border-table-row-divider">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">
                       {{ t("about.status_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">
@@ -114,24 +114,24 @@
                       </OBadge>
                     </td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
+                  <tr class="border-b border-solid border-table-row-divider">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">
                       {{ t("about.create_at_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ formatDate(licenseData.license.created_at) }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
+                  <tr class="border-b border-solid border-table-row-divider">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">
                       {{ t("about.expires_at_lbl") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ formatDate(licenseData.license.expires_at) }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-[var(--color-table-row-divider)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">{{ t("about.company") }}</td>
+                  <tr class="border-b border-solid border-table-row-divider">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">{{ t("about.company") }}</td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.company }}</td>
                   </tr>
-                  <tr v-if="licenseData.key" class="border-b border-solid border-[var(--color-table-row-divider)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
+                  <tr v-if="licenseData.key" class="border-b border-solid border-table-row-divider">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">
                       {{ t("about.license_key") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">
@@ -149,20 +149,20 @@
                       </div>
                     </td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_name" class="border-b border-solid border-[var(--color-table-row-divider)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
+                  <tr v-if="licenseData.license.contact_name" class="border-b border-solid border-table-row-divider">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">
                       {{ t("about.contact_name") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_name }}</td>
                   </tr>
-                  <tr v-if="licenseData.license.contact_email" class="border-b border-solid border-[var(--color-table-row-divider)]">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
+                  <tr v-if="licenseData.license.contact_email" class="border-b border-solid border-table-row-divider">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">
                       {{ t("about.contact_email") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.contact_email }}</td>
                   </tr>
                   <tr v-if="licenseData.license.environment_type">
-                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-[var(--color-table-row-divider)]">
+                    <td class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider">
                       {{ t("about.environment_type") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.environment_type }}</td>
@@ -199,7 +199,7 @@
             </OCardSection>
           </OCard>
 
-          <OCard v-show="showUpdateForm" class="mt-4 border border-solid border-[var(--o2-border-color)]">
+          <OCard v-show="showUpdateForm" class="mt-4 border border-solid border-card-glass-border">
             <OCardSection role="body">
               <div class="text-base font-medium mb-2">
                 {{ t("about.update_license_key") }}
@@ -219,10 +219,10 @@
                   style="min-height: 150px"
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
-                  <div class="flex items-center py-3 px-4 bg-[rgba(34,197,94,0.08)] border border-solid border-[rgba(34,197,94,0.2)] rounded-lg [backdrop-filter:blur(10px)] transition-all duration-200 dark:bg-[rgba(34,197,94,0.15)] dark:border-[rgba(34,197,94,0.3)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
+                  <div class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-default backdrop-blur-md transition-all duration-200 dark:shadow-md">
                     <OIcon
                       name="check-circle"
-                      class="text-green-600 mr-2"
+                      class="text-status-positive mr-2"
                       size="md"
                     />
                     <span class="text-sm">{{
@@ -261,10 +261,10 @@
       </div>
 
       <div class="col-span-1 self-start">
-        <OCard class="futuristic-card border border-solid" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] border-[rgba(99,102,241,0.25)]' : 'border-[var(--o2-border-color)]'">
+        <OCard class="futuristic-card border border-solid border-card-glass-border dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] dark:border-[rgba(99,102,241,0.25)]">
           <OCardSection class="p-3">
             <div>
-              <div :class="store.state.theme === 'dark' ? 'bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]' : ''"></div>
+              <div class="dark:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]"></div>
               <div class="text-xl font-semibold relative z-10">
                 {{ t("about.usage_information") }}
               </div>
@@ -272,8 +272,8 @@
 
             <div class="flex flex-col gap-2 mt-3">
               <!-- Summary Message -->
-              <div class="ingestion-summary-compact border border-solid rounded-lg py-3 px-[14px] [backdrop-filter:blur(10px)] relative overflow-hidden" :class="store.state.theme === 'dark' ? 'bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] border-[rgba(99,102,241,0.3)]' : 'border-[rgba(99,102,241,0.2)]'">
-                <div class="summary-text-compact text-sm leading-[1.6] text-inherit text-[13px]">
+              <div class="ingestion-summary-compact border border-solid rounded-default py-3 px-3.5 [backdrop-filter:blur(10px)] relative overflow-hidden border-[rgba(99,102,241,0.2)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] dark:border-[rgba(99,102,241,0.3)]">
+                <div class="summary-text-compact text-sm leading-[1.6] text-inherit text-compact">
                   <!-- Line 1: License Info -->
                   <div class="flex items-center gap-2 mb-2">
                     <OIcon name="info" size="sm" class="flex-shrink-0" />
@@ -309,7 +309,7 @@
                       "
                       name="warning"
                       size="sm"
-                      class="text-red-500 flex-shrink-0"
+                      class="text-status-error-text flex-shrink-0"
                     />
                     <OIcon
                       v-else-if="
@@ -318,13 +318,13 @@
                       "
                       name="check-circle"
                       size="sm"
-                      class="text-amber-500 flex-shrink-0"
+                      class="text-status-warning-text flex-shrink-0"
                     />
                     <OIcon
                       v-else
                       name="check-circle"
                       size="sm"
-                      class="text-green-500 flex-shrink-0"
+                      class="text-status-positive flex-shrink-0"
                     />
                     <span>
                       <span
@@ -339,8 +339,8 @@
                               t('about.limit_exceeded_days', {
                                 colorClass:
                                   licenseData?.ingestion_exceeded > 30
-                                    ? 'text-red-500'
-                                    : 'text-amber-500',
+                                    ? 'text-status-error-text'
+                                    : 'text-status-warning-text',
                                 days: licenseData?.ingestion_exceeded,
                                 plural:
                                   licenseData?.ingestion_exceeded > 1
@@ -368,7 +368,7 @@
                         ></span
                         ><span
                           v-else
-                          class="text-[12px] opacity-80 italic"
+                          class="text-xs opacity-80 italic"
                           v-html="
                             DOMPurify.sanitize(
                               t('about.limit_exceeded_info', {
@@ -415,8 +415,8 @@
                   </div>
                   <div
                     v-if="isIngestionUnlimited"
-                    class="text-xs text-gray-400 mt-1 text-center"
-                    style="font-size: 10px"
+                    class="text-xs text-text-secondary mt-1 text-center"
+                    style="font-size: var(--text-3xs)"
                   >
                     {{ t("about.usage_shows_zero_unlimited") }}
                   </div>
@@ -448,7 +448,7 @@
         v-model="licenseData.key"
         readonly
         :rows="8"
-        style="font-family: monospace; font-size: 12px"
+        style="font-family: var(--font-mono); font-size: var(--text-xs)"
       />
     </ODialog>
   </div>
@@ -586,7 +586,7 @@ export default defineComponent({
           message:
             t("about.failed_to_update_license") +
             " : " +
-            (error?.response?.data?.message || "unexpected error"),
+            (error?.response?.data?.message || t("settings.licensePage.unexpectedError")),
         });
       }
     };
@@ -617,7 +617,7 @@ export default defineComponent({
           message:
             t("about.failed_to_refresh_license") +
             " : " +
-            (error?.response?.data?.message || "unexpected error"),
+            (error?.response?.data?.message || t("settings.licensePage.unexpectedError")),
         }); 
       }
     }
@@ -746,11 +746,11 @@ export default defineComponent({
       );
 
       if (daysUntilExpiry > 1) {
-        return `${daysUntilExpiry} days remaining until your license expires`;
+        return t("settings.licensePage.daysRemaining", { days: daysUntilExpiry });
       } else if (daysUntilExpiry === 1) {
-        return `1 day remaining until your license expires`;
+        return t("settings.licensePage.oneDayRemaining");
       } else {
-        return "Your license has expired";
+        return t("settings.licensePage.licenseExpired");
       }
     };
 
@@ -1033,49 +1033,42 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.usage-chart-container .grid-stack-item-content {
-  border: 0px !important;
+<style scoped>
+/* keep(lib-override:gridstack): zero the gridstack item border inside the usage chart */
+.usage-chart-container :deep(.grid-stack-item-content) {
+  border: 0 !important;
 }
 
+/* keep(brand): gradient accent bar on the ingestion summary (generated ::before) */
 .ingestion-summary-compact::before {
   content: "";
   position: absolute;
   top: 0;
   left: 0;
-  width: 3px;
+  width: 0.1875rem;
   height: 100%;
   background: linear-gradient(
     180deg,
-    var(--o2-menu-color) 0%,
-    var(--o2-menu-color) 100%
+    var(--color-theme-menu-color) 0%,
+    var(--color-theme-menu-color) 100%
   );
   opacity: 0.6;
 }
 
-.ingestion-summary-compact .summary-text-compact strong {
+.dark .ingestion-summary-compact::before {
+  opacity: 0.8;
+}
+
+/* keep(generated-content): gradient text on the v-html <strong> in the summary */
+.ingestion-summary-compact .summary-text-compact :deep(strong) {
   font-weight: 700;
   background: linear-gradient(
     135deg,
-    var(--o2-menu-color) 0%,
-    var(--o2-menu-color) 100%
+    var(--color-theme-menu-color) 0%,
+    var(--color-theme-menu-color) 100%
   );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-
-.dark .futuristic-card::before {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(99, 102, 241, 0.7) 20%,
-    rgba(168, 85, 247, 0.7) 80%,
-    transparent 100%
-  );
-}
-
-.dark .ingestion-summary-compact::before {
-  opacity: 0.8;
 }
 </style>

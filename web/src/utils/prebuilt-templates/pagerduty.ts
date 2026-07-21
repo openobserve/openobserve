@@ -63,16 +63,18 @@ export const pagerdutyConfig: PrebuiltConfig = {
   credentialFields: [
     {
       key: 'integrationKey',
-      label: 'Integration Key',
+      labelKey: 'alerts.prebuiltDestinations.pagerdutyIntegrationKey',
       type: 'password',
       required: true,
       hint: 'Get your integration key from PagerDuty service settings',
       validator: (key: string) =>
-        key.length === 32 || 'PagerDuty integration key should be 32 characters'
+        key.length === 32 || {
+          key: 'alerts.prebuiltDestinations.pagerdutyIntegrationKeyLength'
+        }
     },
     {
       key: 'severity',
-      label: 'Default Severity',
+      labelKey: 'alerts.prebuiltDestinations.pagerdutySeverity',
       type: 'select',
       required: true,
       options: [

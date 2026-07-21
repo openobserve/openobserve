@@ -20,6 +20,7 @@ import {
 } from "./convertPromQLHeatmapChart";
 import type { ProcessedPromQLData } from "./shared/types";
 import { SPECTRAL_HEATMAP_STOP_COUNT } from "./shared/spectral";
+import { chartColor } from "@/utils/chartTheme";
 
 // Mock dependencies
 vi.mock("../convertDataIntoUnitValue", () => ({
@@ -601,8 +602,12 @@ describe("HeatmapConverter", () => {
         mockExtras,
       );
 
-      expect(result.tooltip.textStyle.color).toBe("#000");
-      expect(result.tooltip.backgroundColor).toBe("rgba(255,255,255,1)");
+      expect(result.tooltip.textStyle.color).toBe(
+        chartColor("--color-tooltip-text"),
+      );
+      expect(result.tooltip.backgroundColor).toBe(
+        chartColor("--color-tooltip-bg"),
+      );
     });
 
     it("should configure tooltip for dark theme", () => {
@@ -636,8 +641,12 @@ describe("HeatmapConverter", () => {
         mockExtras,
       );
 
-      expect(result.tooltip.textStyle.color).toBe("#fff");
-      expect(result.tooltip.backgroundColor).toBe("rgba(0,0,0,1)");
+      expect(result.tooltip.textStyle.color).toBe(
+        chartColor("--color-tooltip-text"),
+      );
+      expect(result.tooltip.backgroundColor).toBe(
+        chartColor("--color-tooltip-bg"),
+      );
     });
 
     describe("label formatter", () => {

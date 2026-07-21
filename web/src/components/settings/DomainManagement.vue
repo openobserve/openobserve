@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("settings.claimParserFunction") }}
       </div>
-      <div class="text-sm text-gray-400 mb-3">
+      <div class="text-sm text-text-secondary mb-3">
         {{ t("settings.claimParserFunctionDescription") }}
       </div>
 
@@ -76,13 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         side="right"
         :width="40"
       >
-        <div class="p-4 text-sm">
-          <div class="mb-4 p-4 rounded" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a]' : 'bg-[#f5f5f5]'">
+        <div class="text-sm">
+          <div class="mb-4 p-4 rounded-default bg-surface-subtle">
             <div class="font-medium mb-2">{{ t("settings.claimParserFunctionInputTitle") }}</div>
             <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
           </div>
 
-          <div class="mb-4 p-4 rounded" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a]' : 'bg-[#f5f5f5]'">
+          <div class="mb-4 p-4 rounded-default bg-surface-subtle">
             <div class="font-medium mb-2">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
             <div class="mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
             <div class="ml-4">
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Recent Errors Section -->
-          <div v-if="claimParserFunction" class="p-4 rounded border-l-[3px]" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-l-[#ff6b6b]' : 'bg-[#f5f5f5] border-l-[#c10015]'">
+          <div v-if="claimParserFunction" class="p-4 rounded-default border-l-[3px] bg-surface-subtle border-l-status-negative">
             <div class="flex items-center mb-2">
               <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
               <div>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSpinner size="xs" />
             </div>
 
-            <div v-else-if="recentErrors.length === 0" class="text-center py-2" style="color: var(--o2-text-muted)">
+            <div v-else-if="recentErrors.length === 0" class="text-center py-2 text-text-muted">
               {{ t("settings.noRecentErrors") }}
             </div>
 
@@ -120,17 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(error, index) in recentErrors.slice(0, 3)"
                 :key="index"
-                class="p-2 mb-1 rounded border-l-2"
-                :class="store.state.theme === 'dark' ? 'bg-[#2a1f1f] border-l-[#ff6b6b]' : 'bg-[#fff9f9] border-l-[#ff9e9e]'"
+                class="p-2 mb-1 rounded-default border-l-2 bg-status-error-bg border-l-status-negative"
               >
                 <div class="flex items-start mb-1">
                   <OIcon name="error" size="xs" class="mr-1 mt-1" />
                   <div class="flex-1">
                     <div class="text-xs font-medium">{{ error.error_type }}</div>
-                    <div class="text-xs" style="color: var(--o2-text-muted)">{{ formatTimestamp(error._timestamp) }}</div>
+                    <div class="text-xs text-text-muted">{{ formatTimestamp(error._timestamp) }}</div>
                   </div>
                 </div>
-                <div class="text-xs wrap-break-word" :class="store.state.theme === 'dark' ? 'text-[#ccc]' : 'text-[#666]'">{{ error.error }}</div>
+                <div class="text-xs wrap-break-word text-text-secondary">{{ error.error }}</div>
               </div>
 
               <!-- Show More Button -->
@@ -159,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("settings.domainRestrictionsSubsection") }}
     </div>
-    <div class="text-sm text-gray-400 mb-4">
+    <div class="text-sm text-text-secondary mb-4">
       {{ t("settings.domainRestrictionsSubsectionDescription") }}
     </div>
 
@@ -194,11 +193,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t('settings.addDomain') }}
           </OButton>
       </OForm>
-      <div class="text-xs text-gray-400 mt-1">
+      <div class="text-xs text-text-secondary mt-1">
         {{ t('settings.domainHint', { at_sign: '@' }) }}
       </div>
 
-      <div class="text-xs text-gray-400 mt-1 mb-3" v-if="domains.length > 0">
+      <div class="text-xs text-text-secondary mt-1 mb-3" v-if="domains.length > 0">
         {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
       </div>
     </div>
@@ -208,10 +207,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
         <div
           v-if="domain && domain.name"
-          class="mb-1 border border-(--o2-border) rounded-lg"
-          :class="store.state.theme === 'dark' ? 'border-[#444] bg-[#1e1e1e]' : 'bg-white'"
+          class="mb-1 border border-border-default rounded-default bg-surface-base"
         >
-          <div class="flex items-center justify-between px-3 py-2 border-b border-b-(--o2-border) rounded-t-lg" :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-b-[#444]' : 'bg-[#f5f5f5]'">
+          <div class="flex items-center justify-between px-3 py-2 border-b border-b-border-default rounded-t-default bg-surface-subtle">
           <div
             :data-test="`domain-management-domain-name-${domain.name}`"
             class="text-base font-bold"
@@ -261,8 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info message for all users -->
           <div
             v-if="domain.policy === 'allow_all'"
-            class="p-2 rounded mb-3"
-            :class="store.state.theme === 'dark' ? 'bg-[#1a2535] text-blue-300' : 'bg-blue-50 text-blue-700'"
+            class="p-2 rounded-default mb-3 bg-status-info-bg text-status-info-text"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
@@ -270,8 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Info message for whole-domain block -->
           <div
             v-if="domain.policy === 'block_all'"
-            class="p-2 rounded mb-3"
-            :class="store.state.theme === 'dark' ? 'bg-[#351a1a] text-red-300' : 'bg-red-50 text-red-700'"
+            class="p-2 rounded-default mb-3 bg-status-error-bg text-status-error-text"
           >
             {{ t("settings.allUsersBlockedMessage", { domain: '@'+domain.name }) }}
           </div>
@@ -287,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- Hint label above the row, so the error can grow below the
                      input without shoving the Add button out of alignment. -->
-                <div class="o-input-label text-sm font-semibold leading-tight mb-1">
+                <div class="o-input-label text-compact font-medium leading-tight text-input-label-text mb-1">
                   {{ t('settings.emailPlaceholder', { domain: '@' + domain.name }) }}
                 </div>
                 <div class="flex gap-x-2 items-start">
@@ -311,8 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
-                class="flex items-center justify-between p-2 mb-1 rounded border border-(--o2-border)"
-                :class="store.state.theme === 'dark' ? 'bg-[#2a2a2a] border-[#444]' : 'bg-[#f9f9f9]'"
+                class="flex items-center justify-between p-2 mb-1 rounded-default border border-border-default bg-surface-subtle"
               >
                 <div class="text-sm">{{ email }}</div>
                 <OButton
@@ -335,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @submit="(v) => addBlockedEmail(domain, v.newEmail)"
                 v-slot="{ isSubmitting }"
               >
-                <div class="o-input-label text-sm font-semibold leading-tight mb-1">
+                <div class="o-input-label text-compact font-medium leading-tight text-input-label-text mb-1">
                   {{ t('settings.blockedEmailPlaceholder', { domain: '@' + domain.name }) }}
                 </div>
                 <div class="flex gap-x-2 items-start">
@@ -359,8 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(email, emailIndex) in domain.blockedEmails"
                 :key="email"
-                class="flex items-center justify-between p-2 mb-1 rounded border"
-                :class="store.state.theme === 'dark' ? 'bg-[#2a1f1f] border-[#5a3a3a]' : 'bg-[#fff5f5] border-[#f3c6c6]'"
+                class="flex items-center justify-between p-2 mb-1 rounded-default border bg-banner-error-soft-bg border-banner-error-soft-border"
               >
                 <div class="text-sm">{{ email }}</div>
                 <OButton
@@ -377,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Hint for any block policy -->
           <div
             v-if="domain.policy === 'block_specific' || domain.policy === 'block_all'"
-            class="text-xs text-gray-400 mt-3"
+            class="text-xs text-text-secondary mt-3"
           >
             {{ t("settings.blockedUsersHint") }}
           </div>
@@ -388,26 +382,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="domain-management-no-domain-message"
-      class="text-xl font-semibold text-gray-400 mt-3 mb-4 w-full text-center p-4 border border-(--o2-border) rounded-lg"
-      :class="store.state.theme === 'dark' ? 'border-[#444] bg-[#1e1e1e]' : 'bg-white'"
+      class="text-xl font-semibold text-text-muted mt-3 mb-4 w-full text-center p-4 border border-border-default rounded-default bg-surface-base"
     >
       {{ t("settings.noDomainMessage") }}
     </div>
 
   </div>
     <!-- Action Buttons — flow inline at the end of the constrained column. -->
-    <div class="flex items-center justify-between gap-2 pt-4 mt-2 border-t border-(--o2-border-color)">
+    <div class="flex items-center justify-between gap-2 pt-4 mt-2 border-t border-card-glass-border">
       <!-- Unsaved-changes indicator: makes it obvious the in-card edits (domains, policies,
            allow/block emails) are staged until Save is clicked. -->
       <div
         v-if="isDirty"
         data-test="domain-management-unsaved-indicator"
-        class="flex items-center gap-2 text-sm"
-        style="color: var(--o2-text-muted)"
+        class="flex items-center gap-2 text-sm text-text-muted"
+       
       >
         <span
-          class="inline-block w-2 h-2 rounded-full shrink-0"
-          style="background: var(--o2-primary-color)"
+          class="inline-block w-2 h-2 rounded-full shrink-0 bg-accent"
+         
         ></span>
         {{ t('common.unsavedChanges') }}
       </div>
@@ -909,7 +902,7 @@ const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp / 1000); // Convert microseconds to milliseconds
     return formatDistanceToNow(date, { addSuffix: true });
   } catch (e) {
-    return "Unknown time";
+    return t("settings.domainManagement.unknownTime");
   }
 };
 

@@ -29,7 +29,7 @@ import store from "./store";
 // (some specs mock it). Resolve OTag `labelKey`s against the raw English JSON so
 // registry-labelled badges render real text in component tests.
 import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
-import enMessages from "@/locales/languages/en.json";
+import enMessages from "@/locales/languages/en-US.json";
 setBadgeTranslator((key: string) =>
   key
     .split(".")
@@ -111,9 +111,7 @@ console.warn = (...args) => {
   // Filter out specific Vue warnings that are expected in test environment
   const message = args[0];
   if (typeof message === 'string') {
-    if (message.includes('Failed setting prop "prefix" on <q-input-stub>') ||
-        message.includes('Cannot set property prefix of [object Element]') ||
-        message.includes('Failed setting prop "prefix" on <q-select-stub>: value undefined is invalid') ||
+    if (message.includes('Cannot set property prefix of [object Element]') ||
         message.includes('onBeforeUnmount is called when there is no active component instance') ||
         // Suppress inject warnings that occur when testing composables outside component context
         // This is expected when testing composables directly with mocked dependencies

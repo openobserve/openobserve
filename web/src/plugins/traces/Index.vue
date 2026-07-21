@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="rounded-md tracePage h-full min-h-full! max-h-full! overflow-hidden!"
+  <div class="rounded-default tracePage h-full min-h-full! max-h-full! overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :fieldValues="fieldValues"
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
-              class="card-container"
+              class="bg-card-glass-bg"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
               @update:activeTab="activeTab = $event"
@@ -114,10 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              style="width: 100%"
               separatorClass="w-px"
               @update:model-value="onSplitterUpdate"
-              class="h-full"
+              class="h-full w-full"
             >
               <template #before>
                 <div class="h-full border-r border-border-default bg-surface-panel">
@@ -128,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :active-include-field-values="activeIncludeFilterValues"
                     :active-exclude-field-values="activeExcludeFilterValues"
                     data-test="traces-search-index-list"
-                    class="card-container h-full"
+                    class="h-full"
                     :key="searchObj.data.stream.streamLists"
                     @update:changeStream="onChangeStream"
                     @update:selectedFields="updateFieldVisibility"
@@ -136,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
-                <div class="h-full pb-[0.625rem]">
+                <div class="h-full pb-2.5">
                   <!-- No trace streams in org yet -->
                   <TracesNoDataState
                     v-if="
@@ -152,11 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        so the empties don't flash in between. -->
                   <div
                     v-else-if="searchObj.loadingStream"
-                    class="card-container h-full flex flex-col items-center justify-center gap-2 text-[var(--o2-text-secondary)]"
+                    class="bg-card-glass-bg h-full flex flex-col items-center justify-center gap-2 text-text-secondary"
                     data-test="traces-search-loading"
                   >
-                    <OSpinner size="sm" />
-                    <span>{{ t("traces.fetchingTraces") }}</span>
+                    <OSpinner size="lg" />
+                    <span class="text-sm">{{ t("traces.fetchingTraces") }}</span>
                   </div>
                   <div
                     v-else-if="
@@ -164,13 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       parseInt(searchObj.data.errorCode) !== 0 &&
                       searchObj.loading == false
                     "
-                    class="card-container h-full"
+                    class="bg-card-glass-bg h-full"
                   >
-                    <div class="text-center pt-[2rem]">
+                    <div class="text-center pt-8">
                       <!-- Actual error case -->
                       <div
                         data-test="traces-search-error-message"
-                        class="text-[1.3rem] pt-4"
+                        class="text-xl pt-4"
                       >
                         {{ t("traces.errorRetrievingTraces") }}
                         <OButton
@@ -187,16 +186,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <!-- Collapsible error detail — shown below results when toggled -->
                       <div class="text-center">
-                        <div class="my-none text-[1rem]! px-[2rem]!">
+                        <div class="my-none text-base! px-8!">
                           <span v-if="disableMoreErrorDetails">
                             <SanitizedHtmlRenderer
                               data-test="traces-search-detail-error-message"
                               :htmlContent="searchObj?.data?.errorMsg"
-                              class="pt-[1rem]"
+                              class="pt-4"
                             />
                             <div
                               v-if="searchObj?.data?.errorDetail"
-                              class="error-display__message pt-[1rem]! text-[var(--o2-text-2)]!"
+                              class="error-display__message pt-4! text-text-secondary!"
                             >
                               {{ searchObj.data.errorDetail }}
                             </div>
@@ -216,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             searchObj.data.stream.selectedStream.label
                           "
                           as="RouterLink"
-                          >Click here</OButton
+                          >{{ t('traces.index.clickHere') }}</OButton
                         >
                         {{ t("traces.configureFullTextSearch") }}
                       </div>
@@ -232,12 +231,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.loading
                     "
                     data-test="traces-search-error-text"
-                    class="text-center py-[40px] text-[20px] card-container h-full"
+                    class="text-center py-10 text-xl bg-card-glass-bg h-full"
                   >
                     <SanitizedHtmlRenderer
                       data-test="traces-search-detail-error-message"
                       :htmlContent="searchObj?.data?.errorMsg"
-                      class="pt-[1rem]"
+                      class="pt-4"
                     />
                   </div>
                   <div v-else-if="!isStreamSelected">
@@ -297,14 +296,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog
       v-model:open="streamChangeDialog.show"
-      title="Change stream?"
+      :title="t('traces.index.changeStreamTitle')"
       size="sm"
-      primary-button-label="Switch stream"
-      secondary-button-label="Cancel"
+      :primary-button-label="t('traces.index.switchStream')"
+      :secondary-button-label="t('traces.index.cancel')"
       @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
       @click:secondary="streamChangeDialog.show = false"
     >
-      <p>This will also update the stream in the Traces/Spans tab and reset existing query.</p>
+      <p>{{ t('traces.index.changeStreamMessage') }}</p>
     </ODialog>
   </div>
 </template>
@@ -345,10 +344,12 @@ import {
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
+import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
@@ -416,6 +417,8 @@ const {
   setServiceColors,
   loadLocalLogFilterField,
   updatedLocalLogFilterField,
+  loadTracesParser,
+  tracesParser,
 } = useTraces();
 const { fnParsedSQL } = logsUtils();
 
@@ -438,7 +441,6 @@ const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
-let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
 const disableMoreErrorDetails = ref(false);
@@ -488,12 +490,6 @@ const selectedStreamName = computed(
 
 const isLLMSpanPresent = ref(false);
 
-const importSqlParser = async () => {
-  const useSqlParser: any = await import("@/composables/useParser");
-  const { sqlParser }: any = useSqlParser.default();
-  parser = await sqlParser();
-};
-
 function getQueryTransform() {
   try {
     searchObj.data.stream.functions = [];
@@ -526,7 +522,7 @@ function getQueryTransform() {
     return;
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while getting functions");
+    showErrorNotification(t("traces.index.errorGettingFunctions"));
   }
 }
 
@@ -562,7 +558,7 @@ async function getStreamList() {
 
         // Restore filter chips from the editor value. The single mount search is
         // owned by loadPageData() (after getStreamList resolves), so we do NOT
-        // trigger a search here — that previously produced a duplicate on load.
+        // trigger a search here.
         if (
           searchObj.data.editorValue &&
           searchObj.data.stream.selectedStreamFields.length
@@ -575,8 +571,7 @@ async function getStreamList() {
         searchObj.loadingStream = false;
         toast({
           variant: "error",
-          message:
-            "Error while pulling index for selected organization" + e.message,
+          message: t("traces.index.errorPullingIndex", { message: e.message }),
         });
       })
       .finally(() => {
@@ -585,7 +580,7 @@ async function getStreamList() {
   } catch (e) {
     searchObj.loadingStream = false;
     console.error("Error while getting streams", e);
-    showErrorNotification("Error while getting streams");
+    showErrorNotification(t("traces.index.errorGettingStreams"));
   }
 }
 
@@ -650,7 +645,7 @@ function loadStreamLists() {
     }
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while loading streams");
+    showErrorNotification(t("traces.index.errorLoadingStreams"));
   }
 }
 
@@ -771,7 +766,7 @@ function buildSearch() {
       // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
       const durationParseResult = parseDurationWhereClause(
         whereClause,
-        parser,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
       if (typeof durationParseResult === "string") {
@@ -781,7 +776,7 @@ function buildSearch() {
       // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
       whereClause = parseSpanKindWhereClause(
         whereClause,
-        parser,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
 
@@ -822,9 +817,7 @@ function buildSearch() {
   } catch (e) {
     console.error("Error while constructing the search query", e);
     searchObj.loading = false;
-    showErrorNotification(
-      "An error occurred while constructing the search query.",
-    );
+    showErrorNotification(t("traces.index.errorConstructingQuery"));
   }
 }
 
@@ -892,7 +885,9 @@ function fetchTracesCount() {
 
 const showTraceDetailsError = () => {
   showErrorNotification(
-    `Trace ${router.currentRoute.value.query.trace_id} not found`,
+    t("traces.index.traceNotFound", {
+      traceId: router.currentRoute.value.query.trace_id,
+    }),
   );
   const query = cloneDeep(router.currentRoute.value.query);
   delete query.trace_id;
@@ -939,6 +934,7 @@ async function getQueryData(
     }
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
+    searchObj.data.sqlSyntaxErrorRanges = [];
 
     searchObj.searchApplied = true;
     searchObj.loading = true;
@@ -989,7 +985,7 @@ async function getQueryData(
     ).trim();
     const filterParseResult = parseDurationWhereClause(
       filter,
-      parser,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
     if (typeof filterParseResult === "string") {
@@ -999,7 +995,7 @@ async function getQueryData(
     // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
     filter = parseSpanKindWhereClause(
       filter,
-      parser,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
 
@@ -1181,7 +1177,7 @@ async function getQueryData(
           const { message, trace_id, code, error_detail } = errData ?? {};
 
           let errorMsg =
-            message || err?.message || "Error while processing request";
+            message || err?.message || t("traces.index.errorProcessingRequest");
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
@@ -1192,6 +1188,20 @@ async function getQueryData(
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
+
+          // Locate the offending token in the query and squiggle it in the
+          // editor (shares the central engine + externalErrors ref with Logs).
+          rangesFromServerError({
+            code,
+            message,
+            errorDetail: error_detail,
+            sqlMode: searchObj.meta.sqlMode,
+            query: searchObj.data.editorValue,
+            streamName: searchObj.data.stream.selectedStream?.value,
+          }).then((ranges) => {
+            searchObj.data.sqlSyntaxErrorRanges = ranges;
+          });
+
           currentSearchTraceId = null;
           delete tracesPartitionMap[searchTraceId];
         },
@@ -1215,7 +1225,7 @@ async function getQueryData(
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
-    searchObj.data.errorMsg = e?.message || "Search request failed";
+    searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
   }
 }
@@ -1515,7 +1525,7 @@ function generateHistogramData() {
       text: "",
       font: {
         size: 12,
-        color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+        color: chartColor("--color-text-heading"),
       },
     },
     margin: {
@@ -1526,14 +1536,14 @@ function generateHistogramData() {
     },
     font: {
       size: 12,
-      color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+      color: chartColor("--color-text-heading"),
     },
     xaxis: { type: "date" },
     yaxis: { ticksuffix: "ms" },
     scattergap: 0.7,
     height: 150,
-    paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-    plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+    paper_bgcolor: chartColor("--color-surface-base"),
+    plot_bgcolor: chartColor("--color-surface-base"),
     autosize: true,
   };
 
@@ -1589,7 +1599,7 @@ onBeforeMount(async () => {
   }
   setupContextProvider();
   restoreUrlQueryParams();
-  await importSqlParser();
+  await loadTracesParser();
   if (!searchObj.loading) {
     await loadPageData();
   }
@@ -1724,7 +1734,7 @@ const restoreFilters = (query: string) => {
 
   const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
-  const parsedQuery = parser.astify(defaultQuery + query);
+  const parsedQuery = tracesParser.value.astify(defaultQuery + query);
 
   restoreFiltersFromQuery(parsedQuery.where);
 };
@@ -2250,10 +2260,9 @@ watch(
   { immediate: true },
 );
 
-// NOTE: auto-run in live mode is driven by explicit triggers at each user-intent
-// handler (filter add/remove, manual date change, redirect, metrics brush) — not
-// by watching `searchObj.data.query`. A query watcher duplicated those explicit
-// triggers (every writer of `data.query` also runs a search), so it was removed.
+// Auto-run in live mode is driven by explicit triggers at each user-intent
+// handler (filter add/remove, manual date change, redirect, metrics brush), not
+// by watching `searchObj.data.query`.
 
 // Handler for service graph view traces event
 const handleServiceGraphViewTraces = (data: any) => {
@@ -2401,32 +2410,31 @@ useShortcuts([
 ]);
 </script>
 
-<style>
-
-.tracePage .index-table :hover::-webkit-scrollbar,
-.tracePage #tracesSearchGridComponent:hover::-webkit-scrollbar {
-  height: 13px;
-  width: 13px;
+<style scoped>
+/* keep(scrollbar): native ::-webkit-scrollbar sizing/shadows on the child field-list
+   & result-grid scrollers, plus a field-label font-size override on child FieldRow
+   DOM — all reached through child components, so not expressible as utilities here. */
+.tracePage :deep(.index-table :hover::-webkit-scrollbar),
+.tracePage :deep(#tracesSearchGridComponent:hover::-webkit-scrollbar) {
+  height: 0.8125rem;
+  width: 0.8125rem;
 }
 
-.tracePage .index-table ::-webkit-scrollbar-track,
-.tracePage #tracesSearchGridComponent::-webkit-scrollbar-track {
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
+.tracePage :deep(.index-table ::-webkit-scrollbar-track),
+.tracePage :deep(#tracesSearchGridComponent::-webkit-scrollbar-track) {
+  -webkit-box-shadow: inset 0 0 0.375rem
+    color-mix(in srgb, var(--color-black) 30%, transparent);
+  border-radius: 0.625rem;
 }
 
-.tracePage .index-table ::-webkit-scrollbar-thumb,
-.tracePage #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-  border-radius: 10px;
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+.tracePage :deep(.index-table ::-webkit-scrollbar-thumb),
+.tracePage :deep(#tracesSearchGridComponent::-webkit-scrollbar-thumb) {
+  border-radius: 0.625rem;
+  -webkit-box-shadow: inset 0 0 0.375rem
+    color-mix(in srgb, var(--color-black) 50%, transparent);
 }
 
-
-.tracePage .index-menu .field_list .field_overlay .field_label {
-  font-size: 12px !important;
-}
-.tracePage .traces-horizontal-splitter.hide-splitter-separator > .o-splitter__separator {
-  background: transparent !important;
-  border: none !important;
+.tracePage :deep(.index-menu .field_list .field_overlay .field_label) {
+  font-size: var(--text-xs) !important;
 }
 </style>

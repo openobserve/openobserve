@@ -67,11 +67,6 @@ export class AlertTemplatesPage {
     async navigateToTemplates(retryCount = 0) {
         const maxRetries = 2; // Maximum number of retry attempts
 
-        // Clean up any q-portal elements that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         try {
             await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
             await this.page.waitForTimeout(1000);
@@ -146,6 +141,13 @@ export class AlertTemplatesPage {
     }
 
     /**
+     * Wait for the templates list page to be ready (Add Template button visible).
+     */
+    async waitForTemplateListReady() {
+        await this.page.locator(this.addTemplateButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    /**
      * Create a template via API first, fall back to UI if API fails
      * @param {string} templateName - Name of the template
      */
@@ -162,20 +164,15 @@ export class AlertTemplatesPage {
         await this.navigateToTemplates();
         await this.page.waitForTimeout(2000);
 
-        // Clean up any q-portal elements that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         // Try multiple fallback selectors for add button
         const addBtnLocator = this.page.locator(this.addTemplateButton);
         const addBtnFallbackLocators = [
             this.addTemplateButton,
             'button:has-text("Add Template")',
-            '.q-table__control button',
+            'table button',
             'button[data-test*="add"]',
             'button:has(.OIcon):has-text("add")',
-            '.q-toolbar button:has-text("Add")',
+            '[role="toolbar"] button:has-text("Add")',
             'button[data-o2-btn]:has-text("Add Template")'
         ];
 
@@ -243,7 +240,7 @@ export class AlertTemplatesPage {
             // Strategy 2: data-test selector for template search
             () => this.page.locator('[data-test="alert-template-search-input"]'),
             // Strategy 3: input inside the templates section (look for search/filter input)
-            () => this.page.locator('[data-o2-page-container] .q-table__control input[type="text"], [data-o2-page-container] input.q-field__input[placeholder*="Search"], [data-o2-page-container] input[placeholder*="search"]').first()
+            () => this.page.locator('[data-o2-page-container] input[placeholder*="search"]').first()
         ];
 
         for (const strategy of strategies) {
@@ -508,11 +505,6 @@ export class AlertTemplatesPage {
         await this.navigateToTemplates();
         await this.page.waitForTimeout(2000);
 
-        // Clean up any q-portal elements that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         await this.page.locator(this.addTemplateButton).click({ force: true });
         await this.page.waitForTimeout(2000);
 
@@ -767,18 +759,13 @@ export class AlertTemplatesPage {
             await this.navigateToTemplates();
             await this.page.waitForTimeout(2000);
 
-            // Clean up any q-portal elements that may intercept clicks
-            await this.page.evaluate(() => {
-                document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-            }).catch(() => {});
-
             // Try import button selectors (avoiding overly broad selectors that click wrong elements)
             const importBtnFallbackLocators = [
                 this.templateImportButton,
                 'button:has-text("Import Template")',
                 '[data-test*="template-import"]',
                 'button:has-text("Import")',
-                '.q-table__control button:has-text("Import")',
+                'table button:has-text("Import")',
             ];
 
             let importBtnClicked = false;
@@ -1225,7 +1212,7 @@ export class AlertTemplatesPage {
     }
 
     async expectValidationErrorVisible(message) {
-        // OInput shows error in .q-field__messages or .q-field__bottom
+        // OInput shows the error message text below the field
         await expect(this.page.getByText(message)).toBeVisible({ timeout: 5000 });
     }
 
@@ -1253,7 +1240,7 @@ export class AlertTemplatesPage {
         }
         // Try paginating through pages to find prebuilt badges
         for (let pageNum = 0; pageNum < 10; pageNum++) {
-            const nextBtn = this.page.locator('button.q-pagination button[aria-label*="Next"], button:has-text("chevron_right")').first();
+            const nextBtn = this.page.locator('button:has-text("chevron_right")').first();
             if (await nextBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
                 const isDisabled = await nextBtn.isDisabled().catch(() => true);
                 if (isDisabled) break;

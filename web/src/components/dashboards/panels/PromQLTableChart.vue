@@ -15,17 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <div class="h-full w-full flex flex-col relative"
     data-test="promql-table-chart"
-    style="
-      height: 100%;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    "
   >
-    <div style="height: 100%; position: relative">
+    <div class="h-full relative">
       <TableRenderer
         ref="innerTableRef"
         :data="{ rows: filteredTableRows, columns: tableColumns }"
@@ -41,11 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #bottom="scope" v-if="showLegendFooter">
           <div class="flex items-center w-full" data-test="dashboard-table-pagination">
             <div class="flex items-center gap-1">
-              <OSelect
+              <OSelect class="min-w-50 max-w-100"
                 v-model="selectedLegend"
                 :options="legendOptions"
-                style="min-width: 200px; max-width: 400px"
-                placeholder="Select series to filter"
+                :placeholder="t('dashboard.promQLTableChart.selectSeriesToFilter')"
               >
                 <template #icon-left>
                   <OIcon name="filter-list" size="xs" />
@@ -77,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -103,6 +96,7 @@ export default defineComponent({
 },
   setup(props) {
     const store = useStore();
+    const { t } = useI18n();
     const filter = ref("");
     const loading = ref(false);
     const innerTableRef = ref<any>(null);
@@ -121,7 +115,7 @@ export default defineComponent({
         console.warn("No rows found in table data");
         return [];
       }
-      // Add unique ID to each row for q-table
+      // Add unique ID to each row for the table
       const rows = props.data.rows.map((row: any, index: number) => ({
         id: `row_${index}`,
         ...row,
@@ -152,7 +146,7 @@ export default defineComponent({
 
       if (tableMode === "all") {
         // In "all" mode, add "All series" option
-        options.push({ label: "All series", value: "__all__" });
+        options.push({ label: t("dashboard.promQLTableChart.allSeries"), value: "__all__" });
       }
 
       // Add individual legend options
@@ -241,6 +235,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       filter,
       store,
       loading,

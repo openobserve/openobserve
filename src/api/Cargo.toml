@@ -15,11 +15,26 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "dep:o2_ratelimit",
+    "openobserve-api-management/enterprise",
+    "openobserve-api-query/enterprise",
     "openobserve-core/enterprise",
 ]
-cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
-vectorscan = ["openobserve-core/vectorscan"]
-vortex = ["config/vortex", "openobserve-core/vortex"]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "openobserve-api-management/cloud",
+    "openobserve-api-query/cloud",
+    "openobserve-core/cloud",
+]
+vectorscan = [
+    "openobserve-api-query/vectorscan",
+    "openobserve-core/vectorscan",
+]
+vortex = [
+    "config/vortex",
+    "openobserve-api-query/vortex",
+    "openobserve-core/vortex",
+]
 profiling = [
     "dep:tikv-jemalloc-ctl",
     "dep:tikv-jemalloc-sys",
@@ -34,6 +49,10 @@ ignored = ["tikv-jemalloc-sys"]
 
 [dependencies]
 openobserve-core.workspace = true
+openobserve-api-management.workspace = true
+openobserve-api-query.workspace = true
+openobserve-api-common.workspace = true
+openobserve-mcp.workspace = true
 axum.workspace = true
 axum-extra.workspace = true
 tower.workspace = true
@@ -46,7 +65,6 @@ anyhow.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
-cron.workspace = true
 datafusion.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
@@ -56,7 +74,6 @@ futures.workspace = true
 hashbrown.workspace = true
 http-auth-basic.workspace = true
 itertools.workspace = true
-jsonwebtoken.workspace = true
 log.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
@@ -65,14 +82,13 @@ o2_ratelimit = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry-proto.workspace = true
 parking_lot.workspace = true
-promql-parser.workspace = true
 prost.workspace = true
 proto.workspace = true
 rand.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rust-embed-for-web.workspace = true
-sea-orm.workspace = true
+web.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snap.workspace = true
@@ -89,8 +105,6 @@ tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
-vector-enrichment.workspace = true
-vrl.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true

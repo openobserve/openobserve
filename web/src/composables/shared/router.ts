@@ -96,7 +96,7 @@ const useRoutes = () => {
     {
       path: "/logout",
       beforeEnter(to: any, from: any, next: any) {
-        // Clear backend auth cookies before redirecting to login (#10900)
+        // Clear backend auth cookies before redirecting to login
         invalidateLoginData();
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);
@@ -175,7 +175,7 @@ const useRoutes = () => {
         title: "Metrics",
       },
       beforeEnter(to: any, from: any, next: any) {
-        if (hasMetricsEditorParams(to.query)) {
+        if (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize") {
           routeGuard(to, from, () =>
             next({
               name: "metricsEditor",

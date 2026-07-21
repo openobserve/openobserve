@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="height: 100%">
-    <div class="p-0" style="width: 100px">
+  <div class="h-full">
+    <div class="p-0 w-25">
       <ul class="flex flex-wrap list-none p-0 m-0">
-        <li
+        <li class="w-12.5"
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
-            'dashboard-chart-border',
+            'border-r border-b border-card-glass-border',
             'transition-colors duration-150 ease-in-out hover:bg-surface-subtle',
             selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
             isChartDisabled(item)
@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : 'cursor-pointer',
           ]"
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
-          style="width: 50px"
           data-test="dashboard-addpanel-chart-selection-item"
           :data-test-selected="selectedChartType === item.id ? item.id : undefined"
         >
@@ -42,12 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img
               :src="item.image.replace('img:', '')"
               :alt="item.title"
-              class="mx-auto my-2"
-              style="width: 24px; height: 24px;"
+              class="mx-auto my-2 w-6 h-6"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
-            <OTooltip
-              style="text-align: center"
+            <OTooltip class="text-center"
               :content="item.title"
               data-test="dashboard-addpanel-chart-selection-tooltip"
             />
@@ -155,27 +152,27 @@ export default defineComponent({
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
-        title: "Gauge",
+        title: t("dashboard.chartSelection.gauge"),
         id: "gauge",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
-        title: "HTML",
+        title: t("dashboard.chartSelection.html"),
         id: "html",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Markdown.svg"),
-        title: "Markdown",
+        title: t("dashboard.chartSelection.markdown"),
         id: "markdown",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/sankey.svg"),
-        title: "Sankey",
+        title: t("dashboard.chartSelection.sankey"),
         id: "sankey",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/chart.png"),
-        title: "Custom Chart",
+        title: t("dashboard.chartSelection.customChart"),
         id: "custom_chart",
       },
     ]);

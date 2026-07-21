@@ -23,11 +23,24 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({
-    t: (key: string) => key,
-  })),
-}));
+// Resolve against the real en.json rather than echoing the key, so these tests
+// also prove the keys exist and interpolate.
+vi.mock("vue-i18n", async () => {
+  const en: any = (await import("@/locales/languages/en-US.json")).default;
+  return {
+    useI18n: vi.fn(() => ({
+      t: (key: string, named?: Record<string, unknown>) => {
+        const msg = key.split(".").reduce((a: any, k) => (a == null ? a : a[k]), en);
+        if (typeof msg !== "string") return key;
+        return named
+          ? msg.replace(/\{(\w+)\}/g, (_: string, p: string) =>
+              named[p] === undefined ? `{${p}}` : String(named[p])
+            )
+          : msg;
+      },
+    })),
+  };
+});
 
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({

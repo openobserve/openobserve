@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col h-full p-0">
     <template v-if="!showImportRegexPatternDialog">
     <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-    <AppPageHeader
+    <OPageLayout
       :title="t('regex_patterns.title')"
       icon="pattern"
-      :subtitle="'Reusable regex patterns for redaction'"
-      class="shrink-0 px-4 border-b border-border-default"
+      :subtitle="t('settings.regexPatternList.subtitle')"
+      bleed
     >
       <template #actions>
         <OButton
@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="createRegexPattern"
         >{{ t("regex_patterns.create_pattern") }}</OButton>
       </template>
-    </AppPageHeader>
-    <div class="card-container flex-1 min-h-0 overflow-hidden">
+    <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
     <OTable
       :frame="false"
       data-test="regex-pattern-list-table"
@@ -54,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      show-index
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="settings-regex-patterns"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-row-action="export"
             variant="ghost"
             size="icon-sm"
-            title="Export Regex Pattern"
+            :title="t('settings.regexPatternList.exportTitle')"
             @click.stop="exportRegexPattern(row)"
             icon-left="download"
           />
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #bottom>
         <div class="flex items-center gap-2">
-          <span class="o2-table-footer-title">
+          <span class="text-xs font-normal">
             {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
           </span>
           <OButton
@@ -142,12 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="delete"
             @click="openBulkDeleteDialog"
           >
-            Delete
+            {{ t("settings.regexPatternList.delete") }}
           </OButton>
         </div>
       </template>
     </OTable>
     </div>
+    </OPageLayout>
     </template>
     <ImportRegexPattern
       v-else-if="showImportRegexPatternDialog"
@@ -164,8 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <ConfirmDialog
-      title="Delete Regex Patterns"
-      :message="`Are you sure you want to delete ${selectedPatterns.length} regex pattern(s)?`"
+      :title="t('settings.regexPatternList.bulkDeleteTitle')"
+      :message="t('settings.regexPatternList.bulkDeleteMessage', { n: selectedPatterns.length })"
       @update:ok="bulkDeleteRegexPatterns"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -202,15 +203,15 @@ import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "RegexPatternList",
   components: {
-    AppPageHeader,
+    OPageLayout,
     ConfirmDialog,
     AddRegexPattern,
     ImportRegexPattern,
@@ -229,13 +230,6 @@ export default defineComponent({
     const router = useRouter();
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("regex_patterns.name"),
@@ -287,8 +281,8 @@ export default defineComponent({
 
     const deleteDialog = ref({
       show: false,
-      title: "Delete Regex Pattern",
-      message: "Are you sure you want to delete this regex pattern?",
+      title: t("settings.regexPatternList.deleteTitle"),
+      message: t("settings.regexPatternList.deleteMessage"),
       data: "" as any,
     });
 
@@ -363,10 +357,8 @@ export default defineComponent({
         const response = await regexPatternsService.list(
           store.state.selectedOrganization.identifier,
         );
-        let counter = 1;
         regexPatterns.value = response.data.patterns.map((pattern: any) => ({
           ...pattern,
-          "#": counter <= 9 ? `0${counter++}` : counter++,
           created_at: convertUnixToDateFormat(pattern.created_at),
           updated_at: convertUnixToDateFormat(pattern.updated_at),
         }));
@@ -374,7 +366,7 @@ export default defineComponent({
         resultTotal.value = regexPatterns.value.length;
       } catch (error: any) {
         toast({
-          message: error.data.message || "Error fetching regex patterns",
+          message: error.data.message || t("settings.regexPatternList.errorFetching"),
           variant: "error",
         });
       } finally {
@@ -401,7 +393,7 @@ export default defineComponent({
         );
         getRegexPatterns();
         toast({
-          message: "Regex pattern deleted successfully.",
+          message: t("settings.regexPatternList.deletedSuccess"),
           variant: "success",
         });
       } catch (error: any) {
@@ -409,7 +401,7 @@ export default defineComponent({
           message:
             error?.data?.message ||
             error?.response?.data?.message ||
-            "Error deleting regex pattern",
+            t("settings.regexPatternList.errorDeleting"),
           variant: "error",
         });
       }
@@ -449,12 +441,12 @@ export default defineComponent({
         link.download = `${row.name || "regex_pattern"}.json`;
         link.click();
         toast({
-          message: "Regex pattern exported successfully",
+          message: t("settings.regexPatternList.exportedSuccess"),
           variant: "success",
         });
       } catch (error: any) {
         toast({
-          message: error.data.message || "Error exporting regex pattern",
+          message: error.data.message || t("settings.regexPatternList.errorExporting"),
           variant: "error",
         });
       } finally {
@@ -498,17 +490,17 @@ export default defineComponent({
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
-            message: `Successfully deleted ${successful.length} regex pattern(s)`,
+            message: t("settings.regexPatternList.bulkDeleteSuccess", { n: successful.length }),
             variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
-            message: `Deleted ${successful.length} regex pattern(s), but ${unsuccessful.length} failed`,
+            message: t("settings.regexPatternList.bulkDeletePartial", { successful: successful.length, unsuccessful: unsuccessful.length }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: `Failed to delete ${unsuccessful.length} regex pattern(s)`,
+            message: t("settings.regexPatternList.bulkDeleteFailed", { n: unsuccessful.length }),
             variant: "error",
           });
         }
@@ -520,7 +512,7 @@ export default defineComponent({
         const errorMessage =
           error?.data?.message ||
           error?.message ||
-          "Error while deleting regex patterns";
+          t("settings.regexPatternList.errorBulkDeleting");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             message: errorMessage,

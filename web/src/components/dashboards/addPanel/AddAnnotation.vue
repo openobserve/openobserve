@@ -5,11 +5,11 @@
     v-model:open="isOpen"
     persistent
     size="lg"
-    :title="isEditMode ? 'Edit Annotation' : 'Add Annotation'"
+    :title="isEditMode ? t('dashboard.addAnnotation.editAnnotation') : t('dashboard.addAnnotation.addAnnotation')"
     form-id="add-annotation-form"
-    :primary-button-label="annotationData.annotation_id ? 'Update' : 'Save'"
-    secondary-button-label="Cancel"
-    :neutral-button-label="annotationData.annotation_id ? 'Delete' : undefined"
+    :primary-button-label="annotationData.annotation_id ? t('dashboard.addAnnotation.update') : t('dashboard.addAnnotation.save')"
+    :secondary-button-label="t('dashboard.addAnnotation.cancel')"
+    :neutral-button-label="annotationData.annotation_id ? t('dashboard.addAnnotation.delete') : undefined"
     neutral-button-variant="destructive"
     @click:secondary="handleClose"
     @click:neutral="handleDeleteWithConfirm"
@@ -18,29 +18,28 @@
     <div class="flex flex-col">
         <OFormInput
           name="title"
-          label="Title"
+          :label="t('dashboard.addAnnotation.titleLabel')"
           required
           data-test="dashboard-add-annotation-title-input"
         />
         <OFormTextarea
           name="text"
-          label="Description"
+          :label="t('dashboard.addAnnotation.description')"
           :rows="3"
           data-test="dashboard-add-annotation-text-input"
         />
 
         <OFormSelect
             name="panels"
-            hint="If no panel is selected, annotations will be applied to all the panels of the dashboard."
+            :hint="t('dashboard.addAnnotation.panelsHint')"
             :options="groupedPanelsOptions"
             multiple
-            style="min-width: 150px"
-            label="Select Panels"
-            class="textbox flex flex-col no-case showLabelOnTop"
+            :label="t('dashboard.addAnnotation.selectPanels')"
+            class="textbox flex flex-col no-case showLabelOnTop min-w-37.5"
             data-test="dashboard-add-annotation-panels-select"
-          />
+        />
         <div class="text-xs mt-3">
-          Timestamp: {{ annotationDateString }}
+          {{ t('dashboard.addAnnotation.timestamp') }} {{ annotationDateString }}
         </div>
     </div>
     </OForm>
@@ -48,15 +47,15 @@
     <ODialog data-test="add-annotation-delete-confirm-dialog"
       v-model:open="showDeleteConfirm"
       size="xs"
-      title="Confirm Delete"
-      secondary-button-label="Cancel"
-      primary-button-label="Delete"
+      :title="t('dashboard.addAnnotation.confirmDelete')"
+      :secondary-button-label="t('dashboard.addAnnotation.cancel')"
+      :primary-button-label="t('dashboard.addAnnotation.delete')"
       primary-button-variant="destructive"
       :primary-button-loading="deleteAnnotation.isLoading.value"
       @click:secondary="showDeleteConfirm = false"
       @click:primary="deleteAnnotation.execute()"
     >
-      <p>Are you sure you want to delete this annotation?</p>
+      <p>{{ t('dashboard.addAnnotation.deleteConfirmMessage') }}</p>
     </ODialog>
   </ODialog>
 </template>
@@ -64,6 +63,7 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
@@ -83,6 +83,7 @@ const props = defineProps({
 const emit = defineEmits(["remove", "close"]);
 
 const store = useStore();
+const { t } = useI18n();
 const isOpen = ref(true);
 const showDeleteConfirm = ref(false);
 
@@ -122,7 +123,7 @@ const groupedPanelsOptions = computed(() =>
 
 const groupPanels = () => {
   groupedPanels.value = props.panelsList.reduce((acc, panel) => {
-    const tabName = panel.tabName || "Unknown Tab";
+    const tabName = panel.tabName || t('dashboard.addAnnotation.unknownTab');
     if (!acc[tabName]) acc[tabName] = [];
     acc[tabName].push({ id: panel.id, title: panel.title });
     return acc;
@@ -186,7 +187,7 @@ const handleSave = async () => {
         );
       } catch (error) {
         showErrorNotification(
-          error?.message ?? "Failed to update annotation: " + error.message,
+          error?.message ?? t('dashboard.addAnnotation.failedUpdateAnnotation', { error: error.message }),
         );
         return;
       }
@@ -200,7 +201,7 @@ const handleSave = async () => {
         );
       } catch (error) {
         showErrorNotification(
-          error?.message ?? "Failed to create annotation: " + error.message,
+          error?.message ?? t('dashboard.addAnnotation.failedCreateAnnotation', { error: error.message }),
         );
         return;
       }

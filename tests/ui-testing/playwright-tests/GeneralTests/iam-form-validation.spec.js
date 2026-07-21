@@ -297,12 +297,17 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
     });
 });
 
-// ── Service Account email format validation ───────────────────────────────────
-// Note: empty email, valid creation, and duplicate email cases are already
-// covered in serviceAccount.spec.js. This suite covers only the format
-// validation case (invalid email string).
+// ── Service Account name format validation ────────────────────────────────────
+// Service accounts are created from a NAME (lowercase slug) — the identifier
+// email is synthesized as <name>.<org>@sa.internal. The name must match
+// /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/ (AddServiceAccount.schema.ts); invalid
+// input shows the serviceAccounts.nameInvalid message. Note: empty name, valid
+// creation, and duplicate name cases are already covered in
+// serviceAccount.spec.js. This suite covers only the format validation case.
 
-test.describe("IAM Service Account email format validation", () => {
+const SA_NAME_ERROR = 'Use lowercase letters, numbers and hyphens';
+
+test.describe("IAM Service Account name format validation", () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
@@ -314,58 +319,61 @@ test.describe("IAM Service Account email format validation", () => {
         testLogger.info('Navigated to IAM Service Accounts tab');
     });
 
-    test("should show error when email format is invalid", {
+    test("should show error when name format is invalid", {
         tag: ['@iamFormValidation', '@functional', '@P1']
     }, async ({ page }) => {
-        testLogger.info('Testing invalid email format for service account');
+        testLogger.info('Testing invalid name format for service account');
 
         await pm.iamFormValidation.openServiceAccountForm();
         await expect(pm.iamFormValidation.getSaDialogLocator()).toBeVisible();
 
-        await pm.iamFormValidation.fillSaEmail('notanemail');
+        // Uppercase and underscores are rejected by the slug regex.
+        await pm.iamFormValidation.fillSaName('Not_A_Valid_Name');
         await pm.iamFormValidation.submitSaForm();
 
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toContainText(
-            'Please enter a valid email address'
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toContainText(
+            SA_NAME_ERROR
         );
 
-        testLogger.info('Invalid email format error correctly shown');
+        testLogger.info('Invalid name format error correctly shown');
     });
 
-    test("should show error when email is missing @ symbol", {
+    test("should show error when name has a leading or trailing hyphen", {
         tag: ['@iamFormValidation', '@functional', '@P1']
     }, async ({ page }) => {
-        testLogger.info('Testing email missing @ for service account');
+        testLogger.info('Testing leading/trailing hyphen name for service account');
 
         await pm.iamFormValidation.openServiceAccountForm();
-        await pm.iamFormValidation.fillSaEmail('missingatgmail.com');
+        await pm.iamFormValidation.fillSaName('-bad-name-');
         await pm.iamFormValidation.submitSaForm();
 
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toContainText(
-            'Please enter a valid email address'
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toContainText(
+            SA_NAME_ERROR
         );
 
-        testLogger.info('Missing @ email error correctly shown');
+        testLogger.info('Leading/trailing hyphen name error correctly shown');
     });
 
-    test("should clear email error when a valid email is entered and re-submitted", {
+    test("should clear name error when a valid name is entered", {
         tag: ['@iamFormValidation', '@functional', '@P2']
     }, async ({ page }) => {
-        testLogger.info('Testing email error clears on valid re-entry');
+        testLogger.info('Testing name error clears on valid re-entry');
 
         await pm.iamFormValidation.openServiceAccountForm();
-        await pm.iamFormValidation.fillSaEmail('bademail');
+        await pm.iamFormValidation.fillSaName('bad_name');
         await pm.iamFormValidation.submitSaForm();
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toContainText('Please enter a valid email address');
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toContainText(SA_NAME_ERROR);
 
-        // Correct the email — error should clear on input change (@update:model-value="emailError = ''")
-        await pm.iamFormValidation.fillSaEmail(`e2e_sa_${Date.now()}@example.com`);
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).not.toBeVisible();
+        // Correct the name — OForm revalidates on change after the first
+        // submit (revalidateLogic modeAfterSubmission: "change"), so the
+        // error clears without another submit. No account is created.
+        await pm.iamFormValidation.fillSaName(`e2e-sa-${Date.now()}`);
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).not.toBeVisible();
 
-        testLogger.info('Service account email error correctly cleared');
+        testLogger.info('Service account name error correctly cleared');
     });
 });
 

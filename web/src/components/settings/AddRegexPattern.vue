@@ -34,12 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           @click="toggleAIChat"
           data-test="add-regex-pattern-open-close-ai-btn"
-          class="ai-hover-btn"
+          class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
-          <img :src="getBtnLogo" class="header-icon ai-icon" />
+          <img :src="getBtnLogo" class="header-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" />
         </OButton>
         <OButton
           data-test="add-regex-pattern-fullscreen-btn"
@@ -50,20 +50,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="fullscreen"
             size="xs"
-            :class="isFullScreen ? 'text-[var(--o2-primary)]' : ''"
+            :class="isFullScreen ? 'text-accent' : ''"
           />
         </OButton>
       </div>
     </template>
     <!-- form inputs starts here -->
-    <div class="flex w-[100%] h-full">
+    <div class="flex w-full h-full">
       <div
         :class="
           store.state.isAiChatEnabled
             ? isFullScreen
               ? 'w-[75%] pl-2'
               : 'w-[65%] pl-2'
-            : 'w-[100%] px-3'
+            : 'w-full'
         "
       >
         <OForm
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :schema="addRegexPatternSchema"
           :default-values="addRegexPatternDefaults"
           @submit="saveRegexPattern"
-          class="flex flex-col gap-4 mt-2"
+          class="flex flex-col gap-4"
         >
           <div class="flex flex-col gap-y-3">
             <OFormInput
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('regex_patterns.name')"
               required
               data-test="add-regex-pattern-name-input"
-              placeholder="Eg. Internal Passwords"
+              :placeholder="t('settings.addRegexPattern.namePlaceholder')"
             />
             <OFormInput
               name="description"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('regex_patterns.description')"
               class="pb-3"
               data-test="add-regex-pattern-description-input"
-              placeholder="Describe your pattern to help users understand"
+              :placeholder="t('settings.addRegexPattern.descriptionPlaceholder')"
             />
             <OBanner
               variant="info"
@@ -99,11 +99,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               data-test="add-regex-pattern-lookaround-note"
             >
-              <div class="text-[12px] font-normal leading-[18px]">
+              <div class="text-xs font-normal leading-4.5">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
                 <code
-                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-[var(--color-banner-info-border)]"
+                  class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
                   >(?=openobserve)\w+</code
                 >
                 <OIcon
@@ -112,14 +112,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="inline-block align-middle mx-1"
                 />
                 <code
-                  class="font-mono text-[12px] px-[4px] py-[1px] rounded-[4px] bg-[var(--color-banner-info-border)]"
+                  class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
                   >openobserve\w*</code
                 >
               </div>
             </OBanner>
             <div class="regex-pattern-input-container">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold leading-5.25"> Regex Pattern </span>
+                <span class="text-sm font-bold leading-5.25">{{ t('settings.addRegexPattern.regexPatternLabel') }}</span>
                 <OButton
                   v-if="
                     config.isEnterprise == 'true' &&
@@ -131,47 +131,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <img
                     :src="goToAILogo"
-                    class="w-[20px] h-[20px] mr-1"
+                    class="w-5 h-5 mr-1"
                   />
                   <span
-                    class="text-[#5960B2] text-sm flex items-center gap-1"
+                    class="text-brand-indigo text-sm flex items-center gap-1"
                   >
-                    Try O2 Assistant to write expressions
+                    {{ t('settings.addRegexPattern.tryAiAssistant') }}
                   </span>
                   <OIcon
                     size="sm"
                     name="arrow-right-alt"
-                    class="text-[#5960B2] w-[20px] h-[20px] ml-1"
+                    class="text-brand-indigo w-5 h-5 ml-1"
                   />
                 </OButton>
               </div>
               <div class="regex-pattern-input">
-                <div
-                  class="py-[2px] h-[24px]"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'bg-gray-500'
-                      : 'bg-gray-200 '
-                  "
-                >
-                  <div
-                    class="text-[12px] font-[500] px-2"
-                    :class="[
-                      store.state.theme === 'dark'
-                        ? 'text-[#ffffff]'
-                        : 'text-[#6B7280]',
-                    ]"
-                  >
-                    Write Pattern
+                <div class="py-0.5 h-6 bg-surface-subtle">
+                  <div class="text-xs font-[500] px-2 text-text-secondary">
+                    {{ t('settings.addRegexPattern.writePattern') }}
                   </div>
                 </div>
                 <OFormTextarea
                   name="pattern"
                   data-test="add-regex-pattern-input"
-                  class="regex-pattern-input"
+                  class="regex-pattern-input w-full"
                   tabindex="0"
-                  style="width: 100%; resize: none"
-                  placeholder="Eg. \d....\d "
+                  style="resize: none"
+                  :placeholder="t('settings.addRegexPattern.patternPlaceholder')"
                   :rows="5"
                 />
               </div>
@@ -180,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div class="flex items-center justify-between">
                 <span class="text-sm font-bold leading-5.25">
-                  Test Regex Pattern
+                  {{ t('settings.addRegexPattern.testRegexPattern') }}
                 </span>
                 <OButton
                   variant="primary"
@@ -188,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!patternValue"
                   @click="testStringOutput"
                 >
-                  Test Input
+                  {{ t('settings.addRegexPattern.testInput') }}
                 </OButton>
               </div>
             </div>
@@ -196,12 +182,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FullViewContainer
                 name="query"
                 v-model:is-expanded="expandState.regexTestString"
-                label="Input string"
-                class="mt-1 py-md h-[24px]"
-                :labelClass="
-                  store.state.theme === 'dark'
-                    ? 'text-white font-medium text-xs leading-[21px]'
-                    : 'text-[#6b7280] font-medium text-xs leading-[21px] -ml-1'"
+                :label="t('settings.addRegexPattern.inputStringLabel')"
+                class="mt-1 py-md h-6"
+                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
               >
                 <template #right> </template>
               </FullViewContainer>
@@ -212,10 +195,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormTextarea
                   name="testString"
                   data-test="add-regex-test-string-input"
-                  class="regex-test-string-input"
+                  class="regex-test-string-input w-full"
                   tabindex="0"
-                  style="width: 100%; resize: none"
-                  placeholder="Eg. 1234567890"
+                  style="resize: none"
+                  :placeholder="t('settings.addRegexPattern.testStringPlaceholder')"
                   :rows="5"
                 />
               </div>
@@ -224,12 +207,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <FullViewContainer
                 name="output"
                 v-model:is-expanded="expandState.outputString"
-                label="Output"
-                class="mt-1 py-md h-[24px]"
-                :labelClass="
-                  store.state.theme === 'dark'
-                    ? 'text-white font-medium text-xs leading-[21px]'
-                    : 'text-[#6b7280] font-medium text-xs leading-[21px] -ml-1'"
+                :label="t('settings.addRegexPattern.outputLabel')"
+                class="mt-1 py-md h-6"
+                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
@@ -238,40 +218,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="outputString"
                   :readonly="true"
                   data-test="add-regex-output-string-input"
-                  class="regex-test-string-input"
+                  class="regex-test-string-input w-full"
                   tabindex="0"
-                  style="width: 100%; resize: none"
-                  placeholder="Output String"
+                  style="resize: none"
+                  :placeholder="t('settings.addRegexPattern.outputStringPlaceholder')"
                   :rows="5"
                 />
                 <div
                   v-else
-                  class="flex flex-col items-center justify-center h-[111px] rounded-md border border-input-border bg-input-bg"
+                  class="flex flex-col items-center justify-center h-27.75 rounded-default border border-input-border bg-input-bg"
                 >
                   <div v-if="!testLoading && outputStringValue.length === 0">
                     <OIcon
                       name="lightbulb"
                       size="md"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-[#ffffff]'
-                          : 'text-[#A8A8A8]'
-                      "
+                      class="text-icon-color"
                     />
                     <span
-                      class="text-[12px] font-[400] text-center"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-[#ffffff]'
-                          : 'text-[#4B5563]'
-                      "
+                      class="text-xs font-[400] text-center text-text-secondary"
                     >
-                      Please click Test Input to see the results
+                      {{ t('settings.addRegexPattern.clickTestInputHint') }}
                     </span>
                   </div>
                   <div v-else-if="testLoading">
                     <span
-                      class="flex items-center justify-center h-[111px]"
+                      class="flex items-center justify-center h-27.75"
                     >
                       <OSpinner size="sm" />
                     </span>
@@ -283,18 +254,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="ml-2"
+        class="ml-2 max-w-full"
         v-if="store.state.isAiChatEnabled"
         style="
           width: 35%;
-          max-width: 100%;
           min-width: 75px;
           height: calc(100vh - 90px) !important;
-        "
-        :class="
-          store.state.theme == 'dark'
-            ? 'dark-mode-chat-container'
-            : 'light-mode-chat-container'
         "
       >
         <O2AIChat
@@ -317,6 +282,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { computed } from "vue";
+import useTheme from "@/composables/useTheme";
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import FullViewContainer from "../functions/FullViewContainer.vue";
@@ -373,6 +339,7 @@ export default defineComponent({
     const { t } = useI18n();
 
     const store = useStore();
+    const { isDark } = useTheme();
 
 
     const isHovered = ref(false);
@@ -401,7 +368,7 @@ export default defineComponent({
     // EDIT-prefill defaults as a typed computed. OForm reads `:default-values`
     // once at mount and the ODrawer (reka-ui `lazy`) unmounts/remounts its body
     // on close/open — so this re-seeds the form each time the drawer opens
-    // (edit → the loaded pattern, create → blank). No `formKey` remount hack.
+    // (edit → the loaded pattern, create → blank).
     const addRegexPatternDefaults = computed((): AddRegexPatternForm => {
       // "from logs" flow prefills the (non-saved) test string from the store.
       const testString =
@@ -483,7 +450,7 @@ export default defineComponent({
       if (isHovered.value || store.state.isAiChatEnabled) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
@@ -500,15 +467,11 @@ export default defineComponent({
     // (the schema already gated it). `description` is the non-form local. OForm
     // awaits this handler → the ODrawer Save spinner is automatic (no isSaving).
     const saveRegexPattern = async (value: AddRegexPatternForm) => {
-      //payload for create and update regex pattern
-      // we need to send the name , pattern , description
       const payload = {
         name: value.name,
         pattern: value.pattern,
         description: value.description ?? "",
       };
-      //here we are emitting close and update:list to the parent component
-      //this is used to close the dialog and update the regex pattern list
       try {
         const response = props.isEdit
           ? await regexPatternService.update(
@@ -523,8 +486,8 @@ export default defineComponent({
         if (response.status == 200) {
           toast({
             message: props.isEdit
-              ? "Regex pattern updated successfully"
-              : "Regex pattern created successfully",
+              ? t("settings.addRegexPattern.updateSuccess")
+              : t("settings.addRegexPattern.createSuccess"),
             variant: "success",
           });
           emit("close");
@@ -536,8 +499,8 @@ export default defineComponent({
             message:
               error.response?.data?.message ||
               (props.isEdit
-                ? "Failed to update regex pattern"
-                : "Failed to create regex pattern"),
+                ? t("settings.addRegexPattern.updateFailed")
+                : t("settings.addRegexPattern.createFailed")),
             variant: "error",
           });
         }
@@ -565,7 +528,7 @@ export default defineComponent({
         );
       } catch (error) {
         toast({
-          message: error.response?.data?.message || "Failed to test string",
+          message: error.response?.data?.message || t("settings.addRegexPattern.testFailed"),
           variant: "error",
         });
       } finally {
@@ -615,24 +578,14 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.regex-pattern-input > div > div > div > textarea {
-  height: 200px !important;
-  resize: none !important;
-  padding-left: 0.5rem !important;
-}
-
-.regex-test-string-input > div > div > div > textarea {
-  resize: none !important;
-  padding-left: 0.5rem !important;
-}
-
-/* The section header strips (Write Pattern / Input string / Output) are flat
-   full-width bars. Square the textareas' own border box so each field reads as
-   one connected unit under its strip instead of a detached rounded box. */
-.regex-pattern-input .rounded-md.border,
-.regex-test-string-input .rounded-md.border {
+<style scoped>
+/* keep(lib-override:o2-textarea): squares the top corners of the textarea's own
+   border box (OTextarea's internal wrapper div, only reachable via :deep()) so
+   each field reads as one unit under its flat full-width section-header strip. */
+.regex-pattern-input :deep(.rounded-default.border),
+.regex-test-string-input :deep(.rounded-default.border) {
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
 }
 </style>
+

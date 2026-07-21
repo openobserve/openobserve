@@ -30,11 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TestModelMatchDialog v-model="showTestMatchDialog" />
 
     <!-- Main List View -->
-    <div v-if="!showImportModelPricingPage" class="flex flex-col h-full">
-      <!-- List View Header -->
-      <!-- Standard section header: title + actions only. Tabs + search moved
-           into the table toolbar below. -->
-      <AppPageHeader icon="paid" :subtitle="'LLM model cost configuration'" class="shrink-0 px-4 border-b border-border-default">
+    <OPageLayout
+      v-if="!showImportModelPricingPage"
+      icon="paid"
+      :subtitle="t('settings.modelPricingList.subtitle')"
+      bleed
+    >
         <template #title>
           {{ t("modelPricing.header") }}
           <OButton
@@ -82,10 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("modelPricing.newModel") }}
           </OButton>
         </template>
-      </AppPageHeader>
 
       <!-- List Table -->
-      <div class="card-container flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
       <OTable
         ref="qTableRef"
         :frame="false"
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #tree-warning="{ row }">
           <div class="flex items-center gap-2 py-1 text-sm leading-none">
-            <OIcon name="warning-amber" size="sm" class="text-[#f59e0b] opacity-85" />
+            <OIcon name="warning-amber" size="sm" class="text-status-warning-text opacity-85" />
             <span class="leading-tight">
               {{
                 t("modelPricing.shadowedWarningBanner", { name: row.name })
@@ -152,14 +152,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-name="{ row }">
-          <div class="flex items-center flex-nowrap relative z-[2] min-h-[24px]">
+          <div class="flex items-center flex-nowrap relative z-[2] min-h-6">
             <span
               v-if="getSource(row) === 'built_in'"
               class="shrink-0 cursor-default inline-flex mr-1"
             >
               <img
                 :src="ooLogo"
-                class="w-[16px] h-[16px]"
+                class="w-4 h-4"
                 alt="OpenObserve"
               />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="corporate-fare"
                 size="sm"
-                class="text-[#757575] dark:text-[#bdbdbd]"
+                class="text-text-secondary"
                />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
             </span>
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="person"
                 size="sm"
-                class="text-[#757575] dark:text-[#bdbdbd]"
+                class="text-text-secondary"
                />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
             </span>
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-match_pattern="{ row }">
           <div class="flex items-center gap-1 min-w-0">
             <code
-              class="text-xs block max-w-full bg-[rgba(0,0,0,0.04)] border border-(--o2-border-color) py-[2px] px-[6px] rounded text-inherit dark:bg-[rgba(255,255,255,0.05)]"
+              class="text-xs block max-w-full bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-default text-inherit"
               :class="{ 'opacity-50 [text-decoration:line-through] [text-decoration-color:currentColor]': isChildRow(row) }"
               >{{ row.match_pattern }}</code
             >
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isChildRow(row)"
               name="warning-amber"
               size="xs"
-              class="shrink-0 text-[#f59e0b] opacity-85"
+              class="shrink-0 text-status-warning-text opacity-85"
             >
               <OTooltip side="top" align="center" :content="t('modelPricing.shadowedTooltip', { name: getParentName(row) })" />
             </OIcon>
@@ -236,15 +236,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("modelPricing.overflowMore") }}
                 <OTooltip>
                   <template #content>
-                    <div class="min-w-[240px]">
-                      <div class="font-bold text-[13px] mb-[3px]">
+                    <div class="min-w-60">
+                      <div class="font-bold text-compact mb-0.75">
                         {{ row.name }}
                       </div>
-                      <table class="w-full border-collapse pricing-breakdown-table">
+                      <table class="w-full border-collapse">
                         <thead>
                           <tr>
-                            <th>{{ t("modelPricing.usageType") }}</th>
-                            <th>
+                            <th class="text-2xs font-semibold text-table-header-text bg-table-header-bg text-left pt-0 pb-1 pl-0 pr-4 border-b border-table-header-border">{{ t("modelPricing.usageType") }}</th>
+                            <th class="text-2xs font-semibold text-table-header-text bg-table-header-bg text-right pt-0 pb-1 pl-0 pr-0 border-b border-table-header-border">
                               {{ t("modelPricing.colPricingSimple") }}
                             </th>
                           </tr>
@@ -256,8 +256,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             )"
                             :key="key"
                           >
-                            <td>{{ formatPriceKey(key) }}</td>
-                            <td>{{ formatPerMillion(price) }}</td>
+                            <td class="text-xs py-0.5 pl-0 pr-4">{{ formatPriceKey(key) }}</td>
+                            <td class="text-xs py-0.5 pl-0 pr-0 text-right font-medium">{{ formatPerMillion(price) }}</td>
                           </tr>
                         </tbody>
                       </table>
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </OTag>
             </template>
-            <span v-else class="text-text-primary">&mdash;</span>
+            <span v-else class="text-text-muted">&mdash;</span>
           </div>
         </template>
         <template #cell-actions="{ row }">
@@ -330,32 +330,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div
-            class="w-full flex flex-col items-center justify-center gap-y-3"
-          >
-            <OIcon name="monetization-on" style="width: 48px; height: 48px; opacity: 0.2;" class="text-gray-400" />
-            <div class="text-base font-medium text-gray-400 mt-2">
-              {{ t("modelPricing.noModels") }}
-            </div>
-            <div class="text-xs text-gray-400">
-              {{ t("modelPricing.noModelsDesc") }}
-            </div>
-            <OButton
-              variant="primary"
-              size="sm"
-              class="self-center"
-              @click="openEditor(null)"
-              data-test="model-pricing-empty-add-btn"
-            >
-              {{ t("modelPricing.newModel") }}
-            </OButton>
-          </div>
+          <OEmptyState
+            size="hero"
+            preset="no-model-pricing"
+            :filtered="isFiltered"
+            data-test="model-pricing-empty-state"
+            @action="(id) => id === 'clear-filters' ? clearFilters() : openEditor(null)"
+          />
         </template>
 
         <template #bottom="scope">
-          <div class="flex items-center w-full h-[48px] gap-x-2">
+          <div class="flex items-center w-full h-12 gap-x-2">
             <div
-              class="o2-table-footer-title flex items-center w-[100px]"
+              class="text-xs font-normal flex items-center w-25"
             >
               {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
             </div>
@@ -385,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </OPageLayout>
     <!-- end v-if="!showImportModelPricingPage" -->
 
     <!-- Pricing detail side panel -->
@@ -405,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <img
               :src="ooLogo"
-              class="w-[18px] h-[18px]"
+              class="w-4.5 h-4.5"
               alt="OpenObserve"
             />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
@@ -422,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="corporate-fare"
               size="sm"
-              class="text-[#757575] dark:text-[#bdbdbd]"
+              class="text-text-secondary"
              />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
           </span>
@@ -433,26 +420,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="person"
               size="sm"
-              class="text-[#757575] dark:text-[#bdbdbd]"
+              class="text-text-secondary"
              />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
           </span>
       </template>
 
-      <div class="p-3 flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-y-auto">
         <div v-if="pricingDialogRow">
           <div class="mb-4">
-            <div class="text-xs font-semibold mb-[6px] text-[#555] dark:text-[#aaa]">
+            <div class="text-xs font-semibold mb-1.5 text-text-secondary">
               {{ t("modelPricing.colPattern") }}
             </div>
-            <code class="text-xs block bg-[rgba(0,0,0,0.04)] border border-(--o2-border-color) py-[2px] px-[6px] rounded text-inherit text-[13px] px-[10px] py-[6px] whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto dark:bg-[rgba(255,255,255,0.05)]">{{
+            <code class="text-xs block bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-default text-inherit text-compact px-2.5 py-1.5 whitespace-pre-wrap break-all max-h-75 overflow-y-auto">{{
               pricingDialogRow.match_pattern
             }}</code>
           </div>
           <OSeparator class="mb-4" />
 
           <div>
-            <div class="text-xs font-semibold mb-[6px] text-[#555] mt-2 pricing-section-label">
+            <div class="text-xs font-semibold mb-1.5 text-text-secondary mt-2 pricing-section-label">
               {{ t("modelPricing.colPricing") }}
             </div>
             <div
@@ -461,13 +448,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getDefaultTier(pricingDialogRow)?.prices || {},
                 ).length
               "
-              class="mt-2 border border-(--o2-border-color) rounded-lg overflow-hidden"
+              class="mt-2 border border-card-glass-border rounded-default overflow-hidden"
             >
-              <table class="w-full border-collapse pricing-panel-table">
+              <table class="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th>{{ t("modelPricing.usageType") }}</th>
-                    <th>{{ t("modelPricing.colPricing") }}</th>
+                    <th class="text-2xs font-semibold text-table-header-text text-left py-1.5 px-3.5 bg-table-header-bg border-b border-table-header-border">{{ t("modelPricing.usageType") }}</th>
+                    <th class="text-2xs font-semibold text-table-header-text text-right py-1.5 px-3.5 bg-table-header-bg border-b border-table-header-border">{{ t("modelPricing.colPricing") }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -476,14 +463,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       getDefaultTier(pricingDialogRow)?.prices || {},
                     )"
                     :key="key"
+                    class="last:[&>td]:border-b-0"
                   >
-                    <td>{{ formatPriceKey(key) }}</td>
-                    <td>{{ formatPerMillion(price) }}</td>
+                    <td class="text-compact py-2 px-3.5 border-b border-table-row-divider">{{ formatPriceKey(key) }}</td>
+                    <td class="text-compact py-2 px-3.5 border-b border-table-row-divider text-right font-semibold">{{ formatPerMillion(price) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <span v-else class="text-gray-400">&mdash;</span>
+            <span v-else class="text-text-muted">&mdash;</span>
           </div>
         </div>
       </div>
@@ -503,9 +491,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onBeforeMount, onActivated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { getImageURL } from "@/utils/zincutils";
 import modelPricingService from "@/services/model_pricing";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
@@ -518,6 +507,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -528,6 +518,7 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const { t } = useI18n();
 const store = useStore();
+const { isDark } = useTheme();
 const router = useRouter();
 
 const qTableRef = ref<any>(null);
@@ -665,6 +656,18 @@ function isReadOnly(model: any): boolean {
   return model.source === "built_in" || model.org_id !== orgIdentifier.value;
 }
 
+// True when the search box or a non-"all" tab is narrowing the list. Drives
+// OEmptyState's `:filtered` so an empty result reads as "No model pricing found"
+// (with Clear filters) rather than the first-run "create your first" card.
+const isFiltered = computed(
+  () => !!filterQuery.value.trim() || selectedTab.value !== "all",
+);
+
+function clearFilters() {
+  filterQuery.value = "";
+  selectedTab.value = "all";
+}
+
 const filteredModels = computed(() => {
   let items = models.value;
   if (filterQuery.value) {
@@ -758,7 +761,7 @@ const orgIdentifier = computed(
 );
 
 const ooLogo = computed(() =>
-  store.state.theme === "dark"
+  isDark.value
     ? getImageURL("openobserve_favicon_dark.ico")
     : getImageURL("images/common/openobserve_favicon.png"),
 );
@@ -955,68 +958,3 @@ useShortcuts([
   { id: "modelPricingRefresh", handler: () => { if (!isInputFocused()) fetchModels(); } },
 ]);
 </script>
-
-<style>
-/* ── Pricing panel table (side panel) child selectors ──────────────── */
-.pricing-panel-table th {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-table-header-text);
-  text-align: left;
-  padding: 6px 14px;
-  background: var(--color-table-header-bg);
-  border-bottom: 1px solid var(--color-table-header-border);
-}
-
-.pricing-panel-table th:last-child {
-  text-align: right;
-}
-
-.pricing-panel-table td {
-  font-size: 13px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--color-table-row-divider);
-}
-
-.pricing-panel-table td:last-child {
-  text-align: right;
-  font-weight: 600;
-}
-
-.pricing-panel-table tr:last-child td {
-  border-bottom: none;
-}
-
-/* ── Pricing breakdown tooltip table child selectors ──────────────── */
-.pricing-breakdown-table th {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-table-header-text);
-  background: var(--color-table-header-bg);
-  text-align: left;
-  padding: 0 16px 4px 0;
-  border-bottom: 1px solid var(--color-table-header-border);
-}
-
-.pricing-breakdown-table th:last-child {
-  text-align: right;
-  padding-right: 0;
-}
-
-.pricing-breakdown-table td {
-  font-size: 12px;
-  padding: 2px 16px 2px 0;
-  border-bottom: none;
-}
-
-.pricing-breakdown-table td:last-child {
-  text-align: right;
-  padding-right: 0;
-  font-weight: 500;
-}
-
-.pricing-breakdown-table tr:last-child td {
-  border-bottom: none;
-}
-
-</style>

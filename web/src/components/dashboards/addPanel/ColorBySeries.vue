@@ -17,8 +17,7 @@
 <template>
   <div>
     <div
-      class="mb-2"
-      style="font-weight: 600; display: flex; align-items: center"
+      class="mb-2 font-semibold flex items-center"
     >
       <span>{{ t("dashboard.colorBySeriesTitle") }}</span>
       <OButton

@@ -3,20 +3,16 @@
 // Validation schema for Condition.vue (the pipeline condition-node drawer).
 //
 // The drawer's only editable content is the composite FilterGroup child — it has
-// no OForm* equivalent, so its model (`conditionGroup`) is BRIDGED into the form
-// as the `conditions` field (watch → setFieldValue, the documented sanctioned
-// bridge) and validated here via `superRefine`. Built via a factory taking `t`
-// (vue-i18n) so every message stays i18n-driven:
+// no OForm* equivalent, so its model (`conditionGroup`) is bridged into the form
+// as the `conditions` field (watch → setFieldValue) and validated here via
+// `superRefine`. Built via a factory taking `t` (vue-i18n) so every message stays
+// i18n-driven:
 //   • at-least-one-condition — a non-empty condition (column + operator + value)
-//     OR a nested group (t('pipeline.atLeastOneCondition')). This replaces the
-//     old imperative `saveCondition()` toast gate (pattern → schema).
+//     OR a nested group (t('pipeline.atLeastOneCondition')).
 //   • complete-fields — once a condition is started, every leaf condition must be
 //     fully filled (column, operator AND value). FilterCondition's inline
 //     "Field is required!" hint is display-only and does NOT gate submit, so the
 //     value/column/operator requirement is enforced here at the form layer.
-//
-// (The audit also listed a `stream_name` required rule, but the live drawer
-// renders no stream input — there is nothing to validate — so it is omitted.)
 
 import { z } from "zod";
 

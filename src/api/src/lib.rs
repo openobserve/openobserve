@@ -15,12 +15,11 @@
 
 //! HTTP/gRPC transport frontend, including OpenAPI schema generation.
 
-#![feature(variant_count)]
 #![recursion_limit = "256"]
 
 #[cfg(feature = "enterprise")]
 pub use openobserve_core::cipher;
-pub use openobserve_core::{common, job, service};
+pub use openobserve_core::{common, service};
 
 pub mod handler;
 pub mod router;

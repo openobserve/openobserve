@@ -10,6 +10,12 @@ import type { RangeValue } from "./ORange.types";
 
 defineOptions({ inheritAttrs: false });
 
+// FormRangeProps extends RangeProps, so EVERY ORange prop is declared here and is
+// therefore absent from $attrs — `v-bind="$attrs"` cannot carry it through. Each
+// one must be forwarded explicitly below or it is silently dropped and ORange
+// falls back to its own default (this is how `vertical`/`markers` once collapsed
+// a vertical slider into a bare 16px horizontal one). Add a binding below when
+// adding a prop to RangeProps.
 const props = defineProps<FormRangeProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
@@ -43,6 +49,11 @@ if (import.meta.env.DEV && !form) {
           :size="props.size"
           :id="props.id"
           :name="props.name"
+          :vertical="props.vertical"
+          :reverse="props.reverse"
+          :label-always="props.labelAlways"
+          :markers="props.markers"
+          :marker-labels="props.markerLabels"
           :model-value="field.state.value"
           :error="
             field.state.meta.errors.length > 0

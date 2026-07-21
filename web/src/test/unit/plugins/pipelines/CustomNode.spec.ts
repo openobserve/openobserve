@@ -128,9 +128,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
-            "q-tooltip": true,
             ConfirmDialog: true,
           },
         },
@@ -157,8 +154,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -185,8 +180,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -213,8 +206,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -240,8 +231,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -269,8 +258,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -302,8 +289,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -332,8 +317,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -378,8 +361,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -406,8 +387,6 @@ describe("CustomNode.vue", () => {
               props: ["type", "id"],
             },
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -432,8 +411,6 @@ describe("CustomNode.vue", () => {
               props: ["type", "id"],
             },
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -458,8 +435,6 @@ describe("CustomNode.vue", () => {
               props: ["type", "id"],
             },
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -483,8 +458,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -506,8 +479,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -529,8 +500,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             ConfirmDialog: true,
           },
         },
@@ -582,15 +551,12 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
-            "q-tooltip": true,
             ConfirmDialog: true,
           },
         },
       });
 
-      expect(wrapper.find(".error-badge").exists()).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-error-badge"]').exists()).toBe(true);
     });
 
     it("should show error count in badge", () => {
@@ -632,9 +598,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
-            "q-tooltip": true,
             ConfirmDialog: true,
           },
         },
@@ -665,11 +628,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
-            "q-tooltip": true,
             ConfirmDialog: true,
           },
         },
@@ -696,8 +654,6 @@ describe("CustomNode.vue", () => {
           stubs: {
             Handle: true,
             "OIcon": true,
-            "q-separator": true,
-            "q-btn": true,
             "confirm-dialog": {
               template: '<div class="confirm-dialog" />',
             },

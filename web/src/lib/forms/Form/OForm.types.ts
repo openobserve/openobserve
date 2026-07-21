@@ -28,7 +28,7 @@ export interface OFormProps<T extends Record<string, unknown>> {
   defaultValues: T;
   /**
    * Validate every field before stopping on the first error.
-   * Mirrors q-form's `greedy` prop. Without this, validation short-circuits
+   * Enables greedy validation (validate all fields, not just stop at the first). Without this, validation short-circuits
    * on the first failed field.
    */
   greedy?: boolean;

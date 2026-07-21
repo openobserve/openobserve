@@ -20,11 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="ingestTabType"
     :tabs="recommendedTabs"
     :splitter-width="270"
+    searchable
+    search-data-test="recommended-list-search-input"
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >
     <div class="w-full h-full">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <div class="overflow-auto h-full pt-1.5">
           <router-view
             :title="tabs"
@@ -193,6 +195,26 @@ export default defineComponent({
         contentClass: "tab_content",
       },
     ];
+
+    // MCP is an AI feature (endpoint requires O2_AI_ENABLED); available on
+    // enterprise and cloud, and only when ai_enabled is on at runtime.
+    if (
+      (config.isEnterprise == "true" || config.isCloud == "true") &&
+      store.state.zoConfig.ai_enabled
+    ) {
+      recommendedTabs.push({
+        name: "recommendedMcp",
+        to: {
+          name: "recommendedMcp",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "mcp",
+        label: t("ingestion.mcp.shortName"),
+        contentClass: "tab_content",
+      });
+    }
 
     return {
       t,

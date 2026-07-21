@@ -38,6 +38,8 @@ export interface ExplorerFilterState {
   hideEmptyPanels: boolean;
   sortBy: "a-z" | "z-a";
   viewMode: "grid" | "rows";
+  /** Page mode — the Explore grid vs the query-driven Visualize workspace. */
+  mode: "explore" | "visualize" | "workspace";
 }
 
 /** Every key this module may write — cleared before each sync so a removed filter leaves the URL. */
@@ -47,10 +49,10 @@ export const EXPLORER_FILTER_PARAM_KEYS = [
   "suffix",
   "type",
   "labels",
-  "favorites",
   "show_empty",
   "sort",
   "view",
+  "mode",
 ] as const;
 
 const TYPE_IDS = new Set(["counter", "gauge", "histogram", "summary", "other"]);
@@ -85,10 +87,15 @@ export function explorerFiltersToQuery(
       (f) => `${f.label}${f.operator ?? "="}${f.value}`,
     );
   }
-  if (state.showFavoritesOnly) query.favorites = "true";
+  // `showFavoritesOnly` is NOT serialized: it is now derived from the mode
+  // (Workspace ⇒ pinned-only), so `?mode=workspace` already implies it. Keeping
+  // it out of the URL removes the double-source that could flip it unexpectedly.
   if (!state.hideEmptyPanels) query.show_empty = "true";
   if (state.sortBy === "z-a") query.sort = "z-a";
   if (state.viewMode === "rows") query.view = "rows";
+  // Explore is the default landing mode, so only the non-default is serialized.
+  if (state.mode === "visualize" || state.mode === "workspace")
+    query.mode = state.mode;
   return query;
 }
 
@@ -120,10 +127,13 @@ export function queryToExplorerFilters(
     .filter((f): f is LabelFilter => f !== null);
   if (labelFilters.length) out.labelFilters = labelFilters;
 
-  if (query.favorites === "true") out.showFavoritesOnly = true;
+  // `favorites` is intentionally not read from the URL — the mode drives
+  // showFavoritesOnly (see explorerFiltersToQuery).
   if (query.show_empty === "true") out.hideEmptyPanels = false;
   if (query.sort === "z-a") out.sortBy = "z-a";
   if (query.view === "rows") out.viewMode = "rows";
+  if (query.mode === "visualize" || query.mode === "workspace")
+    out.mode = query.mode;
 
   return out;
 }

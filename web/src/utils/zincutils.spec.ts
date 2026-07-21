@@ -865,6 +865,7 @@ if .severity == "error" {
         expect(isValidResourceName("invalid#name")).toBe(false);
         expect(isValidResourceName("invalid name")).toBe(false);
         expect(isValidResourceName("invalid?name")).toBe(false);
+        expect(isValidResourceName("invalid/name")).toBe(false);
       });
     });
 

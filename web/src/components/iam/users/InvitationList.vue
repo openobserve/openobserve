@@ -15,16 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + icon + subtitle, matching the Users page. -->
-    <AppPageHeader
+  <OPageLayout
       :title="t('invitation.pendingInvitations')"
-      :subtitle="'Pending and sent member invitations'"
-      icon="mail"
-      class="shrink-0 px-4 border-b border-border-default"
-    />
+      :subtitle="t('iam.invitationList.subtitle')"
+      icon="mail" bleed>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <OTable
           :data="invitations"
           :columns="columns"
@@ -37,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-invitations-list"
@@ -74,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-role="{ row }">
             <OTag v-if="row.role" type="userRole" :value="row.role" />
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-muted">—</span>
           </template>
           <template #cell-inviter_id="{ row }">
             <OUserCell :value="row.inviter_id" />
@@ -108,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title">
+            <span class="text-xs font-normal">
               {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
             </span>
           </template>
@@ -139,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t('invitation.confirmRejectMsg', { org: selectedInvitation?.org_name }) }}</p>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -157,18 +154,18 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "InvitationList",
   components: {
-    AppPageHeader,
+    OPageLayout,
     OEmptyState,
     OButton,
     OTooltip,
@@ -196,15 +193,6 @@ export default defineComponent({
     const selectedInvitation = ref(null);
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        minSize: 40,
-        maxSize: 64,
-        meta: { align: "center", compactPadding: true },
-      },
       {
         id: "org_name",
         header: t("invitation.organizationName"),
@@ -267,7 +255,7 @@ export default defineComponent({
     const fetchPendingInvitations = async () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Loading pending invitations...",
+        message: t("iam.invitationList.loadingPending"),
               timeout: 0,
 });
 
@@ -275,9 +263,7 @@ export default defineComponent({
       try {
         const response = await usersService.getPendingInvites();
 
-        let counter = 1;
         invitations.value = response.data.data.map((invitation: any) => ({
-          "#": counter <= 9 ? `0${counter++}` : counter++,
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
         }));
@@ -288,7 +274,7 @@ export default defineComponent({
         toast({
           message:
             error.response?.data?.message ||
-            "Failed to load pending invitations",
+            t("iam.invitationList.failedLoadPending"),
           variant: "error",
         });
       } finally {
@@ -333,7 +319,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Accepting invitation...",
+        message: t("iam.invitationList.accepting"),
               timeout: 0,
 });
 
@@ -350,7 +336,7 @@ export default defineComponent({
 
         dismiss();
         toast({
-          message: "Invitation accepted successfully!",
+          message: t("iam.invitationList.acceptedSuccess"),
           variant: "success",
         });
 
@@ -369,7 +355,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            error.response?.data?.message || "Failed to accept invitation",
+            error.response?.data?.message || t("iam.invitationList.failedAccept"),
           variant: "error",
         });
       }
@@ -381,7 +367,7 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Rejecting invitation...",
+        message: t("iam.invitationList.rejecting"),
               timeout: 0,
 });
 
@@ -391,7 +377,7 @@ export default defineComponent({
         );
         dismiss();
         toast({
-          message: "Invitation rejected successfully!",
+          message: t("iam.invitationList.rejectedSuccess"),
           variant: "success",
         });
 
@@ -408,7 +394,7 @@ export default defineComponent({
         dismiss();
         toast({
           message:
-            error.response?.data?.message || "Failed to reject invitation",
+            error.response?.data?.message || t("iam.invitationList.failedReject"),
           variant: "error",
         });
       }

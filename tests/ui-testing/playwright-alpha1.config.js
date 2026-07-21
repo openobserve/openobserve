@@ -48,6 +48,16 @@ testLogger.info(`ORGNAME from .env: ${process.env.ORGNAME}`);
  * Alpha1 Cloud Playwright Configuration
  * Uses Dex "Continue with Email" login flow
  */
+
+// Shared browser context for the chromium project.
+const CHROME_USE = {
+  ...devices['Desktop Chrome'],
+  viewport: { width: 1500, height: 1024 },
+  permissions: ['clipboard-read', 'clipboard-write'],
+  // Reuse auth state from global setup (Dex email login)
+  storageState: path.join(__dirname, 'playwright-tests/utils/auth/user.json'),
+};
+
 module.exports = defineConfig({
   testDir: './playwright-tests',
   testMatch: ['**/*.spec.js'],
@@ -60,7 +70,12 @@ module.exports = defineConfig({
 
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // The heavy Alerts specs contend on the shared alpha org's slow list fetches under
+  // concurrent load. Rather than serialize them, they run fully in parallel and rely on
+  // (a) the page-object resilience (bounded retry loops + settle waits for slow stream/
+  // destination/template dropdown fetches) and (b) this suite-wide retry to absorb any
+  // residual contention flake. Only failing tests retry, so passing runs are unaffected.
+  retries: process.env.CI ? 2 : 0,
   workers: 3,
 
   reporter: process.env.CI
@@ -89,14 +104,9 @@ module.exports = defineConfig({
 
   projects: [
     {
+      // Single project — every test runs fully in parallel.
       name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        viewport: { width: 1500, height: 1024 },
-        permissions: ['clipboard-read', 'clipboard-write'],
-        // Reuse auth state from global setup (Dex email login)
-        storageState: path.join(__dirname, 'playwright-tests/utils/auth/user.json'),
-      },
+      use: CHROME_USE,
     },
   ],
 });

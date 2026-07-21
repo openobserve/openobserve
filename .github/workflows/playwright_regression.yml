@@ -145,10 +145,13 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=8192"
           GIT_HASH_OVERRIDE: ${{ github.sha }}
         run: |
-          bash -c "cd web && npm run build && cp -r ./dist /tmp/dist" &
-          sed -i 's|folder = "web/dist/"|folder = "/tmp/dist/"|' src/api/src/handler/http/router/ui.rs
+          mkdir -p /tmp/dist
+          bash -c "cd web && npm run build && cp -r ./dist/. /tmp/dist/" &
+          NPM_PID=$!
+          sed -i 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs && grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
           cargo build --profile release-ci --target x86_64-unknown-linux-gnu
-          wait
+          wait $NPM_PID
+          test -f /tmp/dist/index.html
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4

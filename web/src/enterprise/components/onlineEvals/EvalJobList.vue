@@ -5,6 +5,8 @@
   >
     <template #table>
       <OTable
+        v-model:selected-ids="selectedIds"
+        selection="multiple"
         data-test="eval-job-list-table"
         :data="numberedRows"
         :columns="columns"
@@ -68,6 +70,23 @@
           </div>
         </template>
 
+        <template #bottom="{ totalRows }">
+          <span class="text-xs font-normal">
+            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.job.listTitle") }}
+          </span>
+          <OButton
+            v-if="selectedIds.length > 0"
+            variant="outline-destructive"
+            size="sm"
+            class="ml-3"
+            icon-left="delete"
+            data-test="eval-job-bulk-delete-btn"
+            @click="handleBulkDelete"
+          >
+            {{ t("onlineEvals.job.deleteBulkButton") }} ({{ selectedIds.length }})
+          </OButton>
+        </template>
+
         <template #cell-status="{ row }">
           <OTag
             type="evalStatus"
@@ -77,11 +96,11 @@
         </template>
 
         <template #cell-stream="{ row }">
-          <span class="font-mono text-xs">{{ row.stream }}</span>
+          {{ row.stream }}
         </template>
 
         <template #cell-scorers="{ row }">
-          <span class="font-mono text-xs">{{ scorerCountText(row) }}</span>
+          <span class="tabular-nums">{{ scorerCountText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -136,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -173,6 +192,7 @@ const emit = defineEmits<{
   (e: "delete", row: EvalJob): void;
   (e: "activate", row: EvalJob): void;
   (e: "pause", row: EvalJob): void;
+  (e: "delete-bulk", ids: string[]): void;
   (e: "refresh"): void;
 }>();
 
@@ -186,6 +206,26 @@ function canPause(status: EvalJobStatus): boolean {
 
 const { t } = useI18n();
 const statusFilter = ref<EvalJobStatus | null>(null);
+const selectedIds = ref<string[]>([]);
+
+function handleBulkDelete() {
+  const ids = [...selectedIds.value];
+  if (ids.length === 0) return;
+  emit("delete-bulk", ids);
+}
+
+// After the list reloads (e.g. following a bulk delete), drop any selected ids
+// whose rows no longer exist so the bulk-action button count stays accurate.
+// Pruning (rather than clearing on emit) keeps the selection intact if the user
+// cancels the confirm dialog.
+watch(
+  () => props.rows,
+  (rows) => {
+    const valid = new Set(rows.map((r) => r.id));
+    const pruned = selectedIds.value.filter((id) => valid.has(id));
+    if (pruned.length !== selectedIds.value.length) selectedIds.value = pruned;
+  },
+);
 
 const statusOptions = computed(() => [
   { label: t("onlineEvals.job.allStatuses"), value: null },
@@ -279,7 +319,7 @@ const hasFilters = computed(
 );
 
 // Wire OEmptyState's action ids back into the existing emit contract.
-// `create` mirrors a click on the AppPageHeader's "New job" button;
+// `create` mirrors a click on the OPageHeader's "New job" button;
 // `clear-filters` resets the search + status filter inline.
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");

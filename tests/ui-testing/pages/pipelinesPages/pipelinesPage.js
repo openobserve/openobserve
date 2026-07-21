@@ -1,5 +1,6 @@
 // pipelinesPage.js
 const http = require('http');
+const https = require('https');
 const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
@@ -10,7 +11,12 @@ const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
 
 // HTTP agent that never pools connections. node-fetch v2 keep-alive pooling
 // is the primary cause of "Premature close" / ECONNRESET flakiness in CI.
-const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) URLs work — an http.Agent rejects https:// URLs.
+const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const selectAgent = (parsedURL) =>
+    parsedURL.protocol === 'https:' ? noKeepAliveHttpsAgent : noKeepAliveHttpAgent;
 
 /**
  * Perform a fetch, retrying on transient network errors.
@@ -28,7 +34,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
     const requestOpts = {
         ...options,
         compress: false,
-        agent: noKeepAliveAgent,
+        agent: selectAgent,
     };
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
@@ -244,7 +250,7 @@ export class PipelinesPage {
         this.pipelineSavedMessage = page.locator('[data-test-message="Pipeline saved successfully"]');
         this.addEnrichmentTableText = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.deletedSuccessfullyText = page.locator('[data-test-message*="deleted successfully"]');
-        this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
+        this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) input");
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
 
         // Condition-specific locators for comprehensive testing
@@ -362,14 +368,28 @@ export class PipelinesPage {
     // Methods from PipelinePage
     async openPipelineMenu() {
         await openNavFlyoutChild(this.page, 'pipeline');
-        // pipelineTab.click() auto-waits for actionability, so the pre-click sleep
-        // was redundant. After the click, wait for the pipeline list page to render
-        // instead of a blind 2s — resolves in ~0.5-1s on the common path. Best-effort
-        // (.catch) so callers that immediately page.goto elsewhere aren't blocked.
-        await this.pipelineTab.click();
-        await this.page.locator('[data-test="pipeline-list-page"]')
+        // openNavFlyoutChild navigates via a hover-flyout force-click that can
+        // intermittently miss (the flyout self-closes on settle), leaving us on the
+        // previous page. That was the dominant Pipelines-shard flake: the follow-up
+        // pipelineTab.click() then timed out at the 45s action timeout because the
+        // streamPipelines tab only exists on the pipeline list page. Confirm we
+        // actually landed; if not, navigate directly — a goto is deterministic and
+        // needs no flyout.
+        const onPipelinePage = await this.page.locator('[data-test="pipeline-list-page"]')
             .waitFor({ state: 'visible', timeout: 15000 })
-            .catch(() => {});
+            .then(() => true)
+            .catch(() => false);
+        if (!onPipelinePage) {
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/pipeline/pipelines?org_identifier=${process.env["ORGNAME"]}`
+            );
+            await this.page.locator('[data-test="pipeline-list-page"]')
+                .waitFor({ state: 'visible', timeout: 30000 });
+        }
+        // Ensure the Stream Pipelines section tab is selected. Wait for it to render
+        // before clicking so the click never races the page mount.
+        await this.pipelineTab.waitFor({ state: 'visible', timeout: 15000 });
+        await this.pipelineTab.click();
     }
 
     async addPipeline() {
@@ -481,15 +501,15 @@ export class PipelinesPage {
         await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // The data-test attribute is on a wrapper div, the q-select is inside
-        // Target the q-select input inside the wrapper
+        // The data-test attribute is on a wrapper div, the select trigger is inside
+        // Target the select trigger inside the wrapper
         const streamTypeWrapper = this.page.locator('[data-test="add-pipeline-stream-type-select"]');
         await streamTypeWrapper.waitFor({ state: 'visible', timeout: 15000 });
 
-        // Click on the q-select component inside the wrapper
-        const qSelect = streamTypeWrapper.locator('.q-select');
-        await qSelect.waitFor({ state: 'visible', timeout: 10000 });
-        await qSelect.click();
+        // Click on the select trigger inside the wrapper
+        const streamTypeSelect = streamTypeWrapper.locator('[role="combobox"]');
+        await streamTypeSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await streamTypeSelect.click();
         await this.page.waitForTimeout(500);
     }
 
@@ -943,7 +963,7 @@ export class PipelinesPage {
         await this.dragStreamToTarget(this.conditionButton, { x: 250, y: 250 });
     }
     async fillColumnAndSelectOption(columnName) {
-        // Click the column select (q-select in FilterCondition)
+        // Click the column select in FilterCondition
         await this.columnSelect.locator('input').click();
         await this.columnSelect.locator('input').fill(columnName);
         await this.columnOption.click();
@@ -965,14 +985,52 @@ export class PipelinesPage {
     }
 
     async navigateToAddEnrichmentTable() {
-        await openNavFlyoutChild(this.page, 'pipeline');
-        // The enrichment-table tab uses a Reka-based OToggleGroup — `force` avoids
-        // visibility races when the tab list animates in.
-        await this.enrichmentTableTabLocator.click({ force: true });
-        await this.addEnrichmentTableText.click();
-        // The Add Enrichment Table form (`add-enrichment-table-page`) renders
-        // inside the same parent — wait for it to be visible before returning.
-        await this.addEnrichmentTablePage.waitFor({ state: 'visible', timeout: 15000 });
+        // Land directly on the enrichment-tables LIST page instead of the old
+        // two-hop route (flyout → pipelines list → click the
+        // `pipeline-section-tab-enrichmentTables` OTab). That tab lives in the
+        // pipelines page header (PipelineSectionTabs, rendered in AppPageHeader's
+        // #tabs slot) and only mounts once that page has fully rendered — so on
+        // cloud a slow/missed flyout nav left the tab locator unattached and the
+        // blind `force` click timed out at 45s (systematic across every test).
+        // `enrichmentTables` has its own left-nav flyout child, so navigate
+        // straight to its list page and skip the fragile section-tab hop.
+        const enrichmentListUrlRe = /\/pipeline\/enrichment-tables/;
+        const listPage = this.page.locator('[data-test="enrichment-tables-list-page"]');
+
+        // Prefer SPA nav via the direct flyout child; fall back to a hard goto
+        // if the hover-driven flyout click misses (same recovery pattern as
+        // enrichmentPage.gotoEnrichmentTablesWithOrg).
+        try {
+            await openNavFlyoutChild(this.page, 'enrichment');
+            await this.page.waitForURL(enrichmentListUrlRe, { timeout: 15000 });
+        } catch (navError) {
+            testLogger.warn('Enrichment flyout nav missed — falling back to direct goto', {
+                error: navError.message,
+            });
+            let org = process.env.ORGNAME;
+            try {
+                org = new URL(this.page.url()).searchParams.get('org_identifier') || org;
+            } catch { /* about:blank etc. — keep ORGNAME fallback */ }
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/pipeline/enrichment-tables?org_identifier=${org}`,
+                { waitUntil: 'domcontentloaded' },
+            );
+            await this.page.waitForURL(enrichmentListUrlRe, { timeout: 15000 });
+        }
+
+        // Wait for the list page container, then settle+retry the Add-button
+        // click. The OButton in the AppPageHeader #actions slot can detach
+        // mid-render while the list hydrates (documented add-btn detach race),
+        // so re-resolve the locator and tolerate a transient detach. Short-circuit
+        // if a prior attempt already opened the form (the Add button is v-if'd
+        // out once the form mounts, so re-asserting its visibility would loop).
+        await listPage.waitFor({ state: 'visible', timeout: 20000 });
+        await expect(async () => {
+            if (await this.addEnrichmentTablePage.isVisible().catch(() => false)) return;
+            await expect(this.addEnrichmentTableText).toBeVisible({ timeout: 5000 });
+            await this.addEnrichmentTableText.click({ timeout: 5000 });
+            await expect(this.addEnrichmentTablePage).toBeVisible({ timeout: 10000 });
+        }).toPass({ timeout: 45000 });
     }
 
     async uploadEnrichmentTable(fileName, fileContentPath) {
@@ -1116,11 +1174,34 @@ export class PipelinesPage {
     }
 
     async navigateToStreams() {
+        // `menu-link-/streams-item` is the "Data" nav group tile: it both opens a
+        // hover flyout and navigates. A plain click can register as the hover-open
+        // (flyout appears, page stays blank) without navigating — the same flyout
+        // race that hit openPipelineMenu. Confirm the streams page rendered; if not,
+        // navigate directly. A blind 1s wait previously let refreshStreamStats() fire
+        // against a page that had not loaded.
         await this.streamsMenuItem.click();
-        await this.page.waitForTimeout(1000);
+        const onStreamsPage = await this.page.locator('[data-test="log-stream-table"]')
+            .waitFor({ state: 'visible', timeout: 15000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!onStreamsPage) {
+            await this.page.goto(
+                `${process.env.ZO_BASE_URL}/web/streams?org_identifier=${process.env["ORGNAME"]}`
+            );
+            await this.page.locator('[data-test="log-stream-table"]')
+                .waitFor({ state: 'visible', timeout: 30000 });
+        }
     }
 
     async refreshStreamStats() {
+        // The refresh button is an OButton with :loading bound to the stream-stats
+        // fetch; while loading it is rendered disabled. Clicking during that window
+        // makes Playwright wait on actionability and time out at 45s under CI load
+        // (the pipeline-dynamic flake). Wait for it to settle (visible + enabled)
+        // before clicking.
+        await this.refreshStatsButton.waitFor({ state: 'visible', timeout: 30000 });
+        await expect(this.refreshStatsButton).toBeEnabled({ timeout: 30000 });
         await this.refreshStatsButton.click();
         await this.page.waitForTimeout(1000);
     }
@@ -1138,6 +1219,22 @@ export class PipelinesPage {
     }
 
     async openTimestampMenu() {
+        // The destination-stream data ingested by exploreStreamAndNavigateToPipeline
+        // may not be indexed yet when the logs explorer first renders (indexing
+        // latency is high on loaded envs), so the first row can be absent and a bare
+        // click dead-waits the full 45s action timeout (the pipeline-core:56 flake
+        // once navigation stopped failing earlier). Re-run the query until a row
+        // appears instead of clicking into an empty table.
+        const runQueryBtn = this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
+        for (let attempt = 1; attempt <= 6; attempt++) {
+            if (await this.timestampColumnMenu.isVisible({ timeout: 10000 }).catch(() => false)) {
+                break;
+            }
+            // Re-trigger the search so newly-indexed rows are picked up.
+            await runQueryBtn.first().click({ timeout: 5000 }).catch(() => {});
+            await this.page.waitForTimeout(3000);
+        }
+        await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 15000 });
         await this.timestampColumnMenu.click();
     }
 
@@ -2948,7 +3045,7 @@ export class PipelinesPage {
     async testPauseToggle(rowIndex) {
         const pipelineRows = this.page.locator('[data-test*="pipeline-row"], tr:has([data-test*="pipeline"])');
         const row = pipelineRows.nth(rowIndex);
-        const pauseToggle = row.locator('[data-test*="pause"], [data-test*="toggle"], .q-toggle').first();
+        const pauseToggle = row.locator('[data-test*="pause"], [data-test*="toggle"]').first();
 
         if (await pauseToggle.isVisible().catch(() => false)) {
             const initialState = await pauseToggle.getAttribute('aria-pressed').catch(() => 'unknown');
@@ -3173,7 +3270,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if table is visible
      */
     async isBackfillTableVisible() {
-        const tableLocator = this.page.locator('[data-test*="backfill-table"], table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test*="backfill-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3332,7 +3429,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if table is visible
      */
     async isHistoryTableVisible() {
-        const tableLocator = this.page.locator('[data-test*="history-table"], table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test*="history-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3441,7 +3538,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if table is visible
      */
     async isBackfillJobsTableVisible() {
-        const tableLocator = this.page.locator('[data-test*="backfill-table"], [data-test*="jobs-table"], table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test*="backfill-table"], [data-test*="jobs-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3451,9 +3548,9 @@ export class PipelinesPage {
      */
     async isGenericTableVisible() {
         // TODO(data-test): backfill/jobs/generic tables don't yet expose a data-test
-        // root in their source components — keeping native <table>/.q-table fallback
+        // root in their source components — keeping native <table> fallback
         // until added in web/src/components/pipeline/ and shared table components.
-        const tableLocator = this.page.locator('table, .q-table').first();
+        const tableLocator = this.page.locator('table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3476,12 +3573,12 @@ export class PipelinesPage {
      * Filter by pipeline name
      */
     async filterByPipeline() {
-        const pipelineFilter = this.page.locator('[data-test*="pipeline-filter"], [data-test*="pipeline-select"], .q-select').first();
+        const pipelineFilter = this.page.locator('[data-test*="pipeline-filter"], [data-test*="pipeline-select"]').first();
         if (await pipelineFilter.isVisible().catch(() => false)) {
             await pipelineFilter.click();
             await this.page.waitForTimeout(500);
             // Select first available option
-            const option = this.page.locator('.q-item').first();
+            const option = this.page.locator('[role="option"]').first();
             if (await option.isVisible().catch(() => false)) {
                 await option.click();
             }
@@ -3521,7 +3618,7 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of buttons
      */
     async getTableButtonCount() {
-        const buttons = await this.page.locator('table button, .q-table button').all();
+        const buttons = await this.page.locator('table button').all();
         return buttons.length;
     }
 
@@ -3806,7 +3903,7 @@ export class PipelinesPage {
 
     /**
      * Dismiss any open dialogs or menus.
-     * Use in afterEach cleanup instead of raw page.locator('.q-dialog').
+     * Use in afterEach cleanup instead of a raw dialog locator.
      */
     async dismissOpenDialogs() {
         try {

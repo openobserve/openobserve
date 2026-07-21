@@ -15,14 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
-         table's own toolbar (built-in global filter). -->
-    <AppPageHeader
+  <OPageLayout
       :title="t('iam.roles')"
-      icon="shield"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+      icon="shield" bleed>
       <template #subtitle>
         <span data-test="iam-roles-subtitle">
           {{ t('iam.rolesPage.subtitle') }}
@@ -38,9 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('iam.addRole') }}
         </OButton>
       </template>
-    </AppPageHeader>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <RoleTable
           data-test="iam-roles-table-section"
           :data="rows"
@@ -68,22 +62,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </RoleTable>
       </div>
     </div>
-  </div>
+  </OPageLayout>
   <AddRole
     v-model:open="showAddGroup"
     @added:role="onRoleAdded"
   />
   <ConfirmDialog
-    title="Delete Role"
-    :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
+    :title="t('iam.appRoles.deleteRole')"
+    :message="t('iam.appRoles.deleteConfirm', { roleName: deleteConformDialog?.data?.role_name })"
     :warning-message="deleteImpactMessage"
     @update:ok="_deleteRole"
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
   />
   <ConfirmDialog
-    title="Bulk Delete Roles"
-    :message="`Are you sure you want to delete ${selectedRoleNames.length} role(s)?`"
+    :title="t('iam.appRoles.bulkDeleteRoles')"
+    :message="t('iam.appRoles.bulkDeleteConfirm', { count: selectedRoleNames.length })"
     :warning-message="bulkDeleteImpactMessage"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"
@@ -96,7 +90,7 @@ import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useI18n } from "vue-i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
@@ -144,11 +138,7 @@ onBeforeMount(() => {
 });
 
 const updateTable = () => {
-   let counter = 1;
-  rows.value = rolesState.roles.map((role: { role_name: string }, index: number) => ({
-      ...role,
-      "#": counter <= 9 ? `0${counter++}` : counter++,
-    }));
+  rows.value = rolesState.roles;
 };
 
 const addRole = () => {
@@ -220,7 +210,7 @@ const deleteUserRole = (role: any) => {
   deleteRole(role.role_name, store.state.selectedOrganization.identifier)
     .then(() => {
       toast({
-        message: "Role deleted successfully!",
+        message: t("iam.appRoles.roleDeletedSuccess"),
         variant: "success",
       });
       setupRoles();
@@ -228,7 +218,7 @@ const deleteUserRole = (role: any) => {
     .catch((error: any) => {
       if (error.response.status != 403) {
         toast({
-          message: "Error while deleting role!",
+          message: t("iam.appRoles.roleDeleteError"),
           variant: "error",
         });
       }
@@ -312,17 +302,17 @@ const bulkDeleteUserRoles = async () => {
 
     if (successful.length > 0 && unsuccessful.length === 0) {
       toast({
-        message: `Successfully deleted ${successful.length} role(s)`,
+        message: t("iam.appRoles.bulkDeleteSuccess", { count: successful.length }),
         variant: "success",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
-        message: `Deleted ${successful.length} role(s). Failed to delete ${unsuccessful.length} role(s)`,
+        message: t("iam.appRoles.bulkDeletePartial", { successful: successful.length, unsuccessful: unsuccessful.length }),
         variant: "warning",
       });
     } else if (unsuccessful.length > 0) {
       toast({
-        message: `Failed to delete ${unsuccessful.length} role(s)`,
+        message: t("iam.appRoles.bulkDeleteFailed", { count: unsuccessful.length }),
         variant: "error",
       });
     }
@@ -333,7 +323,7 @@ const bulkDeleteUserRoles = async () => {
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
-        message: error.response?.data?.message || error?.message || "Error while deleting roles",
+        message: error.response?.data?.message || error?.message || t("iam.appRoles.bulkDeleteRolesError"),
         variant: "error",
       });
     }

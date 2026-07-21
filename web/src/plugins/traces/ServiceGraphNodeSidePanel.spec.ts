@@ -67,11 +67,31 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((d: any) => d),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({
-    t: (key: string) => key,
-  })),
-}));
+vi.mock("vue-i18n", async () => {
+  // Resolve keys against the real English locale so migrated t("...") calls
+  // render the actual translated text (badges, caller column, "No operations
+  // found", etc.), instead of the raw key paths the old identity mock returned.
+  const enLocaleFull = (await import("@/locales/languages/en-US.json")).default;
+  // A few tests assert on the raw i18n key (locale-independent), matching the
+  // original identity-mock behavior. Keep those keys mapping to themselves so
+  // those assertions still hold.
+  const identityKeys = new Set<string>(["traces.noLogsAvailableForService"]);
+  const resolve = (key: string): string => {
+    if (identityKeys.has(key)) return key;
+    const val = key
+      .split(".")
+      .reduce<any>(
+        (acc, part) => (acc == null ? undefined : acc[part]),
+        enLocaleFull,
+      );
+    return typeof val === "string" ? val : key;
+  };
+  return {
+    useI18n: vi.fn(() => ({
+      t: (key: string) => resolve(key),
+    })),
+  };
+});
 
 vi.mock("vue-router", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -599,6 +619,59 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No operations found");
     });
+
+    // A tool node's caller is its OWNING AGENT, which sits on an ancestor span —
+    // the operations query must climb the parent chain (COALESCE + chained LEFT
+    // JOINs) exactly like the graph edge, so the panel and the graph agree. The
+    // bug: it used raw service_name, showing the host app as the caller while the
+    // graph correctly showed the agent.
+    it("climbs the parent chain for a TOOL node's caller (matches the graph)", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [] },
+      } as any);
+      wrapper = mountPanel({
+        streamFilter: "sre_agent_v2",
+        selectedNode: { ...baseNode, name: "load_skill", service_type: "tool" },
+      });
+      await flushPromises();
+      const sql =
+        vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      // Nearest-ancestor-agent caller, not raw service_name.
+      expect(sql).toContain(
+        "COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name",
+      );
+      expect(sql).toContain("c.service_name)");
+      // Chained ancestor joins, one per level, keyed on parent span + trace.
+      expect(sql).toContain(
+        'LEFT JOIN "sre_agent_v2" AS p1 ON c.reference_parent_span_id = p1.span_id',
+      );
+      expect(sql).toContain(
+        "p1.reference_parent_span_id = p2.span_id",
+      );
+      expect((sql.match(/LEFT JOIN/g) || []).length).toBe(4);
+      // Filters the tool's own spans (child-qualified identity field).
+      expect(sql).toContain("c.gen_ai_tool_name = 'load_skill'");
+      // NOT the old raw-service_name caller.
+      expect(sql).not.toContain("service_name as caller_service");
+    });
+
+    it("keeps raw service_name as caller for an INFERRED dependency node", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [] },
+      } as any);
+      wrapper = mountPanel({
+        streamFilter: "default",
+        selectedNode: { ...baseNode, name: "postgres", service_type: "database" },
+      });
+      await flushPromises();
+      const sql =
+        vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      // Inferred deps genuinely have the caller on service_name — no agent climb.
+      expect(sql).toContain("service_name as caller_service");
+      expect(sql).not.toContain("LEFT JOIN");
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -864,26 +937,43 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel();
     });
 
-    it("should set sortBy to the provided field when called with asc order", () => {
-      wrapper.vm.handleSortChange("p99", "asc");
+    it("should set sortBy to the field and sortOrder to asc on first click", () => {
+      wrapper.vm.handleSortChange("p99");
       expect(wrapper.vm.sortBy).toBe("p99");
       expect(wrapper.vm.sortOrder).toBe("asc");
     });
 
-    it("should set sortOrder to desc when provided", () => {
-      wrapper.vm.handleSortChange("requests", "desc");
+    it("should toggle sortOrder to desc when the same field is clicked twice", () => {
+      wrapper.vm.handleSortChange("requests");
+      expect(wrapper.vm.sortBy).toBe("requests");
+      expect(wrapper.vm.sortOrder).toBe("asc");
+
+      wrapper.vm.handleSortChange("requests");
       expect(wrapper.vm.sortBy).toBe("requests");
       expect(wrapper.vm.sortOrder).toBe("desc");
     });
 
-    it("should update both sortBy and sortOrder when called multiple times", () => {
-      wrapper.vm.handleSortChange("operation", "asc");
-      expect(wrapper.vm.sortBy).toBe("operation");
+    it("should clear sorting on the third click of the same field", () => {
+      wrapper.vm.handleSortChange("operation");
       expect(wrapper.vm.sortOrder).toBe("asc");
 
-      wrapper.vm.handleSortChange("p95", "desc");
-      expect(wrapper.vm.sortBy).toBe("p95");
+      wrapper.vm.handleSortChange("operation");
       expect(wrapper.vm.sortOrder).toBe("desc");
+
+      wrapper.vm.handleSortChange("operation");
+      expect(wrapper.vm.sortBy).toBe("");
+      expect(wrapper.vm.sortOrder).toBe("");
+    });
+
+    it("should reset sortOrder to asc when switching to a different field", () => {
+      wrapper.vm.handleSortChange("operation");
+      wrapper.vm.handleSortChange("operation");
+      expect(wrapper.vm.sortBy).toBe("operation");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+
+      wrapper.vm.handleSortChange("p95");
+      expect(wrapper.vm.sortBy).toBe("p95");
+      expect(wrapper.vm.sortOrder).toBe("asc");
     });
   });
 
@@ -940,7 +1030,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by p99 ascending when sortBy is p99 and sortOrder is asc", () => {
-        wrapper.vm.handleSortChange("p99", "asc");
+        wrapper.vm.handleSortChange("p99");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].p99).toBe(80000);
         expect(rows[1].p99).toBe(120000);
@@ -948,7 +1038,8 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by p99 descending when sortBy is p99 and sortOrder is desc", () => {
-        wrapper.vm.handleSortChange("p99", "desc");
+        wrapper.vm.handleSortChange("p99"); // asc
+        wrapper.vm.handleSortChange("p99"); // toggle to desc
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].p99).toBe(150000);
         expect(rows[1].p99).toBe(120000);
@@ -956,7 +1047,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by operation alphabetically ascending", () => {
-        wrapper.vm.handleSortChange("operation", "asc");
+        wrapper.vm.handleSortChange("operation");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].operation).toBe("GET /api/products");
         expect(rows[1].operation).toBe("GET /api/users");
@@ -964,7 +1055,8 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by requests numerically descending", () => {
-        wrapper.vm.handleSortChange("requests", "desc");
+        wrapper.vm.handleSortChange("requests"); // asc
+        wrapper.vm.handleSortChange("requests"); // toggle to desc
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].requests).toBe(200);
         expect(rows[1].requests).toBe(100);
@@ -972,7 +1064,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by errors numerically ascending", () => {
-        wrapper.vm.handleSortChange("errors", "asc");
+        wrapper.vm.handleSortChange("errors");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].errors).toBe(0);
         expect(rows[1].errors).toBe(5);
@@ -990,7 +1082,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should return an empty array without error when sortBy is set", () => {
-        wrapper.vm.handleSortChange("p99", "asc");
+        wrapper.vm.handleSortChange("p99");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows).toHaveLength(0);
       });
@@ -1028,6 +1120,79 @@ describe("ServiceGraphNodeSidePanel", () => {
         });
         expect(wrapper.vm.isInferred).toBe(true);
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // serviceNameField — column the panel filters on, per node family
+  // ---------------------------------------------------------------------------
+
+  describe("serviceNameField", () => {
+    it("uses service_name for an instrumented service (no service_type)", () => {
+      wrapper = mountPanel({ selectedNode: baseNode });
+      expect(wrapper.vm.serviceNameField).toBe("service_name");
+    });
+
+    it("uses infer_service_name for inferred dependency kinds", () => {
+      for (const st of ["database", "queue", "rpc", "external"]) {
+        wrapper = mountPanel({
+          selectedNode: { ...baseNode, service_type: st },
+        });
+        expect(wrapper.vm.serviceNameField).toBe("infer_service_name");
+      }
+    });
+
+    it("uses the gen_ai_* column for agent and tool kinds (not infer_service_name)", () => {
+      for (const [st, col] of Object.entries({
+        agent: "gen_ai_agent_name",
+        tool: "gen_ai_tool_name",
+      })) {
+        wrapper = mountPanel({
+          selectedNode: { ...baseNode, service_type: st },
+        });
+        // regression: previously returned "infer_service_name" → "field not found"
+        expect(wrapper.vm.serviceNameField).toBe(col);
+      }
+    });
+
+    it("model defaults to gen_ai_request_model before schema resolves", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "model" },
+      });
+      // streamFieldSet is empty until the schema fetch settles
+      expect(wrapper.vm.serviceNameField).toBe("gen_ai_request_model");
+    });
+
+    it("model COALESCEs request/response when the schema has both", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [
+          { name: "gen_ai_request_model", type: "keyword" },
+          { name: "gen_ai_response_model", type: "keyword" },
+        ],
+      });
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "model" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+      expect(wrapper.vm.serviceNameField).toBe(
+        "COALESCE(gen_ai_request_model, gen_ai_response_model)",
+      );
+    });
+
+    it("model falls back to response_model when the schema has only that (Langfuse/OpenInference)", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [{ name: "gen_ai_response_model", type: "keyword" }],
+      });
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "model" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+      // regression: response-only vendors would otherwise hit "field not found"
+      expect(wrapper.vm.serviceNameField).toBe("gen_ai_response_model");
     });
   });
 

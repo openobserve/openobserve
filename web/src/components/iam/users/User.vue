@@ -17,15 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. The user search moved into
-         the table's own toolbar (built-in global filter) per the layout system. -->
-    <AppPageHeader
+  <OPageLayout
       :title="t('iam.basicUsers')"
       :subtitle="t('user.subtitle')"
-      icon="person"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+      icon="person" bleed>
       <template #actions>
         <member-invitation
           v-if="config.isCloud == 'true'"
@@ -43,9 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('user.add') }}
         </OButton>
       </template>
-    </AppPageHeader>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <OTable
           :key="tableKey"
           :frame="false"
@@ -65,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-row-selectable="(row: any) => row.enableDelete"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-users-list"
@@ -107,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
           <template #cell-auth="{ row }">
             <OTag v-if="row.auth_type" type="authType" :value="row.auth_type" />
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <!-- Roles badges — typed userRole tags for built-in roles, custom
@@ -175,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || 'Organization Members') : t('iam.basicUsers') }}</span>
+            <span class="text-xs font-normal">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || t('iam.user.organizationMembers')) : t('iam.basicUsers') }}</span>
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
@@ -184,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="delete"
               @click="openBulkDeleteDialog"
             >
-              Delete
+              {{ t('iam.user.delete') }}
             </OButton>
           </template>
         </OTable>
@@ -244,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t('user.deleteUsersMsg', { count: selectedUsers.length }) }}</p>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -254,7 +249,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
@@ -283,12 +278,12 @@ import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "UserPageOpenSource",
   components: {
-    AppPageHeader,
+    OPageLayout,
     OTable,
     UpdateUserRole,
     AddUser,
@@ -392,15 +387,6 @@ export default defineComponent({
 
     const columns = computed<OTableColumnDef[]>(() => {
       const cols: OTableColumnDef[] = [
-        {
-          id: "#",
-          header: "#",
-          accessorFn: (row: any) => row["#"],
-          size: TABLE_INDEX_COL_SIZE,
-          minSize: 32,
-          maxSize: 50,
-          meta: { compactPadding: true, align: "left" },
-        },
         {
           id: "email",
           header: t("user.email"),
@@ -519,7 +505,7 @@ export default defineComponent({
             variant: "error",
             message:
               err?.response?.data?.message ||
-              "Failed to load custom roles.",
+              t('iam.user.failedToLoadCustomRoles'),
           });
         }
       }
@@ -528,7 +514,7 @@ export default defineComponent({
     const getInvitedMembers = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading users...",
+        message: t('iam.user.pleaseWaitLoadingUsers'),
               timeout: 0,
 });
 
@@ -620,7 +606,7 @@ export default defineComponent({
     const getOrgMembers = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading users...",
+        message: t('iam.user.pleaseWaitLoadingUsers'),
               timeout: 0,
 });
 
@@ -636,7 +622,6 @@ export default defineComponent({
               users = [...res.data.data, ...invitedMembers];
             }
 
-            let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
               if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
@@ -669,18 +654,16 @@ export default defineComponent({
 
 
               return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
                 email: maskText(data.email),
                 rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                // Store the display-cased role (e.g. "Admin", "Admin (Invited)") so
-                // the edit/update payloads stay byte-identical to pre-migration, which
-                // sent the capitalized value. The role options from getRoles use the
-                // lowercase value ("admin"), so this seeded "Admin" doesn't match an
-                // option — but OSelect renders the raw value as a fallback, so the
-                // field still displays "Admin" correctly. The only cosmetic quirk is
-                // that the open dropdown won't highlight the lowercase option as active.
+                // Store the display-cased role (e.g. "Admin", "Admin (Invited)").
+                // The role options from getRoles use the lowercase value ("admin"),
+                // so this seeded "Admin" doesn't match an option — but OSelect renders
+                // the raw value as a fallback, so the field still displays "Admin"
+                // correctly. The only cosmetic quirk is that the open dropdown won't
+                // highlight the lowercase option as active.
                 role:
                   data?.status == "pending"
                     ? toCamelCase(data.role) + " (Invited)"
@@ -711,11 +694,10 @@ export default defineComponent({
             // Enterprise/cloud: the org-members API only returns a single
             // `role` per user, so users with multiple role assignments
             // (e.g. Viewer + custom "nmcdev") look incomplete. Fetch the
-            // full role list for *all* users in a single request — fire-and-
-            // forget — and re-render the rows when it resolves. This replaces
-            // the previous one-request-per-user pattern (N auth checks + N
-            // OpenFGA reads) with a single batched call, and keeps the table
-            // responsive instead of blocking the whole UI on the role API.
+            // full role list for *all* users in a single batched request —
+            // fire-and-forget — and re-render the rows when it resolves,
+            // keeping the table responsive instead of blocking the whole UI
+            // on the role API.
             if (isEnterpriseOrCloud) {
               const orgId = store.state.selectedOrganization.identifier;
               // Don't await — let the batched role fetch run in the background.
@@ -753,7 +735,7 @@ export default defineComponent({
             dismiss();
             toast({
               variant: "error",
-              message: "Failed to load users: " + (err?.response?.data?.message || err?.message || "Unknown error"),
+              message: t('iam.user.failedToLoadUsers', { error: err?.response?.data?.message || err?.message || t('iam.user.unknownError') }),
               timeout: 5000,
             });
             reject(false);
@@ -790,8 +772,7 @@ export default defineComponent({
     // Refresh handler for the toolbar refresh button. getOrgMembers() only seeds
     // default action flags on each row — the real per-row permissions are
     // computed by updateUserActions(), so it must run after every reload (this
-    // mirrors the onBeforeMount sequence). Binding refresh straight to
-    // getOrgMembers skipped this step and blanked out all row actions.
+    // mirrors the onBeforeMount sequence).
     const refreshUsers = async () => {
       try {
         await getOrgMembers();
@@ -991,7 +972,7 @@ export default defineComponent({
           await getOrgMembers();
         } catch (error) {
           toast({
-            message: "Failed to refresh user list",
+            message: t('iam.user.failedToRefreshUserList'),
             variant: "error",
           });
         }
@@ -1023,7 +1004,7 @@ export default defineComponent({
         updateUserActions();
         if (operationType == "created") {
           toast({
-            message: "User added successfully.",
+            message: t('iam.user.userAddedSuccess'),
             variant: "success",
           });
           // if (
@@ -1052,7 +1033,7 @@ export default defineComponent({
           // }
         } else {
           toast({
-            message: "User updated successfully.",
+            message: t('iam.user.userUpdatedSuccess'),
             variant: "success",
           });
           // usersState.users.forEach((member: any, key: number) => {
@@ -1085,7 +1066,7 @@ export default defineComponent({
         .then(async (res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: "User deleted successfully.",
+              message: t('iam.user.userDeletedSuccess'),
               variant: "success",
             });
             await getOrgMembers();
@@ -1095,7 +1076,7 @@ export default defineComponent({
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message: "Error while deleting user.",
+              message: t('iam.user.errorDeletingUser'),
               variant: "error",
             });
           }
@@ -1112,7 +1093,7 @@ export default defineComponent({
       confirmRevoke.value = false;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t('iam.user.pleaseWait'),
         timeout: 0,
       });
 
@@ -1121,7 +1102,7 @@ export default defineComponent({
         .then(async (res: any) => {
           dismiss();
           toast({
-            message: "Invitation revoked successfully.",
+            message: t('iam.user.invitationRevokedSuccess'),
             variant: "success",
           });
           await getOrgMembers();
@@ -1137,7 +1118,7 @@ export default defineComponent({
         .catch((err: any) => {
           dismiss();
           toast({
-            message: err?.response?.data?.message || "Error while revoking invitation.",
+            message: err?.response?.data?.message || t('iam.user.errorRevokingInvitation'),
             variant: "error",
           });
         });
@@ -1164,17 +1145,17 @@ export default defineComponent({
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
-            message: `Successfully deleted ${successful.length} user(s)`,
+            message: t('iam.user.deletedUsersSuccess', { count: successful.length }),
             variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
-            message: `Deleted ${successful.length} user(s), but ${unsuccessful.length} failed`,
+            message: t('iam.user.deletedUsersPartial', { count: successful.length, failed: unsuccessful.length }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: `Failed to delete ${unsuccessful.length} user(s)`,
+            message: t('iam.user.failedToDeleteUsers', { count: unsuccessful.length }),
             variant: "error",
           });
         }
@@ -1186,7 +1167,7 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
-            message: err.response?.data?.message || err?.message || "Error while deleting users",
+            message: err.response?.data?.message || err?.message || t('iam.user.errorDeletingUsers'),
             variant: "error",
           });
         }
@@ -1196,7 +1177,7 @@ export default defineComponent({
     const updateUserRole = (row: any) => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t('iam.user.pleaseWait'),
         timeout: 0,
       });
 
@@ -1212,7 +1193,7 @@ export default defineComponent({
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
-            const message = `Error while updating organization member`;
+            const message = t('iam.user.errorUpdatingOrgMember');
             toast({
               variant: "error",
               message: message,
@@ -1221,7 +1202,7 @@ export default defineComponent({
           } else {
             toast({
               variant: "success",
-              message: "Organization member updated successfully.",
+              message: t('iam.user.orgMemberUpdatedSuccess'),
             });
           }
           dismiss();
@@ -1348,12 +1329,13 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(lib-override): compact role chip styling (child OTag DOM) */
 :deep(.o2-role-chip) {
-  padding: 2px 8px;
-  font-size: 11px;
+  padding: 0.125rem 0.5rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 0.375rem;
   line-height: 1.4;
 }
 </style>

@@ -48,6 +48,7 @@ import {
   defineExpose,
 } from "vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import {
   parseSQL,
@@ -154,6 +155,7 @@ const emit = defineEmits<{
 // Setup
 // ============================================================================
 
+const { t } = useI18n();
 const router = useRouter();
 const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
@@ -474,7 +476,7 @@ const onAddToDashboard = () => {
   validatePanel(errors, true);
   if (errors.length) {
     showErrorNotification(
-      "There are some errors, please fix them and try again",
+      t("logs.buildQueryPage.validationErrors"),
     );
     return;
   }

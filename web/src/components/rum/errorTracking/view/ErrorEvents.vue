@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="shrink-0 text-right">
           <span
-            class="tabular-nums text-[var(--o2-text-secondary)]"
+            class="tabular-nums text-text-secondary"
             :data-test="`error-events-timeline-offset-${index}`"
             :title="getFormattedDate(event._timestamp / 1000)"
           >{{ offsetLabel(event) }}</span>
@@ -103,12 +103,12 @@ const isErrorEvent = (event: any) =>
   event.type === "error" && event.error_id === props.error.error_id;
 
 const getErrorCategory = (row: any) => {
-  if (row["type"] === "error") return row["error_type"] || "Error";
+  if (row["type"] === "error") return row["error_type"] || t("rum.error");
   else if (row["type"] === "resource") return row["resource_type"];
   else if (row["type"] === "view")
     return row["view_loading_type"] === "route_change"
-      ? "Navigation"
-      : "Reload";
+      ? t("rum.categoryNavigation")
+      : t("rum.categoryReload");
   else if (row["type"] === "action") return row["action_type"];
   else return row["type"];
 };
@@ -127,6 +127,9 @@ const getFormattedDate = (timestamp: number) =>
 </script>
 
 <style scoped lang="scss">
+/* keep(generated-content): the timeline rail is a ::before pseudo-element on
+   .event-timeline (and the dots are absolutely positioned against it), so there
+   is no element for a utility class to land on. */
 .event-timeline {
   position: relative;
 
@@ -138,7 +141,7 @@ const getFormattedDate = (timestamp: number) =>
     top: 0.25rem;
     bottom: 0.25rem;
     width: 1px;
-    background: var(--o2-border-color);
+    background: var(--color-card-glass-border);
   }
 }
 
@@ -148,23 +151,23 @@ const getFormattedDate = (timestamp: number) =>
   top: 0.3125rem;
   width: 0.5625rem;
   height: 0.5625rem;
-  border-radius: 9999px;
-  border: 1px solid var(--o2-border-color);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-card-glass-border);
 
   &--default {
-    background: var(--o2-card-bg, var(--o2-border-color));
+    background: var(--color-card-glass-bg, var(--color-card-glass-border));
   }
 
   &--error {
-    background: var(--o2-severity-error-color);
-    border-color: var(--o2-severity-error-color);
+    background: var(--color-severity-error-color);
+    border-color: var(--color-severity-error-color);
   }
 }
 
 .event-timeline__item--error {
   background: color-mix(
     in srgb,
-    var(--o2-severity-error-color) 6%,
+    var(--color-severity-error-color) 6%,
     transparent
   );
   border-radius: 0.375rem;

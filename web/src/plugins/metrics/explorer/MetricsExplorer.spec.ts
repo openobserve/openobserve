@@ -13,9 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { ref, computed } from "vue";
+import { ref, reactive, computed } from "vue";
+import {
+  getMetricsConfig,
+  encodeMetricsConfig,
+  decodeMetricsConfig,
+} from "@/composables/metrics/metricsUrlState";
 
 /**
  * These test the EXPLORER'S WIRING, not the grid's logic.
@@ -42,8 +47,9 @@ const grid = vi.hoisted(() => {
     labelFilters: { value: [] },
     sortBy: { value: "a-z" },
     viewMode: { value: "grid" },
-    activeRail: { value: "" },
+    activeRail: { value: "prefix" },
     showFavoritesOnly: { value: false },
+    paused: { value: false },
     hideEmptyPanels: { value: true },
     emptyHiddenCount: { value: 0 },
     activeFilterCount: { value: 0 },
@@ -86,8 +92,8 @@ const grid = vi.hoisted(() => {
 
 vi.mock("@/composables/metrics/useMetricsExplorerGrid", () => ({
   default: () => grid,
-  INITIAL_PAGE_SIZE: 30,
-  PAGE_SIZE_INCREMENT: 12,
+  INITIAL_PAGE_SIZE: 8,
+  PAGE_SIZE_INCREMENT: 6,
 }));
 
 // Keep the real vuex (src/stores/index.ts calls createStore at import time);
@@ -98,12 +104,23 @@ vi.mock("vuex", async (importOriginal) => ({
     state: { selectedOrganization: { identifier: "org1" }, theme: "light" },
   }),
 }));
+// Controllable route/router so the URL-state tests can seed `route.query` before
+// mount (hydration) and inspect `router.replace` (sync). `name` must be "metrics"
+// or syncVisualizeUrl and the route.query watcher short-circuit.
+const routerState = vi.hoisted(() => ({
+  replace: vi.fn().mockResolvedValue(undefined),
+  push: vi.fn(),
+  query: {} as Record<string, any>,
+}));
 vi.mock("vue-router", () => ({
-  useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn().mockResolvedValue(undefined),
+  useRouter: () => ({ push: routerState.push, replace: routerState.replace }),
+  useRoute: () => ({
+    get query() {
+      return routerState.query;
+    },
+    name: "metrics",
+    fullPath: "/metrics",
   }),
-  useRoute: () => ({ query: {} }),
 }));
 vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
@@ -118,11 +135,20 @@ import MetricsExplorer from "./MetricsExplorer.vue";
 
 const CARD = { name: "http_requests_total", unsupported: false, cardKind: "counterRate" };
 
-const mountExplorer = () =>
+/** The Visualize pane's runQuery — the toolbar refresh must drive this in
+ *  visualize mode instead of sweeping the Explore grid. */
+const visualizeRunQuery = vi.fn();
+
+/** The panel state the stubbed Visualize pane exposes to its parent — the parent
+ *  reads it to build the `metrics_data` blob. Set per test before entering
+ *  Visualize; null/query-less means "blank canvas, nothing to share". */
+let visualizePanel: any = null;
+
+const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
   mount(MetricsExplorer, {
     global: {
       stubs: {
-        AppPageHeader: true,
+        OPageHeader: true,
         DateTimePickerDashboard: true,
         AutoRefreshInterval: true,
         MetricCard: true,
@@ -143,12 +169,36 @@ const mountExplorer = () =>
         // Rendered rather than stubbed away: a toggle group's CHILDREN are the
         // options, and `stubs: true` drops the default slot — so a group with no
         // items at all, or with the wrong ones, looked identical to a correct one.
+        // The facet segmented control AND its items are the control under test
+        // (Prefix/Suffix/Type + the sort/view/scope toggles) — a `stubs: true`
+        // would drop the item children and the group would look empty regardless
+        // of correctness. Render-through so the items' data-test attrs exist.
         OToggleGroup: {
           template: '<div><slot /></div>',
         },
         OToggleGroupItem: {
           template: '<button type="button"><slot /></button>',
         },
+        OTag: {
+          template: '<span><slot /></span>',
+        },
+        // Pulls in the dashboard PanelEditor (ECharts + useDashboardPanelData),
+        // which needs far more context than this wiring test provides. The
+        // explorer test only cares that it renders in visualize mode; its own
+        // behaviour is covered by MetricsVisualize.spec. Keep the data-test so the
+        // mode-switch assertions still find it.
+        MetricsVisualize: {
+          // Exposes runQuery + dashboardPanelData like the real pane — the toolbar
+          // refresh drives runQuery, and the parent reads dashboardPanelData to
+          // encode the shareable blob.
+          setup: () => ({
+            runQuery: visualizeRunQuery,
+            dashboardPanelData: visualizePanel,
+          }),
+          template:
+            '<div data-test="metrics-explorer-visualize">visualize</div>',
+        },
+        ...stubOverrides,
       },
     },
   });
@@ -157,6 +207,8 @@ describe("MetricsExplorer wiring", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     grid.pagedCards.value = [CARD];
+    routerState.query = {};
+    visualizePanel = null;
   });
 
   describe("a label filter must not leave the visible cards on skeletons", () => {
@@ -248,6 +300,26 @@ describe("MetricsExplorer wiring", () => {
     });
   });
 
+  describe("the toolbar refresh control", () => {
+    it("is a labeled 'Refresh' button, not an icon-only control", () => {
+      // Icon-only refresh was easy to miss next to the date picker; the control
+      // now carries its label like the other toolbar actions.
+      const wrapper = mountExplorer({
+        OButton: {
+          template: '<button v-bind="$attrs"><slot /></button>',
+        },
+      });
+
+      const btn = wrapper.find('[data-test="metrics-explorer-refresh"]');
+      expect(btn.exists()).toBe(true);
+      // t() is mocked to echo the key — the label must come from i18n.
+      expect(btn.text()).toContain("metrics.explorer.refresh");
+      expect(btn.attributes("size")).toBe("sm-toolbar");
+      // Same treatment as the logs/traces Run Query button.
+      expect(btn.attributes("variant")).toBe("primary");
+    });
+  });
+
   describe("refresh and the no-data set", () => {
     it("a MANUAL refresh re-asks the hidden no-data metrics, WITHOUT un-hiding them", async () => {
       // Hidden => not rendered => not queried => still hidden. A metric that has
@@ -277,6 +349,565 @@ describe("MetricsExplorer wiring", () => {
       await flushPromises();
 
       expect(grid.sweepSlice).toHaveBeenCalledWith({ skipCache: false });
+    });
+  });
+
+  describe("the facet selector lives on the search row, over an always-open panel", () => {
+    it("renders Prefix/Suffix/Type as a segmented toggle on the search row", () => {
+      // The facet selector moved out of the left column onto the search row (it
+      // scopes which metrics you are searching). The left column is now just the
+      // panel body for whichever facet is selected.
+      const wrapper = mountExplorer();
+
+      expect(
+        wrapper.find('[data-test="metrics-explorer-rail-prefix"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-rail-suffix"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-rail-type"]').exists(),
+      ).toBe(true);
+    });
+
+    it("does not show the old Saved Views dialog on Explore (it moved to Workspace)", () => {
+      // The mystery dialog is gone: saved views now live in the Workspace rail.
+      const wrapper = mountExplorer();
+      expect(
+        wrapper.find('[data-test="metrics-saved-views"]').exists(),
+      ).toBe(false);
+      // The Workspace rail is not shown in Explore mode either.
+      expect(
+        wrapper.find('[data-test="metrics-workspace-rail"]').exists(),
+      ).toBe(false);
+    });
+
+  });
+
+  describe("Convert to dashboard", () => {
+    it("builds one panel per pinned metric and opens the dialog", () => {
+      // Each pinned metric becomes its own panel, built from the card's type-based
+      // variant (effectiveVariant + buildPanelDataForCard, as the drill-in does).
+      const wrapper = mountExplorer();
+      grid.cards.value = [
+        { name: "http_requests_total", unsupported: false, cardKind: "counterRate" },
+        { name: "node_memory", unsupported: false, cardKind: "gauge" },
+      ];
+      // Convert acts on the scratchpad's pinned metrics.
+      grid.favorites.value = ["http_requests_total", "node_memory"];
+
+      (wrapper.vm as any).openConvertToDashboard();
+
+      expect(grid.effectiveVariant).toHaveBeenCalledTimes(2);
+      expect((wrapper.vm as any).convertPanels).toHaveLength(2);
+      expect((wrapper.vm as any).convertPanels[0].title).toBe("http_requests_total");
+      expect((wrapper.vm as any).convertDialogOpen).toBe(true);
+    });
+
+    it("does nothing when nothing is pinned", () => {
+      const wrapper = mountExplorer();
+      grid.favorites.value = [];
+      (wrapper.vm as any).openConvertToDashboard();
+      expect((wrapper.vm as any).convertDialogOpen).toBe(false);
+    });
+
+    it("shows the active facet panel without a click — the panel is always open", () => {
+      // Regression guard for the redesign: the panel used to be gated behind
+      // clicking a rail icon (showRailPanel = !!activeRail). Now prefix is the
+      // default and the panel is on screen at mount.
+      const wrapper = mountExplorer();
+
+      expect(wrapper.findComponent({ name: "PrefixFilterPanel" }).exists()).toBe(
+        true,
+      );
+    });
+
+    it("selecting a facet switches it — and a re-click deselect never collapses the panel", async () => {
+      const wrapper = mountExplorer();
+
+      (wrapper.vm as any).selectRail("type");
+      expect(grid.activeRail.value).toBe("type");
+
+      // OToggleGroup emits `undefined` when the active item is clicked again
+      // (a deselect). selectRail must IGNORE it so the panel never blanks.
+      (wrapper.vm as any).selectRail(undefined);
+      expect(grid.activeRail.value).toBe("type");
+    });
+  });
+
+  describe("Explore / Visualize mode toggle", () => {
+    it("defaults to Explore — the browse grid, not the Visualize pane", () => {
+      const wrapper = mountExplorer();
+      expect((wrapper.vm as any).isExplore).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-mode-explore"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-mode-visualize"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-visualize"]').exists(),
+      ).toBe(false);
+    });
+
+    it("switches the body to the Visualize pane when the mode flips", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      expect((wrapper.vm as any).mode).toBe("visualize");
+      expect(
+        wrapper.find('[data-test="metrics-explorer-visualize"]').exists(),
+      ).toBe(true);
+    });
+
+    it("ignores the OToggleGroup deselect so mode never goes blank", () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      (wrapper.vm as any).setMode(undefined);
+      expect((wrapper.vm as any).mode).toBe("visualize");
+    });
+
+    it("Workspace (the Scratchpad) shares the grid body, not the Visualize pane", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("workspace");
+      await wrapper.vm.$nextTick();
+
+      expect((wrapper.vm as any).isGridMode).toBe(true); // shares the grid body
+      expect((wrapper.vm as any).isWorkspace).toBe(true);
+      expect(
+        wrapper.find('[data-test="metrics-explorer-visualize"]').exists(),
+      ).toBe(false);
+    });
+
+    it("Workspace shows only pinned metrics (the scratchpad); Explore browses all", async () => {
+      // Workspace = the Scratchpad = your pinned set. It drives the pinned-only
+      // narrowing; switching back to Explore restores browse-all.
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("workspace");
+      await wrapper.vm.$nextTick();
+      expect(grid.showFavoritesOnly.value).toBe(true);
+
+      (wrapper.vm as any).setMode("explore");
+      await wrapper.vm.$nextTick();
+      expect(grid.showFavoritesOnly.value).toBe(false);
+    });
+
+    it("refresh in Visualize fires ONE chart query — no grid sweep, no card re-queries", async () => {
+      // Regression: refresh in Visualize used to call the DateTimePicker's
+      // refresh(), which RE-EMITS a date-change; onDateChange answered it by
+      // re-querying every on-screen card — ~50 requests for a single chart.
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).onCardVisible(CARD); // a card is on screen
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      grid.sweepSlice.mockClear();
+      grid.requestPreview.mockClear();
+      grid.clearPreviewCache.mockClear();
+      visualizeRunQuery.mockClear();
+
+      await (wrapper.vm as any).onRefresh();
+
+      // Exactly one chart re-run…
+      expect(visualizeRunQuery).toHaveBeenCalledTimes(1);
+      // …and the grid is left completely alone.
+      expect(grid.sweepSlice).not.toHaveBeenCalled();
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      expect(grid.clearPreviewCache).not.toHaveBeenCalled();
+    });
+
+    it("the auto-refresh tick also leaves the grid alone in Visualize", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).onCardVisible(CARD);
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      grid.sweepSlice.mockClear();
+      grid.requestPreview.mockClear();
+
+      await (wrapper.vm as any).onRefreshTick();
+
+      expect(grid.sweepSlice).not.toHaveBeenCalled();
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+    });
+
+    it("pauses the grid while off screen (Visualize) so it cannot re-query", async () => {
+      // The grid sweeps its slice whenever the slice changes; switching modes
+      // changes it (the pinned-only narrowing flips). Unpaused, that swept ~40
+      // card queries for a grid the user had just left.
+      const wrapper = mountExplorer();
+      expect(grid.paused.value).toBe(false); // explore: live
+
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      expect(grid.paused.value).toBe(true); // off screen: paused
+
+      (wrapper.vm as any).setMode("workspace");
+      await wrapper.vm.$nextTick();
+      expect(grid.paused.value).toBe(false); // workspace shows the grid again
+    });
+
+    it("card 'Open' opens in-page Visualize, seeded with the card's type-based query", () => {
+      // Open no longer navigates to the separate metrics editor route: it seeds
+      // Visualize with the card's own panel data (effectiveVariant +
+      // buildPanelDataForCard) so the type-based operation carries over.
+      const wrapper = mountExplorer();
+      expect((wrapper.vm as any).mode).toBe("explore");
+
+      (wrapper.vm as any).onSelect(CARD);
+
+      expect(grid.effectiveVariant).toHaveBeenCalled();
+      expect((wrapper.vm as any).mode).toBe("visualize");
+      expect((wrapper.vm as any).visualizeSeed).toBeTruthy();
+    });
+  });
+
+  describe("the type facet uses OCheckboxGroup over a Set<->array boundary", () => {
+    it("exposes selectedTypes as an array for the group, and writes back a Set", () => {
+      // The composable keeps selectedTypes as a Set (URL state + filtering depend
+      // on it); OCheckboxGroup speaks arrays. The two adapters must round-trip.
+      grid.selectedTypes.value = new Set(["counter", "gauge"]);
+      const wrapper = mountExplorer();
+
+      // Set -> array, for the group's model-value.
+      expect((wrapper.vm as any).selectedTypesArray).toEqual([
+        "counter",
+        "gauge",
+      ]);
+
+      // array -> Set, on the group's update. A NEW Set (not a mutation) so the
+      // composable's watchers fire.
+      (wrapper.vm as any).onSelectedTypesChange(["histogram"]);
+      expect(grid.selectedTypes.value).toBeInstanceOf(Set);
+      expect([...grid.selectedTypes.value]).toEqual(["histogram"]);
+    });
+  });
+
+  /**
+   * The filter row.
+   *
+   * Filters are the one control whose width is unbounded, so they get their own
+   * line rather than competing with the fixed-width mode toggle and time
+   * cluster. These pin the two decisions that make the row safe to live with —
+   * without them, moving the bar back into the toolbar passes silently.
+   */
+  describe("the filter control owns a row of its own", () => {
+    const filterRow = (w: any) => w.find('[data-test="metrics-explorer-filter-row"]');
+    const toolbar = (w: any) => w.find('[data-test="metrics-explorer-filter-bar"]');
+
+    it("renders the filter bar in the filter row, NOT in the toolbar", () => {
+      const wrapper = mountExplorer();
+
+      expect(filterRow(wrapper).exists()).toBe(true);
+      expect(filterRow(wrapper).findComponent({ name: "LabelFilterBar" }).exists()).toBe(true);
+      // The toolbar keeps only the mode toggle + time cluster.
+      expect(toolbar(wrapper).findComponent({ name: "LabelFilterBar" }).exists()).toBe(false);
+    });
+
+    it("keeps the row present with ZERO filters, so adding one cannot shift the grid", async () => {
+      grid.labelFilters.value = [];
+      const wrapper = mountExplorer();
+      expect(filterRow(wrapper).exists()).toBe(true);
+
+      // The row must not be conditional on having filters — a row that appears
+      // with the first filter pushes the grid down as the user reads it.
+      grid.labelFilters.value = [{ label: "pod", operator: "=", value: "api-1" }];
+      await flushPromises();
+      expect(filterRow(wrapper).exists()).toBe(true);
+    });
+
+    it("is hidden in Visualize, where the PromQL query carries its own matchers", async () => {
+      const wrapper = mountExplorer();
+      expect(filterRow(wrapper).exists()).toBe(true);
+
+      (wrapper.vm as any).setMode("visualize");
+      await flushPromises();
+
+      // Two ways to say the same thing would conflict; Logs' visualize splits
+      // the same way.
+      expect(filterRow(wrapper).exists()).toBe(false);
+    });
+  });
+
+  /**
+   * Drag-to-zoom on a card.
+   *
+   * The gesture was already live — the converter builds the dataZoom toolbox and
+   * ChartRenderer arms the drag cursor — but nothing listened, so a drag zoomed
+   * and then silently restored. These pin the wiring that makes it do something.
+   */
+  describe("a drag-select on a card's chart re-ranges the grid", () => {
+    const zoomOn = (wrapper: any, event: any) => {
+      (wrapper.vm as any).onCardZoom(event);
+      return (wrapper.vm as any).dateTimePickerRef;
+    };
+
+    it("drives the PICKER (absolute), so the toolbar shows the window being viewed", () => {
+      const wrapper = mountExplorer();
+      const setCustomDate = vi.fn();
+      (wrapper.vm as any).dateTimePickerRef = { setCustomDate };
+
+      const start = new Date("2026-07-16T10:00:00.000Z").getTime();
+      const end = new Date("2026-07-16T10:30:00.000Z").getTime();
+      zoomOn(wrapper, { start, end });
+
+      // Not grid.setTimeRange: going through the picker is what keeps the
+      // toolbar honest (it must not still say "Past 15 Minutes") and what makes
+      // the zoom undoable — and its @on:date-change runs the skipCache + sweep.
+      expect(setCustomDate).toHaveBeenCalledTimes(1);
+      const [type, range] = setCustomDate.mock.calls[0];
+      expect(type).toBe("absolute");
+      expect(range.start.getTime()).toBe(start);
+      expect(range.end.getTime()).toBe(end);
+    });
+
+    it("also calls refresh() — setCustomDate alone never reaches the grid", () => {
+      const wrapper = mountExplorer();
+      const setCustomDate = vi.fn();
+      const refresh = vi.fn();
+      (wrapper.vm as any).dateTimePickerRef = { setCustomDate, refresh };
+
+      zoomOn(wrapper, {
+        start: new Date("2026-07-16T10:00:00.000Z").getTime(),
+        end: new Date("2026-07-16T10:30:00.000Z").getTime(),
+      });
+
+      // setCustomDate only mutates the picker's refs and leaves the emit to
+      // DateTime's auto-apply watcher, which is gated on `autoApply` —
+      // DateTimePickerDashboard defaults it to FALSE. Without refresh() the
+      // toolbar would show the zoomed range while every card kept old data.
+      // ViewDashboard.onDataZoom calls the same pair.
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it("widens a click-without-drag (start === end) into a real window", () => {
+      const wrapper = mountExplorer();
+      const setCustomDate = vi.fn();
+      (wrapper.vm as any).dateTimePickerRef = { setCustomDate };
+
+      // An empty window would return no data at all; ViewDashboard's zoom has
+      // the same guard.
+      const t = new Date("2026-07-16T10:00:00.000Z").getTime();
+      zoomOn(wrapper, { start: t, end: t });
+
+      const [, range] = setCustomDate.mock.calls[0];
+      expect(range.end.getTime()).toBeGreaterThan(range.start.getTime());
+      expect(range.end.getTime() - range.start.getTime()).toBe(60_000);
+    });
+
+    it("ignores a zoom with no range rather than blanking the grid", () => {
+      const wrapper = mountExplorer();
+      const setCustomDate = vi.fn();
+      (wrapper.vm as any).dateTimePickerRef = { setCustomDate };
+
+      zoomOn(wrapper, { start: 0, end: 0 });
+      zoomOn(wrapper, {});
+
+      expect(setCustomDate).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Visualize is URL-driven: the built chart serializes to `metrics_data` so a
+   * refresh / a shared link restores it IN-PAGE (the router keeps mode=visualize
+   * in the explorer). Grid modes already live in the URL, so they just share the
+   * current address. These pin the three seams — encode (share), decode
+   * (hydrate), and the continuous write (sync).
+   */
+  describe("Visualize URL state — share, hydrate, sync", () => {
+    const paramBlob = (href: string) => {
+      const raw = new URL(href).searchParams.get("metrics_data");
+      return raw ? decodeMetricsConfig(raw) : null;
+    };
+
+    const enterVisualizeWith = async (wrapper: any, query = "up") => {
+      visualizePanel = reactive({
+        data: { type: "line", queries: [{ query, fields: {} }] },
+        layout: {},
+      });
+      (wrapper.vm as any).setMode("visualize");
+      await wrapper.vm.$nextTick();
+      await wrapper.vm.$nextTick();
+    };
+
+    describe("shareUrl", () => {
+      it("is the plain current URL in grid modes — state already lives there", () => {
+        const wrapper = mountExplorer();
+        expect((wrapper.vm as any).mode).toBe("explore");
+        expect((wrapper.vm as any).shareUrl).toBe(window.location.href);
+        expect((wrapper.vm as any).shareUrl).not.toContain("metrics_data");
+      });
+
+      it("carries the encoded chart as metrics_data in Visualize", async () => {
+        const wrapper = mountExplorer();
+        await enterVisualizeWith(wrapper, "sum(rate(http_requests_total[5m]))");
+
+        const blob = paramBlob((wrapper.vm as any).shareUrl);
+        expect(blob?.data?.queries?.[0]?.query).toBe(
+          "sum(rate(http_requests_total[5m]))",
+        );
+      });
+
+      it("drops volatile keys (id/title) from the shared blob", async () => {
+        const wrapper = mountExplorer();
+        visualizePanel = reactive({
+          data: {
+            id: "panel-1",
+            title: "My Chart",
+            type: "line",
+            queries: [{ query: "up", fields: {} }],
+          },
+          layout: {},
+        });
+        (wrapper.vm as any).setMode("visualize");
+        await wrapper.vm.$nextTick();
+        await wrapper.vm.$nextTick();
+
+        const blob = paramBlob((wrapper.vm as any).shareUrl);
+        expect(blob?.data).not.toHaveProperty("id");
+        expect(blob?.data).not.toHaveProperty("title");
+        expect(blob?.data?.type).toBe("line");
+      });
+
+      it("omits metrics_data on a blank Visualize (no query yet)", async () => {
+        const wrapper = mountExplorer();
+        visualizePanel = reactive({
+          data: { queries: [{ query: "" }] },
+          layout: {},
+        });
+        (wrapper.vm as any).setMode("visualize");
+        await wrapper.vm.$nextTick();
+
+        expect((wrapper.vm as any).shareUrl).not.toContain("metrics_data");
+      });
+    });
+
+    describe("hydrate on load", () => {
+      const blobFor = (data: any) =>
+        encodeMetricsConfig(getMetricsConfig({ data }));
+
+      it("seeds Visualize from a metrics_data URL on mount", () => {
+        routerState.query = {
+          mode: "visualize",
+          metrics_data: blobFor({
+            type: "bar",
+            queries: [{ query: "up", fields: {} }],
+          }),
+        };
+
+        const wrapper = mountExplorer();
+
+        expect((wrapper.vm as any).mode).toBe("visualize");
+        expect((wrapper.vm as any).visualizeSeed).toEqual({
+          type: "bar",
+          queries: [{ query: "up", fields: {} }],
+        });
+      });
+
+      it("ignores metrics_data when the mode is not Visualize", () => {
+        routerState.query = {
+          mode: "explore",
+          metrics_data: blobFor({ type: "bar", queries: [{ query: "up" }] }),
+        };
+
+        const wrapper = mountExplorer();
+
+        expect((wrapper.vm as any).visualizeSeed).toBeNull();
+      });
+
+      it("leaves the seed untouched when there is no metrics_data", () => {
+        routerState.query = { mode: "visualize" };
+        const wrapper = mountExplorer();
+        expect((wrapper.vm as any).visualizeSeed).toBeNull();
+      });
+
+      it("ignores a malformed blob rather than throwing", () => {
+        routerState.query = { mode: "visualize", metrics_data: "not-base64!!" };
+        expect(() => mountExplorer()).not.toThrow();
+        // no seed built from garbage
+      });
+    });
+
+    describe("sync to URL", () => {
+      beforeEach(() => vi.useFakeTimers());
+      afterEach(() => vi.useRealTimers());
+
+      const blobWrites = () =>
+        routerState.replace.mock.calls
+          .map((c: any) => c[0]?.query?.metrics_data)
+          .filter(Boolean);
+
+      it("writes the blob to the URL when a chart is built in Visualize", async () => {
+        const wrapper = mountExplorer();
+        await enterVisualizeWith(wrapper, "node_load1");
+        vi.advanceTimersByTime(300);
+
+        const wrote = blobWrites().at(-1);
+        expect(wrote).toBeTruthy();
+        expect(decodeMetricsConfig(wrote)?.data?.queries?.[0]?.query).toBe(
+          "node_load1",
+        );
+      });
+
+      it("strips a stale blob from the URL when leaving Visualize", async () => {
+        routerState.query = { metrics_data: "stale", org_identifier: "org1" };
+        const wrapper = mountExplorer();
+        await enterVisualizeWith(wrapper, "up");
+        vi.advanceTimersByTime(300);
+        routerState.replace.mockClear();
+
+        (wrapper.vm as any).setMode("explore");
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(300);
+
+        const stripped = routerState.replace.mock.calls.some(
+          (c: any) => c[0]?.query && !("metrics_data" in c[0].query),
+        );
+        expect(stripped).toBe(true);
+      });
+
+      it("does not touch metrics_data while in a grid mode", async () => {
+        const wrapper = mountExplorer();
+        // A pure grid interaction (sort change) fires syncUrlState, never the
+        // visualize writer.
+        grid.sortBy.value = "z-a";
+        await wrapper.vm.$nextTick();
+        vi.advanceTimersByTime(300);
+
+        expect(blobWrites()).toHaveLength(0);
+      });
+    });
+  });
+
+  /**
+   * The "No metrics match" empty state offers one action card per remedy, gated
+   * on that remedy actually being able to change the result. Favorites ignores
+   * prefix/suffix/type, so "Clear prefix/suffix/type" must not appear there.
+   */
+  describe("empty-state remedies gate on what would actually help", () => {
+    const actionIds = (wrapper: any) =>
+      (wrapper.vm as any).noMatchActions.map((a: any) => a.id);
+
+    it("offers Clear prefix/suffix/type in Explore when a facet is selected", () => {
+      const wrapper = mountExplorer();
+      grid.showFavoritesOnly.value = false;
+      grid.selectedPrefixes.value = new Set(["envoy_cluster"]);
+
+      expect(actionIds(wrapper)).toContain("clear-facets");
+
+      grid.selectedPrefixes.value = new Set(); // reset shared mock
+    });
+
+    it("hides Clear prefix/suffix/type in Favorites — those facets are ignored there", () => {
+      const wrapper = mountExplorer();
+      grid.showFavoritesOnly.value = true;
+      grid.selectedPrefixes.value = new Set(["envoy_cluster"]);
+
+      const ids = actionIds(wrapper);
+      expect(ids).not.toContain("clear-facets");
+      // The favorites-specific remedy is still offered.
+      expect(ids).toContain("clear-favorites");
+
+      grid.showFavoritesOnly.value = false; // reset shared mock
+      grid.selectedPrefixes.value = new Set();
     });
   });
 });

@@ -36,6 +36,9 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
+        'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite destinations)
+        'test_fv_alerts_dest_',    // alerts-form-validation.spec.js (custom destinations created by the test cases)
+        'test_fv_alerts_slack_',   // alerts-form-validation.spec.js (slack destination created by the test cases)
         /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
       ],
       // Template prefixes to clean up
@@ -58,7 +61,9 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
-        'e2e_metrics_'            // alerts-metrics-notification.spec.js (metrics notification tests)
+        'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
+        'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite templates)
+        'test_fv_alerts_tmpl_'     // alerts-form-validation.spec.js (templates created by the test cases)
       ],
       // Folder prefixes to clean up
       ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ']
@@ -212,11 +217,13 @@ test.describe("Pre-Test Cleanup", () => {
       /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
       /^toggle_test_[a-f0-9]{8}$/,                                                           // toggle_test_<uuid> (source toggle test)
       /^edit_form_[a-f0-9]{8}$/,                                                             // edit_form_<uuid> (edit form test)
-      /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test)
+      /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test, legacy prefix)
+      /^view_schema_[a-f0-9]{8}$/,                                                           // view_schema_<uuid> (schema view test — renamed: "schema" prefix hits backend not-an-ingester bug)
       /^duplicate_test_[a-f0-9]{8}$/,                                                        // duplicate_test_<uuid> (duplicate name test)
       /^empty_url_[a-f0-9]{8}$/,                                                             // empty_url_<uuid> (empty URL validation test)
       /^url_404_[a-f0-9]{8}$/,                                                               // url_404_<uuid> (invalid URL 404 test)
-      /^schema_mismatch_[a-f0-9]{8}$/,                                                        // schema_mismatch_<uuid> (schema mismatch test)
+      /^schema_mismatch_[a-f0-9]{8}$/,                                                        // schema_mismatch_<uuid> (schema mismatch test, legacy prefix)
+      /^mismatch_schema_[a-f0-9]{8}$/,                                                        // mismatch_schema_<uuid> (schema mismatch test — renamed off "schema" prefix)
       // Pytest API tests (test_enrichment_table_url.py) - uses api_url_<test>_<uuid8> naming
       /^api_url_create_[a-f0-9]{8}$/,                                                         // api_url_create_<uuid> (create test)
       /^api_url_status_[a-f0-9]{8}$/,                                                         // api_url_status_<uuid> (status test)
@@ -248,8 +255,10 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up URL-based enrichment tables (those showing "NaN MB" in UI)
     // These are tracked separately in /api/{org}/enrichment_tables/status
     await pm.apiCleanup.cleanupUrlEnrichmentTables([
-      /^schema_mismatch_[a-f0-9]{8}$/,    // schema_mismatch_<uuid> (schema mismatch URL tests)
-      /^schema_view_[a-f0-9]{8}$/,        // schema_view_<uuid> (schema view URL tests)
+      /^schema_mismatch_[a-f0-9]{8}$/,    // schema_mismatch_<uuid> (schema mismatch URL tests, legacy prefix)
+      /^mismatch_schema_[a-f0-9]{8}$/,    // mismatch_schema_<uuid> (schema mismatch URL tests, renamed)
+      /^schema_view_[a-f0-9]{8}$/,        // schema_view_<uuid> (schema view URL tests, legacy prefix)
+      /^view_schema_[a-f0-9]{8}$/,        // view_schema_<uuid> (schema view URL tests, renamed)
       /^url_404_[a-f0-9]{8}$/,            // url_404_<uuid> (404 error URL tests)
       /^url_lifecycle_[a-f0-9]{8}$/,      // url_lifecycle_<uuid> (lifecycle URL tests)
       /^invalid_url_[a-f0-9]{8}$/,        // invalid_url_<uuid> (invalid URL tests)
@@ -301,7 +310,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^dedup_test_/,                                // Dedup test streams (dedup_test_*)
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
-        /^auto_playwright_stream$/,                    // Auto playwright stream
+        /^auto_pw_stream_/,                            // Per-run alerts-ui-operations streams (auto_pw_stream_<suffix>)
         /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
         /ellipsis_testing/,                            // Bug #7468 ellipsis test streams (long stream names)
         /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)

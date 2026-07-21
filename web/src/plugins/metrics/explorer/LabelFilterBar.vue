@@ -34,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="labelFilterKey(filter)"
         type="fieldTag"
         value="primarysm"
-        shape="rounded"
-        class="max-w-[250px]"
+        shape="rounded-default"
+        class="max-w-62.5"
       >
         <span class="font-mono text-xs truncate"
           >{{ filter.label }} {{ filter.operator || "=" }}
@@ -54,46 +54,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          on the label alone would collide two chips onto one v-for key. -->
     <!-- The registry's fieldTag/primarysm — the same variant+size the group
          pins, spelled as type/value instead of loose props. -->
-    <OTag
-      v-for="filter in shownFilters"
-      :key="labelFilterKey(filter)"
-      type="fieldTag"
-      value="primarysm"
-      shape="rounded"
-      class="min-w-0 max-w-[250px]"
-      :data-test="`metrics-explorer-label-chip-${filter.label}`"
-    >
-      <!-- The chip truncates its value; the tooltip is where the whole matcher
-           stays readable. -->
-      <OTooltip
-        :content="`${filter.label} ${filter.operator || '='} ${filter.value}`"
-      />
-      <span class="font-mono text-xs truncate"
-        >{{ filter.label }} {{ filter.operator || "=" }}
-        {{ filter.value }}</span
+    <template v-for="(filter, i) in shownFilters" :key="labelFilterKey(filter)">
+      <!-- Said, not inferred. Matchers in a PromQL selector are ALWAYS AND, but
+           two adjacent chips look equally like "either of these" — and the one
+           thing a second chip cannot mean is OR, so the ambiguity always resolves
+           the wrong way. The title carries the fix (`=~` with a regex) for anyone
+           who wanted OR and now knows they did not get it. -->
+      <span
+        v-if="i > 0"
+        class="text-3xs uppercase tracking-wide text-text-secondary shrink-0 select-none"
+        :title="t('metrics.explorer.labels.andSeparatorTitle')"
+        data-test="metrics-explorer-label-and"
+        >{{ t("metrics.explorer.labels.andSeparator") }}</span
       >
-      <template #trailing>
-        <button
-          type="button"
-          class="ml-1 inline-flex items-center cursor-pointer"
-          :aria-label="
-            t('metrics.explorer.labels.removeFilterAria', {
-              filter: labelFilterKey(filter),
-            })
-          "
-          :data-test="`metrics-explorer-label-chip-remove-${filter.label}`"
-          @click.stop="$emit('remove', filter)"
+      <OTag
+        type="fieldTag"
+        value="primarysm"
+        shape="rounded-default"
+        class="min-w-0 max-w-62.5"
+        :data-test="`metrics-explorer-label-chip-${filter.label}`"
+      >
+        <!-- The chip truncates its value; the tooltip is where the whole matcher
+             stays readable. -->
+        <OTooltip
+          :content="`${filter.label} ${filter.operator || '='} ${filter.value}`"
+        />
+        <span class="font-mono text-xs truncate"
+          >{{ filter.label }} {{ filter.operator || "=" }}
+          {{ filter.value }}</span
         >
-          <OIcon name="close" size="xs" />
-        </button>
-      </template>
-    </OTag>
+        <template #trailing>
+          <button
+            type="button"
+            class="ml-1 inline-flex items-center cursor-pointer"
+            :aria-label="
+              t('metrics.explorer.labels.removeFilterAria', {
+                filter: labelFilterKey(filter),
+              })
+            "
+            :data-test="`metrics-explorer-label-chip-remove-${filter.label}`"
+            @click.stop="$emit('remove', filter)"
+          >
+            <OIcon name="close" size="xs" />
+          </button>
+        </template>
+      </OTag>
+    </template>
     <OTag
       v-if="hiddenFilters.length"
       type="countChip"
       value="neutral"
       size="sm"
-      shape="rounded"
+      shape="rounded-default"
       clickable
       class="shrink-0 h-7"
       role="button"
@@ -201,8 +213,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <!-- Defaulted to `=`, one click to change. All four PromQL matchers are
              supported by the selector builder, so regex filters cost nothing
-             extra — but they never get in the way of the common case. -->
+             extra — but they never get in the way of the common case.
+
+             The tooltip is where `=~` earns its keep: matching either of two
+             values is the one thing chips CANNOT do by adding a second filter
+             (matchers in a PromQL selector are always AND, and this engine
+             rejects `or` matchers outright), so regex alternation is the only
+             way to say it — and a user has no reason to guess that. The labels
+             stay the bare symbols: they are what PromQL calls these, and the
+             trigger is `w-20`. -->
         <div class="w-20">
+          <OTooltip
+            :content="t('metrics.explorer.labels.operatorHelp')"
+            content-class="whitespace-pre-line"
+            max-width="20rem"
+            :delay="200"
+          />
           <OSelect
             v-model="draftOperator"
             size="sm"
@@ -245,6 +271,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </div>
+
+    <!-- The empty-row hint, typed out.
+         A SIBLING of the picker block above, never a branch inside it: an extra
+         `v-if` between that block's `v-if` and its `v-else-if` silently breaks
+         the chain, and `+ Filter` then renders at the same time as the value
+         picker. That is a real bug this file has already had.
+
+         Idle + unfiltered only — it is a hint about the empty state, so it gets
+         out of the way the moment there is a chip or an open picker. -->
+    <span
+      v-if="step === 'idle' && !filters.length"
+      class="query-editor-placeholder-overlay min-w-0 flex-1 overflow-hidden pointer-events-none select-none"
+      aria-hidden="true"
+      data-test="metrics-explorer-label-hint"
+    >
+      <!-- The SAME element the Logs placeholder types into (tailwind.css:75), so
+           the font, size and colour are the one shared rule rather than a second
+           opinion on it.
+
+           `flex-1 min-w-0 overflow-hidden` on the wrapper, and `block` here: the
+           shared rule is `nowrap` + `ellipsis`, which only clips once something
+           BOUNDS the width. As a bare inline flex item it took its full intrinsic
+           width instead and pushed `+ Filter` along the row — the hint is the one
+           thing here that must yield, never the control. -->
+      <span class="query-editor-placeholder-typewriter block">{{
+        filterHint
+      }}</span>
+    </span>
+
     <OButton
       v-if="filters.length > 1 && step === 'idle'"
       variant="ghost"
@@ -268,6 +323,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useFilterHint } from "@/composables/metrics/useFilterHint";
 import {
   labelFilterKey,
   type LabelFilter,
@@ -316,6 +372,16 @@ const expanded = ref(false);
 const CHIP_GAP = 8;
 /** Room kept for the "+N more" chip whenever the fit hides anything. */
 const MORE_CHIP_WIDTH = 90;
+/**
+ * The `and` between two chips, plus the extra gap it introduces.
+ *
+ * The measurement clone holds chips only, so without this the fit would be
+ * computed for a narrower row than the one actually rendered and the last chip
+ * would overflow. Deliberately a constant rather than another cloned node: the
+ * word is a fixed, tiny, uppercase string — measuring it would cost a second
+ * reflow to learn something that cannot vary.
+ */
+const AND_SEPARATOR_WIDTH = 24 + CHIP_GAP;
 
 /**
  * How many chips fit on ONE line beside the actions — from the chips' real
@@ -344,7 +410,10 @@ const measure = async () => {
   let used = 0;
   let count = 0;
   for (const w of chipWidths) {
-    const next = used + (count ? CHIP_GAP : 0) + w;
+    // Every chip but the first is preceded by `and` — the clone does not hold
+    // those, so their width is added here.
+    const next =
+      used + (count ? CHIP_GAP + AND_SEPARATOR_WIDTH : 0) + w;
     if (next > avail) break;
     used = next;
     count++;
@@ -353,7 +422,11 @@ const measure = async () => {
     // The "+N more" chip has to fit on the line too.
     while (count > 1 && used + CHIP_GAP + MORE_CHIP_WIDTH > avail) {
       count--;
-      used -= chipWidths[count] + (count ? CHIP_GAP : 0);
+      // Mirrors the addition above exactly — including the `and` this chip
+      // brought with it. An asymmetric subtraction would leave `used` drifting
+      // from the row's real width with every step.
+      used -=
+        chipWidths[count] + (count ? CHIP_GAP + AND_SEPARATOR_WIDTH : 0);
     }
   }
   fitCount.value = Math.max(1, count);
@@ -397,6 +470,21 @@ const draftLabel = ref<string | null>(null);
 const draftOperator = ref<string>("=");
 const draftValue = ref<string | null>(null);
 const labelError = ref("");
+
+/**
+ * The empty-row typewriter hint.
+ *
+ * Enabled only while the row is idle and unfiltered — the only moment it is on
+ * screen. The loop is a chain of timers, so leaving it armed behind a committed
+ * chip or an open picker would burn them for something nobody can see.
+ */
+const hintEnabled = computed(
+  () => step.value === "idle" && !props.filters.length,
+);
+const { placeholder: filterHint } = useFilterHint(
+  computed(() => props.labelNames ?? []),
+  hintEnabled,
+);
 
 const valueOptions = ref<{ label: string; value: string }[]>([]);
 const valuesLoading = ref(false);

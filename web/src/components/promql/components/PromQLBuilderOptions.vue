@@ -21,7 +21,7 @@
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
             >{{ t("dashboard.legendLabel") }}</span>
             <div
               data-test="promql-builder-options-field-input-wrapper"
@@ -47,7 +47,7 @@
               >
                 <OTooltip side="top" max-width="250px">
                   <template #content>
-                    ({{ t("dashboard.optional") }}) <b>Legend - </b>
+                    ({{ t("dashboard.optional") }}) <b>{{ t('metrics.promQLBuilderOptions.legend') }}</b>
                     {{ t("dashboard.overrideMessage") }}
                     <br />
                     {{ t("dashboard.overrideMessageExample") }}
@@ -64,7 +64,7 @@
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
             >{{ t("dashboard.stepValue") }}</span>
             <OInput
               v-model="
@@ -73,7 +73,7 @@
                 ].config.step_value
               "
               type="text"
-              placeholder="e.g., 30s, 1m"
+              :placeholder="t('metrics.promQLBuilderOptions.stepValuePlaceholder')"
               data-test="dashboard-promql-builder-step-value"
               style="width: 140px"
             >
@@ -81,7 +81,7 @@
                 <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" max-width="250px">
                     <template #content>
-                      ({{ t("dashboard.optional") }}) <b>Step - </b>
+                      ({{ t("dashboard.optional") }}) <b>{{ t('metrics.promQLBuilderOptions.step') }}</b>
                       {{ t("dashboard.stepValueTooltip") }}
                       <br />
                       {{ t("dashboard.stepValueTooltipInfo") }}
@@ -101,7 +101,7 @@
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
             >{{ t("common.type") }}</span>
             <OSelect
               v-model="
@@ -123,9 +123,9 @@
             >
               <OTooltip side="top" max-width="250px">
                 <template #content>
-                  <b>Query Type - </b><br />
-                  Range: Returns time series data over a time range.<br />
-                  Instant: Returns single value at a specific point in time.
+                  <b>{{ t('metrics.promQLBuilderOptions.queryType') }}</b><br />
+                  {{ t('metrics.promQLBuilderOptions.rangeDescription') }}<br />
+                  {{ t('metrics.promQLBuilderOptions.instantDescription') }}
                 </template>
               </OTooltip>
             </OIcon>
@@ -174,14 +174,14 @@ export default defineComponent({
       currentQuery.config.query_type = "range";
     }
 
-    // Query type options for q-select
+    // Query type options for the select
     const queryTypeOptions = [
       {
-        label: "Range",
+        label: t("metrics.promQLBuilderOptions.range"),
         value: "range",
       },
       {
-        label: "Instant",
+        label: t("metrics.promQLBuilderOptions.instant"),
         value: "instant",
       },
     ];

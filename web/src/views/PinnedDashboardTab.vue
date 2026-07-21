@@ -14,8 +14,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="pinned-dashboard-tab h-full flex flex-col min-h-0">
-    <div v-if="isLoading" class="flex flex-col gap-2">
-      <OSkeleton v-for="i in 3" :key="i" class="h-[8rem]" />
+    <!-- Skeleton mirrors the loaded layout (toolbar + panels grid) so the
+         transition to real content is stable, instead of flat full-width bars. -->
+    <div v-if="isLoading" class="flex flex-col h-full min-h-0">
+      <div
+        class="flex justify-end items-center gap-2 px-4 py-2 shrink-0 border-b border-border-default"
+      >
+        <div class="w-48"><OSkeleton class="h-8" /></div>
+        <div class="w-24"><OSkeleton class="h-8" /></div>
+        <div class="w-8"><OSkeleton class="h-8" /></div>
+      </div>
+      <div class="flex-1 min-h-0 overflow-hidden p-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+          <div
+            v-for="i in 4"
+            :key="i"
+            class="flex flex-col gap-3 rounded-default border border-border-default p-4 min-h-40"
+          >
+            <div class="flex items-center justify-between">
+              <div class="w-40"><OSkeleton class="h-4" /></div>
+              <div class="w-4"><OSkeleton class="h-4" /></div>
+            </div>
+            <OSkeleton class="flex-1 min-h-24" />
+          </div>
+        </div>
+      </div>
     </div>
     <template v-else-if="dashboardData">
       <div class="flex justify-end items-center gap-2 px-4 py-2 shrink-0 border-b border-border-default">

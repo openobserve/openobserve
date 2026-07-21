@@ -386,7 +386,7 @@ WHERE level = 'error'`;
       // OTextarea renders border/rounded on its inner wrapper div and resize on the textarea
       const innerWrapper = wrapper.find(`${TEXTAREA_WRAPPER} > div`);
       const textareaField = wrapper.find(TEXTAREA_FIELD);
-      expect(innerWrapper.classes()).toContain("rounded-md");
+      expect(innerWrapper.classes()).toContain("rounded-default");
       expect(innerWrapper.classes()).toContain("border");
       expect(textareaField.classes()).toContain("resize-y");
     });
@@ -541,7 +541,7 @@ WHERE level = 'error'`;
     it("should have rounded corners", () => {
       wrapper = createWrapper();
       const innerWrapper = wrapper.find(`${TEXTAREA_WRAPPER} > div`);
-      expect(innerWrapper.classes()).toContain("rounded-md");
+      expect(innerWrapper.classes()).toContain("rounded-default");
     });
   });
 

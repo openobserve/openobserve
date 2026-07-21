@@ -17,34 +17,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row-latency-bar"
-    class="flex flex-nowrap h-[0.85rem] rounded overflow-hidden w-full bg-[var(--o2-border-color)]"
+    class="flex flex-nowrap h-[0.85rem] rounded-default overflow-hidden w-full bg-card-glass-border"
   >
     <div
       v-for="[service, svc] in serviceEntries"
       :key="service"
       data-test="trace-row-latency-segment"
-      class="h-full min-w-[0.125rem]"
+      class="h-full min-w-0.5"
       :style="segmentStyle(service, svc as any)"
     >
       <OTooltip side="left" align="center">
         <template #content>
           <div
-            class="font-semibold mb-[0.35rem] tracking-[0.03rem] opacity-100 text-[0.75rem]"
+            class="font-semibold mb-[0.35rem] tracking-[0.03rem] opacity-100 text-xs"
           >
-            {{ item.spans }} spans across {{ serviceEntries.length }} services
+            {{ t('traces.traceLatencyCell.spansAcrossServices', { spans: item.spans, services: serviceEntries.length }) }}
           </div>
           <div
             v-for="[s, sv] in serviceEntries"
             :key="s"
-            class="grid items-center gap-x-[0.5rem] py-[0.1rem]"
+            class="grid items-center gap-x-2 py-[0.1rem] grid-cols-[0.5rem_1fr_auto_auto]"
             :class="
               s === service ? 'font-bold' : 'font-normal opacity-75'
             "
-            style="grid-template-columns: 0.5rem 1fr auto auto"
           >
             <span
-              class="inline-block w-[0.5rem] h-[0.5rem] rounded-full shrink-0"
-              :style="{ backgroundColor: serviceColors[s] || '#9e9e9e' }"
+              class="inline-block w-2 h-2 rounded-full shrink-0"
+              :style="serviceDotStyle(s)"
             />
             <span class="truncate">{{ s }}</span>
             <span class="text-right">{{
@@ -62,14 +61,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
+
+// TODO(design-tokens): the "unknown service" grey has no semantic token. It is the
+// shared fallback for a service the colour allocator never assigned (also in
+// TraceServiceCell + TraceDetailsSidebar, and asserted by their specs), so it is
+// NOT --color-dag-node-default (same value, but that token means "LLM span type:
+// default"). Needs e.g. --color-trace-service-unknown; then this const is the only
+// site in this file to change.
+const UNKNOWN_SERVICE_COLOR = "#9e9e9e";
 
 const props = defineProps<{
   item: Record<string, any>;
 }>();
 
+const { t } = useI18n();
 const { searchObj } = useTraces();
 const serviceColors = computed(() => searchObj.meta.serviceColors ?? {});
 
@@ -93,10 +102,20 @@ function segmentPercent(svc: any): number {
   return ((svc.duration ?? 0) / totalDuration.value) * 100;
 }
 
+function serviceColor(service: string): string {
+  return serviceColors.value[service] || UNKNOWN_SERVICE_COLOR;
+}
+
+/** Legend dot — per-service colour, so it can only be a runtime binding. */
+function serviceDotStyle(service: string): Record<string, string> {
+  return { backgroundColor: serviceColor(service) };
+}
+
+/** Segment — runtime width (share of total duration) + per-service colour. */
 function segmentStyle(service: string, svc: any): Record<string, string> {
   return {
     width: `${segmentPercent(svc)}%`,
-    backgroundColor: serviceColors.value[service] || "#9e9e9e",
+    backgroundColor: serviceColor(service),
   };
 }
 </script>

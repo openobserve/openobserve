@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div>
-      <AppPageHeader
+      <OPageHeader
         :back="{ onClick: () => router.back(), dataTest: 'back-button' }"
       >
         <template #title>
@@ -30,18 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               size="xs"
               name="content-copy"
-              class="hover:text-[var(--o2-primary-btn-bg)]"
+              class="hover:text-button-primary"
               @click="copyErrorId(error.error_id)"
           /></span>
         </template>
         <template #actions>
           <span>{{ error.timestamp }}</span>
         </template>
-      </AppPageHeader>
+      </OPageHeader>
       <div class="flex items-center flex-nowrap my-1">
         <div
           data-test="error-header-error-type"
-          class="text-[22px] font-bold"
+          class="text-2xl font-bold"
         >{{ error.type }}</div>
       </div>
       <div class="text-base pt-1 flex items-center">
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="error-header-unhandled-badge"
           :class="
             error.error_handling === 'unhandled'
-              ? 'text-red-6 border border-[rgb(246,68,68)] rounded text-sm px-1 mr-2'
+              ? 'text-status-error-text border border-status-negative rounded-default text-sm px-1 mr-2'
               : ''
           "
         >
@@ -68,7 +68,7 @@ import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -81,7 +81,7 @@ const props = defineProps({
 
 const copyErrorId = (id: string) => {
   copyToClipboard(id, {
-    successMessage: "Copied to clipboard",
+    successMessage: t("rum.copiedToClipboard"),
     timeout: 1500,
   });
 };

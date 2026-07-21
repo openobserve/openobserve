@@ -116,9 +116,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showFolderSelection"
       persistent
       size="sm"
-      title="Select Destination Folder"
-      secondary-button-label="Back"
-      primary-button-label="Add Dashboard"
+      :title="t('dashboard.addDashboardFromGitHub.selectFolderTitle')"
+      :secondary-button-label="t('dashboard.addDashboardFromGitHub.back')"
+      :primary-button-label="t('dashboard.addDashboardFromGitHub.addDashboard')"
       :primary-button-disabled="!selectedFolderObj"
       :primary-button-loading="importing"
       @click:secondary="showFolderSelection = false"
@@ -128,18 +128,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           v-model="selectedFolderObj"
           :options="folderOptions"
-          label="Folder"
+          :label="t('dashboard.addDashboardFromGitHub.folder')"
           class="grow"
           data-test="add-dashboard-github-folder-select"
         />
-        <div style="width: 40px; margin-bottom: 2px">
+        <div class="w-10 mb-0.5">
           <OButton
             variant="outline"
             size="icon-xs"
             icon-left="add"
             @click="showAddFolderDialog = true"
             data-test="add-dashboard-github-add-folder"
-            title="Add New Folder"
+            :title="t('dashboard.addDashboardFromGitHub.addNewFolder')"
           />
         </div>
       </div>
@@ -149,9 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="showAddFolderDialog"
       size="sm"
-      title="Add New Folder"
-      primary-button-label="Save"
-      secondary-button-label="Cancel"
+      :title="t('dashboard.addDashboardFromGitHub.addNewFolder')"
+      :primary-button-label="t('dashboard.addDashboardFromGitHub.save')"
+      :secondary-button-label="t('dashboard.addDashboardFromGitHub.cancel')"
       form-id="add-folder-dashboards-form"
       @click:secondary="showAddFolderDialog = false"
       data-test="add-dashboard-github-add-folder-dialog"
@@ -169,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import dashboardsService from "@/services/dashboards";
 import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -203,6 +204,7 @@ export default defineComponent({
   emits: ["update:modelValue", "added"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18n();
 
     const show = computed({
       get: () => props.modelValue,
@@ -319,7 +321,7 @@ export default defineComponent({
           `${S3_BASE}/?list-type=2&prefix=${S3_PREFIX}&delimiter=/`,
         );
         if (!response.ok)
-          throw new Error("Failed to fetch dashboards from gallery");
+          throw new Error(t("dashboard.addDashboardFromGitHub.fetchDashboardsError"));
 
         const xmlText = await response.text();
         const folderNames = parseS3Folders(xmlText).filter(
@@ -341,7 +343,7 @@ export default defineComponent({
         error.value =
           err instanceof Error
             ? err.message
-            : "Failed to load dashboard gallery";
+            : t("dashboard.addDashboardFromGitHub.loadGalleryError");
       } finally {
         loading.value = false;
       }
@@ -467,7 +469,10 @@ export default defineComponent({
                 const response = await fetch(rawUrl);
                 if (!response.ok) {
                   throw new Error(
-                    `Failed to fetch ${jsonFile}: ${response.statusText}`,
+                    t("dashboard.addDashboardFromGitHub.fetchFileError", {
+                      file: jsonFile,
+                      status: response.statusText,
+                    }),
                   );
                 }
                 dashboardJson = await response.json();
@@ -521,7 +526,13 @@ export default defineComponent({
             } catch (err) {
               failCount++;
               errors.push(
-                `${jsonFile}: ${err instanceof Error ? err.message : "Unknown error"}`,
+                t("dashboard.addDashboardFromGitHub.fileError", {
+                  file: jsonFile,
+                  error:
+                    err instanceof Error
+                      ? err.message
+                      : t("dashboard.addDashboardFromGitHub.unknownError"),
+                }),
               );
               console.error(`Failed to import ${jsonFile}:`, err);
             }
@@ -532,18 +543,27 @@ export default defineComponent({
         if (successCount > 0 && failCount === 0) {
           toast({
             variant: "success",
-            message: `Successfully imported ${successCount} dashboard(s)!`,
+            message: t("dashboard.addDashboardFromGitHub.importSuccess", {
+              count: successCount,
+            }),
           });
         } else if (successCount > 0 && failCount > 0) {
           toast({
             variant: "warning",
-            message: `Imported ${successCount} dashboard(s), but ${failCount} failed. Check console for details.`,
+            message: t("dashboard.addDashboardFromGitHub.importPartial", {
+              count: successCount,
+              failCount,
+            }),
             timeout: 5000,
           });
         } else {
           toast({
             variant: "error",
-            message: `Failed to import dashboards: ${errors[0] || "Unknown error"}`,
+            message: t("dashboard.addDashboardFromGitHub.importFailed", {
+              error:
+                errors[0] ||
+                t("dashboard.addDashboardFromGitHub.unknownError"),
+            }),
             timeout: 5000,
           });
         }
@@ -554,7 +574,12 @@ export default defineComponent({
       } catch (err) {
         toast({
           variant: "error",
-          message: `Failed to add dashboards: ${err instanceof Error ? err.message : "Unknown error"}`,
+          message: t("dashboard.addDashboardFromGitHub.addFailed", {
+            error:
+              err instanceof Error
+                ? err.message
+                : t("dashboard.addDashboardFromGitHub.unknownError"),
+          }),
           timeout: 5000,
         });
       } finally {
@@ -575,6 +600,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       show,
       loading,
       store,

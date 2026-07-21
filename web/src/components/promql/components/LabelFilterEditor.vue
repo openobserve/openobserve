@@ -1,6 +1,6 @@
 <template>
   <div data-test="promql-labelfilter-editor">
-    <div style="display: flex; flex-direction: row" class="pl-2">
+    <div class="pl-2 flex flex-row">
       <div
         data-test="promql-labelfilter-editor-label"
         class="text-sm whitespace-nowrap flex items-center min-w-21.5"
@@ -20,7 +20,7 @@
                 <OButton
                   variant="primary"
                   size="chip"
-                  class="!text-[12px]"
+                  class="!text-xs"
                   :data-test="`promql-label-filter-${index}`"
                 >
                   {{ computedLabel(label) }}
@@ -28,16 +28,16 @@
                 </OButton>
               </template>
               <div
-                class="p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+                class="p-3"
                 :data-test="`promql-label-filter-${index}-menu`"
               >
-                <div style="width: 350px">
+                <div class="w-86 [&_.o-input-label]:text-xs [&_.o-input-label]:font-normal">
                   <!-- Label Selection -->
                   <OSelect
                     v-model="label.label"
                     :options="availableLabelOptions"
-                    label="Label"
-                    class="label-filter-label-select showLabelOnTop normal-case! mb-2"
+                    :label="t('metrics.labelFilterEditor.label')"
+                    class="label-filter-label-select showLabelOnTop normal-case! mb-1.5"
                     searchable
                     clearable
                     data-test="promql-label-select"
@@ -45,8 +45,8 @@
                     <template #empty>
                       <span class="text-text-secondary px-3 py-2">{{
                         loadingLabels
-                          ? "Loading labels..."
-                          : "No labels found"
+                          ? t('metrics.labelFilterEditor.loadingLabels')
+                          : t('metrics.labelFilterEditor.noLabelsFound')
                       }}</span>
                     </template>
                   </OSelect>
@@ -55,8 +55,8 @@
                   <OSelect
                     v-model="label.op"
                     :options="operatorOptions"
-                    label="Operator"
-                    class="label-filter-operator-select showLabelOnTop mb-2"
+                    :label="t('metrics.labelFilterEditor.operator')"
+                    class="label-filter-operator-select showLabelOnTop mb-1.5"
                     data-test="promql-operator-select"
                   />
 
@@ -64,7 +64,7 @@
                   <OSelect
                     v-model="label.value"
                     :options="getLabelValueOptions(label.label)"
-                    label="Value"
+                    :label="t('metrics.labelFilterEditor.value')"
                     class="label-filter-value-select showLabelOnTop"
                     :value-key="'value'"
                     :label-key="'label'"
@@ -76,8 +76,8 @@
                     <template #empty>
                       <span class="text-text-secondary px-3 py-2">{{
                         !label.label
-                          ? 'Select a label first'
-                          : 'No values found'
+                          ? t('metrics.labelFilterEditor.selectLabelFirst')
+                          : t('metrics.labelFilterEditor.noValuesFound')
                       }}</span>
                     </template>
                   </OSelect>
@@ -103,7 +103,7 @@
           data-test="promql-add-label-filter"
         >
           <OIcon name="add" size="sm" />
-          <OTooltip content="Add label filter" side="top" />
+          <OTooltip :content="t('metrics.labelFilterEditor.addLabelFilter')" side="top" />
         </OButton>
       </div>
     </div>
@@ -165,7 +165,7 @@ const availableLabelOptions = computed(() => {
 
 const computedLabel = (label: PromqlLabelMatcher): string => {
   if (!label.label) {
-    return "Select label";
+    return t('metrics.labelFilterEditor.selectLabel');
   }
   if (!label.value) {
     return label.label;
@@ -242,13 +242,13 @@ const getLabelValueOptions = (labelKey: string) => {
 const getOperatorHint = (op: string): string => {
   switch (op) {
     case "=":
-      return "Exact match";
+      return t('metrics.labelFilterEditor.exactMatch');
     case "!=":
-      return "Not equal to";
+      return t('metrics.labelFilterEditor.notEqualTo');
     case "=~":
-      return "Regex pattern (e.g., prod.*)";
+      return t('metrics.labelFilterEditor.regexPattern');
     case "!~":
-      return "Regex not matching (e.g., test.*)";
+      return t('metrics.labelFilterEditor.regexNotMatching');
     default:
       return "";
   }

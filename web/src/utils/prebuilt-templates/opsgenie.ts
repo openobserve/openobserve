@@ -57,23 +57,25 @@ export const opsgenieConfig: PrebuiltConfig = {
   credentialFields: [
     {
       key: 'apiKey',
-      label: 'Opsgenie API Key',
+      labelKey: 'alerts.prebuiltDestinations.opsgenieApiKey',
       type: 'password',
       required: true,
       hint: 'Get your API key from Opsgenie integration settings',
       validator: (key: string) =>
-        key.length > 30 || 'Opsgenie API key should be longer than 30 characters'
+        key.length > 30 || {
+          key: 'alerts.prebuiltDestinations.opsgenieApiKeyLength'
+        }
     },
     {
       key: 'euRegion',
-      label: 'EU Region',
+      labelKey: 'alerts.prebuiltDestinations.opsgenieEuRegion',
       type: 'toggle',
       required: false,
       hint: 'Enable for EU-based Opsgenie instances'
     },
     {
       key: 'priority',
-      label: 'Default Priority',
+      labelKey: 'alerts.prebuiltDestinations.opsgeniePriority',
       type: 'select',
       required: false,
       options: [

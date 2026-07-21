@@ -195,7 +195,6 @@ describe("TraceDetails - All Missing Fields (Real Data)", () => {
         plugins: [i18n, router],
         provide: { store },
         stubs: {
-          "q-resize-observer": true,
           "chart-renderer": {
             template: '<div data-test="chart-renderer">Chart</div>',
             props: ["data", "id"],

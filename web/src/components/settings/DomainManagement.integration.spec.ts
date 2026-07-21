@@ -184,12 +184,7 @@ describe("DomainManagement Integration Tests", () => {
       props,
       global: {
         plugins: [i18n],
-        stubs: {
-          QDrawer: {
-            template: '<div class="q-drawer-stub"><slot /></div>',
-            props: ['modelValue', 'side', 'bordered', 'width', 'overlay', 'elevated'],
-          },
-        },
+        stubs: {},
       },
     });
   };

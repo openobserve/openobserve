@@ -98,10 +98,12 @@ export class AlertsPage {
             multiTimeRangeDeleteButton: '[data-test="multi-time-range-alerts-delete-btn"]',
             goToViewEditorButton: '[data-test="go-to-view-editor-btn"]',
 
-            // Step 5: Deduplication (Scheduled only, v3 UI — in Advanced tab)
-            stepDeduplication: '.step-deduplication',
-            stepDeduplicationFingerprintSelect: '.step-deduplication .alert-v3-select',
-            stepDeduplicationTimeWindowInput: '.step-deduplication input[type="number"]',
+            // Step 5: Deduplication (Scheduled only — in Advanced tab). Use data-test
+            // hooks from Deduplication.vue; the old `.step-deduplication .alert-v3-select`
+            // class chain no longer exists on newer builds (e.g. alpha pre-cloud).
+            stepDeduplication: '[data-test="alert-dedup-fingerprint-fields"]',
+            stepDeduplicationFingerprintSelect: '[data-test="alert-dedup-fingerprint-fields"]',
+            stepDeduplicationTimeWindowInput: '[data-test="alert-dedup-time-window-field"]',
 
             // Step 6: Advanced settings
             contextAttributesAddButton: '[data-test="alert-variables-add-btn"]',
@@ -341,6 +343,11 @@ export class AlertsPage {
         }
     }
 
+    /** Wait for the Add Alert button to render — the readiness gate before creating an alert. */
+    async waitForAddAlertButton() {
+        await this.page.locator(this.locators.addAlertButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
     async createAlert(streamName, column, value, destinationName, randomValue) {
         const result = await this.creationWizard.createAlert(streamName, column, value, destinationName, randomValue);
         this.currentAlertName = result;
@@ -527,7 +534,7 @@ export class AlertsPage {
      * Returns 'table' if history table is visible, 'empty' if empty state is shown
      */
     async expectAlertDetailsHistorySectionVisible() {
-        // The history section shows either a q-table (when history exists) or an empty state
+        // The history section shows either a history table (when history exists) or an empty state
         const table = this.page.locator(this.locators.alertDetailsHistoryTable);
         const emptyState = this.page.locator('text=No history available').or(this.page.locator('.OIcon:has-text("history")'));
 
@@ -651,7 +658,7 @@ export class AlertsPage {
     async expectNoChartError() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
         // Assert no error-class banner is visible within the chart container
-        const errorBanner = chartArea.locator('[class*="error"], .q-banner--negative').first();
+        const errorBanner = chartArea.locator('[class*="error"]').first();
         await expect(errorBanner).not.toBeVisible({ timeout: 5000 });
         // Assert no error text pattern is visible anywhere in the chart area.
         // Do NOT swallow — a "Schema error" / "No field named" banner must fail the test.
@@ -659,7 +666,7 @@ export class AlertsPage {
         await expect(errorText).not.toBeAttached({ timeout: 3000 });
 
         // Also check page-level error toasts/banners rendered outside the chart container
-        const pageError = this.page.locator('[role="alert"][class*="bg-negative"], .q-banner--negative').first();
+        const pageError = this.page.locator('[role="alert"][class*="bg-negative"]').first();
         await expect(pageError).not.toBeVisible({ timeout: 5000 });
 
         testLogger.info('No chart error detected');
@@ -671,7 +678,7 @@ export class AlertsPage {
      */
     async getChartErrorMessage() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
-        const errorEl = chartArea.locator('[class*="error"], .q-banner--negative, [role="alert"][class*="bg-negative"]').first();
+        const errorEl = chartArea.locator('[class*="error"], [role="alert"][class*="bg-negative"]').first();
         if (await errorEl.isVisible({ timeout: 2000 }).catch(() => false)) {
             return await errorEl.textContent();
         }
@@ -870,10 +877,6 @@ export class AlertsPage {
         await this.commonActions.navigateToAlerts();
         await this.page.waitForTimeout(1000);
 
-        // Clean up any q-portal overlays that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
         await this.page.waitForTimeout(500);
 
         await this.page.locator(this.locators.newFolderButton).click();
@@ -1001,17 +1004,37 @@ export class AlertsPage {
             testLogger.info('Alert not immediately visible, navigating to alerts and searching', { alertName: nameToVerify });
             await this.page.locator(this.locators.alertMenuItem).click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
 
-            // Search for the alert
+            // Re-search across attempts: under concurrent load the alerts-list refetch after a
+            // fresh create can lag, so a single search + one long wait intermittently missed the
+            // row. Re-type the filter each attempt — and reload once to force a fresh list fetch —
+            // until the row renders. Deterministic (each probe waits for the actual cell); no
+            // reliance on one slow fetch landing inside a fixed window.
             const inputField = this.page.locator(this.locators.alertSearchInputField);
-            await inputField.waitFor({ state: 'attached', timeout: 10000 });
-            await inputField.fill(nameToVerify, { force: true });
-            await this.page.waitForTimeout(2000);
+            const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+            let found = false;
+            for (let attempt = 1; attempt <= 4 && !found; attempt++) {
+                if (attempt === 3) {
+                    // Force a fresh list fetch before the final attempts.
+                    await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+                    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                }
+                await inputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+                await inputField.fill('', { force: true }).catch(() => {});
+                await inputField.fill(nameToVerify, { force: true });
+                // The OTable shows a loading skeleton while the alerts list fetches — real rows
+                // aren't in the DOM yet, so checking now races an all-placeholder table. Wait for
+                // the skeleton to clear first.
+                await listSkeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+                found = await this.page.getByRole('cell', { name: nameToVerify }).first()
+                    .isVisible({ timeout: 10000 }).catch(() => false);
+                if (!found) testLogger.warn('Alert row not visible after search, re-searching', { alertName: nameToVerify, attempt });
+            }
         }
 
-        // Use a longer timeout since the alert list may take time to reload
-        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 30000 });
+        // Final deterministic assertions (the row is present by now under normal + slow paths).
+        await this.page.locator('[data-test="o2-table-skeleton-body"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 15000 });
         await expect(this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible({ timeout: 10000 });
     }
 
@@ -1091,17 +1114,16 @@ export class AlertsPage {
         await this.page.locator(this.locators.alertSubmitButton).click();
         await this.page.waitForTimeout(500);
 
-        // v3 shows a toast notification when name is empty
-        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
-        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
-        // strict-mode violation per AGENT_RULES §2.
-        await expect(
-            this.page
-                .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: 'Alert name is required.' })
-                .first()
-        ).toBeVisible({ timeout: 10000 });
-        testLogger.info('Invalid alert name validation working');
+        // An empty-name Save is rejected with a toast reading "Alert name is required."
+        // (alerts.nameRequired); the name OFormInput may additionally surface an inline field
+        // error (add-alert-name-input-error). Assert whichever signal is present — both
+        // confirm the empty-name save was blocked, which is what this validation verifies.
+        const nameError = this.page.locator('[data-test="add-alert-name-input-error"]');
+        const nameRequiredToast = this.page
+            .locator('[data-test="o-toast-message"]')
+            .filter({ hasText: 'Alert name is required.' });
+        await expect(nameError.or(nameRequiredToast).first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Invalid alert name validation working (empty-name save blocked)');
 
         // Close with robust handling for dialog backdrops
         await this._closeAlertWizard();
@@ -1120,12 +1142,12 @@ export class AlertsPage {
         await this.page.waitForTimeout(500);
 
         // v3 wizard may handle validation differently:
-        //   A) Show inline q-field--error on missing fields
+        //   A) Show inline field error on missing fields
         //   B) Show a toast/notification at the top of the form
         //   C) Submit successfully (if optional fields have defaults)
         // Wait for any of these outcomes within the timeout window.
-        const errorFields = this.page.locator('.q-field--error');
-        const anyToast = this.page.locator('[role="alert"], .q-alert, .notifications');
+        const errorFields = this.page.locator('[aria-invalid="true"]');
+        const anyToast = this.page.locator('[role="alert"], .notifications');
         const successMsg = this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertSuccessMessage });
 
         const outcomes = await Promise.race([
@@ -1463,9 +1485,17 @@ export class AlertsPage {
     async typeInAlertSearchInput(query) {
         const searchInput = this.page.locator(this.locators.alertSearchInputField);
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await searchInput.click();
-        await searchInput.pressSequentially(query, { delay: 100 });
-        // wait until the typed value is reflected on the input
+        // Re-type if the value doesn't stick: under concurrent load pressSequentially can
+        // drop keystrokes or the input re-renders mid-type, leaving a mismatched value.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await searchInput.click().catch(() => {});
+            await searchInput.fill('').catch(() => {});
+            await searchInput.pressSequentially(query, { delay: 80 });
+            if ((await searchInput.inputValue().catch(() => '')) === query) return;
+            testLogger.warn('Alert search value did not stick, retrying', { query, attempt });
+            await this.page.waitForTimeout(400);
+        }
+        // Final assertion so a genuine failure still surfaces clearly.
         await expect(searchInput).toHaveValue(query, { timeout: 5000 });
     }
 
@@ -1956,7 +1986,7 @@ export class AlertsPage {
      * @returns {Promise<string>} e.g. "P1", "P2", "P3", "P4"
      */
     async getSeverityBadgeText() {
-        // Match the q-badge that contains P1, P2, P3, or P4 text
+        // Match the badge that contains P1, P2, P3, or P4 text
         const badge = this.page.locator(this.locators.severityBadge).filter({ hasText: /^.*P[1-4].*$/ });
         await badge.first().waitFor({ state: 'visible', timeout: 10000 });
         // Get just the span with the severity value (first span inside the inner div)
@@ -2019,7 +2049,7 @@ export class AlertsPage {
 
     /**
      * Verify the service graph tab content rendered.
-     * Tabs are v-if gated (no q-tab-panel wrapper). The serviceGraph tab
+     * Tabs are v-if gated (no tab-panel wrapper). The serviceGraph tab
      * renders IncidentServiceGraph inside an absolute-positioned div.
      * Checks for the .incident-service-graph container OR the detail page
      * still being visible (confirming no crash).
@@ -2290,7 +2320,14 @@ export class AlertsPage {
 
         const baseUrl = process.env["ZO_BASE_URL"];
         const orgName = process.env["ORGNAME"];
-        const validationDestinationUrl = `${baseUrl}/api/${orgName}/${streamName}/_json`;
+        // On cloud the backend's SSRF guard rejects the self-referencing ingestion URL
+        // (the cluster's own domain resolves to a private IP), so use an inert public
+        // sink instead. Round-trip validation-stream checks are unavailable on cloud —
+        // tests that poll the validation stream must skip there.
+        const isCloud = isCloudEnvironment();
+        const validationDestinationUrl = isCloud
+            ? 'https://httpbin.org/post'
+            : `${baseUrl}/api/${orgName}/${streamName}/_json`;
 
         // Ensure validation template exists with proper JSON array format for ingestion API
         await pm.alertTemplatesPage.ensureValidationTemplateExists(templateName);
@@ -2303,23 +2340,24 @@ export class AlertsPage {
         const destinationFound = await pm.alertDestinationsPage.findDestinationAcrossPages(destinationName);
 
         if (!destinationFound) {
-            // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
-            const headers = getAuthHeaders();
-            const authHeader = headers['Authorization'] || (() => {
-                if (isCloudEnvironment()) {
-                    testLogger.warn('alertsPage: no cloud passcode available for destination creation - Basic auth will not work on cloud OIDC endpoints');
-                }
-                return this.commonActions.constructor.generateBasicAuthHeader(
+            // Self-referencing ingestion needs auth; never attach credentials when the
+            // destination points at the external sink (would leak the passcode).
+            let destinationHeaders = {};
+            if (!isCloud) {
+                // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
+                const headers = getAuthHeaders();
+                const authHeader = headers['Authorization'] || this.commonActions.constructor.generateBasicAuthHeader(
                     process.env["ZO_ROOT_USER_EMAIL"],
                     process.env["ZO_ROOT_USER_PASSWORD"]
                 );
-            })();
+                destinationHeaders = { 'Authorization': authHeader };
+            }
 
             await pm.alertDestinationsPage.createDestinationWithHeaders(
                 destinationName,
                 validationDestinationUrl,
                 templateName,
-                { 'Authorization': authHeader }
+                destinationHeaders
             );
             testLogger.info('Created validation destination', {
                 destinationName,
@@ -2829,12 +2867,12 @@ export class AlertsPage {
     }
 
     /**
-     * Force-remove residual q-portal elements that occasionally intercept clicks
+     * Force-remove residual portal overlays that occasionally intercept clicks
      * after closing the SQL editor dialog. Used in scheduled feature tests.
      */
     async removeResidualPortals() {
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[data-reka-dialog-overlay], div[data-reka-portalled]').forEach(el => el.remove());
         }).catch(() => {});
     }
 
@@ -2852,7 +2890,7 @@ export class AlertsPage {
      * @param {number} stepIndex - 0-based step index
      */
     async clickStepIndicator(stepIndex) {
-        const indicators = this.page.locator('.alert-v3-steps .step-indicator, [data-test*="step-indicator"] .q-stepper__nav-item, .alert-v3-steps > div > div');
+        const indicators = this.page.locator('.alert-v3-steps .step-indicator, [data-test*="step-indicator"], .alert-v3-steps > div > div');
         const target = indicators.nth(stepIndex);
         await target.waitFor({ state: 'visible', timeout: 10000 });
         await target.click({ force: true });
@@ -3103,11 +3141,6 @@ export class AlertsPage {
      * Click the update button for a specific alert
      */
     async clickAlertUpdateButton(alertName) {
-        // Clean up any q-portal overlays that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         // Search for the alert first
         await this.searchAlert(alertName);
         await this.page.waitForTimeout(1000);
@@ -3542,7 +3575,7 @@ export class AlertsPage {
 
     /**
      * Get autocomplete suggestions dropdown items
-     * Scoped to menu context to avoid matching all q-items on page
+     * Scoped to menu context to avoid matching all option items on page
      * @returns {Locator}
      */
     getAutocompleteSuggestions() {
@@ -3565,8 +3598,8 @@ export class AlertsPage {
      * In v3, aggregation is controlled by selecting a measure function from a dropdown:
      * - "total events" (default) = no aggregation, no group-by
      * - "count", "avg", "sum", etc. = aggregation enabled, group-by appears
-     * This replaces the v2 q-toggle for aggregation.
-     * @returns {Locator} The function dropdown q-select element
+     * This replaces the v2 toggle for aggregation.
+     * @returns {Locator} The function dropdown select element
      */
     getAggregationToggle() {
         // The aggregation function OSelect has no data-test. Its trigger is the first
@@ -3597,7 +3630,7 @@ export class AlertsPage {
 
     /**
      * Enable aggregation by selecting 'count' from the function dropdown (v3 UI).
-     * This replaces the v2 behavior of clicking a q-toggle.
+     * This replaces the v2 behavior of clicking a toggle.
      */
     async enableAggregation() {
         const toggle = this.getAggregationToggle();
@@ -3609,7 +3642,7 @@ export class AlertsPage {
 
     /**
      * Disable aggregation by selecting 'total events' from the function dropdown (v3 UI).
-     * This replaces the v2 behavior of clicking a q-toggle off.
+     * This replaces the v2 behavior of clicking a toggle off.
      */
     async disableAggregation() {
         const toggle = this.getAggregationToggle();
@@ -3823,6 +3856,6 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getErrorMessageBanner() {
-        return this.page.locator('[class*="error"], .q-banner--negative, [data-test*="error"]');
+        return this.page.locator('[class*="error"], [data-test*="error"]');
     }
 }

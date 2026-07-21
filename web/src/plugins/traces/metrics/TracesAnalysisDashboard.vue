@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer data-test="traces-analysis-dashboard-drawer"
+    bleed
     v-model:open="isOpen"
     :width="80"
     :title="drawerTitle"
@@ -29,20 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Baseline Chip -->
         <div
-          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-[0.375rem] rounded text-[0.85rem]"
+          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-1.5 rounded-default text-sm"
           :style="{ '--chip-color': chipColors.baseline }"
         >
           <span class="uppercase tracking-wide opacity-70"
-            >Baseline:</span
+            >{{ t('traces.tracesAnalysisDashboard.baseline') }}</span
           >
-          <span class="whitespace-nowrap text-[0.7rem]">{{
+          <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
               baselineTimeRange.startTime,
               baselineTimeRange.endTime,
             ).start
           }}</span>
-          <span class="opacity-60 text-[0.65rem]">→</span>
-          <span class="whitespace-nowrap text-[0.7rem]">{{
+          <span class="opacity-60 text-3xs">→</span>
+          <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
               baselineTimeRange.startTime,
               baselineTimeRange.endTime,
@@ -53,20 +54,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Selected Chip -->
         <div
           v-if="hasSelectedTimeRange"
-          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-[0.375rem] rounded text-[0.85rem]"
+          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-1.5 rounded-default text-sm"
           :style="{ '--chip-color': chipColors.selected }"
         >
           <span class="uppercase tracking-wide opacity-70"
-            >Selected:</span
+            >{{ t('traces.tracesAnalysisDashboard.selected') }}</span
           >
-          <span class="whitespace-nowrap text-[0.7rem]">{{
+          <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay.startTime,
               selectedTimeRangeDisplay.endTime,
             ).start
           }}</span>
-          <span class="opacity-70 text-[0.65rem]">→</span>
-          <span class="whitespace-nowrap text-[0.7rem]">{{
+          <span class="opacity-70 text-3xs">→</span>
+          <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay.startTime,
               selectedTimeRangeDisplay.endTime,
@@ -77,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Additional filter info -->
         <span
           v-if="filterMetadata"
-          class="opacity-60 text-[0.65rem] ml-1"
+          class="opacity-60 text-3xs ml-1"
         >
           {{ filterMetadata }}
         </span>
@@ -101,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showTabs"
         v-model="activeAnalysisType"
         dense
-        class="border-b border-solid border-[var(--o2-border-color)] text-[var(--o2-text-1)]! insights-dashboard-tabs"
+        class="px-page-edge border-b border-solid border-card-glass-border text-text-secondary! insights-dashboard-tabs"
         align="left"
       >
         <OTab
@@ -111,22 +112,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="tab.label"
           :icon="tab.icon"
           :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
-          class="min-h-[3rem]"
+          class="min-h-12"
         />
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <div class="analysis-content flex-1 pt-2 overflow-hidden flex min-h-0 bg-[#f5f5f5]">
+      <div class="analysis-content flex-1 pt-2 overflow-hidden flex min-h-0 bg-surface-subtle">
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
         <div
           v-if="!showDimensionSelector"
-          class="field-list-sidebar-header-collapsed card-container bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5"
-          style="width: 50px; height: 100%"
+          class="bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5 w-12.5 h-full overflow-y-auto"
           data-test="dimension-selector-collapsed-bar"
           @click="toggleDimensionSelector"
         >
-          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90 mt-2.5 text-[20px]" />
-          <div class="field-list-collapsed-title [writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">Dimensions</div>
+          <OIcon name="expand-all" size="sm" class="rotate-90 mt-2.5 text-xl" />
+          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">{{ t('traces.tracesAnalysisDashboard.dimensions') }}</div>
         </div>
 
         <OSplitter
@@ -141,27 +141,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="relative-position h-full">
               <div
                 v-if="showDimensionSelector"
-                class="dimension-sidebar card-container h-full flex flex-col bg-white"
+                class="dimension-sidebar bg-card-glass-bg h-full flex flex-col"
                 data-test="dimension-selector-sidebar"
               >
                 <!-- Sidebar Header with collapse button -->
                 <div
-                  class="px-3 py-2 flex items-center justify-between shrink-0 border-b border-solid border-[var(--o2-border-color)]"
+                  class="px-3 py-2 flex items-center justify-between shrink-0 border-b border-solid border-card-glass-border"
                 >
-                  <span class="font-semibold text-sm">Dimensions</span>
+                  <span class="font-semibold text-sm">{{ t('traces.tracesAnalysisDashboard.dimensions') }}</span>
                   <OButton
                     variant="outline"
                     size="icon-xs-sq"
                     class="rotate-90"
                     icon-left="unfold-less"
-                    title="Collapse Dimensions"
+                    :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
                     data-test="dimension-selector-collapse-btn"
                     @click="toggleDimensionSelector"
                   />
                 </div>
                 <!-- Search Input -->
                 <div
-                  class="p-[0.625rem] border-solid border-[var(--o2-border-color)]"
+                  class="p-2.5 border-solid border-card-glass-border"
                 >
                   <OSearchInput
                     v-model="dimensionSearchText"
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <li
                       v-for="dimension in filteredDimensions"
                       :key="dimension.value"
-                      class="dimension-list-item flex items-center gap-2 px-3 py-1 border-none!"
+                      class="dimension-list-item flex items-center gap-2 px-3 py-1 border-none! hover:bg-interactive-hover-bg"
                     >
                       <div class="flex items-center shrink-0">
                         <OCheckbox
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div class="flex flex-col flex-1 min-w-0">
                         <span
-                          class="dimension-label truncate cursor-pointer text-[var(--o2-text-2)]! text-sm [line-height:1.25rem]"
+                          class="dimension-label truncate cursor-pointer text-text-secondary! text-sm [line-height:1.25rem]"
                         >
                           {{ dimension.label }}
                           <OTooltip
@@ -211,14 +211,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ul>
 
                   <!-- No results message -->
-                  <div v-else class="p-4 text-center text-gray-500">
+                  <div v-else class="p-4 text-center text-text-muted">
                     {{ t("search.noResult") }}
                   </div>
                 </div>
 
                 <!-- Selected Count Footer -->
                 <div
-                  class="p-3 border-t border-solid border-[var(--o2-border-color)] o2-table-footer-title"
+                  class="p-3 border-t border-solid border-card-glass-border text-xs font-normal"
                 >
                   {{ selectedDimensions.length }}
                   {{ t("latencyInsights.dimensionsSelected") }}
@@ -228,7 +228,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
+            <div
+              class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            ></div>
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
@@ -243,14 +245,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex flex-col items-center justify-center h-full py-20"
                 >
                   <OSpinner
-                    size="xl"
+                    size="lg"
                     class="mb-4"
                     data-test="traces-analysis-dashboard-loading-indicator"
                   />
                   <div class="text-base">
                     {{ t("latencyInsights.analyzingDimensions") }}
                   </div>
-                  <div class="text-xs text-gray-500 mt-2">
+                  <div class="text-xs text-text-secondary mt-2">
                     {{
                       t("latencyInsights.computingDistributions", {
                         count: selectedDimensions.length,
@@ -271,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="text-base mb-2">
                     {{ t("latencyInsights.failedToLoad") }}
                   </div>
-                  <div class="text-sm text-gray-500">{{ error }}</div>
+                  <div class="text-sm text-text-secondary">{{ error }}</div>
                   <OButton
                     variant="outline"
                     size="sm-action"
@@ -314,6 +316,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
@@ -389,10 +392,9 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const { t } = useI18n();
+const { isDark } = useTheme();
 const chipColors = computed(() =>
-  store.state.theme === "dark"
-    ? COMPARISON_COLORS.dark
-    : COMPARISON_COLORS.light,
+  isDark.value ? COMPARISON_COLORS.dark : COMPARISON_COLORS.light,
 );
 const { loading, error, analyzeAllDimensions } = useLatencyInsightsAnalysis();
 const { generateDashboard } = useLatencyInsightsDashboard();
@@ -687,7 +689,7 @@ const filterMetadata = computed(() => {
     props.rateFilter &&
     !props.rateFilter.timeStart
   ) {
-    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} traces/interval`;
+    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} ${t('traces.tracesAnalysisDashboard.tracesPerInterval')}`;
   } else if (
     props.analysisType === "error" &&
     props.errorFilter &&
@@ -1114,24 +1116,22 @@ watch(
 );
 </script>
 
-<style>
-/* Non-scoped: ODrawer body for this drawer does not have flex:1 by default
- * (intentional for form drawers, but the Insights drawer needs a full-height
- * splitter layout). Override the body div — 4th child of the drawer panel after
- * the two sr-only elements (h2, p) and the header div.
- * Also adds the top gap (matching --spacing-dialog-content-py = 0.75rem)
- * that ODialog provides by default but ODrawer omits.
- */
-[data-test="traces-analysis-dashboard-drawer"] > div:nth-child(4) {
+<style scoped>
+/* keep(lib-override:o-drawer): ODrawer renders its own panel; the Insights drawer
+ * needs the body cell (4th child — after the two sr-only nodes h2/p and the header
+ * div) to flex to full height for the splitter layout, reachable only via :deep. */
+[data-test="traces-analysis-dashboard-drawer"] > :deep(div:nth-child(4)) {
   flex: 1 1 0 !important;
   overflow: hidden !important;
   display: flex;
   flex-direction: column;
 }
 
-/* Time range chips styling - matching chart colors */
+/* keep(brand): comparison chips are tinted from the runtime --chip-color
+ * (COMPARISON_COLORS baseline/selected palette) via color-mix — a dynamic brand
+ * color Tailwind can't express; the text mix flips through --color-text-heading. */
 .time-range-chip {
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   line-height: 1.2;
   transition: all 0.2s ease;
 }
@@ -1140,39 +1140,7 @@ watch(
 .time-range-chip.selected-chip {
   background: color-mix(in srgb, var(--chip-color) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
-  color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
+  color: color-mix(in srgb, var(--chip-color) 80%, var(--color-text-heading)) !important;
   font-weight: 500;
-}
-
-.dimension-list-item:hover {
-  background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-}
-
-/* Splitter separator bar — visible narrow divider */
-.analysis-splitter-smooth.q-splitter--vertical > .q-splitter__separator {
-  width: 10px !important;
-}
-
-/* Dark mode support */
-body.body--dark .analysis-content {
-  background: #2a2a2a !important;
-}
-
-body.body--dark .dimension-sidebar {
-  background: #202223 !important;
-}
-
-body.body--dark .dimension-list-item {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-body.body--dark .dimension-list-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-/* Time range chips: dark mode text adjustment */
-body.body--dark .time-range-chip.baseline-chip,
-body.body--dark .time-range-chip.selected-chip {
-  color: color-mix(in srgb, var(--chip-color) 80%, #fff) !important;
 }
 </style>

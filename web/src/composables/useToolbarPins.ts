@@ -36,12 +36,14 @@ export const TOOLBAR_PIN_ORDER: ToolbarPinKey[] = [
 
 const STORAGE_KEY = "logs_toolbar_pinned_items";
 
-// Histogram was a fixed toolbar control before it became pinnable, so it is
-// pinned by default. Its absence from STORAGE_KEY (including arrays persisted
-// before histogram existed as a pin key) means "never decided", not "unpinned" —
-// this flag records the user's first explicit pin/unpin of histogram, after
-// which STORAGE_KEY alone is authoritative.
-const HISTOGRAM_PIN_DECIDED_KEY = "logs_toolbar_histogram_pin_decided";
+// Items pinned by default. An item's absence from STORAGE_KEY (including
+// arrays persisted before the item existed as a pin key) means "never
+// decided", not "unpinned" — the per-item flag below records the user's first
+// explicit pin/unpin, after which STORAGE_KEY alone is authoritative.
+const DEFAULT_PINNED: ToolbarPinKey[] = ["histogram"];
+const PIN_DECIDED_KEYS: Partial<Record<ToolbarPinKey, string>> = {
+  histogram: "logs_toolbar_histogram_pin_decided",
+};
 
 const isValidKey = (key: string): key is ToolbarPinKey =>
   (TOOLBAR_PIN_ORDER as string[]).includes(key);
@@ -55,13 +57,14 @@ const readInitial = (): ToolbarPinKey[] => {
           (k): k is ToolbarPinKey => typeof k === "string" && isValidKey(k),
         )
       : [];
-    const histogramDecided =
-      window.localStorage.getItem(HISTOGRAM_PIN_DECIDED_KEY) === "true";
-    if (!histogramDecided && !pins.includes("histogram"))
-      pins.push("histogram");
+    for (const key of DEFAULT_PINNED) {
+      const decided =
+        window.localStorage.getItem(PIN_DECIDED_KEYS[key]!) === "true";
+      if (!decided && !pins.includes(key)) pins.push(key);
+    }
     return pins;
   } catch {
-    return ["histogram"];
+    return [...DEFAULT_PINNED];
   }
 };
 
@@ -88,9 +91,10 @@ export function useToolbarPins() {
     if (next.has(key)) next.delete(key);
     else next.add(key);
     pinnedSet.value = next;
-    if (key === "histogram") {
+    const decidedKey = PIN_DECIDED_KEYS[key];
+    if (decidedKey) {
       try {
-        window.localStorage.setItem(HISTOGRAM_PIN_DECIDED_KEY, "true");
+        window.localStorage.setItem(decidedKey, "true");
       } catch {
         // localStorage may be unavailable — the default-pinned fallback reapplies next session.
       }

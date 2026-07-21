@@ -190,17 +190,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="logout_confirm"
     persistent
     size="xs"
-    title="Password Changed"
-    primary-button-label="Ok"
+    :title="t('iam.addUser.passwordChanged')"
+    :primary-button-label="t('iam.addUser.ok')"
     @click:primary="signout"
   >
     <div class="flex items-center gap-3">
-      <div class="bg-[var(--o2-primary)] text-white inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0">
+      <div class="bg-accent text-text-inverse inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0">
         <OIcon name="info" size="sm" />
       </div>
-      <span>As you've chosen to change your password, you'll be automatically
-        logged out.</span
-      >
+      <span>{{ t('iam.addUser.changePasswordLogoutMessage') }}</span>
     </div>
   </ODialog>
 </template>
@@ -305,11 +303,10 @@ export default defineComponent({
     const loggedInUserEmail = ref(store.state.userInfo.email);
     const filterdOption = ref([...props.customRoles]);
 
-    // Non-form context (Rule ③): the org the user is assigned to, the original
-    // record we round-trip on edit, and whether the edited user is external.
-    // These are NOT form fields — they live OUTSIDE <OForm>, read by the owner's
-    // v-if / schema-context / submit handler. The 10 editable fields are owned by
-    // the single TanStack form below (no `formData` mirror, no v-model-to-a-ref).
+    // Non-form context: the org the user is assigned to, the original record we
+    // round-trip on edit, and whether the edited user is external. These are NOT
+    // form fields — they live OUTSIDE <OForm>, read by the owner's v-if /
+    // schema-context / submit handler.
     const organization = ref(store.state.selectedOrganization.identifier);
     const editRecord: any = ref(null);
     const isExternalUser = ref(false);
@@ -332,27 +329,19 @@ export default defineComponent({
     const supportsCustomRole =
       config.isEnterprise == "true" || config.isCloud == "true";
 
-    // Reproduce the pre-migration wire behaviour EXACTLY. Before, `custom_role`
-    // was on `formData` only once actually POPULATED — via getUserRoles hydration
-    // (edit + Enterprise/Cloud) or the user picking in the select (add-existing /
-    // edit + Enterprise/Cloud). An unpopulated field stayed `undefined` and was
-    // JSON-omitted; a populated one (even `[]`) was sent. The migrated schema
-    // seeds `custom_role: []` for every mode, collapsing that distinction, so
-    // decide inclusion explicitly to match BEFORE byte-for-byte:
+    // Decide whether to send `custom_role`:
     //   • OSS → never (the field is Enterprise/Cloud-only).
     //   • edit → always (getUserRoles always hydrates it, even to `[]`).
     //   • otherwise (add-existing / create-new) → only when the user actually
-    //     selected roles (length > 0). Untouched `[]` ⇒ omit, as before; a
-    //     selection carried from add-existing into a 422→create-new flow is
-    //     still sent, also as before.
+    //     selected roles (length > 0).
     const includeCustomRole = (value: AddUserForm) =>
       supportsCustomRole &&
       (beingUpdated.value ||
         (Array.isArray(value.custom_role) && value.custom_role.length > 0));
 
-    // The save handler reads the VALIDATED `value` ONLY (Rule ②) — no formData
-    // mirror. Non-form context (org, the original edit record) comes from the refs
-    // above. OForm awaits it, so the footer Save spinner spans the request.
+    // The save handler reads the VALIDATED `value` only. Non-form context (org,
+    // the original edit record) comes from the refs above. OForm awaits it, so
+    // the footer Save spinner spans the request.
     const onSubmit = async (value: AddUserForm) => {
       let selectedOrg = organization.value;
       if (selectedOrg == "other") {
@@ -369,8 +358,8 @@ export default defineComponent({
           change_password: value.change_password,
           organization: selectedOrg,
         };
-        // Match pre-migration: send the hydrated custom_role on Enterprise/Cloud
-        // edits; otherwise drop it (the editRecord spread could also leak it).
+        // Send the hydrated custom_role on Enterprise/Cloud edits; otherwise
+        // drop it (the editRecord spread could also leak it).
         if (includeCustomRole(value)) {
           payload.custom_role = value.custom_role;
         } else {
@@ -433,8 +422,8 @@ export default defineComponent({
         } catch (err: any) {
           if (err.response.data.code === 422) {
             // The email is actually new → switch to "create new user" mode. The
-            // stable schema reads existingUser live, so it now enforces the
-            // password policy WITHOUT a remount.
+            // schema reads existingUser live, so it enforces the password policy
+            // without a remount.
             existingUser.value = false;
           } else {
             if (err.response?.status != 403 || err?.status != 403) {
@@ -453,8 +442,8 @@ export default defineComponent({
             org_member_id: "",
             organization: selectedOrg,
           };
-          // Before, create-new never had a populated custom_role (the select is
-          // hidden in create mode) unless it was carried over from add-existing.
+          // create-new has no populated custom_role (the select is hidden in
+          // create mode) unless it was carried over from add-existing.
           if (!includeCustomRole(value)) {
             delete payload.custom_role;
           }
@@ -471,11 +460,11 @@ export default defineComponent({
       }
     };
 
-    // OWNER pattern (Rule ③): this component renders <OForm>, so it creates the
-    // form here (useOForm) to read it reactively (form.useStore) for parent-side
-    // v-if, then hands it down via <OForm :form="form"> — ONE source of truth.
-    // The schema takes a context GETTER so a single stable instance follows mode
-    // flips (e.g. the 422 add-existing → create-new switch) with no remount.
+    // This component renders <OForm>, so it creates the form here (useOForm) to
+    // read it reactively (form.useStore) for parent-side v-if, then hands it down
+    // via <OForm :form="form"> — ONE source of truth. The schema takes a context
+    // GETTER so a single stable instance follows mode flips (e.g. the 422
+    // add-existing → create-new switch) with no remount.
     const addUserSchema = makeAddUserSchema(
       () => ({
         existingUser: existingUser.value,
@@ -521,10 +510,10 @@ export default defineComponent({
     );
 
     // Reset form state only when the dialog transitions from closed → open.
-    // Previously this was a deep watch on modelValue, but parent-side mutations
-    // of selectedUser caused it to fire mid-flight and reset existingUser back
-    // to true, undoing the 422-catch transition from "add existing user" to
-    // "create new user" and hiding the password/name fields.
+    // A deep watch on modelValue must NOT be used: parent-side mutations of
+    // selectedUser fire it mid-flight and reset existingUser back to true,
+    // undoing the 422-catch add-existing → create-new transition and hiding
+    // the password/name fields.
     const resetFormFromModelValue = (newVal: any) => {
       if (newVal && newVal.email != undefined && newVal.email != "") {
         beingUpdated.value = true;
@@ -541,9 +530,7 @@ export default defineComponent({
           password: "",
         };
         isExternalUser.value = !!newVal.is_external;
-        // Seed the ONE form via reset(values) — never a formData mirror nor a
-        // per-field setFieldValue loop (Rule ③ / playbook "data arrives after
-        // mount" → reset, flash-free).
+        // Seed the form via reset(values) — never a per-field setFieldValue loop.
         form.reset({
           ...blankForm(),
           email: newVal.email ?? "",
@@ -558,8 +545,7 @@ export default defineComponent({
             .getUserRoles(orgId, newVal.email)
             .then((response: any) => {
               // custom_role arrives AFTER mount (async) — bridge it into the form
-              // so the OFormSelect displays it (the sanctioned setFieldValue
-              // bridge for data that arrives post-mount).
+              // so the OFormSelect displays it.
               form.setFieldValue("custom_role", response.data);
             })
             .catch((error: any) => {
@@ -598,7 +584,7 @@ export default defineComponent({
 
       if (props.userRole == "root") {
         organizationOptions.value.push({
-          label: "Other",
+          label: t("iam.addUser.other"),
           value: "other",
         });
       }
@@ -606,8 +592,7 @@ export default defineComponent({
     };
 
     // Options-API: everything the template binds MUST be returned from setup() —
-    // a bare module import is out of the template's scope. The OWNER form, the
-    // reactive form-state reads, and the non-form context all flow through here.
+    // a bare module import is out of the template's scope.
     return {
       t,
       store,
@@ -649,7 +634,7 @@ export default defineComponent({
   },
   methods: {
     signout() {
-      // Always call backend logout to clear auth cookies (#10900)
+      // Always call backend logout to clear auth cookies
       this.invalidateLoginData();
 
       this.store.dispatch("logout");

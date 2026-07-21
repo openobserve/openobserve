@@ -1,26 +1,8 @@
 ﻿<template>
   <EvalListShell
     data-test="scorer"
-    :show-empty="showNoProvidersState"
+    :show-empty="false"
   >
-    <!-- Special-case empty: the org has no LLM providers yet. LLM Judge
-         scorers (the most common type) can't be created without one, so we
-         surface a dedicated provider-onboarding card outside the OTable
-         flow. Reuses the shared `no-llm-providers` preset (same illustration
-         + "Add provider" action) but overrides the copy with scorer-specific
-         context, so it matches the empty-state language used elsewhere in
-         the app instead of the bespoke EvalEmptyState card. -->
-    <template #empty>
-      <OEmptyState
-        size="hero"
-        preset="no-llm-providers"
-        :title="t('onlineEvals.scorer.noProviders.title')"
-        :description="t('onlineEvals.scorer.noProviders.description')"
-        data-test="scorer-no-providers-state"
-        @action="(id) => id === 'create' && $emit('add-provider')"
-      />
-    </template>
-
     <template #table>
       <OTable
         v-model:selected-ids="selectedIds"
@@ -78,7 +60,24 @@
 
         <template #empty>
           <div class="flex items-center justify-center py-8">
+            <!-- Special-case empty: the org has no LLM providers yet. LLM Judge
+                 scorers (the most common type) can't be created without one, so
+                 we surface a dedicated provider-onboarding card. Rendered inside
+                 the table's #empty slot (not EvalListShell's) so the search bar
+                 and column header stay visible — consistent with the no-scorers
+                 state and the Eval Jobs / Score Configs list pages. Reuses the
+                 shared `no-llm-providers` preset with scorer-specific copy. -->
             <OEmptyState
+              v-if="showNoProvidersState"
+              size="hero"
+              preset="no-llm-providers"
+              :title="t('onlineEvals.scorer.noProviders.title')"
+              :description="t('onlineEvals.scorer.noProviders.description')"
+              data-test="scorer-no-providers-state"
+              @action="(id) => id === 'create' && $emit('add-provider')"
+            />
+            <OEmptyState
+              v-else
               size="hero"
               preset="no-scorers"
               :filtered="hasFilters"
@@ -93,7 +92,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title">
+          <span class="text-xs font-normal">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
           </span>
           <OButton
@@ -117,15 +116,15 @@
         </template>
 
         <template #cell-produces="{ row }">
-          <span class="font-mono text-xs">{{ producesLabel(row) || "—" }}</span>
+          {{ producesLabel(row) || "—" }}
         </template>
 
         <template #cell-version="{ row }">
-          <span class="font-mono text-xs">v{{ row.version }}</span>
+          <span class="tabular-nums">v{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="font-mono text-xs">{{ usedByText(row) }}</span>
+          <span class="tabular-nums">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-actions="{ row }">
@@ -305,8 +304,9 @@ const numberedRows = useNumberedRows(filteredRows);
 // When the org has no providers AND no scorers yet, surface a dedicated
 // provider-onboarding screen instead of the standard empty state. LLM Judge
 // scorers (the most common type) can't be created without a provider, so
-// nudging the user there first avoids a dead-end. This case routes through
-// EvalListShell's #empty slot (full card) so the OTable doesn't render.
+// nudging the user there first avoids a dead-end. This renders inside the
+// OTable's #empty slot (not EvalListShell's) so the search bar + column
+// header stay visible, matching the other eval list pages.
 const showNoProvidersState = computed(
   () =>
     !props.loading &&

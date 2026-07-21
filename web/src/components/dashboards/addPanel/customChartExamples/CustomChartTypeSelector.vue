@@ -15,27 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard
+  <!-- Height matches the host ODialog's own max-h-[90vh] cap (minus its body
+       padding + borders) so the dialog body never overflows. That keeps the
+       inner right-content area as the single scroller instead of stacking a
+       second scrollbar on the dialog body. -->
+  <OCard class="p-0 w-full h-[calc(90vh_-_2rem)] overflow-hidden flex flex-col"
     data-test="custom-chart-type-selector-popup"
-    style="
-      padding: 0;
-      width: 100%;
-      height: calc(100vh - 57px);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    "
   >
     <!-- Header -->
     <OCardSection role="header">
       <div class="flex items-center gap-3 w-full">
         <OIcon name="bar-chart" size="sm" />
-        <span class="text-xl font-semibold whitespace-nowrap">Example of custom charts</span>
+        <span class="text-xl font-semibold whitespace-nowrap">{{ t('dashboard.customChartTypeSelector.exampleOfCustomCharts') }}</span>
         <OSearchInput
           v-model="searchQuery"
-          placeholder="Search charts..."
+          :placeholder="t('dashboard.customChartTypeSelector.searchCharts')"
           clearable
-          style="width: 280px; flex: 0 0 280px; margin-left: 16px;"
+          class="w-70 flex-[0_0_17.5rem] ml-4"
           @clear="searchQuery = ''"
         />
         <div class="flex-1" />
@@ -54,25 +50,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Main Content -->
     <OCardSection
-      class="flex"
-      style="height: calc(100% - 60px); overflow: hidden; padding: 0"
+      class="flex h-[calc(100%_-_3.75rem)] overflow-hidden p-0"
     >
-      <div class="flex flex-nowrap" style="height: 100%; width: 100%">
+      <div class="flex flex-nowrap h-full w-full">
         <!-- Left Sidebar -->
         <OCard
-          class="p-4"
-          style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
+          class="p-4 w-40 h-full shrink-0 overflow-y-auto"
         >
-          <div class="text-sm font-medium mb-3 text-weight-bold">Chart Types</div>
+          <div class="text-sm font-medium mb-3 font-bold">{{ t('dashboard.customChartTypeSelector.chartTypes') }}</div>
           <ul class="flex flex-col list-none p-0 m-0">
             <li
               v-for="(category, index) in chartCategories"
               :key="index"
               @click="scrollToCategory(category.chartLabel)"
-              class="flex items-center px-3 py-2 cursor-pointer rounded mb-1 transition-all duration-200 hover:bg-black/4"
-              :class="{
-                'bg-(--q-primary) text-white font-semibold': selectedCategory === category.chartLabel,
-              }"
+              class="flex items-center px-3 py-2 cursor-pointer rounded-default mb-1 transition-all duration-200"
+              :class="
+                selectedCategory === category.chartLabel
+                  ? 'bg-theme-accent text-text-inverse font-semibold'
+                  : 'hover:bg-button-ghost-hover-bg'
+              "
               data-test="chart-category-item"
             >
               <span class="text-sm">{{ category.chartLabel }}</span>
@@ -83,21 +79,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Content Area -->
         <div
           ref="contentArea"
-          class="p-3"
-          style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
+          class="p-3 flex-1 h-full overflow-y-auto overflow-x-hidden"
           @scroll="handleScroll"
         >
           <!-- No Results Message -->
           <div
             v-if="filteredCategories.length === 0"
-            class="flex justify-center items-center"
-            style="height: 100%"
+            class="flex justify-center items-center h-full"
           >
             <div class="text-center">
-              <OIcon name="search-off" style="width: 4rem; height: 4rem;" />
-              <div class="text-xl font-semibold text-gray-400 mt-3">No results found</div>
-              <div class="text-sm text-gray-400 mt-2">
-                Try searching with different keywords
+              <OIcon class="w-16 h-16" name="search-off" />
+              <div class="text-xl font-semibold text-text-muted mt-3">{{ t('dashboard.customChartTypeSelector.noResultsFound') }}</div>
+              <div class="text-sm text-text-muted mt-2">
+                {{ t('dashboard.customChartTypeSelector.trySearchingDifferentKeywords') }}
               </div>
             </div>
           </div>
@@ -110,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-category="category.chartLabel"
             data-test="chart-category-section"
           >
-            <div class="text-xl font-semibold mb-3 text-weight-medium">
+            <div class="text-xl font-semibold mb-3 font-medium">
               {{ category.chartLabel }}
             </div>
             <div class="flex gap-3">
@@ -120,15 +114,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
                 <OCard
-                  class="cursor-pointer transition-all duration-200 h-full hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:-translate-y-0.5"
+                  class="cursor-pointer transition-all duration-200 h-full hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)] hover:-translate-y-0.5"
                   :class="{
-                    'border-2 border-(--q-primary) shadow-[0_4px_12px_rgba(var(--q-primary-rgb),0.3)]': selectedChart?.value === chart.value,
+                    'border-2 border-theme-accent shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]': selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
                   data-test="chart-type-card"
                 >
                   <OCardSection class="p-2">
-                    <div class="w-full h-37.5 flex items-center justify-center bg-[#f8f8f8] rounded overflow-hidden">
+                    <div class="w-full h-37.5 flex items-center justify-center bg-surface-subtle rounded-default overflow-hidden">
                       <img
                         :src="chart.asset"
                         :alt="chart.label"
@@ -138,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </OCardSection>
                   <OCardSection class="pt-0 px-2 pb-2">
-                    <div class="text-xs text-center text-weight-medium">
+                    <div class="text-xs text-center font-medium">
                       {{ chart.label }}
                     </div>
                   </OCardSection>
@@ -152,8 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Confirm Chart Selection Dialog -->
     <CustomChartConfirmDialog
-      title="Confirm Chart Type Selection"
-      message="By selecting this chart type, the existing chart code will be replaced by the selected chart type's code. Do you want to continue?"
+      :title="t('dashboard.customChartTypeSelector.confirmChartTypeSelection')"
+      :message="t('dashboard.customChartTypeSelector.confirmChartTypeSelectionMessage')"
       :currentQuery="currentQuery"
       @update:ok="confirmChartSelection"
       @update:cancel="cancelChartSelection"

@@ -5,6 +5,7 @@ import ImportDashboard from "./ImportDashboard.vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock external dependencies
 vi.mock("@/utils/commons", () => ({
@@ -118,20 +119,7 @@ const createMockRouter = () => {
 const createMockI18n = () => {
   return createI18n({
     locale: "en",
-    messages: {
-      en: {
-        dashboard: {
-          importDashboard: "Import Dashboard",
-          communityDashboard: "Community Dashboard",
-          import: "Import",
-          addURL: "Add URL",
-          dropFileMsg: "Drop file here",
-        },
-        function: {
-          cancel: "Cancel",
-        },
-      },
-    },
+    messages: { en: enLocaleFull },
   });
 };
 

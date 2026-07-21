@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <img
       data-test="trace-row-service-icon"
       :src="serviceIconUrl"
-      class="mr-2 shrink-0 w-[1.25rem] h-[1.25rem]"
+      class="mr-2 shrink-0 w-5 h-5"
       aria-hidden="true"
       alt=""
     />
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center gap-[0.325rem] min-w-0 flex-nowrap!">
       <span
         data-test="trace-row-service-name"
-        class="text-weight-bold truncate min-w-0 text-(--color-grey-500)! text-[0.8rem]! tracking-[0.03rem]! [font-family:var(--font-mono)]"
+        class="truncate min-w-0 text-xs text-text-body"
       >
         {{ item.service_name }}
         <OTooltip side="bottom" align="center">
@@ -42,17 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useTraces from "@/composables/useTraces";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
+import useTheme from "@/composables/useTheme";
 
 const props = defineProps<{
   item: Record<string, any>;
   dataTest?: string;
 }>();
 
-const store = useStore();
+const { isDark } = useTheme();
 
 const { getOrSetServiceColor } = useTraces();
 
@@ -63,7 +63,7 @@ const rootColor = computed(
 const serviceIconUrl = computed(() =>
   getServiceIconDataUrl(
     props.item.service_name,
-    store.state.theme === "dark",
+    isDark.value,
     rootColor.value,
   ),
 );

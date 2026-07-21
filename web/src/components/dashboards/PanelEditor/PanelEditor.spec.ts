@@ -272,14 +272,6 @@ const ODialogStub = {
 const mountGlobal = {
   plugins: [i18n],
   stubs: {
-    QSeparator: true,
-    QSplitter: {
-      template:
-        '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-    },
-    QIcon: true,
-    QBtn: true,
-    QTooltip: true,
     // OSplitter slots must render so nested ODialogs (e.g. the custom-chart
     // selector inside the splitter's #before slot) appear in the DOM.
     OSplitter: {

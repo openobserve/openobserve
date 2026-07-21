@@ -26,13 +26,23 @@
 // uninstrumented gRPC backends are never hidden. Unknown non-empty inferred
 // types default to External (a dependency), never Service.
 
+// GenAI entity kinds (agent/tool/model) are derived from a span's gen_ai_*
+// columns at ingest (surfaced via the edge `connection_type`). Unlike inferred
+// dependencies they are NOT positional: an agent is usually also a real service,
+// so they must win BEFORE the isRealService check — otherwise every agent that
+// calls a tool classifies as a bare Service. Kept in sync with the Rust
+// EntityKind and the shared fixture.
+
 /** The kind an entity is classified into. RPC is a first-class dependency. */
 export type EntityKind =
   | "service"
   | "datastore"
   | "queue"
   | "external"
-  | "rpc";
+  | "rpc"
+  | "agent"
+  | "tool"
+  | "model";
 
 /** The inferred types we branch on explicitly. */
 export type KnownInferType = "database" | "queue" | "external" | "rpc";
@@ -41,10 +51,13 @@ export type KnownInferType = "database" | "queue" | "external" | "rpc";
  * Classify a trace entity.
  *
  * @param isRealService true when the entity emits its own spans (a real
- *   instrumented service). Wins first: a real service that is also inferred (a
- *   collision) stays a Service.
- * @param inferServiceType the entity's `infer_service_type`
- *   (`database`/`queue`/`external`/`rpc`), or null/undefined/empty when none.
+ *   instrumented service). Wins over the dependency kinds: a real service that
+ *   is also inferred (a collision) stays a Service. Does NOT win over GenAI
+ *   kinds — those are explicit and authoritative.
+ * @param inferServiceType the entity's classification tag: for inferred
+ *   dependencies the `infer_service_type`
+ *   (`database`/`queue`/`external`/`rpc`); for GenAI entities the edge
+ *   `connection_type` (`agent`/`tool`/`model`). null/undefined/empty when none.
  *   Note the backend stores `database` (not `datastore`) as the raw type; this
  *   function maps it to the `datastore` kind. Unknown non-empty values fall
  *   through to `external` (a dependency), never `service`.
@@ -53,8 +66,18 @@ export function classifyEntity(
   isRealService: boolean,
   inferServiceType?: KnownInferType | (string & {}) | null,
 ): EntityKind {
-  if (isRealService) return "service";
   const t = (inferServiceType ?? "").trim();
+  // GenAI kinds are explicit and authoritative — checked before isRealService,
+  // because agents are usually real services too.
+  switch (t) {
+    case "agent":
+      return "agent";
+    case "tool":
+      return "tool";
+    case "model":
+      return "model";
+  }
+  if (isRealService) return "service";
   switch (t) {
     case "database":
       return "datastore";

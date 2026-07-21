@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    bleed
     :open="visible"
     :width="60"
     :seamless="true"
@@ -34,26 +35,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               data-test="service-graph-node-panel-view-related-btn"
             >
-              View Related
+              {{ t('traces.serviceGraphNodeSidePanel.viewRelated') }}
               <OIcon name="arrow-drop-down" size="sm" />
             </OButton>
           </template>
           <ODropdownItem
             @select="viewRelatedLogs"
             data-test="service-graph-node-panel-view-related-logs-btn"
-            >Logs</ODropdownItem
+            >{{ t('traces.serviceGraphNodeSidePanel.logs') }}</ODropdownItem
           >
           <ODropdownItem
             @select="viewRelatedTraces"
             data-test="service-graph-node-panel-view-related-traces-btn"
-            >Traces</ODropdownItem
+            >{{ t('traces.serviceGraphNodeSidePanel.traces') }}</ODropdownItem
           >
         </ODropdown>
       </div>
     </template>
 
     <!-- Content Scrollable Area -->
-      <div class="panel-content flex-1 overflow-y-auto overflow-x-hidden bg-[#0f1419] p-2.5">
+      <!-- No horizontal padding here: sections that need an inset (charts, chip row, tab labels)
+           add px-page-edge themselves, so dividers and tables can bleed to the edges naturally. -->
+      <div class="panel-content flex-1 overflow-y-auto overflow-x-hidden bg-surface-base dark:bg-[color-mix(in_srgb,var(--color-grey-950)_85%,var(--color-indigo-900))] py-2.5">
         <!-- RED Charts Section -->
         <div
           v-if="streamFilter !== 'all' && dashboardData"
@@ -63,19 +66,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- DataZoom filter chips + View in Traces button -->
           <div
             v-if="filterChips.length"
-            class="flex items-center gap-2 px-2 py-[0.3rem] flex-wrap"
+            class="flex items-center gap-2 px-page-edge py-[0.3rem] flex-wrap"
             data-test="service-graph-side-panel-filter-chips"
           >
             <!-- Filter chip pills -->
             <div
               v-for="chip in filterChips"
               :key="chip.key"
-              class="inline-flex items-center gap-1 rounded border border-[var(--o2-border)] px-2 py-[0.325rem] text-[0.7rem] leading-none text-[var(--o2-text-primary)]"
+              class="inline-flex items-center gap-1 rounded-default border border-border-default px-2 py-[0.325rem] text-2xs leading-none text-text-body"
               :data-test="`service-graph-filter-chip-${chip.key}`"
               :class="
                 chip.type === 'duration'
-                  ? 'text-[var(--o2-latency-p95)]'
-                  : 'text-[var(--o2-status-error-text)]'
+                  ? 'text-latency-p95'
+                  : 'text-status-error-text'
               "
             >
               <!-- Duration chip icon -->
@@ -83,20 +86,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="chip.type === 'duration'"
                 name="schedule"
                 size="xs"
-                class="text-[var(--o2-latency-p95)]"
+                class="text-latency-p95"
               />
               <!-- Error chip icon -->
               <OIcon
                 v-else-if="chip.type === 'error'"
                 name="warning"
                 size="xs"
-                class="text-[var(--o2-status-error-text)]"
+                class="text-status-error-text"
               />
               <span
                 :class="
                   chip.type === 'duration'
-                    ? 'text-[var(--o2-latency-p95)]'
-                    : 'text-[var(--o2-status-error-text)]'
+                    ? 'text-latency-p95'
+                    : 'text-status-error-text'
                 "
                 >{{ chip.label }}</span
               >
@@ -124,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <OIcon name="search" size="xs" />
               </template>
-              View Traces
+              {{ t('traces.serviceGraphNodeSidePanel.viewTraces') }}
             </OButton>
           </div>
           <div class="charts-wrapper py-0! min-h-[10.875rem] w-full">
@@ -143,11 +146,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="my-[1rem]!" />
+        <!-- Full-bleed divider: panel has no horizontal padding, so w-full reaches both edges -->
+        <OSeparator v-if="streamFilter !== 'all' && dashboardData" class="my-1.5!" />
         <!-- Tabs: Operations / Nodes / Pods -->
         <template v-if="streamFilter !== 'all'">
+          <!-- Row spans full width so the bottom border bleeds; px-page-edge keeps the tab labels inset -->
           <div
-            class="flex items-end border-b border-b-[var(--o2-border-color)] mx-[0.5rem] mb-[0.375rem]"
+            class="flex items-end border-b border-b-card-glass-border mb-0 px-page-edge"
             data-test="service-graph-node-panel-tabs-row"
           >
             <OTabs
@@ -159,8 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTab
                 name="operations"
-                label="Operations"
-                style="text-transform: capitalize"
+                :label="t('traces.serviceGraphNodeSidePanel.operations')"
+                class="capitalize"
                 data-test="service-graph-node-panel-tab-operations"
               />
               <OTab
@@ -168,14 +173,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="cfg.id"
                 :name="cfg.id"
                 :label="cfg.label"
-                style="text-transform: capitalize"
+                class="capitalize"
                 :data-test="`service-graph-node-panel-tab-${cfg.id}`"
               />
               <OTab
                 v-if="!isInferred"
                 name="metrics"
-                label="Metrics"
-                style="text-transform: capitalize"
+                :label="t('traces.serviceGraphNodeSidePanel.metrics')"
+                class="capitalize"
                 data-test="service-graph-node-panel-tab-metrics"
               />
             </OTabs>
@@ -198,12 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <div
-                class="min-w-[12rem]!"
+                class="min-w-48!"
                 data-test="service-graph-node-panel-workload-fields-menu"
               >
                 <template v-for="env in detectedEnvironments" :key="env.key">
                   <div
-                    class="text-xs px-3 pb-0 py-[0.375rem]! uppercase tracking-wide text-muted-foreground"
+                    class="text-xs px-3 pb-0 py-1.5! uppercase tracking-wide text-muted-foreground"
                   >
                     {{ env.label }}
                   </div>
@@ -213,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     )"
                     :key="cfg.id"
                     :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
-                    class="px-[0.325rem]! h-[30px]! min-h-[30px]!"
+                    class="px-[0.325rem]! h-7.5! min-h-7.5!"
                     @select="(e) => { e.preventDefault(); toggleWorkloadField(cfg.id); }"
                   >
                     <template #icon-left>
@@ -243,14 +248,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="recentOperations.length === 0 && !loadingOperations"
-                class="text-xs italic py-2 text-center"
-                style="color: var(--o2-text-secondary)"
+                class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
               >
-                No operations found
+                {{ t('traces.serviceGraphNodeSidePanel.noOperationsFound') }}
               </div>
               <div
                   v-else-if="recentOperations.length > 0 || loadingOperations"
-                  class="overflow-hidden rounded"
+                  class="overflow-hidden svc-panel-table"
                   data-test="service-graph-side-panel-operations-table"
                 >
                   <TenstackTable
@@ -279,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         :class="
                           item.errors > 0
-                            ? 'text-[var(--q-negative)] font-semibold'
+                            ? 'text-[var(--color-status-negative)] font-semibold'
                             : ''
                         "
                         >{{ item.errors }}</span
@@ -291,6 +295,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :max="rowMaxes(sortedOperationsTableRows, ['p99']).p99"
                         :label="formatOperationLatency(item.p99)"
                         variant="warning"
+                        align="right"
+                        inline
                       />
                     </template>
                     <template #cell-p95="{ item }">
@@ -298,6 +304,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="item.p95"
                         :max="rowMaxes(sortedOperationsTableRows, ['p95']).p95"
                         :label="formatOperationLatency(item.p95)"
+                        align="right"
+                        inline
                       />
                     </template>
                     <template #cell-p75="{ item }">
@@ -305,6 +313,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="item.p75"
                         :max="rowMaxes(sortedOperationsTableRows, ['p75']).p75"
                         :label="formatOperationLatency(item.p75)"
+                        align="right"
+                        inline
                       />
                     </template>
                     <template #cell-actions="{ row, column, active }">
@@ -312,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="active"
                         variant="ghost"
                         size="icon"
-                        class="ml-1 absolute! right-2!"
+                        class="ml-1 absolute! right-1!"
                         data-test="service-graph-side-panel-view-traces-btn"
                         @click.stop="
                           navigateToTraces({
@@ -324,15 +334,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         <OIcon name="search" size="xs" />
-                        <OTooltip content="View in Traces" />
+                        <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                       </OButton>
                     </template>
                     <template #empty>
                       <div
-                        class="text-xs italic py-2 text-center"
-                        style="color: var(--o2-text-secondary)"
+                        class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
                       >
-                        No operations found
+                        {{ t('traces.serviceGraphNodeSidePanel.noOperationsFound') }}
                       </div>
                     </template>
                   </TenstackTable>
@@ -350,14 +359,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 v-if="!resourceTabData[cfg.id]?.length && !resourceTabLoading[cfg.id]"
-                class="text-xs italic py-2 text-center"
-                style="color: var(--o2-text-secondary)"
+                class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
               >
-                No {{ cfg.label.toLowerCase() }} data found
+                {{ t('traces.serviceGraphNodeSidePanel.noResourceDataFound', { resource: cfg.label.toLowerCase() }) }}
               </div>
               <div
                 v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
-                class="overflow-hidden rounded"
+                class="overflow-hidden svc-panel-table"
                 :data-test="`service-graph-side-panel-${cfg.id}-table`"
               >
                 <TenstackTable
@@ -388,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="active"
                       variant="ghost"
                       size="icon"
-                      class="ml-1 absolute! right-2!"
+                      class="ml-1 absolute! right-1! bg-table-row-hover-bg! rounded-default shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
                       :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                       @click.stop="
                         navigateToTraces({
@@ -401,14 +409,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       <OIcon name="search" size="xs" />
-                      <OTooltip content="View in Traces" />
+                      <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                     </OButton>
                   </template>
                   <template #cell-errors="{ item }">
                     <span
                       :class="
                         item.errors > 0
-                          ? 'text-[var(--q-negative)] font-semibold'
+                          ? 'text-[var(--color-status-negative)] font-semibold'
                           : ''
                       "
                       >{{ item.errors }}</span
@@ -420,6 +428,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p99']).p99"
                       :label="formatOperationLatency(item.p99)"
                       variant="warning"
+                      align="right"
+                      inline
                     />
                   </template>
                   <template #cell-p95="{ item }">
@@ -427,6 +437,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="item.p95"
                       :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p95']).p95"
                       :label="formatOperationLatency(item.p95)"
+                      align="right"
+                      inline
                     />
                   </template>
                   <template #cell-p75="{ item }">
@@ -434,14 +446,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="item.p75"
                       :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p75']).p75"
                       :label="formatOperationLatency(item.p75)"
+                      align="right"
+                      inline
                     />
                   </template>
                   <template #empty>
                     <div
-                      class="text-xs italic py-2 text-center"
-                      style="color: var(--o2-text-secondary)"
+                      class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
                     >
-                      No {{ cfg.label.toLowerCase() }} data found
+                      {{ t('traces.serviceGraphNodeSidePanel.noResourceDataFound', { resource: cfg.label.toLowerCase() }) }}
                     </div>
                   </template>
                 </TenstackTable>
@@ -455,22 +468,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="p-0! panel-section mb-0! h-full!"
               data-test="service-graph-side-panel-metrics"
             >
-              <!-- Loading state -->
+              <!-- Loading state — shimmer skeletons standing in for the metric charts -->
               <div
                 v-if="metricsCorrelationLoading"
-                class="flex items-center gap-2 py-3 text-sm"
-                style="color: var(--o2-text-secondary)"
+                class="flex flex-col gap-3 px-page-edge py-4"
                 data-test="service-graph-side-panel-metrics-loading"
               >
-                <OSpinner size="xs" />
-                <span>Loading metrics...</span>
+                <OSkeleton type="text" class="w-40! h-4" />
+                <OSkeleton type="rect" class="w-full! h-40" />
+                <OSkeleton type="rect" class="w-full! h-40" />
               </div>
 
               <!-- Error state -->
               <div
                 v-else-if="metricsCorrelationError"
-                class="flex flex-col items-center gap-3 py-6 text-center text-sm"
-                style="color: var(--o2-text-secondary)"
+                class="flex flex-col items-center gap-3 py-6 text-center text-sm text-text-secondary"
                 data-test="service-graph-side-panel-metrics-error"
               >
                 <span>{{ metricsCorrelationError }}</span>
@@ -479,7 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   data-test="service-graph-side-panel-metrics-retry-btn"
                   @click="fetchMetricsCorrelation(true)"
-                  >Retry</OButton
+                  >{{ t('traces.serviceGraphNodeSidePanel.retry') }}</OButton
                 >
               </div>
 
@@ -509,15 +521,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-graph-side-panel-metrics-dashboard"
               />
 
-              <!-- Empty state -->
-              <div
+              <!-- Empty state — standard OEmptyState -->
+              <OEmptyState
                 v-else-if="metricsCorrelationLoaded"
-                class="text-xs italic py-2 text-center"
-                style="color: var(--o2-text-secondary)"
+                size="inline"
+                icon="insights"
+                :title="t('traces.serviceGraphNodeSidePanel.noMetricsAvailable')"
+                hide-action
+                class="py-16"
                 data-test="service-graph-side-panel-metrics-empty"
-              >
-                No metrics available for this service.
-              </div>
+              />
             </OTabPanel>
           </OTabPanels>
         </template>
@@ -590,10 +603,11 @@ import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButto
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { useI18n } from "vue-i18n";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 
@@ -828,6 +842,8 @@ export default defineComponent({
   components: {
     OTag,
     OSeparator,
+    OSkeleton,
+    OEmptyState,
     OTabs,
     OTab,
     OTabPanels,
@@ -839,7 +855,6 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     TenstackTable,
     RenderDashboardCharts,
-    OSpinner,
     OTooltip,
     OCheckbox,
     OIcon,
@@ -918,19 +933,89 @@ export default defineComponent({
       return escapeSingleQuotes(name);
     };
 
+    // Shared cache of stream schema field names — populated by resolveStreamSchema,
+    // consumed by serviceNameField (model column resolution), resolveWorkloadFields
+    // and inferredTabConfigs. Declared here (ahead of serviceNameField) so the
+    // computed can read it without a temporal-dead-zone error at mount.
+    const streamFieldSet = ref<Set<string>>(new Set());
+
     /**
-     * Returns the correct SQL field name for the service name column in WHERE clauses.
+     * Returns the SQL expression for the node's identity column, used in WHERE
+     * clauses (`{expr} = 'name'`). A node falls into one of three families, keyed
+     * by `service_type`:
      *
-     * Inferred services (those discovered from span attributes rather than instrumented
-     * SDKs) use `infer_service_name`, while regular instrumented services use `service_name`.
-     * The distinction is driven by `props.selectedNode.service_type`:
-     * - When `service_type` is set (e.g. "database", "queue", "rpc", "http"), the node
-     *   represents an inferred service → `infer_service_name`.
-     * - When `service_type` is absent, the node represents an instrumented service → `service_name`.
+     * - **Instrumented service** (`service_type` absent) → `service_name`.
+     * - **Inferred dependency** (`database`/`queue`/`rpc`/`external`) → discovered
+     *   from span peer attributes, keyed by `infer_service_name`.
+     * - **GenAI entity** (`agent`/`tool`/`model`) → derived from `gen_ai_*` columns.
+     *   `agent`/`tool` have a single column. `model` may land in either
+     *   `gen_ai_request_model` or `gen_ai_response_model` depending on the vendor
+     *   (Langfuse/OpenInference populate only response), so it resolves to a
+     *   COALESCE over whichever of the two the stream schema actually has —
+     *   referencing a missing column is a hard "field not found" error.
+     *
+     * All call sites use this only as `WHERE {expr} = '...'`, so a COALESCE(...)
+     * expression is valid everywhere it is interpolated.
      */
-    const serviceNameField = computed(() =>
-      props.selectedNode?.service_type ? "infer_service_name" : "service_name",
-    );
+    const GENAI_NAME_FIELD: Record<string, string> = {
+      agent: "gen_ai_agent_name",
+      tool: "gen_ai_tool_name",
+    };
+
+    // Depth of the parent-chain climb used to attribute a tool/model span to its
+    // OWNING agent. Must match the backend (processor.rs AGENT_INHERIT_DEPTH):
+    // the agent name usually lives on an ANCESTOR span (real Google ADK nests
+    // generate_content(agent)→chat→execute_tool), not on the tool/LLM span
+    // itself, so the caller shown in this panel must climb the same way the graph
+    // edge does — otherwise the panel says the app called the tool while the
+    // graph correctly says the agent did.
+    const AGENT_INHERIT_DEPTH = 4;
+
+    // The nearest-ancestor-agent-or-service caller expression + chained ancestor
+    // LEFT JOINs, aliased to child `c` (p1 on c, p2 on p1, …). Mirrors query-4.
+    const genAiCallerClimb = (streamName: string) => {
+      const parts = ["c.gen_ai_agent_name"];
+      for (let k = 1; k <= AGENT_INHERIT_DEPTH; k++)
+        parts.push(`p${k}.gen_ai_agent_name`);
+      parts.push("c.service_name");
+      const callerExpr = `COALESCE(${parts.join(", ")})`;
+      const joins = Array.from({ length: AGENT_INHERIT_DEPTH }, (_, i) => {
+        const k = i + 1;
+        const prev = k === 1 ? "c" : `p${k - 1}`;
+        return `LEFT JOIN "${streamName}" AS p${k} ON ${prev}.reference_parent_span_id = p${k}.span_id AND ${prev}.trace_id = p${k}.trace_id`;
+      }).join(" ");
+      return { callerExpr, joins };
+    };
+
+    /**
+     * The node's identity column expression, with every column prefixed by
+     * `alias` (e.g. `"c."` inside a self-join, `""` for a single-table query).
+     * The prefix is applied AT CONSTRUCTION from the known column names — callers
+     * never post-process the string, so there is no place for a column name to
+     * be missed. See `serviceNameField` for the family rules.
+     */
+    const identityField = (alias = ""): string => {
+      const st = props.selectedNode?.service_type;
+      if (!st) return `${alias}service_name`;
+      if (st === "model") {
+        // Prefer request.model, fall back to response.model; only include a
+        // column the schema has. If neither is known yet (schema unresolved),
+        // default to request.model — the query re-runs reactively once the
+        // schema fetch settles.
+        const fs = streamFieldSet.value;
+        const hasReq = fs.has("gen_ai_request_model");
+        const hasResp = fs.has("gen_ai_response_model");
+        if (hasReq && hasResp)
+          return `COALESCE(${alias}gen_ai_request_model, ${alias}gen_ai_response_model)`;
+        if (hasResp && !hasReq) return `${alias}gen_ai_response_model`;
+        return `${alias}gen_ai_request_model`;
+      }
+      return `${alias}${GENAI_NAME_FIELD[st] ?? "infer_service_name"}`;
+    };
+
+    // Single-table identity expression (unaliased) — used everywhere the query
+    // is a plain `FROM "{stream}"` with no join.
+    const serviceNameField = computed(() => identityField());
 
     const loadDashboard = () => {
       if (!props.selectedNode || props.streamFilter === "all") {
@@ -1061,10 +1146,13 @@ export default defineComponent({
           chips.push({
             key,
             type: "duration",
-            label: `Duration: ${formatTimeWithSuffix(f.start)} – ${formatTimeWithSuffix(f.end)}`,
+            label: t("traces.serviceGraphNodeSidePanel.durationRange", {
+              start: formatTimeWithSuffix(f.start),
+              end: formatTimeWithSuffix(f.end),
+            }),
           });
         } else if (f.panelTitle === "Errors") {
-          chips.push({ key, type: "error", label: "Status: Error" });
+          chips.push({ key, type: "error", label: t("traces.serviceGraphNodeSidePanel.statusError") });
         }
       });
       return chips;
@@ -1172,7 +1260,7 @@ export default defineComponent({
 
         const data = correlateResponse.data;
         if (!data) {
-          correlationError.value = "No correlated streams found.";
+          correlationError.value = t("traces.serviceGraphNodeSidePanel.noCorrelatedStreams");
           correlationData.value = null;
           return;
         }
@@ -1191,10 +1279,10 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status === 403) {
           correlationError.value =
-            "Service Discovery is an enterprise feature.";
+            t("traces.serviceGraphNodeSidePanel.enterpriseFeature");
         } else {
           correlationError.value =
-            err.message || "Failed to load service streams.";
+            err.message || t("traces.serviceGraphNodeSidePanel.failedToLoadStreams");
         }
         correlationData.value = null;
       } finally {
@@ -1341,10 +1429,10 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status === 403) {
           metricsCorrelationError.value =
-            "Service Discovery is an enterprise feature.";
+            t("traces.serviceGraphNodeSidePanel.enterpriseFeature");
         } else {
           metricsCorrelationError.value =
-            err.message || "Failed to load metrics.";
+            err.message || t("traces.serviceGraphNodeSidePanel.failedToLoadMetrics");
         }
         metricsCorrelationData.value = null;
       } finally {
@@ -1353,7 +1441,12 @@ export default defineComponent({
       }
     };
 
-    // Reload RED charts when node, time range, stream, or visibility changes
+    // Reload RED charts when node, time range, stream, visibility — or the
+    // resolved identity column — changes. `serviceNameField` is in the deps
+    // because for a model node it depends on the stream schema (request vs
+    // response model column); the schema fetch settles AFTER the first render,
+    // so without re-running here the charts fire once with the wrong/absent
+    // column and error with "field not found".
     watch(
       () =>
         [
@@ -1361,6 +1454,7 @@ export default defineComponent({
           props.timeRange,
           props.streamFilter,
           props.visible,
+          serviceNameField.value,
         ] as const,
       ([, , , visible]) => {
         if (visible && props.selectedNode) {
@@ -1384,7 +1478,7 @@ export default defineComponent({
     });
     const loadingOperations = ref(false);
 
-    // Dynamic resource tabs state (replaces per-resource recentNodes/recentPods/loadingNodes/loadingPods)
+    // Dynamic resource tabs state
     const resourceTabData = ref<Record<string, ResourceRow[]>>({});
     const resourceTabLoading = ref<Record<string, boolean>>({});
     // Resource groups from getDimensionAnalytics that match the current stream schema
@@ -1393,9 +1487,6 @@ export default defineComponent({
     // IDs of alias entries the user has checked in the dropdown
     const selectedWorkloadFields = ref<string[]>([]);
 
-    // Shared cache of stream schema field names — populated by resolveStreamSchema,
-    // consumed by both resolveWorkloadFields and inferredTabConfigs.
-    const streamFieldSet = ref<Set<string>>(new Set());
     const schemaResolved = ref(false);
 
     /** Fetch the trace stream schema and populate streamFieldSet.
@@ -1592,7 +1683,7 @@ export default defineComponent({
       if (!props.selectedNode) {
         return {
           status: "unknown",
-          text: "Unknown",
+          text: t("traces.serviceGraphNodeSidePanel.unknown"),
         };
       }
 
@@ -1602,17 +1693,17 @@ export default defineComponent({
       if (errorRate > 10) {
         return {
           status: "critical",
-          text: "Critical",
+          text: t("traces.serviceGraphNodeSidePanel.critical"),
         };
       } else if (errorRate > 5) {
         return {
           status: "degraded",
-          text: "Degraded",
+          text: t("traces.serviceGraphNodeSidePanel.degraded"),
         };
       } else {
         return {
           status: "healthy",
-          text: "Healthy",
+          text: t("traces.serviceGraphNodeSidePanel.healthy"),
         };
       }
     });
@@ -1675,11 +1766,21 @@ export default defineComponent({
 
     // ── Sorting state ──────────────────────────────────────────────────────
     const sortBy = ref<string>("");
-    const sortOrder = ref<"asc" | "desc">("");
+    const sortOrder = ref<"asc" | "desc" | "">("");
 
-    function handleSortChange(field: string, order: "asc" | "desc") {
-      sortBy.value = field;
-      sortOrder.value = order;
+    // 3-state sort cycle to match other O2 tables (OTable): asc → desc → cleared.
+    // TenstackTable itself only toggles asc/desc, so we drive the cycle from our
+    // own state and ignore its computed order — clearing restores the default order.
+    function handleSortChange(field: string) {
+      if (sortBy.value !== field) {
+        sortBy.value = field;
+        sortOrder.value = "asc";
+      } else if (sortOrder.value === "asc") {
+        sortOrder.value = "desc";
+      } else {
+        sortBy.value = "";
+        sortOrder.value = "";
+      }
     }
 
     const compareRows = (a: any, b: any, field: string): number => {
@@ -1733,53 +1834,53 @@ export default defineComponent({
       {
         id: "requests",
         accessorFn: (row: any) => formatNumber(row.requests),
-        header: "Requests",
-        size: 100,
+        header: t("traces.serviceGraphNodeSidePanel.requests"),
+        size: 130,
         enableSorting: true,
-        meta: { sortable: true },
+        meta: { sortable: true, align: "right" },
       },
       {
         id: "errors",
         accessorKey: "errors",
-        header: "Errors",
-        size: 80,
+        header: t("traces.serviceGraphNodeSidePanel.errors"),
+        size: 110,
         enableSorting: true,
-        meta: { slot: true, sortable: true },
+        meta: { slot: true, sortable: true, align: "right" },
       },
       {
         id: "p99",
         accessorKey: "p99",
         header: "P99",
-        size: 80,
+        size: 118,
         enableSorting: true,
-        meta: { slot: true, sortable: true },
+        meta: { slot: true, sortable: true, align: "right" },
       },
       {
         id: "p95",
         accessorKey: "p95",
         header: "P95",
-        size: 80,
+        size: 118,
         enableSorting: true,
-        meta: { slot: true, sortable: true },
+        meta: { slot: true, sortable: true, align: "right" },
       },
       {
         id: "p75",
         accessorKey: "p75",
         header: "P75",
-        size: 80,
+        size: 118,
         enableSorting: true,
-        meta: { slot: true, sortable: true },
+        meta: { slot: true, sortable: true, align: "right" },
       },
     ];
 
     // Computed: Operations table columns
     const operationsTableColumns = computed(() => {
-      const cols = buildEntityTableColumns("operation", "Operation");
+      const cols = buildEntityTableColumns("operation", t("traces.serviceGraphNodeSidePanel.operation"));
       if (isInferred.value) {
         cols.unshift({
           id: "caller",
           accessorKey: "caller",
-          header: "Caller",
+          header: t("traces.serviceGraphNodeSidePanel.caller"),
           size: 180,
           enableSorting: true,
           meta: { slot: false, sortable: true },
@@ -1814,14 +1915,33 @@ export default defineComponent({
       try {
         const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
+        const st = props.selectedNode?.service_type;
+        // A tool/model node's caller is its OWNING AGENT, which usually sits on an
+        // ancestor span — resolve it with the same parent-chain climb the graph
+        // edge uses (else the panel would show the host app as the caller, in
+        // conflict with the graph). Genuinely-inferred deps (database/queue/…)
+        // keep the raw service_name as caller. Instrumented services show none.
+        const isGenAiChild = st === "tool" || st === "model";
         const isInf = isInferred.value;
-        const selectCols = isInf
-          ? "service_name as caller_service, operation_name"
-          : "operation_name";
-        const groupCols = isInf
-          ? "service_name, operation_name"
-          : "operation_name";
-        const sql = `SELECT ${selectCols}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' GROUP BY ${groupCols}`;
+
+        const metrics = `count(*) as request_count, count(*) FILTER (WHERE ${isGenAiChild ? "c." : ""}span_status = 'ERROR') as error_count, approx_percentile_cont(${isGenAiChild ? "c." : ""}duration, 0.50) as p50_latency, approx_percentile_cont(${isGenAiChild ? "c." : ""}duration, 0.75) as p75_latency, approx_percentile_cont(${isGenAiChild ? "c." : ""}duration, 0.95) as p95_latency, approx_percentile_cont(${isGenAiChild ? "c." : ""}duration, 0.99) as p99_latency`;
+
+        let sql: string;
+        if (isGenAiChild) {
+          const { callerExpr, joins } = genAiCallerClimb(streamName);
+          // The identity field, built already aliased to the child table `c`
+          // (no post-processing of the expression string).
+          const childField = identityField("c.");
+          sql = `SELECT ${callerExpr} as caller_service, c.operation_name, ${metrics} FROM "${streamName}" AS c ${joins} WHERE ${childField} = '${serviceName}' GROUP BY ${callerExpr}, c.operation_name`;
+        } else {
+          const selectCols = isInf
+            ? "service_name as caller_service, operation_name"
+            : "operation_name";
+          const groupCols = isInf
+            ? "service_name, operation_name"
+            : "operation_name";
+          sql = `SELECT ${selectCols}, ${metrics} FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' GROUP BY ${groupCols}`;
+        }
 
         const response = await searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -1937,6 +2057,10 @@ export default defineComponent({
         props.selectedNode?.id,
         props.streamFilter,
         operationsViewMode.value,
+        // Re-fetch once the schema resolves the model column (request vs
+        // response) — otherwise a model node's operations query fires with the
+        // wrong column and returns "No operations found".
+        serviceNameField.value,
       ],
       () => {
         if (
@@ -2343,6 +2467,8 @@ export default defineComponent({
       serviceHealth,
       isAllStreamsSelected,
       isInferred,
+      serviceNameField,
+      streamFieldSet,
       formatNumber,
       getErrorRateClass,
       getLatencyClass,
@@ -2405,95 +2531,67 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.health-badge::before {
-  content: "●";
-  font-size: 10px;
-}
-
-.health-badge.healthy {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-}
-
-.health-badge.degraded {
-  background: rgba(251, 191, 36, 0.15);
-  color: #fbbf24;
-}
-
-.health-badge.critical {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-}
-
-.health-badge.warning {
-  background: rgba(249, 115, 22, 0.15);
-  color: #f97316;
-}
-
-.body--light .health-badge.healthy {
-  background: rgba(16, 185, 129, 0.08);
-  color: #059669;
-}
-
-.body--light .health-badge.degraded {
-  background: rgba(251, 191, 36, 0.08);
-  color: #d97706;
-}
-
-.body--light .health-badge.critical {
-  background: rgba(239, 68, 68, 0.08);
-  color: #dc2626;
-}
-
-.body--light .health-badge.warning {
-  background: rgba(249, 115, 22, 0.08);
-  color: #ea580c;
-}
-
+<style scoped>
+/* keep(scrollbar): ::-webkit-scrollbar pseudo-elements have no utility form.
+   This panel has both a light treatment (default values) and a dark
+   indigo-tinted "glass" treatment (under `.dark &`). Keep the light rules — do
+   not make it always-dark. */
 .panel-content::-webkit-scrollbar {
-  width: 8px;
+  width: 0.5rem;
 }
 
 .panel-content::-webkit-scrollbar-track {
-  background: #1a1f2e;
+  background: var(--color-surface-panel);
 }
 
 .panel-content::-webkit-scrollbar-thumb {
-  background: #242938;
-  border-radius: 4px;
+  background: var(--color-border-default);
+  border-radius: 0.25rem;
 }
 
 .panel-content::-webkit-scrollbar-thumb:hover {
-  background: #2d3548;
+  background: var(--color-grey-300);
 }
 
-.body--light .panel-content {
-  background: #ffffff;
+.dark .panel-content::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--color-grey-900) 70%, var(--color-indigo-900));
 }
 
-.body--light .panel-content::-webkit-scrollbar-track {
-  background: #f8f9fa;
+.dark .panel-content::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-grey-800) 80%, var(--color-indigo-900));
 }
 
-.body--light .panel-content::-webkit-scrollbar-thumb {
-  background: var(--o2-border);
-}
-
-.body--light .panel-content::-webkit-scrollbar-thumb:hover {
-  background: #d0d0d0;
+.dark .panel-content::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-grey-700) 80%, var(--color-indigo-900));
 }
 
 .panel-section:last-child {
   margin-bottom: 0;
 }
 
-.red-charts-section .card-container {
-  box-shadow: none;
+/* The panel itself scrolls, so these short summary tables should render at their
+   natural height without their own scrollbars. Let the inner scroll container
+   grow to content and hide its scrollbars. */
+.svc-panel-table :deep(.o2-scroll-container) {
+  overflow: hidden;
+  height: auto;
+  max-height: none;
 }
 
-.red-charts-section .card-container :first-child {
-  padding: 0 0.0625rem !important;
+/* Align the first column's content with the tab labels above (page-edge + the
+   tab's own 0.5rem px-2) while the header band and rows still bleed to the edge. */
+.svc-panel-table :deep(tr > th:first-child),
+.svc-panel-table :deep(tr > td:first-child) {
+  padding-left: calc(var(--spacing-page-edge) + 0.5rem);
+}
+
+/* Numeric columns reserve a fixed right-hand slot: the value sits just left of
+   it, and the per-cell "view in traces" button lives in that slot on hover — so
+   there's no overlap and no shift. Headers get the same reserve so their text /
+   sort-icon stay aligned with the values. */
+.svc-panel-table :deep(td[class~="text-right!"]) > div,
+.svc-panel-table :deep(th[class~="text-right!"]) {
+  padding-right: 1.75rem;
 }
 
 </style>

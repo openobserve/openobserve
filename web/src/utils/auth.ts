@@ -12,6 +12,20 @@ import {
 import { useLocalUserInfo } from "@/utils/storage";
 import { getUUID, getUUIDv7 } from "@/utils/uuid";
 
+// Exact paths that stay reachable when the org has ingested nothing yet. The
+// empty-data redirect exists to push people toward ingestion rather than show
+// them empty data views, and that still applies to most of Settings — but an org
+// with nothing ingested is precisely the one an admin is most likely to want to
+// delete, and the Danger Zone lives on /settings/general. "/settings" is included
+// because the nav's Settings entry lands there before redirecting to general.
+// Matched exactly, not by prefix, so the rest of the Settings tree stays gated.
+export const emptyDataAllowedPaths = ["/settings", "/settings/general"];
+
+// "/settings/general/" and "/settings/general" are the same page; an exact match
+// must not hinge on a trailing slash.
+const normalizePath = (path: string) =>
+  path !== "/" && path.endsWith("/") ? path.slice(0, -1) : path;
+
 export const trialPeriodAllowedPath = [
   "iam",
   "users",
@@ -130,6 +144,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
     to.path.indexOf("/ingestion") === -1 &&
     to.path.indexOf("/iam") === -1 &&
     to.name !== "iam" &&
+    emptyDataAllowedPaths.indexOf(normalizePath(to.path)) === -1 &&
     trialPeriodAllowedPath.indexOf(to.name) === -1 &&
     store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data === true &&
@@ -164,7 +179,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
 export const verifyOrganizationStatus = (Organizations: any, Router: any) => {};
 
 export const generateTraceContext = () => {
-  const traceId = getUUIDv7().replace(/-/g, "");
+  const traceId = getUUIDv7(true);
   const spanId = getUUID().replace(/-/g, "").slice(0, 16);
 
   return {

@@ -197,7 +197,7 @@ export default defineComponent({
           route?.query?.folder ?? "default",
         );
 
-        showPositiveNotification("Dashboard updated successfully.");
+        showPositiveNotification(t("dashboard.generalSettingsPage.updatedSuccessfully"));
 
         emit("save");
       } catch (error: any) {
@@ -205,10 +205,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Dashboard updation failed",
+              t("dashboard.generalSettingsPage.updationFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Dashboard updation failed", {
+          showErrorNotification(error?.message ?? t("dashboard.generalSettingsPage.updationFailed"), {
             timeout: 2000,
           });
         }

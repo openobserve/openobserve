@@ -1405,7 +1405,7 @@ describe("Schema Component Tests", () => {
     });
   });
 
-  // Coverage for the q-dialog/q-drawer → ODrawer migration.
+  // Coverage for the ODrawer migration.
   describe("ODrawer Migration", () => {
     const buildProps = (open = true) => ({
       open,
@@ -1844,6 +1844,21 @@ describe("Schema Component Tests", () => {
       // dateChangeValue with relative time period exits early
       w.vm.dateChangeValue({ relativeTimePeriod: "1h" });
       expect(w.vm.redDaysList).toEqual([]);
+    });
+
+    it("should ignore programmatic mount-replay date-change emits (userChangedValue false)", () => {
+      // On mount/remount <date-time> emits an absolute range with
+      // userChangedValue:false. dateChangeValue must ignore it so it does not
+      // push to redDaysList and trigger onSubmit — the cause of the infinite
+      // updateSettings/getStream loop on the Extended Retention tab.
+      mockUpdateSettings.mockClear();
+      w.vm.dateChangeValue({
+        relativeTimePeriod: null,
+        userChangedValue: false,
+        selectedDate: { from: "2024-06-15", to: "2024-06-16" },
+      });
+      expect(w.vm.redDaysList).toEqual([]);
+      expect(mockUpdateSettings).not.toHaveBeenCalled();
     });
 
     it("should set IsdeleteBtnVisible when rows are selected", async () => {

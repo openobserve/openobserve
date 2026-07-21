@@ -9,6 +9,9 @@ const UUID_V4_REGEX =
 const UUID_V7_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const UUID_V7_COMPACT_REGEX =
+  /^[0-9a-f]{32}$/i;
+
 afterEach(() => {
   vi.clearAllMocks();
 });
@@ -72,5 +75,31 @@ describe("getUUIDv7", () => {
     const second = getUUIDv7();
 
     expect(first < second).toBe(true);
+  });
+
+  describe("compact mode", () => {
+    it("returns a string without dashes", () => {
+      const result = getUUIDv7(true);
+
+      expect(result).not.toContain("-");
+    });
+
+    it("returns exactly 32 characters", () => {
+      const result = getUUIDv7(true);
+
+      expect(result).toHaveLength(32);
+    });
+
+    it("contains only hex characters", () => {
+      const result = getUUIDv7(true);
+
+      expect(UUID_V7_COMPACT_REGEX.test(result)).toBe(true);
+    });
+
+    it("preserves the version 7 digit when compact", () => {
+      const result = getUUIDv7(true);
+
+      expect(result[12]).toBe("7");
+    });
   });
 });

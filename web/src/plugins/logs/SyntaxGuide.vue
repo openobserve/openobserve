@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-cy="syntax-guide-button"
           variant="ghost"
           size="sm"
-          class="w-full! justify-start! px-3! py-1.5! h-auto! rounded-md! gap-2! font-normal!"
+          class="w-full! justify-start! px-3! py-1.5! h-auto! rounded-default! gap-2! font-normal!"
         >
           <template #icon-left>
-            <span class="inline-flex items-center justify-center w-7 h-7 rounded-md bg-[var(--o2-section-header-bg)] text-[var(--o2-text-secondary)] shrink-0">
+            <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
               <OIcon name="help" size="sm" />
             </span>
           </template>
@@ -65,60 +65,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
     </template>
-    <div :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
+    <div>
       <div v-if="!sqlmode">
-        <div class="syntax-guide-title">
-          <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
+        <div class="w-105">
+          <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
+          <div class="mb-1.25">
+            <div class="text-xs ml-1.25">
+              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
                 <li>
                   For inverted index search of value 'error' use
-                  <span class="bg-highlight">match_all('error')</span>
+                  <span class="bg-highlight-bg px-1.25">match_all('error')</span>
                   in query editor. Search terms are case-insensitive.
                 </li>
                 <li>
                   For prefix search use
-                  <span class="bg-highlight">match_all('error*')</span>
+                  <span class="bg-highlight-bg px-1.25">match_all('error*')</span>
                   to find all terms starting with 'error'.
                 </li>
                 <li>
                   For phrase prefix search use
-                  <span class="bg-highlight">match_all('error code*')</span>
+                  <span class="bg-highlight-bg px-1.25">match_all('error code*')</span>
                   to find phrases starting with 'error code'.
                 </li>
                 <li>
                   For case sensitive search use
-                  <span class="bg-highlight">match_all('traceHits')</span>
+                  <span class="bg-highlight-bg px-1.25">match_all('traceHits')</span>
                   with exact case matching.
                 </li>
                 <li>
                   For postfix search use
-                  <span class="bg-highlight">match_all('*failed')</span>
+                  <span class="bg-highlight-bg px-1.25">match_all('*failed')</span>
                   to find all terms ending with 'failed'.
                 </li>
                 <li>
                   For column search of value 'error' use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
                   For case-insensitive column search of value 'error' use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >str_match_ignore_case(<b>fieldname</b>, 'Error')</span
                   >
                 </li>
                 <li>
                   To search value 200 for code column use
-                  <span class="bg-highlight">code=200</span>
+                  <span class="bg-highlight-bg px-1.25">code=200</span>
                 </li>
                 <li>
                   To search value 'stderr' for stream column use
-                  <span class="bg-highlight">stream='stderr'</span>
+                  <span class="bg-highlight-bg px-1.25">stream='stderr'</span>
                 </li>
                 <li>
                   For additional examples,
@@ -135,31 +135,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div v-else>
-        <div class="syntax-guide-title">
-          <div class="label">Syntax Guide: SQL Mode</div>
+        <div class="w-105">
+          <div class="label text-sm font-bold">Syntax Guide: SQL Mode</div>
         </div>
         <div class="border-t my-1 border-dropdown-separator" />
         <div class="answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
+          <div class="mb-1.25">
+            <div class="text-xs ml-1.25">
+              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
                 <li>
                   For inverted index search of value 'error' use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                   in query editor. Search terms are case-insensitive.
                 </li>
                 <li>
                   For prefix search use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error*')</span
                   >
                   to find all terms starting with 'error'.
                 </li>
                 <li>
                   For phrase prefix search use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error
                     code*')</span
                   >
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </li>
                 <li>
                   For case sensitive search use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE
                     match_all('traceHits')</span
                   >
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </li>
                 <li>
                   For postfix search use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE
                     match_all('*failed')</span
                   >
@@ -183,27 +183,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </li>
                 <li>
                   For column search of value 'error' use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
                   To search value 200 for code column use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
                   To search value 'stderr' for stream column use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
                   To search and use query function <i>extract_ip</i> on column
                   log use
-                  <span class="bg-highlight"
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT extract_ip(log) FROM <b>stream</b> WHERE
                     code=200</span
                   >

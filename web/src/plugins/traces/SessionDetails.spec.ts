@@ -198,12 +198,12 @@ const turnBodySelector = (traceId = "trace-xyz") =>
 
 const globalStubs = {
   OIcon: {
-    template: '<span class="q-icon-stub" :data-name="name"><slot /></span>',
+    template: '<span :data-name="name"><slot /></span>',
     props: ["name", "size"],
   },
   OTooltip: { template: '<div><slot /><span><slot name="content" /></span></div>', props: ["content", "maxWidth"] },
   OSkeleton: {
-    template: '<div class="q-skeleton-stub" />',
+    template: '<div class="o-skeleton-stub" />',
     props: ["type", "width", "height"],
   },
   OBadge: {
@@ -508,7 +508,7 @@ describe("SessionDetails — turn rows", () => {
 
     const wrapper = await mountComponent();
     const row = wrapper.find(turnRowSelector("ok-trace"));
-    expect(row.classes()).toContain("bg-[var(--color-surface-base)]");
+    expect(row.classes()).toContain("bg-surface-base");
   });
 
   it("status badge in turn header uses critical class for error traces", async () => {
@@ -521,7 +521,7 @@ describe("SessionDetails — turn rows", () => {
     const header = wrapper.find(turnHeaderSelector());
     // Look for the status badge span within the header
     const badgeSpan = header.findAll("span").find(
-      (s) => s.classes().join("").includes("text-[var(--color-error-500)]"),
+      (s) => s.classes().join("").includes("text-error-500"),
     );
     expect(badgeSpan).toBeTruthy();
   });
@@ -536,7 +536,7 @@ describe("SessionDetails — turn rows", () => {
     const header = wrapper.find(turnHeaderSelector());
     const badgeSpan = header.findAll("span").find(
       (s) =>
-        s.classes().join("").includes("text-[var(--color-text-secondary)]"),
+        s.classes().join("").includes("text-text-secondary"),
     );
     expect(badgeSpan).toBeTruthy();
   });
@@ -578,7 +578,7 @@ describe("SessionDetails — turn expand/collapse", () => {
     // While loading, skeleton should be shown (turn-body with loading state)
     const turnBody = wrapper.find(turnBodySelector());
     expect(turnBody.exists()).toBe(true);
-    const skeletons = wrapper.findAll(".q-skeleton-stub");
+    const skeletons = wrapper.findAll(".o-skeleton-stub");
     expect(skeletons.length).toBeGreaterThan(0);
 
     // Clean up

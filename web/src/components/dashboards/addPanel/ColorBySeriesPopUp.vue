@@ -29,11 +29,11 @@
   <ODialog data-test="color-by-series-popup-dialog"
     :open="open"
     @update:open="(v) => { if (!v) cancelEdit(); }"
-    title="Color by series"
+    :title="t('dashboard.colorBySeriesPopUp.title')"
     size="lg"
-    neutral-button-label="+ Add a new color"
+    :neutral-button-label="t('dashboard.colorBySeriesPopUp.addNewColor')"
     neutral-button-variant="outline"
-    primary-button-label="Save"
+    :primary-button-label="t('dashboard.colorBySeriesPopUp.save')"
     form-id="color-by-series-form"
     @click:neutral="addcolorBySeries"
   >
@@ -64,7 +64,7 @@
                 :name="`series[${index}].value`"
                 :items="seriesDataItems"
                 search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
-                label="Select Series"
+                :label="t('dashboard.colorBySeriesPopUp.selectSeries')"
                 label-position="inside"
                 required
                 :value-replace-fn="selectColorBySeriesOption"
@@ -95,7 +95,7 @@
                   class="w-full"
                   :data-test="`dashboard-addpanel-config-color-by-series-set-color-btn-${index}`"
                   @click="setColorByIndex(index)"
-                  >Set color</OButton
+                  >{{ t('dashboard.colorBySeriesPopUp.setColor') }}</OButton
                 >
               </div>
             </div>
@@ -258,7 +258,7 @@ export default defineComponent({
     // Method to open color picker directly
     const openColorPicker = (index: number) => {
       // This method is called when the colorize icon is clicked
-      // The color picker should open automatically due to q-popup-proxy
+      // The color picker should open automatically via its popup proxy
     };
 
     return {

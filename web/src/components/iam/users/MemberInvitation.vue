@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0" style="min-height: inherit">
+  <div class="rounded-default p-0" style="min-height: inherit">
     <div v-if="currentUserRole == 'admin' || currentUserRole == 'root'">
       <!-- Inline form (no dialog): the Save button lives inside <OForm>, so it is
            type="submit" — Enter submits natively, no form-id needed. -->
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onSubmit"
         v-slot="{ isSubmitting }"
       >
-        <div style="position: relative">
+        <div class="relative">
           <OFormInput
             name="email"
             :placeholder="t('user.inviteByEmail')"
@@ -121,7 +121,7 @@ export default defineComponent({
         if (data.data.invalid_members != null) {
           toast({
             variant: "error",
-            message: `Error while member invitation: ${data.data.invalid_members.toString()}`,
+            message: t('iam.memberInvitation.errorWhileInvitation', { members: data.data.invalid_members.toString() }),
             timeout: 15000,
           });
         } else {

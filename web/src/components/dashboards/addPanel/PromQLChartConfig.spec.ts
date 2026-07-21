@@ -195,7 +195,7 @@ describe("PromQLChartConfig", () => {
       expect(
         wrapper.find('[data-test="dashboard-config-maps-name-label"]').exists(),
       ).toBe(true);
-      // dashboard-config-maps-type (mapsMapType q-select) was removed in config redesign (PR #10917)
+      // dashboard-config-maps-type (mapsMapType select) was removed in config redesign (PR #10917)
       expect(
         wrapper.find('[data-test="dashboard-config-maps-type"]').exists(),
       ).toBe(false);
@@ -979,7 +979,7 @@ describe("PromQLChartConfig", () => {
   });
 
   describe("ODialog Migration", () => {
-    // After migration the q-dialog wrapper around ColumnOrderPopUp was removed.
+    // After migration the dialog wrapper around ColumnOrderPopUp was removed.
     // ColumnOrderPopUp now owns its own ODialog and accepts `:open` from the
     // parent. These tests verify the new contract: prop wiring (open,
     // column-order, available-columns) and event handler wiring (@cancel,
@@ -1012,10 +1012,10 @@ describe("PromQLChartConfig", () => {
       return wrapper;
     };
 
-    it("should not render q-dialog wrapper around ColumnOrderPopUp", async () => {
+    it("should not render the legacy dialog wrapper around ColumnOrderPopUp", async () => {
       await setupAllModeWrapper();
 
-      // The legacy data-test was applied to the removed <q-dialog>.
+      // The legacy data-test was applied to the removed dialog.
       // It must not appear in the migrated template.
       expect(
         wrapper.find('[data-test="column-order-dialog"]').exists(),

@@ -3,7 +3,7 @@
     <div class="pb-1 flex justify-start px-3 copy-log-btn">
       <app-tabs
         v-if="filteredTabs.length"
-        class="mb-[0.375rem] logs-json-preview-tabs mr-2 border border-solid border-[var(--o2-border-color)] rounded-[0.25rem] text-[]"
+        class="mb-1.5 mr-2 h-fit overflow-hidden border-t border-l border-r border-solid border-card-glass-border rounded-default"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -14,14 +14,14 @@
         :label="t('common.copyToClipboard')"
         size="xs"
         variant="outline"
-        class="mb-[0.375rem] mr-2"
+        class="mb-1.5 mr-2"
         @click="copyLogToClipboard"
       ><OIcon name="content-copy" size="xs" class="mr-1" />{{ t('common.copyToClipboard') }}</OButton>
         <OButton
         v-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
-        class="mb-[0.375rem] mr-2"
+        class="mb-1.5 mr-2"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
@@ -55,16 +55,15 @@
     <div v-show="activeTab === 'unflattened'" class="pl-3">
       <OSpinner size="md" />
       <div v-if="!loading">
-        <!-- Editor sizing is inlined here because it was originally scoped to this
-             component via <style scoped>; keeping it inline prevents it from
-             leaking onto every .monaco-editor app-wide. (The focus-border is left
-             off so this editor stays borderless like the others.) -->
+        <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
+             every .monaco-editor app-wide. The focus-border is left off so this
+             editor stays borderless like the others. -->
         <code-query-editor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
           class="w-[calc(100%-16px)]!"
-          :class="[mode, mode === 'expanded' ? 'h-[300px]! max-w-[1024px]!' : 'h-[calc(100vh-250px)]!']"
+          :class="[mode, mode === 'expanded' ? 'h-75! max-w-256!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
       </div>
@@ -72,7 +71,7 @@
     <div v-show="activeTab !== 'unflattened'" class="pl-3">
       {
       <div
-        class="log_json_content flex"
+        class="log_json_content whitespace-pre-wrap font-mono text-xs flex"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
         :data-test="`log-detail-row-${key}`"
@@ -88,8 +87,8 @@
               data-test="log-details-include-exclude-field-btn"
               size="xs"
               variant="ghost"
-              class="ml-2 log-json-field-dropdown-btn"
-              aria-label="Add icon"
+              class="ml-2 h-5! w-5! min-h-5! min-w-5! p-0! align-middle"
+              :aria-label="t('logs.jsonPreview.addIcon')"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
             </OButton>
@@ -151,7 +150,7 @@
             <template #icon-left>
               <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
-            Send to AI Chat
+            {{ t('logs.jsonPreview.sendToAiChat') }}
           </ODropdownItem>
           <ODropdownItem
             v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
@@ -168,7 +167,6 @@
         <span
           class="pl-1"
           :data-test="`log-expand-detail-key-${key}`"
-          :class="store.state.theme === 'dark' ? 'dark' : ''"
         >
           <span class="log-key">{{ key }}</span
           ><span class="log-separator">: </span
@@ -189,31 +187,32 @@
       }
       <div
         v-if="showMenu"
-        class="context-menu shadow-lg rounded-sm"
+        class="context-menu shadow-lg rounded-default min-w-50 py-1 [font-size: var(--text-compact)] bg-surface-overlay border border-border-default text-text-body"
         :style="{
           position: 'fixed',
           top: `${menuY}px`,
           left: `${menuX}px`,
           zIndex: 9999,
         }"
-        :class="
-          store.state.theme === 'dark'
-            ? 'context-menu-dark'
-            : 'context-menu-light'
-        "
       >
-        <div class="context-menu-item" @click="copySelectedText">
+        <div
+          class="py-1.5 px-3 flex items-center cursor-pointer [transition:background-color_0.2s] hover:bg-dropdown-item-hover-bg"
+          @click="copySelectedText"
+        >
           <OIcon name="content-copy" size="sm" class="mr-2" />
-          Copy
+          {{ t('logs.jsonPreview.copy') }}
         </div>
-        <div class="context-menu-item" @click="handleCreateRegex">
+        <div
+          class="py-1.5 px-3 flex items-center cursor-pointer [transition:background-color_0.2s] hover:bg-dropdown-item-hover-bg"
+          @click="handleCreateRegex"
+        >
           <img
             :src="regexIconForContextMenu"
             class="mr-2"
             style="width: 14px; height: 14px"
             alt=""
           />
-          Create regex pattern
+          {{ t('logs.jsonPreview.createRegexPattern') }}
         </div>
       </div>
     </div>
@@ -221,7 +220,7 @@
       v-if="config.isEnterprise == 'true'"
       v-model:open="typeOfRegexPattern"
       size="lg"
-      title="What is the type of regex pattern you want to create?"
+      :title="t('logs.jsonPreview.regexPatternTypeTitle')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
       @click:secondary="typeOfRegexPattern = false"
@@ -230,7 +229,7 @@
       <OInput
         data-test="regex-pattern-type-input"
         v-model="regexPatternType"
-        label="Type of regex pattern (e.g. email, phone number, etc.)"
+        :label="t('logs.jsonPreview.regexPatternTypeLabel')"
       />
     </ODialog>
   </div>
@@ -249,6 +248,7 @@ import {
 } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
@@ -348,6 +348,7 @@ export default {
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const activeTab = ref("flattened");
 
     const streamSearchValue = ref<string>("");
@@ -618,7 +619,8 @@ export default {
       // Handler for closing menu on outside click
       //because when user clicks on the log content with right click, the context menu is shown and when user clicks outside the log content, the context menu is closed
       const handleOutsideClick = (e: MouseEvent) => {
-        if (!(e.target as HTMLElement).closest(".q-btn")) {
+        // Guard on the menu itself: its items close it via their own handlers.
+        if (!(e.target as HTMLElement).closest(".context-menu")) {
           showMenu.value = false;
         }
       };
@@ -720,7 +722,8 @@ export default {
         loading.value = false;
         toast({
           message:
-            err.response?.data?.message || "Failed to get the Original data",
+            err.response?.data?.message ||
+            t('logs.jsonPreview.failedToGetOriginalData'),
           variant: "error",
         });
       } finally {
@@ -805,20 +808,20 @@ export default {
     };
 
     const getBtnLogo = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
     const regexIcon = computed(() => {
       return getImageURL(
-        store.state.theme == "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       );
     });
     const regexIconForContextMenu = computed(() => {
       return getImageURL(
-        store.state.theme == "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       );
@@ -867,8 +870,8 @@ export default {
     const copySelectedText = () => {
       if (selectedText.value) {
         copyToClipboard(selectedText.value, {
-          successMessage: "Text copied to clipboard",
-          errorMessage: "Failed to copy text",
+          successMessage: t('logs.jsonPreview.textCopiedToClipboard'),
+          errorMessage: t('logs.jsonPreview.failedToCopyText'),
           timeout: 1500,
         }).then((success) => {
           if (success) {

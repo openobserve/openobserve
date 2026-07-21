@@ -76,5 +76,29 @@
     "is_real_service": false,
     "infer_type": "",
     "expected": "service"
+  },
+  {
+    "note": "agent node from connection_type=agent (client-only, not a real service)",
+    "is_real_service": false,
+    "infer_type": "agent",
+    "expected": "agent"
+  },
+  {
+    "note": "agent that IS also a real service must still be Agent (positional-fix: agent wins over is_real_service)",
+    "is_real_service": true,
+    "infer_type": "agent",
+    "expected": "agent"
+  },
+  {
+    "note": "tool node from connection_type=tool",
+    "is_real_service": false,
+    "infer_type": "tool",
+    "expected": "tool"
+  },
+  {
+    "note": "model node from connection_type=model",
+    "is_real_service": true,
+    "infer_type": "model",
+    "expected": "model"
   }
 ]

@@ -17,15 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="flex flex-col h-full p-0">
-    <div v-if="!showAddDialog" class="flex flex-col h-full">
-      <!-- Standard section header: title + actions only. Search moved into the
-           table's own toolbar below. -->
-      <AppPageHeader
-        :title="t('cipherKey.header')"
-        icon="key"
-        :subtitle="'Encryption keys for sensitive fields'"
-        class="shrink-0 px-4 border-b border-border-default"
-      >
+    <OPageLayout
+      v-if="!showAddDialog"
+      :title="t('cipherKey.header')"
+      icon="key"
+      :subtitle="t('settings.cipherKeysPage.subtitle')"
+      bleed
+    >
         <template #actions>
           <OButton
             variant="primary"
@@ -36,8 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t(`cipherKey.add`) }}
           </OButton>
         </template>
-      </AppPageHeader>
-      <div class="card-container flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         :data="visibleRows"
@@ -53,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        show-index
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="settings-cipher-keys"
@@ -112,8 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedKeys.length > 0"
           #bottom
         >
-          <span class="text-xs text-text-primary font-medium">
-            {{ selectedKeys.length }} selected
+          <span class="text-xs text-text-body font-medium">
+            {{ t('settings.cipherKeysPage.selected', { count: selectedKeys.length }) }}
           </span>
           <OButton
             data-test="cipher-keys-list-delete-keys-btn"
@@ -122,27 +120,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="delete"
             @click="openBulkDeleteDialog"
           >
-            Delete
+            {{ t('settings.cipherKeysPage.delete') }}
           </OButton>
         </template>
       </OTable>
       </div>
-    </div>
+    </OPageLayout>
     <div v-else>
       <add-cipher-key @cancel:hideform="hideAddDialog" />
     </div>
   </div>
   <ConfirmDialog
-    title="Delete Cipher Key"
-    message="Are you sure you want to delete Cipher Key?"
+    :title="t('settings.cipherKeysPage.deleteCipherKeyTitle')"
+    :message="t('settings.cipherKeysPage.deleteCipherKeyMessage')"
     @update:ok="deleteCipherKey"
     @update:cancel="cancelDeleteCipherKey"
     v-model="confirmDelete.visible"
   />
 
   <ConfirmDialog
-    title="Delete Cipher Keys"
-    :message="`Are you sure you want to delete ${selectedKeys.length} cipher key(s)?`"
+    :title="t('settings.cipherKeysPage.deleteCipherKeysTitle')"
+    :message="t('settings.cipherKeysPage.deleteCipherKeysMessage', { count: selectedKeys.length })"
     @update:ok="bulkDeleteCipherKeys"
     @update:cancel="confirmBulkDelete = false"
     v-model="confirmBulkDelete"
@@ -169,15 +167,15 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    AppPageHeader,
+    OPageLayout,
     OEmptyState,
     AddCipherKey,
     ConfirmDialog,
@@ -195,13 +193,6 @@ export default defineComponent({
     const loading = ref(false);
     const filterQuery = ref("");
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("cipherKey.name"),
@@ -312,7 +303,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading data...",
+        message: t("settings.cipherKeysPage.loadingData"),
               timeout: 0,
 });
 
@@ -322,7 +313,6 @@ export default defineComponent({
           const responseData = response.data.keys;
           for (let i = 0; i < responseData.length; i++) {
             data.push({
-              "#": i + 1,
               name: responseData[i].name,
               store_type: responseData[i].key.store.type,
               mechanism_type: responseData[i].key.mechanism.type,
@@ -342,7 +332,7 @@ export default defineComponent({
               variant: "error",
               message:
                 error.response?.data?.message ||
-                "Failed to fetch cipher keys. Please try again.",
+                t("settings.cipherKeysPage.fetchFailed"),
               timeout: 5000,
             });
           }
@@ -366,7 +356,7 @@ export default defineComponent({
       if (confirmDelete.value?.data?.name) {
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait while processing delete request...",
+          message: t("settings.cipherKeysPage.processingDelete"),
                   timeout: 0,
 });
         CipherKeysService.delete(
@@ -377,7 +367,7 @@ export default defineComponent({
             dismiss();
             toast({
               variant: "success",
-              message: `Cipher Key deleted successfully`,
+              message: t("settings.cipherKeysPage.deleteSuccess"),
             });
 
             getData();
@@ -443,17 +433,17 @@ export default defineComponent({
           if (successful.length > 0 && unsuccessful.length === 0) {
             toast({
               variant: "success",
-              message: `Successfully deleted ${successful.length} cipher key(s)`,
+              message: t("settings.cipherKeysPage.bulkDeleteSuccess", { count: successful.length }),
             });
           } else if (successful.length > 0 && unsuccessful.length > 0) {
             toast({
               variant: "warning",
-              message: `Deleted ${successful.length} cipher key(s), but ${unsuccessful.length} failed`,
+              message: t("settings.cipherKeysPage.bulkDeletePartial", { successful: successful.length, failed: unsuccessful.length }),
             });
           } else if (unsuccessful.length > 0) {
             toast({
               variant: "error",
-              message: `Failed to delete ${unsuccessful.length} cipher key(s)`,
+              message: t("settings.cipherKeysPage.bulkDeleteFailed", { count: unsuccessful.length }),
             });
           }
 
@@ -465,7 +455,7 @@ export default defineComponent({
           if (err.response?.status != 403 || err?.status != 403) {
             toast({
               variant: "error",
-              message: err.response?.data?.message || err?.message || "Error while deleting cipher keys",
+              message: err.response?.data?.message || err?.message || t("settings.cipherKeysPage.bulkDeleteError"),
             });
           }
         });

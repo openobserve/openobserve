@@ -24,10 +24,7 @@ use axum::{
 };
 use config::get_config;
 use rust_embed_for_web::{EmbedableFile, RustEmbed};
-
-#[derive(RustEmbed)]
-#[folder = "web/dist/"]
-struct WebAssets;
+use web::WebAssets;
 
 /// Serve static files from embedded web assets
 pub async fn serve(Path(path): Path<String>) -> impl IntoResponse {

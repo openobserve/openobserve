@@ -205,6 +205,56 @@ describe("useMetricsExplorerGrid", () => {
   const cardNamed = (grid: any, name: string) =>
     grid.cards.value.find((c: any) => c.name === name)!;
 
+  describe("the Scratchpad (favorites) narrows the grid when showFavoritesOnly is on", () => {
+    it("narrows sortedCards to the pinned scratchpad set (Workspace tab)", async () => {
+      const grid = await setup();
+      const names = grid.cards.value.map((c: any) => c.name);
+      expect(names.length).toBeGreaterThan(1);
+
+      grid.showFavoritesOnly.value = true;
+      grid.favorites.value = [names[0]]; // scratchpad pins the first
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toEqual([names[0]]);
+
+      // Pinning another metric adds it to the scratchpad view.
+      grid.favorites.value = [names[0], names[1]];
+      expect(grid.sortedCards.value.map((c: any) => c.name).sort()).toEqual(
+        [names[0], names[1]].sort(),
+      );
+    });
+
+    it("ignores prefix/suffix/type facets in Workspace — its panel is hidden there", async () => {
+      // The facet panel is Explore-only. A selection left in the URL from an
+      // Explore session used to keep filtering the pinned set with no visible
+      // control to clear it — emptying Favorites for no discernible reason.
+      const grid = await setup();
+      const pinned = grid.cards.value[0].name;
+
+      // A facet selection that matches NOTHING — in Explore it empties the grid.
+      grid.selectedPrefixes.value = new Set(["__no_such_prefix__"]);
+      grid.showFavoritesOnly.value = false;
+      expect(grid.sortedCards.value).toHaveLength(0);
+
+      // Workspace: the pinned metric survives the (hidden) facet selection.
+      grid.showFavoritesOnly.value = true;
+      grid.favorites.value = [pinned];
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toEqual([pinned]);
+
+      // Type and suffix selections are ignored the same way.
+      grid.selectedTypes.value = new Set(["__no_such_type__"]);
+      grid.selectedSuffixes.value = new Set(["__no_such_suffix__"]);
+      expect(grid.sortedCards.value.map((c: any) => c.name)).toEqual([pinned]);
+    });
+
+    it("still applies prefix/suffix/type in Explore mode", async () => {
+      // The fix must not leak into Explore: a facet that matches nothing there
+      // still empties the grid.
+      const grid = await setup();
+      grid.showFavoritesOnly.value = false;
+      grid.selectedTypes.value = new Set(["__no_such_type__"]);
+      expect(grid.sortedCards.value).toHaveLength(0);
+    });
+  });
+
   describe("a metric hidden as no-data must not stay hidden across a range change", () => {
     it("forgets what was empty when the window changes", async () => {
       // The set is self-sealing: a card in it is filtered OUT of the grid, so it
@@ -302,6 +352,35 @@ describe("useMetricsExplorerGrid", () => {
       expect(grid.previews.value["http_requests_total"].status).toBe("done");
     });
   });
+  describe("a settled card is reused on re-request, not re-queried", () => {
+    it("fires no new query when a done card is re-requested (scroll-back / mode toggle)", async () => {
+      // The card unmounts and remounts when the Explore body is v-if'd out (e.g.
+      // flipping Explore↔Visualize) or scrolled out and back. The remount
+      // re-triggers requestPreview — but a card that already has a result must
+      // reuse it and hit NO backend, the way a dashboard panel does on revisit.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      const first = grid.requestPreview(card);
+      await flush();
+      expect(inFlight).toHaveLength(1);
+      inFlight[0].complete(SERIES);
+      await first;
+      expect(grid.previews.value["http_requests_total"].status).toBe("done");
+
+      const before = inFlight.length;
+      // Re-request (as a remount / scroll-back would) — no skipCache.
+      await grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBe(before); // no new query fired
+
+      // But a refresh (skipCache) still forces a real re-query.
+      grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(inFlight.length).toBe(before + 1);
+    });
+  });
+
   describe("a label can carry more than one matcher", () => {
     it("keeps both, and both reach the query", async () => {
       // `status=~"5.."` AND `status!="503"` is how you say the useful thing, and
@@ -576,12 +655,58 @@ describe("useMetricsExplorerGrid", () => {
 
       expect(grid.pagedCards.value).toHaveLength(INITIAL_PAGE_SIZE);
 
+      /**
+       * Answer every query the grid fires for this preview, until it goes quiet.
+       *
+       * The shared `landPreview` caps itself at 5 rounds, which is not enough
+       * here: partway through the loop below the grid's own debounced sweep
+       * (SWEEP_DEBOUNCE_MS) fires and resolves the REST of the slice, six
+       * queries at a time. Those batches arrive on later rounds, so a 5-round
+       * cap stops answering and strands them, and the awaited preview never
+       * settles — the test times out rather than failing an assertion. Draining
+       * to quiescence is timing-independent; the round cap only exists so a
+       * genuine storm terminates the test instead of hanging it.
+       */
+      /**
+       * Count only the queries THIS org fires. Earlier tests in this file leave
+       * their own grids' debounced sweeps running, and those land in the shared
+       * `inFlight` array during the rounds below — they are this file's own
+       * cross-talk (they name `cpu_temperature`, `lat_seconds_*`, `code="500"`
+       * …, none of which exist in `sparseOrg`), not a storm from this grid.
+       */
+      const asked: number[] = [];
+      const drain = async (preview: Promise<any>) => {
+        for (let round = 0; round < 100; round++) {
+          await flush();
+          if (!inFlight.length) break;
+          for (const q of inFlight) {
+            const m = q.query.match(/metric_(\d+)_total/);
+            if (m) asked.push(Number(m[1]));
+          }
+          inFlight.splice(0, inFlight.length).forEach((q) => q.complete(NO_SERIES));
+        }
+        await preview;
+      };
+
       // Every card on the page comes back empty — the worst case.
       const page = [...grid.pagedCards.value];
       for (const card of page) {
-        await landPreview(grid.requestPreview(card), NO_SERIES);
+        await drain(grid.requestPreview(card));
         inFlight.length = 0;
       }
+
+      // The point of the test, now actually measured rather than assumed.
+      // No metric outside the first page is ever queried: this is the cascade
+      // itself, caught at the query layer rather than only at its after-effect.
+      expect(Math.max(...asked)).toBeLessThan(INITIAL_PAGE_SIZE);
+      expect(new Set(asked).size).toBe(INITIAL_PAGE_SIZE);
+      // And each card is asked at most twice — the rate query, plus the presence
+      // probe that confirms an empty rate() result is real.
+      const perMetric = [...new Set(asked)].map(
+        (i) => asked.filter((a) => a === i).length,
+      );
+      expect(Math.max(...perMetric)).toBeLessThanOrEqual(2);
+      expect(asked).toHaveLength(2 * INITIAL_PAGE_SIZE);
 
       // The page is now EMPTY (all 30 hidden) — it must not have refilled itself
       // from the other 470 metrics.
@@ -626,13 +751,16 @@ describe("useMetricsExplorerGrid", () => {
         return i >= INITIAL_PAGE_SIZE && i < INITIAL_PAGE_SIZE + 24;
       };
 
-      // The first page renders unqueried, so a click asks for 12 more on top.
+      // The first page renders unqueried, so a click asks for PAGE_SIZE_INCREMENT
+      // more on top.
       expect(grid.pagedCards.value).toHaveLength(INITIAL_PAGE_SIZE);
       const target = INITIAL_PAGE_SIZE + PAGE_SIZE_INCREMENT;
 
       const done = grid.showMore();
-      // Drive each look-ahead batch's queries as showMore pulls them.
-      for (let i = 0; i < 12; i++) {
+      // Drive each look-ahead batch's queries as showMore pulls them. A generous
+      // fixed number of flushes — this is the harness draining batches, not the
+      // increment, so it must not be tied to PAGE_SIZE_INCREMENT.
+      for (let i = 0; i < 24; i++) {
         await flush();
         // Mid-flight the budget is untouched: the look-ahead resolves BEFORE
         // the commit, so the grid grows once — not batch by batch — and the

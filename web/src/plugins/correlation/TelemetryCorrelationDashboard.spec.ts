@@ -165,7 +165,7 @@ const i18n = createI18n({
 });
 
 // ---------------------------------------------------------------------------
-// ODrawer stub — replaces the migrated dialog-mode overlay (q-dialog -> ODrawer).
+// ODrawer stub — the dialog-mode overlay.
 // Renders header/default/footer slots and exposes migrated props/emits so we
 // can assert wiring without going through the real Reka portal/teleport.
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ const ODrawerStub = {
 };
 
 // ---------------------------------------------------------------------------
-// ODialog stub — replaces the metric selector dialog (q-dialog -> ODialog).
+// ODialog stub — the metric selector dialog.
 // ---------------------------------------------------------------------------
 const ODialogStub = {
   name: "ODialog",
@@ -534,6 +534,45 @@ describe("TelemetryCorrelationDashboard.vue", () => {
     });
   });
 
+  describe("clearing the metric selection", () => {
+    // Regression (o2-enterprise#2188): deselecting the last checked metric left
+    // its chart on screen. Both reload paths were gated on a non-empty
+    // selection, so nothing ever tore the rendered dashboard down.
+    it("should drop the rendered charts when the last metric is deselected", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = createWrapper();
+
+        // Stand in for a loaded dashboard with one metric charted.
+        wrapper.vm.initialLoadCompleted = true;
+        wrapper.vm.selectedMetricStreams = [...mockMetricStreams.slice(0, 1)];
+        await nextTick();
+        wrapper.vm.dashboardData = {
+          tabs: [{ panels: [{ id: `${mockMetricStreams[0].stream_name}_1` }] }],
+        };
+        wrapper.vm.groupedDashboardData = {
+          compute: { tabs: [{ panels: [{ id: "p1" }] }] },
+        };
+        await nextTick();
+
+        // Uncheck it — the selection is now empty.
+        wrapper.vm.toggleMetricStream(mockMetricStreams[0]);
+        await nextTick();
+        expect(wrapper.vm.selectedMetricStreams.length).toBe(0);
+
+        // The stream watcher debounces before acting.
+        vi.advanceTimersByTime(500);
+        await flushPromises();
+
+        expect(wrapper.vm.dashboardData).toBeNull();
+        expect(wrapper.vm.groupedDashboardData).toEqual({});
+        expect(wrapper.vm.activeDashboardForGroup).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("toggleGroupCollapse", () => {
     it("should add group to collapsedGroups when not collapsed", async () => {
       wrapper = createWrapper();
@@ -754,7 +793,7 @@ describe("TelemetryCorrelationDashboard.vue", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Dialog-mode ODrawer wiring (replaces previous q-dialog)
+  // Dialog-mode ODrawer wiring
   // -------------------------------------------------------------------------
   describe("ODrawer wiring (dialog mode)", () => {
     it("should render an ODrawer when mode is dialog", () => {
@@ -832,7 +871,7 @@ describe("TelemetryCorrelationDashboard.vue", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Metric selector ODialog wiring (replaces previous q-dialog)
+  // Metric selector ODialog wiring
   // -------------------------------------------------------------------------
   describe("ODialog wiring (metric selector)", () => {
     it("should render an ODialog stub for the metric selector", () => {

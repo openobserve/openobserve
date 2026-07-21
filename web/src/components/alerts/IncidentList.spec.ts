@@ -180,7 +180,7 @@ describe("IncidentList.vue", () => {
 
     it("renders the list title", () => {
       wrapper = createWrapper();
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       expect(wrapper.find(".app-page-header h1").text()).toContain("Incident");
     });
 
@@ -326,14 +326,8 @@ describe("IncidentList.vue", () => {
       expect((wrapper.vm as any).visibleIncidents).toHaveLength(0);
     });
 
-    it("adds # index to each visible incident", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      const visible = (wrapper.vm as any).visibleIncidents;
-      // visibleIncidents maps filtered array to add "#": i + 1
-      expect(visible.length).toBeGreaterThan(0);
-      expect(visible[0]["#"]).toBe(1);
-    });
+    // Row index is now OTable's built-in `show-index`; visibleIncidents no
+    // longer injects a "#" field into the data.
 
     it("filters case-insensitively", async () => {
       (incidentsService.list as any).mockResolvedValue({

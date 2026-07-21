@@ -82,13 +82,13 @@ const isTextarea = computed(() => props.type === "textarea");
 const fieldWidthClass = computed(() => {
   switch (props.width) {
     case "xs":
-      return "w-[var(--spacing-field-width-xs)]";
+      return "w-field-width-xs";
     case "sm":
-      return "w-[var(--spacing-field-width-sm)]";
+      return "w-field-width-sm";
     case "md":
-      return "w-[var(--spacing-field-width-md)]";
+      return "w-field-width-md";
     case "lg":
-      return "w-[var(--spacing-field-width-lg)]";
+      return "w-field-width-lg";
     default:
       return "w-full";
   }
@@ -209,10 +209,9 @@ watch(
 );
 
 // ── Styles ─────────────────────────────────────────────────────────────────
-// md was h-10 (40px); reduced to h-8 (32px) for compact config panel density.
-// Height applied to the wrapper (so border is included in the box, matching OSelect).
-// The inner input fills the wrapper via h-full.
-// 34px control height per the design system (HANDOFF §11: input height 34px).
+// Height applied to the wrapper (so border is included in the box, matching
+// OSelect); the inner input fills it via h-full. 34px control height per the
+// design system.
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
   sm: "h-[2.125rem]",
   md: "h-[2.125rem]",
@@ -223,7 +222,7 @@ const textSizeClasses: Record<NonNullable<InputProps["size"]>, string> = {
 };
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "bg-input-bg",
   !isTextarea.value ? heightClasses[props.size ?? "md"] : "",
   /* Focus affordance = soft glow: a 4px translucent halo hugging the border
@@ -234,9 +233,8 @@ const wrapperClasses = computed(() => [
   hasError.value
     ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
     : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-primary-500/25",
-  /* Disabled inputs were almost indistinguishable from enabled ones — same
-     near-white bg, same border. Added opacity-60 + dashed border so they
-     read as obviously inactive at a glance. */
+  /* Disabled inputs get a muted bg + dashed border so they read as obviously
+     inactive at a glance. */
   props.disabled
     ? "bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed"
     : "",
@@ -252,8 +250,8 @@ const wrapperClasses = computed(() => [
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
-        props.disabled && 'o-input-label--disabled',
+        'o-input-label text-compact leading-tight flex items-center gap-1',
+        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -271,7 +269,7 @@ const wrapperClasses = computed(() => [
       <!-- Inside label: floating mini-label at the top of the input border -->
       <span
         v-if="label && labelPosition === 'inside' && !isTextarea"
-        class="absolute top-1 start-3 end-7 text-[0.6875rem] font-medium leading-none text-text-secondary select-none pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis"
+        class="absolute top-1 start-3 end-7 text-2xs font-medium leading-none text-text-secondary select-none pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis"
       >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span>
 
       <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->
@@ -341,6 +339,7 @@ const wrapperClasses = computed(() => [
         :maxlength="maxlength"
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
+        :aria-invalid="hasError || undefined"
         :class="[
           'flex-1 min-w-0 bg-transparent outline-none rounded-[inherit]',
           'text-input-text placeholder:text-input-placeholder',
@@ -404,9 +403,13 @@ const wrapperClasses = computed(() => [
       </span>
     </div>
 
-    <!-- Bottom row: helpText / error / counter -->
+    <!-- Bottom row: helpText / error / counter.
+         `effectiveError` is " " when the field is invalid but its message is
+         rendered elsewhere (OFormInput's #error slot). That carries no text, so
+         it must not open this row — an empty row still costs the parent's gap-1
+         and would grow the field on error, nudging anything aligned beside it. -->
     <div
-      v-if="effectiveError || helpText || maxlength"
+      v-if="(effectiveError && effectiveError.trim()) || helpText || maxlength"
       class="flex items-center justify-between gap-2"
     >
       <span

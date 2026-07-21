@@ -6,21 +6,16 @@ on:
     branches:
       - main
     # Only run when the English source actually changes. Gating to `main` (instead
-    # of every branch) prevents paying AWS Translate for the same strings on each
-    # feature branch — the single largest cost driver of this job.
+    # of every branch) avoids re-translating the same strings on each feature
+    # branch — the single largest cost driver of this job.
     paths:
-      - 'web/src/locales/languages/en.json'
+      - 'web/src/locales/languages/en-US.json'
   workflow_dispatch:
     inputs:
       languages:
         description: 'Languages to translate (space-separated, e.g., "fr es de"). Leave empty for all.'
         required: false
         default: ''
-      force:
-        description: 'Bypass the safety cap for large/intentional translation runs'
-        required: false
-        type: boolean
-        default: false
 
 # Cancel an in-progress run if a newer push to the same ref arrives, so we don't
 # pay for superseded translation runs.
@@ -36,9 +31,8 @@ jobs:
     # Only run on the main repo, not forks.
     if: github.repository == 'openobserve/openobserve'
 
-    # Required for OIDC authentication with AWS and opening the translations PR.
+    # Required for opening the translations PR.
     permissions:
-      id-token: write
       contents: write
       pull-requests: write
 
@@ -48,24 +42,17 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify AWS role secret is configured
+      - name: Verify DeepSeek API key secret is configured
         env:
-          AWS_TRANSLATE_ROLE_ARN: ${{ secrets.AWS_TRANSLATE_ROLE_ARN }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          if [ -z "$AWS_TRANSLATE_ROLE_ARN" ]; then
-            echo "::error::Secret AWS_TRANSLATE_ROLE_ARN is not set. Add the IAM role ARN as a repository secret."
+          if [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "::error::Secret DEEPSEEK_API_KEY is not set. Add it as a repository secret."
             exit 1
           fi
 
-      - name: Configure AWS Credentials with IAM Role
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_TRANSLATE_ROLE_ARN }}
-          role-session-name: GitHubActions-TranslationWorkflow
-          aws-region: us-east-1
-
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -79,19 +66,16 @@ jobs:
         # Inputs are passed as environment variables (not interpolated into the
         # script body) so user-controlled text can never be injected into the
         # shell. The script itself validates language codes against the supported
-        # list before any AWS call (see main.py).
+        # list before any API call (see main.py).
         env:
           INPUT_LANGUAGES: ${{ github.event.inputs.languages }}
-          INPUT_FORCE: ${{ github.event.inputs.force }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
           cd scripts/translations
           ARGS=()
           if [ -n "$INPUT_LANGUAGES" ]; then
             read -ra REQUESTED <<< "$INPUT_LANGUAGES"
             ARGS+=("${REQUESTED[@]}")
-          fi
-          if [ "$INPUT_FORCE" = "true" ]; then
-            ARGS+=("--force")
           fi
           echo "Running translation with args: ${ARGS[*]}"
           python3 main.py "${ARGS[@]}"
@@ -129,15 +113,15 @@ jobs:
             web/src/locales/languages/*.json
             scripts/translations/.translation_state.json
           commit-message: |
-            chore: update translations from en.json
+            chore: update translations from en-US.json
 
             Auto-generated translation updates from English source file.
 
             🤖 Generated with automated translation workflow
-          title: "chore: update translations from en.json"
+          title: "chore: update translations from en-US.json"
           body: |
             Auto-generated translation updates from the English source file
-            (`web/src/locales/languages/en.json`).
+            (`web/src/locales/languages/en-US.json`).
 
             🤖 Generated with automated translation workflow
           labels: |

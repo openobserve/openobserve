@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="full-height">
-    <div v-if="isAddVariable" class="flex flex-col full-height">
+  <div class="h-full max-h-full overflow-hidden">
+    <div v-if="isAddVariable" class="flex flex-col h-full max-h-full overflow-hidden">
       <AddSettingVariable
         v-if="isAddVariable"
         @save="handleSaveVariable"
@@ -24,8 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardVariablesList="dashboardVariablesList"
       />
     </div>
-    <div v-else class="flex flex-col full-height">
-      <DashboardHeader title="Variables">
+    <div v-else class="flex flex-col h-full max-h-full overflow-hidden">
+      <DashboardHeader :title="t('dashboard.variableSettingsPage.variables')">
         <template #right>
           <div class="flex gap-2">
             <!-- show variables dependencies if variables exist -->
@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
-              >{{ t('dashboard.showDependencies') }}</OButton
+            >{{ t('dashboard.showDependencies') }}</OButton
             >
             <OButton
               variant="primary"
               size="sm"
               @click="addVariables"
               data-test="dashboard-add-variable-btn"
-              >{{ t("dashboard.newVariable") }}</OButton
+            >{{ t("dashboard.newVariable") }}</OButton
             >
           </div>
         </template>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'tabs'"
               >
-                {{ row.tabs?.length || 0 }} Tabs
+                {{ t('dashboard.variableSettingsPage.tabsCount', { n: row.tabs?.length || 0 }) }}
               </OTag>
               <OTag
                 type="variableScope"
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'panels'"
               >
-                {{ row.panels?.length || 0 }} Panels
+                {{ t('dashboard.variableSettingsPage.panelsCount', { n: row.panels?.length || 0 }) }}
               </OTag>
 
               <OTooltip
@@ -174,11 +174,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
         />
-        <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" title="Variables Dependency Graph">
-          <div style="height: 60vh">
+        <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" :title="t('dashboard.variableSettingsPage.variablesDependencyGraph')">
+          <div class="h-[60vh]">
             <VariablesDependenciesGraph
               :variablesList="dashboardVariablesList"
-              :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+              :class="'bg-surface-base'"
               @closePopUp="
                 () => (showVariablesDependenciesGraphPopUp = false)
               "
@@ -296,7 +296,7 @@ export default defineComponent({
       },
       {
         id: "scope",
-        header: "Scope",
+        header: t("dashboard.variableSettingsPage.scope"),
         size: COL.status,
         meta: { align: "left" },
       },
@@ -309,7 +309,7 @@ export default defineComponent({
       },
     ];
 
-    // Zero-padded position label ("01", "02", …) matching the previous design.
+    // Zero-padded position label ("01", "02", …).
     const formatIndex = (variable: any) => {
       const index = dashboardVariablesList.value.indexOf(variable);
       return index < 9 ? `0${index + 1}` : `${index + 1}`;
@@ -367,7 +367,7 @@ export default defineComponent({
       const tab = dashboardVariableData.data.tabs?.find(
         (t: any) => t.tabId === tabId,
       );
-      return tab ? tab.name : "Deleted Tab";
+      return tab ? tab.name : t("dashboard.variableSettingsPage.deletedTab");
     };
 
     // Function to get panel name by ID
@@ -379,7 +379,7 @@ export default defineComponent({
           return `${tab.name} > ${panel.title || panel.id}`;
         }
       }
-      return "Deleted Panel";
+      return t("dashboard.variableSettingsPage.deletedPanel");
     };
 
     const handleDragEnd = async () => {
@@ -396,7 +396,7 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        showPositiveNotification("Dashboard updated successfully.", {
+        showPositiveNotification(t("dashboard.variableSettingsPage.dashboardUpdatedSuccessfully"), {
           timeout: 2000,
         });
 
@@ -406,10 +406,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Variable reorder failed",
+              t("dashboard.variableSettingsPage.variableReorderFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Variable reorder failed");
+          showErrorNotification(error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"));
         }
         await getDashboardData();
       }
@@ -512,7 +512,7 @@ export default defineComponent({
           emit("save");
         }
 
-        showPositiveNotification("Variable deleted successfully", {
+        showPositiveNotification(t("dashboard.variableSettingsPage.variableDeletedSuccessfully"), {
           timeout: 2000,
         });
       } catch (error: any) {
@@ -520,10 +520,10 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Variable deletion failed",
+              t("dashboard.variableSettingsPage.variableDeletionFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? "Variable deletion failed", {
+          showErrorNotification(error?.message ?? t("dashboard.variableSettingsPage.variableDeletionFailed"), {
             timeout: 2000,
           });
         }

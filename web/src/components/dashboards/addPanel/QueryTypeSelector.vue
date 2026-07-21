@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
     <ConfirmDialog
-      title="Change Query Mode"
+      :title="t('dashboard.queryTypeSelector.changeQueryMode')"
       :message="confirmDialogMessage"
       @update:ok="changeToggle()"
       @update:cancel="confirmQueryModeChangeDialog = false"
@@ -130,7 +130,7 @@ export default defineComponent({
     const SEED_ON_TOGGLE_PAGES = ["dashboard", "metrics", "build", "logs"];
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDialogMessage = ref(
-      "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
+      t("dashboard.queryTypeSelector.changeQueryModeConfirm"),
     );
 
     const selectedButtonQueryType = ref("sql");
@@ -266,12 +266,14 @@ export default defineComponent({
             selectedQueryType === "builder"
           ) {
             // Switching from PromQL custom to builder
-            confirmDialogMessage.value =
-              "Are you sure you want to switch to builder mode? Your custom PromQL query will be wiped off.";
+            confirmDialogMessage.value = t(
+              "dashboard.queryTypeSelector.switchToBuilderConfirm",
+            );
           } else {
             // Default message for other transitions
-            confirmDialogMessage.value =
-              "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.";
+            confirmDialogMessage.value = t(
+              "dashboard.queryTypeSelector.changeQueryModeConfirm",
+            );
           }
 
           dashboardPanelData.data.queries[
@@ -409,22 +411,15 @@ export default defineComponent({
         // — `customQuery` is.
         if (query.customQuery && query.query) return;
 
-        // Everything above inspects the CURRENT slot, but what we are about to
-        // do is panel-wide: `changeToggle` flips `data.queryType` and clears
-        // EVERY query, because SQL and PromQL are not interchangeable. So the
-        // other slots get a say.
-        //
-        // SQL over a metrics stream is legal — this watcher's whole premise is
-        // that it is merely never what anyone wants — so a SQL panel can quite
-        // reasonably gain a second query on a metrics stream. Adding one used to
-        // erase the first query's SQL and convert the panel to PromQL, which no
-        // one asked for. A panel with a query already written in it is one the
-        // user is building; converting it is their call, one click away.
-        // "Has something in it" is a query string AND a stream to run it
-        // against: a slot the user has not pointed at anything yet still carries
-        // the editor's placeholder SQL (`SELECT histogram(_timestamp) … FROM ""`),
-        // and treating that as work would block the auto-select on exactly the
-        // brand-new panels it exists for.
+        // Everything above inspects the CURRENT slot, but `changeToggle` is
+        // panel-wide: it flips `data.queryType` and clears EVERY query, because
+        // SQL and PromQL are not interchangeable. So the other slots get a say —
+        // a SQL panel can reasonably gain a second query on a metrics stream.
+        // "Has work" = a query string AND a stream to run it against: a slot the
+        // user has not pointed at anything yet still carries the editor's
+        // placeholder SQL (`SELECT histogram(_timestamp) … FROM ""`), and treating
+        // that as work would block the auto-select on the brand-new panels it
+        // exists for.
         const siblingsHaveWork = dashboardPanelData.data.queries.some(
           (q: any, index: number) =>
             index !== dashboardPanelData.layout.currentQueryIndex &&

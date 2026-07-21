@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div class="rounded-md h-full min-h-full! max-h-full! overflow-hidden! logPage" id="logPage" data-test="logs-page-container">
+  <div class="rounded-default h-full min-h-full! max-h-full! overflow-hidden! logPage" id="logPage" data-test="logs-page-container">
     <div
       v-show="!showSearchHistory && !showSearchScheduler"
       id="secondLevel"
-      class="full-height"
+      class="h-full max-h-full overflow-hidden"
     >
       <OSplitter
-        class="full-height"
+        class="h-full max-h-full overflow-hidden"
         v-model="splitterModel"
         :horizontal="true"
         unit="px"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="flex scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection w-full border-t border-border-default"
+            class="flex scroll relative-position thirdlevel h-full max-h-full overflow-hidden p-0 m-0 box-border logsPageMainSection w-full border-t border-border-default"
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
@@ -70,17 +70,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              class="full-height w-full logs-splitter-smooth"
+              class="h-full max-h-full overflow-hidden w-full logs-splitter-smooth"
               separatorClass="field-list-separator"
               :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <div class="relative-position h-full pl-[0.625rem] pt-2 border-r border-border-default bg-surface-panel">
+                <!-- 10px on top (matching the search bar's 4+6 above it).
+                     No right/bottom gutter here: the field list runs into the
+                     divider so its scrollbar sits on the panel edge, and scrolls
+                     into the panel foot. The form controls (stream selector, field
+                     search) carry their own matching px-1.5 gutter (see IndexList /
+                     OFieldList) so they line up — they're controls, not scrolling
+                     surfaces. -->
+                <div class="relative-position h-full pt-2.5 border-r border-border-default bg-surface-panel">
                   <index-list
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
-                    class="card-container"
                     @setInterestingFieldInSQLQuery="
                       setInterestingFieldInSQLQuery
                     "
@@ -90,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #after>
                 <div class="h-full">
                   <div
-                    class="card-container h-full w-full relative-position"
+                    class="bg-card-glass-bg h-full w-full relative-position"
                   >
                     <div
                       v-if="
@@ -112,8 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       checked first and is NOT gated on errorMsg/loading/
                       loadingStream flags. Those could be stale (e.g. a stuck
                       loadingStream after an early-return in extractFields, or a
-                      leftover errorMsg after resetSearchObj) and previously left
-                      the center blank by falling through to the results branch.
+                      leftover errorMsg after resetSearchObj), which would
+                      otherwise fall through to the results branch and leave the
+                      center blank.
                     -->
                     <div
                       v-else-if="
@@ -173,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.loading == false &&
                         searchObj.meta.searchApplied == true
                       "
+                      class="h-full"
                       data-test="logs-search-no-events-found-text"
                     >
                       <LogsNoEventsState
@@ -224,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-else
                       data-test="logs-search-search-result"
-                      class="full-height"
+                      class="h-full max-h-full overflow-hidden"
                     >
                       <search-result
                         ref="searchResultRef"
@@ -247,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
-            class="visualize-container border-t border-border-default"
+            class="h-full border-t border-border-default"
             :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <VisualizeLogsQuery
@@ -262,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="searchObj.meta.logsVisualizeToggle == 'build'"
-            class="build-container"
+            class="h-full overflow-hidden"
             :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <BuildQueryPage
@@ -283,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
-    <div v-show="showSearchHistory" class="full-height">
+    <div v-show="showSearchHistory" class="h-full max-h-full overflow-hidden">
       <search-history
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
@@ -292,28 +300,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
-        class="search-history-empty"
+        class="h-50 rounded-default"
       >
         <div
-          class="search-history-empty__content text-center p-3 flex flex-center"
+          class="h-[80vh] rounded-default text-center p-3 flex items-center justify-center"
         >
           <div>
             <div>
               <OIcon
                 name="history"
-                class="search-history-empty__icon" style="width: 100px; height: 100px;" />
+                class="w-25 h-25 [font-size: var(--text-4xl)] opacity-10" />
             </div>
-            <div class="text-3xl font-semibold search-history-empty__title">
-              Search history is not enabled.
+            <div class="text-3xl font-semibold opacity-80">
+              {{ t("logs.index.searchHistoryNotEnabled") }}
             </div>
             <div
-              class="search-history-empty__info mt-2 flex items-center justify-center"
+              class="opacity-80 mt-2 flex items-center justify-center"
             >
               <OIcon name="info" class="mr-1"
 size="md" />
               <span class="text-xl font-semibold text-center">
-                Set ZO_USAGE_REPORTING_ENABLED to true to enable usage
-                reporting.</span
+                {{ t("logs.index.enableUsageReporting") }}</span
               >
             </div>
 
@@ -328,7 +335,7 @@ size="md" />
         </div>
       </div>
     </div>
-    <div v-show="showSearchScheduler" class="full-height">
+    <div v-show="showSearchScheduler" class="h-full max-h-full overflow-hidden">
       <SearchSchedulersList
         ref="searchSchedulerRef"
         @closeSearchHistory="closeSearchSchedulerFn"
@@ -987,7 +994,7 @@ export default defineComponent({
           const selectedStreams = searchObj.data.stream.selectedStream;
           if (!selectedStreams?.length) {
             searchObj.loading = false;
-            showErrorNotification("Please select a stream to extract patterns");
+            showErrorNotification(t("logs.index.selectStreamToExtractPatterns"));
             return;
           }
           streamName = selectedStreams[0];
@@ -1011,7 +1018,7 @@ export default defineComponent({
       } catch (error) {
         console.error("[Index] Error extracting patterns:", error);
         searchObj.loading = false;
-        showErrorNotification("Error extracting patterns. Please try again.");
+        showErrorNotification(t("logs.index.errorExtractingPatterns"));
       }
     };
 
@@ -1792,7 +1799,7 @@ export default defineComponent({
           dashboardData.data.title == null ||
           dashboardData.data.title.trim() == ""
         ) {
-          errors.push("Name of Panel is required");
+          errors.push(t("logs.index.nameOfPanelRequired"));
         }
       }
 
@@ -1801,7 +1808,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          t("logs.index.errorsFixAndTryAgain"),
         );
         return false;
       }
@@ -2033,7 +2040,7 @@ export default defineComponent({
               isSimpleSelectAllQuery(logsPageQuery)
             ) {
               showErrorNotification(
-                "Select * query is not supported for visualization",
+                t("logs.index.selectStarNotSupportedForVisualization"),
               );
               return;
             }
@@ -2266,7 +2273,7 @@ export default defineComponent({
 
           // show error notification
           showErrorNotification(
-            err.message ?? "Error in updating visualization",
+            err.message ?? t("logs.index.errorUpdatingVisualization"),
           );
           return;
         }
@@ -2540,7 +2547,7 @@ export default defineComponent({
             isSimpleSelectAllQuery(logsPageQuery)
           ) {
             showErrorNotification(
-              "Select * query is not supported for visualization",
+              t("logs.index.selectStarNotSupportedForVisualization"),
             );
             return;
           }
@@ -2561,7 +2568,7 @@ export default defineComponent({
 
           // show error notification
           showErrorNotification(
-            err.message ?? "Error in updating visualization",
+            err.message ?? t("logs.index.errorUpdatingVisualization"),
           );
           return;
         }
@@ -2622,7 +2629,7 @@ export default defineComponent({
           !buildDashboardPanelData.data.queries[0]?.query?.trim()
         ) {
           showErrorNotification(
-            "Query is empty, please select fields to build query",
+            t("logs.index.queryEmptySelectFieldsToBuild"),
           );
           return;
         }
@@ -2960,7 +2967,6 @@ export default defineComponent({
         if (schemaCache?.value && schemaCache?.value?.key === logsPageQuery) {
           extractedFields = schemaCache?.value?.response?.data;
         } else {
-          // Use the refactored getResultSchema function
           extractedFields = await getResultSchema(
             logsPageQuery,
             signal,
@@ -3033,7 +3039,6 @@ export default defineComponent({
           };
         }
 
-        // Use the refactored functions
         await setCustomQueryFields(
           fieldsForVisualization,
           shouldAutoSelectChartTypeForFields,
@@ -3494,7 +3499,7 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
+            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
@@ -3503,7 +3508,7 @@ export default defineComponent({
           (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
         ) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
+            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
@@ -3512,13 +3517,13 @@ export default defineComponent({
           this.searchObj.meta.sqlMode == true
         ) {
           this.resetHistogramWithError(
-            "Histogram is not available for multi stream search.",
+            this.t("logs.index.histogramNotAvailableMultiStream"),
           );
         } else if (
           this.searchObj.data.queryResults.is_histogram_eligible == false
         ) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT and LIMIT queries.",
+            this.t("logs.index.histogramUnavailableCtesDistinctLimit"),
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
@@ -3634,49 +3639,12 @@ export default defineComponent({
 }) as any;
 </script>
 
-<style>
-.logPage .index-menu .field_list .field_overlay .field_label,
-.logPage .q-field__native,
-.logPage .q-field__input,
-.logPage .q-table tbody td {
-  font-size: 12px !important;
-}
-
-.logPage .q-table__top {
-  padding: 0px !important;
-}
-
-.logPage .q-table__control {
-  width: 100%;
-}
-
-.logPage .logsPageMainSection > .q-field__control-container {
-  padding-top: 0px !important;
-}
-
-.logPage .thirdlevel {
-  padding: 0 !important;
-  margin: 0 !important;
-  box-sizing: border-box !important;
-  height: 100% !important;
-  overflow: visible !important;
-  /* Changed from hidden to visible for button */
-}
-
-.field-list-separator::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  background-color: transparent;
-  transition: background-color 0.3s;
-}
-
-.field-list-separator:hover::after {
-  background-color: orange;
+<style scoped>
+/* keep(complex-state): the field label is rendered deep inside the IndexList /
+   FieldRow child components, so this reaches it with :deep() rather than a
+   template utility. Mirrors the identical rule in plugins/traces/Index.vue. */
+.logPage :deep(.index-menu .field_list .field_overlay .field_label) {
+  font-size: var(--text-xs) !important;
 }
 </style>
 

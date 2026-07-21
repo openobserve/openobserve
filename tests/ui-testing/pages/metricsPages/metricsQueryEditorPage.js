@@ -154,12 +154,15 @@ export class MetricsQueryEditorPage {
             this.testLogger.info('Monaco model set, polling for view rendering...');
 
             // CRITICAL: Poll for actual DOM/view rendering, not model state
-            // Monaco renders asynchronously - we must verify via the editor model
+            // Monaco renders asynchronously - we must verify via the editor model.
+            // Gated on the REAL signal (model contains the typed query) with a
+            // generous bounded timeout — 3s was too tight under afternoon cloud
+            // load and let the fast keyboard fallback fire unnecessarily.
             try {
                 await expect.poll(async () => {
                     const text = await this.getCurrentQueryText();
                     return text.includes(query.substring(0, Math.min(10, query.length)));
-                }, { timeout: 3000, intervals: [100, 200, 500] }).toBe(true);
+                }, { timeout: 15000, intervals: [100, 200, 500, 1000] }).toBe(true);
                 this.testLogger.info('✓ Query verified in rendered view');
                 return;
             } catch {
@@ -250,6 +253,42 @@ export class MetricsQueryEditorPage {
     }
 
     /**
+     * Wait for the dashboard-panel Monaco editor to be (re)mounted and visible.
+     *
+     * On tab create / tab switch, DashboardQueryEditor.vue tears down and remounts
+     * the Monaco instance for the newly-active tab. Reading getCurrentQueryText()
+     * before that remount completes yields empty/stale text. This gates on the REAL
+     * signal — a Monaco editor whose DOM node lives inside the dashboard query editor
+     * container AND is actually laid out (offsetParent != null, i.e. visible) — so
+     * callers read a live editor, not a mid-remount one.
+     *
+     * Best-effort: warns (never throws) if the editor isn't confirmed within the
+     * bounded timeout, leaving the caller's own assertions as the authority.
+     *
+     * @param {number} timeout - bounded max wait in ms
+     */
+    async waitForEditorReady(timeout = 8000) {
+        try {
+            await expect.poll(async () => {
+                return await this.page.evaluate(() => {
+                    const editors = window.monaco?.editor?.getEditors?.() || [];
+                    const dashContainer = document.querySelector('[data-test="dashboard-panel-query-editor"]');
+                    if (!dashContainer) return false;
+                    for (const ed of editors) {
+                        const dom = ed.getDomNode?.();
+                        if (dom && dashContainer.contains(dom) && dom.offsetParent !== null) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+            }, { timeout, intervals: [100, 200, 500] }).toBe(true);
+        } catch {
+            this.testLogger.warn('Editor not confirmed ready (mounted + visible) within timeout');
+        }
+    }
+
+    /**
      * Switch to a specific query tab (1-based)
      *
      * Tabs in DashboardQueryEditor.vue are rendered as OTab (Reka UI TabsTrigger)
@@ -282,6 +321,11 @@ export class MetricsQueryEditorPage {
                     timeout: 3000,
                     intervals: [100, 250, 500],
                 }).toBe('active');
+                // Tab is active — now wait for its Monaco editor to be remounted +
+                // visible before returning, so a caller reading getCurrentQueryText()
+                // right after the switch sees the re-rendered (persisted) query, not
+                // a mid-remount empty editor.
+                await this.waitForEditorReady();
                 this.testLogger.info(`✓ Switched to tab ${tabNumber} (verified active)`);
                 return true;
             } catch {
@@ -315,6 +359,9 @@ export class MetricsQueryEditorPage {
                 await expect.poll(async () => {
                     return await this.tabList.count();
                 }, { timeout: 5000, intervals: [100, 250, 500] }).toBeGreaterThan(tabsBefore);
+                // New tab created — wait for its freshly-mounted Monaco editor to be
+                // visible before returning so the caller can immediately act on it.
+                await this.waitForEditorReady();
                 this.testLogger.info('✓ Added new query tab successfully');
                 return true;
             } catch {
@@ -422,11 +469,11 @@ export class MetricsQueryEditorPage {
      * Useful for waiting for async updates after tab switches
      *
      * @param {string} expectedText - The text to look for in the query
-     * @param {number} maxAttempts - Maximum number of attempts (default: 10)
+     * @param {number} maxAttempts - Maximum number of attempts (default: 30 → 15s budget)
      * @param {number} delayMs - Delay between attempts in ms (default: 500)
      * @returns {Promise<{found: boolean, text: string}>} - Result with found status and actual text
      */
-    async pollForQueryText(expectedText, maxAttempts = 10, delayMs = 500) {
+    async pollForQueryText(expectedText, maxAttempts = 30, delayMs = 500) {
         let currentText = '';
         try {
             await expect.poll(async () => {
@@ -479,6 +526,27 @@ export class MetricsQueryEditorPage {
         await this.streamDropdownPopover.first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
         this.testLogger.info(`Selected stream: ${streamValue}`);
+
+        // Readiness gate (root cause #1): in PromQL custom mode, selecting a metric
+        // triggers an ASYNC app flow — fetch metric metadata, then auto-populate the
+        // query editor. The popover closing is NOT that signal. Gate on the REAL
+        // signal — the editor model becoming non-empty — with a generous bounded
+        // timeout so callers that assert on auto-populate don't race the async fill
+        // under cloud load (the 5s poll in P1 was too tight).
+        //
+        // Best-effort by design: if the query never auto-populates (e.g. no metadata
+        // for this metric, or auto-populate broken server-side) we log a warning and
+        // still return streamValue, so callers that do NOT expect auto-population are
+        // unaffected and their own assertions remain the authority.
+        try {
+            await expect.poll(async () => {
+                return (await this.getCurrentQueryText()).trim().length > 0;
+            }, { timeout: 18000, intervals: [200, 300, 500, 1000] }).toBe(true);
+            this.testLogger.info('✓ Auto-populated query detected after stream selection');
+        } catch {
+            this.testLogger.warn('Stream selected but query did not auto-populate within timeout — returning streamValue anyway');
+        }
+
         return streamValue;
     }
 }

@@ -463,7 +463,7 @@ describe("ColorPaletteDropDown", () => {
       expect(flexContainer.classes()).toContain("items-center");
     });
 
-    it("should render q-select with correct props", () => {
+    it("should render the select with correct props", () => {
       const select = wrapper.find("[data-test='color-palette-select']");
       expect(select.exists()).toBeTruthy();
     });

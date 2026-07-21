@@ -21,7 +21,8 @@ pub mod migration;
 pub use openobserve_api::{handler, router};
 #[cfg(feature = "enterprise")]
 pub use openobserve_core::cipher;
-pub use openobserve_core::{common, job, service};
+pub use openobserve_core::{common, service};
+pub use openobserve_jobs::job;
 
 #[cfg(feature = "enterprise")]
 pub mod super_cluster_queue;

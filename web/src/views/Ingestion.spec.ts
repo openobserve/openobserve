@@ -130,14 +130,10 @@ describe("Ingestion", () => {
               props: ['title', 'message', 'modelValue'],
               emits: ['update:ok', 'update:cancel']
             },
-                        'q-btn': { template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>', emits: ['click'] },
-            'q-tabs': { template: '<div class="q-tabs"><slot /></div>' },
-            'q-route-tab': { template: '<div class="q-route-tab"><slot /></div>' },
             OButton: { template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>', props: ['variant', 'size', 'disabled', 'icon', 'title', 'data-test', 'class'], emits: ['click'] },
             OTabs: { template: '<div class="o-tabs-stub"><slot /></div>', props: ['modelValue', 'horizontal', 'align'], emits: ['update:modelValue'] },
             ORouteTab: { template: '<div class="o-route-tab-stub"><slot /></div>', props: ['name', 'to', 'label', 'icon'] },
-            'q-separator': { template: '<div class="q-separator"></div>' },
-            'router-view': { 
+            'router-view': {
               template: '<div class="router-view" @copy-to-clipboard-fn="$emit(\'copy-to-clipboard-fn\', $event)"><slot /></div>', 
               emits: ['copy-to-clipboard-fn']
             },
@@ -205,7 +201,7 @@ describe("Ingestion", () => {
         return;
       }
       expect(wrapper.vm.rumRoutes).toEqual(["frontendMonitoring"]);
-      expect(wrapper.vm.metricRoutes).toEqual(["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"]);
+      expect(wrapper.vm.metricRoutes).toEqual(["prometheus", "vmagent", "otelCollector", "telegraf", "cloudwatchMetrics"]);
       expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP"]);
     });
   });
@@ -476,7 +472,7 @@ describe("Ingestion", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "error",
-        message: "API Key not found.",
+        message: "Passcode not found.",
         timeout: 5000,
       });
     });
@@ -565,7 +561,7 @@ describe("Ingestion", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "error",
-        message: "API Key not found.",
+        message: "Passcode not found.",
         timeout: 5000,
       });
     });

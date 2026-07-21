@@ -41,6 +41,13 @@ export interface SqlErrorRange {
   startLine: number;
   endLine: number;
   column?: number;
+  /**
+   * Optional 1-based end column. When set, the editor squiggles only from
+   * `column` to `endColumn` (used to wrap a single offending token — e.g. an
+   * unknown field name). When omitted, the editor highlights to end-of-line,
+   * which is the right behaviour for syntax errors near the cursor.
+   */
+  endColumn?: number;
   error: string;
 }
 
@@ -83,6 +90,18 @@ const MSG = {
   unexpectedClose:  "Unexpected closing parenthesis ) — check that every ( has a matching )",
   unexpectedComma:  (line: number, col: number) => `Unexpected comma at line ${line}, column ${col} — check your column list or function arguments`,
   generic:          (ch: string, line: number, col: number) => `Unexpected '${ch}' at line ${line}, column ${col}`,
+
+  // Semantic / schema errors (returned by the backend, not caught client-side).
+  // These reference an identifier that we locate in the query text.
+  fieldNotFound:    (field: string) => `Unknown field '${field}' — this column does not exist in the stream`,
+  functionNotFound: (fn: string) => `Unknown function '${fn}' — no such function is defined`,
+  incompatibleType: (field: string) => `Field '${field}' has an incompatible data type for this operation`,
+  streamNotFound:   (stream: string) => `Unknown stream '${stream}' — this stream does not exist`,
+  groupByMissing:   (col: string) => `'${col}' must appear in the GROUP BY clause or be used in an aggregate function`,
+  ambiguousColumn:  (col: string) => `Column '${col}' is ambiguous — qualify it with its stream/table name`,
+  duplicateColumn:  (col: string) => `Column '${col}' is defined more than once — remove or alias the duplicate`,
+  tableNotFound:    (tbl: string) => `Unknown table '${tbl}' — this table or CTE does not exist`,
+  functionSignature:(fn: string) => `Function '${fn}' was called with the wrong argument type(s) — add an explicit cast`,
 } as const;
 
 // ─── Backward context scanner ─────────────────────────────────────────────────
@@ -669,4 +688,328 @@ export async function rangesFromServerMessage(
     : message.replace(/^Error#\s*/i, "").trim();
 
   return [{ startLine: 1, endLine: 1, column: 1, error: fallbackMsg }];
+}
+
+// ─── Semantic (schema) error support ──────────────────────────────────────────
+//
+// Backend search errors that reference an identifier (field/function/stream)
+// but carry NO line/column position. We extract the identifier from the error
+// text and locate every occurrence of it in the query so the editor can
+// squiggle the exact token(s). See src/infra/src/errors/{mod,grpc}.rs for the
+// message formats each code produces.
+
+/** One located token occurrence, in 1-based editor coordinates. */
+interface TokenHit {
+  line: number;
+  startCol: number;
+  /** Exclusive end column (Monaco-style: one past the last char). */
+  endCol: number;
+}
+
+/**
+ * Find every whole-token occurrence of `rawName` in `sql`, skipping string
+ * literals and comments. Matches bare identifiers (`error_id`) and quoted
+ * identifiers (`"error_id"`, `` `error_id` ``). Case-insensitive, since
+ * DataFusion folds identifiers to lower case.
+ *
+ * A double-quoted token is treated as an identifier (SQL semantics), not a
+ * string literal, so quoted field/stream names are still located.
+ */
+export function locateIdentifier(sql: string, rawName: string): TokenHit[] {
+  // Backend usually gives a bare name; guard against dotted (stream.field) forms.
+  const cleaned = rawName.replace(/[`"']/g, "").trim();
+  const name = cleaned.includes(".") ? cleaned.split(".").pop()! : cleaned;
+  if (!name) return [];
+  const target = name.toLowerCase();
+  const hits: TokenHit[] = [];
+
+  const n = sql.length;
+  let i = 0;
+  let line = 1;
+  let col = 1;
+
+  const advance = () => {
+    if (sql[i] === "\n") {
+      line++;
+      col = 1;
+    } else {
+      col++;
+    }
+    i++;
+  };
+
+  while (i < n) {
+    const ch = sql[i];
+
+    // Line comment
+    if (ch === "-" && sql[i + 1] === "-") {
+      while (i < n && sql[i] !== "\n") advance();
+      continue;
+    }
+    // Block comment
+    if (ch === "/" && sql[i + 1] === "*") {
+      advance();
+      advance();
+      while (i < n && !(sql[i] === "*" && sql[i + 1] === "/")) advance();
+      if (i < n) {
+        advance();
+        advance();
+      }
+      continue;
+    }
+    // Single-quoted string literal — never an identifier, skip.
+    if (ch === "'") {
+      advance();
+      while (i < n) {
+        if (sql[i] === "\\") {
+          advance();
+          advance();
+          continue;
+        }
+        if (sql[i] === "'") {
+          advance();
+          if (sql[i] === "'") {
+            advance();
+            continue;
+          } // '' escape
+          break;
+        }
+        advance();
+      }
+      continue;
+    }
+    // Double/backtick-quoted identifier — candidate match.
+    if (ch === '"' || ch === "`") {
+      const q = ch;
+      const startLine = line;
+      const startCol = col;
+      advance(); // opening quote
+      let inner = "";
+      while (i < n) {
+        if (sql[i] === q) {
+          advance();
+          if (sql[i] === q) {
+            inner += q;
+            advance();
+            continue;
+          } // "" escape
+          break;
+        }
+        inner += sql[i];
+        advance();
+      }
+      if (inner.toLowerCase() === target) {
+        hits.push({ line: startLine, startCol, endCol: col });
+      }
+      continue;
+    }
+    // Bare word token.
+    if (/[a-zA-Z_$]/.test(ch)) {
+      const startLine = line;
+      const startCol = col;
+      let word = "";
+      while (i < n && /[a-zA-Z0-9_$]/.test(sql[i])) {
+        word += sql[i];
+        advance();
+      }
+      if (word.toLowerCase() === target) {
+        hits.push({ line: startLine, startCol, endCol: col });
+      }
+      continue;
+    }
+    advance();
+  }
+
+  return hits;
+}
+
+/** Strip quotes/backticks and trailing punctuation from an extracted identifier. */
+function cleanIdent(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  // Strip quotes/backticks and any leading/trailing punctuation, but KEEP
+  // internal dots so a qualified name (schema.col) survives — locateIdentifier
+  // resolves it to its last segment when searching the query text.
+  const cleaned = raw
+    .replace(/[`"']/g, "")
+    .replace(/^[.,\s]+|[.,\s]+$/g, "")
+    .trim();
+  return cleaned || null;
+}
+
+/**
+ * Pull the offending identifier + a contextual message out of a server error.
+ *
+ * Code-agnostic by design: it sniffs the combined message/error_detail text for
+ * the backend's distinctive phrasings rather than dispatching on the 2000x code.
+ * Some callers (e.g. dashboards) only surface the HTTP status, not the business
+ * code, so relying on the code would silently miss those. The phrasings below
+ * are specific enough that false positives on unrelated errors (timeouts, rate
+ * limits) are very unlikely — those simply match nothing and return null.
+ *
+ * Ordered most-specific first. See src/infra/src/errors/{mod,grpc}.rs.
+ */
+function extractSemanticError(
+  text: string,
+): { field: string; message: string } | null {
+  // Field not found (20004): DataFusion "No field named X" or the wrapped
+  // "Search field not found: <field>. Field not found in stream schema."
+  const noField = cleanIdent(text.match(/No field named\s+`?([^`.\s,]+)`?/i)?.[1]);
+  if (noField) return { field: noField, message: MSG.fieldNotFound(noField) };
+  const fieldNotFound = cleanIdent(
+    text.match(/Search field not found:\s*([A-Za-z_$][\w$]*)/i)?.[1],
+  );
+  if (fieldNotFound)
+    return { field: fieldNotFound, message: MSG.fieldNotFound(fieldNotFound) };
+
+  // Function not defined (20005): "Invalid function 'foo'" / "Search function
+  // not defined: foo".
+  const fn = cleanIdent(
+    text.match(/Invalid function\s+'?([A-Za-z_$][\w$]*)'?/i)?.[1] ??
+      text.match(/Search function not defined:\s*([A-Za-z_$][\w$]*)/i)?.[1],
+  );
+  if (fn) return { field: fn, message: MSG.functionNotFound(fn) };
+
+  // Incompatible data type (20007): DataFusion "for field <name>"; the backend
+  // also re-wraps it as "Search field has no compatible data type: field <name>".
+  const typeField = cleanIdent(
+    text.match(/for field\s+([A-Za-z_$][\w$]*)/i)?.[1] ??
+      text.match(/no compatible data type:\s*(?:field\s+)?([A-Za-z_$][\w$]*)/i)?.[1],
+  );
+  if (typeField)
+    return { field: typeField, message: MSG.incompatibleType(typeField) };
+
+  // Stream not found (20002): "Search stream not found: <stream>".
+  const stream = cleanIdent(
+    text.match(/Search stream not found:\s*([^\s,]+)/i)?.[1],
+  );
+  if (stream) return { field: stream, message: MSG.streamNotFound(stream) };
+
+  // ── Execute / planning errors (20008) — free-text DataFusion strings ─────────
+
+  // GROUP BY: a selected column is neither grouped nor aggregated. DataFusion's
+  // wording is "Projection references non-aggregate values: Expression <col>
+  // could not be resolved …"; some versions/engines say "<col> must appear in
+  // the GROUP BY clause".
+  const groupBy = cleanIdent(
+    text.match(
+      /Projection references non-aggregate values:\s*Expression\s+([\w$.]+)/i,
+    )?.[1] ?? text.match(/([\w$.]+)\s+must appear in the GROUP BY/i)?.[1],
+  );
+  if (groupBy) return { field: groupBy, message: MSG.groupByMissing(groupBy) };
+
+  // Ambiguous column: DataFusion says "… unqualified field name <col> which
+  // would be ambiguous" or "Ambiguous reference to (unqualified) field <col>".
+  // The trailing "<col> is ambiguous" form is kept for other engines.
+  const ambiguous = cleanIdent(
+    text.match(/unqualified field name\s+([\w$.]+)\s+which would be ambiguous/i)?.[1] ??
+      text.match(/Ambiguous reference to (?:unqualified )?field\s+([\w$.]+)/i)?.[1] ??
+      text.match(/(?:Column|Reference)\s+'?"?([\w$.]+)"?'?\s+is ambiguous/i)?.[1],
+  );
+  if (ambiguous)
+    return { field: ambiguous, message: MSG.ambiguousColumn(ambiguous) };
+
+  // Duplicate column: "Schema contains duplicate (un)qualified field name <col>".
+  const duplicate = cleanIdent(
+    text.match(/duplicate (?:un)?qualified field name\s+([\w$.]+)/i)?.[1],
+  );
+  if (duplicate)
+    return { field: duplicate, message: MSG.duplicateColumn(duplicate) };
+
+  // Table / CTE not found (JOINs & subqueries): "Table or CTE with name '<t>'
+  // not found" / "table '<t>' not found".
+  const table = cleanIdent(
+    text.match(/Table or CTE with name\s+'?([\w$.]+)'?\s+not found/i)?.[1] ??
+      text.match(/\btable\s+'([\w$.]+)'\s+not found/i)?.[1],
+  );
+  if (table) return { field: table, message: MSG.tableNotFound(table) };
+
+  // Function called with the wrong argument types (the function DOES exist):
+  // "No function matches the given name and argument types '<fn>(…)'".
+  const badFnArgs = cleanIdent(
+    text.match(/No function matches[^']*'([A-Za-z_$][\w$]*)\s*\(/i)?.[1],
+  );
+  if (badFnArgs)
+    return { field: badFnArgs, message: MSG.functionSignature(badFnArgs) };
+
+  return null;
+}
+
+/**
+ * Unified server-error → editor ranges entry point. Handles ALL locatable
+ * search error codes. This is the single function response handlers should
+ * call; it dispatches to the right strategy:
+ *   • 20001 (syntax)   → sqlparser line/column (SQL mode) or reconstructed-SQL
+ *                        parse (non-SQL mode) — precise positions from the parser.
+ *   • 20002/4/5/7/8    → locate the offending identifier in the query text and
+ *                        squiggle every occurrence.
+ * Returns [] when the error carries nothing locatable (e.g. 20003 full-text
+ * field, timeouts, rate limits).
+ *
+ * @param query      The exact text in the editor (raw SQL, or the filter text
+ *                   in non-SQL mode). Used both to locate identifiers and to
+ *                   reconstruct SQL for the non-SQL syntax path.
+ * @param streamName Selected stream — only needed to wrap non-SQL filters.
+ */
+export async function rangesFromServerError(params: {
+  code?: number;
+  message?: string;
+  errorDetail?: string;
+  sqlMode: boolean;
+  query?: string;
+  streamName?: string;
+}): Promise<SqlErrorRange[]> {
+  const {
+    code,
+    message = "",
+    errorDetail = "",
+    sqlMode,
+    query = "",
+    streamName,
+  } = params;
+
+  if (!query.trim()) return [];
+
+  const text = `${message} ${errorDetail}`;
+
+  // ── Syntax errors: defer to the parser-position extractors ──────────────────
+  // Code-agnostic: code 20001, or a message carrying the sqlparser location /
+  // ParserError signature (some callers surface only the HTTP status, not the
+  // 2000x business code). Falls through to the semantic path if it locates
+  // nothing (the client parser can't always reproduce the server's error).
+  const looksLikeSyntax =
+    code === 20001 ||
+    /at\s+Line:\s*\d+,\s*Column:\s*\d+/i.test(text) ||
+    /ParserError|sql parser error/i.test(text);
+  if (looksLikeSyntax) {
+    let syntaxRanges: SqlErrorRange[] = [];
+    if (sqlMode && (errorDetail || message)) {
+      syntaxRanges = await rangesFromSqlParserDetail(
+        errorDetail || message,
+        query,
+      );
+    } else if (!sqlMode && streamName) {
+      const prefix = `select * from "${streamName}" WHERE `;
+      syntaxRanges = await rangesFromServerMessage(
+        message || errorDetail || "",
+        prefix + query,
+        prefix.length,
+      );
+    }
+    if (syntaxRanges.length) return syntaxRanges;
+  }
+
+  // ── Semantic errors: locate the identifier the backend named ────────────────
+  const semantic = extractSemanticError(text);
+  if (!semantic) return [];
+
+  const hits = locateIdentifier(query, semantic.field);
+  if (!hits.length) return [];
+
+  return hits.map((h) => ({
+    startLine: h.line,
+    endLine: h.line,
+    column: h.startCol,
+    endColumn: h.endCol,
+    error: semantic.message,
+  }));
 }

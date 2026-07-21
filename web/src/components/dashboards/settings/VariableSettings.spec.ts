@@ -14,34 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, config } from "@vue/test-utils";
 import { nextTick } from "vue";
+import i18n from "@/locales";
 import VariableSettings from "./VariableSettings.vue";
 
-// Mock external dependencies
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: vi.fn((key: string) => {
-      const translations: Record<string, string> = {
-        "dashboard.queryValues": "Query Values",
-        "dashboard.constant": "Constant", 
-        "dashboard.textbox": "Textbox",
-        "dashboard.custom": "Custom",
-        "dashboard.newVariable": "New Variable",
-        "dashboard.name": "Name",
-        "dashboard.type": "Type", 
-        "dashboard.selectType": "Select Type",
-        "dashboard.actions": "Actions",
-        "dashboard.edit": "Edit",
-        "dashboard.delete": "Delete",
-        "dashboard.isMultiSelect": "Multi Select",
-        "dashboard.isSingleSelect": "Single Select"
-      };
-      return translations[key] || key;
-    })
-  })
-}));
+// Install the real app i18n so migrated keys resolve to their English text.
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
+// Mock external dependencies
 vi.mock("vuex", () => ({
   useStore: () => ({
     state: {
@@ -198,22 +179,10 @@ describe("VariableSettings", () => {
       global: {
         plugins: [],
         stubs: {
-          'q-btn': {
-            name: 'QBtn',
-            template: '<button @click="$emit(\'click\')"><slot /></button>',
-            props: ['icon', 'label', 'color', 'class'],
-            emits: ['click']
-          },
           'OIcon': {
-            name: 'QIcon',
+            name: 'OIcon',
             template: '<span class="OIcon"><slot /></span>',
             props: ['name', 'color']
-          },
-          'q-dialog': {
-            name: 'QDialog',
-            template: '<div v-if="modelValue" class="q-dialog"><slot /></div>',
-            props: ['modelValue'],
-            emits: ['update:modelValue']
           },
           ODialog: {
             name: 'ODialog',
@@ -221,22 +190,6 @@ describe("VariableSettings", () => {
             template: '<div v-if="open" data-test="o-dialog-stub" class="o-dialog"><div data-test="o-dialog-title">{{ title }}</div><slot /></div>',
             props: ['open', 'width', 'title', 'subTitle', 'persistent', 'size', 'showClose'],
             emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral']
-          },
-          'q-card': {
-            name: 'QCard',
-            template: '<div class="q-card"><slot /></div>'
-          },
-          'q-toolbar': {
-            name: 'QToolbar',
-            template: '<div class="q-toolbar"><slot /></div>'
-          },
-          'q-toolbar-title': {
-            name: 'QToolbarTitle',
-            template: '<div class="q-toolbar-title"><slot /></div>'
-          },
-          'q-card-section': {
-            name: 'QCardSection',
-            template: '<div class="q-card-section"><slot /></div>'
           }
         }
       }

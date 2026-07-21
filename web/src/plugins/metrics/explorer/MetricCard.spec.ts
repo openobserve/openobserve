@@ -31,6 +31,10 @@ vi.mock("@/utils/clipboard", () => ({
   }),
 }));
 
+/** Where Create Alert navigated to. */
+const routerPush = vi.hoisted(() => vi.fn());
+vi.mock("vue-router", () => ({ useRouter: () => ({ push: routerPush }) }));
+
 const CARD: any = {
   name: "node_cpu_seconds_total",
   help: "Seconds the CPUs spent in each mode.",
@@ -91,22 +95,27 @@ describe("MetricCard (ported to @/lib)", () => {
       ).toBe(true);
     });
 
-    it("does NOT print the help text on the card body", () => {
+    it("does NOT print the help text as a plain label on the card", () => {
       // It is a full sentence that never fitted; a truncated half-sentence is
-      // worse than none, and it cost the chart ~18px of height.
+      // worse than none, and it cost the chart ~18px of height. It lives in the
+      // info-icon's tooltip (bounded, pre-wrapped) — never as bare visible text
+      // on the card. The tooltip content is not rendered until opened, so the
+      // help sentence is absent from the card's text at rest.
       wrapper = createWrapper();
       expect(wrapper.text()).not.toContain(
         "Seconds the CPUs spent in each mode.",
       );
     });
 
-    it("offers the help text through an info action instead", () => {
+    it("offers the help text through an info-icon button, reachable by a screen reader", () => {
+      // Same pattern as the dashboard panel's description info icon: an
+      // info-outline button whose aria-label carries the full help sentence, so
+      // it is announced — not hidden behind hover alone.
       wrapper = createWrapper();
       const help = wrapper.find(
         '[data-test="metrics-explorer-card-help-node_cpu_seconds_total"]',
       );
       expect(help.exists()).toBe(true);
-      // Reachable by a screen reader, not only by hovering a tooltip.
       expect(help.attributes("aria-label")).toContain(
         "Seconds the CPUs spent in each mode.",
       );
@@ -189,6 +198,41 @@ describe("MetricCard (ported to @/lib)", () => {
         )
         .trigger("click");
       expect(wrapper.emitted("toggle-favorite")).toBeTruthy();
+    });
+
+    it("shows the pin, drill-in, refresh and configure at rest — no hover gate", () => {
+      // The whole point of the redesign: the controls used to live behind an
+      // `invisible group-hover:visible` bar — undiscoverable, unreachable by
+      // keyboard, dead on touch. Every action is in the DOM unconditionally now.
+      wrapper = createWrapper();
+      expect(
+        wrapper
+          .find(
+            '[data-test="metrics-explorer-card-favorite-node_cpu_seconds_total"]',
+          )
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find(
+            '[data-test="metrics-explorer-card-select-node_cpu_seconds_total"]',
+          )
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find(
+            '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
+          )
+          .exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="metrics-explorer-card-fn-node_cpu_seconds_total"]')
+          .exists(),
+      ).toBe(true);
+      // No leftover hover-gating class anywhere in the card.
+      expect(wrapper.html()).not.toContain("group-hover:visible");
     });
 
     it("routes the error state's Retry through refresh, not a plain re-request", async () => {
@@ -483,7 +527,7 @@ describe("MetricCard (ported to @/lib)", () => {
       // Header bar (the dashboard panel bar's box — untinted, bordered),
       // footer, and the badge in the footer where it cannot truncate the name
       // it describes.
-      expect(wrapper.find(".min-h-7.border-b.border-border-subtle").exists()).toBe(
+      expect(wrapper.find(".min-h-7.border-b.border-border-default").exists()).toBe(
         true,
       );
       expect(
@@ -498,5 +542,112 @@ describe("MetricCard (ported to @/lib)", () => {
   it("renders no legacy <q- component", () => {
     wrapper = createWrapper();
     expect(wrapper.html()).not.toContain("<q-");
+  });
+
+  /**
+   * The x-axis must describe the data, not the picker.
+   *
+   * A relative range re-resolves against `now` on every mount, so `timeRange`
+   * marches forward with the wall clock. A card painted from cache kept pinning
+   * its axis to that, and appeared to drift on its own: an axis of 10:15-10:30
+   * drawn over points from 09:40.
+   */
+  describe("the chart's axis follows the window its data came from", () => {
+    const SELECTED = { start_time: 10_000, end_time: 20_000 };
+    const CACHED = { start_time: 1_000, end_time: 11_000 };
+
+    const chartTimeRange = (w: VueWrapper<any>) =>
+      w.findComponent({ name: "MetricCardChart" }).props("timeRange");
+
+    it("uses the CACHED window when the data was restored from cache", () => {
+      wrapper = createWrapper({
+        timeRange: SELECTED,
+        preview: preview({ results: [{ result: [{ values: [[1, "1"]] }] }], cachedTimeRange: CACHED }),
+      });
+
+      // Not SELECTED: those points describe 1_000-11_000, and saying otherwise
+      // is what made the grid look like it was drifting.
+      expect(chartTimeRange(wrapper)).toEqual(CACHED);
+    });
+
+    it("uses the SELECTED window on the live path, where they are the same thing", () => {
+      wrapper = createWrapper({
+        timeRange: SELECTED,
+        preview: preview({ results: [{ result: [{ values: [[1, "1"]] }] }], cachedTimeRange: null }),
+      });
+
+      expect(chartTimeRange(wrapper)).toEqual(SELECTED);
+    });
+  });
+
+  /**
+   * Right-click a data point -> Create Alert, the same gesture a dashboard panel
+   * offers. The card hands the alert page the same `panelData` contract
+   * usePanelActions builds, so a PromQL alert opens pre-filled.
+   */
+  describe("create alert from a right-click on the chart", () => {
+    const QUERIES = [
+      { expr: 'sum(rate({__name__="node_cpu_seconds_total"}[5m]))', legendTemplate: "" },
+    ];
+    const TIME_RANGE = { start_time: 1_000, end_time: 2_000 };
+
+    beforeEach(() => routerPush.mockClear());
+
+    const openMenu = (w: VueWrapper<any>, value = 42) => {
+      (w.vm as any).onChartContextMenu({ x: 10, y: 20, value });
+      return (w.vm as any).alertMenu;
+    };
+
+    it("opens the menu at the click, seeded with the clicked point's value", () => {
+      wrapper = createWrapper({ queries: QUERIES, timeRange: TIME_RANGE });
+
+      const menu = openMenu(wrapper, 42);
+      // The clicked value seeds the threshold — the alert opens on the number
+      // the user actually pointed at.
+      expect(menu).toMatchObject({ visible: true, x: 10, y: 20, value: 42 });
+    });
+
+    it("ignores a right-click that carries no numeric value", () => {
+      wrapper = createWrapper({ queries: QUERIES, timeRange: TIME_RANGE });
+
+      (wrapper.vm as any).onChartContextMenu({ x: 1, y: 2, value: NaN });
+
+      // Off-series right-clicks have no threshold to offer; a menu there would
+      // send NaN to the alert page.
+      expect((wrapper.vm as any).alertMenu.visible).toBe(false);
+    });
+
+    it("navigates to addAlert with the card's PromQL as the panelData contract", () => {
+      wrapper = createWrapper({ queries: QUERIES, timeRange: TIME_RANGE });
+      openMenu(wrapper, 42);
+
+      (wrapper.vm as any).onCreateAlert({ condition: ">=", threshold: 42 });
+
+      expect(routerPush).toHaveBeenCalledTimes(1);
+      const arg = routerPush.mock.calls[0][0];
+      expect(arg.name).toBe("addAlert");
+      expect(arg.query.fromPanel).toBe("true");
+
+      const panelData = JSON.parse(decodeURIComponent(arg.query.panelData));
+      // The same contract usePanelActions.handleCreateAlert builds — it is what
+      // the alert page reads.
+      expect(panelData.queryType).toBe("promql");
+      expect(panelData.queries[0].query).toBe(QUERIES[0].expr);
+      expect(panelData.executedQuery).toBe(QUERIES[0].expr);
+      expect(panelData.threshold).toBe(42);
+      expect(panelData.condition).toBe(">=");
+      expect(panelData.timeRange).toEqual(TIME_RANGE);
+      expect(panelData.panelTitle).toBe(CARD.name);
+      // Closing the menu is part of navigating.
+      expect((wrapper.vm as any).alertMenu.visible).toBe(false);
+    });
+
+    it("does not navigate when the card has no query to alert on", () => {
+      wrapper = createWrapper({ queries: [], timeRange: TIME_RANGE });
+
+      (wrapper.vm as any).onCreateAlert({ condition: ">=", threshold: 1 });
+
+      expect(routerPush).not.toHaveBeenCalled();
+    });
   });
 });

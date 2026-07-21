@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="toolCalls.length > 0"
     class="thread-tools-thread"
-    :class="{ 'thread-tools-thread--dark': isDark }"
   >
     <!-- One-way reveal: clicking shows the calls and removes the pill. -->
     <button v-if="!shown" class="tt-toggle" @click="shown = true">
@@ -37,68 +36,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="tt-pill">
         <span class="tt-count">
           {{ toolCalls.length }}
-          {{ toolCalls.length === 1 ? "tool call" : "tool calls" }}
+          {{
+            toolCalls.length === 1
+              ? t('traces.threadToolCalls.toolCall')
+              : t('traces.threadToolCalls.toolCalls')
+          }}
           · {{ formatDuration(totalToolDuration(toolCalls)) }}
         </span>
-        <span class="tt-link">Show calls</span>
+        <span class="tt-link">{{ t('traces.threadToolCalls.showCalls') }}</span>
       </span>
       <span class="tt-zz"></span>
     </button>
 
     <div v-else class="tt-body">
       <div
-        v-for="t in toolCalls"
-        :key="t.span_id"
+        v-for="tool in toolCalls"
+        :key="tool.span_id"
         class="thread-tool"
-        :class="{ 'thread-tool--open': expandedTools.has(t.span_id) }"
+        :class="{ 'thread-tool--open': expandedTools.has(tool.span_id) }"
       >
-        <div class="thread-tool-row" @click="toggleTool(t.span_id)">
+        <div class="thread-tool-row" @click="toggleTool(tool.span_id)">
           <span class="thread-tool-row__caret">{{
-            expandedTools.has(t.span_id) ? "▾" : "▸"
+            expandedTools.has(tool.span_id) ? "▾" : "▸"
           }}</span>
           <OIcon name="build" size="xs" class="thread-tool-row__icon" />
           <span class="thread-tool-row__name">{{
-            t.tool_name || t.gen_ai_tool_name || t.operation_name
+            tool.tool_name || tool.gen_ai_tool_name || tool.operation_name
           }}</span>
           <span class="flex-1" />
           <span
             class="thread-pill"
             :class="
-              t.span_status === 'ERROR'
+              tool.span_status === 'ERROR'
                 ? 'thread-pill--error'
                 : 'thread-pill--ok'
             "
           >
-            {{ t.span_status === "ERROR" ? "ERROR" : "OK" }}
-            · {{ formatDuration(t.duration) }}
+            {{ tool.span_status === "ERROR" ? "ERROR" : "OK" }}
+            · {{ formatDuration(tool.duration) }}
           </span>
           <button
             class="thread-tool-row__view"
-            @click.stop="emit('span-selected', t.span_id)"
-            title="Open span details"
+            @click.stop="emit('span-selected', tool.span_id)"
+            :title="t('traces.threadToolCalls.openSpanDetails')"
           >
             <OIcon name="open-in-new" size="xs" />
           </button>
         </div>
 
-        <div v-if="expandedTools.has(t.span_id)" class="thread-tool-body">
+        <div v-if="expandedTools.has(tool.span_id)" class="thread-tool-body">
           <div class="thread-tool-body__section">
-            <div class="thread-tool-body__label">Arguments</div>
+            <div class="thread-tool-body__label">{{ t('traces.threadToolCalls.arguments') }}</div>
             <pre class="thread-tool-body__pre">{{
-              formatToolPayload(getInputRaw(t) || t.tool_args)
+              formatToolPayload(getInputRaw(tool) || tool.tool_args)
             }}</pre>
           </div>
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label">
-              Result
-              <span v-if="t.span_status === 'ERROR'" class="text-[color:var(--color-error-600)]">
+              {{ t('traces.threadToolCalls.result') }}
+              <span v-if="tool.span_status === 'ERROR'" class="text-error-600">
                 · ERROR
               </span>
             </div>
             <pre class="thread-tool-body__pre">{{
-              formatToolPayload(getOutputRaw(t)) ||
-              t.status_message ||
-              "(empty)"
+              formatToolPayload(getOutputRaw(tool)) ||
+              tool.status_message ||
+              t('traces.threadToolCalls.empty')
             }}</pre>
           </div>
         </div>
@@ -108,8 +111,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getInputRaw, getOutputRaw } from "./threadView.utils";
 
@@ -120,7 +124,7 @@ defineProps<{
 const emit = defineEmits<{ (e: "span-selected", spanId: string): void }>();
 
 const store = useStore();
-const isDark = computed(() => store.state.theme === "dark");
+const { t } = useI18n();
 
 // One-way reveal for the whole group; per-tool rows expand independently.
 const shown = ref(false);
@@ -173,6 +177,9 @@ function formatDuration(ns: number): string {
 </script>
 
 <style scoped lang="scss">
+/* keep(complex-state): the tiled SVG zigzag artwork (masked so it takes a theme
+   token) plus the nested per-tool open/hover state cascade the utility layer
+   cannot express. */
 /* Tool thread — collapsed "Show calls" pill (redesign mockup .tools-thread). */
 .thread-tools-thread {
   margin: 0.5rem 0;
@@ -187,12 +194,18 @@ function formatDuration(ns: number): string {
     cursor: pointer;
   }
 
+  /* Zigzag rule: the SVG is a MASK (stroke=black → alpha 1), so the visible
+     colour comes from background-color and follows the theme token. A colour
+     baked into the data-URI could not. */
   .tt-zz {
     flex: 1;
     min-width: 1rem;
     height: 0.75rem;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12'%3E%3Cpath d='M0 9L4 3L8 9' fill='none' stroke='%23d6dde7' stroke-width='1.4'/%3E%3C/svg%3E")
+    background-color: var(--color-border-strong);
+    --tt-zz-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='12'%3E%3Cpath d='M0 9L4 3L8 9' fill='none' stroke='black' stroke-width='1.4'/%3E%3C/svg%3E")
       repeat-x center;
+    -webkit-mask: var(--tt-zz-mask);
+    mask: var(--tt-zz-mask);
     opacity: 0.7;
   }
 
@@ -202,29 +215,29 @@ function formatDuration(ns: number): string {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 0.125rem;
     padding: 0.5rem 1.125rem;
     border: 1px solid var(--color-border-default);
     border-radius: 0.625rem;
     background: var(--color-surface-base);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent);
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
   }
 
   .tt-toggle:hover .tt-pill {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 10%, transparent);
   }
 
   .tt-count {
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
     color: var(--color-text-secondary);
     font-weight: 600;
     white-space: nowrap;
   }
 
   .tt-link {
-    font-size: 0.78rem;
-    color: var(--color-primary-500, #3b82f6);
+    font-size: var(--text-xs);
+    color: var(--color-primary-500);
     font-weight: 650;
   }
 
@@ -236,9 +249,18 @@ function formatDuration(ns: number): string {
   }
 }
 
+/* The tool-call thread's identity accent — a distinct green with its own
+   semantic tokens (--color-tool-thread-accent / -text), deliberately not the
+   orange dag-node-tool role nor a status green. Local aliases keep the many
+   color-mix consumers below terse; the -text token flips in dark on its own. */
+.thread-tools-thread {
+  --tt-accent: var(--color-tool-thread-accent);
+  --tt-accent-text: var(--color-tool-thread-accent-text);
+}
+
 .thread-tool {
-  border-bottom: 1px solid rgba(76, 175, 80, 0.15);
-  background: rgba(76, 175, 80, 0.04);
+  border-bottom: 1px solid color-mix(in srgb, var(--tt-accent) 15%, transparent);
+  background: color-mix(in srgb, var(--tt-accent) 4%, transparent);
   transition: background 120ms ease;
 
   &:last-child {
@@ -246,7 +268,7 @@ function formatDuration(ns: number): string {
   }
 
   &--open {
-    background: rgba(76, 175, 80, 0.1);
+    background: color-mix(in srgb, var(--tt-accent) 10%, transparent);
   }
 }
 
@@ -255,34 +277,34 @@ function formatDuration(ns: number): string {
   align-items: center;
   gap: 0.5rem;
   padding: 0.45rem 0.5rem 0.45rem 0.75rem;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   cursor: pointer;
-  color: #4a5568;
+  color: var(--color-text-secondary);
   transition: background 120ms ease;
 
   &:hover {
-    background: rgba(76, 175, 80, 0.12);
+    background: color-mix(in srgb, var(--tt-accent) 12%, transparent);
   }
 
   &__caret {
-    color: #4a5568;
-    font-size: 0.7rem;
-    width: 12px;
+    color: var(--color-text-secondary);
+    font-size: var(--text-2xs);
+    width: 0.75rem;
     text-align: center;
   }
 
   &__icon {
-    width: 18px;
-    height: 18px;
+    width: 1.125rem;
+    height: 1.125rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.95rem;
+    font-size: var(--text-base);
   }
 
   &__name {
-    font-family: monospace;
-    color: #2f7a31;
+    font-family: var(--font-mono);
+    color: var(--tt-accent-text);
     font-weight: 500;
   }
 
@@ -290,8 +312,8 @@ function formatDuration(ns: number): string {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 1.375rem;
+    height: 1.375rem;
     border-radius: 0.25rem;
     background: transparent;
     border: none;
@@ -302,8 +324,8 @@ function formatDuration(ns: number): string {
     transition: all 120ms ease;
 
     &:hover {
-      background: rgba(76, 175, 80, 0.18);
-      color: #2f7a31;
+      background: color-mix(in srgb, var(--tt-accent) 18%, transparent);
+      color: var(--tt-accent-text);
     }
   }
 }
@@ -313,23 +335,23 @@ function formatDuration(ns: number): string {
   align-items: center;
   gap: 0.25rem;
   padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.65rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-3xs);
   font-weight: 600;
   letter-spacing: 0.03rem;
-  font-family: monospace;
+  font-family: var(--font-mono);
   white-space: nowrap;
 
   &--ok {
-    background: rgba(22, 163, 74, 0.1);
+    background: color-mix(in srgb, var(--color-success-600) 10%, transparent);
     color: var(--color-success-600);
-    border: 1px solid rgba(22, 163, 74, 0.25);
+    border: 1px solid color-mix(in srgb, var(--color-success-600) 25%, transparent);
   }
 
   &--error {
-    background: rgba(220, 38, 38, 0.1);
+    background: color-mix(in srgb, var(--color-error-600) 10%, transparent);
     color: var(--color-error-600);
-    border: 1px solid rgba(220, 38, 38, 0.25);
+    border: 1px solid color-mix(in srgb, var(--color-error-600) 25%, transparent);
   }
 }
 
@@ -348,7 +370,7 @@ function formatDuration(ns: number): string {
   }
 
   &__label {
-    font-size: 0.62rem;
+    font-size: var(--text-3xs);
     font-weight: 700;
     letter-spacing: 0.06rem;
     color: var(--color-text-secondary);
@@ -360,60 +382,53 @@ function formatDuration(ns: number): string {
     background: var(--color-surface-base);
     border: 1px solid var(--color-border-default);
     border-radius: 0.25rem;
-    font-family: monospace;
-    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
     color: var(--color-text-body);
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;
-    max-height: 280px;
+    max-height: 17.5rem;
     overflow: auto;
   }
 }
 
-/* ─── dark mode overrides ─────────────────────────────────────────────── */
-.thread-tools-thread--dark {
+/* ─── dark mode overrides ─────────────────────────────────────────────────
+   Only what genuinely differs in dark: the accent text step, the slightly
+   stronger accent washes (a translucent tint over a dark surface needs more
+   alpha to read), and the lighter status steps. The row/caret text colours
+   are gone from here — --color-text-secondary is already theme-paired. */
+.dark .thread-tools-thread {
+  /* --tt-accent-text flips via its own token (--color-tool-thread-accent-text). */
   .thread-tool {
-    background: rgba(76, 175, 80, 0.06);
-    border-bottom-color: rgba(76, 175, 80, 0.2);
-    color: #a0aec0;
+    background: color-mix(in srgb, var(--tt-accent) 6%, transparent);
+    border-bottom-color: color-mix(in srgb, var(--tt-accent) 20%, transparent);
 
     &--open {
-      background: rgba(76, 175, 80, 0.14);
+      background: color-mix(in srgb, var(--tt-accent) 14%, transparent);
     }
   }
 
   .thread-tool-row {
-    color: #a0aec0;
-
     &:hover {
-      background: rgba(76, 175, 80, 0.16);
-    }
-
-    &__caret {
-      color: #a0aec0;
-    }
-
-    &__name {
-      color: #6dd170;
+      background: color-mix(in srgb, var(--tt-accent) 16%, transparent);
     }
 
     &__view:hover {
-      background: rgba(76, 175, 80, 0.22);
-      color: #6dd170;
+      background: color-mix(in srgb, var(--tt-accent) 22%, transparent);
     }
   }
 
   .thread-pill--ok {
-    background: rgba(34, 197, 94, 0.14);
-    color: #4ade80;
-    border-color: rgba(34, 197, 94, 0.3);
+    background: color-mix(in srgb, var(--color-success-500) 14%, transparent);
+    color: var(--color-success-400);
+    border-color: color-mix(in srgb, var(--color-success-500) 30%, transparent);
   }
 
   .thread-pill--error {
-    background: rgba(248, 113, 113, 0.14);
-    color: #f87171;
-    border-color: rgba(248, 113, 113, 0.3);
+    background: color-mix(in srgb, var(--color-error-400) 14%, transparent);
+    color: var(--color-error-400);
+    border-color: color-mix(in srgb, var(--color-error-400) 30%, transparent);
   }
 }
 </style>

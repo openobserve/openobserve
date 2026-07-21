@@ -5,17 +5,20 @@ import type { ColumnDef, Row, Table } from "@tanstack/vue-table";
 
 // ─── Shared column size constants ────────────────────────────────
 /**
- * Fixed width (px) of the auto-rendered selection-checkbox column. Includes the
- * left padding (TABLE_CHECKBOX_COL_PAD_LEFT) that insets the box from the table
- * edge. Imported by OTableHeader/OTableBodyRow so the three stay in sync.
+ * Fixed width (px) of the auto-rendered selection-checkbox column. Imported by
+ * OTableHeader/OTableBodyRow/OTableLoading so the three stay in sync. The box's
+ * left inset is the shared `--spacing-table-edge` token (applied in inline
+ * style), the same edge line the first data column and toolbar search bar use.
  */
-export const TABLE_CHECKBOX_COL_PAD_LEFT = 18;
 export const TABLE_CHECKBOX_COL_SIZE = 44;
 /**
- * Fixed width (px) of the row-index ("#") column. Wide enough to fit a
- * zero-padded 3-digit number at text-xs plus the cell's horizontal padding.
+ * Fixed width (px) of the row-index ("#") column. Fits a 4-digit number at
+ * text-xs after the `--spacing-table-edge` left inset (14px) + right padding.
+ * Paired with `tabular-nums` on the cell so every digit is the same advance
+ * width — otherwise a proportional font makes wide-glyph values (209, 200) clip
+ * to "2…" while narrow ones (215) fit, at the same column width.
  */
-export const TABLE_INDEX_COL_SIZE = 44;
+export const TABLE_INDEX_COL_SIZE = 56;
 
 export const COL = {
   name:         200,
@@ -49,6 +52,15 @@ export const COL = {
   price:        110,
   defaultModel: 180,
   version:      100,
+  // Synthetic monitoring
+  responseTime: 90,
+  uptime:       130,
+  locations:    120,
+  interval:     72,
+  steps:        72,
+  assertions:   90,
+  lastCheck:    100,
+  history:      180,
 } as const;
 
 // ── Column Definition ────────────────────────────────────────────
@@ -61,10 +73,10 @@ export interface OTableColumnMeta {
   /** Additional class applied to the <td> */
   cellClass?: string;
   /**
-   * Mark this as the primary "name" column. Per the design system (HANDOFF §8.2)
-   * the record-name column renders at weight 500 — enough to separate it from
-   * metadata columns (which stay 400 / --text-3) without the "wall of bold".
-   * Only affects default-rendered cells; custom `cell` renderers style their own.
+   * Mark this as the primary "name" column. The record-name column renders at
+   * weight 500 — enough to separate it from metadata columns (which stay 400 /
+   * --text-3) without the "wall of bold". Only affects default-rendered cells;
+   * custom `cell` renderers style their own.
    */
   isName?: boolean;
   /** Format function applied to cell value before rendering */
@@ -299,6 +311,14 @@ export interface OTableProps<TData = any> {
   /** Which column ids to apply highlighting to (default: all) */
   highlightFields?: string[];
 
+  // ── Row Reorder ──
+  /** Enable drag-and-drop row reordering. Renders a drag handle (grip icon)
+   *  as the first column. Uses vue-draggable-next under the hood. */
+  enableRowReorder?: boolean;
+  /** Per-row predicate: return false to disable dragging for that row.
+   *  Defaults to all rows draggable when `enableRowReorder` is true. */
+  disableRowReorder?: (row: TData) => boolean;
+
   // ── Row Styling ──
   /** Static class or dynamic function for row <tr> */
   rowClass?: string | ((row: TData) => string);
@@ -378,6 +398,9 @@ export interface OTableEmits<TData = any> {
     sizes: Record<string, number>,
     idMap: Record<string, string>,
   ];
+
+  // Row reorder
+  "row-reorder": [data: TData[]];
 
   // Virtual scroll
   "scroll-end": [scrollInfo: any];

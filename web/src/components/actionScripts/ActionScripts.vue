@@ -19,13 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="action-scripts-list-page" class="h-full">
     <div v-if="!showAddActionScriptDialog" class="h-full">
-      <PageLayout
-        :header-class="'shrink-0 px-4 border-b border-border-default'"
+      <OPageLayout
+        bleed
+        :title="t('actions.header')"
+        icon="code"
+        :subtitle="'Custom automation and scripting'"
       >
         <!-- Row 1: standard header — title + actions only. Search moved into the
              table's own toolbar below. -->
-        <template #header>
-          <AppPageHeader :title="t('actions.header')" icon="code" :subtitle="'Custom automation and scripting'">
             <template #actions>
               <OButton
                 data-test="action-list-add-btn"
@@ -35,8 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("actions.add") }}</OButton
               >
             </template>
-          </AppPageHeader>
-        </template>
         <OTable
           data-test="action-scripts-table"
           :data="visibleRows"
@@ -52,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :show-global-filter="false"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -119,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 data-test="action-scripts-loading"
                 v-if="alertStateLoadingMap[row.uuid]"
-                style="display: inline-block; width: 33.14px; height: auto"
-                class="flex justify-center items-center ml-1"
+                style="display: inline-block; width: 33.14px"
+                class="flex justify-center items-center ml-1 h-auto"
                 :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
               >
                 <OSpinner size="xs" />
@@ -147,11 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div
-                class="flex items-center justify-between w-full h-[48px]"
+                class="flex items-center justify-between w-full h-12"
               >
                 <div class="flex items-center gap-2">
                   <div
-                    class="o2-table-footer-title flex items-center w-[80px] mr-md"
+                    class="text-xs font-normal flex items-center w-20 mr-md"
                   >
                     {{ resultTotal }} {{ t("actions.header") }}
                   </div>
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </OTable>
-      </PageLayout>
+      </OPageLayout>
     </div>
     <template v-else>
       <div class="w-full">
@@ -256,8 +256,7 @@ import {
   computed,
 } from "vue";
 import type { Ref } from "vue";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -296,12 +295,11 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface ActionScriptList {
-  "#": string | number;
   id: any;
   name: any;
   uuid: any;
@@ -315,8 +313,7 @@ interface ActionScriptList {
 export default defineComponent({
   name: "AlertList",
   components: {
-    PageLayout,
-    AppPageHeader,
+    OPageLayout,
     OIcon,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
@@ -387,13 +384,6 @@ export default defineComponent({
     ]);
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "center" },
-      },
       {
         id: "name",
         header: t("alerts.name"),
@@ -494,7 +484,6 @@ export default defineComponent({
       loading.value = true;
       getAllActions()
         .then(() => {
-          var counter = 1;
           resultTotal.value = store.state.organizationData.actions.length;
           alerts.value = store.state.organizationData.actions.map(
             (alert: any) => {
@@ -512,7 +501,6 @@ export default defineComponent({
             if (data.execution_details_type === "once")
               data.execution_details_type = "Once";
             return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
               name: data.name,
               uuid: data.uuid,

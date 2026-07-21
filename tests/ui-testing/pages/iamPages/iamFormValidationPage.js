@@ -48,9 +48,11 @@ export class IamFormValidationPage {
         // ── Service Account form ──────────────────────────────────────────────
         this.addServiceAccountBtn  = '[data-test="service-accounts-add-btn"]';
         this.saDialog              = '[data-test="add-service-account-dialog"]';
-        // OInput data-test="iam-add-service-account-identifier-input" → -field / -error
-        this.saEmailInput          = '[data-test="iam-add-service-account-identifier-input-field"]';
-        this.saEmailError          = '[data-test="iam-add-service-account-identifier-input-error"]';
+        // Service accounts are created from a NAME (slug) now, not an email —
+        // the identifier is synthesized as <name>.<org>@sa.internal.
+        // OInput data-test="iam-add-service-account-name-input" → -field / -error
+        this.saNameInput           = '[data-test="iam-add-service-account-name-input-field"]';
+        this.saNameError           = '[data-test="iam-add-service-account-name-input-error"]';
         this.saSubmitBtn           = '[data-test="add-service-account-dialog"] [data-test="o-dialog-primary-btn"]';
         this.saCancelBtn           = '[data-test="add-service-account-dialog"] [data-test="o-dialog-secondary-btn"]';
 
@@ -264,8 +266,8 @@ export class IamFormValidationPage {
         await this.page.locator(this.saDialog).waitFor({ state: 'visible', timeout: 8000 });
     }
 
-    async fillSaEmail(email) {
-        await this.page.locator(this.saEmailInput).fill(email);
+    async fillSaName(name) {
+        await this.page.locator(this.saNameInput).fill(name);
     }
 
     async submitSaForm() {
@@ -307,7 +309,7 @@ export class IamFormValidationPage {
     getGroupSubmitBtnLocator()    { return this.page.locator(this.groupSubmitBtn); }
     getRoleNameErrorLocator()     { return this.page.locator(this.roleNameError); }
     getRoleSubmitBtnLocator()     { return this.page.locator(this.roleSubmitBtn); }
-    getSaEmailErrorLocator()      { return this.page.locator(this.saEmailError); }
+    getSaNameErrorLocator()       { return this.page.locator(this.saNameError); }
     getToastMessageLocator()      { return this.page.locator(this.toastMessage); }
     getOrgDialogLocator()         { return this.page.locator(this.orgDialog); }
     getGroupDialogLocator()       { return this.page.locator(this.groupDialog); }

@@ -80,11 +80,43 @@ describe("PrefixFilterPanel", () => {
 
     // Clear lives in the aside's title row (MetricsExplorer), not in the panel:
     // the panel renders only its search and list.
-    it("renders no clear button of its own", () => {
-      wrapper = createWrapper({ selected: new Set(["node_cpu"]) });
-      expect(
-        wrapper.find('[data-test="metrics-explorer-prefix-clear"]').exists(),
-      ).toBe(false);
+    it("always shows the 'Clear filters' control — disabled when nothing is selected", () => {
+      // No disappearing controls: the button is always present and discoverable;
+      // with no selection it is disabled and the count reads "0 selected", so the
+      // row never changes size.
+      wrapper = createWrapper({ selected: new Set(), hasSelection: false });
+      const clear = wrapper.find(
+        '[data-test="metrics-explorer-prefix-clear"]',
+      );
+      expect(clear.exists()).toBe(true);
+      expect(clear.attributes("disabled")).toBeDefined();
+      expect(wrapper.text()).toContain("0 selected");
+    });
+
+    it("enables 'Clear filters' and shows the count when there is a selection", () => {
+      // Labelled "Clear filters", NOT bare "Clear", so it is never confused with
+      // the search box's own inline ✕ (which clears the search text, not filters).
+      wrapper = createWrapper({
+        selected: new Set(["node_cpu", "node_memory"]),
+        hasSelection: true,
+      });
+      const clear = wrapper.find(
+        '[data-test="metrics-explorer-prefix-clear"]',
+      );
+      expect(clear.text()).toContain("Clear filters");
+      expect(clear.attributes("disabled")).toBeUndefined();
+      expect(wrapper.text()).toContain("2 selected");
+    });
+
+    it("emits `clear` (distinct from search) when the clear-filters button is clicked", async () => {
+      wrapper = createWrapper({
+        selected: new Set(["node_cpu"]),
+        hasSelection: true,
+      });
+      await wrapper
+        .find('[data-test="metrics-explorer-prefix-clear"]')
+        .trigger("click");
+      expect(wrapper.emitted("clear")).toHaveLength(1);
     });
   });
 

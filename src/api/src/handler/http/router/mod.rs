@@ -32,7 +32,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::{common::meta::ingestion::INGESTION_EP, service::self_reporting::audit},
+    crate::service::self_reporting::audit,
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
@@ -293,7 +293,8 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
 
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
-    let method = request.method().to_string();
+    let http_method = request.method().clone();
+    let method = http_method.to_string();
     let path = request
         .uri()
         .path()
@@ -301,7 +302,12 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         .unwrap_or("")
         .to_string();
     let path_columns = path.split('/').collect::<Vec<&str>>();
-    let path_len = path_columns.len();
+
+    // Org-relative view of the path so the ingestion-route classifier sees
+    // segment 0 as `{org_id}`. `audit_middleware` runs before prefix stripping,
+    // so `path` here is e.g. `[base_uri/]api/{org}/_bulk`; take everything after
+    // the `api/` segment.
+    let ingestion_path = path.split_once("api/").map(|(_, rest)| rest).unwrap_or("");
 
     if get_o2_config().common.audit_enabled
         && !(path_columns
@@ -310,7 +316,10 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .to_string()
             .ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || (method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1])))
+            || crate::common::meta::ingestion_routes::is_ingestion_write(
+                &http_method,
+                ingestion_path,
+            ))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
         let org_id = {
@@ -975,6 +984,43 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
+
+        // Synthetics — all routes gated behind O2_SYNTHETICS_ENABLED. When off,
+        // nothing is registered and every synthetics path 404s.
+        if get_o2_config().synthetics.enabled {
+            router = router
+                // Synthetics — CRUD + locations
+                .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
+                .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
+                .route("/{org_id}/synthetics/locations/{id}", put(synthetics::update_location).delete(synthetics::delete_location))
+                .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
+                .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
+                .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
+                .route("/{org_id}/synthetics/{id}/artifact", get(synthetics::get_artifact))
+                .route("/{org_id}/synthetics/{id}/artifacts/presign", post(synthetics::presign_artifacts))
+                .route("/{org_id}/synthetics/{id}/runs", get(synthetics::list_runs))
+                .route("/{org_id}/synthetics/{id}/runs/{run_id}", get(synthetics::get_run_detail))
+                // Synthetics — folder move (v2 prefix to match the shared MoveAcrossFolders utility)
+                .route("/v2/{org_id}/synthetics/move", patch(synthetics::move_synthetics))
+                // Synthetics — job API (no org prefix; authenticated via o2syn_ token)
+                .route("/synthetics/jobs/resolve", post(synthetics::job_resolve))
+                .route("/synthetics/jobs/lease", post(synthetics::job_lease))
+                .route("/synthetics/jobs/ack", post(synthetics::job_ack))
+                .route(
+                    "/synthetics/jobs/artifact-urls",
+                    post(synthetics::job_artifact_urls),
+                )
+                .route("/synthetics/jobs/upload", post(synthetics::job_upload))
+                // Synthetics — agent liveness API (no org prefix; o2syn_ token)
+                .route(
+                    "/synthetics/agent/register",
+                    post(synthetics::agent_register),
+                )
+                .route(
+                    "/synthetics/agent/heartbeat",
+                    post(synthetics::agent_heartbeat),
+                );
+        }
     }
 
     #[cfg(feature = "cloud")]

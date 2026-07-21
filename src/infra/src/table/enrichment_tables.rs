@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::time::now_micros;
+use config::{meta::stream::EnrichmentTableMetaStreamStats, utils::time::now_micros};
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, QueryFilter, QueryOrder, QuerySelect, Set,
     entity::prelude::*,
@@ -24,9 +24,11 @@ use super::get_lock;
 // Re-export the entity for convenience
 pub use crate::table::entity::enrichment_tables::{ActiveModel, Column, Entity, Model, Relation};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{ORM_CLIENT, connect_to_orm, get_db},
     errors,
 };
+
+pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
 
 #[derive(FromQueryResult, Debug, Serialize, Deserialize)]
 pub struct EnrichmentTableRecord {
@@ -180,6 +182,47 @@ pub async fn get_by_org_and_name_with_end_time(
         .await?;
 
     Ok(records)
+}
+
+/// Read and flatten the JSON arrays stored for an enrichment table.
+pub async fn get_data_by_org_and_name(
+    org: &str,
+    table_name: &str,
+    end_time_exclusive: Option<i64>,
+) -> Result<(Vec<serde_json::Value>, i64, i64), errors::Error> {
+    let records = if end_time_exclusive.is_some() {
+        get_by_org_and_name_with_end_time(org, table_name, end_time_exclusive).await?
+    } else {
+        get_by_org_and_name(org, table_name).await?
+    };
+
+    let mut values = Vec::new();
+    let mut min_ts = 0;
+    let mut max_ts = 0;
+    for record in records {
+        if min_ts == 0 || record.created_at < min_ts {
+            min_ts = record.created_at;
+        }
+        if max_ts == 0 || record.created_at > max_ts {
+            max_ts = record.created_at;
+        }
+        match serde_json::from_slice::<serde_json::Value>(&record.data) {
+            Ok(serde_json::Value::Array(items)) => values.extend(items),
+            Ok(data) => log::error!("Invalid enrichment data: {data}"),
+            Err(err) => log::error!("Failed to parse enrichment data: {err}"),
+        }
+    }
+
+    Ok((values, min_ts, max_ts))
+}
+
+/// Read the last successfully written meta-stream statistics for an enrichment table.
+pub async fn get_meta_stats(org: &str, table_name: &str) -> Option<EnrichmentTableMetaStreamStats> {
+    let key = format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org}/{table_name}");
+    let value = get_db().await.get(&key).await.ok()?;
+    serde_json::from_slice(&value)
+        .inspect_err(|err| log::error!("Failed to parse meta stream stats: {err}"))
+        .ok()
 }
 
 /// Get all enrichment table records for a specific organization

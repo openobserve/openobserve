@@ -378,7 +378,7 @@ describe("Group.vue", () => {
 
         const addConditionItem = wrapper.find('[data-test="dashboard-add-group-add-condition"]');
         if (addConditionItem.exists()) {
-          // After q-item -> ODropdownItem migration, click on the data-test
+          // After the ODropdownItem migration, click on the data-test
           // element directly (ODropdownItem's @select wires up to its click).
           await addConditionItem.trigger('click');
           expect(wrapper.emitted('add-condition')).toBeTruthy();
@@ -409,7 +409,7 @@ describe("Group.vue", () => {
 
         const addGroupItem = wrapper.find('[data-test="dashboard-add-group-add-group"]');
         if (addGroupItem.exists()) {
-          // After q-item -> ODropdownItem migration, click on the data-test
+          // After the ODropdownItem migration, click on the data-test
           // element directly (ODropdownItem's @select wires up to its click).
           await addGroupItem.trigger('click');
           expect(wrapper.emitted('add-group')).toBeTruthy();

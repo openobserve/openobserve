@@ -17,8 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="iam-roles-selection-section" class="flex flex-col h-full p-0" >
     <div
-      class="flex justify-start px-3 py-2 card-container shrink-0"
-      :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
+      class="flex justify-start px-3 py-2 bg-card-glass-bg shrink-0"
     >
       <div class="mr-3">
         <div
@@ -27,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span
             data-test="iam-roles-selection-show-text"
-            style="font-size: 14px"
+            style="font-size: var(--text-sm)"
           >
-            Show
+            {{ t('iam.groupRoles.show') }}
           </span>
           <OToggleGroup
             class="ml-1"
@@ -56,11 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-search-input"
           v-model="userSearchKey"
           class="h-9 w-50"
-          placeholder="Search Roles"
+          :placeholder="t('iam.groupRoles.searchRoles')"
         />
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" class="flex-1 min-h-0 card-container">
+    <div data-test="iam-roles-selection-table" class="flex-1 min-h-0 bg-card-glass-bg">
       <OTable
         :data="rows"
         :columns="columns"
@@ -114,7 +113,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // show selected users in the table
 // Add is_selected to the user object
@@ -154,18 +153,18 @@ const userSearchKey = ref("");
 
 const usersDisplay = ref("selected");
 
+const { t } = useI18n();
+
 const usersDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.groupRoles.all"),
     value: "all",
   },
   {
-    label: "Selected",
+    label: t("iam.groupRoles.selected"),
     value: "selected",
   },
 ];
-
-const { t } = useI18n();
 
 const hasFetchedOrgUsers = ref(false);
 
@@ -179,7 +178,7 @@ const columns: OTableColumnDef[] = [
     header: "",
     accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: TABLE_INDEX_COL_SIZE,
+    size: TABLE_CHECKBOX_COL_SIZE,
     minSize: 32,
     maxSize: 40,
     meta: { align: "center", compactPadding: true },
@@ -235,10 +234,9 @@ const getchOrgUsers = async () => {
       store.state.selectedOrganization.identifier
     );
 
-    users.value = cloneDeep(data.data).map((role: any, index: number) => {
+    users.value = cloneDeep(data.data).map((role: any) => {
       return {
         role_name: role,
-        "#": index + 1,
         isInGroup: groupUsersMap.value.has(role),
       };
     });

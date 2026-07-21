@@ -28,26 +28,19 @@ import { extractValuesFromHits } from "@/utils/fieldValueUtils";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-// Max unique values stored per field in IDB. 50 is enough for all realistic
-// observability filter fields (status codes, env names, log levels). More than
-// 50 items in a dropdown is noise rather than help. Overridable via .env so
-// team can tune without a code change.
+// Max unique values stored per field in IDB. Overridable via .env.
 const MAX_VALUES_PER_FIELD = Number(
   (import.meta as any).env?.VITE_MAX_FIELD_VALUES ?? 50,
 );
 
 // Total IDB record cap across all orgs/streams/fields combined. Prevents the
-// browser's IndexedDB storage from growing forever across many sessions.
-// 5000 records × ~50 values × ~20 chars avg ≈ ~5MB — well within browser limits.
-// Overridable via .env.
+// browser's IndexedDB storage from growing forever. Overridable via .env.
 const MAX_FIELDS_STORED = Number(
   (import.meta as any).env?.VITE_MAX_FIELDS_STORED ?? 5000,
 );
 
 // How long a field's values stay valid in IDB after the last write.
-// Sliding window — every new write resets the 7-day clock. Fields from streams
-// you stop querying disappear automatically after 7 days of inactivity.
-// Overridable via .env (unit: days).
+// Sliding window — every new write resets the clock. Overridable via .env (unit: days).
 const FIELD_VALUE_TTL_MS =
   Number((import.meta as any).env?.VITE_FIELD_VALUE_TTL_DAYS ?? 7) *
   86400 *
@@ -55,13 +48,11 @@ const FIELD_VALUE_TTL_MS =
 
 // ─── In-memory read cache ─────────────────────────────────────────────────────
 
-// Two-level cache: memory → IDB → [].
-// Without this, every keystroke in the query editor (e.g. "status = ") would
-// trigger an async IDB read (~1ms). With it, the first keystroke pays the IDB
-// cost; all subsequent keystrokes in the same minute return from memory in ~0ms.
+// Two-level cache: memory → IDB → []. Spares repeated keystrokes an async IDB
+// read; only the first read in each TTL window hits IDB.
 const readCache = new Map<string, { values: string[]; ts: number }>();
-const READ_CACHE_TTL_MS = 60_000; // 1 minute — balance between freshness and cost
-const READ_CACHE_MAX_ENTRIES = 500; // ~10 streams × ~50 fields each; enough for any session
+const READ_CACHE_TTL_MS = 60_000; // 1 minute
+const READ_CACHE_MAX_ENTRIES = 500;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -75,13 +66,7 @@ export interface StreamContext {
 
 // Composite string key used as the IDB primary key.
 // Format: "org|streamType|streamName|fieldName"
-// e.g.  : "myorg|logs|http_logs|status"
-//
-// Why a flat string instead of a compound key?
-// IDB compound keys require an array and more complex range queries.
-// A flat string is simpler, human-readable in DevTools, and works perfectly
-// for our point-read access pattern. The "|" separator is safe because
-// org/stream names in OO cannot contain "|".
+// The "|" separator is safe because org/stream names in OO cannot contain "|".
 const makeKey = (ctx: StreamContext, fieldName: string): string =>
   `${ctx.org}|${ctx.streamType}|${ctx.streamName}|${fieldName}`;
 
@@ -89,18 +74,9 @@ const makeKey = (ctx: StreamContext, fieldName: string): string =>
  * Schedule a background write using requestIdleCallback.
  * Falls back to setTimeout(0) in environments without rIC (e.g. Safari).
  *
- * Why this wrapper exists:
- * - requestIdleCallback runs the work AFTER the browser has finished rendering
- *   the current frame — zero impact on the search results appearing on screen.
- * - timeout: 2000 is a safety valve: if the browser stays busy for 2 full
- *   seconds without an idle slot, the write is forced anyway so data is never
- *   permanently lost.
- * - Safari does not support requestIdleCallback. setTimeout(0) is the next
- *   best thing — it defers to the next event loop tick, which still avoids
- *   blocking the current render cycle.
- * - The .catch() wrapper ensures IDB failures (private browsing, quota
- *   exceeded, IDB unavailable) never crash the app. Autocomplete is a
- *   nice-to-have, not a critical feature. Errors are logged in dev only.
+ * `timeout: 2000` forces the write even if the browser never goes idle, so data
+ * is never lost. The .catch() keeps IDB failures (private browsing, quota) from
+ * crashing the app — autocomplete is non-critical; errors are logged in dev only.
  */
 const scheduleWrite = (fn: () => Promise<void>): void => {
   const wrapped = () =>
@@ -118,12 +94,8 @@ const scheduleWrite = (fn: () => Promise<void>): void => {
 };
 
 /**
- * Write to the in-memory read cache with a bounded size.
- *
- * Why evict 10% at a time instead of 1 entry?
- * Evicting a single entry on every insert-at-cap means paying the eviction
- * cost on every new entry once the map is full. Evicting 10% (50 entries) at
- * once amortizes that cost — we only pay it once every 50 inserts.
+ * Write to the in-memory read cache with a bounded size. Evicts 10% at a time
+ * once full so eviction cost is amortized rather than paid on every insert.
  */
 const setCacheEntry = (key: string, values: string[]): void => {
   readCache.set(key, { values, ts: Date.now() });
@@ -142,20 +114,12 @@ const setCacheEntry = (key: string, values: string[]): void => {
 
 /**
  * Capture values returned by the Values API (field expansion in FieldList).
- * Called from useFieldValuesStream.handleResponse() AFTER the existing UI
- * state update — returns synchronously in ~1µs.
+ * Called from useFieldValuesStream.handleResponse() after the existing UI update.
  *
- * Why 200-char filter here (vs 150 in extractValuesFromHits)?
- * The Values API returns pre-selected top values from the server — they have
- * already been ranked and filtered for relevance. The 200-char limit is just
- * a safety net against malformed responses. We don't need the aggressive
- * filtering used for raw log hits where any field can appear.
- *
- * Why delete readCache after write?
- * If the user had already triggered autocomplete for this field (cache was
- * populated), the write would update IDB but the stale cache entry would be
- * returned for the next 60 seconds. Deleting it forces a fresh IDB read the
- * next time the user types, ensuring they see the newly captured values.
+ * The 200-char filter is just a safety net against malformed responses (the
+ * server has already ranked/filtered these values). readCache is deleted after
+ * the write so the next autocomplete read returns the freshly captured values
+ * instead of a stale cache entry.
  */
 export const captureFromValuesApi = (
   ctx: StreamContext,
@@ -187,21 +151,9 @@ export const captureFromValuesApi = (
  * Limits to first 100 hits; skips high-cardinality and excluded fields.
  * Uses a single IDB transaction for all fields to minimise transaction overhead.
  *
- * Why hits.slice(0, 100) even though the logs page already caps at 100?
- * Defensive programming — this function is a public export and could be called
- * by future code that passes a larger array. The slice keeps the contract clear.
- *
- * Why one mergeMultipleValues call instead of N mergeValues calls?
- * Each IDB transaction has a fixed overhead (open, commit, IDB lock). If a
- * stream has 40 fields, 40 individual transactions = 40× that overhead.
- * One transaction with 40 operations = 1× overhead. Substantially cheaper
- * for wide schemas.
- *
- * Why 5% chance for housekeeping (evictExpired + trimToMaxFields)?
- * evictExpired scans the entire IDB by_expires index — on 5000 records that
- * takes 10–20ms even in an idle callback. Running it on every search wastes
- * that time when 99% of searches produce no newly expired records.
- * 1-in-20 gives periodic cleanup with 1/20th the cumulative cost.
+ * Housekeeping (evictExpired + trimToMaxFields) runs on a 5% chance per capture
+ * because evictExpired scans the whole by_expires index (~10–20ms on 5000
+ * records) — too costly to run on every search.
  */
 export const captureFromSearchHits = (
   ctx: StreamContext,
@@ -248,18 +200,8 @@ export const captureFromSearchHits = (
 /**
  * Read stored values for a field — used by autocomplete suggestion provider.
  * Uses in-memory cache (1-minute TTL, 500-entry cap) to avoid IndexedDB
- * round-trips during typing. Never throws — returns empty array on any failure.
- *
- * Why return [] on error instead of propagating?
- * IDB can be unavailable in private browsing mode or certain enterprise
- * browser configurations. Users in those environments should still be able to
- * use the query editor — they just won't see value suggestions. Crashing or
- * showing an error for a non-critical enhancement would be a worse experience.
- *
- * Why check Date.now() - cached.ts < TTL instead of storing expiresAt?
- * Minor: computing expiresAt = Date.now() + TTL at write time and comparing
- * at read time is equivalent. The ts approach is slightly more readable
- * because the TTL constant appears only in one place (READ_CACHE_TTL_MS).
+ * round-trips during typing. Never throws — returns empty array on any failure
+ * (IDB can be unavailable in private browsing; suggestions are non-critical).
  */
 export const getFieldValuesForSuggestion = async (
   ctx: StreamContext,

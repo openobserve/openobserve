@@ -19,6 +19,7 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   delay: 700,
   maxWidth: "320px",
   disabled: false,
+  hoverable: false,
   // MUST stay explicitly undefined. Vue casts an absent Boolean prop to `false`,
   // so without this `open` is false rather than undefined — the `open !== undefined`
   // guard below then passes, TooltipRoot receives `open: false`, and reka switches
@@ -33,9 +34,9 @@ defineSlots<TooltipSlots>();
 const slots = useSlots();
 const hasDefaultSlot = computed(() => !!slots.default);
 
-// ΓöÇΓöÇΓöÇ Child mode (placed inside a parent like q-tooltip) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-// When no default slot is provided, OTooltip acts like q-tooltip: it finds its
-// parent element via a hidden DOM anchor span and attaches hover listeners to it.
+// ─── Child mode (placed inside a parent element as its tooltip) ───────────────
+// When no default slot is provided, OTooltip attaches to its parent: it finds
+// its parent element via a hidden DOM anchor span and attaches hover listeners to it.
 const childAnchorRef = ref<HTMLSpanElement | null>(null);
 const parentEl = ref<Element | null>(null);
 const childOpen = ref(false);
@@ -44,6 +45,25 @@ let cleanupFn: (() => void) | null = null;
 // delay for free from reka's `delay-duration`; child mode wires its own hover
 // listeners, so it has to honour `props.delay` here too.
 let childShowTimer: ReturnType<typeof setTimeout> | null = null;
+// Grace-period close timer used only when `hoverable` is set. On leaving the
+// trigger we wait briefly before closing so the pointer can travel onto the
+// bubble; entering the bubble cancels this timer and keeps the tooltip open.
+let childHideTimer: ReturnType<typeof setTimeout> | null = null;
+const HOVERABLE_GRACE_MS = 120;
+
+// Called from the content bubble's hover handlers (child mode). Entering the
+// bubble cancels a pending close; leaving it closes the tooltip.
+const onContentEnter = () => {
+  if (!props.hoverable) return;
+  if (childHideTimer) {
+    clearTimeout(childHideTimer);
+    childHideTimer = null;
+  }
+};
+const onContentLeave = () => {
+  if (!props.hoverable) return;
+  childOpen.value = false;
+};
 
 onMounted(() => {
   if (!hasDefaultSlot.value && childAnchorRef.value) {
@@ -85,7 +105,17 @@ onMounted(() => {
           clearTimeout(childShowTimer);
           childShowTimer = null;
         }
-        childOpen.value = false;
+        if (props.hoverable) {
+          // Delay the close so the pointer can reach the bubble; onContentEnter
+          // cancels this timer if it lands there in time.
+          if (childHideTimer) clearTimeout(childHideTimer);
+          childHideTimer = setTimeout(() => {
+            childOpen.value = false;
+            childHideTimer = null;
+          }, HOVERABLE_GRACE_MS);
+        } else {
+          childOpen.value = false;
+        }
       };
       parentEl.value.addEventListener("mouseenter", show);
       parentEl.value.addEventListener("mouseleave", hide);
@@ -99,6 +129,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (childShowTimer) clearTimeout(childShowTimer);
+  if (childHideTimer) clearTimeout(childHideTimer);
   cleanupFn?.();
 });
 
@@ -118,8 +149,12 @@ const contentStyle = computed(() => ({
 
 const contentClasses = computed(() => [
   "z-[10100] px-2.5 py-1.5",
-  "bg-[var(--color-surface-overlay)] rounded-md",
-  "text-xs text-[var(--color-text-primary)] font-medium leading-relaxed",
+  "bg-surface-overlay rounded-default",
+  "text-xs text-text-body font-medium leading-relaxed",
+  // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
+  // max-width box instead of overflowing onto the content behind the tooltip.
+  // overflow-wrap is inherited, so nested content (e.g. pre-wrap divs) wraps too.
+  "break-words",
   "data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95",
   "data-[state=instant-open]:animate-in data-[state=instant-open]:fade-in-0",
   "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
@@ -127,6 +162,8 @@ const contentClasses = computed(() => [
   "data-[side=bottom]:slide-in-from-top-1",
   "data-[side=left]:slide-in-from-right-1",
   "data-[side=right]:slide-in-from-left-1",
+  // Hoverable tooltips let the pointer land on the bubble and select its text.
+  props.hoverable ? "pointer-events-auto select-text cursor-text" : "",
   props.contentClass,
 ]);
 </script>
@@ -136,6 +173,7 @@ const contentClasses = computed(() => [
   <TooltipProvider v-if="hasDefaultSlot">
     <TooltipRoot
       :delay-duration="delay"
+      :disable-hoverable-content="!hoverable"
       v-bind="open !== undefined ? { open: disabled ? false : open } : {}"
       :disabled="disabled"
     >
@@ -163,14 +201,14 @@ const contentClasses = computed(() => [
           <TooltipArrow
             :width="10"
             :height="5"
-            :class="'fill-[var(--color-surface-overlay)]'"
+            :class="'fill-surface-overlay'"
           />
         </TooltipContent>
       </TooltipPortal>
     </TooltipRoot>
   </TooltipProvider>
 
-  <!-- ΓöÇΓöÇ Child mode: no default slot, attaches to parent element like q-tooltip -->
+  <!-- ── Child mode: no default slot, attaches to parent element as its tooltip -->
   <template v-else>
     <TooltipProvider>
       <TooltipRoot
@@ -179,6 +217,12 @@ const contentClasses = computed(() => [
         @update:open="childOpen = $event"
       >
         <!-- Hidden trigger span; reference overrides positioning anchor to parentEl -->
+        <!-- NOTE: `style="display:none"` here is a FUNCTIONAL CONTRACT, not
+             decoration — do NOT convert it to `class="hidden"`. The anchor
+             resolution in onMounted() skips hidden siblings by testing
+             `.style.display === "none"`, which only sees an INLINE style. With a
+             class, that loop stops on this span and anchors every child-mode
+             tooltip to a zero-size hidden element, so it never opens on hover. -->
         <TooltipTrigger
           as="span"
           :reference="parentEl ?? undefined"
@@ -194,6 +238,8 @@ const contentClasses = computed(() => [
             :align-offset="alignOffset"
             :style="contentStyle"
             :class="contentClasses"
+            @mouseenter="onContentEnter"
+            @mouseleave="onContentLeave"
           >
             <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
               <slot name="content">{{ content }}</slot>
@@ -206,13 +252,14 @@ const contentClasses = computed(() => [
             <TooltipArrow
               :width="10"
               :height="5"
-              :class="'fill-[var(--color-surface-overlay)]'"
+              :class="'fill-surface-overlay'"
             />
           </TooltipContent>
         </TooltipPortal>
       </TooltipRoot>
     </TooltipProvider>
-    <!-- Anchor placeholder: inserted at the real DOM position to resolve parentElement -->
+    <!-- Anchor placeholder: inserted at the real DOM position to resolve parentElement.
+         `style="display:none"` is required, not decorative — see the note above. -->
     <span ref="childAnchorRef" style="display:none" aria-hidden="true" />
   </template>
 </template>

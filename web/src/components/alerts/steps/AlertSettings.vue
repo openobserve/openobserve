@@ -16,21 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions w-full rounded-lg mx-auto bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+    class="step-alert-conditions w-full rounded-default mx-auto bg-surface-overlay border border-border-default"
   >
     <!-- Section header -->
     <div
-      class="flex items-center py-2.5 px-3"
-      :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'"
+      class="flex items-center py-2.5 px-3 border-b border-border-default"
     >
-      <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
+      <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
       <span
-        class="text-[13px] font-semibold tracking-[0.01em] text-[var(--color-text-primary)]"
+        class="text-compact font-semibold tracking-[0.01em] text-text-heading"
       >{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
     </div>
+
+    <!-- The AddAlert orchestrator owns the ONE <OForm> and provides
+         FORM_CONTEXT_KEY. The OForm* fields below inject that form and bind by
+         nested `name=` (trigger_condition.*, destinations, creates_incident); the
+         composed schema in AddAlert.schema.ts validates them on save. -->
     <div class="px-3 py-2">
       <div>
         <!-- For Real-Time Alerts -->
@@ -38,58 +41,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Silence Notification (Cooldown) -->
           <div class="flex justify-start items-start pb-3 mb-4">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-                <OTooltip
-                  :content="t('alerts.alertSettings.cooldownTooltip')"
-                  side="right"
-                />
+              <OTooltip
+                :content="t('alerts.alertSettings.cooldownTooltip')"
+                side="right"
+              />
             </div>
-            <div>
-              <div class="flex items-center mr-2" style="width: fit-content">
-                <div
-                  style="width: 87px; margin-left: 0 !important"
-                  class="silence-notification-input"
-                >
-                  <OInput
-                    v-model="formData.trigger_condition.silence"
+            <div class="flex flex-col gap-1 mr-2 w-fit">
+              <div class="flex items-center">
+                <div class="w-21.75">
+                  <OFormInput
+                    name="trigger_condition.silence"
                     type="number"
                     min="0"
                     data-test="alert-settings-silence-duration-input"
-                    @update:model-value="
-                      $emit('update:trigger', formData.trigger_condition)
-                    "
-                  />
+                  >
+                    <!-- Message rendered below at pair width — see silenceError. -->
+                    <template #error />
+                  </OFormInput>
                 </div>
                 <div
-                  style="
-                    min-width: 90px;
-                    margin-left: 0 !important;
-                    height: 28px;
-                    font-size: 13px;
-                  "
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                  "
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
-                v-if="
-                  formData.trigger_condition.silence < 0 ||
-                  formData.trigger_condition.silence === undefined ||
-                  formData.trigger_condition.silence === null ||
-                  formData.trigger_condition.silence === ''
-                "
-                class="text-red-8 pt-1"
-                style="font-size: 11px; line-height: 12px"
+                v-if="silenceError"
+                class="text-xs text-input-error-text whitespace-nowrap"
+                data-test="alert-settings-silence-error"
+                role="alert"
               >
-                {{ t("alerts.alertSettings.fieldRequired") }}
+                {{ silenceError }}
               </div>
             </div>
           </div>
@@ -97,54 +83,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destinations -->
           <div class="flex items-start pb-4 mb-4">
             <div
-              style="width: 190px; height: 28px"
-              class="flex items-center font-semibold"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
-              <span>{{ t("alerts.destination") }} *</span>
+              {{ t("alerts.destination") + " *" }}
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OTooltip
+                :content="t('alerts.alertSettings.destinationsTooltip')"
+                side="right"
+              />
             </div>
-            <div class="flex flex-col">
-              <div class="flex items-center">
-                <OSelect
-                  v-model="localDestinations"
-                  :options="formattedDestinations"
-                  data-test="alert-destinations-select"
-                  multiple
-                  class="min-w-[180px] max-w-[300px]"
-                  @update:model-value="emitDestinationsUpdate"
-                >
-                  <template #empty>{{
-                    t("alerts.alertSettings.noDestinationsAvailable")
-                  }}</template>
-                </OSelect>
-                <OButton
-                  data-test="alert-settings-refresh-destinations-btn"
-                  class="ml-1"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.alertSettings.refreshDestinations')"
-                  @click="$emit('refresh:destinations')"
-                >
-                  <OIcon name="refresh" size="sm" />
-                </OButton>
-                <OButton
-                  data-test="create-destination-btn"
-                  variant="outline"
-                  size="sm"
-                  class="ml-2"
-                  @click="routeToCreateDestination"
-                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
-                >
-              </div>
-              <div
-                v-if="
-                  destinationsTouched &&
-                  (!localDestinations || localDestinations.length === 0)
-                "
-                class="text-red-8 pt-1"
-                style="font-size: 11px; line-height: 12px"
+            <!-- items-start, not items-center: the select's wrapper grows when its
+                 validation message appears, and centring would drift the refresh /
+                 add buttons down, out of line with the control. -->
+            <div class="flex items-start">
+              <OFormSelect
+                name="destinations"
+                :options="formattedDestinations"
+                data-test="alert-destinations-select"
+                multiple
+                class="min-w-45 max-w-75"
               >
-                {{ t("alerts.alertSettings.fieldRequired") }}
-              </div>
+                <template #empty>{{
+                  t("alerts.alertSettings.noDestinationsAvailable")
+                }}</template>
+              </OFormSelect>
+              <OButton
+                data-test="alert-settings-refresh-destinations-btn"
+                variant="ghost"
+                size="icon-circle-sm"
+                class="ml-1"
+                :title="t('alerts.alertSettings.refreshDestinations')"
+                @click="$emit('refresh:destinations')"
+              >
+                <OIcon name="refresh" size="sm" />
+              </OButton>
+              <OButton
+                data-test="create-destination-btn"
+                variant="outline"
+                size="sm"
+                class="ml-2"
+                @click="routeToCreateDestination"
+                >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
+              >
             </div>
           </div>
         </template>
@@ -152,183 +132,137 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div class="flex items-start mr-2 mb-4!">
+          <div ref="periodFieldRef" class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.period") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-                <OTooltip
-                  :content="t('alerts.alertSettings.periodTooltip')"
-                  side="right"
-                />
+              <OTooltip
+                :content="t('alerts.alertSettings.periodTooltip')"
+                side="right"
+              />
             </div>
-            <div>
-              <div
-                ref="periodFieldRef"
-                class="flex items-center mr-2"
-                style="width: fit-content"
-              >
-                <div
-                  style="width: 87px; margin-left: 0 !important"
-                  class="period-input-container"
-                >
-                  <OInput
-                    v-model="formData.trigger_condition.period"
+            <div class="flex flex-col gap-1 mr-2 w-fit">
+              <div class="flex items-center">
+                <div class="w-21.75">
+                  <OFormInput
+                    name="trigger_condition.period"
                     type="number"
                     min="1"
                     :debounce="300"
                     data-test="alert-settings-period-input"
                     @update:model-value="handlePeriodChange"
-                  />
+                  >
+                    <!-- Message rendered below at pair width — see periodError. -->
+                    <template #error />
+                  </OFormInput>
                 </div>
                 <div
-                  style="
-                    min-width: 90px;
-                    margin-left: 0 !important;
-                    height: 28px;
-                    font-weight: normal;
-                    font-size: 13px;
-                  "
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                  "
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
-                v-if="!Number(formData.trigger_condition.period)"
-                class="text-red-8 pt-1"
-                style="font-size: 11px; line-height: 12px"
+                v-if="periodError"
+                class="text-xs text-input-error-text whitespace-nowrap"
+                data-test="alert-settings-period-error"
+                role="alert"
               >
-                {{ t("alerts.alertSettings.fieldRequired") }}
+                {{ periodError }}
               </div>
             </div>
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div class="flex items-start mr-2 mb-4!">
+          <div ref="silenceFieldRef" class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-                <OTooltip
-                  :content="t('alerts.alertSettings.cooldownTooltip')"
-                  side="right"
-                />
+              <OTooltip
+                :content="t('alerts.alertSettings.cooldownTooltip')"
+                side="right"
+              />
             </div>
-            <div>
-              <div
-                ref="silenceFieldRef"
-                class="flex items-center mr-2"
-                style="width: fit-content"
-              >
-                <div style="width: 87px; margin-left: 0 !important">
-                  <OInput
-                    v-model="formData.trigger_condition.silence"
+            <div class="flex flex-col gap-1 mr-2 w-fit">
+              <div class="flex items-center">
+                <div class="w-21.75">
+                  <OFormInput
+                    name="trigger_condition.silence"
                     type="number"
                     min="0"
                     :debounce="300"
                     data-test="alert-settings-silence-duration-input"
-                    @update:model-value="emitTriggerUpdate"
-                  />
+                  >
+                    <!-- Message rendered below at pair width — see silenceError. -->
+                    <template #error />
+                  </OFormInput>
                 </div>
                 <div
-                  style="
-                    min-width: 90px;
-                    margin-left: 0 !important;
-                    height: 28px;
-                    font-size: 13px;
-                  "
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                  "
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
-                v-if="
-                  formData.trigger_condition.silence < 0 ||
-                  formData.trigger_condition.silence === undefined ||
-                  formData.trigger_condition.silence === null ||
-                  formData.trigger_condition.silence === ''
-                "
-                class="text-red-8 pt-1"
-                style="font-size: 11px; line-height: 12px"
+                v-if="silenceError"
+                class="text-xs text-input-error-text whitespace-nowrap"
+                data-test="alert-settings-silence-error"
+                role="alert"
               >
-                {{ t("alerts.alertSettings.fieldRequired") }}
+                {{ silenceError }}
               </div>
             </div>
           </div>
 
           <!-- Destinations -->
-          <div class="flex items-start mr-2 mb-4!">
+          <div ref="destinationsFieldRef" class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.destination") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-                <OTooltip
-                  :content="t('alerts.alertSettings.destinationsTooltip')"
-                  side="right"
-                />
+              <OTooltip
+                :content="t('alerts.alertSettings.destinationsTooltip')"
+                side="right"
+              />
             </div>
-            <div>
-              <div class="flex items-center">
-                <OSelect
-                  ref="destinationsFieldRef"
-                  v-model="localDestinations"
-                  :options="formattedDestinations"
-                  data-test="alert-destinations-select"
-                  multiple
-                  :error="destinationError"
-                  class="min-w-[180px] max-w-[300px]"
-                  @update:model-value="
-                    destinationError = false;
-                    emitDestinationsUpdate();
-                  "
-                >
-                  <template #empty>{{
-                    t("alerts.alertSettings.noDestinationsAvailable")
-                  }}</template>
-                </OSelect>
-                <OButton
-                  data-test="alert-settings-refresh-destinations-btn"
-                  class="ml-1"
-                  variant="ghost"
-                  size="icon-circle-sm"
-                  :title="t('alerts.alertSettings.refreshDestinations')"
-                  @click="$emit('refresh:destinations')"
-                >
-                  <OIcon name="refresh" size="sm" />
-                </OButton>
-                <OButton
-                  data-test="create-destination-btn"
-                  variant="outline"
-                  size="sm"
-                  class="ml-2"
-                  @click="routeToCreateDestination"
-                  >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
-                >
-              </div>
-              <div
-                v-if="
-                  destinationsTouched &&
-                  (!localDestinations || localDestinations.length === 0)
-                "
-                class="text-red-8 pt-1"
-                style="font-size: 11px; line-height: 12px"
+            <!-- items-start, not items-center: the select's wrapper grows when its
+                 validation message appears, and centring would drift the refresh /
+                 add buttons down, out of line with the control. -->
+            <div class="flex items-start">
+              <OFormSelect
+                name="destinations"
+                :options="formattedDestinations"
+                data-test="alert-destinations-select"
+                multiple
+                class="min-w-45 max-w-75"
               >
-                {{ t("alerts.alertSettings.fieldRequired") }}
-              </div>
+                <template #empty>{{
+                  t("alerts.alertSettings.noDestinationsAvailable")
+                }}</template>
+              </OFormSelect>
+              <OButton
+                data-test="alert-settings-refresh-destinations-btn"
+                variant="ghost"
+                size="icon-circle-sm"
+                class="ml-1"
+                :title="t('alerts.alertSettings.refreshDestinations')"
+                @click="$emit('refresh:destinations')"
+              >
+                <OIcon name="refresh" size="sm" />
+              </OButton>
+              <OButton
+                data-test="create-destination-btn"
+                variant="outline"
+                size="sm"
+                class="ml-2"
+                @click="routeToCreateDestination"
+                >{{ t("alerts.alertSettings.addNewDestination") }}</OButton
+              >
             </div>
           </div>
         </template>
@@ -336,18 +270,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Creates Incident toggle — shown for all alert types -->
         <div class="flex items-start mb-4!">
           <div
-            class="font-semibold flex items-center"
-            style="width: 190px; height: 28px"
+            class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
           >
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.createsIncidentTooltip')"
-                side="right"
-              />
+            <OTooltip
+              :content="t('alerts.alertSettings.createsIncidentTooltip')"
+              side="right"
+            />
           </div>
-          <OSwitch
-            v-model="formData.creates_incident"
+          <OFormSwitch
+            name="creates_incident"
             data-test="alert-creates-incident-toggle"
           />
         </div>
@@ -357,32 +290,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  computed,
-  watch,
-  nextTick,
-  type PropType,
-} from "vue";
+import { computed, defineComponent, inject, ref, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import {
-  getCronIntervalDifferenceInSeconds,
-  isAboveMinRefreshInterval,
-  convertMinutesToCron,
-} from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { convertMinutesToCron } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "Step3AlertConditions",
-  components: { OButton, OInput, OSelect, OSwitch, OTooltip, OIcon },
+  components: {
+    OButton,
+    OFormInput,
+    OFormSelect,
+    OFormSwitch,
+    OTooltip,
+    OIcon,
+  },
   props: {
     formData: {
       type: Object as PropType<any>,
@@ -392,6 +323,7 @@ export default defineComponent({
       type: String,
       default: "false",
     },
+    // Passed by the parent but not consumed here (kept to avoid attr fallthrough).
     columns: {
       type: Array as PropType<any[]>,
       default: () => [],
@@ -422,323 +354,68 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
-    // Field refs for focus manager
-    const periodFieldRef = ref(null);
-    const thresholdFieldRef = ref(null);
-    const silenceFieldRef = ref(null);
-    const destinationsFieldRef = ref(null);
+    // Field refs consumed by the parent's AlertFocusManager (registered off the
+    // step ref). Scheduled-only.
+    const periodFieldRef = ref<any>(null);
+    const silenceFieldRef = ref<any>(null);
+    const destinationsFieldRef = ref<any>(null);
 
-    // Local state for aggregation toggle
-    // Only enable aggregation when query type is "custom" (not "sql" or "promql")
-    const queryType = computed(
-      () => props.formData.query_condition?.type || "custom",
-    );
-    const localIsAggregationEnabled = ref(
-      queryType.value === "custom" && props.isAggregationEnabled,
-    );
-    const localDestinations = ref(props.destinations);
-    const destinationsTouched = ref(false);
-    const destinationError = ref(false);
+    // Period / silence are composite "number + Minutes addon" fields: a 5.4rem
+    // OFormInput glued to a unit block. OFormInput renders its message INSIDE
+    // that narrow width, wrapping it into a ragged column and growing the field,
+    // which pushes the addon out of line. Empty #error slot suppresses the inline
+    // text (the field keeps its red border) and we render the message in a
+    // full-width sibling below the pair. Reads the same R3-timed field errors
+    // OFormInput would have surfaced — single source of truth, wider display.
+    const form: any = inject(FORM_CONTEXT_KEY, null);
+    const fieldError = (path: string) =>
+      form
+        ? form.useStore((s: any) =>
+            firstFieldError(s.fieldMeta?.[path]?.errors ?? []),
+          )
+        : computed(() => undefined);
+    const periodError = fieldError("trigger_condition.period");
+    const silenceError = fieldError("trigger_condition.silence");
 
-    // Timezone management
-    const browserTimezone = ref("");
-    const filteredTimezone = ref<string[]>([]);
-    const showTimezoneWarning = ref(false);
-
-    // Cron validation
-    const cronJobError = ref("");
-
-    // Initialize timezone
-    const initializeTimezone = () => {
+    const getBrowserTimezone = (): string => {
       try {
-        const detectedTimezone =
-          Intl.DateTimeFormat().resolvedOptions().timeZone;
-        browserTimezone.value = detectedTimezone;
-
-        // Auto-detect and set timezone if not already set and in cron mode
-        if (
-          props.formData.trigger_condition.frequency_type === "cron" &&
-          !props.formData.trigger_condition.timezone
-        ) {
-          props.formData.trigger_condition.timezone = detectedTimezone;
-          showTimezoneWarning.value = true;
-        }
-
-        // Get all available timezones
-        try {
-          // @ts-ignore - supportedValuesOf is not in all TypeScript versions
-          if (
-            typeof Intl !== "undefined" &&
-            typeof Intl.supportedValuesOf === "function"
-          ) {
-            // @ts-ignore
-            filteredTimezone.value = Intl.supportedValuesOf("timeZone");
-          } else {
-            // Fallback for older browsers
-            filteredTimezone.value = [detectedTimezone];
-          }
-        } catch (err) {
-          filteredTimezone.value = [detectedTimezone];
-        }
-      } catch (e) {
-        console.error("Error initializing timezone:", e);
-        browserTimezone.value = "UTC";
-        filteredTimezone.value = ["UTC"];
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      } catch {
+        return "UTC";
       }
     };
 
-    // Initialize on mount
-    initializeTimezone();
-
-    // Watch for prop changes
-    watch(
-      () => props.isAggregationEnabled,
-      (newVal) => {
-        // Only enable aggregation if query type is "custom"
-        localIsAggregationEnabled.value =
-          queryType.value === "custom" && newVal;
-      },
-    );
-
-    // Watch for query type changes
-    watch(queryType, (newType) => {
-      // Disable aggregation when switching to sql or promql
-      // Only update local state — do not emit to parent so the composable
-      // preserves the builder-mode isAggregationEnabled value across tab switches.
-      if (newType !== "custom") {
-        localIsAggregationEnabled.value = false;
-      } else {
-        // Re-enable aggregation if it was previously enabled
-        localIsAggregationEnabled.value = props.isAggregationEnabled;
-      }
-    });
-
-    watch(
-      () => props.destinations,
-      (newVal) => {
-        localDestinations.value = newVal;
-      },
-    );
-
-    // Watch for frequency type changes to manage timezone
-    watch(
-      () => props.formData.trigger_condition.frequency_type,
-      (newVal) => {
-        if (newVal === "cron") {
-          initializeTimezone();
-        }
-      },
-    );
-
-    // Aggregation functions
-    const aggFunctions = [
-      "count",
-      "min",
-      "max",
-      "avg",
-      "sum",
-      "median",
-      "p50",
-      "p75",
-      "p90",
-      "p95",
-      "p99",
-    ];
-
-    // Trigger operators
-    const triggerOperators = [
-      "=",
-      "!=",
-      ">=",
-      ">",
-      "<=",
-      "<",
-      "Contains",
-      "NotContains",
-    ];
-
-    // Filtered numeric columns for aggregation
-    const filteredNumericColumns = ref([...props.columns]);
-    const filterNumericColumns = (val: string, update: any) => {
-      update(() => {
-        if (val === "") {
-          filteredNumericColumns.value = [...props.columns];
-        } else {
-          const needle = val.toLowerCase();
-          filteredNumericColumns.value = props.columns.filter(
-            (v: any) => v.toLowerCase().indexOf(needle) > -1,
-          );
-        }
-      });
-    };
-
-    // Filtered destinations
-
-    // Timezone filter function
-    const timezoneFilterFn = (val: string, update: any) => {
-      update(() => {
-        if (val === "") {
-          try {
-            // @ts-ignore
-            if (
-              typeof Intl !== "undefined" &&
-              typeof Intl.supportedValuesOf === "function"
-            ) {
-              // @ts-ignore
-              filteredTimezone.value = Intl.supportedValuesOf("timeZone");
-            }
-          } catch (e) {
-            // Keep current filtered list
-          }
-        } else {
-          const needle = val.toLowerCase();
-          const allTimezones: string[] = [];
-          try {
-            // @ts-ignore
-            if (
-              typeof Intl !== "undefined" &&
-              typeof Intl.supportedValuesOf === "function"
-            ) {
-              // @ts-ignore
-              allTimezones.push(...Intl.supportedValuesOf("timeZone"));
-            }
-          } catch (e) {
-            allTimezones.push(browserTimezone.value);
-          }
-          filteredTimezone.value = allTimezones.filter(
-            (v: string) => v.toLowerCase().indexOf(needle) > -1,
-          );
-        }
-      });
-    };
-
-    // Handle frequency type change with conversion
-    const handleFrequencyTypeChange = (type: "minutes" | "cron") => {
-      // If switching to cron and we have a frequency value, convert it
-      // Only convert if there's no existing cron expression
-      if (
-        type === "cron" &&
-        props.formData.trigger_condition.frequency_type === "minutes"
-      ) {
-        const frequencyMinutes = Number(
-          props.formData.trigger_condition.frequency,
-        );
-        const existingCron = props.formData.trigger_condition.cron;
-
-        // Only convert if we have a frequency value and no existing cron expression
-        if (
-          frequencyMinutes &&
-          frequencyMinutes > 0 &&
-          (!existingCron || existingCron.trim() === "")
-        ) {
-          // Convert minutes to cron expression (6-field format: second minute hour day month dayOfWeek)
-          const cronExpression = convertMinutesToCron(frequencyMinutes);
-          props.formData.trigger_condition.cron = cronExpression;
-
-          // Set timezone if not already set
-          if (!props.formData.trigger_condition.timezone) {
-            props.formData.trigger_condition.timezone =
-              browserTimezone.value ||
-              Intl.DateTimeFormat().resolvedOptions().timeZone;
-          }
-        }
-      }
-
-      // Update the frequency type
-      props.formData.trigger_condition.frequency_type = type;
-      emitTriggerUpdate();
-    };
-
-    // Validate cron expression
-    const validateFrequency = () => {
-      cronJobError.value = "";
-
-      if (props.formData.trigger_condition.frequency_type === "cron") {
-        try {
-          const intervalInSecs = getCronIntervalDifferenceInSeconds(
-            props.formData.trigger_condition.cron,
-          );
-
-          if (
-            typeof intervalInSecs === "number" &&
-            !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
-          ) {
-            const minInterval =
-              Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-            cronJobError.value = `Frequency should be greater than ${minInterval - 1} seconds.`;
-            return;
-          }
-        } catch (e) {
-          cronJobError.value = "Invalid cron expression";
-        }
-      }
-
-      if (props.formData.trigger_condition.frequency_type === "minutes") {
-        const intervalInMins = Math.ceil(
-          store.state?.zoConfig?.min_auto_refresh_interval / 60,
-        );
-
-        if (props.formData.trigger_condition.frequency < intervalInMins) {
-          cronJobError.value =
-            "Minimum frequency should be " + intervalInMins + " minutes";
-          return;
-        }
-      }
-    };
-
-    // Emit updates
-    const emitTriggerUpdate = () => {
-      validateFrequency();
-      emit("update:trigger", props.formData.trigger_condition);
-    };
-
-    // Handle period change and sync with frequency, silence, and cron
-    const handlePeriodChange = () => {
-      const periodValue = Number(props.formData.trigger_condition.period);
-
+    // Period typed → cross-step CASCADE (period drives frequency / cron /
+    // timezone / silence). The ancestor AddAlert listens to @update:trigger
+    // (updateTriggerCondition → setFieldValue) and writes the whole
+    // trigger_condition into the ONE form, so the visible silence field
+    // auto-fills. The period field value itself is already written into the form
+    // by its own OFormInput binding; it rides on the emit so the parent write
+    // does not revert it.
+    const handlePeriodChange = (val: unknown) => {
+      const periodValue = Number(val);
+      // Spread the FRESH form value, not `props.formData.trigger_condition`.
+      // The prop is a `form.useStore` read-view that only refreshes on the next
+      // render, and the parent's @update:trigger handler is a WHOLE-OBJECT
+      // `setFieldValue("trigger_condition", …)` — so spreading the stale prop
+      // round-trips a pre-write snapshot and silently clobbers any field written
+      // earlier in the same tick.
+      const currentTrigger =
+        form?.getFieldValue?.("trigger_condition") ??
+        props.formData.trigger_condition;
+      const nextTrigger: Record<string, any> = {
+        ...currentTrigger,
+        period: val,
+      };
       if (periodValue && periodValue > 0) {
-        // Only sync frequency if period is above minimum refresh interval
-        // This prevents frequency from going below the minimum allowed value
         const minFrequency =
-          Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) ||
-          10;
-        if (periodValue >= minFrequency) {
-          props.formData.trigger_condition.frequency = periodValue;
-        }
-
-        // Always sync cron expression, regardless of current mode
-        // This ensures cron is up-to-date when user switches to cron mode
-        const cronExpression = convertMinutesToCron(periodValue);
-        props.formData.trigger_condition.cron = cronExpression;
-
-        // Ensure timezone is set
-        if (!props.formData.trigger_condition.timezone) {
-          props.formData.trigger_condition.timezone =
-            browserTimezone.value ||
-            Intl.DateTimeFormat().resolvedOptions().timeZone;
-        }
-
-        // Always sync silence notification
-        props.formData.trigger_condition.silence = periodValue;
+          Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
+        if (periodValue >= minFrequency) nextTrigger.frequency = periodValue;
+        nextTrigger.cron = convertMinutesToCron(periodValue);
+        if (!nextTrigger.timezone) nextTrigger.timezone = getBrowserTimezone();
+        nextTrigger.silence = periodValue;
       }
-
-      emitTriggerUpdate();
-    };
-
-    const emitAggregationUpdate = () => {
-      emit("update:aggregation", props.formData.query_condition.aggregation);
-    };
-
-    const emitDestinationsUpdate = () => {
-      destinationsTouched.value = true;
-      emit("update:destinations", localDestinations.value);
-    };
-
-    const emitPromqlConditionUpdate = () => {
-      emit(
-        "update:promqlCondition",
-        props.formData.query_condition.promql_condition,
-      );
+      emit("update:trigger", nextTrigger);
     };
 
     const routeToCreateDestination = () => {
@@ -752,235 +429,17 @@ export default defineComponent({
       window.open(url, "_blank");
     };
 
-    // Validation method - just call the inline validations that already exist
-    const validate = async () => {
-      // Validate cron/frequency first
-      validateFrequency();
-
-      // Check if there are any cron validation errors
-      if (cronJobError.value) {
-        return { valid: false, message: cronJobError.value };
-      }
-
-      // For Real-Time Alerts
-      if (props.isRealTime === "true") {
-        // Check silence notification
-        if (
-          props.formData.trigger_condition.silence < 0 ||
-          props.formData.trigger_condition.silence === undefined ||
-          props.formData.trigger_condition.silence === null ||
-          props.formData.trigger_condition.silence === ""
-        ) {
-          return {
-            valid: false,
-            message: `${t("alerts.silenceNotification")} should be greater than or equal to 0`,
-          };
-        }
-
-        // Check destinations (required for both real-time and scheduled)
-        if (!localDestinations.value || localDestinations.value.length === 0) {
-          destinationsTouched.value = true;
-          destinationError.value = true;
-          return {
-            valid: false,
-            message: "At least one destination is required.",
-            focusDestination: true,
-          };
-        }
-
-        return { valid: true };
-      }
-
-      // For Scheduled Alerts
-      // Check if aggregation is enabled
-      // Check if query type is PromQL - validate both promql_condition AND threshold
-      if (queryType.value === "promql") {
-        // Validate PromQL condition
-        if (!props.formData.query_condition.promql_condition) {
-          return { valid: false, message: "PromQL condition is required" };
-        }
-        if (!props.formData.query_condition.promql_condition.operator) {
-          return { valid: false, message: null };
-        }
-        if (
-          props.formData.query_condition.promql_condition.value === undefined ||
-          props.formData.query_condition.promql_condition.value === null ||
-          props.formData.query_condition.promql_condition.value === ""
-        ) {
-          return { valid: false, message: null };
-        }
-
-        // Also validate threshold for PromQL
-        if (!props.formData.trigger_condition.operator) {
-          return { valid: false, message: null };
-        }
-        const threshold = Number(props.formData.trigger_condition.threshold);
-        if (isNaN(threshold) || threshold < 1) {
-          return {
-            valid: false,
-            message: `${t("alerts.threshold")} should be greater than 0`,
-          };
-        }
-      } else if (
-        localIsAggregationEnabled.value &&
-        props.formData.query_condition.aggregation
-      ) {
-        // Validate group by fields (if any are added, they must not be empty)
-        const groupByFields =
-          props.formData.query_condition.aggregation.group_by;
-        if (groupByFields && groupByFields.length > 0) {
-          for (const field of groupByFields) {
-            if (!field || field === "") {
-              return { valid: false, message: null }; // Show inline error only
-            }
-          }
-        }
-
-        // Validate aggregation having clause
-        if (
-          !props.formData.query_condition.aggregation.having.column ||
-          props.formData.query_condition.aggregation.having.column === ""
-        ) {
-          return { valid: false, message: null };
-        }
-        if (
-          !props.formData.query_condition.aggregation.having.value ||
-          props.formData.query_condition.aggregation.having.value === ""
-        ) {
-          return { valid: false, message: null };
-        }
-        if (!props.formData.query_condition.aggregation.having.operator) {
-          return { valid: false, message: null };
-        }
-
-        // Also validate threshold when aggregation is enabled
-        if (!props.formData.trigger_condition.operator) {
-          return { valid: false, message: null };
-        }
-        const threshold = Number(props.formData.trigger_condition.threshold);
-        if (isNaN(threshold) || threshold < 1) {
-          return {
-            valid: false,
-            message: `${t("alerts.threshold")} should be greater than 0`,
-          };
-        }
-      } else {
-        // Validate threshold without aggregation
-        if (!props.formData.trigger_condition.operator) {
-          return { valid: false, message: null };
-        }
-        const threshold = Number(props.formData.trigger_condition.threshold);
-        if (isNaN(threshold) || threshold < 1) {
-          return {
-            valid: false,
-            message: `${t("alerts.threshold")} should be greater than 0`,
-          };
-        }
-      }
-
-      // Validate period
-      const period = Number(props.formData.trigger_condition.period);
-      if (isNaN(period) || period < 1) {
-        return {
-          valid: false,
-          message: `${t("alerts.period")} should be greater than 0`,
-        };
-      }
-
-      // Validate frequency
-      if (props.formData.trigger_condition.frequency_type === "minutes") {
-        const frequency = Number(props.formData.trigger_condition.frequency);
-        if (isNaN(frequency) || frequency < 1) {
-          return {
-            valid: false,
-            message: `${t("alerts.frequency")} should be greater than 0`,
-          };
-        }
-      } else if (props.formData.trigger_condition.frequency_type === "cron") {
-        if (
-          !props.formData.trigger_condition.cron ||
-          !props.formData.trigger_condition.timezone
-        ) {
-          return { valid: false, message: null };
-        }
-      }
-
-      // Validate silence notification
-      if (
-        props.formData.trigger_condition.silence < 0 ||
-        props.formData.trigger_condition.silence === undefined ||
-        props.formData.trigger_condition.silence === null ||
-        props.formData.trigger_condition.silence === ""
-      ) {
-        return {
-          valid: false,
-          message: `${t("alerts.silenceNotification")} should be greater than or equal to 0`,
-        };
-      }
-
-      // Check destinations (required for both real-time and scheduled)
-      if (!localDestinations.value || localDestinations.value.length === 0) {
-        destinationsTouched.value = true;
-        destinationError.value = true;
-        return {
-          valid: false,
-          message: "At least one destination is required.",
-          focusDestination: true,
-        };
-      }
-
-      return { valid: true };
-    };
-
-    const focusDestination = () => {
-      nextTick(() => {
-        const el = (destinationsFieldRef.value as any)?.$el as HTMLElement;
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          setTimeout(() => {
-            const input = el.querySelector("input") as HTMLElement;
-            input?.focus();
-          }, 400);
-        }
-      });
-    };
-
     return {
       t,
       store,
-      queryType,
-      localIsAggregationEnabled,
-      localDestinations,
-      destinationsTouched,
-      destinationError,
-      aggFunctions,
-      triggerOperators,
-      filteredNumericColumns,
-      filterNumericColumns,
-      emitTriggerUpdate,
-      emitAggregationUpdate,
-      emitDestinationsUpdate,
-      routeToCreateDestination,
       handlePeriodChange,
-      // Timezone
-      browserTimezone,
-      filteredTimezone,
-      showTimezoneWarning,
-      timezoneFilterFn,
-      // Frequency type switching
-      handleFrequencyTypeChange,
-      // Cron validation
-      cronJobError,
-      validateFrequency,
-      // Validation
-      validate,
-      // Field refs for focus manager
+      routeToCreateDestination,
+      // Field refs for the parent focus manager
       periodFieldRef,
-      thresholdFieldRef,
       silenceFieldRef,
       destinationsFieldRef,
-      focusDestination,
-      emitPromqlConditionUpdate,
+      periodError,
+      silenceError,
     };
   },
 });

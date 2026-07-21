@@ -20,11 +20,9 @@ import {
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import {
-  TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
-  TABLE_CHECKBOX_COL_PAD_LEFT,
-} from "../OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
@@ -62,6 +60,10 @@ const props = defineProps<{
     row: any;
     value: any;
   }) => Record<string, any>;
+  /** When true, renders a drag handle grip icon as the first cell. */
+  enableRowReorder?: boolean;
+  /** Per-row predicate: when false, the drag handle is hidden for this row. */
+  rowDraggable?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -123,14 +125,16 @@ const showTreeWarning = computed(
  * Used to align the warning row's content + connector line under the chevron.
  */
 const treeConnectorX = computed(() => {
-  const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
   const expansionWidth = props.expansionEnabled ? 32 : 0; // w-8
+  const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
+  const dragWidth = props.enableRowReorder ? 16 : 0; // w-4
   const cellPaddingLeft = 8; // px-2
   const halfChevron = 9; // 18px / 2
   const parentDepth = treeMeta.value?.depth ?? 0;
   return (
-    selectionWidth +
     expansionWidth +
+    selectionWidth +
+    dragWidth +
     cellPaddingLeft +
     parentDepth * 16 +
     halfChevron
@@ -263,8 +267,8 @@ function onRowBlur() {
       rowClass,
     ]"
     :style="{
-      height: 'var(--o2-table-row-height, 2.25rem)',
-      ...(statusBarColor ? { '--o2-row-status-color': statusBarColor } : {}),
+      height: 'var(--table-row-height, 2.25rem)',
+      ...(statusBarColor ? { '--row-status-color': statusBarColor } : {}),
       ...rowStyle,
     }"
     :data-status-bar="statusBarColor ? 'true' : undefined"
@@ -306,7 +310,7 @@ function onRowBlur() {
         width: TABLE_CHECKBOX_COL_WIDTH + 'px',
         minWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
         maxWidth: TABLE_CHECKBOX_COL_WIDTH + 'px',
-        paddingLeft: TABLE_CHECKBOX_COL_PAD_LEFT + 'px',
+        paddingLeft: 'var(--spacing-table-edge)',
       }"
       data-test="o2-table-select-cell"
     >
@@ -318,6 +322,20 @@ function onRowBlur() {
           @update:model-value="emit('toggle-selection', row.original)"
         />
       </div>
+    </td>
+
+    <!-- Drag handle cell -->
+    <td
+      v-if="enableRowReorder"
+      :class="[
+        'w-4 min-w-4 px-0 text-center align-middle',
+        bordered ? 'border-b border-table-row-divider' : '',
+        rowDraggable === false ? 'invisible' : '',
+      ]"
+      class="o2-table-drag-handle"
+      data-test="o2-table-row-drag-handle"
+    >
+      <OIcon name="drag-indicator" size="xs" class="text-text-secondary cursor-grab transition-opacity" />
     </td>
 
     <!-- Data cells -->
@@ -352,19 +370,20 @@ function onRowBlur() {
   <tr
     v-if="showTreeWarning"
     :data-test="`o2-table-tree-warning-${row.index}`"
-    class="bg-(--color-warning-surface,rgba(251,191,36,0.08))"
+    class="bg-warning-surface"
   >
     <td
       :colspan="
         row.getVisibleCells().length +
         (expansionEnabled ? 1 : 0) +
-        (selectionEnabled ? 1 : 0)
+        (selectionEnabled ? 1 : 0) +
+        (enableRowReorder ? 1 : 0)
       "
       :class="[
         'o2-table-tree-warning-cell relative',
         bordered ? 'border-b border-table-row-divider' : '',
       ]"
-      :style="{ '--o2-tree-connector-x': treeConnectorX + 'px' }"
+      :style="{ '--tree-connector-x': treeConnectorX + 'px' }"
     >
       <div class="relative z-1 flex items-center justify-center">
         <slot name="tree-warning" :row="row.original" />
@@ -382,7 +401,8 @@ function onRowBlur() {
       :colspan="
         row.getVisibleCells().length +
         (expansionEnabled ? 1 : 0) +
-        (selectionEnabled ? 1 : 0)
+        (selectionEnabled ? 1 : 0) +
+        (enableRowReorder ? 1 : 0)
       "
       :class="bordered ? 'border-b border-table-row-divider' : ''"
     >
@@ -391,23 +411,24 @@ function onRowBlur() {
   </tr>
 </template>
 
-<style>
-/* Per-row status spine. Painted as an inset box-shadow on the row's first
-   cell — an extra <td> would add a phantom column on only the rows that have
-   a status color and shift their cells out of alignment under table-fixed. */
+<style scoped>
+/* keep(complex-state): per-row status spine, painted as an inset box-shadow on
+   the row's first cell (a `> td:first-child` child-combinator target) — an extra
+   <td> would add a phantom column and misalign cells under table-fixed. */
 .o2-table-row-with-status > td:first-child {
-  box-shadow: inset 0.25rem 0 0 0 var(--o2-row-status-color);
+  box-shadow: inset 0.25rem 0 0 0 var(--row-status-color, transparent);
 }
 
-/* Continuation of the tree connector vertical line through the warning row */
+/* keep(generated-content): continuation of the tree connector vertical line
+   through the warning row, drawn as an ::after off the inline connector-x var. */
 .o2-table-tree-warning-cell::after {
   content: "";
   position: absolute;
-  left: var(--o2-tree-connector-x);
+  left: var(--tree-connector-x, 0);
   top: 0;
   bottom: 0;
-  width: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  width: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 0;
 }

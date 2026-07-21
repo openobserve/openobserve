@@ -40,6 +40,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   enableColumnResize: false,
   enableColumnReorder: false,
   enableColumnPin: false,
+  enableRowReorder: false,
   persistColumns: false,
   loading: false,
   streaming: false,
@@ -305,7 +306,7 @@ const selection = useTableSelection(table, {
 const expansion = useTableExpansion<TData>(
   {
     expansion: props.expansion,
-    expandedIds: props.expandedIds,
+    expandedIds: () => props.expandedIds,
     rowKey: props.rowKey,
     getSubRows: props.getSubRows,
   },
@@ -367,16 +368,11 @@ const {
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
 
-// ── Actions column content-measurement ──────────────────────────
-// The actions column has no fixed semantic width — it's "as wide as its
-// buttons, no more". We can't know that from the column def (buttons live in a
-// slot), so after each render we measure the rendered action cells and pin the
-// column's CSS size var to the widest content. These vars override the nominal
-// sizes computed in useTableCore.
-// Per-column CSS size-var overrides. The actions column is NO LONGER measured
-// from the DOM at runtime (it's sized deterministically from its icon count in
-// useTableCore, so the skeleton and loaded table match) — this stays empty for
-// now but is kept as the override channel the table style/sums read from.
+// ── Per-column CSS size-var overrides ──────────────────────────
+// Override channel the table style/sums read from, overriding the nominal sizes
+// computed in useTableCore. The actions column is sized deterministically from
+// its icon count in useTableCore (so the skeleton and loaded table match), so
+// this currently stays empty.
 const measuredColumnSizeVars = ref<Record<string, string>>({});
 
 // ── Flex-fill measurement ───────────────────────────────────────
@@ -661,9 +657,8 @@ function freezeFlexColumns(): void {
   // Pin each flex column to its ACTUAL rendered width so TanStack's resize
   // starts from exactly where the column is — no jump. The DOM is current at
   // mousedown, so getBoundingClientRect is reliable; the arithmetic fill is a
-  // fallback for when the element isn't found / has no layout (tests). (The
-  // arithmetic alone was off on some pages where a column's rendered width
-  // differs from its nominal size.)
+  // fallback for when the element isn't found / has no layout (tests). (Arithmetic
+  // alone can be off where a column's rendered width differs from its nominal size.)
   const fills = fillWidths();
   const sizing = { ...columnSizing.value };
   for (const id of ids) {
@@ -808,7 +803,7 @@ defineExpose({
     <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
     <div
       v-if="slots.toolbar || slots['toolbar-trailing']"
-      class="flex items-center px-3 py-2 gap-2 border-b border-[var(--color-table-row-divider)]"
+      class="flex items-center px-page-edge py-2 gap-2 border-b border-table-row-divider"
       data-test="o2-table-toolbar"
     >
       <slot name="toolbar" />
@@ -827,7 +822,7 @@ defineExpose({
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
       v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
-      class="flex items-center gap-2 px-3 py-2 border-b border-[var(--color-table-row-divider)] bg-[var(--color-table-header-bg)]"
+      class="flex items-center gap-2 px-page-edge py-2 border-b border-table-row-divider bg-table-header-bg"
       data-test="o2-table-global-filter"
     >
       <div class="relative max-w-xs flex-1">
@@ -893,16 +888,21 @@ defineExpose({
           props.horizontalScroll ? 'min-w-max' : ((useComputedWidth && frozen) ? '' : 'w-full'),
           props.horizontalScroll || props.defaultColumns ? 'table-auto' : 'table-fixed',
           (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'border-separate border-spacing-0',
-          // Without a leading selection/expansion gutter the first column would
-          // hug the table's left edge; inset it so it aligns like gutter tables.
-          (!selection.isEnabled.value && !expansion.isEnabled.value) ? 'o2-table--inset-first' : '',
+          // Symmetric edge inset (SPACING_AUDIT.md §7): the first and last cell
+          // content sit --spacing-table-edge (14px) from the table edges on EVERY
+          // table, while the per-cell row dividers still span the full width
+          // (full-bleed). Applied unconditionally so all tables align identically;
+          // the compact `.o2-table` modifier still overrides it via !important, and
+          // a leading checkbox/expand/drag gutter supplies the left inset on its
+          // own (same token — see the CSS).
+          'o2-table--edge-inset',
         ]"
         :style="{
           ...columnSizeVars,
           ...measuredColumnSizeVars,
           ...dynamicSizeVars,
           ...(computedTableWidth ? { width: computedTableWidth } : {}),
-          '--o2-table-row-height': props.rowHeight != null
+          '--table-row-height': props.rowHeight != null
             ? `${props.rowHeight}px`
             : (props.dense ? 'var(--table-row-height-dense, 2.25rem)' : 'var(--table-row-height-normal, 2.75rem)'),
         }"
@@ -919,6 +919,7 @@ defineExpose({
           :is-all-selected="selection.isAllSelected()"
           :is-indeterminate="selection.isIndeterminate()"
           :expansion-enabled="expansion.isEnabled.value"
+          :enable-row-reorder="props.enableRowReorder"
           :enable-column-reorder="props.enableColumnReorder"
           :enable-column-resize="props.enableColumnResize"
           :is-resizing="columnMgmt.isResizing.value"
@@ -948,6 +949,8 @@ defineExpose({
           :table-columns="table.getVisibleLeafColumns()"
           :selection-enabled="selection.isEnabled.value"
           :expansion-enabled="expansion.isEnabled.value"
+          :enable-row-reorder="props.enableRowReorder"
+          :bordered="props.bordered"
         />
 
         <!-- ── Body ─────────────────────────────────────────── -->
@@ -976,6 +979,10 @@ defineExpose({
           :enable-cell-copy="props.enableCellCopy"
           :loading="props.loading"
           :get-cell-style="(props.getCellStyle as any)"
+          :enable-row-reorder="props.enableRowReorder"
+          :disable-row-reorder="props.disableRowReorder"
+          :global-filter-active="!!globalFilterLocal"
+          :row-key="props.rowKey"
           :virtual-rows="isVirtual ? virtualRows : undefined"
           :total-size="isVirtual ? totalSize : undefined"
           :base-offset="isVirtual ? baseOffset : undefined"
@@ -989,6 +996,7 @@ defineExpose({
             if (canExpand) expansion.toggleRow(row);
             emit('row-click', row, evt);
           }"
+          @row-reorder="(data: TData[]) => emit('row-reorder', data)"
           @row-dblclick="(row: TData, evt: MouseEvent) => emit('row-dblclick', row, evt)"
           @row-mouseenter="(row: TData, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
           @row-mouseleave="(row: TData) => emit('row-mouseleave', row)"
@@ -1028,7 +1036,7 @@ defineExpose({
           <tr
             v-for="footerGroup in table.getFooterGroups()"
             :key="footerGroup.id"
-            class="bg-[var(--color-table-header-bg)]"
+            class="bg-table-header-bg"
           >
             <!-- Expand placeholder -->
             <th
@@ -1040,14 +1048,19 @@ defineExpose({
               v-if="selection.isMultiple.value"
               class="w-0"
             />
+            <!-- Drag handle placeholder -->
+            <th
+              v-if="props.enableRowReorder"
+              class="w-0 px-0"
+            />
             <th
               v-for="header in footerGroup.headers"
               :key="header.id"
               :colspan="header.colSpan"
               :data-test="`o2-table-footer-cell-${header.id}`"
               :class="[
-                'px-2 py-1 text-left text-text-primary text-xs',
-                'border-t border-[var(--color-table-header-border)]',
+                'px-2 py-1 text-left text-text-body text-xs',
+                'border-t border-table-header-border',
                 (header.column.columnDef.meta as any)?.align === 'center' ? 'text-center' : '',
                 (header.column.columnDef.meta as any)?.align === 'right' ? 'text-right' : '',
               ]"
@@ -1115,7 +1128,7 @@ defineExpose({
       <div
         v-if="showStreaming"
         data-test="o2-table-streaming-bar"
-        class="sticky bottom-0 h-1 w-full bg-[var(--color-table-streaming-bar)] animate-pulse z-10"
+        class="sticky bottom-0 h-1 w-full bg-table-streaming-bar animate-pulse z-10"
         aria-label="Data streaming in progress"
       />
     </div>
@@ -1168,14 +1181,58 @@ defineExpose({
 </template>
 
 <style scoped>
-/* When the table has no leading selection/expansion gutter, the first data
-   column would otherwise sit flush against the left edge with only the default
-   cell padding (0.5rem). Inset the first header + body cell so these tables read
-   with the same comfortable left margin as tables that do have a checkbox
-   gutter. Targeted by data-test prefix so full-width colspan rows (expanded /
-   tree-warning) are left untouched. */
-.o2-table--inset-first :deep(th[data-test^="o2-table-th-"]:first-child),
-.o2-table--inset-first :deep(td[data-test^="o2-table-cell-"]:first-child) {
-  padding-left: 1rem;
+/* Symmetric edge inset (SPACING_AUDIT.md §7). The first and last real cell of
+   every row are inset 1rem so a table's content aligns to the same 1rem grid
+   line as the page header, on BOTH edges — while the per-cell row dividers
+   (border-b on each td) still span the full table width, so separators stay
+   full-bleed. Targeted by the data-test prefix so full-width colspan rows
+   (expanded / tree-warning) are untouched, and the invisible trailing __spacer__
+   column is excluded so the right inset lands on real content. A leading
+   checkbox/expand/drag gutter is excluded from the left rule — that gutter cell
+   already supplies the left inset itself; padding it would squish its icon. */
+.o2-table--edge-inset :deep(th[data-test^="o2-table-th-"]:first-child:not([data-test="o2-table-th-select"]):not([data-test="o2-table-th-expand"]):not([data-test="o2-table-th-drag"])),
+.o2-table--edge-inset :deep(td[data-test^="o2-table-cell-"]:first-child) {
+  padding-left: var(--spacing-table-edge);
+}
+.o2-table--edge-inset :deep(th[data-test^="o2-table-th-"]:last-child:not([data-test="o2-table-th-__spacer__"])),
+.o2-table--edge-inset :deep(td[data-test^="o2-table-cell-"]:last-child:not([data-test="o2-table-cell-__spacer__"])) {
+  padding-right: var(--spacing-table-edge);
+}
+
+/* keep(lib-override:o2-table-modifiers): `.o2-table` / `.o2-row-md` /
+   `.o2-table-header-sticky` are a PUBLIC modifier API — call sites put them on
+   <OTable>, so they land on this component's root (attr fallthrough), but every
+   declaration targets OTable's OWN th/td/thead, which OTableHeader /
+   OTableBodyCell render. That is why they live here behind :deep() instead of
+   as template utilities: no call site owns the DOM being styled. Scoping adds
+   [data-v] to the root compound only, which the root already carries.
+   Consumers: settings/DiscoveredServices.vue, plugins/logs/DetailTable.vue,
+   plugins/logs/SearchJobInspector.vue. */
+.o2-table :deep(th),
+.o2-table :deep(td) {
+  padding: 0 0.3125rem !important;
+  height: 2.25rem;
+}
+
+.o2-table.o2-row-md :deep(th),
+.o2-table.o2-row-md :deep(td) {
+  height: 2.25rem !important;
+}
+
+.o2-table :deep(tr td) {
+  border-bottom: 1px solid var(--color-card-glass-border) !important;
+}
+
+/* keep(lib-override:o2-table-hide-header): public modifier, same shape as the
+   block above — `thead` is this component's own render, and the class is passed
+   in by components/queries/QueryList.vue and plugins/logs/SearchBar.vue (x2). */
+.o2-table-hide-header :deep(thead) {
+  display: none;
+}
+
+.o2-table-header-sticky :deep(thead) {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 </style>

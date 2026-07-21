@@ -182,7 +182,7 @@ const jumpTargetSublabel = computed(() => {
     .fromMillis(lastDataUs / 1000)
     .setZone(zone)
     .toFormat("MMM d, yyyy HH:mm:ss");
-  return `Last data: ${formatted} (${zone})`;
+  return t("logs.logsNoEventsState.lastData", { formatted, zone });
 });
 
 // --- time-range helpers ------------------------------------------------------

@@ -34,12 +34,28 @@ export class CipherKeys {
     }
 
     async navigateToSettingsMenu() {
-        await this.page.waitForSelector('[data-test="menu-link-/settings-item"]');
-        await this.settingsMenu.click();
+        // Navigate straight to the Cipher Keys settings sub-route instead of clicking
+        // the left-nav Settings menu. The revamped Settings landing is a SectionHub
+        // (settings/index.vue) whose per-tab data-tests (e.g. `management-cipher-key-tab`)
+        // only render once you are INSIDE a section sub-route — landing on the hub left
+        // the tab unrendered, so the old `waitForSelector('[data-test="management-cipher-key-tab"]')`
+        // could only exhaust the 45s action timeout. Cipher Keys shares the exact same
+        // `visible: isEnt` gate as Regex Patterns (settings/index.vue:236/246), and the
+        // SDR shard's regex-management tests pass on this same alpha1 cloud env, proving
+        // the tab DOES render here — this mirrors the proven direct-goto that
+        // regexPatternsPage.navigateToRegexPatterns() uses.
+        const orgName = process.env.ORGNAME || 'default';
+        const baseUrl = process.env.ZO_BASE_URL;
+        await this.page.goto(`${baseUrl}/web/settings/cipher_keys?org_identifier=${orgName}`);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
       }
 
       async navigateToCipherKeyTab() {
-        await this.page.waitForSelector('[data-test="management-cipher-key-tab"]');
+        // On the cipher_keys sub-route the tab is the active rail item; assert it is
+        // rendered (real readiness signal, bounded — not the 45s action timeout) and
+        // click it to guarantee we land on the Cipher Keys list. Idempotent: safe when
+        // navigateToSettingsMenu() already placed us on the route.
+        await expect(this.cipherKeyTab).toBeVisible({ timeout: 30000 });
         await this.cipherKeyTab.click();
       }
 

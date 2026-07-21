@@ -374,4 +374,48 @@ describe("legends follow the SERIES a query returns, not the query count", () =>
     expect(data.queries).toHaveLength(1);
     expect(data.config.show_legends).toBe(false);
   });
+
+  /**
+   * Convert-to-dashboard POSTs this object STRAIGHT to the API — it never passes
+   * through the panel editor, which is what fills defaults on the drill-in path.
+   * So every field the Rust `Panel` struct requires has to be present here or the
+   * save fails outright on deserialize.
+   *
+   * The required set, from config/src/meta/dashboards/v8/mod.rs:101-119 — bare
+   * (non-Option) fields with no `#[serde(default)]`. `id` and `title` are stamped
+   * per-panel by the convert path, so they are not this builder's job.
+   */
+  describe("the object satisfies the dashboard Panel contract", () => {
+    it("carries `description` — a bare String on the Rust side, so omitting it 500s", () => {
+      const data = handoff([meta("http_requests_total", "Counter")], "http_requests_total");
+
+      // v8/mod.rs:106 — `pub description: String` with NO serde default. Its
+      // absence was the "missing field `description`" failure on Convert.
+      expect(data.description).toBe("");
+    });
+
+    it("carries every other required Panel/Query/PanelFields field", () => {
+      const data = handoff([meta("http_requests_total", "Counter")], "http_requests_total");
+
+      // Panel (v8:101) — `config` and `queries` are required alongside description.
+      expect(data.type).toBeTruthy();
+      expect(data.config).toBeDefined();
+      expect(Array.isArray(data.queries)).toBe(true);
+      // PanelConfig.show_legends (v8:338) is a bare bool.
+      expect(typeof data.config.show_legends).toBe("boolean");
+
+      for (const query of data.queries) {
+        // Query (v8:122) — query/vrl_function_query are Option, but
+        // custom_query/fields/config are not.
+        expect(typeof query.customQuery).toBe("boolean");
+        expect(query.fields).toBeDefined();
+        expect(query.config).toBeDefined();
+        // PanelFields (v8:161) — stream/stream_type/x/y are all bare.
+        expect(query.fields.stream).toBeTruthy();
+        expect(query.fields.stream_type).toBe("metrics");
+        expect(Array.isArray(query.fields.x)).toBe(true);
+        expect(Array.isArray(query.fields.y)).toBe(true);
+      }
+    });
+  });
 });

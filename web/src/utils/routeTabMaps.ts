@@ -82,6 +82,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     AzureConfig: "AzureConfig",
     ingestFromTraces: "ingestFromTraces",
     frontendMonitoring: "frontendMonitoring",
+    recommendedMcp: "recommendedMcp",
   },
 
   security: {
@@ -102,6 +103,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
   /** ingestion/metrics/Index.vue */
   ingestMetrics: {
     prometheus: "prometheus",
+    vmagent: "vmagent",
     otelCollector: "otelCollector",
     telegraf: "telegraf",
     cloudwatchMetrics: "cloudwatchMetrics",

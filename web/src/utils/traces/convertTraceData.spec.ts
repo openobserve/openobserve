@@ -308,6 +308,88 @@ describe("convertTraceData", () => {
   });
 
   describe("convertServiceGraphToTree", () => {
+    it("roots the tree at the entry-edge node so children attach to the right parent (agent-graph regression)", () => {
+      // API shape: {from: null → orchestrator}, orchestrator → {Supervisor, Worker},
+      // Worker → {gpt-4o, run_query}. Bug: the null-from entry edge made
+      // orchestrator look parented, rootNodes came back empty, and gpt-4o was
+      // placed under the wrong parent (visible as a model hanging off the root).
+      const graphData = {
+        nodes: [
+          { id: "orchestrator", label: "orchestrator" },
+          { id: "Supervisor", label: "Supervisor", service_type: "agent" },
+          { id: "Worker", label: "Worker", service_type: "agent" },
+          { id: "gpt-4o", label: "gpt-4o", service_type: "model" },
+          { id: "run_query", label: "run_query", service_type: "tool" },
+        ],
+        edges: [
+          { from: null, to: "orchestrator", total_requests: 1 },
+          { from: "orchestrator", to: "Supervisor", total_requests: 1 },
+          { from: "orchestrator", to: "Worker", total_requests: 1 },
+          { from: "Worker", to: "gpt-4o", total_requests: 1 },
+          { from: "Worker", to: "run_query", total_requests: 1 },
+        ],
+      };
+      const result = convertServiceGraphToTree(graphData as any, "horizontal");
+      const roots = result.options.series[0].data;
+      // A single root (orchestrator), not a flat pile of orphaned nodes.
+      expect(roots).toHaveLength(1);
+      expect(roots[0].name).toBe("orchestrator");
+      // orchestrator's children are the two agents.
+      const l1 = (roots[0].children ?? []).map((c: any) => c.name).sort();
+      expect(l1).toEqual(["Supervisor", "Worker"]);
+      // gpt-4o is under Worker — NOT a sibling of the agents / under the root.
+      const worker = roots[0].children.find((c: any) => c.name === "Worker");
+      const workerKids = (worker.children ?? []).map((c: any) => c.name).sort();
+      expect(workerKids).toEqual(["gpt-4o", "run_query"]);
+    });
+
+    // Agent highlighting (indigo tint, larger symbol, radar-ping halo) is a
+    // treatment for the dedicated Agent Graph page ONLY. On the Service Graph
+    // tab the caller omits agentHighlight, and an agent must render as a plain
+    // node — no ping animation, no size bump.
+    it("does NOT highlight agents unless agentHighlight is set", () => {
+      const graphData = {
+        nodes: [
+          { id: "root", label: "root" },
+          { id: "planner", label: "planner", service_type: "agent" },
+        ],
+        edges: [
+          { from: null, to: "root", total_requests: 1 },
+          { from: "root", to: "planner", total_requests: 1 },
+        ],
+      };
+      const decode = (sym: string) =>
+        atob(
+          sym.replace(/^image:\/\//, "").replace("data:image/svg+xml;base64,", ""),
+        );
+
+      // Service Graph mount (agentHighlight defaults false).
+      const plain = convertServiceGraphToTree(graphData as any, "horizontal");
+      const plainAgent = plain.options.series[0].data[0].children.find(
+        (c: any) => c.name === "planner",
+      );
+      const plainSvg = decode(plainAgent.symbol);
+      expect(plainSvg).not.toContain("<animate ");
+      expect(plainSvg).toContain('viewBox="0 0 56 56"'); // tight box = plain node
+
+      // Agent Graph mount (agentHighlight true).
+      const hl = convertServiceGraphToTree(
+        graphData as any,
+        "horizontal",
+        true,
+        700,
+        true,
+      );
+      const hlAgent = hl.options.series[0].data[0].children.find(
+        (c: any) => c.name === "planner",
+      );
+      const hlSvg = decode(hlAgent.symbol);
+      expect(hlSvg).toContain("<animate "); // ping rings present
+      expect(hlSvg).toContain('viewBox="0 0 104 104"'); // padded box
+      // Highlighted agent symbol is larger than the plain one.
+      expect(hlAgent.symbolSize).toBeGreaterThan(plainAgent.symbolSize);
+    });
+
     it("should convert service graph to tree with horizontal layout", () => {
       const graphData = {
         nodes: [
@@ -485,6 +567,51 @@ describe("convertTraceData", () => {
   });
 
   describe("convertServiceGraphToNetwork", () => {
+    // Layered layout must preserve the agent hierarchy's DEPTH:
+    // service(0) → agent(1) → model/tool(2). The old code pinned every node with
+    // a service_type to the max rank, collapsing agent→model so a model (gpt-4o)
+    // jumped up to the agent's column and its edge looked like it came from the
+    // parent app. GenAI kinds must keep their BFS depth. (agent-graph regression)
+    it("keeps model/tool one rank deeper than their agent in layered layout", () => {
+      const graphData = {
+        nodes: [
+          { id: "crewai-app", label: "crewai-app", service_type: "service", requests: 13 },
+          { id: "ResearchCrew", label: "ResearchCrew", service_type: "agent", requests: 4 },
+          { id: "gpt-4o", label: "gpt-4o", service_type: "model", requests: 6 },
+          { id: "web_scraper", label: "web_scraper", service_type: "tool", requests: 1 },
+        ],
+        edges: [
+          { from: null, to: "crewai-app", total_requests: 13 },
+          { from: "crewai-app", to: "ResearchCrew", total_requests: 4, connection_type: "agent" },
+          { from: "ResearchCrew", to: "gpt-4o", total_requests: 6, connection_type: "model" },
+          { from: "ResearchCrew", to: "web_scraper", total_requests: 1, connection_type: "tool" },
+        ],
+      };
+      const res = convertServiceGraphToNetwork(
+        graphData as any,
+        "layered",
+        new Map(),
+        true,
+        undefined,
+        1200,
+        700,
+        true,
+      );
+      const data = res.options.series[0].data;
+      const x = (id: string) => data.find((n: any) => n.id === id)!.x;
+      // Strictly increasing depth: app < agent < model, app < agent < tool.
+      expect(x("crewai-app")).toBeLessThan(x("ResearchCrew"));
+      expect(x("ResearchCrew")).toBeLessThan(x("gpt-4o"));
+      expect(x("ResearchCrew")).toBeLessThan(x("web_scraper"));
+      // Model and tool share the same (deepest) rank → same column.
+      expect(x("gpt-4o")).toBe(x("web_scraper"));
+      // The gpt-4o link originates at the agent, never the parent app.
+      const links = res.options.series[0].links || [];
+      expect(links.find((l: any) => l.target === "gpt-4o")?.source).toBe(
+        "ResearchCrew",
+      );
+    });
+
     it("should convert service graph to network format", () => {
       const graphData = {
         nodes: [
@@ -842,6 +969,45 @@ describe('convertServiceGraphToNetwork', () => {
     it("should handle undefined-like name without throwing", () => {
       const result = getServiceIconDataUrl(null as any, false, "#000000");
       expect(result.startsWith("data:image/svg+xml;base64,")).toBe(true);
+    });
+
+    // Agent nodes carry an animated "radar ping" halo baked INTO their symbol
+    // SVG (SMIL <animate> rings), so the effect stays centred on the node and
+    // pans/zooms with it. These assertions lock that in — the halo drifting or
+    // disappearing is a regression, not a cosmetic tweak.
+    it("bakes animated radar-ping rings into the agent symbol", () => {
+      const svg = decodeDataUrl(
+        getServiceIconDataUrl("planner", false, "#22c55e", "agent"),
+      );
+      // Two staggered rings, each with r / opacity / stroke-width animations.
+      expect((svg.match(/<circle[^>]*opacity="0"/g) || []).length).toBe(2);
+      expect((svg.match(/<animate /g) || []).length).toBe(6);
+      expect(svg).toContain('attributeName="r"');
+      expect(svg).toContain('repeatCount="indefinite"');
+      // Indigo accent, outside the health palette.
+      expect(svg).toContain("#6366f1");
+    });
+
+    it("centres the agent disc + rings in the padded viewBox (no clip)", () => {
+      const svg = decodeDataUrl(
+        getServiceIconDataUrl("planner", true, "#22c55e", "agent"),
+      );
+      // Padded box so the ring can expand without clipping; disc at its centre.
+      expect(svg).toContain('viewBox="0 0 104 104"');
+      expect(svg).toContain('cx="52" cy="52"');
+      // Max animated radius (46) must stay inside the half-box (52).
+      const maxR = Math.max(
+        ...[...svg.matchAll(/values="24;(\d+)"/g)].map((m) => Number(m[1])),
+      );
+      expect(maxR).toBeLessThanOrEqual(52);
+    });
+
+    it("does NOT add ping rings or padding to non-agent nodes", () => {
+      const svg = decodeDataUrl(
+        getServiceIconDataUrl("payment", false, "#22c55e", "service"),
+      );
+      expect(svg).toContain('viewBox="0 0 56 56"');
+      expect(svg).not.toContain("<animate ");
     });
   });
 });

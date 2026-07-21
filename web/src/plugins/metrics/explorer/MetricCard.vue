@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="root"
-    class="group relative flex flex-col h-full overflow-hidden border border-border-default rounded-md hover:border-primary focus-within:border-primary"
+    class="group relative flex flex-col h-full overflow-hidden border border-border-default rounded-default hover:border-primary focus-within:border-primary"
     role="group"
     :aria-label="
       t('metrics.explorer.card.ariaLabel', {
@@ -34,101 +34,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          text stays selectable. Still fully keyboard reachable: the action bar
          reveals on `focus-within`, so tabbing lands on Refresh / Configure /
          Pin / Open. -->
-    <!-- EXACTLY the dashboard panel bar's box (PanelContainer's
+    <!-- Matches the dashboard panel bar's box (PanelContainer's
          dashboard-panel-bar): same min-height, padding and bottom border, no
-         tint — measured side by side, a card header and a panel header are now
-         indistinguishable.
-
-         Identical in both views: rows view is grid view with a single, wider
-         column, not a different card. -->
+         tint. -->
     <div
-      class="relative flex items-center gap-2 min-w-0 min-h-7 py-1 px-2 border-b border-border-subtle"
+      class="relative flex items-center gap-2 min-w-0 min-h-7 py-1 px-2 border-b border-border-default"
     >
       <!-- The name gets the full header width; the type badge sits in the
            footer, where it cannot truncate the name it describes. -->
       <div class="flex items-center gap-1.5 min-w-0">
-        <!-- EXACTLY the dashboard panel title's classes (PanelContainer's
-             dashboard-panel-header): same size, weight, tracking and token, so
-             a card's title and the panel it becomes read identically. Mono
-             semibold looked like a different COLOR at this size — denser
-             glyphs, same grey-900. -->
+        <!-- Matches the dashboard panel title's classes (PanelContainer's
+             dashboard-panel-header): same size, weight, tracking and token. -->
         <span
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-(--color-text-primary) tracking-[0.02em]"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-heading tracking-[0.02em]"
           :title="card.name"
           >{{ card.name }}</span
         >
       </div>
 
-      <!-- Last Refreshed — the SAME element the dashboard panel bar carries
-           (PanelErrorButtons): 🕑 with the relative tooltip, in the header, at
-           the right. A card restored from cache says how old its data really
-           is instead of passing it off as live. -->
-      <span
-        v-if="preview?.lastTriggeredAt"
-        class="lastRefreshedAt ml-auto text-[smaller] whitespace-nowrap overflow-hidden text-ellipsis shrink-0"
-        :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
-      >
-        <span class="text-[smaller] mr-0.5">
-          🕑
-          <OTooltip side="bottom" align="end">
-            <template #content
-              >Last Refreshed:
-              <RelativeTime :timestamp="preview.lastTriggeredAt"
-            /></template>
-          </OTooltip>
-        </span>
-        <RelativeTime
-          :timestamp="preview.lastTriggeredAt"
-          :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
-        />
-      </span>
+      <!-- Spacer, then the right-hand cluster (PanelContainer: title, `flex-1`
+           spacer, then the action row). -->
+      <div class="flex-1" />
 
-      <!-- Visible on focus as well as hover: a hover-only affordance is not
-           keyboard reachable. Touch devices have no hover, so it stays visible
-           there too.
-
-           Absolutely positioned ON PURPOSE. `invisible` is visibility:hidden,
-           which still reserves the box — in flow, these buttons were stealing
-           ~120px from the metric name and truncating it even on cards with
-           plenty of room. Out of flow, the name gets the full width and the
-           actions overlay it only while they are actually shown. -->
-      <!-- The bar paints its own background so it can overlay the metric name;
-           that background must match the band it sits on, or it shows as a patch
-           of the wrong shade.
-
-           Anchored to the BAND (which is `relative`) with `inset-y-0`, so it is
-           exactly as tall as the band by construction. A fixed `h-6` + `top-1`
-           was 28px against a ~25px band, and the extra 3px hung over the chart.
-           Anchoring means the two cannot drift apart if the band's padding ever
-           changes. -->
-      <div
-        class="absolute inset-y-0 right-2 z-10 flex items-center gap-0.5 rounded pl-2 bg-surface-base invisible group-hover:visible group-focus-within:visible [@media(hover:none)]:visible"
-      >
-        <!-- The bar lands exactly where the in-flow clock sits, so it carries
-             its OWN copy — hovering must not make "how old is this data"
-             unreadable, it is half the reason to look at the card. -->
-        <span
-          v-if="preview?.lastTriggeredAt"
-          class="lastRefreshedAt text-[smaller] whitespace-nowrap mr-1"
-        >
-          <span class="text-[smaller] mr-0.5">🕑</span>
-          <RelativeTime
-            :timestamp="preview.lastTriggeredAt"
-            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
-          />
-        </span>
-
-        <!-- OTooltip goes INSIDE the button, not around it: nested, it binds
-             its own hover listeners to its parent element. That is what the
-             rest of the app does (583 of 590 usages) and it reads more cleanly
-             on an OButton than a wrapper would. Wrapping also works — it did
-             not until the `open` prop default was fixed in OTooltip.vue, which
-             is worth knowing if you are reading an older comment of mine that
-             blamed OButton. -->
-
-        <!-- The help text is a full sentence and never fit on the card; a
-             truncated half-sentence is worse than none. It lives here instead,
-             where it can be read in full. -->
+      <!-- The action row: `size="icon"` buttons sitting adjacent (no gap).
+           Order (left→right): Help → Configure → Open → Pin → 🕑 clock → Refresh. -->
+      <div class="flex flex-nowrap items-center shrink-0">
+        <!-- Help — the SAME element the dashboard panel bar uses for its panel
+             description (PanelContainer `dashboard-panel-description-info`): an
+             info-outline icon with a width-capped, pre-wrapped OTooltip. NOT a
+             dropdown item — a full help sentence in an unbounded menu item blew
+             the menu out to full-page width. -->
         <OButton
           v-if="card.help"
           variant="ghost"
@@ -143,24 +78,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-help-${card.name}`"
           @click.stop
         >
-          <OTooltip :content="card.help" max-width="360px" />
+          <OTooltip side="bottom" align="end" max-width="13.75rem">
+            <template #content
+              ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
+            >
+          </OTooltip>
         </OButton>
 
-        <OButton
-          v-if="!card.unsupported"
-          variant="ghost"
-          size="icon"
-          icon-left="refresh"
-          :loading="preview?.status === 'loading'"
-          :aria-label="
-            t('metrics.explorer.card.refreshAria', { name: card.name })
-          "
-          :data-test="`metrics-explorer-card-refresh-${card.name}`"
-          @click="$emit('refresh', card)"
-        >
-          <OTooltip :content="t('metrics.explorer.card.refreshTooltip')" />
-        </OButton>
-
+        <!-- Configure — visible icon button (only when the card is configurable). -->
         <OButton
           v-if="card.configurable"
           variant="ghost"
@@ -175,6 +100,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
         </OButton>
 
+        <!-- The drill-in. The ONLY thing that navigates; the chart and card are
+             not click targets, so the metric name stays selectable.
+
+             `edit`, not `open-in-new`: this opens the metric in the in-page
+             Visualize workspace to CHANGE it (query, chart type, functions), and
+             open-in-new is the web's idiom for "leaves this page / new tab",
+             which this does not do. -->
+        <OButton
+          variant="ghost"
+          size="icon"
+          icon-left="edit"
+          :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
+          :data-test="`metrics-explorer-card-select-${card.name}`"
+          @click="$emit('select', card)"
+        >
+          <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
+        </OButton>
+
+        <!-- Pin (star). Always visible. -->
         <OButton
           variant="ghost"
           size="icon"
@@ -199,23 +143,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
 
-        <!-- The drill-in. An icon rather than a "Select" label: the word said
-             nothing about where it led, and it was the one text button in a bar
-             of icons. `ghost-primary` keeps it tinted, so it still reads as the
-             primary action among the ghost icons beside it.
-
-             Deliberately the ONLY thing that navigates. The chart is not a click
-             target and the card is not a button — making them so is what used to
-             swallow any attempt to select the metric name. -->
-        <OButton
-          variant="ghost-primary"
-          size="icon"
-          icon-left="open-in-new"
-          :aria-label="t('metrics.explorer.card.openAria', { name: card.name })"
-          :data-test="`metrics-explorer-card-select-${card.name}`"
-          @click="$emit('select', card)"
+        <!-- Last Refreshed — the SAME element the dashboard panel bar carries
+             (PanelErrorButtons): 🕑 with the relative tooltip. `ml-1.25` matches
+             PanelErrorButtons' spacing. A card restored from cache says how old
+             its data really is instead of passing it off as live. -->
+        <span
+          v-if="preview?.lastTriggeredAt"
+          class="lastRefreshedAt ml-1.25 mr-0.5 text-[smaller] whitespace-nowrap overflow-hidden text-ellipsis shrink-0"
+          :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
         >
-          <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
+          <span class="text-[smaller] mr-0.5">
+            🕑
+            <OTooltip side="bottom" align="end">
+              <template #content
+                >{{ t("metrics.metricCard.lastRefreshed") }}
+                <RelativeTime :timestamp="preview.lastTriggeredAt"
+              /></template>
+            </OTooltip>
+          </span>
+          <RelativeTime
+            :timestamp="preview.lastTriggeredAt"
+            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
+          />
+        </span>
+
+        <!-- Refresh — always visible, rightmost with the clock (the freshness
+             cluster). Re-runs this card's query, dropping the cached response so
+             a metric that has started emitting shows up. -->
+        <OButton
+          v-if="!card.unsupported"
+          variant="ghost"
+          size="icon"
+          icon-left="refresh"
+          :loading="preview?.status === 'loading'"
+          :aria-label="
+            t('metrics.explorer.card.refreshAria', { name: card.name })
+          "
+          :data-test="`metrics-explorer-card-refresh-${card.name}`"
+          @click="$emit('refresh', card)"
+        >
+          <OTooltip :content="t('metrics.explorer.card.refreshTooltip')" />
         </OButton>
       </div>
     </div>
@@ -236,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            editor icon still works, so the metric stays explorable. -->
       <div
         v-if="card.unsupported"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
         :data-test="`metrics-explorer-card-unsupported-${card.name}`"
       >
         <OIcon name="help-outline" size="sm" />
@@ -245,12 +212,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Understood, but the chosen variant is not something a card can draw —
            an info metric's label table renders through a component the card does
-           not use. Previously this was a silent no-preview, so the card sat on
-           the loading skeleton below forever and read as a chart that had failed
-           to load. The drill-in works: the editor renders the table properly. -->
+           not use. The drill-in works: the editor renders the table properly. -->
       <div
         v-else-if="preview?.status === 'unavailable'"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
         :data-test="`metrics-explorer-card-nopreview-${card.name}`"
       >
         <OIcon name="table-chart" size="sm" />
@@ -259,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-else-if="preview?.status === 'error'"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] opacity-65 text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
         :data-test="`metrics-explorer-card-error-${card.name}`"
       >
         <!-- The backend's message is the only thing that distinguishes a
@@ -335,12 +300,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Has data, but `rate()` could not make a point out of it — fewer than two
            samples in its window. Deliberately NOT the "No data" tile: the metric
-           is populated, and saying otherwise is what used to hide it from the grid
-           entirely. The hint carries the actual remedy, which is the user's to
+           is populated. The hint carries the actual remedy, which is the user's to
            choose (a wider range, or a shorter scrape interval). -->
       <!-- The same inline OEmptyState a dashboard panel shows for no data
-           (PanelSchemaRenderer) — same component, same icon, same i18n key.
-           The old hatched grey band read as a different design language. -->
+           (PanelSchemaRenderer) — same component, same icon, same i18n key. -->
       <OEmptyState
         v-else-if="isSparse"
         size="inline"
@@ -373,12 +336,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- The CONVERSION failed — the query succeeded, so the preview is
-           status "done" and none of the error branches above catch it. Without
-           this tile the emit fell on the floor and the card was a blank white
-           region with no message and no way out. -->
+           status "done" and none of the error branches above catch it. -->
       <div
         v-else-if="renderError"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-[11px] text-text-secondary"
+        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs text-text-secondary"
         :data-test="`metrics-explorer-card-render-error-${card.name}`"
       >
         <span class="inline-flex items-center gap-1 cursor-help">
@@ -411,8 +372,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :bucket-unit="bucketO2Unit.unit"
         :bucket-unit-custom="bucketO2Unit.unitCustom"
         :color="color"
-        :time-range="timeRange"
+        :time-range="dataTimeRange"
         @error="renderError = String($event ?? '')"
+        @zoom="$emit('zoom', $event)"
+        @contextmenu="onChartContextMenu"
       />
 
       <div v-else class="h-full">
@@ -467,7 +430,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- The footer pads itself now that the frame is flush, mirroring how the
          panel bar pads itself. -->
-    <div class="flex items-center justify-between gap-2 text-[10px] px-2 py-1">
+    <div class="flex items-center justify-between gap-2 text-3xs px-2 py-1">
       <!-- The function actually in effect, so a ⚙ override is visible on the
            card rather than silently identical to the default. -->
       <span class="opacity-70 text-text-secondary truncate">{{
@@ -500,22 +463,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
+
+    <!-- Create Alert — the SAME menu the dashboard panel raises on right-click
+         (PanelSchemaRenderer mounts this exact component), so the gesture and the
+         wording are identical wherever a chart is. Position is viewport-fixed
+         from the click, so the card's `overflow-hidden` cannot clip it. -->
+    <AlertContextMenu
+      :visible="alertMenu.visible"
+      :x="alertMenu.x"
+      :y="alertMenu.y"
+      :value="alertMenu.value"
+      @select="onCreateAlert"
+      @close="alertMenu.visible = false"
+    />
   </div>
 </template>
 
 <script lang="ts">
 import {
   computed,
+  defineAsyncComponent,
   defineComponent,
   onBeforeUnmount,
   onMounted,
+  reactive,
   ref,
   watch,
   type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import useTheme from "@/composables/useTheme";
 import MetricCardChart from "./MetricCardChart.vue";
+
+// Async, exactly as PanelSchemaRenderer imports it: the menu is only ever
+// needed once a user right-clicks a chart, so it stays out of the grid's chunk.
+const AlertContextMenu = defineAsyncComponent(
+  () => import("@/components/dashboards/AlertContextMenu.vue"),
+);
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -570,6 +556,7 @@ export default defineComponent({
     LoadingProgress,
     OTag,
     OTooltip,
+    AlertContextMenu,
   },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
@@ -593,27 +580,100 @@ export default defineComponent({
     "toggle-favorite",
     "visible",
     "hidden",
-    // "refresh", not "retry". Both the header button and the no-data card's
+    // `refresh`, not `retry`: both the header button and the no-data card's
     // retry button emit `refresh` (the parent listens for `@refresh` and calls
-    // `grid.refreshCard`) — "retry" was declared here and emitted nowhere, while
-    // the event the component actually fires went undeclared. Undeclared emits
-    // fall through to $attrs and get bound to the root ELEMENT as a DOM
-    // listener, which is how a component ends up with a handler that silently
-    // never fires the day someone renames the event to something a DOM element
-    // also emits.
+    // `grid.refreshCard`). Declare it here — an undeclared emit falls through to
+    // $attrs and binds to the root ELEMENT as a DOM listener, so a handler can
+    // silently never fire when the event name matches a DOM event.
     "refresh",
+    // A drag-select on the card's chart, as `{start, end}` epoch ms. Forwarded
+    // straight from MetricCardChart — the card takes no action of its own,
+    // because a zoom re-ranges the WHOLE grid (every card shares one window),
+    // which only the explorer can do.
+    "zoom",
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
     const store = useStore();
+    const router = useRouter();
     const root = ref<HTMLElement | null>(null);
-    const isDark = computed(() => store.state.theme === "dark");
+    const { isDark } = useTheme();
+
+    /* ------------------------------------------------ create alert */
+
+    /**
+     * Right-click a data point -> Create Alert, the same gesture a dashboard
+     * panel offers. Handled HERE rather than emitted to the explorer: the menu is
+     * positioned from the click and the payload is this card's own query, so
+     * there is nothing for the parent to decide. (`contextmenu` is also a real
+     * DOM event name — emitting it would bind to the root element and fire on
+     * every right-click anywhere on the card, which is the trap the `refresh`
+     * note above describes.)
+     */
+    const alertMenu = reactive({ visible: false, x: 0, y: 0, value: 0 });
+
+    const onChartContextMenu = (event: {
+      x: number;
+      y: number;
+      value: number;
+    }) => {
+      // The clicked point's value seeds the threshold, so the alert opens
+      // pre-filled with the number the user actually pointed at.
+      if (!Number.isFinite(event?.value)) return;
+      alertMenu.visible = true;
+      alertMenu.x = event.x;
+      alertMenu.y = event.y;
+      alertMenu.value = event.value;
+    };
+
+    /**
+     * The same `panelData` contract the dashboard path builds
+     * (usePanelActions.handleCreateAlert) and the alert page reads: queries +
+     * queryType + timeRange + the chosen condition/threshold.
+     *
+     * `yAxisColumn` is deliberately absent — it is SQL-only there too; a PromQL
+     * alert thresholds the expression's own value.
+     */
+    const onCreateAlert = (selection: {
+      condition: string;
+      threshold: number;
+    }) => {
+      alertMenu.visible = false;
+
+      const queries = props.queries ?? [];
+      if (!queries.length) return;
+
+      const panelData = {
+        panelTitle: props.card.name,
+        panelId: `metrics-explorer-card-${props.card.name}`,
+        queries: queries.map((q: any) => ({
+          query: q.expr,
+          customQuery: true,
+          fields: { stream_type: "metrics" },
+          config: { promql_legend: q.legendTemplate ?? "" },
+        })),
+        queryType: "promql",
+        timeRange: props.timeRange,
+        threshold: selection.threshold,
+        condition: selection.condition,
+        executedQuery: queries[0]?.expr,
+      };
+
+      router.push({
+        name: "addAlert",
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+          fromPanel: "true",
+          panelData: encodeURIComponent(JSON.stringify(panelData)),
+        },
+      });
+    };
 
     const color = computed(() => cardColorForIndex(props.index, isDark.value));
     // Kept for the card's aria label; the VISIBLE badge renders through the
     // registry's metricType group, which owns the label and colour.
     const badgeLabel = computed(
-      () => BADGE_LABELS[props.card.typeFilterBucket] ?? "Other",
+      () => BADGE_LABELS[props.card.typeFilterBucket] ?? t("metrics.metricCard.other"),
     );
 
     const o2Unit = computed(() =>
@@ -636,8 +696,7 @@ export default defineComponent({
      * asked for when they report the failure, so they go below the message
      * rather than into it. One preformatted string rather than a rich slot —
      * OTooltip renders its content in a portal that only mounts while open, so a
-     * slot's contents cannot be asserted in a test, and this must not regress
-     * quietly again.
+     * slot's contents cannot be asserted in a test.
      */
     const errorTooltip = computed(() => {
       const preview = props.preview;
@@ -645,7 +704,9 @@ export default defineComponent({
       return [
         preview.error,
         preview.errorDetail,
-        preview.errorTraceId ? `Trace ID: ${preview.errorTraceId}` : "",
+        preview.errorTraceId
+          ? t("metrics.metricCard.traceId", { id: preview.errorTraceId })
+          : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -671,13 +732,21 @@ export default defineComponent({
       const preview = props.preview;
       if (!preview?.error) return "";
       return [
-        `Metric: ${props.card.name}`,
+        t("metrics.metricCard.metricLabel", { name: props.card.name }),
         ...(preview.errorQueries?.length
-          ? [`Query: ${preview.errorQueries.join("\n       ")}`]
+          ? [
+              t("metrics.metricCard.queryLabel", {
+                query: preview.errorQueries.join("\n       "),
+              }),
+            ]
           : []),
-        `Error: ${preview.error}`,
-        preview.errorDetail ? `Cause: ${preview.errorDetail}` : "",
-        preview.errorTraceId ? `Trace ID: ${preview.errorTraceId}` : "",
+        t("metrics.metricCard.errorLabel", { error: preview.error }),
+        preview.errorDetail
+          ? t("metrics.metricCard.causeLabel", { cause: preview.errorDetail })
+          : "",
+        preview.errorTraceId
+          ? t("metrics.metricCard.traceId", { id: preview.errorTraceId })
+          : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -723,6 +792,27 @@ export default defineComponent({
      */
     const isSparse = computed(() => !!props.preview?.sparse && isEmpty.value);
 
+    /**
+     * The window the chart's x-axis is drawn against: the one this data was
+     * FETCHED for, falling back to the selected one.
+     *
+     * They are the same thing on the live path. They diverge only for a card
+     * painted from the persisted cache, and there the selected window is a lie:
+     * a relative range ("Past 15 Minutes") re-resolves against `now` on every
+     * mount, so `timeRange` marches forward with the wall clock while the cached
+     * points stay where they were. Pinning to it drew an axis of 10:15-10:30 over
+     * data from 09:40 — the chart appeared to drift on its own.
+     *
+     * Dashboards never hit this because their pin is streaming-only (it is gated
+     * on `loading`, which a cache paint leaves false), so a cached panel just
+     * auto-ranges onto its own data. A card pins deliberately — it has to, since
+     * one sparse series would otherwise invent a two-day axis — so it must pin to
+     * the window that is actually true of the data.
+     */
+    const dataTimeRange = computed(
+      () => props.preview?.cachedTimeRange ?? props.timeRange,
+    );
+
     // Lazy queries: only cards in (or within one viewport of) the scroll window
     // fetch anything.
     let observer: IntersectionObserver | null = null;
@@ -765,8 +855,12 @@ export default defineComponent({
       copyErrorReport,
       isEmpty,
       isSparse,
+      dataTimeRange,
       renderError,
       onRetryRender,
+      alertMenu,
+      onChartContextMenu,
+      onCreateAlert,
     };
   },
 });

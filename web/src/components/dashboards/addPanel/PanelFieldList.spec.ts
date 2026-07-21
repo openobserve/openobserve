@@ -914,4 +914,73 @@ describe("FieldList", () => {
       expect(currentQuery().query).toContain("sum(");
     });
   });
+
+  /**
+   * In edit mode the stream list waits for a stream rather than fetching against
+   * a half-built query — the panel's own data arrives asynchronously.
+   *
+   * But a parent can seed the query in ITS `onMounted`, which runs BEFORE this
+   * component's watcher exists (the metrics Visualize workspace does exactly
+   * that, mounting PanelEditor with `edit-mode` and seeding the stream itself).
+   * A change-only watcher never fires for a value already present, so the Stream
+   * dropdown stayed empty forever: "No options found" under a stream that is
+   * plainly selected.
+   */
+  describe("edit mode loads the stream list for an ALREADY-set stream", () => {
+    const currentQuery = () => mockReturn.dashboardPanelData.data.queries[0];
+
+    it("fetches immediately in metrics edit mode even when stream is blank", async () => {
+      currentQuery().fields.stream = "";
+      currentQuery().fields.stream_type = "metrics";
+
+      wrapper = mountComponent({
+        pageKey: "metrics",
+        props: { editMode: true },
+      });
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
+    });
+
+    it("fetches when the stream is set before mount (the seeded-parent case)", async () => {
+      // The parent seeded this before the field list ever mounted.
+      currentQuery().fields.stream = "envoy_cluster_assignment_stale";
+      currentQuery().fields.stream_type = "metrics";
+
+      wrapper = mountComponent({ props: { editMode: true } });
+      await flushPromises();
+
+      // Without `immediate` this never ran, and the dropdown had no options.
+      expect(mockGetStreams).toHaveBeenCalledWith("metrics", false);
+      expect(mockReturn.dashboardPanelData.meta.stream.streamResults).toEqual(
+        mockStreamResults,
+      );
+    });
+
+    it("still fetches when the stream arrives AFTER mount (the real edit case)", async () => {
+      currentQuery().fields.stream = "";
+      wrapper = mountComponent({ props: { editMode: true } });
+      await flushPromises();
+      expect(mockGetStreams).not.toHaveBeenCalled();
+
+      // The panel's data lands late — the original reason this path defers.
+      currentQuery().fields.stream = "some_stream";
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledTimes(1);
+    });
+
+    it("loads once, not once per stream change", async () => {
+      currentQuery().fields.stream = "first";
+      wrapper = mountComponent({ props: { editMode: true } });
+      await flushPromises();
+
+      // The watcher stops itself after the first hit; picking another stream
+      // must not refetch the whole list.
+      currentQuery().fields.stream = "second";
+      await flushPromises();
+
+      expect(mockGetStreams).toHaveBeenCalledTimes(1);
+    });
+  });
 });

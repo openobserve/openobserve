@@ -1,9 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for UpdateRole.vue. `role` is required (the old imperative
-// `roleError = 'Role is required'` guard, now schema-driven). `first_name` is a
-// read-only display field — kept as an optional form entry per R1-strict so every
-// control inside <OForm> is an OForm* component, but excluded from any rule.
+// Validation schema for UpdateRole.vue. `role` is required. `first_name` is a
+// read-only display field — an optional form entry (so every control inside
+// <OForm> is an OForm* component) but excluded from any rule.
 //
 // Built via a factory so the required message stays i18n-driven (pass useI18n's
 // `t`). EDIT-prefill form: defaults (role/first_name from props.modelValue) live

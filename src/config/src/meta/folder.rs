@@ -42,6 +42,7 @@ pub enum FolderType {
     Dashboards,
     Alerts,
     Reports,
+    Synthetics,
 }
 
 pub const DEFAULT_FOLDER: &str = "default";

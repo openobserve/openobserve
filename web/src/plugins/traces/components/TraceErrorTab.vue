@@ -15,35 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OEmptyState
     v-if="!hasSpanError"
-    class="w-full flex items-center justify-center text-center pt-4 font-bold tab-content-dynamic-height h-full"
+    size="inline"
+    variant="no-results"
+    :title="t('traces.noErrorPresent')"
+    hide-action
     data-test="trace-details-sidebar-no-error"
-  >
-    {{ t("traces.noErrorPresent") }}
-  </div>
+  />
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--o2-status-error-bg)] border-[var(--o2-status-error-text)]"
+    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-[var(--o2-text-4)]! text-[0.85rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-label! text-sm tracking-[0.03rem] pl-2 w-full pb-0.5"
       >
-        {{ spanStatusCode ? "HTTP Status Code" : "gRPC Status Code" }}
+        {{ spanStatusCode ? t("traces.traceErrorTab.httpStatusCode") : t("traces.traceErrorTab.grpcStatusCode") }}
       </div>
       <div class="flex items-center">
         <SpanStatusCodeBadge
           v-if="spanStatusCode || spanGrpcStatusCode"
           :code="spanStatusCode"
           :grpc-code="spanGrpcStatusCode"
-          class="text-[0.9rem]! flex! items-center"
+          class="text-sm! flex! items-center"
         />
         <span
-          class="text-[0.9rem] font-semibold"
-          :style="{ color: 'var(--o2-status-error-text)' }"
+          class="text-sm font-semibold text-status-error-text"
           data-test="trace-details-sidebar-error-summary-title"
         >
           {{ statusCodeTitle }}
@@ -55,19 +55,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- DB Response Status Code -->
   <div
     v-if="hasSpanError && spanDbResponseStatusCode"
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--o2-status-error-bg)] border-[var(--o2-status-error-text)]"
+    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-[var(--o2-text-4)]! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-label! text-3xs tracking-[0.03rem] pl-2 w-full pb-0.5"
       >
-        DB Response Status Code
+        {{ t("traces.traceErrorTab.dbResponseStatusCode") }}
       </div>
-      <div class="flex items-center pl-[0.5rem]">
+      <div class="flex items-center pl-2">
         <span
-          class="text-[0.9rem] font-semibold"
-          :style="{ color: 'var(--o2-status-error-text)' }"
+          class="text-sm font-semibold text-status-error-text"
           data-test="trace-details-sidebar-db-response-status-code-value"
         >
           {{ spanDbResponseStatusCode }}
@@ -79,19 +78,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Process Exit Code -->
   <div
     v-if="hasSpanError && spanProcessExitCode"
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--o2-status-error-bg)] border-[var(--o2-status-error-text)]"
+    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="flex-col items-center gap-1">
       <div
-        class="text-[var(--o2-text-4)]! text-[0.65rem] tracking-[0.03rem] pl-[0.5rem] w-full pb-[0.125rem]"
+        class="text-text-label! text-3xs tracking-[0.03rem] pl-2 w-full pb-0.5"
       >
-        Process Exit Code
+        {{ t("traces.traceErrorTab.processExitCode") }}
       </div>
-      <div class="flex items-center pl-[0.5rem]">
+      <div class="flex items-center pl-2">
         <span
-          class="text-[0.9rem] font-semibold"
-          :style="{ color: 'var(--o2-status-error-text)' }"
+          class="text-sm font-semibold text-status-error-text"
           data-test="trace-details-sidebar-process-exit-code-value"
         >
           {{ spanProcessExitCode }}
@@ -105,18 +103,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="
       hasSpanError && (errorBannerTitle || errorBannerMessage || spanErrorType)
     "
-    class="error-summary rounded p-[0.5rem] mb-[0.5rem] border border-solid bg-[var(--o2-status-error-bg)] border-[var(--o2-status-error-text)]"
+    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
     data-test="trace-details-sidebar-error-summary"
   >
-    <div class="flex items-center gap-2 mb-[0.25rem]">
+    <div class="flex items-center gap-2 mb-1">
       <OIcon
         name="error"
         size="sm"
-        class="text-[var(--o2-status-error-text)]"
+        class="text-status-error-text"
       />
       <span
-        class="text-[1rem] font-semibold"
-        :style="{ color: 'var(--o2-status-error-text)' }"
+        class="text-base font-semibold text-status-error-text"
         data-test="trace-details-sidebar-error-summary-title"
       >
         {{ errorBannerTitle }}
@@ -124,8 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="errorBannerMessage"
-      class="ml-[1.5rem] text-[0.875rem] mb-[0.25rem]"
-      :style="{ color: 'var(--o2-text-secondary)' }"
+      class="ml-6 text-sm mb-1 text-text-secondary"
       data-test="trace-details-sidebar-error-summary-message"
     >
       {{ errorBannerMessage }}
@@ -135,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Exceptions Table -->
   <template v-if="hasExceptionEvents.length">
     <div
-      class="text-[0.9rem] pt-[0.325rem]! font-semibold pb-[0.325rem] text-[var(--o2-text-secondary)]!"
+      class="text-sm pt-[0.325rem]! font-semibold pb-[0.325rem] text-text-secondary!"
     >
       {{ t("traces.exceptionsWithCount", { count: hasExceptionEvents.length }) }}
     </div>
@@ -150,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expansion="multiple"
       :expanded-ids="expandedExceptionIds"
       @update:expanded-ids="expandedExceptionIds = $event"
-      class="trace-detail-tab-table w-full border border-solid border-[var(--o2-border-color)] tab-content-dynamic-height"
+      class="trace-detail-tab-table w-full border border-solid border-card-glass-border tab-content-dynamic-height"
     >
       <template #cell-@timestamp="{ row }">
         <span>{{ formatTimestamp(row) }}</span>
@@ -163,32 +159,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #expansion="{ row }">
-        <div class="px-4 py-3 bg-[var(--o2-card-background)] rounded">
+        <div class="px-4 py-3 bg-surface-base rounded-default">
           <div class="space-y-3">
             <!-- Exception Type -->
             <div class="space-y-1">
-              <span class="block font-semibold text-[var(--o2-text-secondary)] text-sm mb-1">{{ t("traces.typeLabel") }}</span>
-              <span class="text-[#d32f2f] font-semibold bg-[rgba(211,47,47,0.1)] py-1 px-2 rounded inline-block text-sm dark:text-[#ef5350] dark:bg-[rgba(239,83,80,0.15)]">{{ row["exception.type"] }}</span>
+              <span class="block font-semibold text-text-secondary text-sm mb-1">{{ t("traces.typeLabel") }}</span>
+              <span class="text-status-error-text font-semibold bg-status-error-bg py-1 px-2 rounded-default inline-block text-sm">{{ row["exception.type"] }}</span>
             </div>
 
             <!-- Exception Message -->
             <div class="space-y-1">
-              <span class="block font-semibold text-[var(--o2-text-secondary)] text-sm mb-1">{{ t("traces.messageLabel") }}</span>
-              <div class="text-(--o2-text-secondary) bg-(--o2-code-bg) p-2 rounded border-l-[3px] border-l-[#ff9800] whitespace-pre-wrap break-words leading-normal text-sm dark:bg-[rgba(255,255,255,0.05)] dark:border-l-[#ffb74d] dark:text-[var(--o2-border)]">
+              <span class="block font-semibold text-text-secondary text-sm mb-1">{{ t("traces.messageLabel") }}</span>
+              <div class="text-text-secondary bg-code-bg p-2 rounded-default border-l-[3px] border-l-status-warning-text whitespace-pre-wrap break-words leading-normal text-sm">
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
             </div>
 
             <!-- Exception Escaped -->
             <div class="space-y-1">
-              <span class="block font-semibold text-[var(--o2-text-secondary)] text-sm mb-1">{{ t("traces.escapedLabel") }}</span>
+              <span class="block font-semibold text-text-secondary text-sm mb-1">{{ t("traces.escapedLabel") }}</span>
               <span class="text-sm">{{ row["exception.escaped"] }}</span>
             </div>
 
             <!-- Stacktrace -->
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="block font-semibold text-[var(--o2-text-secondary)] text-sm">{{ t("traces.stacktraceLabel") }}</span>
+                <span class="block font-semibold text-text-secondary text-sm">{{ t("traces.stacktraceLabel") }}</span>
                 <OButton
                   v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
                   variant="secondary"
@@ -203,12 +199,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
-                class="bg-(--o2-code-bg) rounded border border-(--o2-border) p-3 overflow-x-auto max-h-[600px] overflow-y-auto dark:bg-[#0d0d0d] dark:border-[#2a2a2a]"
+                class="bg-code-bg rounded-default border border-border-default p-3 overflow-x-auto max-h-150 overflow-y-auto"
                 data-test="exception-stacktrace-container"
               >
-                <div class="stacktrace-content m-0 p-0 text-[11px] leading-[1.6] text-[#2c3e50] font-[Monaco,Menlo,'Ubuntu_Mono',Consolas,'source-code-pro',monospace] whitespace-pre-wrap break-words dark:text-[#d4d4d4]" v-html="formatStackTrace(row['exception.stacktrace'])" />
+                <div class="stacktrace-content m-0 p-0 text-2xs leading-[1.6] text-code-text font-mono whitespace-pre-wrap break-words" v-html="formatStackTrace(row['exception.stacktrace'])" />
               </div>
-              <div v-else class="flex items-center justify-center bg-(--o2-code-bg) text-[#6c757d] text-xs italic py-4 px-3 border border-dashed border-(--o2-border) rounded dark:bg-[rgba(255,255,255,0.05)] dark:border-[#4a5568] dark:text-[#a0aec0]" data-test="exception-stacktrace-empty">
+              <div v-else class="flex items-center justify-center bg-code-bg text-text-muted text-xs italic py-4 px-3 border border-dashed border-border-default rounded-default" data-test="exception-stacktrace-empty">
                 <OIcon name="info" size="sm" class="mr-1" />
                 <span>{{ t("traces.noStacktraceAvailable") }}</span>
               </div>
@@ -231,6 +227,7 @@ import useTraceDetails from "@/composables/traces/useTraceDetails";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -563,141 +560,102 @@ function copyStackTrace(stacktrace: string) {
 }
 </script>
 
-<style>
-body.body--dark .stacktrace-content .stack-file {
-  color: #9cdcfe;
+<style scoped>
+/* keep(generated-content): the `.stack-*` classes style the stacktrace markup that
+   formatStackTrace() builds and the template injects with v-html — there is no
+   template element to carry a utility, so they stay as CSS (:deep, since the
+   generated nodes carry no scope attribute).
+   Every colour maps onto the shared --color-syntax-* family (the same palette
+   OCodeBlock uses); those tokens flip light<->dark in dark.css, so ONE rule set
+   covers both themes and the per-theme override list is gone. */
+.stacktrace-content :deep(.stack-line) {
+  padding: 0.125rem 0;
 }
 
-body.body--dark .stacktrace-content .stack-path {
-  color: #ce9178;
-}
-
-body.body--dark .stacktrace-content .stack-lineno {
-  color: #b5cea8;
-}
-
-body.body--dark .stacktrace-content .stack-function {
-  color: #dcdcaa;
-}
-
-body.body--dark .stacktrace-content .stack-keyword {
-  color: #c586c0;
-}
-
-body.body--dark .stacktrace-content .stack-exception {
-  color: #f48771;
-}
-
-body.body--dark .stacktrace-content .stack-traceback {
-  color: #808080;
-}
-
-body.body--dark .stacktrace-content .stack-traceback-header {
-  color: #808080;
-}
-
-body.body--dark .stacktrace-content .stack-during {
-  color: #808080;
-}
-
-body.body--dark .stacktrace-content .stack-code {
-  color: #d4d4d4;
-}
-
-body.body--dark .stacktrace-content .stack-call {
-  color: #4ec9b0;
-}
-
-body.body--dark .stacktrace-content .stack-ellipsis {
-  color: #808080;
-}
-
-body.body--dark .stacktrace-content .stack-error-msg {
-  color: #d4d4d4;
-}
-
-body.body--dark .stacktrace-content .stack-raise {
-  color: #f48771;
-}
-
-/* Child/descendant selectors for stacktrace-content */
-.stacktrace-content .stack-line {
-  padding: 2px 0;
-}
-
-.stacktrace-content .stack-empty {
+.stacktrace-content :deep(.stack-empty) {
   height: 0.5em;
 }
 
-.stacktrace-content .stack-file {
-  color: #0066cc;
+/* `File "…", line N, in fn` scaffolding literals — a frame-header role of its
+   own, distinct from path / lineno / function which the inner spans set. */
+.stacktrace-content :deep(.stack-file) {
+  color: var(--color-syntax-builtin);
   font-weight: 500;
 }
 
-.stacktrace-content .stack-path {
-  color: #d63384;
+/* file + module paths -> string role */
+.stacktrace-content :deep(.stack-path) {
+  color: var(--color-syntax-string);
 }
 
-.stacktrace-content .stack-lineno {
-  color: #087990;
+/* line and column numbers -> number role */
+.stacktrace-content :deep(.stack-lineno) {
+  color: var(--color-syntax-number);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-function {
-  color: #6f42c1;
+/* function / frame names -> function role */
+.stacktrace-content :deep(.stack-function) {
+  color: var(--color-syntax-function);
 }
 
-.stacktrace-content .stack-keyword {
-  color: #8250df;
+/* language keywords (`at`, `raise`, `panic:`, `goroutine`, `Caused by:`) */
+.stacktrace-content :deep(.stack-keyword) {
+  color: var(--color-syntax-keyword);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-exception {
-  color: #d73a49;
+/* exception / error type names -> the app's error text role */
+.stacktrace-content :deep(.stack-exception) {
+  color: var(--color-status-error-text);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-traceback {
-  color: #6c757d;
+/* dim framing lines (Traceback header, "During handling of…", `... N more`) */
+.stacktrace-content :deep(.stack-traceback) {
+  color: var(--color-syntax-comment);
   font-style: italic;
 }
 
-.stacktrace-content .stack-traceback-header {
-  color: #6c757d;
+.stacktrace-content :deep(.stack-traceback-header) {
+  color: var(--color-syntax-comment);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-during {
-  color: #6c757d;
+.stacktrace-content :deep(.stack-during) {
+  color: var(--color-syntax-comment);
   margin: 0.5em 0;
 }
 
-.stacktrace-content .stack-during-text {
+.stacktrace-content :deep(.stack-during-text) {
   font-style: italic;
 }
 
-.stacktrace-content .stack-code {
-  color: #2c3e50;
+.stacktrace-content :deep(.stack-ellipsis) {
+  color: var(--color-syntax-comment);
+}
+
+/* echoed source line + trailing error message -> plain code body text */
+.stacktrace-content :deep(.stack-code) {
+  color: var(--color-syntax-text);
   padding-left: 2em;
 }
 
-.stacktrace-content .stack-call {
-  color: #0969da;
+.stacktrace-content :deep(.stack-error-msg) {
+  color: var(--color-syntax-text);
 }
 
-.stacktrace-content .stack-ellipsis {
-  color: #6c757d;
+/* call sites `fn(` inside the echoed source line */
+.stacktrace-content :deep(.stack-call) {
+  color: var(--color-syntax-tag);
 }
 
-.stacktrace-content .stack-error {
+/* the `raise` line's residual text — same error red as the exception it names */
+.stacktrace-content :deep(.stack-raise) {
+  color: var(--color-status-error-text);
+}
+
+.stacktrace-content :deep(.stack-error) {
   margin-top: 0.5em;
-}
-
-.stacktrace-content .stack-error-msg {
-  color: #2c3e50;
-}
-
-.stacktrace-content .stack-raise {
-  color: #d73a49;
 }
 </style>

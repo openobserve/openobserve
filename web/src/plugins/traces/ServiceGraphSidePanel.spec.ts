@@ -35,11 +35,38 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({
-    t: (key: string) => key,
-  })),
-}));
+// Resolve translation keys against the real app locale so serviceHealth
+// labels and other text ("Healthy", "View Related", ...) come through instead
+// of raw key paths.
+vi.mock("vue-i18n", async () => {
+  const enLocaleFull = (await import("@/locales/languages/en-US.json")).default as Record<
+    string,
+    unknown
+  >;
+  const resolve = (key: string): unknown =>
+    key
+      .split(".")
+      .reduce<unknown>(
+        (obj, part) =>
+          obj && typeof obj === "object"
+            ? (obj as Record<string, unknown>)[part]
+            : undefined,
+        enLocaleFull,
+      );
+  return {
+    useI18n: vi.fn(() => ({
+      t: (key: string, params?: Record<string, unknown>) => {
+        const value = resolve(key);
+        if (typeof value !== "string") return key;
+        return params
+          ? value.replace(/\{(\w+)\}/g, (_, name) =>
+              params[name] != null ? String(params[name]) : `{${name}}`,
+            )
+          : value;
+      },
+    })),
+  };
+});
 
 import searchService from "@/services/search";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";

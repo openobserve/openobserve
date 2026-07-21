@@ -16,25 +16,34 @@ enterprise = [
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
+    "common/enterprise",
     "config/enterprise",
+    "promql/enterprise",
+    "search/enterprise",
 ]
-cloud = ["infra/cloud", "enterprise", "o2_enterprise/cloud"]
-vectorscan = ["o2_enterprise/vectorscan"]
+cloud = [
+    "infra/cloud",
+    "enterprise",
+    "o2_enterprise/cloud",
+    "common/cloud",
+]
+vectorscan = ["o2_enterprise/vectorscan", "search/vectorscan"]
 vortex = [
     "dep:vortex",
-    "dep:vortex-datafusion",
     "config/vortex",
     "o2_enterprise?/vortex",
+    "search/vortex",
 ]
 
 [dependencies]
+common.workspace = true
+openobserve-vrl.workspace = true
+promql.workspace = true
+search.workspace = true
 axum.workspace = true
 http.workspace = true
-http-body.workspace = true
 http-body-util.workspace = true
-ahash.workspace = true
 anyhow.workspace = true
-argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
 aws-config = { workspace = true, optional = true }
@@ -50,24 +59,20 @@ datafusion.workspace = true
 datafusion-proto.workspace = true
 datafusion-functions-json.workspace = true
 arrow.workspace = true
-arrow-flight.workspace = true
 arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
 vortex = { workspace = true, optional = true }
-vortex-datafusion = { workspace = true, optional = true }
 flate2.workspace = true
 futures.workspace = true
 hashlink.workspace = true
 hashbrown.workspace = true
-hex.workspace = true
 itertools.workspace = true
 jsonwebtoken.workspace = true
 log.workspace = true
 maxminddb.workspace = true
 md5.workspace = true
-memchr.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
@@ -82,20 +87,15 @@ proto.workspace = true
 rand.workspace = true
 rayon.workspace = true
 regex.workspace = true
-regex-syntax.workspace = true
 reqwest.workspace = true
-rquickjs.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true
 webpki-roots.workspace = true
 sea-orm.workspace = true
-segment.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-sha256.workspace = true
 snap.workspace = true
 sqlparser.workspace = true
-strum.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 time.workspace = true
@@ -104,7 +104,6 @@ tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
-uaparser.workspace = true
 url.workspace = true
 utoipa.workspace = true
 version-compare.workspace = true
@@ -115,16 +114,13 @@ config.workspace = true
 infra.workspace = true
 ingester.workspace = true
 wal.workspace = true
-report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
 tantivy_utils.workspace = true
 zip.workspace = true
 futures-util.workspace = true
-tokio-stream.workspace = true
 flight.workspace = true
-async-stream.workspace = true
 sourcemap.workspace = true
 
 [dev-dependencies]

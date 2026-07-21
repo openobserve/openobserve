@@ -13,9 +13,12 @@
 // limitations under the License.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { mount, flushPromises, VueWrapper, config } from "@vue/test-utils";
 import { nextTick } from "vue";
+import i18n from "@/locales";
 import VariableCustomValueSelector from "./VariableCustomValueSelector.vue";
+
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 describe("VariableCustomValueSelector", () => {
   let wrapper: VueWrapper<any>;

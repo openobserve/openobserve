@@ -230,15 +230,7 @@ describe("VariablesValueSelector", () => {
       },
       global: {
         plugins: [],
-        stubs: {
-          "q-input": {
-            name: "QInput",
-            template:
-              '<input v-model="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-            props: ["modelValue", "label", "dense", "outlined", "readonly"],
-            emits: ["update:modelValue"],
-          },
-        },
+        stubs: {},
       },
     });
   };

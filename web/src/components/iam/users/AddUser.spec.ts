@@ -132,6 +132,11 @@ const setField = (wrapper: VueWrapper<any>, name: string, value: unknown) =>
 const submitForm = async (wrapper: VueWrapper<any>) => {
   await getForm(wrapper).vm.form.handleSubmit();
   await flushPromises();
+  // Let any in-flight onDynamicAsync validation (scheduled on a macrotask by
+  // TanStack's async validator plumbing) land before assertions — otherwise a
+  // stale run can overwrite form.state.errors after the submit settles.
+  await new Promise((r) => setTimeout(r, 0));
+  await flushPromises();
 };
 
 describe("AddUser", () => {

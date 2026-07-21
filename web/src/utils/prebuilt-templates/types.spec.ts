@@ -48,13 +48,13 @@ describe('Prebuilt Templates Types', () => {
     it('should have required properties', () => {
       const field: CredentialField = {
         key: 'apiKey',
-        label: 'API Key',
+        labelKey: 'alerts.prebuiltDestinations.opsgenieApiKey',
         type: 'password',
         required: true
       };
 
       expect(field).toHaveProperty('key');
-      expect(field).toHaveProperty('label');
+      expect(field).toHaveProperty('labelKey');
       expect(field).toHaveProperty('type');
       expect(field).toHaveProperty('required');
     });
@@ -62,7 +62,7 @@ describe('Prebuilt Templates Types', () => {
     it('should support optional hint property', () => {
       const field: CredentialField = {
         key: 'apiKey',
-        label: 'API Key',
+        labelKey: 'alerts.prebuiltDestinations.opsgenieApiKey',
         type: 'password',
         required: true,
         hint: 'Enter your API key here'
@@ -71,11 +71,12 @@ describe('Prebuilt Templates Types', () => {
       expect(field.hint).toBe('Enter your API key here');
     });
 
-    it('should support optional validator function', () => {
-      const validator = (value: string) => value.length > 0 || 'Required';
+    it('should support optional validator function returning an i18n message', () => {
+      const validator = (value: string) =>
+        value.length > 0 || { key: 'alerts.validation.credentialFieldRequired' };
       const field: CredentialField = {
         key: 'apiKey',
-        label: 'API Key',
+        labelKey: 'alerts.prebuiltDestinations.opsgenieApiKey',
         type: 'password',
         required: true,
         validator
@@ -83,13 +84,15 @@ describe('Prebuilt Templates Types', () => {
 
       expect(typeof field.validator).toBe('function');
       expect(field.validator?.('test')).toBe(true);
-      expect(field.validator?.('')).toBe('Required');
+      expect(field.validator?.('')).toEqual({
+        key: 'alerts.validation.credentialFieldRequired'
+      });
     });
 
     it('should support select type with options', () => {
       const field: CredentialField = {
         key: 'priority',
-        label: 'Priority',
+        labelKey: 'alerts.prebuiltDestinations.opsgeniePriority',
         type: 'select',
         required: true,
         options: [
@@ -123,7 +126,7 @@ describe('Prebuilt Templates Types', () => {
         credentialFields: [
           {
             key: 'webhookUrl',
-            label: 'Webhook URL',
+            labelKey: 'alerts.prebuiltDestinations.slackWebhookUrl',
             type: 'text',
             required: true
           }

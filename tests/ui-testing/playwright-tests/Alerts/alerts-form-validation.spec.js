@@ -4,6 +4,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { AlertsFormValidationPage } = require('../../pages/alertsPages/alertsFormValidationPage.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Alerts — Form Validation E2E Tests
@@ -14,13 +15,122 @@ const { AlertsFormValidationPage } = require('../../pages/alertsPages/alertsForm
 //   • ImportDestination — submit without file → error or button disabled
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Self-seeded prerequisites
+//
+// The app hard-disables the "Add Alert" button when the org has ZERO alert
+// destinations (button title = "alerts.noDestinations"). The wizard-based blocks
+// (FilterCondition / FieldsInput / QueryConfig / AlertSettings) therefore need at
+// least one destination to exist before they can open the wizard.
+//
+// Rather than depend on some other spec having left a destination behind (an
+// implicit, order-dependent cross-file coupling that breaks on an isolated
+// shard), we seed a WORKER-SCOPED template + destination via API in beforeAll and
+// remove them in afterAll. Worker-scoped names keep this safe under parallel
+// execution (beforeAll/afterAll run once per worker) and on cloud/alpha.
+//
+// Both the seed prefix (e2e_alertfv_ — unique to this file) and the names created
+// by the test cases themselves (test_fv_alerts_dest/slack/tmpl) are registered in
+// cleanup.spec.js so a crashed run can't leave junk — and so the fixed-name "valid
+// create" destination is purged before each run (otherwise its second run would
+// 409 and fail).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const RUN_ID = Date.now().toString(36).slice(-4) + Math.random().toString(36).substring(2, 5);
+const AUTH_STATE = 'playwright-tests/utils/auth/user.json';
+
+async function apiCall(page, method, path, body = null) {
+  const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+  const headers = getAuthHeaders();
+  return page.evaluate(async ({ url, method, headers, body }) => {
+    const opts = { method, headers };
+    if (body) opts.body = JSON.stringify(body);
+    const resp = await fetch(url, opts);
+    const data = await resp.json().catch(() => ({}));
+    return { status: resp.status, data };
+  }, { url: `${baseUrl}${path}`, method, headers, body });
+}
+
+async function ensureSeedTemplate(page, templateName) {
+  const org = getOrgIdentifier();
+  const resp = await apiCall(page, 'POST', `/api/${org}/alerts/templates`, {
+    name: templateName,
+    body: JSON.stringify({ text: 'E2E form-validation seed: {alert_name}' }),
+    isDefault: false,
+  });
+  testLogger.info('Seed template', { name: templateName, status: resp.status });
+}
+
+async function ensureSeedDestination(page, destinationName, templateName) {
+  const org = getOrgIdentifier();
+  const resp = await apiCall(page, 'POST', `/api/${org}/alerts/destinations`, {
+    name: destinationName,
+    url: 'https://httpbin.org/post',
+    method: 'post',
+    skip_tls_verify: false,
+    template: templateName,
+    headers: {},
+  });
+  testLogger.info('Seed destination', { name: destinationName, status: resp.status });
+}
+
 test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0', '@smoke'] }, () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
 
   /** @type {PageManager} */
   let pm;
   /** @type {AlertsFormValidationPage} */
   let fvPage;
+
+  // Worker-scoped so parallel workers never collide on the same name and each
+  // worker cleans up exactly what it created (module scope is per-worker process).
+  let seedTemplateName;
+  let seedDestinationName;
+
+  test.beforeAll(async ({ browser }, testInfo) => {
+    seedTemplateName = `e2e_alertfv_${RUN_ID}_w${testInfo.workerIndex}_tmpl`;
+    seedDestinationName = `e2e_alertfv_${RUN_ID}_w${testInfo.workerIndex}_dest`;
+
+    const context = await browser.newContext({ storageState: AUTH_STATE });
+    const page = await context.newPage();
+    try {
+      const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+      const org = getOrgIdentifier();
+      await page.goto(`${baseUrl}?org_identifier=${org}`);
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+
+      // A destination requires a template to reference — seed template first.
+      await ensureSeedTemplate(page, seedTemplateName);
+      await ensureSeedDestination(page, seedDestinationName, seedTemplateName);
+      testLogger.info('Form-validation prerequisites seeded', { destination: seedDestinationName });
+    } finally {
+      await page.close();
+      await context.close();
+    }
+  });
+
+  test.afterAll(async ({ browser }) => {
+    const context = await browser.newContext({ storageState: AUTH_STATE });
+    const page = await context.newPage();
+    try {
+      const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+      const org = getOrgIdentifier();
+      await page.goto(`${baseUrl}?org_identifier=${org}`);
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+
+      // Delete destination first (it references the template), then the template.
+      if (seedDestinationName) {
+        await apiCall(page, 'DELETE', `/api/${org}/alerts/destinations/${seedDestinationName}`).catch(() => {});
+      }
+      if (seedTemplateName) {
+        await apiCall(page, 'DELETE', `/api/${org}/alerts/templates/${seedTemplateName}`).catch(() => {});
+      }
+      testLogger.info('Form-validation prerequisites cleaned up');
+    } finally {
+      await page.close();
+      await context.close();
+    }
+  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -34,7 +144,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   // ═══════════════════════════════════════════════════════════════════════════
 
   test.describe('AddDestination form validation', () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
 
     test('should show name and type errors when submitting empty custom destination form', {
       tag: ['@alerts-form-validation', '@P0', '@smoke'],
@@ -145,7 +255,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   // ═══════════════════════════════════════════════════════════════════════════
 
   test.describe('AddTemplate form validation', () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
 
     test('should show name and body errors when submitting empty template form', {
       tag: ['@alerts-form-validation', '@P0', '@smoke'],
@@ -196,7 +306,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   // ═══════════════════════════════════════════════════════════════════════════
 
   test.describe('ImportAlert form validation', () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
 
     test('should show error or keep import button disabled when no file or JSON is provided', {
       tag: ['@alerts-form-validation', '@P0', '@smoke'],
@@ -248,7 +358,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   // ═══════════════════════════════════════════════════════════════════════════
 
   test.describe('FilterCondition form validation', { tag: ['@alertsFormValidation', '@P1'] }, () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
 
     test('should render filter condition row with all required selectors', {
       tag: ['@alertsFormValidation', '@P1'],
@@ -320,10 +430,10 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
       await fvPage.addFilterCondition();
       await fvPage.getFieldsInputRowLocator(0).waitFor({ state: 'visible', timeout: 10000 });
 
-      // Trigger value field blur without entering a value
-      const valueField = fvPage.getFilterConditionValueFieldLocator().first();
-      await valueField.click();
-      await page.keyboard.press('Tab');
+      // Post-migration the alert form validates on SUBMIT (useOForm/revalidateLogic),
+      // not on blur. Submit with an empty condition value so the schema-driven
+      // "Field is required!" error surfaces inline on the value OFormInput (R3).
+      await page.locator('[data-test="add-alert-submit-btn"]').click();
 
       // Value error should become visible
       const valueError = fvPage.getFilterConditionValueErrorLocator().first();
@@ -340,7 +450,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   // ═══════════════════════════════════════════════════════════════════════════
 
   test.describe('FieldsInput condition management', { tag: ['@alertsFormValidation', '@P1'] }, () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
 
     test('should add a second condition row when Add Condition button is clicked', {
       tag: ['@alertsFormValidation', '@P1'],
@@ -399,7 +509,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   // ═══════════════════════════════════════════════════════════════════════════
 
   test.describe('ImportDestination form validation', () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
 
     test('should show error or keep import button disabled when no file or JSON is provided', {
       tag: ['@alerts-form-validation', '@P0', '@smoke'],
@@ -447,7 +557,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   // ═══════════════════════════════════════════════════════════════════════════
 
   test.describe('QueryConfig form validation', { tag: ['@alerts-form-validation', '@P1'] }, () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
 
     test.beforeEach(async ({ page }) => {
       // Navigate to alerts list and open the Add Alert wizard
@@ -500,7 +610,7 @@ test.describe('Alerts Form Validation', { tag: ['@alerts-form-validation', '@P0'
   // ═══════════════════════════════════════════════════════════════════════════
 
   test.describe('AlertSettings form validation', { tag: ['@alerts-form-validation', '@P1'] }, () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
 
     test.beforeEach(async ({ page }) => {
       // Navigate to alerts list and open the Add Alert wizard

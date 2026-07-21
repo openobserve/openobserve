@@ -16,26 +16,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex flex-col logs-index-menu pr-[0.375rem]! h-full bg-surface-panel!"
-    :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
+    class="flex flex-col logs-index-menu w-full h-full bg-surface-panel!"
   >
+    <!-- Stream type + stream selector. Shares the same page-edge gutter as the
+         field search input and the field rows below it (baked into OFieldList),
+         so all three form controls line up on one left/right edge. The scrolling
+         list itself deliberately runs flush to the divider so its scrollbar lands
+         on the panel edge — only the rows inside it carry the gutter. -->
     <div
-      class="flex items-center gap-1"
-      style="max-width: 100%; overflow: hidden"
+      class="flex items-center gap-2 px-page-edge max-w-full"
     >
       <OButton
         v-if="
           searchObj.data.stream.streamType &&
           searchObj.data.stream.streamType !== 'logs'
         "
-        data-test="log-search-index-list-stream-type-badge"
-        variant="ghost"
+        data-test="log-search-index-list-back-to-logs-btn"
+        variant="outline"
         size="icon-sm"
-        class="shrink-0 h-8 w-8 border border-(--o2-border) rounded p-0"
+        class="shrink-0 h-8 w-8 border border-border-default rounded-default p-0"
         @click="onStreamTypeChange('logs')"
       >
-        <OIcon :name="streamTypeIcon" size="sm" />
-        <OTooltip :content="streamTypeLabel + ' — ' + t('search.switchToLogs')" side="bottom" align="center" />
+        <OIcon name="swap-horiz" size="sm" />
+        <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <div class="flex-1 min-w-0">
         <OSelect
@@ -200,60 +203,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Group 1 header -->
             <div class="h-7 flex items-center justify-between px-2">
-              <OSkeleton type="rect" class="h-3 w-24 rounded-sm" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-24 rounded-default" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 1 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
             <!-- Group 2 header -->
             <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-16 rounded-sm" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-16 rounded-default" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 2 field -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
             <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-32 rounded-sm" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-sm" />
+              <OSkeleton type="rect" class="h-3 w-32 rounded-default" />
+              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
             </div>
             <!-- Group 3 fields -->
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
-            <div class="flex items-center gap-2 px-3 py-[0.375rem]">
-              <OSkeleton type="rect" class="w-[0.875rem] h-[0.875rem] rounded-sm shrink-0" />
+            <div class="flex items-center gap-2 px-3 py-1.5">
+              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
           </div>
@@ -497,29 +500,6 @@ export default defineComponent({
       rowsPerPage: 25,
     });
 
-    const streamTypes = [
-      { label: t("search.logs"), value: "logs", icon: "search" },
-      { label: t("search.traces"), value: "traces", icon: "account-tree" },
-      { label: t("search.metrics"), value: "metrics", icon: "bar-chart" },
-      {
-        label: t("search.enrichmentTables"),
-        value: "enrichment_tables",
-        icon: "table-view",
-      },
-    ];
-
-    const streamTypeIcon = computed(() => {
-      const current = searchObj.data.stream.streamType;
-      return (
-        streamTypes.find((t) => t.value === current)?.icon ?? "search"
-      );
-    });
-
-    const streamTypeLabel = computed(() => {
-      const current = searchObj.data.stream.streamType;
-      return streamTypes.find((t) => t.value === current)?.label ?? "";
-    });
-
     const onStreamTypeChange = async (newType: string) => {
       searchObj.data.stream.streamType = newType;
       searchObj.data.stream.selectedStream = [];
@@ -682,11 +662,10 @@ export default defineComponent({
       return result;
     });
 
-    // `immediate` seeds streamOptions on every (re)mount. The old q-select
-    // re-seeded via its `@filter` handler on each open; that was lost in the
-    // OSelect migration, so without `immediate` the lazy watcher never fired
-    // after a v-if remount (streamList itself is unchanged) and the list stayed
-    // empty. OSelect handles search filtering internally over these options.
+    // `immediate` seeds streamOptions on every (re)mount — without it the lazy
+    // watcher never fires after a v-if remount (streamList itself is unchanged)
+    // and the list stays empty. OSelect handles search filtering internally over
+    // these options.
     watch(
       () => streamList.value,
       () => {
@@ -839,7 +818,6 @@ export default defineComponent({
 
     // if interesting field is enabled, then set default tab as interesting fields
     // otherwise set default tab as user defined schema
-    // store.state.zoConfig.interesting_field_enabled was set as interesting fields was getting set by default with _timestamp field
     function setDefaultFieldTab() {
       if (store.state.zoConfig.log_page_default_field_list === "uds") {
         // reset pagination only if tab has changed
@@ -891,7 +869,7 @@ export default defineComponent({
       }
 
       if (!filtered.length) {
-        return [{ name: "No matching fields found", label: true, group: "__none__" }];
+        return [{ name: t("logs.indexList.noMatchingFields"), label: true, group: "__none__" }];
       }
       return filtered;
     };
@@ -1134,7 +1112,7 @@ export default defineComponent({
           if (!validationFlag) {
             fieldValues.value[name]["isLoading"] = false;
             fieldValues.value[name]["errMsg"] =
-              "Filter is not valid for selected streams.";
+              t("logs.indexList.filterNotValidForStreams");
             return;
           }
           if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
@@ -1227,7 +1205,7 @@ export default defineComponent({
         console.log(err);
         toast({
           variant: "error",
-          message: "Error while fetching field values",
+          message: t("logs.indexList.errorFetchingFieldValues"),
         });
       }
     };
@@ -1248,7 +1226,7 @@ export default defineComponent({
       } else {
         toast({
           variant: "error",
-          message: "Failed to generate filter expression",
+          message: t("logs.indexList.failedToGenerateFilterExpression"),
         });
       }
     };
@@ -1267,7 +1245,7 @@ export default defineComponent({
       if (!expressions.length) {
         toast({
           variant: "error",
-          message: "Failed to generate filter expressions",
+          message: t("logs.indexList.failedToGenerateFilterExpressions"),
         });
         return;
       }
@@ -1742,8 +1720,7 @@ export default defineComponent({
       if (errorCodes.includes(response.code)) {
         handleSearchError(payload, {
           content: {
-            message:
-              "WebSocket connection terminated unexpectedly. Please check your network and try again",
+            message: t("logs.indexList.websocketTerminated"),
             trace_id: payload.traceId,
             code: response.code,
             error_detail: "",
@@ -1759,7 +1736,7 @@ export default defineComponent({
       if (fieldValues.value[request.queryReq?.fields[0]]) {
         fieldValues.value[request.queryReq.fields[0]].isLoading = false;
         fieldValues.value[request.queryReq.fields[0]].errMsg =
-          "Failed to fetch field values";
+          t("logs.indexList.failedToFetchFieldValues");
       }
 
       removeTraceId(request.queryReq.fields[0], request.traceId);
@@ -1883,7 +1860,7 @@ export default defineComponent({
         fieldValues.value[fieldName].isLoading = false;
       } catch (error) {
         console.error("Failed to fetch field values:", error);
-        fieldValues.value[fieldName].errMsg = "Failed to fetch field values";
+        fieldValues.value[fieldName].errMsg = t("logs.indexList.failedToFetchFieldValues");
         fieldValues.value[fieldName].isLoading = false;
       }
     };
@@ -1993,7 +1970,7 @@ export default defineComponent({
         return res;
       } catch (err) {
         console.error("Failed to fetch field values:", err);
-        fieldValues.value[name].errMsg = "Failed to fetch field values";
+        fieldValues.value[name].errMsg = t("logs.indexList.failedToFetchFieldValues");
       }
     };
 
@@ -2037,9 +2014,6 @@ export default defineComponent({
       openFilterCreator,
       addSearchTerm,
       fieldValues,
-      streamTypes,
-      streamTypeIcon,
-      streamTypeLabel,
       onStreamTypeChange,
       "add": "add",
       "visibility-off": "visibility-off",
@@ -2118,3 +2092,36 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(lib-override:o2-table): `.logs-index-menu` and both `.index-table` divs are
+   this component's own template, but the tbody/tr/td they lay out are OTable's
+   internal render (via GroupedFieldList) and `.schema-field-toggle` is
+   FieldListPagination's DOM — child DOM this owner can only reach with :deep().
+   The `.logs-index-menu` ancestor is kept so the selectors match at their original
+   specificity. */
+.logs-index-menu .index-table {
+  width: 100%;
+  height: calc(100% - 2.5rem);
+}
+
+.logs-index-menu .index-table :deep(tr) {
+  margin-bottom: 1px;
+}
+
+.logs-index-menu .index-table :deep(tbody),
+.logs-index-menu .index-table :deep(tr),
+.logs-index-menu .index-table :deep(td) {
+  width: 100%;
+  display: block;
+  height: fit-content;
+  overflow: hidden;
+}
+
+.logs-index-menu .index-table :deep(.schema-field-toggle) {
+  border: 1px solid var(--color-card-glass-border);
+  border-radius: 0.325rem;
+  background-color: transparent;
+  line-height: 0.625rem;
+}
+</style>

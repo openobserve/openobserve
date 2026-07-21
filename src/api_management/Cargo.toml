@@ -1,0 +1,54 @@
+[package]
+name = "openobserve-api-management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "dep:o2_dex",
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "dep:vrl",
+    "openobserve-core/enterprise",
+]
+cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
+
+[dependencies]
+openobserve-api-common.workspace = true
+openobserve-core.workspace = true
+anyhow.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+base64.workspace = true
+chrono.workspace = true
+config.workspace = true
+hashbrown.workspace = true
+http.workspace = true
+infra.workspace = true
+jsonwebtoken.workspace = true
+log.workspace = true
+o2_dex = { workspace = true, optional = true }
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+regex.workspace = true
+reqwest.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+svix-ksuid.workspace = true
+time.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+utoipa.workspace = true
+vrl = { workspace = true, optional = true }
+
+[dev-dependencies]
+cron.workspace = true
+tower.workspace = true

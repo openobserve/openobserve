@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,18 +14,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="flex flex-col flex-1 min-h-0 h-full">
-    <!-- Standard page header (AppPageHeader), matching Add Panel / Import Dashboard.
-         BaseImport's built-in header is hidden (hide-header) so this single header
-         serves all three tabs. The title preserves the existing per-tab text: the
-         Built-in Patterns tab keeps t('regex_patterns.import_title') ("Import
-         Pattern") and the File / URL tabs keep "Import Regex Pattern" — no header
-         text is changed by this migration. -->
-    <AppPageHeader
-      :title="headerTitle"
-      :back="{ label: t('regex_patterns.title'), onClick: arrowBackFn, dataTest: 'regex-pattern-import-back-btn' }"
-      class="px-4 border-b border-border-default"
-    >
+  <OPageLayout
+    :title="headerTitle"
+    :back="{ label: t('regex_patterns.title'), onClick: arrowBackFn, dataTest: 'regex-pattern-import-back-btn' }"
+    bleed
+  >
       <template #actions>
         <OButton
           variant="outline"
@@ -43,12 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="regex-pattern-import-json-btn"
         >{{ t('dashboard.import') }}</OButton>
       </template>
-    </AppPageHeader>
 
     <base-import
       v-if="activeTab !== 'import_built_in_patterns'"
       ref="baseImportRef"
-      title="Import Regex Pattern"
+      :title="t('settings.importRegexPattern.title')"
       test-prefix="regex-pattern"
       hide-header
       container-class="flex-1 min-h-0"
@@ -64,11 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="regexPatternErrorsToDisplay.length > 0"
-          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
-          Error Validations
+          {{ t('settings.importRegexPattern.errorValidations') }}
         </div>
-        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('settings.importRegexPattern.outputMessages') }}</div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="flex-1 min-h-0 overflow-auto resize-none">
               <!-- Regex Pattern Errors Section -->
@@ -91,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span
                         data-test="regex-pattern-import-name-error"
-                        class="text-red"
+                        class="text-status-negative"
                         v-if="
                           typeof errorMessage === 'object' &&
                           errorMessage.field == 'regex_pattern_name'
@@ -102,14 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OInput
                             data-test="regex-pattern-import-name-input"
                             v-model="userSelectedRegexPatternName[index]"
-                            :label="'Regex Pattern Name *'"
+                            :label="t('settings.importRegexPattern.regexPatternNameLabel')"
                             @update:model-value="updateRegexPatternName(userSelectedRegexPatternName[index], index)"
                           />
                         </div>
                       </span>
                       <span
                         data-test="regex-pattern-import-pattern-error"
-                        class="text-red"
+                        class="text-status-negative"
                         v-else-if="
                           typeof errorMessage === 'object' &&
                           errorMessage.field == 'regex_pattern'
@@ -121,12 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OInput
                             data-test="regex-pattern-import-name-input"
                             v-model="userSelectedRegexPattern[index]"
-                            :label="'Regex Pattern *'"
+                            :label="t('settings.importRegexPattern.regexPatternLabel')"
                             @update:model-value="updateRegexPattern(userSelectedRegexPattern[index], index)"
                           />
                         </div>
                       </span>
-                      <span class="text-red" v-else>{{ errorMessage }}</span>
+                      <span class="text-status-negative" v-else>{{ errorMessage }}</span>
                     </div>
                   </div>
                 </div>
@@ -137,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-base mb-2.5 uppercase text-primary"
                   data-test="regex-pattern-import-creation-title"
                 >
-                  Regex Pattern Creation
+                  {{ t('settings.importRegexPattern.regexPatternCreation') }}
                 </div>
                 <div
                   v-for="(val, index) in regexPatternCreators"
@@ -148,11 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="{
                       'py-1.25 text-sm font-bold': true,
                       'text-green ': val.success,
-                      'text-red': !val.success,
+                      'text-status-negative': !val.success,
                     }"
                     :data-test="`regex-pattern-import-creation-${index}-message`"
                   >
-                    <pre style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; max-width: 100%;">{{ val.message }}</pre>
+                    <pre class="whitespace-pre-wrap max-w-full" style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;">{{ val.message }}</pre>
                   </div>
                 </div>
               </div>
@@ -166,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="activeTab === 'import_built_in_patterns'"
       class="w-full flex-1 min-h-0 overflow-hidden flex flex-col"
     >
-      <div class="card-container pt-2 px-2.5">
+      <div class="bg-card-glass-bg pt-2 px-2.5">
         <div class="app-tabs-container h-9 w-fit">
           <app-tabs
             data-test="regex-pattern-import-tabs"
@@ -183,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="built-in-patterns-tab"
       />
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -202,7 +194,7 @@ import { useRouter } from "vue-router";
 
 
 import AppTabs from "../common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
@@ -268,23 +260,23 @@ export default defineComponent({
     const headerTitle = computed(() =>
       activeTab.value === "import_built_in_patterns"
         ? t("regex_patterns.import_title")
-        : "Import Regex Pattern",
+        : t("settings.importRegexPattern.title"),
     );
 
     // All tabs including the built-in patterns tab
     const allTabs = ref([
       {
-        label: "Built-in Patterns",
+        label: t("settings.importRegexPattern.tabBuiltInPatterns"),
         value: "import_built_in_patterns",
         icon: "menu-book",
       },
       {
-        label: "File Upload / JSON",
+        label: t("settings.importRegexPattern.tabFileUploadJson"),
         value: "import_json_file",
         icon: "upload",
       },
       {
-        label: "URL Import",
+        label: t("settings.importRegexPattern.tabUrlImport"),
         value: "import_json_url",
         icon: "link",
       },
@@ -331,7 +323,7 @@ export default defineComponent({
 
       try {
         if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
+          throw new Error(t("settings.importRegexPattern.jsonStringEmpty"));
         }
 
         const parsedJson = JSON.parse(jsonString);
@@ -340,7 +332,7 @@ export default defineComponent({
           : [parsedJson];
       } catch (e: any) {
         toast({
-          message: e.message || "Invalid JSON format",
+          message: e.message || t("settings.importRegexPattern.invalidJsonFormat"),
           variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
@@ -363,7 +355,7 @@ export default defineComponent({
 
       if (successCount === totalCount) {
         toast({
-          message: `Successfully imported ${successCount} pattern(s)`,
+          message: t("settings.importRegexPattern.importSuccess", { count: successCount }),
           variant: "success",
         });
 
@@ -403,7 +395,7 @@ export default defineComponent({
         return false;
       } catch (e: any) {
         toast({
-          message: "Error importing Regex Pattern please check the JSON",
+          message: t("settings.importRegexPattern.importError"),
           variant: "error",
         });
         return false;
@@ -414,7 +406,7 @@ export default defineComponent({
       if(!jsonObj.name || !jsonObj.name.trim() || typeof jsonObj.name !== 'string'){
         regexPatternErrorsToDisplay.value.push([{
           field: 'regex_pattern_name',
-          message: `Regex pattern - ${index}: name is required`
+          message: t("settings.importRegexPattern.nameRequired", { index })
         }]);
         return false;
       }
@@ -424,12 +416,12 @@ export default defineComponent({
       if(!jsonObj.pattern || !jsonObj.pattern.trim() || typeof jsonObj.pattern !== 'string'){
         regexPatternErrorsToDisplay.value.push([{
           field: 'regex_pattern',
-          message: `Regex pattern - ${index}: is required`
+          message: t("settings.importRegexPattern.patternRequired", { index })
         }]);
         return false;
       }
       if(typeof jsonObj.description !== 'string' && jsonObj.description !== null && jsonObj.description !== undefined){
-        regexPatternErrorsToDisplay.value.push([`Regex pattern - ${index}: description must be a string or should be empty`]);
+        regexPatternErrorsToDisplay.value.push([t("settings.importRegexPattern.descriptionMustBeString", { index })]);
         return false;
       }
       return true;
@@ -445,29 +437,29 @@ export default defineComponent({
           await regexPatternsService.create(store.state.selectedOrganization.identifier, payload);
           regexPatternCreators.value.push({
               success: true,
-              message: `Regex pattern - ${index}: "${jsonObj.name}" created successfully \nNote: please remove the created regex pattern object ${jsonObj.name} from the json file`,
+              message: t("settings.importRegexPattern.createSuccess", { index, name: jsonObj.name }),
           });
           return true;
       } catch (error: any) {
-          const errorMessage = error?.response?.data?.message || "Unknown Error";
+          const errorMessage = error?.response?.data?.message || t("settings.importRegexPattern.unknownError");
 
           // Check if it's a duplicate pattern error
           if (errorMessage.includes("already exists")) {
             toast({
-              message: `Pattern "${jsonObj.name}" already exists. Please use a different name.`,
+              message: t("settings.importRegexPattern.alreadyExists", { name: jsonObj.name }),
               variant: "error",
             });
           } else {
             // Show generic error notification for other errors
             toast({
-              message: `Failed to import pattern "${jsonObj.name}": ${errorMessage}`,
+              message: t("settings.importRegexPattern.importPatternFailed", { name: jsonObj.name, error: errorMessage }),
               variant: "error",
             });
           }
 
           regexPatternCreators.value.push({
               success: false,
-              message: `Regex pattern - ${index}: "${jsonObj.name}" creation failed --> \n Reason: ${errorMessage}`,
+              message: t("settings.importRegexPattern.createFailed", { index, name: jsonObj.name, error: errorMessage }),
           });
           return false;
       }
@@ -553,7 +545,7 @@ export default defineComponent({
     OSeparator,
     BaseImport,
     AppTabs,
-    AppPageHeader,
+    OPageLayout,
     OButton,
     OInput,
     BuiltInPatternsTab: defineAsyncComponent(
