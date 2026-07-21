@@ -18,8 +18,7 @@ use infra::{
     table::online_eval_jobs,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{EvalJobMessage, Message, MessageType};
-
-use crate::service::llm_evaluations::eval_jobs::reconciler;
+use openobserve_core::service::llm_evaluations::eval_jobs::reconciler;
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {

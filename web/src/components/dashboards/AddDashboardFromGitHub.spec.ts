@@ -748,7 +748,7 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(drawer.attributes("data-secondary-label")).toBe("Cancel");
     });
 
-    it("should show the select prompt on the ODrawer primary button when nothing is selected", async () => {
+    it("should expose the select prompt on the ODrawer primary button when nothing is selected", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
@@ -763,9 +763,7 @@ describe("AddDashboardFromGitHub Component", () => {
       ];
       await wrapper.vm.$nextTick();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-label")).toBe(
-        "Add 1 dashboard(s)",
-      );
+      expect(drawer.attributes("data-primary-label")).toBe("Add 1 dashboard(s)");
     });
 
     it("should disable the ODrawer primary button when no dashboards selected", async () => {
