@@ -502,6 +502,10 @@ pub async fn update_config(
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
+    // Remember the pre-update threshold so we can detect an actual change below and, if so,
+    // recompute the trained model's cutoff in place without a retrain.
+    let previous_threshold = existing.threshold;
+
     let mut active_model = existing.into_active_model();
 
     // Update only provided fields
@@ -510,6 +514,14 @@ pub async fn update_config(
     // Track whether we need to reset (delete + push) an existing trigger after save.
     // Used when schedule_interval changes so next_run_at reflects the new cadence.
     let mut reset_trigger_after_save = false;
+    // Track whether the threshold (percentile) actually changed, so we recompute the trained
+    // model's baked cutoff in place after the DB save — no retrain required. Only read behind
+    // the enterprise cfg below; in an OSS build it is assigned but unused (no recompute path).
+    #[cfg_attr(
+        not(feature = "enterprise"),
+        allow(unused_assignments, unused_variables)
+    )]
+    let mut new_threshold: Option<i32> = None;
     if let Some(enabled) = req.enabled {
         active_model.enabled = Set(enabled);
 
@@ -573,7 +585,11 @@ pub async fn update_config(
         active_model.detection_window_seconds = Set(detection_window_seconds);
     }
     if let Some(percentile) = req.percentile {
-        active_model.threshold = Set(percentile.clamp(50.0, 99.9) as i32);
+        let clamped = percentile.clamp(50.0, 99.9) as i32;
+        active_model.threshold = Set(clamped);
+        if clamped != previous_threshold {
+            new_threshold = Some(clamped);
+        }
     }
     if let Some(training_window_days) = req.training_window_days {
         active_model.training_window_days = Set(training_window_days.max(1));
@@ -608,6 +624,61 @@ pub async fn update_config(
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::anomaly_detection::cache::invalidate_config(&updated.anomaly_id)
         .await;
+
+    // If the threshold (percentile) changed on a trained config, recompute the model's baked
+    // cutoff in place from its persisted training-score distribution — no retrain needed. This
+    // runs AFTER invalidate_config so the fresh re-cache inside recompute wins. If the model is
+    // legacy (no sidecar) or recompute fails, fall back to forcing a one-time retrain so the
+    // change is never silently dropped. Training/detection (and thus the model + sidecar) live
+    // only on the alert_manager node, so this recompute happens where the model is; other
+    // super-cluster regions hold no model and only sync the config row for API reads.
+    // Skip while a (re)train is in flight (status == Training): the running trainer already
+    // reads `config.threshold` live and will bake the new percentile into the model it is about
+    // to produce, so recomputing the outgoing model would be wasted work and the fallback would
+    // clobber the in-progress retrain.
+    #[cfg(feature = "enterprise")]
+    if let Some(threshold) = new_threshold
+        && updated.is_trained
+        && updated.current_model_version > 0
+        && updated.status
+            != o2_enterprise::enterprise::anomaly_detection::types::Status::Training.to_i32()
+    {
+        let recomputed =
+            o2_enterprise::enterprise::anomaly_detection::threshold::recompute_threshold(
+                org_id,
+                &updated.anomaly_id,
+                updated.current_model_version,
+                threshold as f64,
+            )
+            .await;
+        match recomputed {
+            Ok(true) => {
+                log::info!(
+                    "[anomaly_detection {}] threshold recomputed in place (no retrain)",
+                    updated.anomaly_id
+                );
+            }
+            Ok(false) | Err(_) => {
+                if let Err(e) = recomputed.as_ref() {
+                    log::warn!(
+                        "[anomaly_detection {}] threshold recompute failed ({e}); forcing retrain",
+                        updated.anomaly_id
+                    );
+                } else {
+                    log::info!(
+                        "[anomaly_detection {}] no training-score sidecar; forcing one-time retrain to apply new threshold",
+                        updated.anomaly_id
+                    );
+                }
+                if let Err(e) = force_retrain_for_threshold(org_id, &updated.anomaly_id).await {
+                    log::warn!(
+                        "[anomaly_detection {}] failed to force retrain after threshold change: {e}",
+                        updated.anomaly_id
+                    );
+                }
+            }
+        }
+    }
 
     // Broadcast config update to all super cluster regions.
     #[cfg(feature = "enterprise")]
@@ -902,6 +973,50 @@ pub async fn clone_config(
         obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
     Ok(val)
+}
+
+/// Force a one-time retrain so a threshold change takes effect on a config whose model cannot
+/// be recomputed in place (legacy model with no training-score sidecar, or a recompute error).
+///
+/// Marks the config `Waiting` + `is_trained = false` — either condition makes the enterprise
+/// training scheduler pick it up on its next tick — and nudges the scheduler so it fires
+/// promptly. After that first retrain the training-score sidecar is persisted and all future
+/// threshold changes are recomputed in place with no retrain.
+#[cfg(feature = "enterprise")]
+async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<()> {
+    let db = ORM_CLIENT
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+
+    let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
+
+    // Don't clobber an in-flight (re)train: a training run already bakes the latest
+    // `config.threshold`, so the new percentile will land in the model it produces. Resetting
+    // status/is_trained here would interrupt it for no benefit.
+    if config.status
+        == o2_enterprise::enterprise::anomaly_detection::types::Status::Training.to_i32()
+    {
+        log::info!(
+            "[anomaly_detection {anomaly_id}] retrain already in progress; new threshold will be applied by it"
+        );
+        return Ok(());
+    }
+
+    let mut active = config.into_active_model();
+    // Status 0 = Waiting; is_trained = false — both route the config into the retrain queue.
+    active.status = Set(0i32);
+    active.is_trained = Set(false);
+    active.updated_at = Set(Utc::now().timestamp_micros());
+    active.update(db).await?;
+
+    // Nudge the training scheduler so the retrain fires promptly rather than on its next
+    // periodic sweep.
+    o2_enterprise::enterprise::anomaly_detection::scheduler::trigger_training(anomaly_id).await?;
+
+    Ok(())
 }
 
 /// Cancel an in-progress training run.
