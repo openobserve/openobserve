@@ -350,6 +350,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OEmptyState,
+    OSkeleton,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {

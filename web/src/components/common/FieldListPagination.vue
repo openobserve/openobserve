@@ -44,7 +44,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="person" size="xs" class="text-3xs!"></OIcon>
             <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
-              :data-test="`${dataTestPrefix}-fields-list-user-defined-fields-warning-tooltip`"
               :content="t('search.userDefinedSchemaLabel')"
               max-width="18.75rem"
               side="right"
@@ -54,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else-if="opt.slot === 'all_fields_slot'">
             <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
-              :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
               side="right"
               align="center"
@@ -101,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="opt.slot === 'all_fields_slot'">
             <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
-              :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
               max-width="18.75rem"
               side="right"
               align="center"
@@ -135,7 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pagination -->
       <div v-if="pagesNumber > 1" class="flex items-center gap-0.5">
         <OTooltip
-          :data-test="`${dataTestPrefix}-fields-list-pagination-tooltip`"
           :content="'Total Fields: ' + totalFieldsCount"
           max-width="18.75rem"
           side="left"
@@ -189,7 +185,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="$emit('reset-fields')"
         />
         <OTooltip
-          :data-test="`${dataTestPrefix}-fields-list-reset-tooltip`"
           :content="t('search.resetFields')"
           max-width="18.75rem"
           side="left"
