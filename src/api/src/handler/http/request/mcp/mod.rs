@@ -22,7 +22,7 @@ use axum::{
 };
 use futures_util::StreamExt;
 #[cfg(feature = "enterprise")]
-use openobserve_mcp::OAuthServerMetadata;
+use openobserve_mcp::{OAuthProtectedResourceMetadata, OAuthServerMetadata};
 use openobserve_mcp::{
     MCP_PROTOCOL_VERSION, MCPRequest, handle_mcp_request, handle_mcp_request_stream,
 };
@@ -348,6 +348,76 @@ pub async fn oauth_authorization_server_metadata() -> Response {
         .unwrap()
 }
 
+/// Handler for OAuth 2.0 Protected Resource Metadata (Enterprise)
+/// RFC 9728: https://datatracker.ietf.org/doc/html/rfc9728
+/// Public (no auth) — points MCP clients at the Dex authorization server.
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    get,
+    path = "/.well-known/oauth-protected-resource/{resource_path}",
+    context_path = "",
+    tag = "MCP",
+    operation_id = "OAuthProtectedResourceMetadata",
+    responses((status = 200, description = "Success", content_type = "application/json")),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn oauth_protected_resource_metadata(
+    Path(resource_path): Path<String>,
+) -> Response {
+    let cfg = config::get_config();
+    let o2_base = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
+    // resource_path is the captured suffix, e.g. "api/default/mcp"
+    let resource = format!("{}/{}", o2_base.trim_end_matches('/'), resource_path.trim_start_matches('/'));
+
+    let dex_config = o2_dex::config::get_config();
+    let auth_server = dex_config.dex_url.clone();
+
+    let metadata = OAuthProtectedResourceMetadata::build(&resource, &auth_server);
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(serde_json::to_string(&metadata).unwrap()))
+        .unwrap()
+}
+
+/// Handler for OAuth 2.0 Protected Resource Metadata (Non-Enterprise)
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    get,
+    path = "/.well-known/oauth-protected-resource/{resource_path}",
+    context_path = "",
+    tag = "MCP",
+    operation_id = "OAuthProtectedResourceMetadata",
+    responses((status = 404, description = "Not Found - enterprise only", content_type = "application/json")),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn oauth_protected_resource_metadata(
+    Path(_resource_path): Path<String>,
+) -> Response {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "error": "OAuth discovery is only available in enterprise edition"
+            }))
+            .unwrap(),
+        ))
+        .unwrap()
+}
+
+/// Bare-root probe: some clients GET `/.well-known/oauth-protected-resource` with no suffix.
+/// Delegates with an empty resource path (resource then = the O2 base + "/").
+#[cfg(feature = "enterprise")]
+pub async fn oauth_protected_resource_metadata_root() -> Response {
+    oauth_protected_resource_metadata(Path(String::new())).await
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn oauth_protected_resource_metadata_root() -> Response {
+    oauth_protected_resource_metadata(Path(String::new())).await
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{Value, json};
@@ -401,5 +471,15 @@ mod tests {
         openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
 
         assert!(!openobserve_mcp::tools::get_mcp_tools().is_empty());
+    }
+
+    #[tokio::test]
+    async fn protected_resource_metadata_responds() {
+        let response =
+            oauth_protected_resource_metadata(Path("api/default/mcp".to_string())).await;
+        // Enterprise: 200; OSS build: 404. Either is a valid, non-panicking response.
+        assert!(
+            response.status() == StatusCode::OK || response.status() == StatusCode::NOT_FOUND
+        );
     }
 }
