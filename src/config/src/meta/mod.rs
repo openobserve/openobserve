@@ -34,6 +34,7 @@ pub mod pipeline;
 pub mod plan;
 pub mod projections;
 pub mod promql;
+pub mod queue_store;
 pub mod ratelimit;
 pub mod search;
 pub mod self_reporting;
