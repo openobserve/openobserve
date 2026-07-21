@@ -8688,9 +8688,9 @@
         }
       },
       "selector": {
-        "title": "Span filter (optional)",
+        "title": "Which Spans (Optional)",
         "hint": {
-          "trace": "Choose which spans from an eligible trace are included. An empty filter includes all spans."
+          "trace": "Leave empty to include every span in the trace."
         }
       },
       "endSignal": {
@@ -8748,21 +8748,21 @@
         "createForScorerTitle": "Create a Span Selector for this scorer",
         "editorTitle": "Span Selector",
         "name": "Selector name",
-        "schemaMode": "Schema",
-        "defaultSchema": "Default GenAI schema",
-        "customSchema": "Custom schema",
-        "defaultSchemaHelp": "Emits the eight compact GenAI fields. Missing values are null.",
+        "schemaMode": "Fields To Read",
+        "defaultSchema": "Standard GenAI Fields",
+        "customSchema": "Custom Fields",
+        "defaultSchemaHelp": "These eight fields are read from every matching span. Anything missing comes through empty.",
         "fields": "Fields",
-        "fieldsHelp": "Select exact source-stream fields. No additional fields are emitted.",
-        "maximumSpans": "Maximum spans",
-        "budget": "Worst-case field-value budget: {used} / 40000 characters",
+        "fieldsHelp": "Only these fields are read \u2014 nothing else is sent to the scorer.",
+        "maximumSpans": "Maximum Spans",
+        "budget": "Limits how many spans are selected from the trace.",
         "validation": {
           "name": "Enter a selector name.",
           "duplicateName": "Selector names must be unique in this job.",
           "filter": "Complete or remove the unfinished filter condition.",
           "fields": "Select at least one field for a custom schema.",
           "maximumSpans": "Maximum spans must be a positive whole number.",
-          "budget": "Reduce the maximum spans or field count to fit the 40000-character budget.",
+          "budget": "Too many spans for the fields selected. Lower the span count, or read fewer fields.",
           "binding": "Select a Span Selector for every scorer."
         }
       },

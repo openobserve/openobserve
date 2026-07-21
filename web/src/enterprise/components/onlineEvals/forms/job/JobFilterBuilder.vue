@@ -1,5 +1,8 @@
 <template>
-  <div class="mb-4">
+  <!-- No outer margin: every parent spaces its children with `gap`, so an
+       mb-* here stacked on top of that and left an oversized hole beneath the
+       filter (worst in the Span Selector drawer, gap-5 + mb-4). -->
+  <div>
     <div class="flex flex-col gap-0.5 mb-2">
       <span
         class="text-compact leading-tight font-medium text-input-label-text"

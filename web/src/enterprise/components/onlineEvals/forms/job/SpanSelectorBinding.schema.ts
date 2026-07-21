@@ -2,6 +2,16 @@ import { z } from "zod";
 
 type Translate = (key: string) => string;
 
+/**
+ * Worst-case characters a Span Selector may emit into a scorer prompt.
+ * Was hardcoded here AND twice in SpanSelectorBinding.vue AND written into two
+ * translated strings — five copies of one number.
+ */
+export const SPAN_SELECTOR_BUDGET_CHARS = 40000;
+
+/** Assumed worst-case characters per field value, used to size the budget. */
+export const SPAN_SELECTOR_CHARS_PER_FIELD = 1000;
+
 export const makeSpanSelectorSchema = (
   t: Translate,
   options: {
@@ -54,7 +64,10 @@ export const makeSpanSelectorSchema = (
         value.fieldMode === "default"
           ? options.defaultFieldCount
           : value.fields.length;
-      if (value.maximumSpans * fieldCount * 1000 > 40000) {
+      if (
+        value.maximumSpans * fieldCount * SPAN_SELECTOR_CHARS_PER_FIELD >
+        SPAN_SELECTOR_BUDGET_CHARS
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["maximumSpans"],

@@ -46,7 +46,9 @@
       data-test="span-selector-drawer"
       @click:secondary="drawerOpen = false"
     >
-      <OForm :id="formId" :form="form" class="flex flex-col gap-4 p-4">
+      <!-- No p-4: ODrawer already applies the app-wide body inset. gap-5 is the
+           mandated OForm field spacing (was gap-4, with gap-2 nested inside). -->
+      <OForm :id="formId" :form="form" class="flex flex-col gap-5">
         <OFormInput
           name="name"
           :label="t('onlineEvals.job.spanSelector.name')"
@@ -75,24 +77,36 @@
           </template>
         </component>
 
-        <OFormSelect
+        <!-- Two mutually exclusive choices — a radio group rather than a
+             dropdown that must be opened to reveal it holds only two options.
+             Same pattern as AddEnrichmentTable.vue. -->
+        <OFormOptionGroup
           name="fieldMode"
           :label="t('onlineEvals.job.spanSelector.schemaMode')"
           :options="fieldModeOptions"
+          orientation="horizontal"
           required
-          size="sm"
           data-test="span-selector-field-mode"
         />
 
         <div
           v-if="formValues.fieldMode === 'default'"
-          class="flex flex-col gap-2"
+          class="flex flex-col gap-1.5"
         >
           <span class="text-xs text-input-help-text leading-none">
             {{ t("onlineEvals.job.spanSelector.defaultSchemaHelp") }}
           </span>
-          <div class="flex flex-wrap gap-1">
-            <OTag v-for="field in DEFAULT_FIELDS" :key="field" size="xs">
+          <!-- These are the actual field names that reach the scorer, so they
+               read as data rather than chrome: a colour variant instead of the
+               default grey, and sm so the long gen_ai_* names stay legible. -->
+          <div class="flex flex-wrap gap-1.5">
+            <OTag
+              v-for="field in DEFAULT_FIELDS"
+              :key="field"
+              variant="primary-soft"
+              size="sm"
+              :data-test="`span-selector-default-field-${field}`"
+            >
               {{ field }}
             </OTag>
           </div>
@@ -107,19 +121,20 @@
           multiple
           searchable
           required
-          size="sm"
+          size="md"
           data-test="span-selector-fields"
         />
 
+        <!-- Last: the cap is bounded by how many fields were chosen above, so
+             it reads after that choice. The size rule itself lives in
+             SpanSelectorBinding.schema.ts and is enforced on save — not
+             recomputed here. -->
         <OFormInput
           name="maximumSpans"
           :label="t('onlineEvals.job.spanSelector.maximumSpans')"
           type="number"
           min="1"
-          :max="maximumAllowedSpans"
-          :help-text="
-            t('onlineEvals.job.spanSelector.budget', { used: outputBudget })
-          "
+          :help-text="t('onlineEvals.job.spanSelector.budget')"
           required
           size="sm"
           data-test="span-selector-maximum-spans"
@@ -140,6 +155,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormOptionGroup from "@/lib/forms/OptionGroup/OFormOptionGroup.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -232,17 +248,6 @@ const formValues = form.useStore(
 
 const boundSelector = computed(() =>
   props.selectors.find((selector) => selector.id === props.binding),
-);
-const fieldCount = computed(() =>
-  formValues.value.fieldMode === "default"
-    ? DEFAULT_FIELDS.length
-    : formValues.value.fields.length,
-);
-const outputBudget = computed(
-  () => Number(formValues.value.maximumSpans || 0) * fieldCount.value * 1000,
-);
-const maximumAllowedSpans = computed(() =>
-  Math.max(1, Math.floor(40000 / Math.max(1, fieldCount.value * 1000))),
 );
 
 function generatedId() {
