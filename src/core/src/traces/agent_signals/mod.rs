@@ -13,40 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod actions;
-pub mod agent_signals;
-pub mod ai;
-pub mod alerts;
-pub mod cluster;
-pub mod correlation;
-pub mod dashboards;
-pub mod destinations;
-pub mod enrichment_table;
-pub mod folder;
-pub mod function;
-pub mod gen_ai;
-pub mod inverted_index;
-pub mod logger;
-pub mod meta_store;
-pub mod model_pricing;
-pub mod organization;
-pub mod otlp;
-pub mod pipeline;
-pub mod plan;
-pub mod projections;
-pub mod promql;
-pub mod ratelimit;
-pub mod search;
-pub mod self_reporting;
-pub mod service_graph;
-pub mod service_streams;
-pub mod session;
-pub mod short_url;
-pub mod sql;
-pub mod stream;
-pub mod synthetics;
-pub mod system_settings;
-pub mod timed_annotations;
-pub mod traces;
-pub mod triggers;
-pub mod user;
+pub mod aggregator;
+pub mod api;
+pub mod processor;
+pub use aggregator::write_agent_signals;
+pub use api::get_agent_signals;
+#[cfg(feature = "enterprise")]
+pub use processor::process_agent_signals_stream;

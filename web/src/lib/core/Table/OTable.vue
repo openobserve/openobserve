@@ -1090,6 +1090,7 @@ defineExpose({
       <OTableEmpty
         v-if="showEmpty"
         :message="props.emptyMessage"
+        :floor="!props.fillHeight"
       >
         <template v-if="slots.empty" #default>
           <slot name="empty" />
