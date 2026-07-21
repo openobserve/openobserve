@@ -124,23 +124,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
           class="login-inputs"
         >
-          <div class="flex flex-col gap-3">
-            <OInput
-              v-model="name"
+          <OForm
+            :schema="loginSchema"
+            :default-values="loginDefaults"
+            @submit="onSignIn"
+            class="flex flex-col gap-3"
+          >
+            <OFormInput
+              name="name"
               data-cy="login-user-id"
               data-test="login-user-id"
               :label="`${t('login.userEmail')} *`"
-              placeholder="Email"
+              :placeholder="t('login.email')"
               type="email"
+              required
             />
 
-            <OInput
-              v-model="password"
+            <OFormInput
+              name="password"
               data-cy="login-password"
               data-test="login-password"
               :label="`${t('login.password')} *`"
-              placeholder="Password"
+              :placeholder="t('login.password')"
               type="password"
+              required
             />
 
             <OButton
@@ -151,11 +158,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               block
               type="submit"
               :loading="submitting"
-              @click="onSignIn()"
             >
               {{ t('login.login') }}
             </OButton>
-          </div>
+          </OForm>
         </div>
       </div>
     </div>
@@ -183,14 +189,16 @@ import { computed } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
+import OForm from '@/lib/forms/Form/OForm.vue';
+import OFormInput from '@/lib/forms/Input/OFormInput.vue';
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeLoginSchema, loginDefaults, type LoginForm } from "./Login.schema";
 
 export default defineComponent({
   name: "PageLogin",
-  components: { OButton, OInput },
+  components: { OButton, OForm, OFormInput },
 
   setup() {
     const store = useStore();
@@ -210,6 +218,12 @@ export default defineComponent({
     const submitting = ref(false);
 
     const loginAsInternalUser = ref(false);
+
+    // Zod schema for the internal-user login form (email + required password).
+    // Built via the i18n factory and RETURNED from setup() so `:schema` resolves
+    // in the Options-API template (a module-scope import is out of the template's
+    // scope, which would silently disable validation).
+    const loginSchema = makeLoginSchema(t);
 
     onBeforeMount(() => {
 
@@ -247,8 +261,14 @@ export default defineComponent({
       }
     };
 
-    const onSignIn = () => {
-      if (name.value == "" || password.value == "") {
+    // Called by OForm's @submit with the schema-validated values. Still accepts
+    // no argument (falls back to the name/password refs) so it can be invoked
+    // directly — the empty-field guard below stays as defense in depth even
+    // though the schema now blocks empty/invalid submits before we get here.
+    const onSignIn = (values?: LoginForm) => {
+      const nameValue = values?.name ?? name.value;
+      const passwordValue = values?.password ?? password.value;
+      if (nameValue == "" || passwordValue == "") {
         toast({
           variant: "warning",
           message: "Please input valid username or password.",
@@ -259,23 +279,23 @@ export default defineComponent({
           //authorize user using username and password
           authService
             .sign_in_user({
-              name: name.value,
-              password: password.value,
+              name: nameValue,
+              password: passwordValue,
             })
             .then(async (res: any) => {
               //if user is authorized, get user info
               if (res.data.status == true) {
                 //get user info from backend and extract auth token and set it into localstorage
-                const authToken = getBasicAuth(name.value, password.value);
+                const authToken = getBasicAuth(nameValue, passwordValue);
                 const userInfo = {
-                  given_name: name.value,
+                  given_name: nameValue,
                   auth_time: Math.floor(Date.now() / 1000),
-                  name: name.value,
+                  name: nameValue,
                   exp: Math.floor(
                     (new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000,
                   ),
                   family_name: "",
-                  email: name.value,
+                  email: nameValue,
                   role: res.data.role,
                 };
                 const encodedUserInfo: any = b64EncodeStandard(
@@ -429,6 +449,8 @@ export default defineComponent({
       email,
       submitting,
       onSignIn,
+      loginSchema,
+      loginDefaults,
       tab: ref("signin"),
       innerTab: ref("signup"),
       store,

@@ -1409,7 +1409,10 @@
     "cnfpassword": "Confirm Password",
     "singnInWithGoogle": "Continue with Google",
     "email": "Email",
-    "login": "Login"
+    "login": "Login",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Please enter a valid email",
+    "passwordRequired": "Password is required"
   },
   "user": {
     "header": "Organization Member",
