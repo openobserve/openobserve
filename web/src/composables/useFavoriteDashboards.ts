@@ -87,11 +87,41 @@ export function useFavoriteDashboards() {
     }
   };
 
+  // Drop favorites pointing at dashboards that no longer exist (deleted from
+  // their folder). Without this the Favorites view keeps rendering a ghost row
+  // from the stored label, and acting on it hits the API with a dead id.
+  const removeFavorites = async (
+    org: string,
+    userId: string,
+    dashboardIds: string[],
+  ) => {
+    if (!org || !userId || !dashboardIds.length) return;
+    const ids = new Set(dashboardIds);
+    const prev = favorites.value;
+    const next = prev.filter((f) => !ids.has(f.dashboardId));
+    if (next.length === prev.length) return; // none of them were favorited
+    favorites.value = next;
+    try {
+      await settings.setUserSetting(
+        org,
+        userId,
+        SETTING_KEY,
+        favorites.value,
+        SETTING_CATEGORY,
+      );
+    } catch {
+      // Best-effort cleanup that trails a successful delete — leave the local
+      // list pruned so the row disappears now, and let the next load() reconcile
+      // rather than resurrecting a row for a dashboard that is already gone.
+    }
+  };
+
   return {
     favorites,
     isLoading,
     isFavorite,
     load,
     toggleFavorite,
+    removeFavorites,
   };
 }
