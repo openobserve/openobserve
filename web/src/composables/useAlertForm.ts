@@ -98,6 +98,7 @@ import {
 } from "@/utils/alerts/anomalyFilterOperators";
 import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import config from "@/aws-exports";
+import { isWorkflowsEnabled } from "@/utils/featureGates";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
   makeAddAlertSchema,
@@ -305,10 +306,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // delivered to a destination OR a workflow, which relaxes "destinations ≥ 1"
   // into "at least one of the two". In OSS this stays false and the rule (and
   // its message) is byte-identical to before.
-  const addAlertSchema = makeAddAlertSchema(
-    t,
-    config.isEnterprise === "true" || config.isCloud === "true",
-  );
+  // Also respects the backend /config flag: on an enterprise build with
+  // workflows switched OFF the picker has no Workflows group, so relaxing the
+  // rule would surface "destination or workflow required" for a choice the user
+  // cannot make. Falls back to the strict "destination required" rule, which is
+  // the same rule OSS gets. (Built once in setup — if /config has not landed
+  // yet this is the stricter of the two, which is the safe direction.)
+  const addAlertSchema = makeAddAlertSchema(t, isWorkflowsEnabled());
   const form = useOForm({
     defaultValues: buildDefaultForm() as Record<string, unknown>,
     schema: addAlertSchema,

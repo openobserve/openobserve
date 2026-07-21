@@ -17,11 +17,25 @@ import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
+import { isWorkflowsDisabled } from "@/utils/featureGates";
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (enterprise O2_SYNTHETICS_ENABLED). Direct URL access redirects home when off.
 const syntheticsRouteGuard = (to: any, from: any, next: any) => {
   if (store.state.zoConfig?.synthetics_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
+// Workflows are gated on BOTH the enterprise/cloud build and the backend
+// /config flag `workflows_enabled`. Redirect home on direct URL access when the
+// flag is explicitly off. Uses isWorkflowsDisabled (not !isWorkflowsEnabled) so a
+// deep link is not bounced during the startup window where /config has not landed
+// yet — see the note in featureGate.ts.
+const workflowsRouteGuard = (to: any, from: any, next: any) => {
+  if (isWorkflowsDisabled()) {
     next("/");
     return;
   }
@@ -236,7 +250,7 @@ const useEnterpriseRoutes = () => {
         title: "Workflows",
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
+        workflowsRouteGuard(to, from, next);
       },
       children: [
         {
@@ -245,7 +259,7 @@ const useEnterpriseRoutes = () => {
           component: WorkflowEditor,
           meta: { title: "New Workflow" },
           beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
+            workflowsRouteGuard(to, from, next);
           },
         },
         {
@@ -254,7 +268,7 @@ const useEnterpriseRoutes = () => {
           component: WorkflowEditor,
           meta: { title: "Edit Workflow" },
           beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
+            workflowsRouteGuard(to, from, next);
           },
         },
         {
@@ -266,7 +280,7 @@ const useEnterpriseRoutes = () => {
           component: WorkflowRuns,
           meta: { title: "Workflow Runs" },
           beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
+            workflowsRouteGuard(to, from, next);
           },
         },
       ],

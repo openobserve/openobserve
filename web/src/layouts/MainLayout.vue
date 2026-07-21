@@ -180,6 +180,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
+import { isWorkflowsEnabled as workflowsEnabled } from "@/utils/featureGates";
 
 import { setLanguage } from "../utils/cookies";
 import { getLocale } from "../locales";
@@ -343,9 +344,11 @@ export default defineComponent({
     });
 
     // Workflows — enterprise/cloud only (FD3). Build-time gate, no runtime flag.
-    const isWorkflowsEnabled = computed(() => {
-      return config.isEnterprise == "true" || config.isCloud == "true";
-    });
+    // Enterprise/cloud build AND the backend `/config` flag `workflows_enabled`.
+    // Reactive so the menu picks it up regardless of whether the config response
+    // arrived before or after mount — the shared gate is the same one the routes
+    // and the alert workflow picker use.
+    const isWorkflowsEnabled = computed(() => workflowsEnabled());
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
     // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
@@ -615,29 +618,39 @@ export default defineComponent({
 
     // Insert the Workflows entry after Actions (fallback: Alerts). Idempotent.
     const updateWorkflowsMenu = () => {
-      if (!isWorkflowsEnabled.value) return;
-
-      const workflowExists = linksList.value.some(
+      const existingIndex = linksList.value.findIndex(
         (link) => link.name === "workflows",
       );
-      if (workflowExists) return;
 
-      const actionIndex = linksList.value.findIndex(
-        (link) => link.name === "actionScripts",
-      );
-      const alertIndex = linksList.value.findIndex(
-        (link) => link.name === "alertList",
-      );
-      const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
-      if (anchor === -1) return;
+      if (isWorkflowsEnabled.value) {
+        if (existingIndex !== -1) return;
 
-      linksList.value.splice(anchor + 1, 0, {
-        title: t("menu.workflows"),
-        icon: "schema",
-        link: "/workflows",
-        name: "workflows",
-      });
+        const actionIndex = linksList.value.findIndex(
+          (link) => link.name === "actionScripts",
+        );
+        const alertIndex = linksList.value.findIndex(
+          (link) => link.name === "alertList",
+        );
+        const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
+        if (anchor === -1) return;
+
+        linksList.value.splice(anchor + 1, 0, {
+          title: t("menu.workflows"),
+          icon: "schema",
+          link: "/workflows",
+          name: "workflows",
+        });
+      } else if (existingIndex !== -1) {
+        // The entry must be REMOVED, not just skipped: the menu is rebuilt on
+        // org switch and `workflows_enabled` can differ per deployment, so an
+        // add-only guard would leave a stale entry behind.
+        linksList.value.splice(existingIndex, 1);
+      }
     };
+
+    // If `/config` resolves after this component mounted (or the flag flips),
+    // keep the menu in sync — same contract as the other flag-driven entries.
+    watch(isWorkflowsEnabled, () => updateWorkflowsMenu(), { immediate: false });
     const splitterModel = ref(100);
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
