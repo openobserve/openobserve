@@ -503,9 +503,11 @@ export class HomePage {
      * @returns {Promise<boolean>} - True if dark mode is active
      */
     async isDarkMode() {
-        // Read the body class via page.evaluate (the dark-theme class lives on
-        // document.body and is not addressable via a data-test attribute).
-        return await this.page.evaluate(() => document.body.classList.contains('body--dark'));
+        // The dark-mode signal is the `.dark` class on <html>
+        // (document.documentElement) — set by utils/theme.ts. The legacy Quasar
+        // `body--dark` class on <body> was retired in the design-token
+        // migration (#13173).
+        return await this.page.evaluate(() => document.documentElement.classList.contains('dark'));
     }
 
     /**
