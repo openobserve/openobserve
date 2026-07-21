@@ -1,18 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for schema.vue's "Add Field(s)" flow. The dynamic rows are
-// rendered by the (now form-only) StreamFieldInputs, so schema.vue owns a small
-// TanStack form whose only field is the `newSchemaFields` array.
+// rendered by StreamFieldInputs, so schema.vue owns a small TanStack form whose
+// only field is the `newSchemaFields` array. schema.vue's `onSubmit` runs this
+// validation and bails when a row is invalid.
 //
-// GATED (Option A — parity with AddStream). Before the form-only migration,
-// schema.vue showed an inline field-name regex error while typing but did NOT
-// block the save, so invalid names (e.g. "user!id") were silently accepted and
-// pushed into `defined_schema_fields`. This schema restores the validation AND
-// gates the save on it: schema.vue's `onSubmit` runs the form's validation and
-// bails when a row is invalid (see the gate there).
-//
-// IMPORTANT — validate the NORMALIZED name, not the raw one. Unlike AddStream's
-// strict `makeStreamFieldRowSchema(t)` (which rejects the raw value), schema.vue
+// IMPORTANT — validate the NORMALIZED name, not the raw one. schema.vue
 // normalizes each name at save time (trim + lowercase + space/hyphen → "_"), so
 // "my field" and "my-field" legitimately become "my_field". Judging the raw
 // value would wrongly block those. We therefore validate each name the way it
@@ -30,7 +23,7 @@ const normalizeFieldName = (v: string): string =>
  * Build the "Add Field(s)" form schema.
  *
  * @param t useI18n's `t`, so required messages resolve from the shared
- *   `logStream.*` keys (also used by AddStream / PR #13077).
+ *   `logStream.*` keys.
  */
 export const makeSchemaFieldsSchema = (t: (_key: string) => string) =>
   z.object({

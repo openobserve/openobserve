@@ -31,7 +31,7 @@ const mockLinks: NavItem[] = [
 
 const menuLinkStub = {
   template:
-    '<a class="q-item" :data-test="\'menu-link-\' + linkName + \'-item\'" @mouseenter="$emit(\'menu-hover\', link)"><slot /></a>',
+    '<a :data-test="\'menu-link-\' + linkName + \'-item\'" @mouseenter="$emit(\'menu-hover\', link)"><slot /></a>',
   props: ["linkName", "mini", "title", "icon", "link", "name", "exact", "display", "hide"],
   emits: ["menu-hover"],
   inheritAttrs: true,

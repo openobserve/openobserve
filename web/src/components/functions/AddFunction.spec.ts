@@ -6,6 +6,7 @@ import { createStore } from 'vuex';
 import { createI18n } from 'vue-i18n';
 import { nextTick } from 'vue';
 import { createRouter, createWebHistory } from 'vue-router';
+import config from '@/aws-exports';
 
 // Mock dependencies
 vi.mock('@/services/jstransform', () => ({
@@ -21,24 +22,33 @@ vi.mock('@/services/segment_analytics', () => ({
   },
 }));
 
-const mockStore = createStore({
-  state: {
-    theme: 'light',
-    isAiChatEnabled: false,
-    zoConfig: {
-      ai_enabled: false,
+// Mutable so each test can pick the entitlement BEFORE mounting (the gate is a
+// computed over a plain config object — it evaluates per component instance).
+vi.mock('@/aws-exports', () => ({
+  default: { isEnterprise: 'false', isCloud: 'false' },
+}));
+
+const makeStore = (orgIdentifier = 'test-org') =>
+  createStore({
+    state: {
+      theme: 'light',
+      isAiChatEnabled: false,
+      zoConfig: {
+        ai_enabled: false,
+      },
+      selectedOrganization: {
+        identifier: orgIdentifier,
+      },
+      userInfo: {
+        email: 'test@example.com',
+      },
     },
-    selectedOrganization: {
-      identifier: 'test-org',
+    actions: {
+      setIsAiChatEnabled: vi.fn(),
     },
-    userInfo: {
-      email: 'test@example.com',
-    },
-  },
-  actions: {
-    setIsAiChatEnabled: vi.fn(),
-  },
-});
+  });
+
+const mockStore = makeStore();
 
 const mockRouter = createRouter({
   history: createWebHistory(),
@@ -104,17 +114,83 @@ describe('AddFunction.vue Branch Coverage', () => {
     'ConfirmDialog': true,
     'O2AIChat': true,
   };
-  const mountAddFunction = (props: any = defaultProps) =>
+  // `org` lets a test pick the selected organization (the _meta org keeps JS on
+  // OSS); omitted, it uses the default "test-org" store.
+  const mountAddFunction = (props: any = defaultProps, org?: string) =>
     mount(AddFunction, {
       props,
       global: {
         plugins: [mockI18n, mockRouter],
-        provide: { store: mockStore },
+        provide: { store: org ? makeStore(org) : mockStore },
         stubs,
       },
     });
   const getForm = (wrapper: any) =>
     (wrapper.findComponent(OForm).vm as any).form;
+
+  // JavaScript functions are an enterprise/cloud entitlement; OSS stays VRL-only.
+  // The gate drives the VRL/JS radio options, which in turn drive the editor
+  // language + placeholder — so getting it wrong silently mislabels the editor.
+  describe('JS entitlement gate (enterprise/cloud only)', () => {
+    const values = (wrapper: any) =>
+      ((wrapper.vm as any).transformTypeOptions as any[]).map((o) => o.value);
+
+    beforeEach(() => {
+      (config as any).isEnterprise = 'false';
+      (config as any).isCloud = 'false';
+    });
+
+    it('OSS: offers VRL only — no JavaScript option', () => {
+      expect(values(mountAddFunction())).toEqual(['0']);
+    });
+
+    it('enterprise: offers VRL + JavaScript', () => {
+      (config as any).isEnterprise = 'true';
+      expect(values(mountAddFunction())).toEqual(['0', '1']);
+    });
+
+    it('cloud: offers VRL + JavaScript', () => {
+      (config as any).isCloud = 'true';
+      expect(values(mountAddFunction())).toEqual(['0', '1']);
+    });
+
+    it('is no longer tied to the _meta org (any enterprise org gets JS)', () => {
+      // the old rule keyed ONLY off selectedOrganization === "_meta"; the store
+      // here is "test-org", so JS must appear purely from the entitlement.
+      (config as any).isEnterprise = 'true';
+      expect(values(mountAddFunction())).toContain('1');
+    });
+
+    it('OSS _meta org still gets JS (pre-existing SSO claim-parsing behavior)', () => {
+      // _meta predates the enterprise entitlement — it must keep JS on OSS.
+      const wrapper = mountAddFunction(defaultProps, '_meta');
+      expect(values(wrapper)).toEqual(['0', '1']);
+    });
+
+    it('OSS non-_meta org gets no JS', () => {
+      expect(values(mountAddFunction(defaultProps, 'some-org'))).toEqual(['0']);
+    });
+
+    it('OSS but EDITING an existing JS function: keeps the JS option', () => {
+      // otherwise the radio renders with nothing selected and the editor would
+      // silently fall back to VRL for a JS function.
+      const wrapper = mountAddFunction({
+        ...defaultProps,
+        isUpdated: true,
+        modelValue: { ...defaultProps.modelValue, transType: '1' },
+      });
+      expect(values(wrapper)).toEqual(['0', '1']);
+    });
+
+    it('OSS editing a VRL function: still no JS option', () => {
+      const wrapper = mountAddFunction({
+        ...defaultProps,
+        isUpdated: true,
+        modelValue: { ...defaultProps.modelValue, transType: '0' },
+      });
+      expect(values(wrapper)).toEqual(['0']);
+    });
+  });
 
   describe('Update vs Create Logic (real OForm submit)', () => {
     it('calls create when not updating and the name is valid', async () => {

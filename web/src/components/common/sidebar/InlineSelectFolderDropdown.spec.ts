@@ -183,7 +183,7 @@ describe("InlineSelectFolderDropdown.vue", () => {
       expect(wrapper.vm.$options.name).toBe("InlineSelectFolderDropdown");
     });
 
-    it("renders the q-select", () => {
+    it("renders the select", () => {
       wrapper = createWrapper();
       expect(wrapper.find(".o-select-stub").exists()).toBe(true);
     });
@@ -236,13 +236,13 @@ describe("InlineSelectFolderDropdown.vue", () => {
       expect(wrapper.find('[data-test="o-button-stub"]').exists()).toBe(false);
     });
 
-    it("forwards disable=true to q-select stub", () => {
+    it("forwards disable=true to the select stub", () => {
       wrapper = createWrapper({ disable: true });
       const select = wrapper.find(".o-select-stub");
       expect(select.attributes("data-disable")).toBe("true");
     });
 
-    it("forwards disable=false to q-select stub by default", () => {
+    it("forwards disable=false to the select stub by default", () => {
       wrapper = createWrapper();
       const select = wrapper.find(".o-select-stub");
       expect(select.attributes("data-disable")).toBe("false");
@@ -434,10 +434,10 @@ describe("InlineSelectFolderDropdown.vue", () => {
     });
   });
 
-  // ─── Emit: update:modelValue from q-select ──────────────────────────────────
+  // ─── Emit: update:modelValue from the select ──────────────────────────────────
 
-  describe("q-select model value", () => {
-    it("emits 'update:modelValue' when q-select updates", async () => {
+  describe("select model value", () => {
+    it("emits 'update:modelValue' when the select updates", async () => {
       wrapper = createWrapper();
 
       const select = wrapper.find(".o-select-stub select");
@@ -450,7 +450,7 @@ describe("InlineSelectFolderDropdown.vue", () => {
       expect(emitted![0]).toEqual(["folder-1"]);
     });
 
-    it("passes the modelValue prop down to q-select", () => {
+    it("passes the modelValue prop down to the select", () => {
       wrapper = createWrapper({ modelValue: "folder-2" });
       const select = wrapper.find(".o-select-stub select");
       expect((select.element as HTMLSelectElement).value).toBe("folder-2");

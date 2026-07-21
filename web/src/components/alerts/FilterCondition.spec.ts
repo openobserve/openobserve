@@ -243,7 +243,7 @@ describe('FilterCondition.vue Branch Coverage', () => {
     });
   });
 
-  // TODO: filterColumns internal API was removed when q-select was replaced with OSelect.
+  // TODO: filterColumns internal API was removed when the select was replaced with OSelect.
   // These tests need rewriting against the new OSelect filter API.
   describe.skip('Filter Functionality Branch Coverage', () => {
     it('should reset filtered fields when filter value is empty', async () => {
@@ -357,26 +357,6 @@ describe('FilterCondition.vue Branch Coverage', () => {
   });
 
   describe('Event Emission Branch Coverage', () => {
-    it('should emit events on model updates', async () => {
-      const wrapper = mount(FilterCondition, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
-        },
-      });
-
-      // Test column update event — OSelect replaces QSelect post-migration
-      const columnSelect = wrapper.findComponent({ name: 'OSelect' });
-      await columnSelect.vm.$emit('update:model-value', 'field1');
-
-      // Should emit input:update event
-      expect(wrapper.emitted('input:update')).toBeTruthy();
-      expect(wrapper.emitted('input:update')?.[0]).toEqual(['conditions', defaultProps.condition]);
-    });
-
     it('should call delete, add, and add-group functions', async () => {
       const wrapper = mount(FilterCondition, {
         props: defaultProps,
@@ -477,7 +457,10 @@ describe('FilterCondition.vue Form Mode (namePrefix + OForm)', () => {
   // ["query_condition", "conditions"]).
   const mountFormHost = (
     condition: Record<string, unknown>,
-    { namePrefix = 'tree.conditions[0]' }: { namePrefix?: string } = {},
+    {
+      namePrefix = 'tree.conditions[0]',
+      allowCustomColumns = false,
+    }: { namePrefix?: string; allowCustomColumns?: boolean } = {},
   ) => {
     const tree = reactive({
       filterType: 'group',
@@ -502,6 +485,7 @@ describe('FilterCondition.vue Form Mode (namePrefix + OForm)', () => {
           defaults: { tree },
           streamFields,
           namePrefix,
+          allowCustomColumns,
         };
       },
       template: `
@@ -514,6 +498,7 @@ describe('FilterCondition.vue Form Mode (namePrefix + OForm)', () => {
             :depth="0"
             :is-first-in-group="true"
             :name-prefix="namePrefix"
+            :allow-custom-columns="allowCustomColumns"
           />
         </OForm>`,
     });
@@ -617,40 +602,86 @@ describe('FilterCondition.vue Form Mode (namePrefix + OForm)', () => {
     expect(wrapper.text()).not.toContain('Field is required!');
   });
 
-  it('falls back to BARE mode when no namePrefix is passed — even inside an OForm (pipeline safety)', () => {
-    const { wrapper } = mountFormHost(makeCondition({ column: 'field1' }), {
-      namePrefix: '',
+  // ── Custom columns (`allowCustomColumns`) ────────────────────────────────
+  // A user may type a column that is not in streamFields and press Enter; the
+  // select only EMITS `create` with the typed term — it does not set the value.
+  // FilterCondition must add the option AND write the value THROUGH the form
+  // (the bound `condition` is the readonly read-view).
+  //
+  // #13277 made FilterCondition form-mode only but dropped `@create` and the
+  // custom-column accumulator, silently killing this affordance for pipelines
+  // (whose guidelines tell users to press Enter), workflows, and enterprise
+  // JobFilterBuilder. These tests pin it so it cannot be dropped again.
+  describe('custom column creation', () => {
+    const columnSelect = (wrapper: any) =>
+      wrapper.findAllComponents(OFormSelect)[0];
+
+    it('marks the column select creatable when allowCustomColumns is on', () => {
+      const { wrapper } = mountFormHost(makeCondition(), {
+        allowCustomColumns: true,
+      });
+      expect(columnSelect(wrapper).props('creatable')).toBe(true);
     });
 
-    // No OForm* wrappers — the bare v-model controls render instead, so a
-    // form-owning consumer (pipeline's Condition.vue) is untouched until it
-    // opts in by passing a prefix.
-    expect(wrapper.findAllComponents(OFormSelect)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OFormInput)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OSelect).length).toBe(2);
-    expect(wrapper.findComponent(OInput).exists()).toBe(true);
-  });
-
-  it('falls back to BARE mode when namePrefix is set but no OForm context exists', () => {
-    const wrapper = mount(FilterCondition, {
-      props: {
-        condition: makeCondition({ column: 'field1' }),
-        streamFields,
-        index: 0,
-        label: 'and',
-        depth: 0,
-        isFirstInGroup: true,
-        namePrefix: 'tree.conditions[0]',
-      },
-      global: {
-        plugins: [mockI18n],
-        provide: { store: mockStore },
-      },
+    it('is not creatable by default', () => {
+      const { wrapper } = mountFormHost(makeCondition());
+      expect(columnSelect(wrapper).props('creatable')).toBe(false);
     });
 
-    expect(wrapper.findAllComponents(OFormSelect)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OFormInput)).toHaveLength(0);
-    expect(wrapper.findAllComponents(OSelect).length).toBe(2);
-    expect(wrapper.findComponent(OInput).exists()).toBe(true);
+    it('adds the typed term as an option AND writes it into the form', async () => {
+      const { wrapper, form } = mountFormHost(makeCondition(), {
+        allowCustomColumns: true,
+      });
+      const select = columnSelect(wrapper);
+
+      await select.vm.$emit('create', 'my_custom_col');
+      await nextTick();
+
+      // written through the form, not onto the readonly read-view...
+      expect(form.state.values.tree.conditions[0].column).toBe('my_custom_col');
+      // ...and present in the options so it renders instead of showing blank.
+      expect(
+        (select.props('options') as any[]).some(
+          (o) => o.value === 'my_custom_col',
+        ),
+      ).toBe(true);
+      expect(wrapper.findComponent(FilterCondition).emitted('input:update')).toBeTruthy();
+    });
+
+    it('keeps a custom column after the field list is re-filtered (search)', async () => {
+      const { wrapper } = mountFormHost(makeCondition(), {
+        allowCustomColumns: true,
+      });
+      const select = columnSelect(wrapper);
+
+      await select.vm.$emit('create', 'kept_col');
+      await nextTick();
+      // Searching rebuilds filteredFields from allColumns(); a custom column
+      // that lived only in filteredFields would vanish here.
+      await select.vm.$emit('search', 'kept');
+      await nextTick();
+
+      expect(
+        (select.props('options') as any[]).some((o) => o.value === 'kept_col'),
+      ).toBe(true);
+    });
+
+    it('ignores blank terms and does not duplicate an existing column', async () => {
+      const { wrapper, form } = mountFormHost(makeCondition(), {
+        allowCustomColumns: true,
+      });
+      const select = columnSelect(wrapper);
+
+      await select.vm.$emit('create', '   ');
+      await nextTick();
+      expect(form.state.values.tree.conditions[0].column).toBe('');
+
+      await select.vm.$emit('create', 'field1');
+      await nextTick();
+      expect(
+        (select.props('options') as any[]).filter((o) => o.value === 'field1'),
+      ).toHaveLength(1);
+      expect(form.state.values.tree.conditions[0].column).toBe('field1');
+    });
   });
 });

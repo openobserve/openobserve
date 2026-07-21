@@ -194,7 +194,7 @@ const incidents = {
    * Get correlated telemetry streams for an incident
    *
    * Uses the incident's group_values to find related logs, metrics, and traces
-   * via the service correlation API. Now filters dimensions to only include
+   * via the service correlation API. Filters dimensions to only include
    * fields that are actually used for disambiguation.
    *
    * @param org_identifier Organization ID

@@ -83,11 +83,11 @@ function toggle(browserId: string, deviceId: string) {
 
 <template>
   <div
-    class="rounded-lg border border-border-default mb-4"
+    class="rounded-default border border-border-default mb-4"
     data-test="synthetics-check-browser-devices"
   >
-    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
-      <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
+    <div class="flex items-center border-b border-border-default py-2.5 px-3">
+      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
       <h3 class="text-base font-semibold text-text-heading">
         {{ t('synthetics.browserDevices.title') }}
       </h3>
@@ -98,7 +98,7 @@ function toggle(browserId: string, deviceId: string) {
         <div
           v-for="device in activeDevices"
           :key="device.id"
-          class="flex items-center gap-1 text-xs font-semibold capitalize w-20 text-text-heading"
+          class="flex items-center gap-1 text-xs font-semibold capitalize w-20 text-text-label"
         >
           <OIcon :name="DEVICE_ICONS[device.id] ?? 'devices'" size="sm" />
           {{ t(deviceLabelKey(device.label)) }}
@@ -113,7 +113,7 @@ function toggle(browserId: string, deviceId: string) {
       >
         <div class="flex items-center gap-2 w-32 shrink-0">
           <img :src="BROWSER_ICONS[browser.id]" class="size-5" alt="" />
-          <span class="text-sm font-medium text-text-heading capitalize">{{ browser.label }}</span>
+          <span class="text-sm font-medium text-text-body capitalize">{{ browser.label }}</span>
         </div>
         <div
           v-for="device in activeDevices"

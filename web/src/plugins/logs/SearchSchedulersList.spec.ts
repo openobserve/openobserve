@@ -116,17 +116,7 @@ describe("SearchSchedulersList Component", () => {
           store,
         },
         stubs: {
-                    'q-table': true,
-          'q-tr': true,
-          'q-td': true,
-          'q-btn': true,
           'OIcon': true,
-          'q-toggle': true,
-          'q-tabs': true,
-          'q-tab': true,
-          'q-tab-panels': true,
-          'q-tab-panel': true,
-          'q-select': true,
           'DateTime': {
             template: '<div class="mock-datetime"></div>',
             methods: {

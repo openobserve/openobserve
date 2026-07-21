@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { ComputedRef, InjectionKey } from "vue";
+
 export interface NavItem {
   title: string;
   icon: string;
@@ -23,6 +25,18 @@ export interface NavItem {
   hide?: boolean;
   badge?: number;
 }
+
+/**
+ * Provided by ONavbar, injected by each MenuLink. True once the rail's single
+ * sliding-selection pill is positioned and visible — while true, an active
+ * MenuLink defers its fill (background + left accent) to that pill and keeps only
+ * its active text/icon colour. False (e.g. before first measure, or while the
+ * rail is hidden) means each active tile paints its own pill as before, so the
+ * nav never renders without a visible selection.
+ */
+export const RailIndicatorActiveKey: InjectionKey<ComputedRef<boolean>> = Symbol(
+  "o-navbar-rail-indicator-active",
+);
 
 /**
  * A flyout sub-item. These mirror the target page's own in-page section nav

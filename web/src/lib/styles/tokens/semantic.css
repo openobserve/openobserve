@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    SEMANTIC TOKENS — maps base palette to intent/meaning
    Used directly in components for shared design decisions.
    ============================================================
@@ -12,13 +12,14 @@
 /* ── Light-mode defaults ─────────────────────────────────── */
 :root {
   /* Text — grey-based semantic hierarchy */
-  --color-text-heading:     var(--color-grey-900);  /* h1-h6, modal titles */
-  --color-text-primary:     var(--color-grey-900);  /* alias for heading — backward compat */
+  --color-text-heading:     var(--color-grey-800);  /* h1-h6, modal titles, page/panel titles */
   --color-text-body:        var(--color-grey-700);  /* paragraphs, default body */
-  --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions */
-  --color-text-caption:     var(--color-grey-500);  /* captions, footnotes, timestamps */
+  --color-text-secondary:   var(--color-grey-500);  /* supporting text, descriptions, captions */
   --color-text-label:       var(--color-grey-400);  /* form labels, metadata, badges */
   --color-text-muted:       var(--color-grey-300);  /* disabled, placeholder, de-emphasized */
+  /* label / disabled / placeholder (+ border-strong, scrollbar-thumb-hover) are
+     intentionally equal for now: all route through the grey-400 primitive so any one
+     can diverge later. Distinct intents kept as distinct tokens on purpose, NOT aliases. */
   --color-text-disabled:    var(--color-grey-400);
   --color-text-placeholder: var(--color-grey-400);
   --color-text-soft:        rgba(0, 0, 0, 0.75);   /* black at 75% — readable but not harsh */
@@ -33,13 +34,24 @@
   --color-surface-overlay: var(--color-white);
   --color-surface-subtle:       var(--color-grey-100);
   --color-surface-subtle-hover: var(--color-grey-200);
+  /* Accent-tinted interaction surfaces. The ONE place the "hover/active on an
+     accent-tinted control" treatment lives, so buttons, menu items, tabs, selected
+     rows etc. share it — change it here and every accent hover/active surface moves. */
+  --color-surface-accent-hover:  var(--color-primary-50);
+  --color-surface-accent-active: var(--color-primary-100);
+  /* Soft-tinted icon chips — a pale accent square holding a coloured glyph
+     (Home resource/explore rows, KPI-card icons, section headers). Registered
+     as semantic tokens so the pale light-mode fill flips to a dark accent tint
+     in dark.css instead of staying light on the dark canvas. */
+  --color-icon-chip-primary-bg:   var(--color-primary-50);
+  --color-icon-chip-primary-text: var(--color-primary-600);
+  --color-icon-chip-success-bg:   var(--color-success-50);
+  --color-icon-chip-success-text: var(--color-success-600);
+  --color-icon-chip-warning-bg:   var(--color-warning-50);
+  --color-icon-chip-warning-text: var(--color-warning-700);
   /* App chrome (top bar + side rail + the gutter behind the content card) — a
-     BARELY-tinted near-white (prototype --g-100 ≈ #F5F6F9), just a whisper of
-     brand hue so the white content card floats on a calm backdrop. A strong
-     tint reads as "too bright". (Must live here in the .scss set the app loads —
-     the parallel .css set is NOT imported by the app, so a value defined only
-     there leaves the token undefined and the chrome falls through to the body
-     tint.) */
+     barely-tinted near-white, just a whisper of brand hue so the white content
+     card floats on a calm backdrop. A strong tint reads as "too bright". */
   --color-surface-chrome:  color-mix(in srgb, var(--color-primary-50) 55%, var(--color-grey-50));
   --color-surface-chrome-deeper: var(--color-primary-100);
 
@@ -47,23 +59,16 @@
   --color-border-default: var(--color-grey-200);
   --color-border-strong:  var(--color-grey-400);
   /* Soft divider — lighter than the structural border. Use for in-list row
-     dividers and intra-card section splits (HANDOFF.md §1.3 --border-soft). */
+     dividers and intra-card section splits. */
   --color-border-subtle:  var(--color-grey-150);
 
   /* Overlay scrim — semi-transparent backdrop */
   --color-overlay-scrim: color-mix(in srgb, var(--color-grey-950) 50%, transparent);
 
-  /* Status (semantic text+bg pairs) — the --color-* home for what used to be
-     --o2-status-*. Theme-paired via dark.css. Use these for status TEXT and
-     tinted status BACKGROUNDS (badges, callouts, required-field marks, etc.). */
-  --color-status-success-text: #208A3C;
-  --color-status-success-bg:   #F2FCF3;
-  --color-status-info-text:    #588CF3;
-  --color-status-info-bg:      #EDF3FF;
-  --color-status-warning-text: #E56D17;
-  --color-status-warning-bg:   #FFF4EB;
-  --color-status-error-text:   #CC3645;
-  --color-status-error-bg:     #FFF7F7;
+  /* Accent — the single brand colour, exposed as a semantic knob so feature code
+     never hardcodes `primary-600`. It flips to primary-400 in dark mode (dark.css)
+     so thin small marks stay readable — that dark flip is why it can't be raw primary-600. */
+  --color-accent: var(--color-primary-600);
 
   /* Favorite (filled heart) — a rose/pink-leaning red, deliberately warmer
      than the destructive error red so "loved" and "danger" never read as the
@@ -76,10 +81,8 @@
 @theme inline {
   /* Text */
   --color-text-heading:     var(--color-text-heading);
-  --color-text-primary:     var(--color-text-primary);
   --color-text-body:        var(--color-text-body);
   --color-text-secondary:   var(--color-text-secondary);
-  --color-text-caption:     var(--color-text-caption);
   --color-text-label:       var(--color-text-label);
   --color-text-muted:       var(--color-text-muted);
   --color-text-disabled:    var(--color-text-disabled);
@@ -95,30 +98,59 @@
   --color-surface-overlay: var(--color-surface-overlay);
   --color-surface-subtle:       var(--color-surface-subtle);
   --color-surface-subtle-hover: var(--color-surface-subtle-hover);
+  --color-surface-accent-hover:  var(--color-surface-accent-hover);
+  --color-surface-accent-active: var(--color-surface-accent-active);
+  --color-icon-chip-primary-bg:   var(--color-icon-chip-primary-bg);
+  --color-icon-chip-primary-text: var(--color-icon-chip-primary-text);
+  --color-icon-chip-success-bg:   var(--color-icon-chip-success-bg);
+  --color-icon-chip-success-text: var(--color-icon-chip-success-text);
+  --color-icon-chip-warning-bg:   var(--color-icon-chip-warning-bg);
+  --color-icon-chip-warning-text: var(--color-icon-chip-warning-text);
   --color-surface-chrome:        var(--color-surface-chrome);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
-  /* Borders */
+  /* Borders — only `default` is registered as an app-facing utility. `strong`/`subtle`
+     are library-internal: defined in :root above and consumed by component tokens
+     (checkbox, table row-divider, tooltip, …) via var(), but NOT registered here, so
+     no `border-border-strong/subtle` utility exists. Feature code uses `default` only. */
   --color-border-default: var(--color-border-default);
-  --color-border-strong:  var(--color-border-strong);
-  --color-border-subtle:  var(--color-border-subtle);
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);
 
-  /* Status (self-references so `text-status-error-text` etc. utilities exist
-     and dark.css overrides apply) */
-  --color-status-success-text: var(--color-status-success-text);
-  --color-status-success-bg:   var(--color-status-success-bg);
-  --color-status-info-text:    var(--color-status-info-text);
-  --color-status-info-bg:      var(--color-status-info-bg);
-  --color-status-warning-text: var(--color-status-warning-text);
-  --color-status-warning-bg:   var(--color-status-warning-bg);
-  --color-status-error-text:   var(--color-status-error-text);
-  --color-status-error-bg:     var(--color-status-error-bg);
+  /* Accent */
+  --color-accent: var(--color-accent);
 
-  /* Favorite (self-reference so `text-favorite` utility exists + dark override
-     applies) */
+  /* White / black / transparent / current / inherit — Tailwind ships these as
+     --color-* theme keys, so the `--color-*: initial` reset (palette-reset.css) wipes
+     them too. Re-register here so bg-white/text-black/bg-transparent/border-transparent/
+     text-current/text-inherit keep compiling. */
+  --color-white: var(--color-white);
+  --color-black: var(--color-black);
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-inherit: inherit;
+
+  /* Brand neutral scale (re-exports from base.css). Registered so `text-grey-500`
+     etc. compile as utilities. Note the British spelling — `grey-*` is ours; `gray-*`
+     is Tailwind's un-themed gray (#6b7280 vs our #737373) and is banned by the
+     rawPalette guard. */
+  --color-grey-0:   var(--color-grey-0);
+  --color-grey-50:  var(--color-grey-50);
+  --color-grey-100: var(--color-grey-100);
+  --color-grey-150: var(--color-grey-150);
+  --color-grey-200: var(--color-grey-200);
+  --color-grey-300: var(--color-grey-300);
+  --color-grey-400: var(--color-grey-400);
+  --color-grey-500: var(--color-grey-500);
+  --color-grey-600: var(--color-grey-600);
+  --color-grey-700: var(--color-grey-700);
+  --color-grey-800: var(--color-grey-800);
+  --color-grey-850: var(--color-grey-850);
+  --color-grey-900: var(--color-grey-900);
+  --color-grey-950: var(--color-grey-950);
+
+  /* Favorite */
   --color-favorite: var(--color-favorite);
 
   /* Brand / Primary (re-exports from base.css) */
@@ -132,14 +164,24 @@
   --color-primary-700: var(--color-primary-700);
   --color-primary-800: var(--color-primary-800);
   --color-primary-900: var(--color-primary-900);
+  --color-primary-950: var(--color-primary-950);
 
   /* Error / Danger (re-exports from base.css) */
   --color-error-50:  var(--color-error-50);
   --color-error-100: var(--color-error-100);
+  --color-error-300: var(--color-error-300);
   --color-error-400: var(--color-error-400);
   --color-error-500: var(--color-error-500);
   --color-error-600: var(--color-error-600);
   --color-error-700: var(--color-error-700);
+
+  /* Success (re-exports from base.css) */
+  --color-success-50:  var(--color-success-50);
+  --color-success-100: var(--color-success-100);
+  --color-success-400: var(--color-success-400);
+  --color-success-500: var(--color-success-500);
+  --color-success-600: var(--color-success-600);
+  --color-success-700: var(--color-success-700);
 
   /* Warning (re-exports from base.css) */
   --color-warning-50:  var(--color-warning-50);
@@ -149,214 +191,73 @@
   --color-warning-600: var(--color-warning-600);
   --color-warning-700: var(--color-warning-700);
 
-  /* Radius / Shadow (re-exports from base.css) */
-  --radius-sm:   var(--radius-sm);
-  --radius-md:   var(--radius-md);
-  --radius-lg:   var(--radius-lg);
-  --radius-xl:   var(--radius-xl);
+  /* Radius / Shadow (re-exports from base.css for @theme registration).
+     Two real tiers only: rounded-default (controls) + rounded-surface (large
+     surfaces), plus rounded-full. sm/md/lg/xl were retired — see base.css. */
+  --radius-default: var(--radius-default);
+  --radius-surface: var(--radius-surface);
   --radius-full: var(--radius-full);
+  --radius-checkbox: var(--radius-checkbox);
 
-  --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
+
+  /* Code-syntax family. Registered so bg-syntax-bg / text-syntax-keyword etc.
+     compile as utilities. */
+  --color-syntax-bg:          var(--color-syntax-bg);
+  --color-syntax-text:        var(--color-syntax-text);
+  --color-syntax-keyword:     var(--color-syntax-keyword);
+  --color-syntax-function:    var(--color-syntax-function);
+  --color-syntax-number:      var(--color-syntax-number);
+  --color-syntax-string:      var(--color-syntax-string);
+  --color-syntax-builtin:     var(--color-syntax-builtin);
+  --color-syntax-comment:     var(--color-syntax-comment);
+  --color-syntax-tag:         var(--color-syntax-tag);
+  --color-syntax-bullet:      var(--color-syntax-bullet);
+  --color-syntax-addition-fg: var(--color-syntax-addition-fg);
+  --color-syntax-addition-bg: var(--color-syntax-addition-bg);
+  --color-syntax-deletion-fg: var(--color-syntax-deletion-fg);
+  --color-syntax-deletion-bg: var(--color-syntax-deletion-bg);
+
+  /* The --color-gradient-* family is deliberately NOT registered here: it would
+     generate `bg-gradient-ai` as `background-color: <linear-gradient()>` — invalid
+     CSS the browser drops. Consume gradients as
+     `bg-[image:var(--color-gradient-ai)]` (background-image) instead. */
 }
 
-/* ── Legacy semantic tokens (_variables.scss light mode) ── */
+/* ── Theme-driven runtime tokens (set inline by utils/theme.ts) ──
+   Static values below are the light-mode DEFAULT theme; theme.ts overrides
+   them via inline style when a custom accent color is picked or dark mode is active. */
 :root {
-  --o2-theme-mode: white;
-  --o2-primary-background: #FFFFFF;
-  --o2-secondary-background: #F7F9FE;
-  --o2-muted-background: #E8ECF0;
-  --o2-text-heading:     #19191E;
-  --o2-text-primary:     var(--o2-text-heading);
-  --o2-text-body:        #404040;
-  --o2-text-secondary:   #5A5D6B;
-  --o2-text-caption:     #6C707E;
-  --o2-text-label:       #818594;
-  --o2-text-muted:       #A8ADBD;
-  --o2-text-placeholder: #A8ADBD;
-  --o2-text-link:        #6069D3;
-  --o2-text-link-hover:  #575FC5;
-  --o2-text-code:        #5A5D6B;
-  --o2-text-inverse:     #FFFFFF;
-  --o2-text-4: var(--o2-text-heading);
-  --o2-text-2: var(--o2-text-secondary);
-  --o2-text-1: var(--o2-text-caption);
-  --o2-text-3: var(--o2-text-label);
-  --o2-card-background: #FFFFFF;
-  --o2-card-text: #19191E;
-  --o2-popover-background: #FFFFFF;
-  --o2-popover-text: #19191E;
-  --o2-code-bg: #F7F8FA;
-  --o2-border: #E8ECF0;
-  --o2-border-input: #D3D5DB;
-  --o2-primary-color: var(--color-primary-600);
-  --o2-primary-foreground: #FFFFFF;
-  --o2-hover-accent: color-mix(in srgb, var(--o2-theme-color) 15%, white);
-  --o2-destructive-foreground: #FFFFFF;
-  --o2-focus-ring: #282D5D;
-  --o2-hover-shadow: #dddddd;
-  --o2-hover-gray: color-mix(in srgb, var(--o2-theme-color) 2%, rgb(244, 244, 244));
-  --o2-bg-gray: color-mix(in srgb, var(--o2-theme-color) 10%, rgb(237, 237, 237));
-  --o2-scrollbar-track-bg: rgba(0, 0, 0, 0.01);
-  --o2-scrollbar-track-hover-bg: rgba(0, 0, 0, 0.01);
-  --o2-scrollbar-thumb-bg: color-mix(in srgb, #3F7994 20%, white);
-  --o2-scrollbar-thumb-hover-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
-  --o2-scrollbar-thumb-active-bg: color-mix(in srgb, var(--o2-theme-elements) 0%, white);
-  --o2-theme-color: #3F7994;
-  --o2-dark-theme-color: #112027;
-  --o2-body-primary-bg: rgba(89, 155, 174, 0.01);
-  --o2-body-secondary-bg: rgba(89, 155, 174, 0.4);
-  --o2-primary-btn-bg: color-mix(in srgb, var(--o2-theme-color) 100%, white);
-  --o2-primary-btn-text: #FFFFFF;
-  --o2-toggle-track-bg: color-mix(in srgb, var(--o2-theme-color) 90%, white);
-  --o2-toggle-track-off-bg: color-mix(in srgb, var(--o2-theme-color) 30%, white);
-  --o2-card-bg: rgba(255, 255, 255, 0.8);
-  --o2-card-bg-solid: rgba(255, 255, 255);
-  --o2-header-menu-bg: rgba(255, 255, 255, 0.5);
-  --o2-border-color: rgba(0, 0, 0, 0.12);
-  --o2-border-2: rgba(0, 0, 0, 0.08);
-  --o2-box-shadow: 0px 0px rgba(0, 0, 0, 0.2), 0 0.063rem 0.063rem rgba(0, 0, 0, 0.14), 0 3px 0.063rem -3px rgba(0, 0, 0, 0.12);
-  --o2-menu-gradient-start: rgba(89, 175, 199, 0.3);
-  --o2-menu-gradient-end: rgba(48, 193, 233, 0.3);
-  --o2-menu-border-color: rgba(89, 155, 174, 0.6);
-  --o2-menu-color: #3F7994;
-  --o2-table-header-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
-  --o2-sticky-col-header-bg: #E0E0E0;
-  --o2-pivot-header-border: rgba(0, 0, 0, 0.15);
-  --o2-table-actions-bg: white;
-  /* Legacy log-table row tokens now ALIAS the OTable row standard, so the
-     TenstackTable (logs/traces/etc.) rows match every OTable across the app.
-     Theme-paired automatically via the --color-table-row-* tokens. */
-  --o2-log-table-row-bg: var(--color-surface-base);
-  --o2-log-table-row-alt-bg: var(--color-table-row-striped-bg);
-  --o2-log-table-row-hover: var(--color-table-row-hover-bg);
-  --o2-log-table-row-border: var(--color-table-row-divider);
-  --o2-log-table-header-bg: #f1f3f7;
-  --o2-tab-bg: color-mix(in srgb, var(--o2-theme-color) 20%, white);
-  --o2-tab-text-color: #19191E;
-  --o2-inactive-tab-bg: color-mix(in srgb, var(--o2-theme-color) 10%, white);
-  --o2-actions-column-shawdow: rgba(0, 0, 0, 0.1);
-  --q-primary: var(--o2-theme-color);
-  --o2-icon-color: #808080;
-  --o2-icon-color-dark: #5e5e5e;
-  --o2-json-key: #B71C1C;
-  --o2-json-string: #047857;
-  --o2-json-number: #2563EB;
-  --o2-json-boolean: #6D28D9;
-  --o2-json-null: #6B7280;
-  --o2-json-object: #4B5563;
-  --o2-input-label-text-color: #636464;
-  --tw-border-style: #e5e7eb;
-  --o2-section-header-bg: color-mix(in srgb, var(--o2-theme-color) 3%, rgb(247, 247, 247));
-  --o2-tag-grey-1: #E2E8F0;
-  --o2-tag-grey-2: #eaebec;
-  --o2-wildcard-header-blue-bg: #F5F8FE;
-  --o2-wildcard-header-blue-text: #2E55A3;
-  --o2-wildcard-header-green-bg: #F2FCF3;
-  --o2-wildcard-header-green-text: #208A3C;
-  --o2-wildcard-header-orange-bg: #FFF4EB;
-  --o2-wildcard-header-orange-text: #A14916;
-  --o2-wildcard-header-purple-bg: #FAF5FF;
-  --o2-wildcard-header-purple-text: #643CB8;
-  --o2-wildcard-header-grey-bg: #F7F8FA;
-  --o2-wildcard-header-grey-text: #5A5D6B;
-  --o2-wildcard-bar-blue: #88ADF7;
-  --o2-wildcard-bar-green: #55A76A;
-  --o2-wildcard-bar-orange: #E56D17;
-  --o2-wildcard-bar-purple: #834DF0;
-  --o2-wildcard-bar-grey: #818594;
-  --o2-label-chip-ip-bg:       #F2FCF3;
-  --o2-label-chip-ip-text:     #208A3C;
-  --o2-label-chip-ipv4-bg:     #F2FCF3;
-  --o2-label-chip-ipv4-text:   #208A3C;
-  --o2-label-chip-ipv6-bg:     #F2FCF3;
-  --o2-label-chip-ipv6-text:   #208A3C;
-  --o2-label-chip-method-bg:   #FFF2F3;
-  --o2-label-chip-method-text: #CC3645;
-  --o2-label-chip-url-bg:      #E4E9FE;
-  --o2-label-chip-url-text:    #575FC5;
-  --o2-label-chip-num-bg:      #FFF4EB;
-  --o2-label-chip-num-text:    #A14916;
-  --o2-label-chip-float-bg:    #FFF4EB;
-  --o2-label-chip-float-text:  #A14916;
-  --o2-label-chip-hex-bg:      #FFFAEB;
-  --o2-label-chip-hex-text:    #C27D04;
-  --o2-label-chip-ts-bg:       #FAF5FF;
-  --o2-label-chip-ts-text:     #643CB8;
-  --o2-label-chip-date-bg:     #FAF5FF;
-  --o2-label-chip-date-text:   #643CB8;
-  --o2-label-chip-time-bg:     #FAF5FF;
-  --o2-label-chip-time-text:   #643CB8;
-  --o2-label-chip-id-bg:       #F2FCFC;
-  --o2-label-chip-id-text:     #077A7F;
-  --o2-label-chip-email-bg:    #FFF7F7;
-  --o2-label-chip-email-text:  #E55765;
-  --o2-label-chip-str-bg:      #E8ECF0;
-  --o2-label-chip-str-text:    #5A5D6B;
-  --o2-label-chip-default-bg:  #E8ECF0;
-  --o2-label-chip-default-text: #5A5D6B;
-  --o2-label-chip-pattern-bg:  #EDF3FF;
-  --o2-label-chip-pattern-text: #2E55A3;
-  --o2-dashboard-placeholder-bg: #B3BDF1;
-  --o2-field-type-string-bg: oklch(95% 0.052 163.051);
-  --o2-field-type-string-text: oklch(59.6% 0.145 163.225);
-  --o2-field-type-boolean-bg: #e74c3c;
-  --o2-field-type-boolean-text: #fff;
-  --o2-field-type-float-bg: oklch(94.6% 0.033 307.174);
-  --o2-field-type-float-text: oklch(55.8% 0.288 302.321);
-  --o2-field-type-number-bg: oklch(95.4% 0.038 75.164);
-  --o2-field-type-number-text: oklch(64.6% 0.222 41.116);
-  --o2-field-type-timestamp-bg: oklch(93.2% 0.032 255.585);
-  --o2-field-type-timestamp-text: oklch(54.6% 0.245 262.881);
-  --o2-trace-surface: #FFFFFF;
-  --o2-trace-border: #E8ECF0;
-  --o2-trace-text-primary: #19191E;
-  --o2-trace-text-secondary: #5A5D6B;
-  --o2-trace-hover: #F7F8FA;
-  --o2-trace-selected: #F5F8FE;
-  --o2-latency-p99: #de6d17;
-  --o2-latency-p95: #0a4ce8;
-  --o2-cancel-query-bg: #f67a7a;
-  --o2-error-tag-bg: #f9d3d3;
-  --o2-error-tag-text: #e74c3c;
-  --o2-status-success-text: #208A3C;
-  --o2-status-success-bg: #F2FCF3;
-  --o2-status-info-text: #588CF3;
-  --o2-status-info-bg: #EDF3FF;
-  --o2-status-warning-text: #E56D17;
-  --o2-status-warning-bg: #FFF4EB;
-  --o2-status-error-text: #CC3645;
-  --o2-status-error-bg: #FFF7F7;
-  /* Log-severity colors — MUST stay aligned with STATUS_COLORS in
-     src/utils/logs/statusParser.ts (row spines / severity accents, so RUM
-     sessions match the logs page). */
-  --o2-severity-error-color: #EF5350;
-  --o2-severity-warning-color: #FB8C00;
-  --o2-status-neutral-text: #6C707E;
-  --o2-status-neutral-bg: #F7F8FA;
-  --o2-span-kind-client-text: #588CF3;
-  --o2-span-kind-client-bg: #EDF3FF;
-  --o2-span-kind-server-text: #208A3C;
-  --o2-span-kind-server-bg: #F2FCF3;
-  --o2-span-kind-producer-text: #7444D4;
-  --o2-span-kind-producer-bg: #EFE5FF;
-  --o2-span-kind-consumer-text: #058B90;
-  --o2-span-kind-consumer-bg: #DAF4F5;
-  --o2-span-kind-internal-text: #6C707E;
-  --o2-span-kind-internal-bg: #E8ECF0;
-  --o2-positive: #208A3C;
-  --o2-negative: #DB3B4B;
-  --o2-warning: #DF9303;
-  --o2-info: #4682FA;
-  --o2-gray: #818594;
-  --o2-service-health-healthy: #52c41a;
-  --o2-service-health-degraded: #faad14;
-  --o2-service-health-warning: #fa8c16;
-  --o2-service-health-critical: #f5222d;
+  --color-theme-accent: #3F7994;
+  --color-theme-table-header-bg: color-mix(in srgb, var(--color-theme-accent) 20%, white);
+  --color-theme-tab-bg: color-mix(in srgb, var(--color-theme-accent) 20%, white);
+  --color-theme-tab-bg-inactive: color-mix(in srgb, var(--color-theme-accent) 10%, white);
+  --color-theme-menu-color: #3F7994;
+  --color-theme-menu-gradient-start: rgba(89, 175, 199, 0.3);
+  --color-theme-menu-gradient-end: rgba(48, 193, 233, 0.3);
+  --color-theme-body-bg-primary: rgba(89, 155, 174, 0.01);
+  --color-theme-body-bg-secondary: rgba(89, 155, 174, 0.4);
+  --color-theme-header-menu-bg: rgba(255, 255, 255, 0.5);
+
+  /* Shared hover + surface accent formula */
+  --color-interactive-hover-bg: color-mix(in srgb, var(--color-theme-accent) 15%, white);
+
+  /* Status/semantic colors driven by utils/theme.ts (O2 Signature default
+     + any custom semantic theme, e.g. Crimson Ink) */
+  --color-status-negative: #DB3B4B;
+  --color-status-positive: #208A3C;
+  --color-status-error-text: #CC3645;
+  --color-status-error-bg: #FFF7F7;
+  --color-status-success-text: #208A3C;
+  --color-status-success-bg: #F2FCF3;
 }
 
-/* ── Legacy aliases (_legacy-variables.scss) ── */
+/* ── Domain / data-viz / brand literal tokens ──
+   Defined in base.css (raw values live with the palette); their @theme
+   registrations live in semantic.css / component.css. */
+
+/* ── Layout aliases ── */
 :root {
   --navbar-height: 36px;
 }

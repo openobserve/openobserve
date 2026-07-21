@@ -579,17 +579,15 @@ export default class DashboardPanelConfigs {
 
   /**
    * Fill the threshold for the conditional rule at ruleIdx (default operator "<").
-   * The threshold OInput has no data-test; scoped via the rule row's `.w-28` container,
-   * located by walking up from the ruleIdx's text-color swatch (which does have a data-test).
+   * The threshold OInput carries `o2-format-cond-threshold-<field>-<ruleIdx>`, which
+   * OInput forwards to its inner <input> as `...-field`.
    */
   async fillConditionThreshold(ruleIdx, threshold) {
-    const anchor = this.overrideDialog
-      .locator(`[data-test^="o2-format-cond-text-"][data-test$="-${ruleIdx}"]`)
+    const thresholdInput = this.overrideDialog
+      .locator(
+        `[data-test^="o2-format-cond-threshold-"][data-test$="-${ruleIdx}-field"]`
+      )
       .first();
-    const row = anchor.locator(
-      'xpath=ancestor::div[contains(@class,"rounded-md")][1]'
-    );
-    const thresholdInput = row.locator(".w-28 input").first();
     await thresholdInput.waitFor({ state: "visible", timeout: 5000 });
     await thresholdInput.fill(String(threshold));
   }

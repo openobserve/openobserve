@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Grouped left rail (prototype admin model): the rail is always present;
        the chosen section renders its own page (header + table) to the right. -->
-  <PageLayout :sidebar-width="218" data-test="iam-page">
+  <OPageLayout bleed :sidebar-width="230" data-test="iam-page">
     <template #sidebar>
       <SectionRail
         :groups="sectionGroups"
@@ -28,11 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <section class="h-full min-w-0 min-h-0 overflow-y-auto">
       <RouterView />
     </section>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import {
   type SectionHubGroup,

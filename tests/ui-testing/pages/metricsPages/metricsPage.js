@@ -619,7 +619,7 @@ export class MetricsPage {
     // Query type switching methods
     async switchToSQLMode() {
         // Try to find and click SQL mode toggle/button
-        const sqlToggle = this.page.locator('[data-test*="sql"], button:has-text("SQL"), .q-toggle:has-text("SQL")').first();
+        const sqlToggle = this.page.locator('[data-test*="sql"], button:has-text("SQL")').first();
         const isVisible = await sqlToggle.isVisible().catch(() => false);
         if (isVisible) {
             await sqlToggle.click();
@@ -630,7 +630,7 @@ export class MetricsPage {
 
     async switchToPromQLMode() {
         // Try to find and click PromQL mode toggle/button
-        const promqlToggle = this.page.locator('[data-test*="promql"], button:has-text("PromQL"), .q-toggle:has-text("PromQL")').first();
+        const promqlToggle = this.page.locator('[data-test*="promql"], button:has-text("PromQL")').first();
         const isVisible = await promqlToggle.isVisible().catch(() => false);
         if (isVisible) {
             await promqlToggle.click();
@@ -882,7 +882,7 @@ export class MetricsPage {
         const chartSelectors = {
           'line': 'canvas, svg path, .apexcharts-line-series',
           'pie': 'svg path[class*="pie"], .apexcharts-pie, path[class*="slice"]',
-          'table': 'table tbody tr, .q-table tbody tr, .data-table tbody tr',
+          'table': 'table tbody tr, .data-table tbody tr',
           'heatmap': 'svg rect, .apexcharts-heatmap, .heatmap-cell',
           'gauge': 'svg circle, .gauge-chart, .apexcharts-radialbar',
           'bar': 'svg rect[class*="bar"], .apexcharts-bar-series, rect[class*="column"]'
@@ -899,7 +899,7 @@ export class MetricsPage {
     }
 
     async getTableHeaderCount() {
-        return await this.page.locator('table thead th, .q-table thead th').count();
+        return await this.page.locator('table thead th').count();
     }
 
     async getHeatmapCellCount() {
@@ -1502,7 +1502,7 @@ export class MetricsPage {
     }
 
     async getVisibleOptionElements() {
-        return this.page.locator('input, select, .q-toggle, .q-checkbox').locator('visible');
+        return this.page.locator('input, select').locator('visible');
     }
 
     async getVisibleOptionElementCount() {
@@ -1568,7 +1568,7 @@ export class MetricsPage {
     // ===== CHART OPTIONS METHODS =====
 
     async getVisibleChartOptions() {
-        return this.page.locator('.q-item:visible, [role="option"]:visible');
+        return this.page.locator('[role="option"]:visible');
     }
 
     // ===== LEGEND METHODS =====
@@ -1577,7 +1577,7 @@ export class MetricsPage {
     // ===== MODE SELECTION METHODS =====
 
     async getModeOptions() {
-        return this.page.locator('.q-item:has-text("SQL"), .q-item:has-text("PromQL")');
+        return this.page.locator('[role="option"]:has-text("SQL"), [role="option"]:has-text("PromQL")');
     }
 
     async getModeOptionCount() {
@@ -1657,7 +1657,7 @@ export class MetricsPage {
     }
 
     async getTableCellValues() {
-        const cells = await this.page.locator('table td, .q-table td, .data-table td').allTextContents();
+        const cells = await this.page.locator('table td, .data-table td').allTextContents();
         return cells.filter(c => c.trim() !== '');
     }
 
@@ -1690,7 +1690,7 @@ export class MetricsPage {
     // ===== ADDITIONAL HELPER METHODS FOR metrics.spec.js =====
 
     async hasTable() {
-        const dataTable = this.page.locator('.results-table, .data-table, table.q-table, [class*="table"], .q-table__middle, table').first();
+        const dataTable = this.page.locator('.results-table, .data-table, [class*="table"], table').first();
         return await dataTable.isVisible().catch(() => false);
     }
 
@@ -1705,7 +1705,7 @@ export class MetricsPage {
     }
 
     async getTableCells() {
-        return await this.page.locator('tbody td, .q-table__middle td, .table-cell').allTextContents();
+        return await this.page.locator('tbody td, .table-cell').allTextContents();
     }
 
     async getResultsPageText() {
@@ -2126,7 +2126,7 @@ export class MetricsPage {
 
     // SQL mode methods
     async getSqlToggle() {
-        return this.page.locator('[data-test*="sql"], button:has-text("SQL"), .q-toggle:has-text("SQL")').first();
+        return this.page.locator('[data-test*="sql"], button:has-text("SQL")').first();
     }
 
     async getSqlIndicator() {
@@ -2171,7 +2171,7 @@ export class MetricsPage {
      * @returns {Locator}
      */
     getThemeToggleButton() {
-        return this.page.locator('[data-test*="theme"], [class*="theme-toggle"], button:has-text("dark"), .q-toggle:has-text("dark")');
+        return this.page.locator('[data-test*="theme"], [class*="theme-toggle"], button:has-text("dark")');
     }
 
     /**
@@ -2436,7 +2436,7 @@ export class MetricsPage {
      * Returns the share button's disabled tooltip locator if visible.
      */
     getShareButtonDisabledTooltip() {
-        return this.page.locator('[role="tooltip"], .q-tooltip, [data-test*="tooltip"]').filter({ hasText: /Web URL|web.url|not configured/i });
+        return this.page.locator('[role="tooltip"], [data-test*="tooltip"]').filter({ hasText: /Web URL|web.url|not configured/i });
     }
 
     /**

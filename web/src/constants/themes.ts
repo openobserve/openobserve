@@ -31,8 +31,6 @@ import type { SemanticColors } from "@/utils/theme";
 export interface ThemeModeColors {
   // Hex color used for buttons/toggles/borders and to derive the primary palette
   themeColor: string;
-  // Opacity on a 1-10 scale (10 = fully opaque). Kept for backwards-compat.
-  themeColorOpacity?: number;
   // Optional multi-color semantic palette (errors/success/secondary button, etc.)
   semanticColors?: SemanticColors;
 }
@@ -68,24 +66,16 @@ export const THEME_STORAGE_KEYS = {
   },
 } as const;
 
-/**
- * Predefined themes with both light and dark mode colors.
- * Update a theme's color codes here and every user who selected it by name
- * (or who is on the default) will pick up the change on next load.
- */
+/** Predefined themes with both light and dark mode colors. */
 export const PREDEFINED_THEMES: PredefinedTheme[] = [
-  // Theme names are intentionally color-agnostic (observability/product terms),
-  // so a theme's accent colors can change in any release without the name going stale.
   {
     id: 10,
     name: "O2 Signature",
     light: {
       themeColor: "#6B76E3",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#8B8DF0",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -93,11 +83,9 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Pulse",
     light: {
       themeColor: "#3F7994",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#3F7994",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -105,11 +93,9 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Horizon",
     light: {
       themeColor: "#077A7F",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#588CF3",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -117,11 +103,9 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Beacon",
     light: {
       themeColor: "#3369D6",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#6EA8FE",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -129,11 +113,9 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Lens",
     light: {
       themeColor: "#4682FA",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#E56D17",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -141,7 +123,6 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Crimson Ink",
     light: {
       themeColor: "#E11D48",
-      themeColorOpacity: 10,
       semanticColors: {
         error: "#F97316",
         errorBg: "#FFF7ED",
@@ -159,7 +140,6 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     },
     dark: {
       themeColor: "#FB7185",
-      themeColorOpacity: 10,
       semanticColors: {
         error: "#FB923C",
         errorBg: "#3A1A08",

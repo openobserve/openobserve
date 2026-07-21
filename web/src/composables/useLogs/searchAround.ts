@@ -193,11 +193,9 @@ export const useSearchAround = () => {
           } else {
             searchObj.data.queryResults = res.data;
           }
-          //extract fields from query response
           await extractFields();
           generateHistogramSkeleton();
           generateHistogramData();
-          //update grid columns
           updateGridColumns();
           await filterHitsColumns();
 

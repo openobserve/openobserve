@@ -111,6 +111,17 @@ pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
+
+/// Internal columns are implicitly part of every user-defined schema:
+/// never persisted in `defined_schema_fields` and exempt from the UDS limit.
+pub fn is_uds_internal_column(name: &str) -> bool {
+    name == TIMESTAMP_COL_NAME
+        || name == ID_COL_NAME
+        || name == ORIGINAL_DATA_COL_NAME
+        || name == ALL_VALUES_COL_NAME
+        || name == get_config().common.column_all
+}
+
 pub const MESSAGE_COL_NAME: &str = "message";
 pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
 pub const STREAM_NAME_LABEL_OLD: &str = "stream_name";
@@ -1609,6 +1620,8 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_MIN_RECORDS", default = 100)]
+    pub file_download_min_records: i64,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
     pub file_download_priority_queue_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
@@ -2026,6 +2039,12 @@ pub struct Limit {
         help = "Default is 8192, Batch size for parquet read/write operations and datafusion execution. Range: [1024, 8192]. Should carefully set this value, default is enough for most cases."
     )]
     pub batch_size: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_ERROR_RETAIN_DURATION",
+        default = 2592000,
+        help = "Default is 30 days, how many days in past to retain the errored workflow input files"
+    )]
+    pub workflow_error_retention_secs: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2380,6 +2399,10 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
+    /// Max `le` labels (buckets + gap markers + inf) a native histogram sample may
+    /// expand to; over-limit samples are downscaled (adjacent buckets merged).
+    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 16)]
+    pub native_histogram_max_buckets: usize,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
@@ -2886,6 +2909,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
     // clamp datafusion_min_partition_num to 1
     cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
+
+    // retain for atleast 1 hour
+    if cfg.limit.workflow_error_retention_secs <= 3600 {
+        cfg.limit.workflow_error_retention_secs = 3600;
+    }
 
     Ok(())
 }

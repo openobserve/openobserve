@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex flex-col" data-test="dashboard-tab-delete-radio-group">
           <ORadioGroup v-model="action" orientation="vertical" class="gap-4">
-            <div style="display: flex; flex-direction: row">
+            <div class="flex flex-row">
               <ORadio
                 val="move"
                 :disabled="moveTabOptions.length === 0"

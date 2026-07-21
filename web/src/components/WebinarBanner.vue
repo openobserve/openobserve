@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Header variant: w-full top bar above the toolbar -->
   <div
     v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
-    class="webinar-top-bar w-full bg-amber-400 text-[#1a1a1a]"
+    class="webinar-top-bar w-full bg-promo-webinar-accent text-promo-webinar-text"
     data-test="webinar-header-banner"
     role="banner"
   >
     <div class="webinar-top-bar-content flex items-center justify-center gap-2 py-[0.2rem] px-4 flex-wrap relative">
-      <span class="webinar-top-bar-text text-[0.8125rem] font-bold text-[#1a1a1a] text-center">
+      <span class="webinar-top-bar-text text-compact font-bold text-promo-webinar-text text-center">
         <strong>{{ webinarData.tag }}:</strong> {{ webinarData.title }}
         <span v-if="webinarData.date" class="webinar-top-bar-date font-medium">
           {{ formattedDate }}
@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
-        class="webinar-top-bar-link text-[0.8125rem] font-bold text-[#1e3a8a] underline whitespace-nowrap hover:text-[#1e40af]"
+        class="webinar-top-bar-link text-compact font-bold text-promo-webinar-link underline whitespace-nowrap hover:text-promo-webinar-link-hover"
         data-test="webinar-top-bar-register-link"
       >
         {{ webinarData.primaryButton.text }}
       </a>
 
-      <span class="webinar-top-bar-sep text-[#374151] font-normal opacity-60 select-none" aria-hidden="true">|</span>
+      <span class="webinar-top-bar-sep text-promo-webinar-sep font-normal opacity-60 select-none" aria-hidden="true">|</span>
 
       <OButton
         variant="webinar-dismiss"
@@ -57,25 +57,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Home variant: larger banner -->
   <div
     v-else-if="webinarData && !isExpired && variant === 'home'"
-    class="webinar-home-banner mb-3 relative overflow-hidden rounded-[0.625rem] border border-[color-mix(in_srgb,var(--q-secondary)_35%,transparent)] bg-[linear-gradient(120deg,color-mix(in_srgb,var(--q-secondary)_14%,var(--o2-primary-background))_0%,var(--o2-primary-background)_55%,color-mix(in_srgb,var(--q-secondary)_7%,var(--o2-primary-background))_100%)]"
+    class="webinar-home-banner mb-3 relative overflow-hidden rounded-default border border-[color-mix(in_srgb,var(--color-promo-webinar-accent)_35%,transparent)] bg-[linear-gradient(120deg,color-mix(in_srgb,var(--color-promo-webinar-accent)_14%,var(--color-surface-base))_0%,var(--color-surface-base)_55%,color-mix(in_srgb,var(--color-promo-webinar-accent)_7%,var(--color-surface-base))_100%)]"
     data-test="webinar-home-banner"
   >
     <!-- Decorative blobs -->
-    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-(--q-secondary) blur-[2.5rem] w-[10rem] h-[10rem] top-[-3rem] left-[-2rem]" aria-hidden="true" />
-    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-(--q-secondary) blur-[2.5rem] w-[8rem] h-[8rem] bottom-[-2.5rem] right-[6rem]" aria-hidden="true" />
+    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-promo-webinar-accent blur-[2.5rem] w-40 h-40 top-[-3rem] left-[-2rem]" aria-hidden="true" />
+    <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-promo-webinar-accent blur-[2.5rem] w-32 h-32 bottom-[-2.5rem] right-24" aria-hidden="true" />
 
     <!-- Content row -->
     <div class="webinar-home-content relative z-[1] flex items-center justify-between flex-wrap gap-3 p-4 pr-[1.375rem]">
       <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->
-        <div class="webinar-home-badge inline-flex items-center gap-[0.375rem] text-[0.7rem] font-bold uppercase tracking-[0.06em] text-[var(--q-secondary)]">
-          <span class="webinar-home-badge-dot w-[0.5rem] h-[0.5rem] rounded-full bg-(--q-secondary) shrink-0 [animation:badge-pulse_1.8s_ease-in-out_infinite]" />
+        <div class="webinar-home-badge inline-flex items-center gap-1.5 text-2xs font-bold uppercase tracking-[0.06em] text-promo-webinar-accent-text">
+          <span class="webinar-home-badge-dot w-2 h-2 rounded-full bg-promo-webinar-accent shrink-0" />
           {{ webinarData.tag }}
         </div>
 
-        <div class="webinar-home-title text-base font-bold text-[var(--o2-text-primary)] leading-[1.35] max-w-[36rem]">{{ webinarData.title }}</div>
+        <div class="webinar-home-title text-base font-bold text-text-heading leading-[1.35] max-w-[36rem]">{{ webinarData.title }}</div>
 
-        <div v-if="webinarData.date" class="webinar-home-meta flex items-center gap-[0.3rem] text-[0.8125rem] leading-none text-[var(--o2-text-secondary)]">
+        <div v-if="webinarData.date" class="webinar-home-meta flex items-center gap-[0.3rem] text-compact leading-none text-text-secondary">
           <OIcon name="schedule" size="xs" />
           <span class="[line-height:1]">{{ formattedDate }}</span>
         </div>
@@ -179,17 +179,24 @@ onMounted(async () => {
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): the "live" badge dot pulse is used only by this banner. The
+   `animation` is declared here, not as a template `[animation:…]` utility, so
+   Vue's scoped compiler renames the keyframe and this reference together. */
+.webinar-home-badge-dot {
+  animation: badge-pulse 1.8s ease-in-out infinite;
+}
+
 @keyframes badge-pulse {
   0%,
   100% {
     transform: scale(1);
     opacity: 1;
   }
-
   50% {
     transform: scale(1.5);
     opacity: 0.5;
   }
 }
 </style>
+

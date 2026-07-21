@@ -89,7 +89,7 @@ import CreateProtocolCheck from "./CreateProtocolCheck.vue";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
-  AppPageHeader: {
+  OPageHeader: {
     template: '<div data-test="synthetics-header"><slot /></div>',
     props: ["title", "subtitle", "back"],
   },

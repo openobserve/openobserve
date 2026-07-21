@@ -66,6 +66,8 @@ use tracing::{Level, span};
 use crate::common::utils::auth::check_permissions;
 #[cfg(feature = "enterprise")]
 use crate::common::utils::http::get_or_create_trace_id;
+#[cfg(feature = "enterprise")]
+use crate::service::workflows::WorkflowTriggerType;
 use crate::{
     common::{
         infra::config::ORGANIZATIONS,
@@ -106,7 +108,7 @@ pub enum AlertError {
     #[error("Alert name cannot contain '/'")]
     AlertNameContainsForwardSlash,
 
-    #[error("Alert destinations is required")]
+    #[error("Alert destination or workflows is required")]
     AlertDestinationMissing,
 
     #[error("Alert already exists")]
@@ -193,6 +195,9 @@ pub enum AlertError {
     /// Not support save destination remote pipeline for alert so far
     #[error("Not support save destination {0} type for alert so far")]
     NotSupportedAlertDestinationType(Module),
+
+    #[error("Alert workflow {id} not found")]
+    AlertWorkflowNotFound { id: String },
 }
 
 pub async fn save(
@@ -342,8 +347,13 @@ async fn prepare_alert(
         });
     }
 
+    #[cfg(feature = "enterprise")]
+    let destination_missing = alert.destinations.is_empty() && alert.workflows.is_empty();
+    #[cfg(not(feature = "enterprise"))]
+    let destination_missing = alert.destinations.is_empty();
+
     // before saving alert check alert destination
-    if alert.destinations.is_empty() {
+    if destination_missing {
         return Err(AlertError::AlertDestinationMissing);
     }
     for dest in alert.destinations.iter() {
@@ -357,6 +367,21 @@ async fn prepare_alert(
                 return Err(AlertError::AlertDestinationNotFound {
                     dest: dest.to_string(),
                 });
+            }
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    for workflow in alert.workflows.iter() {
+        match crate::service::workflows::get_workflow_by_id(org_id, workflow).await {
+            Ok(None) => {
+                return Err(AlertError::AlertWorkflowNotFound {
+                    id: workflow.to_owned(),
+                });
+            }
+            Ok(Some(_)) => {}
+            Err(e) => {
+                return Err(AlertError::InfraError(infra::errors::Error::OtherError(e)));
             }
         }
     }
@@ -896,8 +921,12 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     #[cfg(not(feature = "enterprise"))]
     let incident_routed = false;
 
+    let trace_id = config::ider::generate_trace_id();
+    let trace_id = format!("trig_id_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
-        alert.send_notification(&[], now, None, now).await?
+        alert
+            .send_notification(&trace_id, &[], now, None, now)
+            .await?
     } else {
         (String::new(), String::new())
     };
@@ -974,8 +1003,12 @@ pub async fn trigger_by_name(
     #[cfg(not(feature = "enterprise"))]
     let incident_routed = false;
 
+    let trace_id = config::ider::generate_trace_id();
+    let trace_id = format!("trig_name_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
-        alert.send_notification(&[], now, None, now).await?
+        alert
+            .send_notification(&trace_id, &[], now, None, now)
+            .await?
     } else {
         (String::new(), String::new())
     };
@@ -998,6 +1031,7 @@ pub trait AlertExt: Sync + Send + 'static {
     /// and the error message if any
     async fn send_notification(
         &self,
+        trace_id: &str,
         rows: &[Map<String, Value>],
         rows_end_time: i64,
         start_time: Option<i64>,
@@ -1039,6 +1073,7 @@ impl AlertExt for Alert {
 
     async fn send_notification(
         &self,
+        _trace_id: &str,
         rows: &[Map<String, Value>],
         rows_end_time: i64,
         start_time: Option<i64>,
@@ -1047,6 +1082,16 @@ impl AlertExt for Alert {
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
+
+        #[cfg(feature = "enterprise")]
+        let mut workflow_error = 0;
+        #[cfg(feature = "enterprise")]
+        let mut workflow_err_msg = "".to_string();
+
+        #[cfg(not(feature = "enterprise"))]
+        let workflow_error = 0;
+        #[cfg(not(feature = "enterprise"))]
+        let workflow_err_msg = "".to_string();
 
         // Get alert-level template if specified (takes precedence over destination templates)
         let alert_template = if let Some(ref template_name) = self.template {
@@ -1128,9 +1173,96 @@ impl AlertExt for Alert {
                 }
             }
         }
+
+        // we check specifically for non empty to avoid the clone of data into Value
+        #[cfg(feature = "enterprise")]
+        if !self.workflows.is_empty() {
+            let data: Vec<_> = rows.iter().map(|v| Value::Object(v.clone())).collect();
+
+            let source_id = self
+                .id
+                .as_ref()
+                .map_or(format!("{}/{}", self.org_id, self.name), |v| v.to_string());
+
+            let metadata: HashMap<String, String> = vec![
+                ("org_id", self.org_id.clone()),
+                ("stream_type", self.stream_type.to_string()),
+                ("stream_name", self.stream_name.clone()),
+                ("alert_name", self.name.clone()),
+                (
+                    "alert_type",
+                    if self.is_real_time {
+                        "realtime"
+                    } else {
+                        "scheduled"
+                    }
+                    .to_string(),
+                ),
+                ("alert_period", self.trigger_condition.period.to_string()),
+                (
+                    "alert_operator",
+                    self.trigger_condition.operator.to_string(),
+                ),
+                (
+                    "alert_threshold",
+                    self.trigger_condition.threshold.to_string(),
+                ),
+                ("alert_count", rows.len().to_string()),
+                (
+                    "alert_start_time",
+                    start_time
+                        .unwrap_or(
+                            rows_end_time
+                                - Duration::try_minutes(self.trigger_condition.period)
+                                    .unwrap()
+                                    .num_microseconds()
+                                    .unwrap(),
+                        )
+                        .to_string(),
+                ),
+                ("alert_end_time", rows_end_time.to_string()),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
+
+            for workflow in self.workflows.iter() {
+                if let Err(e) = crate::service::workflows::send_workflow_trigger(
+                    _trace_id,
+                    &self.org_id,
+                    source_id.clone(),
+                    WorkflowTriggerType::AlertFired,
+                    workflow,
+                    metadata.clone(),
+                    &data,
+                )
+                .await
+                {
+                    log::error!(
+                        "Error triggering workflow for {}/{}/{}/{} for workflow {} err: {}",
+                        self.org_id,
+                        self.stream_type,
+                        self.stream_name,
+                        self.name,
+                        workflow,
+                        e
+                    );
+                    workflow_error += 1;
+                    workflow_err_msg = format!(
+                        "{workflow_err_msg} Error triggering workflow {} err: {e};",
+                        workflow
+                    );
+                }
+            }
+        }
+
         if no_of_error == self.destinations.len() {
             Err(AlertError::SendNotificationError {
                 error_message: err_message,
+            })
+        } else if self.destinations.is_empty() && workflow_error == self.workflows.len() {
+            Err(AlertError::SendNotificationError {
+                error_message: workflow_err_msg,
             })
         } else {
             Ok((success_message, err_message))
@@ -3772,7 +3904,7 @@ mod tests {
         );
         assert_eq!(
             AlertError::AlertDestinationMissing.to_string(),
-            "Alert destinations is required"
+            "Alert destination or workflows is required"
         );
         assert_eq!(AlertError::AlertNotFound.to_string(), "Alert not found");
         assert_eq!(

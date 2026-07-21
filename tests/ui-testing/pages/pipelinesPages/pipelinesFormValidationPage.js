@@ -133,7 +133,7 @@ export class PipelinesFormValidationPage {
 
     async uploadPipelineFile(filePath) {
         testLogger.info('Uploading pipeline file', { filePath });
-        // OFile (q-file) wraps a hidden native <input type="file"> — target it directly
+        // OFile wraps a hidden native <input type="file"> — target it directly
         const nativeInput = this.page.locator(`${this.importPipelineFileInput} input[type="file"]`);
         await nativeInput.setInputFiles(filePath);
     }

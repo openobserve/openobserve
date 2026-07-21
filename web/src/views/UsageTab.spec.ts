@@ -258,54 +258,44 @@ describe("UsageTab", () => {
     });
 
     it("should render the streams overview section", () => {
-      const streamsSection = wrapper.find(
-        '[aria-label="Streams overview section"]',
-      );
-      expect(streamsSection.exists()).toBe(true);
+      // The streams section renders the KPI tile row carrying the streams count
+      expect(
+        wrapper.find('[data-test="home-usage-tab-streams-count"]').exists(),
+      ).toBe(true);
     });
 
     it("should render streams count tile", () => {
-      const tile = wrapper.find('[aria-label="Streams count statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-streams-count"]');
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-streams-count"]').text(),
-      ).toBe("5");
+      expect(tile.text()).toBe("5");
     });
 
     it("should render events count tile", () => {
-      const tile = wrapper.find('[aria-label="Events count statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-events-count"]');
       expect(tile.exists()).toBe(true);
       // formatEventCount(10000) -> "10000" (falls back to summary.doc_count)
-      expect(
-        tile.find('[data-test="home-usage-tab-events-count"]').text(),
-      ).toBe("10000");
+      expect(tile.text()).toBe("10000");
     });
 
     it("should render ingested data size tile", () => {
       const tile = wrapper.find(
-        '[aria-label="Ingested data size statistics"]',
+        '[data-test="home-usage-tab-ingested-size"]',
       );
       expect(tile.exists()).toBe(true);
       // fallback: summary.value.ingested_data = formatSizeFromMB(2000) -> "2000 MB"
-      expect(
-        tile.find('[data-test="home-usage-tab-ingested-size"]').text(),
-      ).toBe("2000 MB");
+      expect(tile.text()).toBe("2000 MB");
     });
 
     it("should render the functions tile", () => {
-      const tile = wrapper.find('[aria-label="Functions count statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-functions-count"]');
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-functions-count"]').text(),
-      ).toBe("3");
+      expect(tile.text()).toBe("3");
     });
 
     it("should render the dashboards tile", () => {
-      const tile = wrapper.find('[aria-label="Dashboards count statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-dashboards-count"]');
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-dashboards-count"]').text(),
-      ).toBe("4");
+      expect(tile.text()).toBe("4");
     });
 
     it("should render the alerts overview section", () => {
@@ -367,20 +357,16 @@ describe("UsageTab", () => {
 
     it("should render compressed data size tile when isCloud is false", () => {
       const tile = wrapper.find(
-        '[aria-label="Compressed data size statistics"]',
+        '[data-test="home-usage-tab-compressed-size"]',
       );
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-compressed-size"]').text(),
-      ).toBe("500 MB");
+      expect(tile.text()).toBe("500 MB");
     });
 
     it("should render index size tile when isCloud is false", () => {
-      const tile = wrapper.find('[aria-label="Index size statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-index-size"]');
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-index-size"]').text(),
-      ).toBe("100 MB");
+      expect(tile.text()).toBe("100 MB");
     });
   });
 

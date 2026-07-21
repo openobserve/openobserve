@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCollapsible
     :model-value="isExpanded"
     @update:model-value="handleToggle"
-    class="field-expansion-item w-full rounded overflow-hidden"
+    class="field-expansion-item w-full rounded-default overflow-hidden"
     trigger-class="px-0! py-0!"
   >
     <template #trigger>
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span class="w-[0.55rem] shrink-0 flex items-center justify-center mr-1">
           <OIcon
-            class="inline-flex items-center justify-center shrink-0 w-4 text-[var(--o2-text-muted)]"
+            class="inline-flex items-center justify-center shrink-0 w-4 text-text-muted"
             :name="isExpanded ? 'expand-more' : 'chevron-right'"
             size="sm"
           />
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OFieldRow>
     </template>
 
-    <div class="pl-4 pr-0 py-0">
+    <div class="pl-4 pr-2 py-0">
         <slot name="body">
           <FieldValuesPanel
             ref="fieldValuesPanelRef"
@@ -248,17 +248,18 @@ const handleToggle = (val: boolean) => {
 defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
 </script>
 
-<style>
-.field-expansion-item button[data-state]:not([role="checkbox"]) {
-  min-height: 24px !important;
+<style scoped>
+/* keep(complex-state): :deep overrides of the child collapsible's trigger button
+   and content wrapper; the [data-state] rule targets this component's own item. */
+.field-expansion-item :deep(button[data-state]:not([role="checkbox"])) {
+  min-height: 1.5rem !important;
 }
 
-.field-expansion-item .o-collapsible-content {
+.field-expansion-item :deep(.o-collapsible-content) {
   width: 100%;
 }
 
 .field-expansion-item[data-state="open"] {
   margin-bottom: 0.375rem;
 }
-
 </style>

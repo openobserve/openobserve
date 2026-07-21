@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[
       'o2-empty-state relative flex flex-col items-center justify-center overflow-hidden',
+      '[--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]',
       sizeClass.root,
       { 'o2-empty-state--hero': size === 'hero' },
     ]"
@@ -72,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div :class="['flex flex-col max-w-xl', sizeClass.copy]">
         <component
           :is="size === 'inline' ? 'p' : 'h2'"
-          :class="['font-medium text-text-primary tracking-[-0.01em]', sizeClass.title]"
+          :class="['font-medium text-text-heading tracking-[-0.01em]', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
         </component>
@@ -88,7 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (+ optional secondary) button(s) from preset/props -->
       <div
         v-if="$slots.actions || showCards || resolvedActionLabel || secondaryActionLabel"
-        :class="['flex flex-nowrap items-stretch justify-center', sizeClass.actions]"
+        :class="[
+          props.columns
+            ? 'flex flex-wrap justify-center'
+            : 'flex flex-nowrap items-stretch justify-center',
+          sizeClass.actions,
+        ]"
       >
         <slot name="actions">
           <template v-if="showCards">
@@ -174,6 +180,11 @@ const props = withDefaults(
     secondaryActionLabel?: string;
     /** Suppress the preset's actions (e.g. table empties with no CTA). */
     hideAction?: boolean;
+    /**
+     * Whether to wrap action cards onto multiple rows (flex-wrap) instead of
+     * forcing a single row (flex-nowrap). Use when you have more than 2-3 cards.
+     */
+    columns?: boolean;
     /**
      * The underlying list HAS items but the current filter/search matched none.
      * Switches to a "no results" treatment (magnifier + "No {noun} found" +
@@ -324,7 +335,7 @@ const SIZE_MAP: Record<
   }
 > = {
   hero: {
-    root: "w-full h-full min-h-[320px] px-6 py-12",
+    root: "w-full h-full min-h-80 px-6 py-12",
     stack: "gap-7",
     copy: "gap-2.5",
     actions: "gap-3 pt-1",
@@ -335,7 +346,7 @@ const SIZE_MAP: Record<
     iconWrap: "",
   },
   block: {
-    root: "w-full min-h-[260px] px-6 py-10",
+    root: "w-full min-h-65 px-6 py-10",
     stack: "gap-5",
     copy: "gap-2",
     actions: "gap-2.5 pt-0.5",
@@ -346,7 +357,7 @@ const SIZE_MAP: Record<
     iconWrap: "",
   },
   inline: {
-    root: "w-full min-h-[160px] px-4 py-8",
+    root: "w-full min-h-40 px-4 py-8",
     stack: "gap-3",
     copy: "gap-1",
     actions: "gap-2 pt-1",
@@ -360,9 +371,3 @@ const SIZE_MAP: Record<
 };
 const sizeClass = computed(() => SIZE_MAP[size.value]);
 </script>
-
-<style>
-/* CSS custom property for the dot-grid backdrop; dark mode overrides it. */
-.o2-empty-state { --empty-dot: var(--color-grey-300); }
-.dark .o2-empty-state { --empty-dot: var(--color-grey-800); }
-</style>

@@ -32,14 +32,6 @@ const i18n = createI18n({
       common: {
         delete: "Delete",
       },
-      pipeline: {
-        llmEvaluationNodeTitle: "LLM Evaluation",
-        nameLabel: "Name",
-        samplingLabel: "Sampling",
-        samplingOfTraces: "of traces",
-        samplingAllTraces: "All traces",
-        llmEvaluationDescription: "Evaluates traces using LLM",
-      },
     },
   },
 });
@@ -54,6 +46,7 @@ vi.mock("@vue-flow/core", () => ({
     template: '<div class="mock-handle" />',
     props: ["id", "type", "position", "class"],
   },
+  Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -167,11 +160,6 @@ function buildPipelineObj(overrides: Record<string, any> = {}) {
         io_type: "input",
         icon: "img:mock-url/images/pipeline/query.svg",
       },
-      {
-        subtype: "llm_evaluation",
-        io_type: "default",
-        icon: "img:mock-url/images/pipeline/llm.svg",
-      },
     ],
     ...overrides,
   };
@@ -271,14 +259,6 @@ describe("CustomNode.vue", () => {
           stream_name: "prom",
         },
         io_type: "input",
-      });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("mounts without errors for an llm_evaluation node", () => {
-      wrapper = createWrapper({
-        data: { node_type: "llm_evaluation", name: "my-eval", sampling_rate: 0.5 },
-        io_type: "default",
       });
       expect(wrapper.exists()).toBe(true);
     });
@@ -527,45 +507,6 @@ describe("CustomNode.vue", () => {
   });
 
   // =========================================================================
-  describe("llm_evaluation node rendering", () => {
-    it("renders the llm_evaluation node container", () => {
-      wrapper = createWrapper({
-        data: { node_type: "llm_evaluation", name: "eval-node", sampling_rate: 0.1 },
-        io_type: "default",
-      });
-      expect(
-        wrapper
-          .find('[data-test="pipeline-node-default-llm-evaluation-node"]')
-          .exists()
-      ).toBe(true);
-    });
-
-    it("shows the node name", () => {
-      wrapper = createWrapper({
-        data: { node_type: "llm_evaluation", name: "my-llm", sampling_rate: 0.5 },
-        io_type: "default",
-      });
-      expect(wrapper.text()).toContain("my-llm");
-    });
-
-    it("shows sampling rate as percentage when sampling_rate is set", () => {
-      wrapper = createWrapper({
-        data: { node_type: "llm_evaluation", name: "e", sampling_rate: 0.25 },
-        io_type: "default",
-      });
-      expect(wrapper.text()).toContain("25%");
-    });
-
-    it("falls back to 'LLM Evaluation' label when name is absent", () => {
-      wrapper = createWrapper({
-        data: { node_type: "llm_evaluation" },
-        io_type: "default",
-      });
-      expect(wrapper.text()).toContain("LLM Evaluation");
-    });
-  });
-
-  // =========================================================================
   describe("computed: hasNodeError", () => {
     it("returns false when last_error is null", () => {
       wrapper = createWrapper({}, {
@@ -627,12 +568,12 @@ describe("CustomNode.vue", () => {
           },
         },
       });
-      expect(wrapper.find(".error-badge").exists()).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-error-badge"]').exists()).toBe(true);
     });
 
     it("does NOT render error badge when hasNodeError is false", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".error-badge").exists()).toBe(false);
+      expect(wrapper.find('[data-test="pipeline-node-error-badge"]').exists()).toBe(false);
     });
   });
 
@@ -707,7 +648,7 @@ describe("CustomNode.vue", () => {
     it("returns grey for unknown io_type", () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
-      expect(vm.getNodeColor("unknown")).toBe("#6b7280");
+      expect(vm.getNodeColor("unknown")).toBe("var(--color-grey-500)");
     });
   });
 
@@ -1075,123 +1016,9 @@ describe("CustomNode.vue", () => {
   });
 
   // =========================================================================
-  describe("onFunctionClick", () => {
-    it("sets pipelineObj.userSelectedNode to the given data", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const data = { node_type: "function", name: "f" };
-      const event = new MouseEvent("click");
-      vm.onFunctionClick(data, event, "node-1");
-      expect(mockPipelineObj.userSelectedNode).toBe(data);
-    });
-
-    it("sets pipelineObj.userClickedNode to the given id", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onFunctionClick({}, event, "node-99");
-      expect(mockPipelineObj.userClickedNode).toBe("node-99");
-    });
-
-    it("calls onDragStart with function dataToOpen object", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onFunctionClick({}, event, "node-1");
-      expect(mockOnDragStart).toHaveBeenCalled();
-      const callArg = mockOnDragStart.mock.calls[0][1];
-      expect(callArg.subtype).toBe("function");
-    });
-
-    it("closes the menu after click", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      vm.menu = true;
-      const event = new MouseEvent("click");
-      vm.onFunctionClick({}, event, "node-1");
-      expect(vm.menu).toBe(false);
-    });
-  });
-
-  // =========================================================================
-  describe("onConditionClick", () => {
-    it("sets pipelineObj.userClickedNode to the given id", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onConditionClick({ label: "" }, event, "cond-node");
-      expect(mockPipelineObj.userClickedNode).toBe("cond-node");
-    });
-
-    it("updates data.label to the given id", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const data: any = { label: "" };
-      const event = new MouseEvent("click");
-      vm.onConditionClick(data, event, "cond-node");
-      expect(data.label).toBe("cond-node");
-    });
-
-    it("calls onDragStart with condition subtype", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onConditionClick({}, event, "c-1");
-      const callArg = mockOnDragStart.mock.calls[0][1];
-      expect(callArg.subtype).toBe("condition");
-    });
-  });
-
-  // =========================================================================
-  describe("onStreamOutputClick", () => {
-    it("sets userClickedNode to data.label when id is falsy", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const data = { label: "stream-label" };
-      const event = new MouseEvent("click");
-      vm.onStreamOutputClick(data, event, null);
-      expect(mockPipelineObj.userClickedNode).toBe("stream-label");
-    });
-
-    it("sets userClickedNode to id when id is truthy", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onStreamOutputClick({}, event, "stream-id");
-      expect(mockPipelineObj.userClickedNode).toBe("stream-id");
-    });
-
-    it("calls onDragStart with stream subtype and output io_type", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onStreamOutputClick({}, event, "s-1");
-      const callArg = mockOnDragStart.mock.calls[0][1];
-      expect(callArg.subtype).toBe("stream");
-      expect(callArg.io_type).toBe("output");
-    });
-  });
-
-  // =========================================================================
-  describe("onExternalDestinationClick", () => {
-    it("calls onDragStart with remote_stream subtype", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const event = new MouseEvent("click");
-      vm.onExternalDestinationClick({}, event, "ext-1");
-      const callArg = mockOnDragStart.mock.calls[0][1];
-      expect(callArg.subtype).toBe("remote_stream");
-    });
-
-    it("sets userClickedNode to data.label when id is null", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const data = { label: "ext-label" };
-      const event = new MouseEvent("click");
-      vm.onExternalDestinationClick(data, event, null);
-      expect(mockPipelineObj.userClickedNode).toBe("ext-label");
-    });
-  });
+  // (onFunctionClick/onConditionClick/onStreamOutputClick/onExternalDestinationClick
+  //  describes removed — those handlers were deleted with the dead
+  //  userClickedNode/userSelectedNode add-connected-node feature.)
 
   // =========================================================================
   describe("updateEdgeColors", () => {
@@ -1228,7 +1055,7 @@ describe("CustomNode.vue", () => {
       const vm = wrapper.vm as any;
       vm.updateEdgeColors("node-1", null, true);
       expect(mockPipelineObj.currentSelectedPipeline.edges[0].style.stroke).toBe(
-        "#6b7280"
+        "var(--color-grey-500)"
       );
     });
 

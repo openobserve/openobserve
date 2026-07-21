@@ -24,54 +24,39 @@
 //   - creates_incident           (switch)              — optional boolean
 //
 // The cross-step threshold / promql / aggregation / group_by / frequency / cron
-// checks that used to live in the component's hand-rolled validate() are NOT
-// here — they belong to QueryConfig / the AddAlert orchestrator (see the
-// "CROSS-STEP CHECKS TO REHOME" note in the migration report). Do not add them.
+// checks are NOT here — they belong to QueryConfig / the AddAlert orchestrator.
+// Do not add them.
 //
-// Number inputs emit STRINGS out of OFormInput → `z.coerce.number()`
-// (playbook §2). TanStack does NOT write the coerced value back onto the field,
-// so the component re-coerces (`Number(...)`) when it emits the payload up so the
-// parent's trigger_condition keeps number types (Rule ④ payload parity).
+// Number inputs emit STRINGS out of OFormInput → `z.coerce.number()`. TanStack
+// does NOT write the coerced value back onto the field, so the component
+// re-coerces (`Number(...)`) when it emits the payload up so the parent's
+// trigger_condition keeps number types.
 
 import { z } from "zod";
 import type { Translator } from "./QueryConfig.schema";
 
 // Validation messages are i18n-driven — `alerts.validation.*` locale keys,
-// resolved via the injected `t`. English values are byte-for-byte the
-// pre-migration strings (parity). Parity map:
-//   silence ≥ 0          → alerts.validation.silenceNonNegative
-//   period ≥ 1           → alerts.validation.periodPositive
-//   destinations ≥ 1     → alerts.validation.destinationRequired
+// resolved via the injected `t`.
 
 // ── Composable field FRAGMENTS (factories over the injected `t`) ─────────────
 // Exposed so the AddAlert orchestrator schema can compose the SAME rules into
 // its (bigger) alert schema — call these instead of re-declaring the rules, so
 // the step and the orchestrator can never drift.
 //
-//   import {
-//     makeSilenceSchema,
-//     makePeriodSchema,
-//     makeDestinationsSchema,
-//     alertSettingsCreatesIncidentSchema,
-//   } from "./steps/AlertSettings.schema";
-//
 // The orchestrator applies the period rule MODE-CONDITIONALLY (scheduled only)
 // via `createAlertSettingsSchema(t, isRealTime)`.
 
-/** True when the RAW input value is empty (unset). Mirrors the `isBlank` helper
- *  in QueryConfig.schema.ts (kept local — that one is module-private there). */
+/** True when the RAW input value is empty (unset). */
 const isBlank = (v: unknown): boolean =>
   v === undefined || v === null || v === "";
 
-/** silence ≥ 0 (required). Pre-migration: `silence < 0 || undefined/null/''`
- *  → invalid, in BOTH realtime and scheduled modes.
+/** silence ≥ 0 (required).
  *
  *  ⚠️ Checked on the RAW value — NOT `z.coerce.number()`. Because
  *  `Number("") === 0`, a coerced blank would PASS `.min(0)` (0 is a legal
  *  silence!), save, and then `parseInt("")` in getAlertPayload → `NaN` →
  *  serialised to `null`. Zero-safety is exactly why this rule cannot coerce:
- *  it must tell "" apart from 0. Same trap documented in
- *  QueryConfig.schema.ts (see its `isBlank` / `isBelowOne` note). */
+ *  it must tell "" apart from 0. */
 export const makeSilenceSchema = (t: Translator) =>
   z
     .unknown()
@@ -79,14 +64,14 @@ export const makeSilenceSchema = (t: Translator) =>
       (v) => !isBlank(v) && !Number.isNaN(Number(v)) && Number(v) >= 0,
       t("alerts.validation.silenceNonNegative"),
     )
-    // Output stays `number` (identical to the `z.coerce.number()` this replaces)
-    // so composed z.infer types are unchanged. Inert at runtime — TanStack does
-    // not write a validator's parsed output back onto the field.
+    // Output stays `number` so composed z.infer types are unchanged. Inert at
+    // runtime — TanStack does not write a validator's parsed output back onto
+    // the field.
     .transform((v) => Number(v));
 
-/** period ≥ 1 (required). Pre-migration this rule applied in the SCHEDULED
- *  branch only (the period input only renders for scheduled alerts). Compose it
- *  conditionally in the orchestrator; standalone AlertSettings applies it via
+/** period ≥ 1 (required). Applies in the SCHEDULED branch only (the period input
+ *  only renders for scheduled alerts). Compose it conditionally in the
+ *  orchestrator; standalone AlertSettings applies it via
  *  `createAlertSettingsSchema(t, isRealTime)` below. */
 export const makePeriodSchema = (t: Translator) =>
   z.coerce.number().min(1, t("alerts.validation.periodPositive"));
@@ -96,7 +81,7 @@ export const makePeriodSchema = (t: Translator) =>
 export const makeDestinationsSchema = (t: Translator) =>
   z.array(z.string()).min(1, t("alerts.validation.destinationRequired"));
 
-/** creates_incident: optional boolean (no pre-migration rule). */
+/** creates_incident: optional boolean. */
 export const alertSettingsCreatesIncidentSchema = z.boolean().optional();
 
 /**
@@ -118,24 +103,50 @@ export const makeAlertSettingsShape = (t: Translator) =>
 // ── Mode-conditional composite ──────────────────────────────────────────────
 
 /**
- * The AlertSettings rule set, composed VERBATIM into the AddAlert orchestrator
- * schema (AddAlert.schema.ts superRefine) — the step itself is a DESCENDANT of
- * the ONE AddAlert form and no longer owns an <OForm>.
+ * The AlertSettings rule set, composed into the AddAlert orchestrator schema.
  *
- * `isRealTime` gates the period rule EXACTLY like the pre-migration code: the
- * period input renders (and is validated ≥ 1) only for scheduled alerts. In
- * realtime mode period is not rendered and keeps its default value, so it is a
- * plain `z.coerce.number()` with no min (no newly-tightened rule — Rule ④).
+ * `isRealTime` gates the period rule: the period input renders (and is validated
+ * ≥ 1) only for scheduled alerts. In realtime mode period is not rendered and
+ * keeps its default value, so it is a plain `z.coerce.number()` with no min.
  */
-export const createAlertSettingsSchema = (t: Translator, isRealTime: boolean) =>
-  z.object({
+export const createAlertSettingsSchema = (
+  t: Translator,
+  isRealTime: boolean,
+  // ENTERPRISE/CLOUD only. An alert can be delivered to a destination OR to a
+  // linked workflow, so with workflows available the "destinations ≥ 1" rule
+  // becomes "at least ONE of the two". Defaults to false so OSS — and every
+  // existing caller/spec passing two args — keeps main's exact rule and message.
+  allowWorkflows = false,
+) => {
+  const base = z.object({
     trigger_condition: z.object({
       silence: makeSilenceSchema(t),
       period: isRealTime ? z.coerce.number() : makePeriodSchema(t),
     }),
-    destinations: makeDestinationsSchema(t),
+    // With workflows in play the per-field `min(1)` can't express the rule (it
+    // is cross-field), so it moves to the refinement below.
+    destinations: allowWorkflows
+      ? z.array(z.string()).optional()
+      : makeDestinationsSchema(t),
+    workflows: z.array(z.string()).optional(),
     creates_incident: alertSettingsCreatesIncidentSchema,
   });
+
+  if (!allowWorkflows) return base;
+
+  return base.superRefine((val, ctx) => {
+    const hasDestination = (val.destinations?.length ?? 0) > 0;
+    const hasWorkflow = (val.workflows?.length ?? 0) > 0;
+    if (hasDestination || hasWorkflow) return;
+    // Reported on `destinations` so it renders under the combined targets
+    // control (AlertSettings surfaces it via fieldError("destinations")).
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["destinations"],
+      message: t("alerts.destinationOrWorkflowRequired"),
+    });
+  });
+};
 
 export type AlertSettingsForm = z.infer<
   ReturnType<typeof createAlertSettingsSchema>

@@ -462,7 +462,7 @@ describe("IncidentRCAAnalysis", () => {
   });
 
   describe("Theme Switching", () => {
-    it("should update in-flight banner styles when switching from light to dark mode", async () => {
+    it("should keep the semantic in-flight banner surface when switching from light to dark mode", async () => {
       wrapper = mountComponent({
         hasExistingRca: false,
         rcaLoading: true,
@@ -470,23 +470,23 @@ describe("IncidentRCAAnalysis", () => {
       });
 
       const bannerBefore = findByTestId(wrapper, "rca-inflight-container");
-      expect(bannerBefore.classes()).toContain("bg-indigo-50");
+      expect(bannerBefore.classes()).toContain("bg-status-info-bg");
 
       await wrapper.setProps({ isDarkMode: true });
       await flushPromises();
 
       const bannerAfter = findByTestId(wrapper, "rca-inflight-container");
-      expect(bannerAfter.classes()).toContain("bg-indigo-900/20");
+      expect(bannerAfter.classes()).toContain("bg-status-info-bg");
     });
 
-    it("should apply correct dark mode styles during loading", () => {
+    it("should apply the semantic in-flight banner surface during loading in dark mode", () => {
       wrapper = mountComponent({
         rcaLoading: true,
         isDarkMode: true,
       });
 
       const container = findByTestId(wrapper, "rca-inflight-container");
-      expect(container.classes()).toContain("bg-indigo-900/20");
+      expect(container.classes()).toContain("bg-status-info-bg");
     });
   });
 

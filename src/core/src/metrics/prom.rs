@@ -49,6 +49,7 @@ use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use proto::prometheus_rpc;
 
+use super::native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram};
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
@@ -81,9 +82,6 @@ pub async fn remote_write(
     let cfg = get_config();
     let dedup_enabled = cfg.common.metrics_dedup_enabled;
     let election_interval = cfg.limit.metrics_leader_election_interval * 1000000;
-    let mut last_received: i64 = 0;
-    let mut has_entry = false;
-    let mut accept_record: bool;
     let mut cluster_name = String::new();
     let mut metric_data_map: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
     let mut metric_schema_map: HashMap<String, SchemaCache> = HashMap::new();
@@ -184,6 +182,12 @@ pub async fn remote_write(
     for event in &request.timeseries {
         if let Some(name_label) = event.labels.iter().find(|l| l.name == NAME_LABEL) {
             let metric_name = format_stream_name(name_label.value.to_string());
+            if !event.histograms.is_empty() {
+                // native histograms degrade into classic streams; preload those too
+                for suffix in CLASSIC_HISTOGRAM_SUFFIXES {
+                    unique_metrics.insert(format!("{metric_name}{suffix}"));
+                }
+            }
             unique_metrics.insert(metric_name);
         }
     }
@@ -273,12 +277,10 @@ pub async fn remote_write(
             .drain(..)
             .filter(|label| {
                 if label.name == cfg.prom.ha_replica_label {
-                    if !has_entry {
-                        replica_label = label.value.clone();
-                    }
+                    replica_label = label.value.clone();
                     false
                 } else if label.name == cfg.prom.ha_cluster_label {
-                    if !has_entry && cluster_name.is_empty() {
+                    if cluster_name.is_empty() {
                         cluster_name = format!("{}/{}", org_id, label.value.clone());
                     }
                     false
@@ -306,65 +308,22 @@ pub async fn remote_write(
             let Some(sample_val) = super::sanitize_metric_value(sample.value) else {
                 continue;
             };
+
+            // HA election runs at the first record that will actually be written, so a
+            // replica sending only unusable data cannot retain leadership
+            if first_line && dedup_enabled && !cluster_name.is_empty() {
+                first_line = false;
+                if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
+                    // do not accept any entries for this request
+                    observe_rejected_request(org_id, &start);
+                    return Ok(());
+                }
+            }
+
             let metric = Metric {
                 labels: &labels,
                 value: sample_val,
             };
-
-            if first_line && dedup_enabled && !cluster_name.is_empty() {
-                let lock = METRIC_CLUSTER_LEADER.read().await;
-                match lock.get(&cluster_name) {
-                    Some(leader) => {
-                        last_received = leader.last_received;
-                        has_entry = true;
-                    }
-                    None => {
-                        has_entry = false;
-                    }
-                }
-                drop(lock);
-                accept_record = if !replica_label.is_empty() {
-                    prom_ha_handler(
-                        has_entry,
-                        &cluster_name,
-                        &replica_label,
-                        last_received,
-                        election_interval,
-                    )
-                    .await
-                } else {
-                    true
-                };
-                has_entry = true;
-                first_line = false;
-            } else {
-                accept_record = true
-            }
-            if !accept_record {
-                // do not accept any entries for request
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/prometheus/api/v1/write",
-                        "200",
-                        org_id,
-                        StreamType::Metrics.as_str(),
-                        "",
-                        "",
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/prometheus/api/v1/write",
-                        "200",
-                        org_id,
-                        StreamType::Metrics.as_str(),
-                        "",
-                        "",
-                    ])
-                    .inc();
-                return Ok(());
-            }
 
             let mut value: json::Value = json::to_value(&metric).unwrap();
             let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
@@ -374,31 +333,78 @@ pub async fn remote_write(
             );
 
             // ready to be buffered for downstream processing
-            if stream_executable_pipelines
-                .get(&metric_name)
-                .is_some_and(|v| !v.is_empty())
-            {
-                // buffer to pipeline for batch processing
-                stream_pipeline_inputs
-                    .entry(metric_name.to_owned())
-                    .or_default()
-                    .push((value, timestamp));
-            } else {
-                // get json object
-                let mut local_val = match value.take() {
-                    json::Value::Object(val) => val,
-                    _ => unreachable!(),
-                };
+            buffer_metric_record(
+                &metric_name,
+                value,
+                timestamp,
+                &stream_executable_pipelines,
+                &user_defined_schema_map,
+                &mut stream_pipeline_inputs,
+                &mut json_data_by_stream,
+            );
+        }
 
-                if let Some(Some(fields)) = user_defined_schema_map.get(&metric_name) {
-                    local_val = crate::service::ingestion::refactor_map(local_val, fields);
+        // native histograms degrade into classic `_count`/`_sum`/`le` `_bucket`
+        // records so existing PromQL works on them unchanged
+        if !event.histograms.is_empty() {
+            // one stream name + label template per derived stream, shared by every
+            // record of the event instead of cloned per record
+            let mut derived_streams = CLASSIC_HISTOGRAM_SUFFIXES.map(|suffix| {
+                let mut hist_labels = labels.clone();
+                if let Some(name) = hist_labels.get_mut(NAME_LABEL) {
+                    name.push_str(suffix);
+                }
+                (format!("{metric_name}{suffix}"), hist_labels)
+            });
+            for hp in &event.histograms {
+                sample_count += 1;
+                let records = expand_native_histogram(hp, cfg.prom.native_histogram_max_buckets);
+                if records.is_empty() {
+                    // unsupported schema or stale marker: nothing will be written
+                    continue;
                 }
 
-                // buffer to downstream processing directly
-                json_data_by_stream
-                    .entry(metric_name.clone())
-                    .or_default()
-                    .push((local_val, timestamp));
+                // same first-writable-record election as the samples loop
+                if first_line && dedup_enabled && !cluster_name.is_empty() {
+                    first_line = false;
+                    if !run_ha_election(&cluster_name, &replica_label, election_interval).await {
+                        observe_rejected_request(org_id, &start);
+                        return Ok(());
+                    }
+                }
+
+                let timestamp = parse_i64_to_timestamp_micros(hp.timestamp);
+                for (suffix, le, value) in records {
+                    let Some(value) = super::sanitize_metric_value(value) else {
+                        continue;
+                    };
+                    let idx = CLASSIC_HISTOGRAM_SUFFIXES
+                        .iter()
+                        .position(|s| *s == suffix)
+                        .unwrap();
+                    let (stream_name, hist_labels) = &mut derived_streams[idx];
+                    if let Some(le) = le {
+                        hist_labels.insert(BUCKET_LABEL.to_string(), le);
+                    }
+                    let metric = Metric {
+                        labels: hist_labels,
+                        value,
+                    };
+                    let mut value: json::Value = json::to_value(&metric).unwrap();
+                    value.as_object_mut().unwrap().insert(
+                        TIMESTAMP_COL_NAME.to_string(),
+                        json::Value::Number(timestamp.into()),
+                    );
+                    buffer_metric_record(
+                        stream_name,
+                        value,
+                        timestamp,
+                        &stream_executable_pipelines,
+                        &user_defined_schema_map,
+                        &mut stream_pipeline_inputs,
+                        &mut json_data_by_stream,
+                    );
+                }
             }
         }
         sample_processing_time += sample_start.elapsed().as_micros();
@@ -1162,6 +1168,93 @@ pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String>
                 .map(|m| m.value.clone())
         }
     }
+}
+
+/// Per-stream buffer of records ready for the write path, keyed by stream name.
+type JsonDataByStream = HashMap<String, Vec<(json::Map<String, json::Value>, i64)>>;
+
+/// Routes one metric record either into its stream's pipeline input buffer or, with UDS
+/// trimming applied, directly into the per-stream write buffer.
+fn buffer_metric_record(
+    metric_name: &str,
+    mut value: json::Value,
+    timestamp: i64,
+    stream_executable_pipelines: &HashMap<String, Vec<ExecutablePipeline>>,
+    user_defined_schema_map: &HashMap<String, Option<HashSet<String>>>,
+    stream_pipeline_inputs: &mut HashMap<String, Vec<(json::Value, i64)>>,
+    json_data_by_stream: &mut JsonDataByStream,
+) {
+    if stream_executable_pipelines
+        .get(metric_name)
+        .is_some_and(|v| !v.is_empty())
+    {
+        // buffer to pipeline for batch processing
+        stream_pipeline_inputs
+            .entry(metric_name.to_owned())
+            .or_default()
+            .push((value, timestamp));
+    } else {
+        // get json object
+        let mut local_val = match value.take() {
+            json::Value::Object(val) => val,
+            _ => unreachable!(),
+        };
+
+        if let Some(Some(fields)) = user_defined_schema_map.get(metric_name) {
+            local_val = crate::service::ingestion::refactor_map(local_val, fields);
+        }
+
+        // buffer to downstream processing directly
+        json_data_by_stream
+            .entry(metric_name.to_owned())
+            .or_default()
+            .push((local_val, timestamp));
+    }
+}
+
+/// Looks up the current leader state and runs leader election for this replica.
+/// Requests without a replica label are always accepted.
+async fn run_ha_election(cluster_name: &str, replica_label: &str, election_interval: i64) -> bool {
+    if replica_label.is_empty() {
+        return true;
+    }
+    let (has_entry, last_received) = match METRIC_CLUSTER_LEADER.read().await.get(cluster_name) {
+        Some(leader) => (true, leader.last_received),
+        None => (false, 0),
+    };
+    prom_ha_handler(
+        has_entry,
+        cluster_name,
+        replica_label,
+        last_received,
+        election_interval,
+    )
+    .await
+}
+
+/// Records the request metrics for a write rejected by HA election.
+fn observe_rejected_request(org_id: &str, start: &std::time::Instant) {
+    let time = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/prometheus/api/v1/write",
+            "200",
+            org_id,
+            StreamType::Metrics.as_str(),
+            "",
+            "",
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/prometheus/api/v1/write",
+            "200",
+            org_id,
+            StreamType::Metrics.as_str(),
+            "",
+            "",
+        ])
+        .inc();
 }
 
 async fn prom_ha_handler(

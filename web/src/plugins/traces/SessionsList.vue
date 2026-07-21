@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sessions-list h-full! flex flex-col bg-[var(--color-surface-base)] card-container"
+    class="sessions-list h-full! flex flex-col bg-card-glass-bg"
   >
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
@@ -74,16 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="filterMode === 'stream'"
               data-test="sessions-list-stream-selector"
-              class="w-[14rem] flex-shrink-0"
+              class="w-56 flex-shrink-0"
             >
               <!-- Hold a picker-shaped skeleton until the stream list lands, so
                    the selector doesn't flash an empty dropdown then populate. -->
-              <SkeletonBox
-                v-if="!streamsLoaded"
-                width="100%"
-                height="2.125rem"
-                rounded
-              />
+              <OSkeleton type="text" v-if="!streamsLoaded" class="w-full h-8.5" />
               <OSelect
                 v-else
                 v-model="activeStream"
@@ -92,24 +87,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="availableStreams.map((s) => ({ label: s, value: s }))"
                 labelKey="label"
                 valueKey="value"
-                class="w-full rounded"
+                class="w-full rounded-default"
                 @update:model-value="onStreamChange"
               />
             </div>
             <div
               v-else
               data-test="sessions-list-agent-selector"
-              class="w-[14rem] flex-shrink-0"
+              class="w-56 flex-shrink-0"
             >
               <!-- Same treatment for agents: toggling to Agent mode kicks off the
                    listAgents fetch, so show the skeleton until it resolves
                    instead of an empty agent picker. -->
-              <SkeletonBox
-                v-if="!agentsLoaded"
-                width="100%"
-                height="2.125rem"
-                rounded
-              />
+              <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
               <OSelect
                 v-else
                 v-model="activeAgent"
@@ -118,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="agentSelectOptions"
                 labelKey="label"
                 valueKey="value"
-                class="w-full rounded"
+                class="w-full rounded-default"
                 @update:model-value="onAgentChange"
               />
             </div>
@@ -174,14 +164,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
         <!-- Timestamp -->
         <template #cell-firstSeenNanos="{ row }">
-          <span class="text-[0.75rem] tabular-nums">
+          <span class="text-xs tabular-nums">
             {{ formatTimestamp(row.firstSeenNanos) }}
           </span>
         </template>
 
         <!-- Session ID -->
         <template #cell-sessionId="{ row }">
-          <div class="text-[0.75rem] truncate w-full">
+          <div class="text-xs truncate w-full">
             {{ row.sessionId }}
             <OTooltip :content="row.sessionId" />
           </div>
@@ -199,22 +189,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-firstUserMessage="{ row }">
           <div
             v-if="row.firstUserMessage"
-            class="text-[0.75rem] text-[var(--color-text-secondary)] truncate w-full"
+            class="text-xs text-text-secondary truncate w-full"
           >
             {{ row.firstUserMessage }}
             <OTooltip :content="row.firstUserMessage" />
           </div>
-          <span v-else class="text-[0.75rem] text-[var(--color-text-muted)]">—</span>
+          <span v-else class="text-xs text-text-muted">—</span>
         </template>
 
         <!-- Turns -->
         <template #cell-turns="{ row }">
-          <span class="text-[0.75rem]">{{ row.turns }}</span>
+          <span class="text-xs">{{ row.turns }}</span>
         </template>
 
         <!-- Duration -->
         <template #cell-durationNanos="{ row }">
-          <span class="text-[0.75rem]">
+          <span class="text-xs">
             {{ formatDuration(row.durationNanos) }}
             <OTooltip :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
           </span>
@@ -222,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Tokens -->
         <template #cell-tokens="{ row }">
-          <span class="text-[0.75rem] tabular-nums">
+          <span class="text-xs tabular-nums">
             {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
             <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
           </span>
@@ -230,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Cost -->
         <template #cell-cost="{ row }">
-          <span class="text-[0.75rem]">${{ row.cost.toFixed(4) }}</span>
+          <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
         </template>
 
         <!-- Status (derived from error_count) -->
@@ -262,7 +252,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import genAiAgentMappingService, {

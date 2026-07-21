@@ -55,13 +55,7 @@ describe('enterprisePlan.vue', () => {
           store
         },
         stubs: {
-          'q-card': true,
-          'q-separator': true,
           'OIcon': true,
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')" v-bind="$attrs"><slot/></button>',
-            emits: ['click']
-          }
         }
       }
     });

@@ -94,7 +94,7 @@ const richContent = computed(() =>
       :content="cardContent"
       :doc-url="docURL"
     />
-    <div v-else class="text-[16px]">
+    <div v-else class="text-base">
       <CopyContent :content="aiContent" />
       <div class="font-bold pt-6 pb-2">
         Click
@@ -102,7 +102,7 @@ const richContent = computed(() =>
           :href="safeHttpUrl(docURL)"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-blue-500 hover:text-blue-600"
+          class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
           >here</a
         >
