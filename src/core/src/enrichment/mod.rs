@@ -37,7 +37,7 @@ pub async fn get_enrichment_table(
     org_id: &str,
     table_name: &str,
     apply_primary_region_if_specified: bool,
-) -> Result<Arc<Vec<vrl::value::Value>>, anyhow::Error> {
+) -> Result<Arc<Vec<transform::vrl::value::Value>>, anyhow::Error> {
     let value_type =
         get_enrichment_table_inner(org_id, table_name, apply_primary_region_if_specified).await?;
     value_type.to_vrl()
@@ -100,8 +100,10 @@ pub async fn get_enrichment_table_inner(
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use vector_enrichment::{Case, Condition, Table};
-    use vrl::value::Value;
+    use transform::{
+        vector_enrichment::{Case, Condition, Table},
+        vrl::value::Value,
+    };
 
     use super::*;
 

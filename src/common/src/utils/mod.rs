@@ -15,7 +15,6 @@
 
 pub mod functions;
 pub mod http;
-pub mod js;
 pub mod jwt;
 pub mod redirect_response;
 pub mod ssrf_guard;

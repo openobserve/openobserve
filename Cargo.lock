@@ -2277,13 +2277,11 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
- "openobserve-vrl",
  "opentelemetry",
  "parking_lot 0.12.5",
  "prost 0.14.3",
  "regex",
  "reqwest 0.13.2",
- "rquickjs",
  "segment",
  "serde",
  "serde_json",
@@ -2295,6 +2293,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-opentelemetry",
+ "transform",
  "uaparser",
  "url",
  "utoipa",
@@ -6684,7 +6683,6 @@ dependencies = [
  "datafusion",
  "datafusion-functions-json",
  "datafusion-proto",
- "enrichment",
  "env_logger",
  "expect-test",
  "faststr",
@@ -6739,7 +6737,6 @@ dependencies = [
  "regex-syntax",
  "report_server",
  "reqwest 0.13.2",
- "rquickjs",
  "rust-embed-for-web",
  "rustls",
  "rustls-native-certs",
@@ -6780,7 +6777,6 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "version-compare",
- "vrl",
  "wal",
  "webpki-roots 1.0.6",
  "x509-parser",
@@ -6907,9 +6903,9 @@ dependencies = [
  "tokio",
  "tower",
  "tracing",
+ "transform",
  "url",
  "utoipa",
- "vrl",
 ]
 
 [[package]]
@@ -6921,7 +6917,6 @@ dependencies = [
  "bytes",
  "chrono",
  "config",
- "enrichment",
  "futures",
  "hashbrown 0.16.1",
  "http 1.4.0",
@@ -6939,6 +6934,7 @@ dependencies = [
  "tokio-stream",
  "tower",
  "tracing",
+ "transform",
  "utoipa",
 ]
 
@@ -6968,7 +6964,6 @@ dependencies = [
  "datafusion",
  "datafusion-functions-json",
  "datafusion-proto",
- "enrichment",
  "expect-test",
  "flate2",
  "flight",
@@ -6991,7 +6986,6 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "object_store",
- "openobserve-vrl",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7026,11 +7020,11 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-opentelemetry",
+ "transform",
  "url",
  "utoipa",
  "version-compare",
  "vortex",
- "vrl",
  "wal",
  "webpki-roots 1.0.6",
  "x509-parser",
@@ -7056,7 +7050,6 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "openobserve-core",
- "openobserve-vrl",
  "prometheus",
  "proto",
  "regex",
@@ -7065,6 +7058,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tonic",
+ "transform",
  "wal",
 ]
 
@@ -7085,18 +7079,6 @@ dependencies = [
  "tokio",
  "url",
  "utoipa",
-]
-
-[[package]]
-name = "openobserve-vrl"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "config",
- "enrichment",
- "serde_json",
- "tokio",
- "vrl",
 ]
 
 [[package]]
@@ -9657,7 +9639,6 @@ dependencies = [
  "datafusion",
  "datafusion-functions-json",
  "datafusion-proto",
- "enrichment",
  "flight",
  "futures",
  "futures-util",
@@ -9669,7 +9650,6 @@ dependencies = [
  "memchr",
  "o2_enterprise",
  "object_store",
- "openobserve-vrl",
  "opentelemetry",
  "parking_lot 0.12.5",
  "parquet",
@@ -9690,11 +9670,11 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-opentelemetry",
+ "transform",
  "url",
  "utoipa",
  "vortex",
  "vortex-datafusion",
- "vrl",
 ]
 
 [[package]]
@@ -11485,6 +11465,22 @@ dependencies = [
  "tracing-core",
  "tracing-log",
  "tracing-serde",
+]
+
+[[package]]
+name = "transform"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "config",
+ "enrichment",
+ "log",
+ "o2_enterprise",
+ "regex",
+ "rquickjs",
+ "serde_json",
+ "tokio",
+ "vrl",
 ]
 
 [[package]]

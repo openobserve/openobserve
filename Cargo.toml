@@ -157,7 +157,6 @@ rayon.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
-rquickjs.workspace = true
 rust-embed-for-web.workspace = true
 rustls.workspace = true
 rustls-native-certs.workspace = true
@@ -199,9 +198,7 @@ url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 version-compare.workspace = true
-vector-enrichment.workspace = true
 x509-parser.workspace = true
-vrl.workspace = true
 zstd.workspace = true
 config.workspace = true
 infra.workspace = true
@@ -241,7 +238,7 @@ members = [
     "src/api_common",
     "src/common",
     "src/core",
-    "src/vrl",
+    "src/transform",
     "src/search",
     "src/promql",
     "src/jobs",
@@ -275,7 +272,7 @@ tantivy_utils = { path = "src/tantivy_utils" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
 common = { path = "src/common" }
-openobserve-vrl = { path = "src/vrl" }
+transform = { path = "src/transform" }
 search = { path = "src/search" }
 promql = { path = "src/promql" }
 openobserve-api = { path = "src/api" }
