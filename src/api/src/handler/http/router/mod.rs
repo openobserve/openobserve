@@ -162,17 +162,13 @@ fn maybe_add_mcp_www_authenticate(uri: &Uri, resp: Response) -> Response {
     if resp.status() != StatusCode::UNAUTHORIZED {
         return resp;
     }
-    // MCP endpoint == the `.../{org}/mcp` resource. `auth_middleware` runs
-    // inside the `.nest("/api", …)` router, so by the time we see the URI the
-    // `/api` prefix has been stripped — the path is `/{org}/mcp`, not
-    // `/api/{org}/mcp`. Match on the last non-empty segment so detection is
-    // independent of whether the prefix is present.
+    // MCP endpoint == `/{org}/mcp`. `auth_middleware` runs inside the
+    // `.nest("/api", …)` router, so the `/api` prefix is already stripped by the
+    // time we see the URI. Match the SECOND segment specifically (mirroring
+    // `token.rs`'s `path_columns.get(1)`) so routes that merely END in a
+    // user-named `mcp` segment (e.g. a stream called "mcp") do not false-positive.
     let path = uri.path();
-    let is_mcp = path
-        .rsplit('/')
-        .find(|seg| !seg.is_empty())
-        .map(|seg| seg == "mcp")
-        .unwrap_or(false);
+    let is_mcp = path.trim_start_matches('/').split('/').nth(1) == Some("mcp");
     if !is_mcp {
         return resp;
     }
@@ -195,7 +191,7 @@ fn attach_mcp_www_authenticate(path: &str, mut resp: Response) -> Response {
     // resource is `{base_uri}/api/{org}/mcp`, and the RFC 9728 discovery doc
     // lives at `<web_url>{base_uri}/.well-known/oauth-protected-resource` with
     // that resource path appended (RFC 9728 §3.1).
-    let external_resource_path = format!("{}/api{}", cfg.common.base_uri, path);
+    let external_resource_path = format!("/api{path}");
     let resource_meta = format!(
         "{}{}/.well-known/oauth-protected-resource{}",
         cfg.common.web_url.trim_end_matches('/'),
@@ -1516,5 +1512,52 @@ mod tests {
     fn test_cors_empty_web_url_allows_all() {
         // Empty web_url is permissive (dev mode)
         assert!(is_origin_allowed(b"https://any.origin.com", ""));
+    }
+
+    #[test]
+    fn mcp_www_authenticate_skips_non_401() {
+        let uri: Uri = "/default/mcp".parse().unwrap();
+        let resp = (StatusCode::OK, "ok").into_response();
+        let out = maybe_add_mcp_www_authenticate(&uri, resp);
+        assert!(!out.headers().contains_key(header::WWW_AUTHENTICATE));
+    }
+
+    #[test]
+    fn mcp_www_authenticate_skips_non_mcp_routes() {
+        // A stream literally named "mcp" must NOT get the MCP challenge.
+        for p in [
+            "/default/streams/mcp",
+            "/default/streams/foo",
+            "/default/dashboards/mcp",
+        ] {
+            let uri: Uri = p.parse().unwrap();
+            let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
+            let out = maybe_add_mcp_www_authenticate(&uri, resp);
+            assert!(
+                !out.headers().contains_key(header::WWW_AUTHENTICATE),
+                "non-mcp path {p} must not carry an MCP WWW-Authenticate challenge"
+            );
+        }
+    }
+
+    #[test]
+    fn mcp_www_authenticate_targets_mcp_endpoint() {
+        let uri: Uri = "/default/mcp".parse().unwrap();
+        let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
+        let out = maybe_add_mcp_www_authenticate(&uri, resp);
+        // Enterprise adds the RFC 9728 challenge (when dex is enabled); OSS never does.
+        // Assert only that the path classification did not panic and that any header
+        // present is the expected RFC 9728 shape.
+        if let Some(v) = out.headers().get(header::WWW_AUTHENTICATE) {
+            let v = v.to_str().unwrap();
+            assert!(
+                v.contains("resource_metadata="),
+                "unexpected challenge: {v}"
+            );
+            assert!(
+                v.contains("/.well-known/oauth-protected-resource/api/default/mcp"),
+                "unexpected challenge: {v}"
+            );
+        }
     }
 }

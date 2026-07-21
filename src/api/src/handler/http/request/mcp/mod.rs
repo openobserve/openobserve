@@ -21,11 +21,11 @@ use axum::{
     response::Response,
 };
 use futures_util::StreamExt;
-#[cfg(feature = "enterprise")]
-use openobserve_mcp::{OAuthProtectedResourceMetadata, OAuthServerMetadata};
 use openobserve_mcp::{
     MCP_PROTOCOL_VERSION, MCPRequest, handle_mcp_request, handle_mcp_request_stream,
 };
+#[cfg(feature = "enterprise")]
+use openobserve_mcp::{OAuthProtectedResourceMetadata, OAuthServerMetadata};
 
 /// MCP protocol version header name (MCP 2025-11-25)
 const MCP_PROTOCOL_VERSION_HEADER: &str = "MCP-Protocol-Version";
@@ -361,13 +361,15 @@ pub async fn oauth_authorization_server_metadata() -> Response {
     responses((status = 200, description = "Success", content_type = "application/json")),
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
-pub async fn oauth_protected_resource_metadata(
-    Path(resource_path): Path<String>,
-) -> Response {
+pub async fn oauth_protected_resource_metadata(Path(resource_path): Path<String>) -> Response {
     let cfg = config::get_config();
     let o2_base = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
     // resource_path is the captured suffix, e.g. "api/default/mcp"
-    let resource = format!("{}/{}", o2_base.trim_end_matches('/'), resource_path.trim_start_matches('/'));
+    let resource = format!(
+        "{}/{}",
+        o2_base.trim_end_matches('/'),
+        resource_path.trim_start_matches('/')
+    );
 
     let dex_config = o2_dex::config::get_config();
     let auth_server = dex_config.dex_url.clone();
@@ -391,9 +393,7 @@ pub async fn oauth_protected_resource_metadata(
     responses((status = 404, description = "Not Found - enterprise only", content_type = "application/json")),
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
-pub async fn oauth_protected_resource_metadata(
-    Path(_resource_path): Path<String>,
-) -> Response {
+pub async fn oauth_protected_resource_metadata(Path(_resource_path): Path<String>) -> Response {
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .header(header::CONTENT_TYPE, "application/json")
@@ -475,11 +475,8 @@ mod tests {
 
     #[tokio::test]
     async fn protected_resource_metadata_responds() {
-        let response =
-            oauth_protected_resource_metadata(Path("api/default/mcp".to_string())).await;
+        let response = oauth_protected_resource_metadata(Path("api/default/mcp".to_string())).await;
         // Enterprise: 200; OSS build: 404. Either is a valid, non-panicking response.
-        assert!(
-            response.status() == StatusCode::OK || response.status() == StatusCode::NOT_FOUND
-        );
+        assert!(response.status() == StatusCode::OK || response.status() == StatusCode::NOT_FOUND);
     }
 }

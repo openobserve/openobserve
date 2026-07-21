@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Reproduction: unauthenticated MCP POST must return 401 WITH a WWW-Authenticate
 # header advertising RFC 9728 resource metadata. Fails before Task 4.
+#
+# MANUAL repro script — NOT run by `cargo test`. This file lives in a Cargo
+# integration-test directory for organizational purposes only; `cargo test`
+# only picks up `.rs` files there, so this shell script is never executed
+# automatically. Run it by hand against a running ENTERPRISE server with Dex
+# enabled (it asserts the RFC 9728 WWW-Authenticate challenge that only the
+# enterprise build advertises).
 set -euo pipefail
 BASE="${O2_BASE:-http://localhost:5080}"
 ORG="${O2_ORG:-default}"

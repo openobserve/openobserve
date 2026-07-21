@@ -372,6 +372,11 @@ mod tests {
         assert_eq!(v["resource"], "http://localhost:5080/api/default/mcp");
         assert_eq!(v["authorization_servers"][0], "http://localhost:5556/dex");
         assert_eq!(v["bearer_methods_supported"][0], "header");
-        assert!(v["scopes_supported"].as_array().unwrap().contains(&serde_json::json!("openid")));
+        assert!(
+            v["scopes_supported"]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!("openid"))
+        );
     }
 }
