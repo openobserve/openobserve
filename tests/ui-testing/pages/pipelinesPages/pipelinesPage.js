@@ -1243,15 +1243,18 @@ export class PipelinesPage {
         // once navigation stopped failing earlier). Re-run the query until a row
         // appears instead of clicking into an empty table.
         const runQueryBtn = this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
-        for (let attempt = 1; attempt <= 6; attempt++) {
-            if (await this.timestampColumnMenu.isVisible({ timeout: 10000 }).catch(() => false)) {
+        // ~10 attempts (~120s) not 6 (~78s): on a contended alpha the destination stream's
+        // first row routinely lands past 90s (pipeline-dynamic 72/97/113 flake at this step).
+        // Comfortably inside the 5-min CI test timeout.
+        for (let attempt = 1; attempt <= 10; attempt++) {
+            if (await this.timestampColumnMenu.isVisible({ timeout: 9000 }).catch(() => false)) {
                 break;
             }
             // Re-trigger the search so newly-indexed rows are picked up.
             await runQueryBtn.first().click({ timeout: 5000 }).catch(() => {});
             await this.page.waitForTimeout(3000);
         }
-        await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 15000 });
+        await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 20000 });
         await this.timestampColumnMenu.click();
     }
 
@@ -2589,7 +2592,10 @@ export class PipelinesPage {
      * Wait for query node to be visible
      * @param {number} timeout - Timeout in ms (default: 30000)
      */
-    async waitForQueryNodeVisible(timeout = 30000) {
+    async waitForQueryNodeVisible(timeout = 45000) {
+        // 45s (was 30s): under sustained full-shard load the query node's canvas render
+        // lags past 30s after saveQuery (pipelines:180 hard-failed on cloud but passes
+        // solo — a heavy-load render lag, not a missing node). Matches the CI actionTimeout.
         await this.queryNode.first().waitFor({ state: 'visible', timeout });
     }
 
