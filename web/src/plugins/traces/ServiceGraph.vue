@@ -463,7 +463,7 @@ export default defineComponent({
     },
   },
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
@@ -472,6 +472,9 @@ export default defineComponent({
     const { searchObj } = useTraces();
 
     const loading = ref(false);
+    // Stamped when a graph load settles — lets a parent page show a
+    // "last refreshed" time next to its refresh control.
+    const lastRunAt = ref<number | null>(null);
     const error = ref<string | null>(null);
     const showSettings = ref(false);
     const lastUpdated = ref("");
@@ -551,11 +554,13 @@ export default defineComponent({
 
     // ── Zoom controls ─────────────────────────────────────────────────────────
     // The mouse still zooms (roam:true) so you can focus an area with the wheel;
-    // scaleLimit on the series bounds it so it can't run away. The +/- buttons
-    // drive the SAME series `zoom` option via setOption, reading the chart's
-    // CURRENT zoom first so button + wheel stay in sync.
+    // scaleLimit on the series bounds it so it can't run away (the old "erratic"
+    // feel). The +/- buttons drive the SAME series `zoom` option via setOption,
+    // reading the chart's CURRENT zoom first so button + wheel stay in sync.
+    // Match the series `scaleLimit` (convertTraceData.ts) so the +/- buttons and
+    // box-zoom never compute a factor the chart will silently clamp away.
     const ZOOM_MIN = 0.4;
-    const ZOOM_MAX = 4;
+    const ZOOM_MAX = 3;
 
     // The live zoom level from the chart (kept in sync with wheel zoom), so a
     // button press adjusts from where the user actually is, not a stale ref.
@@ -579,6 +584,7 @@ export default defineComponent({
     const zoomIn = () => zoomBy(1.25);
     const zoomOut = () => zoomBy(1 / 1.25);
 
+
     // Fit-to-screen: recreate the chart (keyed on chartKey) so ECharts re-fits
     // the full graph bounding box into the panel at zoom 1, re-centered — the
     // reliable reset for both tree (layout:none) and graph series (also clears
@@ -587,6 +593,7 @@ export default defineComponent({
       lastChartOptions.value = null;
       chartKey.value++;
     };
+
     const toggleKindVisibility = (kind: string) => {
       const s = new Set(hiddenKinds.value);
       s.has(kind) ? s.delete(kind) : s.add(kind);
@@ -664,6 +671,33 @@ export default defineComponent({
 
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
+
+    // Restore drag-to-pan (map-style). The shared ChartRenderer arms the
+    // `dataZoomSelect` global cursor on every render, which turns a drag into a
+    // rectangle-select and HIJACKS it away from the graph's `roam` pan — the
+    // reason you couldn't move the graph left/right/up/down. This graph has no
+    // dataZoom, so we turn that cursor mode OFF: once the chart exists, and again
+    // after each `finished` render (ChartRenderer re-arms it on every setOption).
+    const disablePanBlockingCursor = (chart: any) => {
+      chart?.dispatchAction?.({
+        type: "takeGlobalCursor",
+        key: "dataZoomSelect",
+        dataZoomSelectActive: false,
+      });
+    };
+    const boundCursorClear = () =>
+      disablePanBlockingCursor(chartRendererRef.value?.chart);
+    watch(
+      [chartKey, () => chartRendererRef.value?.chart],
+      () => {
+        const chart = chartRendererRef.value?.chart;
+        if (!chart) return;
+        disablePanBlockingCursor(chart);
+        chart.off?.("finished", boundCursorClear);
+        chart.on?.("finished", boundCursorClear);
+      },
+      { immediate: true, flush: "post" },
+    );
 
     // Track last chart options to prevent unnecessary recreation for graph view
     const lastChartOptions = ref<any>(null);
@@ -1576,6 +1610,7 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
+        lastRunAt.value = Date.now();
       }
     };
 
@@ -1837,6 +1872,9 @@ export default defineComponent({
       await loadTraceStreams();
       loadServiceGraph();
     });
+
+    // Public API for parent pages (e.g. Agent Graph page's header refresh).
+    expose({ refresh: loadServiceGraph, loading, lastRunAt });
 
     return {
       t,

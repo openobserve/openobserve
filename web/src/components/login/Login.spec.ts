@@ -1251,4 +1251,102 @@ describe("Login", () => {
     expect(wrapper.vm.tab).toBe("signup");
     expect(wrapper.vm.innerTab).toBe("signin");
   });
+
+  // OForm migration: the internal-user login form must submit on Enter (native
+  // <form> submit) and validate email/password before calling the auth service.
+  describe("internal login form (OForm)", () => {
+    let internalStore: any;
+
+    beforeEach(() => {
+      // sso_enabled false => showSSO false => the OForm block renders directly.
+      internalStore = createStore({
+        state: {
+          zoConfig: {
+            sso_enabled: false,
+            native_login_enabled: true,
+            rum: { enabled: false },
+          },
+          userInfo: { email: "test@example.com" },
+        },
+        actions: {
+          setUserInfo: vi.fn(),
+          setCurrentUser: vi.fn(),
+          setSelectedOrganization: vi.fn(),
+        },
+        dispatch: vi.fn(),
+      });
+
+      wrapper = mount(Login, {
+        attachTo: "#app",
+        global: { plugins: [i18n, internalStore, router] },
+      });
+    });
+
+    it("should render the login form with email, password and submit button", () => {
+      expect(wrapper.find("form").exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="login-user-id-field"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="login-password-field"]').exists(),
+      ).toBe(true);
+      expect(wrapper.find('[data-test="login-sign-in"]').exists()).toBe(true);
+    });
+
+    it("should not call sign_in_user and should show errors when submitting an empty form", async () => {
+      const authService = await import("@/services/auth");
+
+      await wrapper.find("form").trigger("submit");
+      await flushPromises();
+
+      expect(authService.default.sign_in_user).not.toHaveBeenCalled();
+      expect(
+        wrapper.find('[data-test="login-user-id-error"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="login-password-error"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should show an invalid-email error and not submit when the email is malformed", async () => {
+      const authService = await import("@/services/auth");
+
+      await wrapper
+        .find('[data-test="login-user-id-field"]')
+        .setValue("not-an-email");
+      await wrapper
+        .find('[data-test="login-password-field"]')
+        .setValue("password123");
+      await wrapper.find("form").trigger("submit");
+      await flushPromises();
+
+      expect(authService.default.sign_in_user).not.toHaveBeenCalled();
+      const emailError = wrapper.find('[data-test="login-user-id-error"]');
+      expect(emailError.exists()).toBe(true);
+      expect(emailError.attributes("data-test-error-text")).toBe(
+        "Please enter a valid email",
+      );
+    });
+
+    it("should call sign_in_user with the entered credentials when the form is submitted with valid values", async () => {
+      const authService = await import("@/services/auth");
+
+      await wrapper
+        .find('[data-test="login-user-id-field"]')
+        .setValue("user@example.com");
+      await wrapper
+        .find('[data-test="login-password-field"]')
+        .setValue("password123");
+      await wrapper.find("form").trigger("submit");
+
+      // Async schema validation resolves before onSubmit runs, so poll rather
+      // than assume a fixed number of microtask ticks.
+      await vi.waitFor(() =>
+        expect(authService.default.sign_in_user).toHaveBeenCalledWith({
+          name: "user@example.com",
+          password: "password123",
+        }),
+      );
+    });
+  });
 });

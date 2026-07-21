@@ -43,4 +43,4 @@ tokio-stream.workspace = true
 tower.workspace = true
 tracing.workspace = true
 utoipa.workspace = true
-vector-enrichment.workspace = true
+transform.workspace = true

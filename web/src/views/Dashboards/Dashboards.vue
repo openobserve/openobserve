@@ -77,6 +77,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </div>
           </ODropdownItem>
+          <ODropdownSeparator />
+          <ODropdownItem
+            v-for="migration in migrationOptions"
+            :key="migration.key"
+            :data-test="`dashboard-migrate-${migration.key}`"
+            @select="openMigration(migration.url)"
+          >
+            <div class="flex items-center gap-2 w-full">
+              <div class="flex flex-col flex-1 min-w-0">
+                <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
+                <span class="text-xs text-dropdown-item-text opacity-60"
+                  >{{ t(`dashboard.${migration.descKey}`) }}</span
+                >
+              </div>
+              <OIcon
+                name="open-in-new"
+                size="xs"
+                class="shrink-0 text-dropdown-item-text opacity-60"
+              />
+            </div>
+          </ODropdownItem>
         </ODropdown>
         <!-- new dashboard button -->
         <OButton
@@ -504,6 +525,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -538,6 +560,7 @@ import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import {
   deleteDashboardById,
   deleteFolderById,
+  evictDashboardsFromCache,
   getAllDashboards,
   getAllDashboardsByFolderId,
   getDashboard,
@@ -646,7 +669,15 @@ export default defineComponent({
       isFavorite,
       toggleFavorite: toggleFavoriteSetting,
       load: loadFavorites,
+      removeFavorites,
     } = useFavoriteDashboards();
+    // Prune favorites that pointed at just-deleted dashboards, so the Favorites
+    // view doesn't keep a row whose id is already gone from the backend.
+    const pruneFavorites = async (dashboardIds: string[]) => {
+      const org = store.state.selectedOrganization?.identifier;
+      const userId = store.state.userInfo?.email;
+      if (org && userId) await removeFavorites(org, userId, dashboardIds);
+    };
     // The favorites view is a rail location, not a toolbar filter: it is
     // active exactly when the Favorites pseudo-folder is selected.
     const showFavoritesOnly = computed(
@@ -1058,6 +1089,17 @@ export default defineComponent({
       });
     };
 
+    const migrationOptions = [
+      { key: "datadog",     url: "https://migration.openobserve.ai/datadog-to-o2",    labelKey: "migrateFromDatadog",     descKey: "migrateFromDatadogDesc" },
+      { key: "grafana",     url: "https://migration.openobserve.ai/grafana-to-o2",    labelKey: "migrateFromGrafana",     descKey: "migrateFromGrafanaDesc" },
+      { key: "kibana",      url: "https://migration.openobserve.ai/kibana-to-o2",     labelKey: "migrateFromKibana",      descKey: "migrateFromKibanaDesc" },
+      { key: "cloudwatch",  url: "https://migration.openobserve.ai/cloudwatch-to-o2", labelKey: "migrateFromCloudWatch",  descKey: "migrateFromCloudWatchDesc" },
+    ];
+
+    const openMigration = (url: string) => {
+      window.open(url, "_blank", "noopener,noreferrer");
+    };
+
     const duplicateDashboard = async (
       dashboardId: any,
       folderId = activeFolderId.value,
@@ -1132,11 +1174,30 @@ export default defineComponent({
           const favFolders = [
             ...new Set(favorites.value.map((f: any) => f.folderId)),
           ];
-          await Promise.all(
+          const fetched = await Promise.all(
             favFolders.map((fid) =>
-              getAllDashboards(store, fid).catch(() => null),
+              getAllDashboards(store, fid)
+                .then(() => fid)
+                .catch(() => null),
             ),
           );
+          // Self-heal favorites left behind by deletions we didn't perform here
+          // (another tab, another user's session, the dashboard view). Only
+          // folders that actually came back are authoritative — a failed fetch
+          // must not be read as "the dashboard is gone".
+          const refreshed = new Set(fetched.filter(Boolean));
+          const lists = store.state.organizationData?.allDashboardList ?? {};
+          const stale = favorites.value
+            .filter(
+              (f: any) =>
+                refreshed.has(f.folderId) &&
+                Array.isArray(lists[f.folderId]) &&
+                !lists[f.folderId].some(
+                  (b: any) => b.dashboardId === f.dashboardId,
+                ),
+            )
+            .map((f: any) => f.dashboardId);
+          await pruneFavorites(stale);
         } else {
           const response = await getAllDashboards(
             store,
@@ -1238,6 +1299,7 @@ export default defineComponent({
         // Capture before the row reference is cleared — used below to drop a
         // stale Home pin that pointed at the just-deleted dashboard.
         const deletedWasHome = isHome(selectedDelete.value.id);
+        const deletedId = selectedDelete.value.id;
         try {
           //delete dashboard by id and folder id
           await deleteDashboardById(
@@ -1252,6 +1314,7 @@ export default defineComponent({
               ? t("dashboard.pinnedDeletedPinRemoved")
               : t("dashboard.deletedSuccessfully"),
           );
+          await pruneFavorites([deletedId]);
           // The backend clears the home_dashboard setting on delete; re-read it
           // so the Home shortcut button / pin state updates immediately instead
           // of lingering until the next navigation.
@@ -1481,29 +1544,56 @@ export default defineComponent({
           return;
         }
 
+        // Snapshot the selection first: reading `dashboards` below can re-run
+        // that computed, which resets selectedIds as a side effect.
+        const idsToDelete = [...selectedDashboardIds.value];
+
         // Did this batch include the Home-pinned dashboard? Captured before the
         // delete so we can refresh the pin state afterwards (the backend clears
         // the home_dashboard setting when the pinned dashboard is deleted).
-        const bulkIncludedHome = selectedDashboardIds.value.some((id: string) =>
-          isHome(id),
+        const bulkIncludedHome = idsToDelete.some((id: string) => isHome(id));
+
+        // Group the selection by the folder each dashboard actually lives in.
+        // The Favorites view is a pseudo-folder spanning many real folders, so
+        // its id is not a valid `?folder=` value (the backend 404s on it) and a
+        // single folder-scoped call could not cover the selection anyway. In a
+        // normal folder view every row shares activeFolderId, so this collapses
+        // to the one request it always was.
+        const rowFolders = new Map(
+          dashboards.value.map((row: any) => [row.id, row.folder_id]),
         );
+        const idsByFolder = new Map<string, string[]>();
+        for (const id of idsToDelete) {
+          const folderId =
+            rowFolders.get(id) ||
+            (showFavoritesOnly.value ? "default" : activeFolderId.value) ||
+            "default";
+          const bucket = idsByFolder.get(folderId);
+          if (bucket) bucket.push(id);
+          else idsByFolder.set(folderId, [id]);
+        }
 
-        // Extract dashboard ids
-        const payload = {
-          ids: selectedDashboardIds.value,
-        };
-
-        const response = await dashboardService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-          activeFolderId.value,
+        const responses = await Promise.all(
+          [...idsByFolder].map(([folderId, ids]) =>
+            dashboardService.bulkDelete(
+              store.state.selectedOrganization.identifier,
+              { ids },
+              folderId,
+            ),
+          ),
         );
 
         dismiss();
 
-        // Handle response based on successful/unsuccessful arrays
-        if (response.data) {
-          const { successful = [], unsuccessful = [] } = response.data;
+        // Handle response based on successful/unsuccessful arrays, merged
+        // across the per-folder calls.
+        const successful = responses.flatMap(
+          (r: any) => r?.data?.successful ?? [],
+        );
+        const unsuccessful = responses.flatMap(
+          (r: any) => r?.data?.unsuccessful ?? [],
+        );
+        if (responses.some((r: any) => r?.data)) {
           const successCount = successful.length;
           const failCount = unsuccessful.length;
 
@@ -1531,9 +1621,32 @@ export default defineComponent({
           // Fallback success message
           toast({
             variant: "success",
-            message: t("dashboard.dashboards.deletedSuccessfullyCount", { count: selectedIds.value.length }),
+            message: t("dashboard.dashboards.deletedSuccessfullyCount", { count: idsToDelete.length }),
           });
         }
+
+        // Drop favorites for everything that actually got deleted, so the
+        // Favorites view doesn't keep rows whose ids are gone. `unsuccessful`
+        // entries may be plain ids or objects, so normalise before excluding.
+        const failedIds = new Set(
+          unsuccessful.map((u: any) =>
+            typeof u === "string" ? u : (u?.dashboardId ?? u?.id),
+          ),
+        );
+        const deletedIds = idsToDelete.filter((id: string) => !failedIds.has(id));
+
+        // Drop the deleted rows from the cached folder lists. Folder navigation
+        // is cache-first, so the source folder would otherwise keep rendering
+        // them until a manual refresh — and pruning favorites below removes the
+        // folder from the set that gets refetched, so nothing else would.
+        const deletedByFolder = new Map<string, string[]>();
+        idsByFolder.forEach((ids, folderId) => {
+          const kept = ids.filter((id: string) => !failedIds.has(id));
+          if (kept.length) deletedByFolder.set(folderId, kept);
+        });
+        evictDashboardsFromCache(store, deletedByFolder);
+
+        await pruneFavorites(deletedIds);
 
         selectedIds.value = [];
         // Refresh dashboards
@@ -1602,6 +1715,8 @@ export default defineComponent({
       showAddDashboardFromGitHub,
       addDashboard,
       importDashboard,
+      migrationOptions,
+      openMigration,
       resultTotal,
       routeToViewD,
       showDeleteDialogFn,

@@ -35,7 +35,7 @@ use tokio::task::JoinHandle;
 #[derive(Debug, Clone)]
 pub enum Values {
     Json(Arc<Vec<serde_json::Value>>),
-    Vrl(Arc<Vec<vrl::value::Value>>),
+    Vrl(Arc<Vec<transform::vrl::value::Value>>),
     RecordBatch(Vec<RecordBatch>),
 }
 
@@ -121,7 +121,7 @@ impl Values {
     }
 
     /// Convert to VRL format if not already in that format
-    pub fn to_vrl(&self) -> Result<Arc<Vec<vrl::value::Value>>> {
+    pub fn to_vrl(&self) -> Result<Arc<Vec<transform::vrl::value::Value>>> {
         match self {
             Values::Vrl(data) => Ok(Arc::clone(data)),
             Values::Json(data) => {
@@ -149,7 +149,7 @@ impl Values {
         match self {
             Values::RecordBatch(batches) => Ok(batches.clone()),
             Values::Vrl(data) => {
-                let chunks: Vec<&[vrl::value::Value]> =
+                let chunks: Vec<&[transform::vrl::value::Value]> =
                     data.as_ref().chunks(get_batch_size()).collect();
 
                 chunks
@@ -1015,7 +1015,7 @@ mod tests {
 
     #[test]
     fn test_values_vrl_len_nonempty() {
-        use vrl::value::Value as VrlValue;
+        use transform::vrl::value::Value as VrlValue;
         let v = Values::Vrl(Arc::new(vec![VrlValue::Null, VrlValue::Null]));
         assert_eq!(v.len(), 2);
     }
@@ -1082,7 +1082,7 @@ mod tests {
 
     #[test]
     fn test_values_vrl_is_empty_false() {
-        use vrl::value::Value as VrlValue;
+        use transform::vrl::value::Value as VrlValue;
         let v = Values::Vrl(Arc::new(vec![VrlValue::Null]));
         assert!(!v.is_empty());
     }
@@ -1162,7 +1162,7 @@ mod tests {
 
     #[test]
     fn test_values_vrl_clone_and_debug() {
-        use vrl::value::Value as VrlValue;
+        use transform::vrl::value::Value as VrlValue;
         let v = Values::Vrl(Arc::new(vec![VrlValue::Null]));
         let cloned = v.clone();
         assert_eq!(cloned.len(), 1);
