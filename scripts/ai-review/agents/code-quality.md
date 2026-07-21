@@ -33,6 +33,17 @@ You are a **Code Quality Reviewer** for the OpenObserve project. Your focus is b
 
 ## TypeScript/Vue Checks
 
+For any change under `web/`, **read the tracked skills `.claude/skills/ui-architect/SKILL.md` (UI
+house rules) and `.claude/skills/eslint-error-handling/SKILL.md` (lint/type-check playbook) first** —
+they hold the authoritative, ESLint-encoded conventions. Flag changed code that violates them:
+
 - Verify component reactivity (computed, ref, reactive) is used correctly
 - Check for missing cleanup in `onUnmounted` / `watch` teardown
 - Watch for memory leaks from retained references in long-lived components
+- **No `any`, no `!` non-null assertions, no use-site `as` casts** (except `as const` and
+  `Array/Object as PropType<T>`) — type at the declaration site instead
+- **Mutating a prop** directly (`vue/no-mutating-props`) — must go through a computed alias / emit
+- New Quasar (`<q-*>`) elements or `Notify` where an O2 component / `toast()` exists (ESLint
+  `vue/no-restricted-html-elements` / `no-restricted-imports` gives the exact replacement)
+- Hardcoded px / hex colors / user-facing strings instead of design tokens + i18n
+- New code that is not type-clean or lint-clean (the gates are a hard 0)

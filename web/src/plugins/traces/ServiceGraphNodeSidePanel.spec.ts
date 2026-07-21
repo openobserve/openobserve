@@ -116,7 +116,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
-import useStreams from "@/composables/useStreams";
 import { correlate as correlateStreams } from "@/services/service_streams";
 
 

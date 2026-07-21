@@ -343,7 +343,9 @@ function traceTimeOffset(startTimeNs: number): string {
 }
 
 // ── Data fetching ───────────────────────────────────────────
-async function fetchTraceMetadata(traceIds: string[]) {
+async function fetchTraceMetadata(
+  traceIds: string[],
+): Promise<Record<string, any>> {
   if (traceIds.length === 0) return {};
 
   const orgId = store.state.selectedOrganization.identifier;
@@ -357,7 +359,7 @@ async function fetchTraceMetadata(traceIds: string[]) {
     ? `trace_id='${safeTraceIds[0]}'`
     : `trace_id IN (${safeTraceIds.map(id => `'${id}'`).join(',')})`;
 
-  return new Promise((resolve, reject) => {
+  return new Promise<Record<string, any>>((resolve, reject) => {
     const traceId = generateTraceContext().traceId;
     const metadata: Record<string, any> = {};
 

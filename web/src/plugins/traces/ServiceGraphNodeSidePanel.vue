@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data="sortedOperationsTableRows"
                     sorting="server"
                     :sort-by="sortBy"
-                    :sort-order="sortOrder || undefined"
+                    :sort-order="sortOrderProp"
                     :loading="loadingOperations"
                     :default-columns="false"
                     :row-height="38"
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data="sortResourceRows(buildResourceTableRows(cfg))"
                   sorting="server"
                   :sort-by="sortBy"
-                  :sort-order="sortOrder || undefined"
+                  :sort-order="sortOrderProp"
                   :loading="resourceTabLoading[cfg.id]"
                   :default-columns="false"
                   :row-height="38"
@@ -1072,7 +1072,7 @@ export default defineComponent({
       );
       const serviceFilter = `${serviceNameField.value} = '${serviceName}'`;
 
-      convertedDashboard.tabs[0].panels.forEach((panel: any, index) => {
+      convertedDashboard.tabs[0].panels.forEach((panel: any, index: number) => {
         let whereClause: string;
 
         if (panel.title === "Errors") {
@@ -1196,7 +1196,7 @@ export default defineComponent({
         if (f.panelTitle === "Errors") errorsOnly = true;
         if (f.panelTitle === "Duration" && f.start !== null && f.start > 0) {
           minDurationMicros = f.start;
-          maxDurationMicros = f.end;
+          maxDurationMicros = f.end ?? undefined;
         }
       });
 
@@ -1327,45 +1327,6 @@ export default defineComponent({
         correlationError.value = null;
       },
     );
-
-    // Extract semantic dimensions from a span for richer metric correlation
-    const extractSpanDimensions = (
-      span: Record<string, any>,
-    ): Record<string, string> => {
-      const dimensions: Record<string, string> = {};
-      if (span.service_name) dimensions["service"] = span.service_name;
-
-      const attributeMappings: Record<string, string> = {
-        k8s_namespace_name: "k8s-namespace",
-        "k8s.namespace.name": "k8s-namespace",
-        k8s_deployment_name: "k8s-deployment",
-        "k8s.deployment.name": "k8s-deployment",
-        k8s_pod_name: "k8s-pod",
-        "k8s.pod.name": "k8s-pod",
-        k8s_container_name: "k8s-container",
-        "k8s.container.name": "k8s-container",
-        k8s_node_name: "k8s-node",
-        "k8s.node.name": "k8s-node",
-        k8s_cluster_name: "k8s-cluster",
-        "k8s.cluster.name": "k8s-cluster",
-        host_name: "host-name",
-        "host.name": "host-name",
-        cloud_region: "cloud-region",
-        "cloud.region": "cloud-region",
-        cloud_availability_zone: "cloud-availability-zone",
-        "cloud.availability_zone": "cloud-availability-zone",
-        container_name: "container-name",
-        "container.name": "container-name",
-      };
-
-      for (const [attr, dim] of Object.entries(attributeMappings)) {
-        let service_attr = "service_" + attr;
-        if (span[service_attr] && !dimensions[dim]) {
-          dimensions[dim] = String(span[service_attr]);
-        }
-      }
-      return dimensions;
-    };
 
     // Fetch the most recent span for this service to extract rich semantic dimensions
     const fetchLatestSpan = async (): Promise<Record<string, any> | null> => {
@@ -1818,6 +1779,12 @@ export default defineComponent({
     // ── Sorting state ──────────────────────────────────────────────────────
     const sortBy = ref<string>("");
     const sortOrder = ref<"asc" | "desc" | "">("");
+
+    // The table's sort-order prop only accepts "asc" | "desc" | undefined; our
+    // internal "" cleared-sentinel maps to undefined for the binding.
+    const sortOrderProp = computed<"asc" | "desc" | undefined>(() =>
+      sortOrder.value === "" ? undefined : sortOrder.value,
+    );
 
     // 3-state sort cycle to match other O2 tables (OTable): asc → desc → cleared.
     // TenstackTable itself only toggles asc/desc, so we drive the cycle from our
@@ -2574,6 +2541,7 @@ export default defineComponent({
       sortedOperationsTableRows,
       sortBy,
       sortOrder,
+      sortOrderProp,
       handleSortChange,
       sortResourceRows,
       formatOperationLatency,

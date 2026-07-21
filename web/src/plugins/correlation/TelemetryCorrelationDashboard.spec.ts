@@ -513,7 +513,6 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       wrapper = createWrapper({ metricStreams: [] });
       const stream = { stream_name: "new_metric", stream_type: "metrics", filters: {} };
 
-      const initialCount = wrapper.vm.selectedMetricStreams.length;
       wrapper.vm.selectedMetricStreams = [];
       wrapper.vm.toggleMetricStream(stream);
       await nextTick();

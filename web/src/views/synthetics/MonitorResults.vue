@@ -133,6 +133,7 @@ import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
@@ -195,7 +196,7 @@ const drawerOpen = ref(false);
 const selectedRunId = ref("");
 const selectedExecutionId = ref("");
 const drawerRunStatus = ref<{
-  variant: string;
+  variant: BadgeVariant;
   icon: string;
   label: string;
 } | null>(null);
@@ -203,7 +204,7 @@ const drawerUrl = ref("");
 const drawerTimestamp = ref("");
 
 function onRunStatusUpdate(status: {
-  variant: string;
+  variant: BadgeVariant;
   icon: string;
   label: string;
   url: string;

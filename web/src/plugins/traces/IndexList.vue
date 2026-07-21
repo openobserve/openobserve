@@ -102,15 +102,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span class="text-xs w-8 shrink-0">{{ p.label }}</span>
                       <span class="text-xs flex-1 text-right pr-1">
-                        {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
+                        {{ formatPercentile(durationPercentiles[p.key]) }}
                       </span>
                       <div class="flex w-12">
                         <OButton
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                          :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                          @click.stop="addSearchTerm(`duration>='${formatPercentile(durationPercentiles[p.key])}'`)"
                           class="o2-custom-button-hover ml-1! border! border-card-glass-border!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
@@ -118,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                          :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                          @click.stop="addSearchTerm(`duration<='${formatPercentile(durationPercentiles[p.key])}'`)"
                           class="o2-custom-button-hover mr-2.5! border! border-card-glass-border! ml-auto!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />
@@ -179,12 +179,12 @@ import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles, { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
-import { removeFieldFromWhereAST, logsUtils } from "@/composables/useLogs/logsUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -192,14 +192,10 @@ export default defineComponent({
     FieldRow,
     OButton,
     OSelect,
-    OInput,
     OSpinner,
     OIcon,
     GroupedFieldList: defineAsyncComponent(
       () => import("@/components/common/GroupedFieldList.vue"),
-    ),
-    FieldListPagination: defineAsyncComponent(
-      () => import("@/components/common/FieldListPagination.vue"),
     ),
     GroupedFieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
@@ -295,11 +291,19 @@ export default defineComponent({
       );
     };
 
-    const onStreamChange = (selectedValue: string | null) => {
-      const stream = selectedValue
-        ? searchObj.data.stream.streamLists.find((s: any) => s.value === selectedValue) ?? null
-        : null;
-      searchObj.data.stream.selectedStream = stream;
+    const onStreamChange = (selectedValue: SelectModelValue) => {
+      const streamValue = typeof selectedValue === "string" ? selectedValue : null;
+      const matched = streamValue
+        ? searchObj.data.stream.streamLists.find(
+            (s: any) => s.value === streamValue,
+          )
+        : undefined;
+      // No match clears to the empty-stream sentinel (the codebase's "cleared"
+      // convention everywhere else — resetSearchObj, SearchBar, Index).
+      searchObj.data.stream.selectedStream = matched ?? {
+        label: "",
+        value: "",
+      };
       searchObj.data.query = "";
       searchObj.data.editorValue = "";
       searchObj.data.resultGrid.currentPage = 0;
@@ -381,11 +385,14 @@ export default defineComponent({
       PERCENTILE_LABELS.some((p) => durationPercentiles.value[p.key] !== null),
     );
 
+    const formatPercentile = (value: number | null) =>
+      value === null ? "" : formatTimeWithSuffix(value);
+
     const expandedFields = ref<Record<string, boolean>>({});
     const fieldValuesCurrentFrom = ref<Record<string, number>>({});
     const fieldValuesCurrentKeyword = ref<Record<string, string>>({});
 
-    const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
+    logsUtils();
 
     const removeFieldFromWhereStr = (
       whereClause: string,
@@ -474,7 +481,8 @@ export default defineComponent({
       expandedFields.value[field.name] = true;
 
       if (field.name === "duration") {
-        const decodedSql = b64DecodeUnicode(buildFieldValuesSql(field.name));
+        // buildFieldValuesSql emits valid base64, so the decode never hits its catch (undefined) path.
+        const decodedSql = b64DecodeUnicode(buildFieldValuesSql(field.name))!;
         const whereMatch = decodedSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
         fetchPercentiles({
           streamName: searchObj.data.stream.selectedStream.value,
@@ -595,6 +603,7 @@ export default defineComponent({
       resetSelectedFields,
       // Field value fetching
       fieldValues,
+      defaultValuesCount,
       expandedFields,
       openFilterCreator,
       handleSearchFieldValues,
@@ -609,6 +618,7 @@ export default defineComponent({
       hasDurationPercentiles,
       PERCENTILE_LABELS,
       formatTimeWithSuffix,
+      formatPercentile,
       getValueMapper,
     };
   },

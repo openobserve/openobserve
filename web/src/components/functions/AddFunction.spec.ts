@@ -466,9 +466,6 @@ describe('AddFunction.vue Branch Coverage', () => {
       const vm = wrapper.vm as any;
       
       // Test the beforeunload logic branch coverage by testing the watcher
-      const originalName = vm.formData.name;
-      const originalFunction = vm.formData.function;
-      
       // Change the form data to trigger the watcher
       vm.formData.name = 'changed';
       

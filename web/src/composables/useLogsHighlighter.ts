@@ -23,13 +23,13 @@
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
-import { computed, ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
+import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { searchState } from "@/composables/useLogs/searchState";
 
 export function useLogsHighlighter() {
-  const processedResults = ref({});
+  const processedResults = ref<Record<string, string>>({});
 
   const store = useStore();
   const { isDark } = useTheme();
@@ -63,7 +63,7 @@ export function useLogsHighlighter() {
   watch(
     () => isDark.value,
     (newTheme) => {
-      currentColors.value = getThemeColors(newTheme === "dark");
+      currentColors.value = getThemeColors(newTheme);
     },
   );
 

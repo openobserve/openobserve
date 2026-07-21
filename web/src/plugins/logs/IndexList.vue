@@ -293,8 +293,6 @@ import {
   addSpacesToOperators,
 } from "../../utils/zincutils";
 import streamService from "../../services/stream";
-import EqualIcon from "@/components/icons/EqualIcon.vue";
-import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -313,7 +311,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { captureFromValuesApi } from "@/composables/useFieldValueStore";
@@ -335,8 +333,6 @@ export default defineComponent({
     },
   },
   components: {
-    EqualIcon,
-    NotEqualIcon,
     GroupedFieldList: defineAsyncComponent(
       () => import("@/components/common/GroupedFieldList.vue"),
     ),
@@ -346,9 +342,6 @@ export default defineComponent({
     FieldExpansion: defineAsyncComponent(
       () => import("@/components/common/FieldExpansion.vue"),
     ),
-    FieldListPagination: defineAsyncComponent(
-      () => import("@/components/common/FieldListPagination.vue"),
-    ),
     GroupedFieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
     ),
@@ -356,12 +349,11 @@ export default defineComponent({
     OSelect,
     OIcon,
     OTooltip,
-    OSpinner,
     OEmptyState,
   },
   emits: ["setInterestingFieldInSQLQuery"],
   methods: {
-    handleStreamSelection(value: string | string[] | null) {
+    handleStreamSelection(value: SelectModelValue) {
       if (this.selectionMode === "single") {
         this.searchObj.data.stream.selectedStream = value ? [value as string] : [];
       } else {
@@ -1624,7 +1616,10 @@ export default defineComponent({
       return searchObj.data.stream.selectedStream.some((stream: any) => {
         store.state.zoConfig.user_defined_schemas_enabled &&
           searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
-          stream.settings.hasOwnProperty("defined_schema_fields") &&
+          Object.prototype.hasOwnProperty.call(
+            stream.settings,
+            "defined_schema_fields",
+          ) &&
           (stream.settings?.defined_schema_fields?.slice() || []) > 0;
       });
     };
@@ -1971,6 +1966,7 @@ export default defineComponent({
       } catch (err) {
         console.error("Failed to fetch field values:", err);
         fieldValues.value[name].errMsg = t("logs.indexList.failedToFetchFieldValues");
+        return undefined;
       }
     };
 
@@ -1992,7 +1988,7 @@ export default defineComponent({
       pagination.value = newPagination;
     };
 
-    const setPage = (page) => {
+    const setPage = (page: number) => {
       pagination.value = { ...pagination.value, page };
     };
 

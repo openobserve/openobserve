@@ -209,11 +209,7 @@ describe("DashboardMapsQueryBuilder", () => {
     it("should register all required components", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$options.components.SortByBtnGrp).toBeDefined();
       expect(wrapper.vm.$options.components.DynamicFunctionPopUp).toBeDefined();
-      expect(
-        wrapper.vm.$options.components.SanitizedHtmlRenderer,
-      ).toBeDefined();
       expect(
         wrapper.vm.$options.components.DashboardFiltersOption,
       ).toBeDefined();
@@ -907,21 +903,6 @@ describe("DashboardMapsQueryBuilder", () => {
   });
 
   describe("SortByBtnGrp Integration", () => {
-    it("should render SortByBtnGrp for name when not custom query and SQL", () => {
-      mockDashboardPanelData.data.queries[0].customQuery = false;
-      mockDashboardPanelData.data.queryType = "sql";
-      mockDashboardPanelData.data.queries[0].fields.name = {
-        type: "build",
-        label: "Name",
-        args: [
-          { type: "field", value: { field: "name_field", streamAlias: "" } },
-        ],
-      };
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.$options.components.SortByBtnGrp).toBeDefined();
-    });
-
     it("should not render SortByBtnGrp for custom query", () => {
       mockDashboardPanelData.data.queries[0].customQuery = true;
       mockDashboardPanelData.data.queries[0].fields.name = {
@@ -937,20 +918,6 @@ describe("DashboardMapsQueryBuilder", () => {
       expect(shouldShow).toBe(false);
     });
 
-    it("should render SortByBtnGrp for value_for_maps when conditions met", () => {
-      mockDashboardPanelData.data.queries[0].customQuery = false;
-      mockDashboardPanelData.data.queryType = "sql";
-      mockDashboardPanelData.data.queries[0].fields.value_for_maps = {
-        type: "build",
-        label: "Value",
-        args: [
-          { type: "field", value: { field: "value_field", streamAlias: "" } },
-        ],
-      };
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.$options.components.SortByBtnGrp).toBeDefined();
-    });
   });
 
   describe("Error Handling", () => {

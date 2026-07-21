@@ -980,6 +980,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -1802,7 +1803,7 @@ const failedStepOptions = computed<SelectOption[]>(() => {
 // ── OTable columns ───────────────────────────────────────────────────────
 interface VisibleRun {
   id: number;
-  statusBadgeVariant: string;
+  statusBadgeVariant: BadgeVariant;
   statusIcon: string;
   statusLabel: string;
   scheduledTs: number;

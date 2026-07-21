@@ -62,7 +62,6 @@ import useDashboardPanelData from "../../../composables/dashboard/useDashboardPa
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "ChartSelection",
@@ -230,6 +229,6 @@ export default defineComponent({
       isChartDisabled,
     };
   },
-  components: { OIcon , OTooltip },
+  components: { OTooltip },
 });
 </script>

@@ -351,7 +351,6 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should render trace content area", () => {
-      const content = wrapper.find(".trace-details-content");
       // Component should handle missing data gracefully
       expect(wrapper.vm).toBeDefined();
     });

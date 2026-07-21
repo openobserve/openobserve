@@ -65,7 +65,7 @@ vi.mock("../dateTimeUtils", () => ({
 }));
 
 vi.mock("../panelValidation", () => ({
-  findFirstValidMappedValue: vi.fn((val, mappings, type) => {
+  findFirstValidMappedValue: vi.fn((val, mappings) => {
     if (!mappings || mappings.length === 0) return null;
 
     const mapping = mappings.find((m: any) => {
@@ -79,7 +79,7 @@ vi.mock("../panelValidation", () => ({
 }));
 
 vi.mock("date-fns-tz", () => ({
-  toZonedTime: vi.fn((timestamp, timezone) => {
+  toZonedTime: vi.fn((timestamp) => {
     return new Date(timestamp);
   }),
 }));

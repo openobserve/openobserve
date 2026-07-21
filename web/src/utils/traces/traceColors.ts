@@ -212,7 +212,7 @@ export const generateServiceColorMap = (
   const colorMap = new Map<string, string>();
   const usedColors = new Set<number>();
 
-  serviceNames.forEach((serviceName, index) => {
+  serviceNames.forEach((serviceName) => {
     // Use hash for consistency, but track used colors to maximize distinction
     let hash = 0;
     for (let i = 0; i < serviceName.length; i++) {
@@ -240,7 +240,7 @@ export const generateServiceColorMap = (
  * @param backgroundColor - Background color CSS variable
  * @returns 'white' or 'black'
  */
-export const getContrastTextColor = (backgroundColor: string): string => {
+export const getContrastTextColor = (_backgroundColor: string): string => {
   // For now, return white for all span colors as they're designed with good contrast
   // Can be enhanced with actual luminance calculation if needed
   return "white";

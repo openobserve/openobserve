@@ -262,8 +262,8 @@ export default defineComponent({
         BillingService.resume_subscription(
           this.store.state.selectedOrganization.identifier,
         )
-          .then(async (res) => {
-            await this.loadSubscription(true);
+          .then(async () => {
+            await this.loadSubscription();
           })
           .catch((e) => {
             this.proLoading = false;
@@ -313,7 +313,7 @@ export default defineComponent({
           });
         });
     },
-    async loadSubscription(fromPro = false) {
+    async loadSubscription() {
       try {
         const res = await BillingService.list_subscription(
           this.store.state.selectedOrganization.identifier,

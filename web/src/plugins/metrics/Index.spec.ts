@@ -51,7 +51,7 @@ vi.mock("@/composables/useNotifications", () => ({
 const mockResetDashboardPanelData = vi.fn();
 const mockResetDashboardPanelDataAndAddTimeField = vi.fn();
 const mockResetAggregationFunction = vi.fn();
-const mockValidatePanel = vi.fn((errors: any[]) => {
+const mockValidatePanel = vi.fn(() => {
   /* default: no errors */
 });
 const mockRemoveXYFilters = vi.fn();
@@ -460,7 +460,6 @@ describe("Metrics Index — runQuery method", () => {
     const wrapper = createWrapper();
     await flushPromises();
 
-    const before = wrapper.vm.chartData;
     wrapper.vm.runQuery();
     await nextTick();
 
@@ -746,7 +745,6 @@ describe("Metrics Index — cancelAddPanelQuery method", () => {
     await flushPromises();
 
     // Populate search request trace ids
-    const ids = ["trace-1", "trace-2"];
     // searchRequestTraceIds is computed from variablesAndPanelsDataLoadingState
     // We can directly verify that cancelQuery is called (the assignment is internal)
     wrapper.vm.cancelAddPanelQuery();
@@ -914,7 +912,7 @@ describe("Metrics Index — watcher: isConfigPanelOpen dispatches resize", () =>
 
   it("dispatches a resize event when isConfigPanelOpen changes", async () => {
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
-    const wrapper = createWrapper();
+    createWrapper();
     await flushPromises();
 
     mockDashboardPanelData.layout.isConfigPanelOpen = true;
@@ -937,7 +935,7 @@ describe("Metrics Index — watcher: showQueryBar dispatches resize", () => {
 
   it("dispatches a resize event when showQueryBar changes", async () => {
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
-    const wrapper = createWrapper();
+    createWrapper();
     await flushPromises();
 
     mockDashboardPanelData.layout.showQueryBar = false;

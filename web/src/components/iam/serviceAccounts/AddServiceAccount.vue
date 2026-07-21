@@ -326,7 +326,7 @@ export default defineComponent({
       if (this.beingUpdated) {
         // Round-trip the existing record (minus email, which is passed
         // separately) with the edited description.
-        const { email: userEmail, ...rest } = this.modelValue;
+        const { email: userEmail, ...rest } = this.modelValue ?? {};
         const payload: any = { ...rest, organization, first_name: value.first_name };
         try {
           const res = await service_accounts.update(

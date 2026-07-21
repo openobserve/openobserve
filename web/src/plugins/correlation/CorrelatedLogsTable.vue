@@ -330,11 +330,9 @@ class="mr-1" />
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import {
-  buildSubjectButtons,
-  streamMatchesPatterns,
   SUBJECT_BUTTONS_BY_SET,
   resolveSetId,
-  type SubjectButton,
+  type SubjectButtonSpec,
 } from "@/composables/useMetricSubjectButtons";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -386,34 +384,25 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
-const { loadKeyFields, semanticGroups } = useServiceCorrelation();
+const { loadKeyFields } = useServiceCorrelation();
 
 // Use correlated logs composable
 const {
-  loading,
   error,
   searchResults,
   pagedResults,
-  totalHits,
-  took,
   currentFilters,
-  currentTimeRange,
   currentPage,
   totalPages,
   displayPageSize,
-  logStreamsCount,
   hasResults,
   isLoading,
   hasError,
   isEmpty,
   fetchCorrelatedLogs,
   goToPage,
-  updateFilter,
   updateFilters,
-  resetFilters,
-  refresh,
   isMatchedDimension,
-  isAdditionalDimension,
 } = useCorrelatedLogs(props);
 
 // Stream name for JSON preview — use first correlated stream, or source stream
@@ -565,12 +554,6 @@ const hideViewRelatedButton = computed(
 const hideSearchTermActions = computed(
   () => props.hideSearchTermActions ?? false,
 );
-
-// Combined dimensions for DimensionFiltersBar (merges matched and additional)
-const allDimensions = computed(() => ({
-  ...matchedDimensions.value,
-  ...additionalDimensions.value,
-}));
 
 // Track which dimensions are unstable (for UI styling)
 const unstableDimensionKeys = computed(
@@ -808,7 +791,7 @@ const columnMaxCap = computed(() => {
     : Math.max(0, containerWidth.value - TIMESTAMP_COL_WIDTH - 30);
 });
 
-const DEFAULT_LONG_TEXT_FIELDS = [];
+const DEFAULT_LONG_TEXT_FIELDS: string[] = [];
 
 // Measures a field's content width and returns the capped size plus whether the
 // raw measurement exceeded maxCap (used to build the dynamic long-text list).
@@ -1010,18 +993,6 @@ const formatTimestamp = (timestamp: number): string => {
   );
 };
 
-/**
- * Format time range for display
- */
-const formatTimeRange = (range: {
-  startTime: number;
-  endTime: number;
-}): string => {
-  const start = formatTimestamp(range.startTime);
-  const end = formatTimestamp(range.endTime);
-  return `${start} - ${end}`;
-};
-
 // Compute selected fields from the columns
 watch(
   tableColumns,
@@ -1054,11 +1025,7 @@ const handleApplyFilters = () => {
   updateFilters(pendingFilters.value);
 };
 
-const handleResetFilters = () => {
-  resetFilters();
-};
-
-const handleRowClick = (row: any) => {
+const handleRowClick = () => {
 };
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
@@ -1131,10 +1098,6 @@ const toggleColumnVisibility = (field: string) => {
 
 // Toggle all columns (select all / deselect all)
 const toggleSelectAll = () => {
-  const selectableFields = availableFields.value.filter(
-    (field) => field !== "_timestamp"
-  );
-
   if (areAllColumnsSelected.value) {
     // Deselect all (except timestamp)
     visibleColumns.value = new Set(["_timestamp"]);
@@ -1309,7 +1272,7 @@ const handleViewTrace = (log: any) => {
   router.push(query);
 };
 
-const handleNestedCorrelation = (row: any) => {
+const handleNestedCorrelation = () => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
 };
 
@@ -1327,7 +1290,7 @@ onBeforeUnmount(() => {
 // Watch for prop changes
 watch(
   () => props.timeRange,
-  (newRange) => {
+  () => {
   },
   { deep: true },
 );
@@ -1370,25 +1333,24 @@ const chipDimensionSource = computed<Record<string, string>>(() => {
   return out;
 });
 
-type ChipKind = "context" | "subject";
-type DimensionChip = { key: string; label: string; value: string; kind: ChipKind; };
+type DimensionChip = import("./CorrelationEventHeader.vue").DimensionChip;
 
 const subjectSemanticIds = computed<Set<string>>(() => {
   if (!props.matchedSetId) return new Set();
   const canonical = resolveSetId(props.matchedSetId);
   const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
-  return specs?.length ? new Set(specs.flatMap((s: SubjectButton) => s.semanticIds)) : new Set();
+  return specs?.length ? new Set(specs.flatMap((s: SubjectButtonSpec) => s.semanticIds)) : new Set();
 });
 
 const unifiedChips = computed<DimensionChip[]>(() =>
   Object.keys(chipDimensionSource.value)
     .filter((key) => !subjectSemanticIds.value.has(key))
-    .map((key): DimensionChip => ({
+    .map((key) => ({
       key,
       label: dimensionDisplayLabel(key),
       value: chipDimensionSource.value[key],
-      kind: "context",
-    })),
+      kind: "context" as DimensionChip["kind"],
+    } as DimensionChip)),
 );
 
 </script>

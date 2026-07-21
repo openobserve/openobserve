@@ -177,7 +177,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
 import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import OTable from "@/lib/core/Table/OTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
@@ -197,14 +196,11 @@ import {
 } from "../../../utils/llmUtils";
 import {
   formatTimeWithSuffix,
-  formatLargeNumber,
 } from "../../../utils/zincutils";
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import TracesNoEventsState from "@/plugins/traces/TracesNoEventsState.vue";
 
 interface Props {
@@ -244,7 +240,6 @@ interface Props {
   scrollEl?: HTMLElement | null;
 }
 
-const { t } = useI18n();
 const store = useStore();
 
 const props = withDefaults(defineProps<Props>(), {
@@ -330,7 +325,6 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
   }
 };
 
-const rowsPerPageOptions = [10, 25, 50, 100];
 
 const { searchObj, updatedLocalLogFilterField } = useTraces();
 const { buildColumns } = useTracesTableColumns();
@@ -383,7 +377,8 @@ const onColumnReorder = (newOrder: string[]) => {
   searchObj.data.stream.selectedFields = newOrder.filter(
     (id) => id !== store.state.zoConfig.timestamp_column,
   );
-  updatedLocalLogFilterField(mode);
+  // useTraces only persists per traces/spans; other modes have no column state.
+  updatedLocalLogFilterField(mode as "traces" | "spans");
 };
 
 const onCloseColumn = (columnDef: any) => {
@@ -391,13 +386,10 @@ const onCloseColumn = (columnDef: any) => {
   const fieldIdx = searchObj.data.stream.selectedFields.indexOf(columnDef.id);
   if (fieldIdx !== -1) {
     searchObj.data.stream.selectedFields.splice(fieldIdx, 1);
-    updatedLocalLogFilterField(mode);
+    updatedLocalLogFilterField(mode as "traces" | "spans");
   }
-  const colIdx = searchObj.data.resultGrid.columns.findIndex(
-    (c: any) => c.id === columnDef.id,
-  );
   searchObj.data.resultGrid.columns = searchObj.data.resultGrid.columns.filter(
-    (c) => c.id !== columnDef.id,
+    (c: { id: string }) => c.id !== columnDef.id,
   );
 
   // If the closed column was the active sort column, reset to default
@@ -421,11 +413,6 @@ const hasResults = computed(
   () => props.searchPerformed && props.hits.length > 0,
 );
 
-const totalPages = computed(() =>
-  props.total && props.rowsPerPage
-    ? Math.max(1, Math.ceil(props.total / props.rowsPerPage))
-    : 1,
-);
 </script>
 
 <style scoped>

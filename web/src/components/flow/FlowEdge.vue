@@ -29,9 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 
-<script setup>
-import { BaseEdge, getBezierPath } from "@vue-flow/core";
-import { computed } from "vue";
+<script setup lang="ts">
+import { BaseEdge, getBezierPath, Position } from "@vue-flow/core";
+import { computed, type PropType } from "vue";
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -39,8 +39,8 @@ const props = defineProps({
   sourceY: { type: Number, required: true },
   targetX: { type: Number, required: true },
   targetY: { type: Number, required: true },
-  sourcePosition: { type: String, required: true },
-  targetPosition: { type: String, required: true },
+  sourcePosition: { type: String as PropType<Position>, required: true },
+  targetPosition: { type: String as PropType<Position>, required: true },
   data: { type: Object, required: false },
   markerEnd: { type: String, required: false },
   style: { type: Object, required: false },
@@ -51,6 +51,6 @@ const props = defineProps({
 const path = computed(() => getBezierPath(props));
 </script>
 
-<script>
+<script lang="ts">
 export default { inheritAttrs: false };
 </script>

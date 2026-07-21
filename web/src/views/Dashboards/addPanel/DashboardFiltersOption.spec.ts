@@ -337,14 +337,6 @@ describe("DashboardFiltersOption", () => {
       const noFieldsData = reactive(_createDefaultPanelData());
       mockPanelData = noFieldsData;
 
-      const { mount: localMount } = (() => {
-        // We need the composable mock to return no schema fields.
-        // Re-mount won't help since the mock is static. Instead, verify
-        // that addFilter handles the case via the component that was
-        // mounted with the current mock data.
-        return { mount: mountComponent };
-      })();
-
       // The mock composable has fixed schema fields. To test the fallback
       // (when firstOption is undefined), we'd need to override the mock.
       // This is covered by the fact that schemaOptions[0]?.value uses

@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
 
-              <template #bottom="scope">
+              <template #bottom>
                 <div class="flex items-center justify-between w-full py-2">
                   <div class="flex items-center text-xs font-normal mr-4">
                     {{ resultTotal }} {{ t('function.header') }}
@@ -228,7 +228,6 @@ import {
   ref,
   computed,
   watch,
-  onMounted,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -237,7 +236,6 @@ import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
-import NoData from "../shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
@@ -251,7 +249,6 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -264,14 +261,12 @@ export default defineComponent({
     PipelineSectionTabs,
     OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
-    NoData,
     ConfirmDialog,
     OButton,
     OBadge,
     ODialog,
     OSearchInput,
     OTooltip,
-    OCheckbox,
     },
   emits: [
     "updated:fields",

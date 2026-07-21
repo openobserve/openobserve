@@ -38,7 +38,12 @@ const props = defineProps<{
   /** Unique row identifier field (used as VueDraggableNext item-key). */
   rowKey?: string;
   /** Virtual scroll: virtual items from useTableVirtualization */
-  virtualRows?: { index: number; start: number; size: number; key: number }[];
+  virtualRows?: {
+    index: number;
+    start: number;
+    size: number;
+    key: number | string | bigint;
+  }[];
   /** Virtual scroll: total height of the virtual container */
   totalSize?: number;
   /** Virtual scroll: base offset for Firefox compatibility */
@@ -278,7 +283,7 @@ function getRowForItem(item: any): Row<any> {
 
     <OTableBodyRow
       v-for="virtualRow in virtualRows"
-      :key="virtualRow.key"
+      :key="(virtualRow.key as string | number)"
       :row="getRowForIndex(virtualRow.index)"
       :measure-el="measureElement"
       :measure-row-element="measureRowElement"

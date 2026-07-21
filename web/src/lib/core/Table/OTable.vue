@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, provide, ref, toRef, useSlots, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender } from "@tanstack/vue-table";
@@ -13,7 +13,6 @@ import { useTableSorting } from "./composables/useTableSorting";
 import { useTableSelection } from "./composables/useTableSelection";
 import { useTableExpansion } from "./composables/useTableExpansion";
 import { useTableTree, OTableTreeContextKey } from "./composables/useTableTree";
-import { useTableFiltering } from "./composables/useTableFiltering";
 import { useTableHighlight } from "./composables/useTableHighlight";
 import { useTableColumnManagement } from "./composables/useTableColumnManagement";
 import { useTableVirtualization } from "./composables/useTableVirtualization";
@@ -101,7 +100,7 @@ const columnIds = computed(() => props.columns.map((c) => c.id));
 //   "pageSize"  → match the table's pageSize (Stripe / Vercel style).
 //                 Skeleton fills the page; can feel excessive when the
 //                 real dataset turns out to be small.
-const SKELETON_ROW_STRATEGY: "fixed" | "pageSize" = "fixed";
+const SKELETON_ROW_STRATEGY = "fixed" as "fixed" | "pageSize";
 const FIXED_SKELETON_ROWS = 8;
 
 const skeletonRowCount = computed(() => {
@@ -269,8 +268,6 @@ const {
   effectiveColumns,
   columnOrder,
   columnSizing,
-  isClientSort,
-  isClientPagination,
   columnSizeVars,
 } = useTableCore<TData>(
   {
@@ -350,16 +347,6 @@ const expansion = useTableExpansion<TData>(
     expandedIds: () => props.expandedIds,
     rowKey: props.rowKey,
     getSubRows: props.getSubRows,
-  },
-  emit,
-);
-
-// ── Filtering ───────────────────────────────────────────────────
-const filtering = useTableFiltering<TData>(
-  {
-    get globalFilter() { return globalFilterLocal.value; },
-    globalFilterPlaceholder: props.globalFilterPlaceholder,
-    filterMode: props.filterMode,
   },
   emit,
 );
@@ -1178,6 +1165,7 @@ defineExpose({
               :row="slotProps.row"
               :value="slotProps.value"
               :column="slotProps.column"
+              :index="slotProps.index"
             />
           </template>
 

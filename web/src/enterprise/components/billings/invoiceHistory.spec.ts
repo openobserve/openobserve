@@ -277,7 +277,6 @@ describe("InvoiceHistory", () => {
   describe("Performance and Optimization", () => {
     it("should maintain component stability", () => {
       // Test that component maintains its structure after updates
-      const initialHtml = wrapper.html();
       wrapper.vm.$forceUpdate();
       
       // Verify component still exists and has expected elements

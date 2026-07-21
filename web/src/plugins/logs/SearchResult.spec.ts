@@ -509,7 +509,7 @@ describe("SearchResult Component", () => {
 
     it("should handle column sizes update with empty previous sizes", async () => {
       wrapper.vm.searchObj.data.resultGrid.colSizes = {};
-      wrapper.vm.searchObj.data.stream.selectedStream = "new-stream";
+      wrapper.vm.searchObj.data.stream.selectedStream = ["new-stream"];
 
       // OTable emits column-id-keyed sizes; handleColumnSizesUpdate converts them
       // to the legacy CSS-var persistence format so saved views load correctly.

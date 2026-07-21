@@ -218,14 +218,13 @@ import { MarkerType, useVueFlow } from "@vue-flow/core";
 import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 import { contextRegistry, createPipelinesContextProvider } from "@/composables/contextProviders";
 import JsonEditor from "../common/JsonEditor.vue";
-import { validatePipeline as validatePipelineUtil, type ValidationResult } from '../../utils/validatePipeline';
+import { validatePipeline as validatePipelineUtil } from '../../utils/validatePipeline';
 import { useReo } from "@/services/reodotdev_analytics";
 
 const functionImage = getImageURL("images/pipeline/transform_function.png");
 const streamImage = getImageURL("images/pipeline/input_stream.png");
 const streamOutputImage = getImageURL("images/pipeline/output_stream.png");
 const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
-const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
 import useStreams from "@/composables/useStreams";
@@ -253,6 +252,8 @@ interface Function {
   description: string;
   stream: string;
   order: number;
+  trans_type?: number;
+  [key: string]: unknown;
 }
 
 interface Pipeline {
@@ -265,51 +266,6 @@ interface Pipeline {
   functions: Function[];
   derived_streams: any[];
 }
-
-interface Node {
-  name: string;
-  x: number;
-  y: number;
-  type: string;
-  fixed: boolean;
-  order?: number;
-  stream?: string;
-}
-
-interface NodeLink {
-  from: string[];
-  to: string[];
-}
-
-const plotChart: any = ref({
-  options: {
-    tooltip: {},
-    series: [
-      {
-        type: "graph",
-        layout: "none",
-        symbolSize: "60",
-        roam: false,
-        label: {
-          show: true,
-        },
-        draggable: true,
-        edgeSymbol: ["arrow"],
-        edgeSymbolSize: [10, 10],
-        edgeLabel: {
-          fontSize: 20,
-        },
-        data: [],
-        links: [],
-        lineStyle: {
-          opacity: 0.9,
-          width: 2,
-          curveness: 0,
-        },
-      },
-    ],
-  },
-});
 
 const pipeline = ref<Pipeline>({
   pipeline_id: "",
@@ -427,19 +383,6 @@ const onStepPick = (item: any) => {
 pipelineObj.nodeTypes = nodeTypes;
 pipelineObj.functions = functions;
 
-const nodes: Ref<Node[]> = ref([]);
-
-const hasInputType = computed(() => {
-  return pipelineObj.currentSelectedPipeline.nodes.some(
-    (node: any) => node.io_type === "input",
-  );
-});
-const isNodeConfigDrawerOpen = computed(
-  () => pipelineObj.dialog.show,
-);
-
-const nodeLinks = ref<{ [key: string]: NodeLink }>({});
-
 const refreshFunctionList = () => {
   getFunctions();
 };
@@ -463,9 +406,6 @@ const isPipelineSaving = ref(false);
 
 const { getStreams } = useStreams();
 
-const nodeRows = ref<(string | null)[]>([]);
-
-
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
 const associatedFunctions: Ref<string[]> = ref([]);
@@ -484,14 +424,6 @@ const toggleJsonEditorAIChat = () => {
 };
 
 const { t } = useI18n();
-
-const dialog = ref({
-  name: "streamRouting",
-  show: false,
-  title: "Stream Routing",
-  message: "",
-  okCallback: () => {},
-});
 
 const validationErrors = ref<string[]>([]);
 
@@ -609,7 +541,7 @@ onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
 
   // Add keyboard handler for edge deletion
-  const handleKeydown = (event) => {
+  const handleKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Delete' || event.key === 'Backspace') {
       const selectedEdges = getSelectedEdges.value
 
@@ -848,7 +780,7 @@ const savePipeline = async () => {
       if (
         node.data.node_type === "stream" &&
         node.data.stream_name &&
-        node.data.stream_name.hasOwnProperty("value")
+        Object.prototype.hasOwnProperty.call(node.data.stream_name, "value")
       ) {
         node.data.stream_name = node.data.stream_name.value;
       }
@@ -1167,6 +1099,7 @@ const beforeUnloadHandler = (e: any) => {
     e.returnValue = confirmMessage;
     return confirmMessage;
   }
+  return undefined;
 };
 
 const openJsonEditor = () => {

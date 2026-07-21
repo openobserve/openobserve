@@ -522,6 +522,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeModelPricingSchema,
   type ModelPricingForm,
+  type ModelPricingTier,
 } from "./ModelPricingEditor.schema";
 
 const { t } = useI18n();
@@ -589,7 +590,9 @@ const form = useOForm<ModelPricingForm>({
 
 // Reactive view of the form-owned `tiers` array — form.useStore tracks array
 // mutations (a plain form.state.values read in a computed would not).
-const formTiers = form.useStore((s: any) => s.values.tiers ?? []);
+const formTiers = form.useStore(
+  (s): ModelPricingTier[] => s.values.tiers ?? [],
+);
 
 function createEmptyModel() {
   return {

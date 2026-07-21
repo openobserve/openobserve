@@ -15,6 +15,7 @@ import OEmptyState from '@/lib/core/EmptyState/OEmptyState.vue'
 import useSyntheticResults from '@/composables/useSyntheticResults'
 import syntheticsService from '@/services/synthetics'
 import type { HttpAssertion } from '@/types/synthetics'
+import type { BadgeVariant } from '@/lib/core/Badge/OBadge.types'
 
 const props = withDefaults(
   defineProps<{
@@ -29,7 +30,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (
     e: 'update-status',
-    status: { variant: string; icon: string; label: string; url: string; timestamp: string },
+    status: { variant: BadgeVariant; icon: string; label: string; url: string; timestamp: string },
   ): void
 }>()
 

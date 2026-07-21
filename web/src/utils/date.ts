@@ -220,6 +220,7 @@ export const getConsumableRelativeTime = (period: string) => {
       endTime: endTimeStamp.getTime() * 1000,
     };
   }
+  return undefined;
 };
 
 export const getRelativePeriod = (period: string) => {
@@ -327,7 +328,7 @@ export const formatToTimeCompact = (us: number): string =>
  * subtractRelativeTime(new Date(), { days: 7 })     // 7 days ago
  */
 export function subtractRelativeTime(
-  endDate: Date,
+  endDate: Date | number,
   period: Record<string, number>,
 ): Date {
   return sub(endDate, period);

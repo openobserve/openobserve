@@ -32,7 +32,6 @@ import useSearchConnection from "@/composables/useLogs/useSearchConnection";
 import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
-import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
 export const useSearchStream = () => {
   const { showErrorNotification } = useNotifications();
@@ -97,7 +96,7 @@ export const useSearchStream = () => {
    * Handle search completion
    * Orchestrates histogram processing if needed
    */
-  const handleSearchComplete = (payload: any, response: any) => {
+  const handleSearchComplete = (payload: any) => {
     // Process histogram if needed
     if (
       payload.type === "search" &&
@@ -134,7 +133,7 @@ export const useSearchStream = () => {
   /**
    * Handle search reset/retry
    */
-  const handleSearchReset = (data: any, traceId?: string) => {
+  const handleSearchReset = (data: any) => {
     try {
       if (data.type === "search") {
         if (!data.isPagination) {

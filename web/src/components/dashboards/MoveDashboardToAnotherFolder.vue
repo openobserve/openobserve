@@ -32,7 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           :model-value="
             store.state.organizationData.folders.find(
-              (item) => item.folderId === activeFolderId,
+              (item: { folderId: string; name: string }) =>
+                item.folderId === activeFolderId,
             )?.name
           "
           :label="t('dashboard.currentFolderLabel')"
@@ -73,7 +74,7 @@ export default defineComponent({
     },
     dashboardIds: {
       type: Array,
-      default: [],
+      default: () => [],
     },
     open: {
       type: Boolean,

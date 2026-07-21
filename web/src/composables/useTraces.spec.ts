@@ -672,7 +672,7 @@ describe("useTraces", () => {
     });
 
     it("returns same number of items as input", () => {
-      const { formatTracesMetaData, searchObj } = useTraces();
+      const { formatTracesMetaData } = useTraces();
       const traces = [
         {
           trace_id: "t1",

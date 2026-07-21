@@ -63,9 +63,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { reactive } from "vue";
-import { useRoute } from "vue-router";
 import searchService from "@/services/search";
 import apiDashboard from "@/utils/rum/api.json";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
@@ -91,8 +89,6 @@ export default defineComponent({
   emits: ["variablesManagerReady"],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const route = useRoute();
-    const router = useRouter();
     const store = useStore();
     const currentDashboardData = reactive({
       data: {},

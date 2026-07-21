@@ -537,31 +537,6 @@ describe("PipelineEditor", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
-  describe("Drag and Drop Operations", () => {
-    it("onNodeDragStart stores node data in dataTransfer", () => {
-      const e = { dataTransfer: { setData: vi.fn() } };
-      wrapper.vm.onNodeDragStart(e, "stream");
-      expect(e.dataTransfer.setData).toHaveBeenCalledWith("text", "stream");
-    });
-
-    it("onNodeDragOver prevents default", () => {
-      const e = { preventDefault: vi.fn() };
-      wrapper.vm.onNodeDragOver(e);
-      expect(e.preventDefault).toHaveBeenCalled();
-    });
-
-    it("onNodeDrop prevents default and reads dataTransfer", () => {
-      const e = {
-        preventDefault: vi.fn(),
-        dataTransfer: { getData: vi.fn().mockReturnValue("stream") },
-      };
-      wrapper.vm.onNodeDrop(e);
-      expect(e.preventDefault).toHaveBeenCalled();
-      expect(e.dataTransfer.getData).toHaveBeenCalledWith("text");
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────────
   describe("savePipeline Validations", () => {
     beforeEach(async () => {
       wrapper.vm.onSubmitPipeline = vi.fn().mockResolvedValue(true);
@@ -849,9 +824,6 @@ describe("PipelineEditor", () => {
         "openJsonEditor",
         "findMissingEdges",
         "isValidNodes",
-        "onNodeDragStart",
-        "onNodeDrop",
-        "onNodeDragOver",
         "beforeUnloadHandler",
         "confirmSaveBasicPipeline",
       ];

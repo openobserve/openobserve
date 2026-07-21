@@ -200,7 +200,7 @@ const agentFilter = computed(() =>
   filterMode.value === "agent" ? (selectedAgent.value?.name ?? "") : "",
 );
 
-function onFilterModeChange(mode?: string | number | null) {
+function onFilterModeChange(mode: unknown) {
   if (mode === "stream" || mode === "agent") filterMode.value = mode;
   if (mode === "agent" && !agentsLoaded.value) loadAgents();
 }
@@ -285,8 +285,10 @@ onMounted(async () => {
   }
 
   try {
-    const res = await getStreams("traces", false, false);
-    availableStreams.value = (res?.list ?? []).map((s: any) => s.name);
+    const res = (await getStreams("traces", false, false)) as {
+      list?: { name: string }[];
+    };
+    availableStreams.value = (res?.list ?? []).map((s) => s.name);
     if (availableStreams.value.length && !activeStream.value) {
       activeStream.value = availableStreams.value[0];
     }

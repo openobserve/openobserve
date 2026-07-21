@@ -49,11 +49,11 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/utils/query/promQLUtils", () => ({
-  addLabelToPromQlQuery: vi.fn((query, name, value, operator) => query),
+  addLabelToPromQlQuery: vi.fn((query) => query),
 }));
 
 vi.mock("@/utils/query/sqlUtils", () => ({
-  addLabelsToSQlQuery: vi.fn((query, filters) => Promise.resolve(query)),
+  addLabelsToSQlQuery: vi.fn((query) => Promise.resolve(query)),
   getStreamFromQuery: vi.fn(() => Promise.resolve("test_stream")),
 }));
 
@@ -107,16 +107,13 @@ vi.mock("@/utils/dashboard/dateTimeUtils", () => ({
 }));
 
 // Enhanced WebSocket mocking
-let mockWebSocketCallbacks: any = {};
 let shouldWebSocketThrow = false;
-let webSocketConnectionState = "connected";
 
 vi.mock("@/composables/useSearchWebSocket", () => ({
   default: () => ({
     fetchQueryDataWithWebSocket: vi
       .fn()
       .mockImplementation((payload, callbacks) => {
-        mockWebSocketCallbacks = callbacks;
         if (shouldWebSocketThrow) {
           callbacks?.error?.(payload, { message: "WebSocket error" });
           return "error-trace-id";
@@ -154,7 +151,6 @@ vi.mock("./useAnnotations", () => ({
 }));
 
 // Enhanced HTTP Streaming mocking
-let mockStreamingCallbacks: any = {};
 let shouldStreamingThrow = false;
 
 vi.mock("../useStreamingSearch", () => ({
@@ -162,7 +158,6 @@ vi.mock("../useStreamingSearch", () => ({
     fetchQueryDataWithHttpStream: vi
       .fn()
       .mockImplementation((payload, callbacks) => {
-        mockStreamingCallbacks = callbacks;
         if (shouldStreamingThrow) {
           callbacks?.error?.(payload, { message: "Streaming error" });
           return "error-stream-id";
@@ -207,11 +202,6 @@ vi.mock("vue", async () => {
     onUnmounted: vi.fn((cb) => cb?.()),
   };
 });
-
-// Enhanced Global Configuration
-let mockRunCount = 0;
-let mockForceLoadState = false;
-let mockIsVariablesLoading = false;
 
 // Test Helper Functions
 const createMockPanelSchema = (overrides: any = {}) =>
@@ -260,12 +250,9 @@ const resetAllMocks = () => {
   shouldMetricsThrow = false;
 
   // Reset WebSocket mocks
-  mockWebSocketCallbacks = {};
   shouldWebSocketThrow = false;
-  webSocketConnectionState = "connected";
 
   // Reset streaming mocks
-  mockStreamingCallbacks = {};
   shouldStreamingThrow = false;
 
   // Reset cache mocks
@@ -279,11 +266,6 @@ const resetAllMocks = () => {
 
   // Reset config
   shouldRequireApiCall = true;
-
-  // Reset global config
-  mockRunCount = 0;
-  mockForceLoadState = false;
-  mockIsVariablesLoading = false;
 
   // Reset helper function mocks
   mockIfPanelVariablesCompletedLoading.mockReturnValue(true);
@@ -317,7 +299,7 @@ describe("usePanelDataLoader", () => {
     }));
 
     // Mock setTimeout to work with promise-based async flows
-    vi.spyOn(global, "setTimeout").mockImplementation((fn: any, ms: number) => {
+    vi.spyOn(global, "setTimeout").mockImplementation((fn: any) => {
       if (typeof fn === "function") {
         // Execute immediately for tests
         Promise.resolve().then(() => fn());
@@ -1684,7 +1666,7 @@ describe("usePanelDataLoader", () => {
         );
 
         // Start loadData without waiting (it will be pending due to visibility check after cache attempt)
-        const loadPromise = loader.loadData();
+        loader.loadData();
 
         // Give it a moment to attempt cache restore (happens before visibility wait)
         await new Promise((resolve) => setTimeout(resolve, 100));

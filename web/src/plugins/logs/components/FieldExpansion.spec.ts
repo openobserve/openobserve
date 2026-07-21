@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount } from "@vue/test-utils";
 import FieldExpansion from "@/components/common/FieldExpansion.vue";
 
 vi.mock("vue-i18n", () => ({

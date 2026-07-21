@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :default-columns="false"
             class="o2-table o2-row-md o2-schema-table log-detail-source-table w-full border border-solid border-card-glass-border"
           >
-            <template #cell-field="{ row, value }">
+            <template #cell-field="{ value }">
               <div
                 :data-test="`log-detail-${value}-key`"
                 class="text-left text-status-error-text"
@@ -450,7 +450,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 const defaultValue: any = () => {
   return {
@@ -634,11 +633,13 @@ export default defineComponent({
     ];
 
     // Transform rowData object into array of rows
-    const tableRows = computed(() => {
+    const tableRows = computed<
+      { _rowKey: string; field: string; value: string | number | boolean }[]
+    >(() => {
       return Object.entries(rowData.value).map(([field, value]) => ({
         _rowKey: "field_" + field,
         field,
-        value,
+        value: value as string | number | boolean,
       }));
     });
 

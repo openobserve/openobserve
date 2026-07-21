@@ -185,10 +185,6 @@ describe("router/index (factory)", () => {
     });
 
     it("should allow navigation to /cb when not authenticated", async () => {
-      const next = vi.fn();
-      const to = { path: "/cb", meta: {}, query: {} };
-      const from = { path: "/" };
-
       // Trigger the guard manually via the internal hooks
       await router.push("/login").catch(() => {});
       // Accessing protected router guard via beforeEach simulation
@@ -232,7 +228,7 @@ describe("router/index (factory)", () => {
     });
 
     it("should dispatch login action when sessionUserInfo exists but store is not logged in", async () => {
-      const dispatchSpy = vi.spyOn(store, "dispatch");
+      vi.spyOn(store, "dispatch");
       vi.mocked(getDecodedUserInfo).mockReturnValue(
         JSON.stringify({ email: "test@example.com" }),
       );

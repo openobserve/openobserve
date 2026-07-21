@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
-            @update:model-value="(v) => { activeTab = v; }"
+            @update:model-value="(v) => { activeTab = v as 'all' | 'prebuilt' | 'custom'; }"
             data-test="destination-list-tabs"
           >
             <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
@@ -284,7 +284,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OTag from '@/lib/core/Badge/OTag.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -311,7 +310,6 @@ export default defineComponent({
     OButton,
     OTooltip,
     OSearchInput,
-    OCheckbox,
     OTag,
     OTable,
     OToggleGroup,

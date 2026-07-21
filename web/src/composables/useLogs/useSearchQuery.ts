@@ -20,10 +20,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
-import {
-  convertDateToTimestamp,
-  getConsumableRelativeTime,
-} from "@/utils/date";
+import { getConsumableRelativeTime } from "@/utils/date";
 import config from "@/aws-exports";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
@@ -75,7 +72,6 @@ export const useSearchQuery = () => {
     isDistinctQuery,
     isWithQuery,
     isLimitQuery,
-    extractTimestamps,
     addTransformToQuery,
     updateUrlQueryParams,
     fnUnparsedSQL,
@@ -119,7 +115,7 @@ export const useSearchQuery = () => {
     if (Number.isNaN(searchObj.data.datetime.startTime))
       searchObj.data.datetime.startTime = "Invalid Date";
 
-    const queryReq: SearchRequestPayload = buildSearch();
+    const queryReq: SearchRequestPayload | null = buildSearch();
 
     // Update highlight query on run-query
     if (searchObj.meta.sqlMode) {
@@ -161,7 +157,10 @@ export const useSearchQuery = () => {
         if (
           searchObj.meta.refreshInterval == 0 &&
           router.currentRoute.value.name == "logs" &&
-          searchObj.data.queryResults.hasOwnProperty("hits")
+          Object.prototype.hasOwnProperty.call(
+            searchObj.data.queryResults,
+            "hits",
+          )
         ) {
           const start_time: number =
             initialQueryPayload.value?.query?.start_time || 0;
@@ -266,7 +265,7 @@ export const useSearchQuery = () => {
   const buildSearch = (
     readOnly: boolean = false,
     ignoreQuickMode: boolean = false,
-  ): SearchRequestPayload => {
+  ): SearchRequestPayload | null => {
     try {
       let query = searchObj.data.query.trim();
 
@@ -297,7 +296,8 @@ export const useSearchQuery = () => {
             const msg = buildContextualSqlMessage(query, syntaxErr);
             searchObj.data.errorMsg = `SQL syntax error at line ${line}, column ${col}: ${msg}`;
             searchObj.data.sqlSyntaxErrorRanges = [
-              { startLine: line, endLine: line, column: col, error: msg },
+              // msg is string|null; `!` is compile-time only (null passes through unchanged).
+              { startLine: line, endLine: line, column: col, error: msg! },
             ];
           }
         }
@@ -475,7 +475,7 @@ export const useSearchQuery = () => {
     query: string,
     req: any,
     readOnly: boolean = false,
-  ): SearchRequestPayload => {
+  ): SearchRequestPayload | null => {
     // Only mutate query in normal mode
     if (!readOnly) {
       searchObj.data.query = query;
@@ -530,11 +530,14 @@ export const useSearchQuery = () => {
    * Convenience wrapper for read-only mode
    * Use this when you need the query payload without mutating searchObj
    */
-  const getSearchQueryPayload = (): SearchRequestPayload => {
+  const getSearchQueryPayload = (): SearchRequestPayload | null => {
     return buildSearch(true);
   };
 
-  const handleNonSqlMode = (query: string, req: any): SearchRequestPayload => {
+  const handleNonSqlMode = (
+    query: string,
+    req: any,
+  ): SearchRequestPayload | null => {
     const parseQuery = [query];
     let queryFunctions = "";
     let whereClause = "";
@@ -595,7 +598,7 @@ export const useSearchQuery = () => {
   const handleMultiStream = (
     req: any,
     whereClause: string,
-  ): SearchRequestPayload => {
+  ): SearchRequestPayload | null => {
     let streams: any = searchObj.data.stream.selectedStream;
 
     if (whereClause.trim() != "") {

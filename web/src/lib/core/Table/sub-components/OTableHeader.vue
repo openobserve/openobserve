@@ -3,7 +3,7 @@
 <script setup lang="ts">
 import type { HeaderGroup, Table } from "@tanstack/vue-table";
 import { FlexRender } from "@tanstack/vue-table";
-import { computed, inject, ref } from "vue";
+import { inject } from "vue";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -55,8 +55,6 @@ function startResize(header: any, event: MouseEvent | TouchEvent) {
   emit("resize-start");
   header.getResizeHandler()?.(event);
 }
-
-const drag = ref(false);
 
 const horizontalScroll = inject<{ value: boolean } | null>(
   "o2TableHorizontalScroll",
@@ -156,8 +154,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
            `col.id` produced `undefined` for every one → duplicate Vue keys + dead
            sort (P0-A1). -->
       <th
-        v-if="levelIdx === 0"
-        v-for="col in pivotRowColumns"
+        v-for="col in levelIdx === 0 ? pivotRowColumns : []"
         :key="'pivot-rh-' + (col.name ?? col.id)"
         :rowspan="pivotHeaderLevels.length"
         :data-test="`o2-table-pivot-th-${col.name ?? col.id}`"
@@ -367,7 +364,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               class="flex items-center shrink-0"
             >
               <OIcon
-                v-if="getSortIcon(header.id) === 'asc'"
+                v-if="getSortIcon?.(header.id) === 'asc'"
                 name="arrow-upward"
                 size="sm"
                 class="text-table-sort-icon-active"
@@ -375,7 +372,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 data-test-sort-direction="asc"
               />
               <OIcon
-                v-else-if="getSortIcon(header.id) === 'desc'"
+                v-else-if="getSortIcon?.(header.id) === 'desc'"
                 name="arrow-downward"
                 size="sm"
                 class="text-table-sort-icon-active"
@@ -531,7 +528,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             </span>
             <template v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable">
               <OIcon
-                v-if="getSortIcon(header.id) === 'asc'"
+                v-if="getSortIcon?.(header.id) === 'asc'"
                 name="arrow-upward"
                 size="sm"
                 class="shrink-0 text-table-sort-icon-active"
@@ -539,7 +536,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 data-test-sort-direction="asc"
               />
               <OIcon
-                v-else-if="getSortIcon(header.id) === 'desc'"
+                v-else-if="getSortIcon?.(header.id) === 'desc'"
                 name="arrow-downward"
                 size="sm"
                 class="shrink-0 text-table-sort-icon-active"

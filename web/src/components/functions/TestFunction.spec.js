@@ -1,11 +1,9 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import TestFunction from "./TestFunction.vue";
-import jstransform from "@/services/jstransform";
 import searchService from "@/services/search";
-import { nextTick, ref } from 'vue';
+import { nextTick } from 'vue';
 import useStreams from "@/composables/useStreams";
 
 // Mock the jstransform service
@@ -68,12 +66,10 @@ describe("TestFunction Component", () => {
   let wrapper;
   let mockStore;
   let mockRouter;
-  let mockNotify;
   let mockGetStreams;
 
   beforeEach(async () => {
     // Setup mock notify
-    mockNotify = vi.fn(() => ({ dismiss: vi.fn() }));
 
     // Setup mock store
     mockStore = {

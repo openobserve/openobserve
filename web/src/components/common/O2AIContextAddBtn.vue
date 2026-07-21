@@ -51,7 +51,7 @@
 
 <script setup lang="ts">
 import { getImageURL } from '@/utils/zincutils';
-import { computed } from 'vue';
+import { computed, type PropType } from 'vue';
 import { useStore } from 'vuex';
 import config from '@/aws-exports';
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -71,8 +71,9 @@ const props = defineProps({
         default: 'xs',
         required: false
     },
+    // String or object: Vue compiles static style="" attributes into objects.
     style:{
-        type: String,
+        type: [String, Object] as PropType<string | Record<string, string>>,
         default: '',
         required: false
     },

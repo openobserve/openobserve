@@ -16,7 +16,7 @@
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { buildTooltip } from "./shared/axisBuilder";
-import { buildPieChartConfig, buildLegendConfig } from "./shared/gridBuilder";
+import { buildPieChartConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 
@@ -52,8 +52,8 @@ export class PieConverter implements PromQLChartConverter {
       rawValues: Array<[number, string]>;
     }> = [];
 
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
         const value = applyAggregation(seriesData.values, aggregation);
 
         if (value < chartMin) chartMin = value;
@@ -72,7 +72,7 @@ export class PieConverter implements PromQLChartConverter {
     // Now apply colors and build data with unit formatting
     seriesDataCollection.forEach((seriesData) => {
       // Extract numeric values for color calculation
-      const numericValues = seriesData.rawValues.map(([_, val]) =>
+      const numericValues = seriesData.rawValues.map(([, val]) =>
         parseFloat(val),
       );
 

@@ -273,7 +273,7 @@ function makeObjectStore(name: string): MockObjectStore {
   return store;
 }
 
-function makeTransaction(db: MockDB, _storeName: string): MockTransaction {
+function makeTransaction(db: MockDB): MockTransaction {
   let _oncomplete: (() => void) | null = null;
   let _onerror: (() => void) | null = null;
 
@@ -323,16 +323,13 @@ function makeDB(): MockDB {
         return stores.has(name);
       },
     },
-    createObjectStore(
-      name: string,
-      _opts: { keyPath: string; autoIncrement: boolean },
-    ) {
+    createObjectStore(name: string) {
       const store = makeObjectStore(name);
       stores.set(name, store);
       return store;
     },
-    transaction(storeName: string, _mode: string) {
-      return makeTransaction(db, storeName);
+    transaction() {
+      return makeTransaction(db);
     },
   };
   return db;

@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, ref, watch, toValue, type Ref, type MaybeRefOrGetter } from "vue";
+import { computed, toValue, type Ref, type MaybeRefOrGetter } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import type { Row } from "@tanstack/vue-table";
 

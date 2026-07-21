@@ -213,7 +213,7 @@ export default defineComponent({
 
     // The pinned dashboard could not be loaded (deleted / inaccessible). Clear
     // the pin and tell the user why — distinct from a deliberate close.
-    function onPinnedUnavailable(_dashboardId: string) {
+    function onPinnedUnavailable() {
       removeHomePin();
       toast({
         variant: "error",
@@ -241,7 +241,9 @@ export default defineComponent({
           });
           return ordered;
         }
-      } catch {}
+      } catch {
+        /* ignore: fall back to default tab order */
+      }
       return [...DEFAULT_TABS.value];
     }
 

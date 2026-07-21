@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="services-catalog"
             data-test="services-catalog-table"
             @row-click="(row) => handleRowClick(row)"
-            @sort-change="(p) => handleSortChange(p.column, p.order)"
+            @sort-change="(p) => handleSortChange(p.column)"
           >
             <!-- Status badge -->
             <template #cell-status="{ row }">
@@ -436,8 +436,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
@@ -447,7 +447,6 @@ import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import streamService from "@/services/stream";
-import { formatLatency } from "@/utils/traces/treeTooltipHelpers";
 import { classifyEntity } from "@/utils/traces/serviceClassification";
 import {
   b64EncodeUnicode,
@@ -456,11 +455,10 @@ import {
   formatTimeWithSuffix,
 } from "@/utils/zincutils";
 import { getEffectiveTimeRange } from "@/utils/date";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -468,7 +466,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();
-const store = useStore();
 const { columnVisibility, setColumnVisibility } =
   useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
@@ -576,7 +573,7 @@ const hasInferColumns = ref<boolean | null>(null);
 // includes the "cleared" step), computing the direction ourselves. When OTable
 // emits its clear step (empty column), that means the currently-sorted column
 // was clicked again → flip it.
-function handleSortChange(field: string, _order: "asc" | "desc") {
+function handleSortChange(field: string) {
   const clickedField = field || sortBy.value;
   if (clickedField === sortBy.value && sortBy.value) {
     // Same column re-clicked → flip direction (2-state toggle).
@@ -615,7 +612,7 @@ let currentTraceId: string | null = null;
 // sort-change; the catalog reorders `sortedServices` itself), so each sortable
 // column just sets `sortable: true`. The service-name column is the `flex`
 // filler so the table fills its container like the Dashboards name column.
-const tableColumns = computed(() => [
+const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "service_name",
     hideable: true,
@@ -953,7 +950,7 @@ function getTimeRange(): { start_time: number; end_time: number } {
 // Load trace streams using the same method as the Traces search page
 const loadAvailableStreams = async () => {
   try {
-    const res = await getStreams("traces", false, false);
+    const res: any = await getStreams("traces", false, false);
     if (res?.list?.length > 0) {
       availableStreams.value = res.list.map((stream: any) => stream.name);
     }
@@ -962,8 +959,9 @@ const loadAvailableStreams = async () => {
   }
 };
 
-const onStreamFilterChange = (stream: string) => {
-  emit("request:stream-change", stream);
+const onStreamFilterChange = (stream: SelectModelValue) => {
+  // Single-select stream picker → the emitted value is the stream name string.
+  emit("request:stream-change", String(stream ?? ""));
 };
 
 async function loadServicesCatalog() {
@@ -1098,13 +1096,13 @@ ORDER BY total_requests DESC`;
           services.value = Array.from(serviceMap.values());
         }
       },
-      error: (_payload: any, _response: any) => {
+      error: () => {
         isLoading.value = false;
       },
-      complete: (_payload: any, _response: any) => {
+      complete: () => {
         isLoading.value = false;
       },
-      reset: (_payload: any, _response: any) => {
+      reset: () => {
         services.value = [];
         isLoading.value = false;
       },

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 
 // vi.mock calls are hoisted — must appear before any imports of the tested module.
 
@@ -31,9 +31,7 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/utils/zincutils", () => ({
-  timestampToTimezoneDate: vi.fn(
-    (ms: number, _tz: string, _fmt: string) => `formatted:${ms}`,
-  ),
+  timestampToTimezoneDate: vi.fn((ms: number) => `formatted:${ms}`),
 }));
 
 vi.mock("@/utils/traces/constants", () => ({

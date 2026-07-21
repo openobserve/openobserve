@@ -87,7 +87,7 @@ function navigate(to: RouteLocationRaw) {
 
 // OTabs emits change when a tab is clicked; navigation is handled by navigate()
 // above, so this is a no-op that satisfies the required @change binding.
-function onTabChange(_key: string | number) {}
+function onTabChange() {}
 
 const props = defineProps<{
   /** The same grouped sections the hub uses. */

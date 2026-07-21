@@ -251,7 +251,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="px-page-edge span_details_tabs">
       <OTabs
-        v-model="activeTab"
+        :model-value="activeTab"
+        @update:model-value="$emit('update:activeTab', $event)"
         dense
         align="left"
         data-test="trace-details-sidebar-tabs"
@@ -334,7 +335,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'px-page-edge py-2'
       "
     >
-      <OTabPanels v-model="activeTab"
+      <OTabPanels :model-value="activeTab"
+@update:model-value="$emit('update:activeTab', $event)"
 grow
 class="h-full overflow-y-auto">
         <!-- LLM Preview Tab Panel -->
@@ -808,7 +810,7 @@ class="h-5! text-xs!">
             :metric-group-definitions="metricGroupResources"
             :panelHeight="12"
             :panelWidth="96"
-            @close="activeTab = 'attributes'"
+            @close="$emit('update:activeTab', 'attributes')"
           />
           <!-- Loading/Empty state when no data -->
           <div
@@ -854,7 +856,7 @@ import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
-import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
+import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
@@ -863,7 +865,6 @@ import {
   formatTimeWithSuffix,
   convertTimeFromNsToUs,
   getImageURL,
-  b64EncodeUnicode,
 } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
@@ -876,7 +877,6 @@ import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
-import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import {
@@ -894,7 +894,6 @@ import {
   getObservationTypeColor,
   formatModelParameters,
 } from "@/utils/llmUtils";
-import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -902,17 +901,16 @@ import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
-import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
   TRACE_SERVICE_DETECTION_KEY,
   useSpanServiceDetection,
 } from "@/utils/traces/useSpanServiceDetection";
+import type { Span } from "@/ts/interfaces/traces/span.types";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 // luxon equivalent of "MMM DD, YYYY HH:mm:ss.SSS Z" → e.g. "Jun 24, 2026 17:39:32.157 +0530"
@@ -922,7 +920,7 @@ export default defineComponent({
   name: "TraceDetailsSidebar",
   props: {
     span: {
-      type: Object,
+      type: Object as PropType<Span>,
       default: () => null,
     },
     baseTracePosition: {
@@ -1043,8 +1041,6 @@ export default defineComponent({
     const sysInstrOpen = ref(false);
     const modelParamsOpen = ref(false);
 
-    const showPendingFilter = false;
-
     const closeSidebar = () => {
       emit("close");
     };
@@ -1072,7 +1068,7 @@ export default defineComponent({
 
     // Emits class names only — the colours live in the style block below, driven
     // by the registered --color-json-* tokens, so the output themes itself.
-    const highlightedJSON = (value) => {
+    const highlightedJSON = (value: Record<string, unknown>) => {
       const attrs = value;
       const query = props.searchQuery;
 
@@ -1112,10 +1108,6 @@ export default defineComponent({
     };
 
     const store = useStore();
-
-    const RAW_VALUE_FILTER_FIELDS = new Set([
-      store.state?.zoConfig?.timestamp_column || "_timestamp",
-    ]);
 
     const hasDbSpan = computed(() =>
       Object.keys(props.span ?? {}).some((key) => key.startsWith("db_")),
@@ -1449,9 +1441,9 @@ export default defineComponent({
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       try {
-        spanDetails.events = JSON.parse(props.span.events || "[]").map(
-          (event: any) => event,
-        );
+        spanDetails.events = JSON.parse(
+          (props.span.events as unknown as string) || "[]",
+        ).map((event: any) => event);
       } catch (_e: any) {
         console.log(_e);
         spanDetails.events = [];

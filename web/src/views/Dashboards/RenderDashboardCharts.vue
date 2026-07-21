@@ -311,10 +311,7 @@ import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
 import { useRoute } from "vue-router";
-import {
-  checkIfVariablesAreLoaded,
-  updateDashboard,
-} from "../../utils/commons";
+import { updateDashboard } from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
@@ -322,14 +319,10 @@ import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
-import type { useVariablesManager as UseVariablesManagerType } from "@/composables/dashboard/useVariablesManager";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import {
-  getPanelTimeFromURL,
-  convertPanelTimeRangeToPicker,
   convertTimeObjToPickerFormat,
-  convertGlobalTimeToPickerFormat,
   resolvePanelTimeValue,
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
@@ -770,6 +763,7 @@ export default defineComponent({
         // refresh dashboard
         refreshDashboard();
       } finally {
+        /* no cleanup needed */
       }
     });
 
@@ -849,7 +843,7 @@ export default defineComponent({
       });
 
       // Trigger window resize after panel resize to update charts
-      gridStackInstance.on("resizestop", (event, element) => {
+      gridStackInstance.on("resizestop", () => {
         window.dispatchEvent(new Event("resize"));
       });
     }; // Update panel layout data from GridStack items
@@ -1023,7 +1017,7 @@ export default defineComponent({
 
     watch(
       () => [selectedTabId.value],
-      async (newPanels, oldPanels) => {
+      async () => {
         // Only refresh if the number of tab changes
         await nextTick();
         await refreshGridStack();
@@ -1219,7 +1213,7 @@ export default defineComponent({
      * Handles same-dashboard drilldown by pushing new var-* values
      * from the URL into the variables manager and committing them.
      */
-    const updateInitialVariableValues = async (...args: any) => {
+    const updateInitialVariableValues = async () => {
       // if view panel is open then close it
       showViewPanel.value = false;
 
@@ -1577,7 +1571,9 @@ export default defineComponent({
       // This prevents unnecessary route updates when panel refreshes without time changes
       const hasQueryChanged =
         Object.keys(query).some((key) => query[key] !== route.query[key]) ||
-        Object.keys(route.query).some((key) => !query.hasOwnProperty(key));
+        Object.keys(route.query).some(
+          (key) => !Object.prototype.hasOwnProperty.call(query, key),
+        );
 
       if (hasQueryChanged) {
         await router.replace({ query });

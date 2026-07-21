@@ -407,13 +407,10 @@ import {
   watch,
   computed,
   inject,
-  nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
-import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
@@ -434,7 +431,6 @@ export default defineComponent({
     OButtonGroup,
     OButton,
     ODropdown,
-    SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
@@ -442,7 +438,7 @@ export default defineComponent({
     OTooltip,
   },
   props: ["dashboardData"],
-  setup(props) {
+  setup() {
     const { t } = useI18n();
     const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
@@ -468,7 +464,6 @@ export default defineComponent({
       addFilteredItem,
       promqlMode,
       cleanupDraggingFields,
-      selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -606,11 +601,11 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const onDragStart = (e: any, item: any) => {
+    const onDragStart = (e: any) => {
       e.preventDefault();
     };
 
-    const onDragOver = (e: any, area: string) => {
+    const onDragOver = (e: any, _columnData?: string) => {
       e.preventDefault();
     };
     const onDragEnter = (e: any, area: string, index: any) => {
@@ -638,7 +633,7 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
-    const Hint = computed((e: any) => {
+    const Hint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "sankey":
           return t("dashboard.oneFieldMessage");

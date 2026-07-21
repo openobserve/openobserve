@@ -645,7 +645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :stream-type="searchObj.data.stream.streamType"
           :correlation-props="correlationDashboardProps"
           :correlation-loading="correlationLoading"
-          :correlation-error="correlationError"
+          :correlation-error="correlationError ?? undefined"
           :initial-tab="detailTableInitialTab"
           class="rounded-default"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
@@ -736,6 +736,7 @@ import {
   defineAsyncComponent,
   watch,
   nextTick,
+  type PropType,
 } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
@@ -764,8 +765,6 @@ import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
-import EqualIcon from "@/components/icons/EqualIcon.vue";
-import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -813,8 +812,6 @@ export default defineComponent({
     CellActions,
     O2AIContextAddBtn,
     JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
-    EqualIcon,
-    NotEqualIcon,
     TelemetryCorrelationDashboard,
     PatternList: defineAsyncComponent(
       () => import("./patterns/PatternList.vue"),
@@ -848,11 +845,11 @@ export default defineComponent({
       default: () => [],
     },
     streamDocTimeRange: {
-      type: Object,
+      type: Object as PropType<{ min: number; max: number }>,
       default: undefined,
     },
     queryWindowUs: {
-      type: Object,
+      type: Object as PropType<{ start: number; end: number }>,
       default: undefined,
     },
   },
@@ -866,12 +863,16 @@ export default defineComponent({
         cssVarSizes[`--col-${id}-size`] = size as number;
         cssVarSizes[`--header-${id}-size`] = size as number;
       }
+      // colSizes entries are arrays of size-maps keyed by joined stream name.
+      const colSizes = this.searchObj.data.resultGrid?.colSizes as Record<
+        string,
+        Record<string, unknown>[]
+      >;
       const prevColSizes =
-        this.searchObj.data.resultGrid?.colSizes[
-          this.searchObj.data.stream.selectedStream
-        ]?.[0] || {};
+        colSizes?.[this.searchObj.data.stream.selectedStream.join(",")]?.[0] ||
+        {};
       this.searchObj.data.resultGrid.colSizes[
-        this.searchObj.data.stream.selectedStream
+        this.searchObj.data.stream.selectedStream.join(",")
       ] = [
         {
           ...prevColSizes,
@@ -879,18 +880,18 @@ export default defineComponent({
         },
       ];
     },
-    handleColumnOrderUpdate(newColOrder: string[], columns: any[]) {
+    handleColumnOrderUpdate(newColOrder: string[]) {
       // Here we are checking if the columns are default columns ( _timestamp and source)
       // If selected fields are empty, then we are setting colOrder to empty array as we
       // don't change the order of default columns
       // If you store the colOrder it will create issue when you save the view and load it again
       if (!this.searchObj.data.stream.selectedFields.length) {
         this.searchObj.data.resultGrid.colOrder[
-          this.searchObj.data.stream.selectedStream
+          this.searchObj.data.stream.selectedStream.join(",")
         ] = [];
       } else {
         this.searchObj.data.resultGrid.colOrder[
-          this.searchObj.data.stream.selectedStream
+          this.searchObj.data.stream.selectedStream.join(",")
         ] = [...newColOrder];
 
         if (newColOrder.length > 0) {
@@ -980,6 +981,7 @@ export default defineComponent({
         this.$emit("update:scroll");
         this.scrollTableToTop(0);
       }
+      return undefined;
     },
     closeColumn(col: any) {
       // Explicit user action — clear the system-pick marker so the result persists.
@@ -1154,7 +1156,12 @@ export default defineComponent({
     // Volume Analysis state
     const showVolumeAnalysisDashboard = ref(false);
     const hasHistogramSelection = ref(false);
-    const histogramSelectionRange = ref({
+    const histogramSelectionRange = ref<{
+      start: number;
+      end: number;
+      timeStart: number | undefined;
+      timeEnd: number | undefined;
+    }>({
       start: 0,
       end: 0,
       timeStart: undefined,
@@ -1166,7 +1173,7 @@ export default defineComponent({
     } | null>(null);
 
     const searchTableRef: any = ref(null);
-    const scrollContainerRef = ref(null);
+    const scrollContainerRef = ref<HTMLElement | null>(null);
     const histogramRef = ref(null);
 
     // Correlation dashboard state
@@ -1435,7 +1442,10 @@ export default defineComponent({
     const reDrawChart = () => {
       if (
          
-        searchObj.data.histogram.hasOwnProperty("xData") &&
+        Object.prototype.hasOwnProperty.call(
+          searchObj.data.histogram,
+          "xData",
+        ) &&
         searchObj.data.histogram.xData.length > 0
       ) {
         const { xData, yData, breakdownSeries, chartParams, breakdownField } =
@@ -1461,7 +1471,7 @@ export default defineComponent({
       });
     };
 
-    const changeMaxRecordToReturn = (val: any) => {
+    const changeMaxRecordToReturn = () => {
       // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
     };
 
@@ -1937,19 +1947,6 @@ export default defineComponent({
       }
     });
 
-    // Debug watcher for patterns state
-    watch(
-      () => patternsState.value.patterns,
-      (newPatterns) => {
-        // console.log("[SearchResult] Patterns state changed:", {
-        //   hasPatterns: !!newPatterns,
-        //   patternCount: newPatterns?.patterns?.length || 0,
-        //   statistics: newPatterns?.statistics,
-        // });
-      },
-      { deep: true },
-    );
-
     // Watch for sidebar close to clear correlation data
     // This ensures fresh correlation data when reopening with a different "row"
     watch(
@@ -2008,7 +2005,7 @@ export default defineComponent({
     const selectedStreamFullTextSearchKeys = computed(() => {
       const defaultFTSKeys = store?.state?.zoConfig?.default_fts_keys || [];
       const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields
-        .filter((field: string) => field.ftsKey)
+        .filter((field: any) => field.ftsKey)
         .map((field: any) => field.name);
       //merge default FTS keys with selected stream FTS keys
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
