@@ -12,8 +12,5 @@ ignore = [
   "RUSTSEC-2026-0001", # from rkyv, dep of rust_decimal
   "RUSTSEC-2026-0049", # from rustls-webpki 0.101.7/0.102.8, transitive dep of aws-smithy-http-client and async-nats (upstream not yet migrated to rustls 0.23)
   "RUSTSEC-2026-0105", # from core2 0.4.0 (yanked + unmaintained), transitive via pyroscope -> libflate; no upgrade path until libflate publishes a release that drops the core2 dependency
-  "RUSTSEC-2026-0189", # from rmcp 0.12/0.13, transitive via rmcp-openapi; fixed rmcp 1.4 is incompatible until upstream migrates
-  "RUSTSEC-2026-0194", # from quick-xml 0.26/0.38/0.39, transitive via pprof/plist/object_store; fixed quick-xml 0.41 is outside their version constraints
-  "RUSTSEC-2026-0195", # from quick-xml 0.26/0.38/0.39, transitive via pprof/plist/object_store; fixed quick-xml 0.41 is outside their version constraints
 ]
 informational_warnings = ["unmaintained"] # warn for categories of informational advisories
