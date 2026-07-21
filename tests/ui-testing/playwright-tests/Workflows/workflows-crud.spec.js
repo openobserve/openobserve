@@ -25,8 +25,9 @@ test.describe('Workflows CRUD & builder', { tag: ['@workflows', '@enterprise', '
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    // Enterprise-only feature: skip on OSS / builds where it is not enabled.
-    test.skip(!(await pm.workflowsPage.isAvailable()), 'Workflows is enterprise-only / not enabled on this build');
+    // Enterprise-only feature: these specs run ONLY in the ENT playwright matrix (never wired into
+    // OSS), where Workflows is enabled by default. No runtime availability skip — if the feature is
+    // missing where this runs, the test must fail loudly rather than silently pass as skipped.
   });
 
   // CT-01 / WF-NEG-02 — a workflow requires at least one step after the trigger.

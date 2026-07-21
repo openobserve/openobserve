@@ -1,7 +1,10 @@
 // Workflows (v1) page object — OpenObserve Enterprise "Workflows" feature.
 // Feature: event(alert_fired) -> action(remote/pipeline destination), optional Condition/Function nodes.
-// Selector map captured live from feat/workflows_v1 on test.o2aks1 (2026-07-20). See
+// Selectors reconciled against merged main (web/src/components/workflows/*, 2026-07-21). See
 // tests/ui-testing/MD_Files/features/workflows/ for the full test plan + findings (K9/K10 etc).
+// NOTE: the canvas node-interaction selectors (trigger add-out/delete, palette-*) are NOT yet
+// present in merged markup — the nodes render on a vue-flow canvas. They feed only the parked
+// test.fixme cases and must be discovered live on an ENT build before those tests are enabled.
 //
 // Known quirks baked in here:
 //   K9 — the editor Save button has a tooltip overlay that intercepts pointer events; we click it
@@ -20,17 +23,18 @@ class WorkflowsPage {
     this.page = page;
     // Header / list
     this.addBtn = '[data-test="workflow-list-add-btn"]';
-    this.searchInput = 'input[placeholder="Search Workflows"]';
-    this.listTable = 'table';
+    this.searchInput = '[data-test="workflow-list-search-input"]';
+    this.listTable = '[data-test="workflow-list-table"]';
     // Editor
     this.editorPage = '[data-test="workflow-editor-page"]';
-    this.nameField = '[data-test="workflow-editor-name-field"]';
-    this.descField = '[data-test="workflow-editor-description-field"]';
+    this.nameField = '[data-test="workflow-editor-name"]';
+    this.descField = '[data-test="workflow-editor-description"]';
     this.saveBtn = '[data-test="workflow-editor-save"]';
     this.testBtn = '[data-test="workflow-editor-test"]';
     this.cancelBtn = '[data-test="workflow-editor-cancel"]';
     this.backBtn = '[data-test="workflow-editor-back"]';
-    // Palette
+    // Palette + trigger node — UNVERIFIED against merged markup (canvas-rendered; fixme-only).
+    // TODO(Healer): discover real values on a live ENT build before enabling the node-building tests.
     this.paletteCondition = '[data-test="workflow-palette-condition-default-btn"]';
     this.paletteFunction = '[data-test="workflow-palette-function-default-btn"]';
     this.paletteDestination = '[data-test="workflow-palette-destination-output-btn"]';
@@ -49,8 +53,8 @@ class WorkflowsPage {
     this.drawerSecondary = '[data-test="o-drawer-secondary-btn"]';
     // Destination picker (inside node drawer)
     this.destPicker = '[data-test="destination-picker"]';
-    this.destPickerCreateToggle = '[data-test="destination-picker-create-toggle-btn"]';
-    this.destPickerSelectTrigger = '[data-test="destination-picker-select-trigger"]';
+    this.destPickerCreateToggle = '[data-test="destination-picker-create-toggle"]';
+    this.destPickerSelectTrigger = '[data-test="destination-picker-select"]';
   }
 
   // Workflows is an Enterprise-only feature. On OSS builds the API returns 404/403 and the menu is
